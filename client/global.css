@@ -122,11 +122,11 @@
 
 @layer utilities {
   .bg-gradient-dark {
-    background: linear-gradient(135deg, #000000 0%, #0a0a0a 50%, #1a1a1a 100%);
+    background: linear-gradient(135deg, #0b1220 0%, #0e1530 50%, #162044 100%);
   }
   
   .bg-gradient-section {
-    background: linear-gradient(180deg, #000000 0%, #0f0f0f 50%, #1a1a1a 100%);
+    background: linear-gradient(180deg, #0b1220 0%, #121a38 50%, #19264f 100%);
   }
   
   /* Animations */

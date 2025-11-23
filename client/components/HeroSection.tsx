@@ -1,5 +1,7 @@
 import { useState, useEffect } from "react";
-import { Star } from "lucide-react";
+
+import { Star, ChevronLeft, ChevronRight } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { motion } from "framer-motion";
 import { cn } from "@/lib/utils";
 
@@ -62,12 +64,12 @@ export default function HeroSection() {
           key={currentIndex}
           src={currentMovie.image}
           alt={currentMovie.title}
-          className="w-full h-full object-cover opacity-30"
-          initial={{ opacity: 0, scale: 1.1 }}
-          animate={{ opacity: 0.3, scale: 1 }}
+          className="w-full h-full object-cover opacity-50"
+          initial={{ opacity: 0, scale: 1.08 }}
+          animate={{ opacity: 0.5, scale: 1 }}
           transition={{ duration: 1 }}
         />
-        <div className="absolute inset-0 bg-gradient-to-t from-black via-black/50 to-black/30" />
+        <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-black/25 to-transparent" />
       </div>
       
       {/* Content */}
@@ -84,9 +86,9 @@ export default function HeroSection() {
             initial={{ opacity: 0, scale: 0.9 }}
             animate={{ opacity: 1, scale: 1 }}
             transition={{ delay: 0.2, duration: 0.5 }}
-            className="inline-block mb-6 px-6 py-2 border-2 border-blue-400/50 rounded-lg bg-black/30 backdrop-blur-sm"
+            className="inline-block mb-6 px-6 py-2 border-2 border-cyan-400/60 rounded-lg bg-black/20 backdrop-blur-sm shadow-[0_0_20px_rgba(34,211,238,0.25)]"
           >
-            <span className="text-blue-400 font-semibold tracking-wider">NOW SHOWING</span>
+            <span className="text-cyan-400 font-semibold tracking-wider">NOW SHOWING</span>
           </motion.div>
 
           {/* Movie Title */}
@@ -94,7 +96,7 @@ export default function HeroSection() {
             initial={{ opacity: 0, y: 30 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.3, duration: 0.6 }}
-            className="text-5xl md:text-7xl font-bold text-white mb-6"
+            className="text-5xl md:text-7xl font-bold bg-gradient-to-r from-cyan-300 via-sky-400 to-fuchsia-400 bg-clip-text text-transparent drop-shadow-[0_0_12px_rgba(99,102,241,0.35)] mb-6"
           >
             {currentMovie.title}
           </motion.h1>
@@ -111,9 +113,9 @@ export default function HeroSection() {
               <span className="text-xl font-semibold text-white">{currentMovie.rating}</span>
             </div>
             <span className="text-gray-300">•</span>
-            <span className="text-lg text-white">{currentMovie.duration}</span>
+            <span className="text-lg text-cyan-300">{currentMovie.duration}</span>
             <span className="text-gray-300">•</span>
-            <span className="text-lg text-purple-400 font-medium">{currentMovie.genres}</span>
+            <span className="text-lg text-fuchsia-400 font-medium">{currentMovie.genres}</span>
           </motion.div>
 
           {/* Description */}
@@ -127,17 +129,33 @@ export default function HeroSection() {
           </motion.p>
         </motion.div>
 
-        {/* Carousel Indicators */}
+        {/* Carousel Controls & Indicators */}
+        <Button
+          variant="ghost"
+          size="icon"
+          className="absolute left-6 top-1/2 -translate-y-1/2 bg-black/30 border border-white/20 text-white hover:bg-cyan-500/20 hover:border-cyan-400/60 backdrop-blur-sm"
+          onClick={() => setCurrentIndex((prev) => (prev - 1 + featuredMovies.length) % featuredMovies.length)}
+        >
+          <ChevronLeft />
+        </Button>
+        <Button
+          variant="ghost"
+          size="icon"
+          className="absolute right-6 top-1/2 -translate-y-1/2 bg-black/30 border border-white/20 text-white hover:bg-fuchsia-500/20 hover:border-fuchsia-400/60 backdrop-blur-sm"
+          onClick={() => setCurrentIndex((prev) => (prev + 1) % featuredMovies.length)}
+        >
+          <ChevronRight />
+        </Button>
         <div className="flex items-center justify-center gap-2 mt-12">
           {featuredMovies.map((_, index) => (
             <button
               key={index}
               onClick={() => setCurrentIndex(index)}
               className={cn(
-                "w-2 h-2 rounded-full transition-all duration-300",
+                "w-3 h-3 rounded-full transition-all duration-300 shadow-[0_0_10px_rgba(34,211,238,0.35)]",
                 index === currentIndex
-                  ? "w-8 bg-blue-400"
-                  : "bg-gray-600 hover:bg-gray-500"
+                  ? "w-10 bg-cyan-400"
+                  : "bg-gray-500/70 hover:bg-gray-400"
               )}
             />
           ))}

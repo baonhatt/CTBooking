@@ -9,8 +9,15 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import {
+  Select,
+  SelectTrigger,
+  SelectValue,
+  SelectContent,
+  SelectItem,
+} from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
-import { Ticket, Users, UserCheck, CreditCard, Clock } from "lucide-react";
+import { Ticket, Users, UserCheck, CreditCard, Clock, Check } from "lucide-react";
 import { Radio, Space } from "antd";
 import type { RadioChangeEvent } from "antd";
 
@@ -27,11 +34,17 @@ export default function BookingSection({ onBookClick }: BookingSectionProps) {
     email: "",
     ticketType: "standard",
     quantity: 1,
+    movie: "",
   });
   const [isProcessing, setIsProcessing] = useState(false);
   const [countdown, setCountdown] = useState(600); // 10 minutes in seconds
   const timerRef = useRef<NodeJS.Timeout | null>(null);
   const countdownRef = useRef<NodeJS.Timeout | null>(null);
+  const movies = [
+    { id: "cinesphere-1", title: "CineSphere Experience 1" },
+    { id: "cinesphere-2", title: "CineSphere Experience 2" },
+    { id: "cinesphere-3", title: "CineSphere Experience 3" },
+  ];
 
   useEffect(() => {
     return () => {
@@ -53,6 +66,7 @@ export default function BookingSection({ onBookClick }: BookingSectionProps) {
       email: "",
       ticketType: "standard",
       quantity: 1,
+      movie: "",
     });
     setPaymentMethod("momo");
   };
@@ -119,13 +133,24 @@ export default function BookingSection({ onBookClick }: BookingSectionProps) {
                 whileInView={{ opacity: 1, y: 0 }}
                 viewport={{ once: true }}
                 transition={{ duration: 0.6, delay: 0.1 }}
-                className="bg-black/40 backdrop-blur-sm rounded-xl p-6 border border-white/10 hover:border-blue-400/50 text-center transition-all duration-300 hover:shadow-lg hover:shadow-blue-500/20"
+                className="rounded-2xl p-6 border border-white/10 text-left bg-black/30 backdrop-blur-sm hover:bg-gradient-to-br hover:from-cyan-900/40 hover:via-cyan-700/20 hover:to-fuchsia-800/40 hover:shadow-[0_0_35px_rgba(99,102,241,0.25)] transition-all duration-300"
               >
-                <div className="text-3xl font-bold text-blue-400 mb-2">
+                <div className="text-white font-semibold text-lg mb-3">Vé Tiêu Chuẩn</div>
+                <div className="text-4xl md:text-5xl font-extrabold text-cyan-400 mb-1">
                   {ticketPrice.toLocaleString("vi-VN")}₫
                 </div>
-                <div className="text-gray-300 mb-2 font-semibold">Vé Tiêu Chuẩn</div>
-                <div className="text-sm text-gray-400">Thời lượng: 10-15 phút</div>
+                <div className="text-sm text-gray-300 mb-5">/ phim (10-15 phút)</div>
+                <ul className="space-y-2 mb-6">
+                  <li className="flex items-center gap-2 text-gray-100"><Check className="h-4 w-4 text-emerald-400" /> Ghế chuyển động 6D</li>
+                  <li className="flex items-center gap-2 text-gray-100"><Check className="h-4 w-4 text-emerald-400" /> Mắt kính 3D active</li>
+                  <li className="flex items-center gap-2 text-gray-100"><Check className="h-4 w-4 text-emerald-400" /> Hiệu ứng môi trường</li>
+                </ul>
+                <Button
+                  onClick={handleOpenModal}
+                  className="bg-white text-black hover:bg-white/90 font-semibold px-6 py-5 rounded-lg"
+                >
+                  Đặt Ngay
+                </Button>
               </motion.div>
 
               <motion.div
@@ -133,11 +158,13 @@ export default function BookingSection({ onBookClick }: BookingSectionProps) {
                 whileInView={{ opacity: 1, y: 0 }}
                 viewport={{ once: true }}
                 transition={{ duration: 0.6, delay: 0.2 }}
-                className="bg-black/40 backdrop-blur-sm rounded-xl p-6 border border-white/10 hover:border-purple-400/50 text-center transition-all duration-300 hover:shadow-lg hover:shadow-purple-500/20"
+                className="bg-black/30 rounded-2xl p-6 border border-white/10 text-center"
               >
-                <Users className="h-8 w-8 text-purple-400 mx-auto mb-2" />
-                <div className="text-xl font-semibold text-white mb-2">Vé Nhóm</div>
-                <div className="text-sm text-gray-400">Đang cập nhật</div>
+                <Users className="h-8 w-8 text-gray-400 mx-auto mb-2" />
+                <div className="text-xl font-semibold text-white mb-1">Vé Nhóm</div>
+                <div className="text-sm text-gray-400 mb-2">Đang cập nhật</div>
+                <div className="text-xs text-gray-500 mb-6">Dành cho nhóm 4-6 người</div>
+                <Button disabled className="bg-gray-700/60 text-gray-300">Sắp ra mắt</Button>
               </motion.div>
 
               <motion.div
@@ -145,35 +172,21 @@ export default function BookingSection({ onBookClick }: BookingSectionProps) {
                 whileInView={{ opacity: 1, y: 0 }}
                 viewport={{ once: true }}
                 transition={{ duration: 0.6, delay: 0.3 }}
-                className="bg-black/40 backdrop-blur-sm rounded-xl p-6 border border-white/10 hover:border-pink-400/50 text-center transition-all duration-300 hover:shadow-lg hover:shadow-pink-500/20"
+                className="bg-black/30 rounded-2xl p-6 border border-white/10 text-center"
               >
-                <UserCheck className="h-8 w-8 text-pink-400 mx-auto mb-2" />
-                <div className="text-xl font-semibold text-white mb-2">Thành Viên</div>
-                <div className="text-sm text-gray-400">Đang cập nhật</div>
+                <UserCheck className="h-8 w-8 text-gray-400 mx-auto mb-2" />
+                <div className="text-xl font-semibold text-white mb-1">Thành Viên</div>
+                <div className="text-sm text-gray-400 mb-2">Đang cập nhật</div>
+                <div className="text-xs text-gray-500 mb-6">Ưu đãi đặc biệt cho hội viên</div>
+                <Button disabled className="bg-gray-700/60 text-gray-300">Sắp ra mắt</Button>
               </motion.div>
             </div>
-
-            <motion.div
-              initial={{ opacity: 0, scale: 0.9 }}
-              whileInView={{ opacity: 1, scale: 1 }}
-              viewport={{ once: true }}
-              transition={{ duration: 0.6, delay: 0.4 }}
-              className="text-center"
-            >
-              <Button
-                onClick={handleOpenModal}
-                className="bg-gradient-to-r from-blue-500 to-purple-500 hover:from-blue-600 hover:to-purple-600 text-white font-semibold px-8 py-6 text-lg rounded-lg shadow-lg transition-all duration-300 hover:scale-105"
-              >
-                <Ticket className="mr-2 h-5 w-5" />
-                Đặt Vé Ngay
-              </Button>
-            </motion.div>
           </div>
         </div>
       </section>
 
       <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
-        <DialogContent className="bg-gradient-dark border-white/20 max-w-2xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="bg-gradient-dark border-white/20 max-w-md max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="text-2xl font-bold text-blue-400">
               Đặt Vé CINESPHERE
@@ -183,7 +196,29 @@ export default function BookingSection({ onBookClick }: BookingSectionProps) {
             </DialogDescription>
           </DialogHeader>
 
-          <form onSubmit={handleSubmit} className="space-y-6">
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="movie" className="text-white">
+                Chọn Phim *
+              </Label>
+              <Select
+                value={formData.movie}
+                onValueChange={(value) =>
+                  setFormData({ ...formData, movie: value })
+                }
+              >
+                <SelectTrigger className="bg-black/40 border-neon-cyan/30 text-white">
+                  <SelectValue placeholder="Chọn phim" />
+                </SelectTrigger>
+                <SelectContent>
+                  {movies.map((m) => (
+                    <SelectItem key={m.id} value={m.id}>
+                      {m.title}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
             <div className="space-y-2">
               <Label htmlFor="name" className="text-white">
                 Họ và Tên *
@@ -315,13 +350,13 @@ export default function BookingSection({ onBookClick }: BookingSectionProps) {
                 type="button"
                 variant="outline"
                 onClick={handleCloseModal}
-                className="flex-1 border-white/20 text-white hover:bg-white/10"
+                className="flex-1 border-white/20 text-gray-400 hover:bg-white/10"
               >
                 Hủy
               </Button>
               <Button
                 type="submit"
-                disabled={isProcessing}
+                disabled={isProcessing || !formData.movie}
                 className="flex-1 bg-gradient-to-r from-blue-500 to-purple-500 hover:from-blue-600 hover:to-purple-600 text-white"
               >
                 {isProcessing ? "Đang xử lý..." : "Thanh Toán"}
