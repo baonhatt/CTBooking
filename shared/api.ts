@@ -10,3 +10,18 @@
 export interface DemoResponse {
   message: string;
 }
+
+export interface Movie {
+  id: string;
+  title: string;
+  year: number;
+  duration: string;
+  genres: string[];
+  posterUrl: string;
+}
+
+export interface MoviesResponse {
+  year: number;
+  count: number;
+  items: Movie[];
+}

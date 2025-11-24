@@ -1,15 +1,17 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Header from "@/components/Header";
 import HeroSection from "@/components/HeroSection";
 import TechnologyBanner from "@/components/TechnologyBanner";
 import BookingSection from "@/components/BookingSection";
 import ProductSection from "@/components/ProductSection";
 import Footer from "@/components/Footer";
-// Ant Design v6 uses CSS-in-JS, no CSS import needed
 import { ConfigProvider } from "antd";
+import { motion } from "framer-motion";
+import { ArrowUp } from "lucide-react";
 
 export default function Index() {
   const [isBookingModalOpen, setIsBookingModalOpen] = useState(false);
+  const [showBackToTop, setShowBackToTop] = useState(false);
 
   const handleBookClick = () => {
     setIsBookingModalOpen(true);
@@ -22,17 +24,28 @@ export default function Index() {
     }, 100);
   };
 
+  useEffect(() => {
+    const onScroll = () => setShowBackToTop(window.scrollY > 200);
+    window.addEventListener("scroll", onScroll);
+    onScroll();
+    return () => window.removeEventListener("scroll", onScroll);
+  }, []);
+
+  const scrollToTop = () => {
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
+
   return (
     <ConfigProvider
       theme={{
         token: {
-          colorPrimary: "#00f0ff",
-          colorBgBase: "#000000",
-          colorText: "#ffffff",
+          colorPrimary: "#22d3ee", // cyan-400
+          colorBgBase: "#0e1b3d", // navy
+          colorText: "#e6f6ff",
         },
       }}
     >
-      <div className="min-h-screen bg-gradient-dark">
+      <div className="min-h-screen bg-gradient-light">
         <Header onBookClick={handleBookClick} />
         <main>
           <HeroSection />
@@ -43,6 +56,14 @@ export default function Index() {
           <ProductSection />
         </main>
         <Footer />
+        <motion.button 
+          onClick={scrollToTop} 
+          whileHover={{ scale: 1.1, y: -5 }} 
+          whileTap={{ scale: 0.95 }} 
+          className={`fixed bottom-8 right-8 w-12 h-12 rounded-full bg-black border border-white/20 flex items-center justify-center hover:border-blue-400 transition-colors z-50 ${showBackToTop ? "opacity-100" : "opacity-0 pointer-events-none"}`} 
+        > 
+          <ArrowUp className="h-5 w-5 text-blue-400" /> 
+        </motion.button>
       </div>
     </ConfigProvider>
   );

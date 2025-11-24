@@ -65,7 +65,7 @@ export default function Header({ onBookClick }: HeaderProps) {
         
         <Button
           onClick={onBookClick}
-          className="bg-gradient-to-r from-blue-500 to-purple-500 hover:from-blue-600 hover:to-purple-600 text-white font-semibold px-6 py-2 rounded-lg shadow-lg transition-all duration-300 hover:scale-105 animate-fade-in delay-300"
+          className="bg-gradient-to-r md:text-[5px] md:text-base from-blue-500 to-purple-500 hover:from-blue-600 hover:to-purple-600 text-white font-semibold px-4 py-2 md:px-6 md:py-2 rounded-lg shadow-lg transition-all duration-300 hover:scale-105 animate-fade-in delay-300"
         >
           <Ticket className="mr-2 h-4 w-4" />
           ĐẶT VÉ NGAY

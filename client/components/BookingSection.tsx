@@ -20,6 +20,9 @@ import { Label } from "@/components/ui/label";
 import { Ticket, Users, UserCheck, CreditCard, Clock, Check } from "lucide-react";
 import { Radio, Space } from "antd";
 import type { RadioChangeEvent } from "antd";
+import type { Movie } from "@shared/api";
+import { useMovies2025 } from "@/hooks/useMovies";
+import { toast } from "@/components/ui/use-toast";
 
 interface BookingSectionProps {
   onBookClick: () => void;
@@ -40,11 +43,8 @@ export default function BookingSection({ onBookClick }: BookingSectionProps) {
   const [countdown, setCountdown] = useState(600); // 10 minutes in seconds
   const timerRef = useRef<NodeJS.Timeout | null>(null);
   const countdownRef = useRef<NodeJS.Timeout | null>(null);
-  const movies = [
-    { id: "cinesphere-1", title: "CineSphere Experience 1" },
-    { id: "cinesphere-2", title: "CineSphere Experience 2" },
-    { id: "cinesphere-3", title: "CineSphere Experience 3" },
-  ];
+  const { data: movies = [] } = useMovies2025();
+  const [errors, setErrors] = useState<Record<string, string>>({});
 
   useEffect(() => {
     return () => {
@@ -52,6 +52,8 @@ export default function BookingSection({ onBookClick }: BookingSectionProps) {
       if (countdownRef.current) clearTimeout(countdownRef.current);
     };
   }, []);
+
+  // movies fetched via React Query; no manual effect needed
 
   const handleOpenModal = () => {
     setIsModalOpen(true);
@@ -69,10 +71,26 @@ export default function BookingSection({ onBookClick }: BookingSectionProps) {
       movie: "",
     });
     setPaymentMethod("momo");
+    setErrors({});
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    const nextErrors: Record<string, string> = {};
+    if (!formData.movie) nextErrors.movie = "Vui lòng chọn phim";
+    if (!formData.name || formData.name.trim().length < 2)
+      nextErrors.name = "Họ tên chưa hợp lệ";
+    if (!/^[0-9]{9,11}$/.test(formData.phone))
+      nextErrors.phone = "Số điện thoại 9-11 chữ số";
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email))
+      nextErrors.email = "Email chưa hợp lệ";
+    if (formData.quantity < 1 || formData.quantity > 10)
+      nextErrors.quantity = "Số lượng từ 1 đến 10";
+    if (Object.keys(nextErrors).length) {
+      setErrors(nextErrors);
+      toast({ title: "Thông tin chưa hợp lệ", description: "Vui lòng kiểm tra lại các trường", variant: "destructive" });
+      return;
+    }
     setIsProcessing(true);
     setCountdown(600);
     
@@ -82,7 +100,11 @@ export default function BookingSection({ onBookClick }: BookingSectionProps) {
         if (prev <= 1) {
           if (countdownRef.current) clearInterval(countdownRef.current);
           setIsProcessing(false);
-          alert("Hết thời gian thanh toán!");
+          toast({
+            title: "Thanh toán thất bại",
+            description: "Hết thời gian thanh toán. Vui lòng thử lại.",
+            variant: "destructive",
+          });
           handleCloseModal();
           return 600;
         }
@@ -94,7 +116,10 @@ export default function BookingSection({ onBookClick }: BookingSectionProps) {
     timerRef.current = setTimeout(() => {
       if (countdownRef.current) clearInterval(countdownRef.current);
       setIsProcessing(false);
-      alert(`Thanh toán thành công qua ${paymentMethod === "momo" ? "MoMo" : "VNPay"}!`);
+      toast({
+        title: "Thanh toán thành công",
+        description: `Bạn đã thanh toán qua ${paymentMethod === "momo" ? "MoMo" : "VNPay"}.`,
+      });
       handleCloseModal();
       setCountdown(600);
     }, 5000);
@@ -108,6 +133,7 @@ export default function BookingSection({ onBookClick }: BookingSectionProps) {
 
   const ticketPrice = 250000;
   const totalPrice = ticketPrice * formData.quantity;
+  const selectedMovie = movies.find((m) => m.id === formData.movie);
 
   return (
     <>
@@ -186,9 +212,9 @@ export default function BookingSection({ onBookClick }: BookingSectionProps) {
       </section>
 
       <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
-        <DialogContent className="bg-gradient-dark border-white/20 max-w-md max-h-[90vh] overflow-y-auto">
+        <DialogContent className="bg-gradient-dark border-cyan-400/30 shadow-[0_0_40px_rgba(34,211,238,0.25)] max-w-md max-h-[90vh] overflow-y-auto scrollbar-neon">
           <DialogHeader>
-            <DialogTitle className="text-2xl font-bold text-blue-400">
+            <DialogTitle className="text-2xl font-bold text-cyan-300">
               Đặt Vé CINESPHERE
             </DialogTitle>
             <DialogDescription className="text-gray-300">
@@ -207,7 +233,7 @@ export default function BookingSection({ onBookClick }: BookingSectionProps) {
                   setFormData({ ...formData, movie: value })
                 }
               >
-                <SelectTrigger className="bg-black/40 border-neon-cyan/30 text-white">
+                <SelectTrigger className={`bg-black/40 text-white ${errors.movie ? "border-red-500" : "border-cyan-400/40"} focus:ring-cyan-400`}>
                   <SelectValue placeholder="Chọn phim" />
                 </SelectTrigger>
                 <SelectContent>
@@ -218,6 +244,17 @@ export default function BookingSection({ onBookClick }: BookingSectionProps) {
                   ))}
                 </SelectContent>
               </Select>
+              {selectedMovie && (
+                <div className="flex items-center gap-3 mt-2 p-2 rounded-lg bg-black/30 border border-white/10">
+                  <img src={selectedMovie.posterUrl} alt={selectedMovie.title} className="w-12 h-12 rounded object-cover" />
+                  <div className="text-sm text-gray-300">
+                    <div className="font-semibold text-white">{selectedMovie.title}</div>
+                    <div className="text-cyan-300">{selectedMovie.duration}</div>
+                    <div className="text-fuchsia-400">{selectedMovie.genres.join(" / ")}</div>
+                  </div>
+                </div>
+              )}
+              {errors.movie && <div className="text-red-400 text-xs mt-1">{errors.movie}</div>}
             </div>
             <div className="space-y-2">
               <Label htmlFor="name" className="text-white">
@@ -230,9 +267,10 @@ export default function BookingSection({ onBookClick }: BookingSectionProps) {
                 onChange={(e) =>
                   setFormData({ ...formData, name: e.target.value })
                 }
-                className="bg-black/40 border-neon-cyan/30 text-white"
+                className={`bg-black/40 text-white ${errors.name ? "border-red-500" : "border-cyan-400/40"} focus-visible:ring-cyan-400`}
                 placeholder="Nhập họ và tên"
               />
+              {errors.name && <div className="text-red-400 text-xs mt-1">{errors.name}</div>}
             </div>
 
             <div className="space-y-2">
@@ -247,9 +285,10 @@ export default function BookingSection({ onBookClick }: BookingSectionProps) {
                 onChange={(e) =>
                   setFormData({ ...formData, phone: e.target.value })
                 }
-                className="bg-black/40 border-neon-cyan/30 text-white"
+                className={`bg-black/40 text-white ${errors.phone ? "border-red-500" : "border-cyan-400/40"} focus-visible:ring-cyan-400`}
                 placeholder="Nhập số điện thoại"
               />
+              {errors.phone && <div className="text-red-400 text-xs mt-1">{errors.phone}</div>}
             </div>
 
             <div className="space-y-2">
@@ -264,29 +303,34 @@ export default function BookingSection({ onBookClick }: BookingSectionProps) {
                 onChange={(e) =>
                   setFormData({ ...formData, email: e.target.value })
                 }
-                className="bg-black/40 border-neon-cyan/30 text-white"
+                className={`bg-black/40 text-white ${errors.email ? "border-red-500" : "border-cyan-400/40"} focus-visible:ring-cyan-400`}
                 placeholder="Nhập email"
               />
+              {errors.email && <div className="text-red-400 text-xs mt-1">{errors.email}</div>}
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="quantity" className="text-white">
-                Số Lượng Vé *
-              </Label>
-              <Input
-                id="quantity"
-                type="number"
-                min="1"
-                required
-                value={formData.quantity}
-                onChange={(e) =>
-                  setFormData({
-                    ...formData,
-                    quantity: parseInt(e.target.value) || 1,
-                  })
-                }
-                className="bg-black/40 border-neon-cyan/30 text-white"
-              />
+              <Label htmlFor="quantity" className="text-white">Số Lượng Vé *</Label>
+              <div className="flex items-center gap-2">
+                <Button type="button" variant="outline" className="h-10 w-10 border-cyan-400/40 hover:bg-cyan-500/10" onClick={() => setFormData({ ...formData, quantity: Math.max(1, formData.quantity - 1) })}>-</Button>
+                <Input
+                  id="quantity"
+                  type="number"
+                  min="1"
+                  max="10"
+                  required
+                  value={formData.quantity}
+                  onChange={(e) =>
+                    setFormData({
+                      ...formData,
+                      quantity: Math.min(10, Math.max(1, parseInt(e.target.value) || 1)),
+                    })
+                  }
+                  className={`bg-black/40 text-white text-center ${errors.quantity ? "border-red-500" : "border-cyan-400/40"} focus-visible:ring-cyan-400`}
+                />
+                <Button type="button" variant="outline" className="h-10 w-10 border-cyan-400/40 hover:bg-cyan-500/10" onClick={() => setFormData({ ...formData, quantity: Math.min(10, formData.quantity + 1) })}>+</Button>
+              </div>
+              {errors.quantity && <div className="text-red-400 text-xs mt-1">{errors.quantity}</div>}
             </div>
 
             <div className="space-y-4">
@@ -328,6 +372,9 @@ export default function BookingSection({ onBookClick }: BookingSectionProps) {
                   {totalPrice.toLocaleString("vi-VN")}₫
                 </span>
               </div>
+              {selectedMovie && (
+                <div className="text-sm text-gray-300">{selectedMovie.title} • {selectedMovie.duration}</div>
+              )}
             </div>
 
             {isProcessing && (
