@@ -3,6 +3,9 @@ import express from "express";
 import cors from "cors";
 import { handleDemo } from "./routes/demo";
 import { handleMovies2025 } from "./routes/movies";
+import { handleLogin } from "./routes/login";
+import { handleRegister } from "./routes/register";
+
 
 export function createServer() {
   const app = express();
@@ -20,6 +23,8 @@ export function createServer() {
 
   app.get("/api/demo", handleDemo);
   app.get("/api/movies/2025", handleMovies2025);
+  app.post("/api/login", handleLogin);
+  app.post("/api/register", handleRegister);
 
   return app;
 }

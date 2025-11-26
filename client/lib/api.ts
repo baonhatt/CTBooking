@@ -1,4 +1,4 @@
-import type { Movie, MoviesResponse } from "@shared/api";
+import type { Movie, MoviesResponse, Login, Register } from "@shared/api";
 
 export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "";
 
@@ -18,9 +18,23 @@ async function request<T>(path: string, init: RequestInit = {}) {
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
   return (await res.json()) as T;
 }
-
+// ----------------- API GET MOVIES 2025 -----------------
 export async function getMovies2025(options?: { signal?: AbortSignal }) {
   return request<MoviesResponse>("/api/movies/2025", { signal: options?.signal });
 }
-
-export type { Movie, MoviesResponse };
+// ----------------- API LOGIN -----------------
+export async function loginApi(body: { email: string; password: string }) {
+  return request<{ status: string; message: string; user: any }>("/api/login", {
+    method: "POST",
+    body: JSON.stringify(body),
+  });
+}
+// ----------------- API REGISTER -----------------
+export async function registerApi(body: { email: string; password: string }) {
+  return request<{ status: string; message: string; user: any }>("/api/register", {
+    method: "POST",
+    body: JSON.stringify(body),
+  });
+}
+// ----------------- DECLARE TYPE -----------------
+export type { Movie, MoviesResponse, Login, Register };
