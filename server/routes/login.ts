@@ -1,22 +1,22 @@
 import { RequestHandler } from "express";
 import type { Login } from "@shared/api";
+import { prisma } from '../lib/prisma'
 
-export const handleLogin: RequestHandler = (req, res) => {
-  const users: Login[] = [
-    { email: "admin@gmail.com", password: "123456" },
-    { email: "user@gmail.com", password: "123456" },
-  ];
-
+export const handleLogin: RequestHandler = async (req, res) => {
   const { email, password } = req.body as Partial<Login>;
-
-  if (!email || !password) {
-    return res.status(400).json({ status: "error", message: "Missing credentials" });
+  const useracc = await prisma.accounts.findFirst({
+    where: {
+      email: email,
+      password: password
+    }
+  })
+  if (!useracc) {
+    return res.status(200).json({ status: "error", message: "Sai email hoặc mật khẩu"});
   }
-
-  const ok = users.some((u) => u.email === email && u.password === password);
-  const username = (email.includes("@") ? email.split("@")[0] : email).trim();
-  if (ok) {
-    return res.status(200).json({ status: "success", message: "Login successful", user: { username: username, email: email } });
-  }
-  return res.status(401).json({ status: "error", message: "Invalid credentials" });
+  const user = await prisma.users.findFirst({
+    where: {
+      id: useracc.user_id
+    }
+  })
+  return res.status(200).json({ status: "success", message: "Đăng nhập thành công!", user: { username: user.fullname, email: email } });
 };
