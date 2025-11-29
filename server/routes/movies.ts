@@ -82,6 +82,22 @@ export const getAllActiveMoviesToday: RequestHandler = async (_req, res) => {
           },
         },
       },
+      include: {
+        showtimes: {
+          where: {
+            start_time: {
+              gte: todayStart,
+              lte: todayEnd,
+            },
+          },
+          select: {
+            id: true,
+            start_time: true,
+            total_sold: true,
+            price: true,
+          },
+        },
+      },
       orderBy: {
         release_date: "desc"
       }
@@ -97,12 +113,18 @@ export const getAllActiveMoviesToday: RequestHandler = async (_req, res) => {
         duration_min: m.duration_min ?? 0,
         price: Number(m.price),
         release_date: m.release_date,
+        showtimes: m.showtimes.map((s) => ({
+          id: s.id,
+          start_time: s.start_time,
+          total_sold: s.total_sold,
+          price: Number(s.price),
+        })),
       }));
       return res.status(200).json({ activeMovies });
     } else {
       return res.status(200).json({ activeMovies: [] });
     }
   } catch (error) {
-    return res.status(500).json({ message: "Internal server error" });
+    return res.status(500).json({ message: "Lỗi máy chủ nội bộ" });
   }
 };
