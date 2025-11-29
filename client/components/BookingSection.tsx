@@ -17,8 +17,8 @@ import {
   SelectItem,
 } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
-import { Ticket, Users, UserCheck, CreditCard, Clock, Check } from "lucide-react";
-import { Radio, Space } from "antd";
+import { Ticket, Users, UserCheck, CreditCard, Clock, Check, Loader2 } from "lucide-react";
+import { Radio, Space, DatePicker } from "antd";
 import type { RadioChangeEvent } from "antd";
 import type { Movie } from "@shared/api";
 import { useMovies2025 } from "@/hooks/useMovies";
@@ -30,14 +30,31 @@ interface BookingSectionProps {
 
 export default function BookingSection({ onBookClick }: BookingSectionProps) {
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isConfirmOpen, setIsConfirmOpen] = useState(false);
+  const [isResultOpen, setIsResultOpen] = useState(false);
+  const [qrUrl, setQrUrl] = useState<string | null>(null);
+  const [orderInfo, setOrderInfo] = useState<any>(null);
   const [paymentMethod, setPaymentMethod] = useState<string>("momo");
-  const [formData, setFormData] = useState({
+  interface BookingFormData {
+    name: string;
+    phone: string;
+    email: string;
+    ticketType: string;
+    quantity: number;
+    movie: string;
+    date: Date;
+    showtime: string;
+  }
+
+  const [formData, setFormData] = useState<BookingFormData>({
     name: "",
     phone: "",
     email: "",
     ticketType: "standard",
     quantity: 1,
     movie: "",
+    date: new Date(),
+    showtime: "",
   });
   const [isProcessing, setIsProcessing] = useState(false);
   const [countdown, setCountdown] = useState(600); // 10 minutes in seconds
@@ -69,9 +86,37 @@ export default function BookingSection({ onBookClick }: BookingSectionProps) {
       ticketType: "standard",
       quantity: 1,
       movie: "",
+      date: new Date(),
+      showtime: "",
     });
     setPaymentMethod("momo");
     setErrors({});
+    setIsConfirmOpen(false);
+  };
+
+  const isFormDirty = () => {
+    const defaults = { name: "", phone: "", email: "", ticketType: "standard", quantity: 1, movie: "" };
+    const changed = Object.keys(defaults).some((k) => (formData as any)[k] !== (defaults as any)[k]);
+    return changed || Object.keys(errors).length > 0 || isProcessing;
+  };
+
+  const attemptClose = () => {
+    if (isFormDirty()) {
+      setIsConfirmOpen(true);
+      return;
+    }
+    handleCloseModal();
+  };
+
+  const disableOutOfRangeDate = (current: any) => {
+    if (!current) return false;
+    const d: Date = current.toDate();
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const max = new Date();
+    max.setDate(max.getDate() + 3);
+    max.setHours(23, 59, 59, 999);
+    return d < today || d > max;
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -93,7 +138,7 @@ export default function BookingSection({ onBookClick }: BookingSectionProps) {
     }
     setIsProcessing(true);
     setCountdown(600);
-    
+
     // Simulate payment processing with countdown
     countdownRef.current = setInterval(() => {
       setCountdown((prev) => {
@@ -102,7 +147,6 @@ export default function BookingSection({ onBookClick }: BookingSectionProps) {
           setIsProcessing(false);
           toast({
             title: "Thanh toán thất bại",
-            description: "Hết thời gian thanh toán. Vui lòng thử lại.",
             variant: "destructive",
           });
           handleCloseModal();
@@ -116,11 +160,21 @@ export default function BookingSection({ onBookClick }: BookingSectionProps) {
     timerRef.current = setTimeout(() => {
       if (countdownRef.current) clearInterval(countdownRef.current);
       setIsProcessing(false);
-      toast({
-        title: "Thanh toán thành công",
-        description: `Bạn đã thanh toán qua ${paymentMethod === "momo" ? "MoMo" : "VNPay"}.`,
-      });
-      handleCloseModal();
+      const summary = {
+        movie: selectedMovie?.title,
+        dateDisplay: formData.date ? formData.date.toLocaleDateString("vi-VN") : "",
+        showtime: formData.showtime,
+        name: formData.name,
+        quantity: formData.quantity,
+        amount: totalPrice,
+        method: paymentMethod,
+      };
+      const dataStr = encodeURIComponent(JSON.stringify({ ...summary, ref: Date.now().toString() }));
+      const url = `https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=${dataStr}`;
+      setQrUrl(url);
+      setOrderInfo(summary);
+      setIsResultOpen(true);
+      setIsModalOpen(false);
       setCountdown(600);
     }, 5000);
   };
@@ -134,6 +188,7 @@ export default function BookingSection({ onBookClick }: BookingSectionProps) {
   const ticketPrice = 250000;
   const totalPrice = ticketPrice * formData.quantity;
   const selectedMovie = movies.find((m) => m.id === formData.movie);
+console.log(formData)
 
   return (
     <>
@@ -210,9 +265,23 @@ export default function BookingSection({ onBookClick }: BookingSectionProps) {
           </div>
         </div>
       </section>
+      <Dialog
 
-      <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
-        <DialogContent className="bg-gradient-dark border-cyan-400/30 shadow-[0_0_40px_rgba(34,211,238,0.25)] max-w-md max-h-[90vh] overflow-y-auto scrollbar-neon">
+        open={isModalOpen}
+        onOpenChange={(open) => {
+          if (!open) {
+            attemptClose();
+          } else {
+            setIsModalOpen(true);
+          }
+        }}
+        modal={true}
+      >
+        <DialogContent
+          onInteractOutside={(e) => {
+            e.preventDefault();
+          }}
+          className="bg-gradient-dark border-cyan-400/30 shadow-[0_0_40px_rgba(34,211,238,0.25)] max-w-md max-h-[90vh] overflow-y-auto scrollbar-neon">
           <DialogHeader>
             <DialogTitle className="text-2xl font-bold text-cyan-300">
               Đặt Vé CINESPHERE
@@ -233,7 +302,7 @@ export default function BookingSection({ onBookClick }: BookingSectionProps) {
                   setFormData({ ...formData, movie: value })
                 }
               >
-                <SelectTrigger className={`bg-black/40 text-white ${errors.movie ? "border-red-500" : "border-cyan-400/40"} focus:ring-cyan-400`}>
+                <SelectTrigger disabled={isProcessing} className={`bg-black/40 text-white ${errors.movie ? "border-red-500" : "border-cyan-400/40"} focus:ring-cyan-400`}>
                   <SelectValue placeholder="Chọn phim" />
                 </SelectTrigger>
                 <SelectContent>
@@ -255,6 +324,39 @@ export default function BookingSection({ onBookClick }: BookingSectionProps) {
                 </div>
               )}
               {errors.movie && <div className="text-red-400 text-xs mt-1">{errors.movie}</div>}
+              {selectedMovie && (
+                <div className="mt-4 grid gap-3">
+                  <Label className=" text-white">Chọn ngày</Label>
+                  <DatePicker
+                    className="w-full bg-white text-gray-900 placeholder:text-gray-500"
+                    disabled={isProcessing}
+                    onChange={(v) => setFormData({ ...formData, date: v ? v.toDate() : null, showtime: "" })}
+                    disabledDate={disableOutOfRangeDate}
+                    placeholder="Chọn ngày"
+                  />
+                  {errors.date && <div className="text-red-500 text-xs">{errors.date}</div>}
+                  {formData.date && (
+                    <div className="mt-2">
+                      <Label className="text-white">Giờ chiếu</Label>
+                      <div className="flex flex-wrap gap-2 mt-2">
+                        {["10:00", "13:00", "16:00", "19:00", "21:00"].map((t) => (
+                          <Button
+                            key={t}
+                            type="button"
+                            variant={formData.showtime === t ? "default" : "outline"}
+                            className={formData.showtime === t ? "bg-blue-600 text-white" : "border-gray-300 text-gray-900"}
+                            disabled={isProcessing}
+                            onClick={() => setFormData({ ...formData, showtime: t })}
+                          >
+                            {t}
+                          </Button>
+                        ))}
+                      </div>
+                      {errors.showtime && <div className="text-red-500 text-xs mt-1">{errors.showtime}</div>}
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
             <div className="space-y-2">
               <Label htmlFor="name" className="text-white">
@@ -267,6 +369,7 @@ export default function BookingSection({ onBookClick }: BookingSectionProps) {
                 onChange={(e) =>
                   setFormData({ ...formData, name: e.target.value })
                 }
+                disabled={isProcessing}
                 className={`bg-black/40 text-white ${errors.name ? "border-red-500" : "border-cyan-400/40"} focus-visible:ring-cyan-400`}
                 placeholder="Nhập họ và tên"
               />
@@ -285,6 +388,7 @@ export default function BookingSection({ onBookClick }: BookingSectionProps) {
                 onChange={(e) =>
                   setFormData({ ...formData, phone: e.target.value })
                 }
+                disabled={isProcessing}
                 className={`bg-black/40 text-white ${errors.phone ? "border-red-500" : "border-cyan-400/40"} focus-visible:ring-cyan-400`}
                 placeholder="Nhập số điện thoại"
               />
@@ -303,6 +407,7 @@ export default function BookingSection({ onBookClick }: BookingSectionProps) {
                 onChange={(e) =>
                   setFormData({ ...formData, email: e.target.value })
                 }
+                disabled={isProcessing}
                 className={`bg-black/40 text-white ${errors.email ? "border-red-500" : "border-cyan-400/40"} focus-visible:ring-cyan-400`}
                 placeholder="Nhập email"
               />
@@ -312,7 +417,7 @@ export default function BookingSection({ onBookClick }: BookingSectionProps) {
             <div className="space-y-2">
               <Label htmlFor="quantity" className="text-white">Số Lượng Vé *</Label>
               <div className="flex items-center gap-2">
-                <Button type="button" variant="outline" className="h-10 w-10 border-cyan-400/40 hover:bg-cyan-500/10" onClick={() => setFormData({ ...formData, quantity: Math.max(1, formData.quantity - 1) })}>-</Button>
+                <Button disabled={isProcessing} type="button" variant="outline" className="h-10 w-10 border-cyan-400/40 hover:bg-cyan-500/10" onClick={() => setFormData({ ...formData, quantity: Math.max(1, formData.quantity - 1) })}>-</Button>
                 <Input
                   id="quantity"
                   type="number"
@@ -326,9 +431,10 @@ export default function BookingSection({ onBookClick }: BookingSectionProps) {
                       quantity: Math.min(10, Math.max(1, parseInt(e.target.value) || 1)),
                     })
                   }
+                  disabled={isProcessing}
                   className={`bg-black/40 text-white text-center ${errors.quantity ? "border-red-500" : "border-cyan-400/40"} focus-visible:ring-cyan-400`}
                 />
-                <Button type="button" variant="outline" className="h-10 w-10 border-cyan-400/40 hover:bg-cyan-500/10" onClick={() => setFormData({ ...formData, quantity: Math.min(10, formData.quantity + 1) })}>+</Button>
+                <Button disabled={isProcessing} type="button" variant="outline" className="h-10 w-10 border-cyan-400/40 hover:bg-cyan-500/10" onClick={() => setFormData({ ...formData, quantity: Math.min(10, formData.quantity + 1) })}>+</Button>
               </div>
               {errors.quantity && <div className="text-red-400 text-xs mt-1">{errors.quantity}</div>}
             </div>
@@ -345,6 +451,7 @@ export default function BookingSection({ onBookClick }: BookingSectionProps) {
                 <Space direction="vertical" className="w-full">
                   <Radio
                     value="momo"
+                    disabled={isProcessing}
                     className="text-white [&>span]:text-white"
                   >
                     <div className="flex items-center gap-2">
@@ -354,6 +461,7 @@ export default function BookingSection({ onBookClick }: BookingSectionProps) {
                   </Radio>
                   <Radio
                     value="vnpay"
+                    disabled={isProcessing}
                     className="text-white [&>span]:text-white"
                   >
                     <div className="flex items-center gap-2">
@@ -396,8 +504,8 @@ export default function BookingSection({ onBookClick }: BookingSectionProps) {
               <Button
                 type="button"
                 variant="outline"
-                onClick={handleCloseModal}
-                className="flex-1 border-white/20 text-gray-400 hover:bg-white/10"
+                onClick={attemptClose}
+                className="flex-1 border-white/20 text-black-400 hover:bg-gray-300"
               >
                 Hủy
               </Button>
@@ -406,10 +514,62 @@ export default function BookingSection({ onBookClick }: BookingSectionProps) {
                 disabled={isProcessing || !formData.movie}
                 className="flex-1 bg-gradient-to-r from-blue-500 to-purple-500 hover:from-blue-600 hover:to-purple-600 text-white"
               >
-                {isProcessing ? "Đang xử lý..." : "Thanh Toán"}
+                {isProcessing ? (
+                  <span className="flex items-center justify-center gap-2">
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Đang xử lý...
+                  </span>
+                ) : (
+                  "Thanh Toán"
+                )}
               </Button>
             </div>
           </form>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={isConfirmOpen} onOpenChange={setIsConfirmOpen}>
+        <DialogContent className="max-w-sm bg-black/80 border border-white/20">
+          <DialogHeader>
+            <DialogTitle className="text-white">Xác nhận đóng</DialogTitle>
+            <DialogDescription className="text-gray-300">Bạn có chắc muốn đóng form? Dữ liệu đang nhập sẽ bị mất.</DialogDescription>
+          </DialogHeader>
+          <div className="flex gap-3">
+            <Button variant="outline" className="flex-1" onClick={() => setIsConfirmOpen(false)}>Tiếp tục chỉnh sửa</Button>
+            <Button className="flex-1 bg-red-600 hover:bg-red-700" onClick={handleCloseModal}>Tiếp tục đóng</Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={isResultOpen} onOpenChange={setIsResultOpen}>
+        <DialogContent className="max-w-md bg-white text-black border border-gray-200">
+          <DialogHeader>
+            <DialogTitle className="text-xl font-bold">Thông tin mua vé</DialogTitle>
+            <DialogDescription className="text-gray-600">Quét QR để thanh toán và lưu vé của bạn</DialogDescription>
+          </DialogHeader>
+          {orderInfo && (
+            <div className="space-y-3">
+              <div className="grid grid-cols-2 gap-2 text-sm">
+                <span className="text-gray-600">Phim</span><span className="font-medium">{orderInfo.movie}</span>
+                <span className="text-gray-600">Ngày</span><span className="font-medium">{orderInfo.dateDisplay}</span>
+                <span className="text-gray-600">Giờ</span><span className="font-medium">{orderInfo.showtime}</span>
+                <span className="text-gray-600">Họ tên</span><span className="font-medium">{orderInfo.name}</span>
+                <span className="text-gray-600">Số lượng</span><span className="font-medium">{orderInfo.quantity}</span>
+                <span className="text-gray-600">Thanh toán</span><span className="font-medium">{orderInfo.method === "momo" ? "MoMo" : "VNPay"}</span>
+                <span className="text-gray-600">Tổng tiền</span><span className="font-semibold text-blue-600">{orderInfo.amount.toLocaleString("vi-VN")}₫</span>
+              </div>
+              <div className="flex items-center justify-center py-4">
+                {qrUrl && <img src={qrUrl} alt="QR thanh toán" className="rounded-md border" />}
+              </div>
+              <div className="flex gap-3">
+                <Button variant="outline" className="flex-1" onClick={() => setIsResultOpen(false)}>Đóng</Button>
+                <Button className="flex-1 bg-blue-600 hover:bg-blue-700" onClick={() => {
+                  setIsResultOpen(false);
+                  handleCloseModal();
+                }}>Hoàn tất</Button>
+              </div>
+            </div>
+          )}
         </DialogContent>
       </Dialog>
     </>

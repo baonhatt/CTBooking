@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { toast } from "@/components/ui/use-toast";
-import { Ticket } from "lucide-react";
+import { Ticket, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/useAuth";
 
@@ -17,6 +17,9 @@ export default function Header({ onBookClick }: HeaderProps) {
   const [isLoginOpen, setIsLoginOpen] = useState(false);
   const [isRegisterOpen, setIsRegisterOpen] = useState(false);
   const [isForgetPassOpen, setIsForgetPassOpen] = useState(false);
+  const [isLoginLoading, setIsLoginLoading] = useState(false);
+  const [isRegisterLoading, setIsRegisterLoading] = useState(false);
+  const [isForgetLoading, setIsForgetLoading] = useState(false);
   const [loginEmail, setLoginEmail] = useState("");
   const [loginPassword, setLoginPassword] = useState("");
   const [registerEmail, setRegisterEmail] = useState("");
@@ -57,6 +60,7 @@ export default function Header({ onBookClick }: HeaderProps) {
   const handleLoginSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
+      setIsLoginLoading(true);
       const data = await auth.login(loginEmail,loginPassword);
       if (data?.status === "success") {
         localStorage.setItem("authUser", JSON.stringify({ user: data.user }));
@@ -68,6 +72,8 @@ export default function Header({ onBookClick }: HeaderProps) {
       }
     } catch (err: any) {
       toast({ title: "Đăng nhập thất bại", description: err.message });
+    } finally {
+      setIsLoginLoading(false);
     }
   };
   const openRegister = () => {
@@ -90,6 +96,7 @@ export default function Header({ onBookClick }: HeaderProps) {
       return;
     }
     try {
+      setIsRegisterLoading(true);
       const data = await auth.register(registerEmail, registerPassword, registerName);
       if (data?.status === "success") {
         localStorage.setItem("authUser", JSON.stringify({ user: data.user }));
@@ -103,11 +110,14 @@ export default function Header({ onBookClick }: HeaderProps) {
       }
     } catch (err: any) {
       toast({ title: "Đăng ký thất bại", description: err.message });
+    } finally {
+      setIsRegisterLoading(false);
     }
   };
   const handleForgetPassSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
+      setIsForgetLoading(true);
       const data = await auth.forgetPass(forgetPassEmail);
       if (data?.status === "success") {
         toast({ title: "Thông báo hệ thống!", description: data.message });
@@ -116,6 +126,8 @@ export default function Header({ onBookClick }: HeaderProps) {
       }
     } catch (err: any) {
       toast({ title: "Thông báo hệ thống!", description: err.message });
+    } finally {
+      setIsForgetLoading(false);
     }
   }
 
@@ -185,30 +197,39 @@ export default function Header({ onBookClick }: HeaderProps) {
                 <form className="space-y-4" onSubmit={handleLoginSubmit}>
                   <div>
                     <label className="text-sm text-gray-300 mb-1 block">Email</label>
-                    <Input
-                      type="email"
-                      placeholder="you@email.com"
-                      value={loginEmail}
-                      onChange={(e) => setLoginEmail(e.target.value)}
-                      maxLength={50}
-                      required
-                    />
+                  <Input
+                    type="email"
+                    placeholder="you@email.com"
+                    value={loginEmail}
+                    onChange={(e) => setLoginEmail(e.target.value)}
+                    maxLength={50}
+                    disabled={isLoginLoading}
+                    required
+                  />
                   </div>
                   <div>
                     <label className="text-sm text-gray-300 mb-1 block">Mật khẩu</label>
-                    <Input
-                      type="password"
-                      placeholder="••••••••"
-                      value={loginPassword}
-                      onChange={(e) => setLoginPassword(e.target.value)}
-                      required
-                      maxLength={50}
-                      pattern="^(?=.*[A-Za-z])(?=.*\d)[A-Za-z\d]{6,}$"
-                      title="Mật khẩu phải có ít nhất 6 ký tự, bao gồm cả chữ cái và số"
-                    />
+                  <Input
+                    type="password"
+                    placeholder="••••••••"
+                    value={loginPassword}
+                    onChange={(e) => setLoginPassword(e.target.value)}
+                    required
+                    maxLength={50}
+                    pattern="^(?=.*[A-Za-z])(?=.*\d)[A-Za-z\d]{6,}$"
+                    title="Mật khẩu phải có ít nhất 6 ký tự, bao gồm cả chữ cái và số"
+                    disabled={isLoginLoading}
+                  />
                   </div>
-                  <Button type="submit" className="w-full bg-gradient-to-r from-blue-500 to-purple-500 hover:from-blue-600 hover:to-purple-600">
-                    Đăng nhập
+                  <Button type="submit" disabled={isLoginLoading} className="w-full bg-gradient-to-r from-blue-500 to-purple-500 hover:from-blue-600 hover:to-purple-600">
+                    {isLoginLoading ? (
+                      <span className="flex items-center justify-center gap-2">
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                        Đang đăng nhập...
+                      </span>
+                    ) : (
+                      "Đăng nhập"
+                    )}
                   </Button>
                   <div className="flex justify-between items-center">
                     <div></div>
@@ -256,6 +277,7 @@ export default function Header({ onBookClick }: HeaderProps) {
                     value={registerEmail}
                     onChange={(e) => setRegisterEmail(e.target.value)}
                     maxLength={50}
+                    disabled={isRegisterLoading}
                     required
                   />
                 </div>
@@ -267,6 +289,7 @@ export default function Header({ onBookClick }: HeaderProps) {
                     value={registerName}
                     maxLength={50}
                     onChange={(e) => setRegisterName(e.target.value)}
+                    disabled={isRegisterLoading}
                   />
                 </div>
                 <div>
@@ -280,6 +303,7 @@ export default function Header({ onBookClick }: HeaderProps) {
                     required
                     pattern="^(?=.*[A-Za-z])(?=.*\d)[A-Za-z\d]{6,}$"
                     title="Mật khẩu phải có ít nhất 6 ký tự, bao gồm cả chữ cái và số"
+                    disabled={isRegisterLoading}
                   />
                 </div>
                 <div>
@@ -293,10 +317,18 @@ export default function Header({ onBookClick }: HeaderProps) {
                     required
                     pattern="^(?=.*[A-Za-z])(?=.*\d)[A-Za-z\d]{6,}$"
                     title="Mật khẩu phải có ít nhất 6 ký tự, bao gồm cả chữ cái và số"
+                    disabled={isRegisterLoading}
                   />
                 </div>
-                <Button type="submit" className="w-full bg-gradient-to-r from-blue-500 to-purple-500 hover:from-blue-600 hover:to-purple-600">
-                  Đăng ký
+                <Button type="submit" disabled={isRegisterLoading} className="w-full bg-gradient-to-r from-blue-500 to-purple-500 hover:from-blue-600 hover:to-purple-600">
+                  {isRegisterLoading ? (
+                    <span className="flex items-center justify-center gap-2">
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      Đang đăng ký...
+                    </span>
+                  ) : (
+                    "Đăng ký"
+                  )}
                 </Button>
                 <div className="flex justify-center">
                   <Button
@@ -328,11 +360,19 @@ export default function Header({ onBookClick }: HeaderProps) {
                     onChange={(e) => setForgetPassEmail(e.target.value)}
                     maxLength={50}
                     title="Vui lòng nhập email của bạn để thay đổi mật khẩu!"
+                    disabled={isForgetLoading}
                     required
                   />
                 </div>
-                <Button type="submit" className="w-full bg-gradient-to-r from-blue-500 to-purple-500 hover:from-blue-600 hover:to-purple-600">
-                  Xác Nhận
+                <Button type="submit" disabled={isForgetLoading} className="w-full bg-gradient-to-r from-blue-500 to-purple-500 hover:from-blue-600 hover:to-purple-600">
+                  {isForgetLoading ? (
+                    <span className="flex items-center justify-center gap-2">
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      Đang gửi...
+                    </span>
+                  ) : (
+                    "Xác Nhận"
+                  )}
                 </Button>
                 <div className="flex justify-center">
                   <Button

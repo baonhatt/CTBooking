@@ -70,7 +70,7 @@ export const getAllActiveMoviesToday: RequestHandler = async (_req, res) => {
   const todayEnd = new Date();
   todayEnd.setHours(23, 59, 59, 999);
   try {
-    const active_movies = await prisma.movies.findMany({
+    const active_movies = await (prisma as any).movies.findMany({
       where: {
         is_active: true,
         showtimes: {

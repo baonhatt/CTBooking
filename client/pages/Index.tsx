@@ -39,9 +39,19 @@ export default function Index() {
     <ConfigProvider
       theme={{
         token: {
-          colorPrimary: "#22d3ee", // cyan-400
-          colorBgBase: "#0e1b3d", // navy
-          colorText: "#e6f6ff",
+          colorPrimary: "#22d3ee",
+          colorBgBase: "#0e1b3d",
+          colorText: "#000000",
+        },
+        components: {
+          DatePicker: {
+            colorBgContainer: "#ffffff",
+            colorBgElevated: "#ffffff",
+            colorText: "#000000",
+            colorBorder: "#e5e7eb",
+            controlItemBgHover: "#f1f5f9",
+            colorTextDisabled: "#94a3b8",
+          },
         },
       }}
     >

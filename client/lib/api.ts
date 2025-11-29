@@ -1,4 +1,4 @@
-import type { Movie, MoviesResponse, Login, Register } from "@shared/api";
+import type { Movie, MoviesResponse, Login, Register, ActiveMoviesTodayResponse } from "@shared/api";
 
 export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "";
 
@@ -58,6 +58,14 @@ export async function resetPasswordApi(body: { token: string; newPassword : stri
   return request<{ status: string; message: string; }>("/api/reset-password", {
     method: "POST",
     body: JSON.stringify(body),
+  });
+}
+
+// ----------------- API GET ACTIVE MOVIES TODAY -----------------
+export async function getAllActiveMoviesToday(options?: { signal?: AbortSignal }) {
+  return request<{ activeMovies: ActiveMoviesTodayResponse[] }>("/api/getActiveMovies", {
+    method: "POST",
+    signal: options?.signal,
   });
 }
 // ----------------- DECLARE TYPE -----------------
