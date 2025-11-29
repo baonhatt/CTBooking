@@ -1,10 +1,7 @@
 import { useState, useEffect } from "react";
-
-import { Star, ChevronLeft, ChevronRight } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { Star } from "lucide-react";
 import { motion } from "framer-motion";
 import { cn } from "@/lib/utils";
-import { useMovies2025 } from "@/hooks/useMovies";
 
 const featuredMovies = [
   {
@@ -47,26 +44,15 @@ const featuredMovies = [
 
 export default function HeroSection() {
   const [currentIndex, setCurrentIndex] = useState(0);
-  const { data: apiMovies = [] } = useMovies2025();
 
   useEffect(() => {
     const interval = setInterval(() => {
-      const len = apiMovies.length ? apiMovies.length : featuredMovies.length;
-      setCurrentIndex((prev) => (prev + 1) % len);
+      setCurrentIndex((prev) => (prev + 1) % featuredMovies.length);
     }, 5000);
     return () => clearInterval(interval);
-  }, [apiMovies]);
+  }, []);
 
-  // movies fetched via React Query; no manual effect needed
-  const isApi = apiMovies.length > 0;
-  const listLength = isApi ? apiMovies.length : featuredMovies.length;
-  const idx = currentIndex % listLength;
-  const imageSrc = isApi ? apiMovies[idx].posterUrl : featuredMovies[idx].image;
-  const titleText = isApi ? apiMovies[idx].title : featuredMovies[idx].title;
-  const durationText = isApi ? apiMovies[idx].duration : featuredMovies[idx].duration;
-  const genresText = isApi ? apiMovies[idx].genres.join(" / ") : featuredMovies[idx].genres;
-  const descText = isApi ? "" : featuredMovies[idx].description;
-  const ratingValue = 4.8;
+  const currentMovie = featuredMovies[currentIndex];
 
   return (
     <section id="hero" className="relative min-h-screen flex items-center justify-center bg-gradient-dark overflow-hidden">
@@ -74,14 +60,14 @@ export default function HeroSection() {
       <div className="absolute inset-0">
         <motion.img
           key={currentIndex}
-          src={imageSrc}
-          alt={titleText}
-          className="w-full h-full object-cover opacity-50"
-          initial={{ opacity: 0, scale: 1.08 }}
-          animate={{ opacity: 0.5, scale: 1 }}
+          src={currentMovie.image}
+          alt={currentMovie.title}
+          className="w-full h-full object-cover opacity-30"
+          initial={{ opacity: 0, scale: 1.1 }}
+          animate={{ opacity: 0.3, scale: 1 }}
           transition={{ duration: 1 }}
         />
-        <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-black/25 to-transparent" />
+        <div className="absolute inset-0 bg-gradient-to-t from-black via-black/50 to-black/30" />
       </div>
       
       {/* Content */}
@@ -98,9 +84,9 @@ export default function HeroSection() {
             initial={{ opacity: 0, scale: 0.9 }}
             animate={{ opacity: 1, scale: 1 }}
             transition={{ delay: 0.2, duration: 0.5 }}
-            className="inline-block mb-6 px-6 py-2 border-2 border-cyan-400/60 rounded-lg bg-black/20 backdrop-blur-sm shadow-[0_0_20px_rgba(34,211,238,0.25)]"
+            className="inline-block mb-6 px-6 py-2 border-2 border-blue-400/50 rounded-lg bg-black/30 backdrop-blur-sm"
           >
-            <span className="text-cyan-400 font-semibold tracking-wider">NOW SHOWING</span>
+            <span className="text-blue-400 font-semibold tracking-wider">NOW SHOWING</span>
           </motion.div>
 
           {/* Movie Title */}
@@ -108,9 +94,9 @@ export default function HeroSection() {
             initial={{ opacity: 0, y: 30 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.3, duration: 0.6 }}
-            className="text-5xl md:text-7xl font-bold bg-gradient-to-r from-cyan-300 via-sky-400 to-fuchsia-400 bg-clip-text text-transparent drop-shadow-[0_0_12px_rgba(99,102,241,0.35)] mb-6"
+            className="text-5xl md:text-7xl font-bold text-white mb-6"
           >
-            {titleText}
+            {currentMovie.title}
           </motion.h1>
 
           {/* Movie Details */}
@@ -122,53 +108,36 @@ export default function HeroSection() {
           >
             <div className="flex items-center gap-2">
               <Star className="h-5 w-5 text-yellow-400 fill-yellow-400" />
-              <span className="text-xl font-semibold text-white">{ratingValue}</span>
+              <span className="text-xl font-semibold text-white">{currentMovie.rating}</span>
             </div>
             <span className="text-gray-300">•</span>
-            <span className="text-lg text-cyan-300">{durationText}</span>
+            <span className="text-lg text-white">{currentMovie.duration}</span>
             <span className="text-gray-300">•</span>
-            <span className="text-lg text-fuchsia-400 font-medium">{genresText}</span>
+            <span className="text-lg text-purple-400 font-medium">{currentMovie.genres}</span>
           </motion.div>
 
-          {descText && (
-            <motion.p
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.6, duration: 0.6 }}
-              className="text-xl text-gray-300 max-w-2xl mx-auto mb-8"
-            >
-              {descText}
-            </motion.p>
-          )}
+          {/* Description */}
+          <motion.p
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.6, duration: 0.6 }}
+            className="text-xl text-gray-300 max-w-2xl mx-auto mb-8"
+          >
+            {currentMovie.description}
+          </motion.p>
         </motion.div>
 
-        {/* Carousel Controls & Indicators */}
-        <Button
-          variant="ghost"
-          size="icon"
-          className="absolute left-6 top-1/2 -translate-y-1/2 bg-black/30 border border-white/20 text-white hover:bg-cyan-500/20 hover:border-cyan-400/60 backdrop-blur-sm"
-          onClick={() => setCurrentIndex((prev) => (prev - 1 + listLength) % listLength)}
-        >
-          <ChevronLeft />
-        </Button>
-        <Button
-          variant="ghost"
-          size="icon"
-          className="absolute right-6 top-1/2 -translate-y-1/2 bg-black/30 border border-white/20 text-white hover:bg-fuchsia-500/20 hover:border-fuchsia-400/60 backdrop-blur-sm"
-          onClick={() => setCurrentIndex((prev) => (prev + 1) % listLength)}
-        >
-          <ChevronRight />
-        </Button>
+        {/* Carousel Indicators */}
         <div className="flex items-center justify-center gap-2 mt-12">
-          {Array.from({ length: listLength }).map((_, index) => (
+          {featuredMovies.map((_, index) => (
             <button
               key={index}
               onClick={() => setCurrentIndex(index)}
               className={cn(
-                "w-3 h-3 rounded-full transition-all duration-300 shadow-[0_0_10px_rgba(34,211,238,0.35)]",
+                "w-2 h-2 rounded-full transition-all duration-300",
                 index === currentIndex
-                  ? "w-10 bg-cyan-400"
-                  : "bg-gray-500/70 hover:bg-gray-400"
+                  ? "w-8 bg-blue-400"
+                  : "bg-gray-600 hover:bg-gray-500"
               )}
             />
           ))}

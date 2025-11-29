@@ -4,8 +4,8 @@ import { motion } from "framer-motion";
 const technologies = [
   {
     icon: Globe,
-    title: "Màn hình 4 chiều độ phân giải 10k",
-    description: "Bao trùm thị giác, loại bỏ mọi giới hạn không gian, trải nghiệm đắm chìm vào không gian ảo.",
+    title: "Màn Hình Vòm 360°",
+    description: "Bao trùm thị giác, loại bỏ mọi giới hạn không gian.",
     color: "from-blue-400 to-blue-600",
   },
   {
@@ -33,11 +33,11 @@ export default function TechnologyBanner() {
           transition={{ duration: 0.6 }}
           className="text-center mb-16"
         >
-          <h2 className="text-4xl md:text-5xl font-bold bg-gradient-to-r from-cyan-300 via-sky-400 to-fuchsia-400 bg-clip-text text-transparent mb-4">
-            CINESPHERE – Giải trí công nghệ cao
+          <h2 className="text-4xl md:text-5xl font-bold bg-gradient-to-r from-blue-400 via-purple-400 to-pink-400 bg-clip-text text-transparent mb-4">
+            CÔNG NGHỆ ĐỈNH CAO
           </h2>
-          <p className="text-xl text-gray-300 max-w-3xl mx-auto">
-            CINESPHERE là thương hiệu tiên phong trong lĩnh vực giải trí công nghệ cao tại Việt Nam, nổi bật với mô hình 3D mắt thường đầu tiên – mang đến trải nghiệm hình ảnh sống động, chân thực mà không cần kính hỗ trợ. Đây là bước đột phá giúp khán giả tiếp cận công nghệ thị giác hiện đại một cách tự nhiên và thoải mái.
+          <p className="text-xl text-gray-300 max-w-2xl mx-auto">
+            CineSphere mang đến trải nghiệm nhập vai chưa từng có với hệ thống mô phỏng 6D hiện đại nhất.
           </p>
         </motion.div>
 
