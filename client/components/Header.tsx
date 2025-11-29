@@ -5,22 +5,25 @@ import { Input } from "@/components/ui/input";
 import { toast } from "@/components/ui/use-toast";
 import { Ticket } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { loginApi, registerApi } from "@/lib/api";
+import { useAuth } from "@/hooks/useAuth";
 
 interface HeaderProps {
   onBookClick: () => void;
 }
-
+const auth = useAuth();
 export default function Header({ onBookClick }: HeaderProps) {
   const [isScrolled, setIsScrolled] = useState(false);
   const [userName, setUserName] = useState<string | null>(null);
   const [isLoginOpen, setIsLoginOpen] = useState(false);
   const [isRegisterOpen, setIsRegisterOpen] = useState(false);
+  const [isForgetPassOpen, setIsForgetPassOpen] = useState(false);
   const [loginEmail, setLoginEmail] = useState("");
   const [loginPassword, setLoginPassword] = useState("");
   const [registerEmail, setRegisterEmail] = useState("");
+  const [registerName, setRegisterName] = useState("");
   const [registerPassword, setRegisterPassword] = useState("");
   const [registerConfirmPassword, setRegisterConfirmPassword] = useState("");
+  const [forgetPassEmail, setForgetPassEmail] = useState("");
 
   useEffect(() => {
     const handleScroll = () => {
@@ -54,10 +57,7 @@ export default function Header({ onBookClick }: HeaderProps) {
   const handleLoginSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      const data = await loginApi({
-        email: loginEmail,
-        password: loginPassword,
-      });
+      const data = await auth.login(loginEmail,loginPassword);
       if (data?.status === "success") {
         localStorage.setItem("authUser", JSON.stringify({ user: data.user }));
         setUserName(data.user.username);
@@ -65,11 +65,9 @@ export default function Header({ onBookClick }: HeaderProps) {
         setIsLoginOpen(false);
         setLoginEmail("");
         setLoginPassword("");
-      } else {
-        toast({ title: "Đăng nhập thất bại", description: data?.message || "Sai thông tin" });
       }
-    } catch (err) {
-      toast({ title: "Lỗi hệ thống", description: "Không thể kết nối máy chủ" });
+    } catch (err: any) {
+      toast({ title: "Đăng nhập thất bại", description: err.message });
     }
   };
   const openRegister = () => {
@@ -80,6 +78,10 @@ export default function Header({ onBookClick }: HeaderProps) {
     setIsLoginOpen(true);
     setIsRegisterOpen(false);
   };
+  const openForgetPass = () => {
+    setIsForgetPassOpen(true);
+    setIsLoginOpen(false);
+  };
 
   const handleRegisterSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -88,10 +90,7 @@ export default function Header({ onBookClick }: HeaderProps) {
       return;
     }
     try {
-      const data = await loginApi({
-        email: loginEmail,
-        password: loginPassword,
-      });
+      const data = await auth.register(registerEmail, registerPassword, registerName);
       if (data?.status === "success") {
         localStorage.setItem("authUser", JSON.stringify({ user: data.user }));
         setUserName(data.user.username);
@@ -100,13 +99,25 @@ export default function Header({ onBookClick }: HeaderProps) {
         setRegisterEmail("");
         setRegisterPassword("");
         setRegisterConfirmPassword("");
-      } else {
-        toast({ title: "Đăng ký thất bại", description: data?.message || "Sai thông tin" });
+        setIsLoginOpen(true);
       }
-    } catch (err) {
-      toast({ title: "Lỗi hệ thống", description: "Không thể kết nối máy chủ" });
+    } catch (err: any) {
+      toast({ title: "Đăng ký thất bại", description: err.message });
     }
   };
+  const handleForgetPassSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      const data = await auth.forgetPass(forgetPassEmail);
+      if (data?.status === "success") {
+        toast({ title: "Thông báo hệ thống!", description: data.message });
+        setIsForgetPassOpen(false);
+        setForgetPassEmail("");
+      }
+    } catch (err: any) {
+      toast({ title: "Thông báo hệ thống!", description: err.message });
+    }
+  }
 
   const scrollToSection = (id: string) => {
     const element = document.getElementById(id);
@@ -176,9 +187,10 @@ export default function Header({ onBookClick }: HeaderProps) {
                     <label className="text-sm text-gray-300 mb-1 block">Email</label>
                     <Input
                       type="email"
-                      placeholder="you@example.com"
+                      placeholder="you@email.com"
                       value={loginEmail}
                       onChange={(e) => setLoginEmail(e.target.value)}
+                      maxLength={50}
                       required
                     />
                   </div>
@@ -190,24 +202,42 @@ export default function Header({ onBookClick }: HeaderProps) {
                       value={loginPassword}
                       onChange={(e) => setLoginPassword(e.target.value)}
                       required
+                      maxLength={50}
+                      pattern="^(?=.*[A-Za-z])(?=.*\d)[A-Za-z\d]{6,}$"
+                      title="Mật khẩu phải có ít nhất 6 ký tự, bao gồm cả chữ cái và số"
                     />
                   </div>
                   <Button type="submit" className="w-full bg-gradient-to-r from-blue-500 to-purple-500 hover:from-blue-600 hover:to-purple-600">
                     Đăng nhập
                   </Button>
-                  <div className="flex justify-center">
+                  <div className="flex justify-between items-center">
+                    <div></div>
                     <Button
                       variant="link"
                       className="text-sm text-blue-400 hover:text-blue-300"
                       type="button"
                       onClick={() => {
+                        openForgetPass();
+                      }}
+                    >
+                      Quên mật khẩu?
+                    </Button>
+                  </div>
+                  <div className="relative w-full">
+                    <span className="absolute inset-x-0 bottom-0 h-[1px] bg-gray-400"></span>
+                  </div>
+                  <div className="flex justify-center mt-4">
+                    <Button
+                      variant="link"
+                      className="text-sm text-blue-400 hover:text-blue-300 pt-6"
+                      type="button"
+                      onClick={() => {
                         openRegister();
                       }}
                     >
-                      Chưa có tài khoản? Đăng ký
+                      Bạn chưa có tài khoản? Đăng ký
                     </Button>
                   </div>
-
                 </form>
               </DialogContent>
             </Dialog>
@@ -222,10 +252,21 @@ export default function Header({ onBookClick }: HeaderProps) {
                   <label className="text-sm text-gray-300 mb-1 block">Email</label>
                   <Input
                     type="email"
-                    placeholder="you@example.com"
+                    placeholder="you@email.com"
                     value={registerEmail}
                     onChange={(e) => setRegisterEmail(e.target.value)}
+                    maxLength={50}
                     required
+                  />
+                </div>
+                <div>
+                  <label className="text-sm text-gray-300 mb-1 block">Tên</label>
+                  <Input
+                    type="text"
+                    placeholder="Họ và tên"
+                    value={registerName}
+                    maxLength={50}
+                    onChange={(e) => setRegisterName(e.target.value)}
                   />
                 </div>
                 <div>
@@ -234,18 +275,24 @@ export default function Header({ onBookClick }: HeaderProps) {
                     type="password"
                     placeholder="••••••••"
                     value={registerPassword}
+                    maxLength={50}
                     onChange={(e) => setRegisterPassword(e.target.value)}
                     required
+                    pattern="^(?=.*[A-Za-z])(?=.*\d)[A-Za-z\d]{6,}$"
+                    title="Mật khẩu phải có ít nhất 6 ký tự, bao gồm cả chữ cái và số"
                   />
                 </div>
                 <div>
-                  <label className="text-sm text-gray-300 mb-1 block">Mật khẩu</label>
+                  <label className="text-sm text-gray-300 mb-1 block">Nhập Lại Mật khẩu</label>
                   <Input
                     type="password"
                     placeholder="••••••••"
                     value={registerConfirmPassword}
+                    maxLength={50}
                     onChange={(e) => setRegisterConfirmPassword(e.target.value)}
                     required
+                    pattern="^(?=.*[A-Za-z])(?=.*\d)[A-Za-z\d]{6,}$"
+                    title="Mật khẩu phải có ít nhất 6 ký tự, bao gồm cả chữ cái và số"
                   />
                 </div>
                 <Button type="submit" className="w-full bg-gradient-to-r from-blue-500 to-purple-500 hover:from-blue-600 hover:to-purple-600">
@@ -266,6 +313,43 @@ export default function Header({ onBookClick }: HeaderProps) {
               </form>
             </DialogContent>
           </Dialog>
+          <Dialog open={isForgetPassOpen} onOpenChange={setIsForgetPassOpen}>
+            <DialogContent className="bg-gradient-dark border border-white/10">
+              <DialogHeader>
+                <DialogTitle className="text-blue-400 text-center">QUÊN MẬT KHẨU</DialogTitle>
+              </DialogHeader>
+              <form className="space-y-4" onSubmit={handleForgetPassSubmit}>
+                <div>
+                  <label className="text-sm text-gray-300 mb-1 block">Email</label>
+                  <Input
+                    type="email"
+                    placeholder="you@gmail.com"
+                    value={forgetPassEmail}
+                    onChange={(e) => setForgetPassEmail(e.target.value)}
+                    maxLength={50}
+                    title="Vui lòng nhập email của bạn để thay đổi mật khẩu!"
+                    required
+                  />
+                </div>
+                <Button type="submit" className="w-full bg-gradient-to-r from-blue-500 to-purple-500 hover:from-blue-600 hover:to-purple-600">
+                  Xác Nhận
+                </Button>
+                <div className="flex justify-center">
+                  <Button
+                    variant="link"
+                    className="text-sm text-blue-400 hover:text-blue-300"
+                    type="button"
+                    onClick={() => {
+                      setIsForgetPassOpen(false);
+                      setIsLoginOpen(true);
+                    }}
+                  >
+                    Quay lại đăng nhập!
+                  </Button>
+                </div>
+              </form>
+            </DialogContent>
+          </Dialog>
           <Button
             onClick={onBookClick}
             className="bg-gradient-to-r md:text-[5px] md:text-base from-blue-500 to-purple-500 hover:from-blue-600 hover:to-purple-600 text-white font-semibold px-4 py-2 md:px-6 md:py-2 rounded-lg shadow-lg transition-all duration-300 hover:scale-105"
@@ -276,6 +360,5 @@ export default function Header({ onBookClick }: HeaderProps) {
         </div>
       </div>
     </header>
-
   );
 }

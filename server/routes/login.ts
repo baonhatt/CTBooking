@@ -1,17 +1,21 @@
 import { RequestHandler } from "express";
 import type { Login } from "@shared/api";
 import { prisma } from '../lib/prisma'
+import bcrypt from "bcryptjs";
 
 export const handleLogin: RequestHandler = async (req, res) => {
   const { email, password } = req.body as Partial<Login>;
   const useracc = await prisma.accounts.findFirst({
     where: {
       email: email,
-      password: password
     }
   })
   if (!useracc) {
-    return res.status(200).json({ status: "error", message: "Sai email hoặc mật khẩu"});
+    return res.status(400).json({ status: "error", message: "Email không tồn tại!" });
+  }
+  const isPasswordValid = await bcrypt.compare(password, useracc.password);
+  if (!isPasswordValid) {
+    return res.status(400).json({ status: "error", message: "Mật khẩu không đúng!" });
   }
   const user = await prisma.users.findFirst({
     where: {
