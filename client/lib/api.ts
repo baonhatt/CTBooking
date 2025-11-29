@@ -68,5 +68,33 @@ export async function getAllActiveMoviesToday(options?: { signal?: AbortSignal }
     signal: options?.signal,
   });
 }
+// ----------------- API CREATE MOMO PAYMENT -----------------
+export async function createMomoPaymentApi(body: {
+  partnerCode: string;
+  partnerName: string;
+  storeId: string;
+  requestId: string;
+  amount: number;
+  orderId: string;
+  orderInfo: string;
+  redirectUrl: string;
+  ipnUrl: string;
+  lang?: any;
+  extraData?: any;
+  requestType: string;
+  signature: string;
+}) {
+  return request<{ payUrl: string }>("/api/momo/create-payment", {
+    method: "POST",
+    body: JSON.stringify(body),
+  });
+}
+// ----------------- API ADMIN LOGIN -----------------
+export async function adminLoginApi(body: { email: string; password: string }) {
+  return request<{ token: string; exp: number; user: { email: string } }>("/api/admin/login", {
+    method: "POST",
+    body: JSON.stringify(body),
+  });
+}
 // ----------------- DECLARE TYPE -----------------
 export type { Movie, MoviesResponse, Login, Register };
