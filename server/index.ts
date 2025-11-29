@@ -6,6 +6,7 @@ import { handleMovies2025 } from "./routes/movies";
 import { handleLogin } from "./routes/login";
 import { handleRegister } from "./routes/register";
 import { handleForgetPass, handleResetPassword } from "./routes/forget-pass";
+import { getAllActiveMoviesToday } from "./routes/movies";
 
 
 export function createServer() {
@@ -27,6 +28,7 @@ export function createServer() {
   app.post("/api/register", handleRegister);
   app.post("/api/forget-password", handleForgetPass);
   app.post("/api/reset-password", handleResetPassword);
+  app.post("/api/getActiveMovies", getAllActiveMoviesToday);
 
   return app;
 }

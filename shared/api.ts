@@ -36,3 +36,15 @@ export interface MoviesResponse {
   count: number;
   items: Movie[];
 }
+
+export interface ActiveMoviesTodayResponse {
+  title: string;
+  description: string;
+  cover_image: string;
+  detail_images: string;
+  genres: string;
+  rating: string;
+  duration_min: number;
+  price: number;
+  release_date: Date;
+}

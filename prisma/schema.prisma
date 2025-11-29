@@ -32,6 +32,7 @@ model users {
   updated_at DateTime?  @default(now()) @db.Timestamptz(6)
 
   accounts   accounts[]
+  bookings   bookings[]
 }
 
 model tokens {
@@ -44,4 +45,50 @@ model tokens {
 
   account    accounts  @relation(fields: [account_id], references: [id], onDelete: Cascade)
 }
+
+model movies {
+  id            Int       @id @default(autoincrement())
+  title         String    @db.VarChar(255)
+  description   String?
+  cover_image   String?
+  detail_images Json?
+  genres        Json?
+  rating        Decimal?  @db.Decimal(3, 1)
+  duration_min  Int?
+  is_active  Boolean?  @default(true)
+  price         Decimal    @db.Decimal(10, 2)
+  
+  release_date  DateTime?
+  created_at    DateTime  @default(now())
+  updated_at    DateTime  @default(now())
+  
+  showtimes     showtimes[]
+}
+
+model showtimes {
+  id         Int       @id @default(autoincrement())
+  movie_id   Int
+  start_time DateTime
+  price      Decimal    @db.Decimal(10, 2)
+
+  created_at DateTime   @default(now())
+  updated_at DateTime   @default(now())
+
+  movie      movies     @relation(fields: [movie_id], references: [id], onDelete: Cascade)
+  bookings   bookings[]
+}
+
+model bookings {
+  id           Int       @id @default(autoincrement())
+  user_id      Int
+  showtime_id  Int
+  ticket_count Int
+  total_price  Decimal   @db.Decimal(10, 2)
+
+  created_at   DateTime  @default(now())
+
+  user         users      @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  showtime     showtimes  @relation(fields: [showtime_id], references: [id], onDelete: Cascade)
+}
+
 
