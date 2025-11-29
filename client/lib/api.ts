@@ -15,7 +15,17 @@ async function request<T>(path: string, init: RequestInit = {}) {
       ...(init.headers || {}),
     },
   });
-  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  if (!res.ok) {
+    let errorMessage = `HTTP ${res.status}`;
+    try {
+      const errorData = await res.json();
+      if (errorData?.message) {
+        errorMessage = errorData.message;
+      }
+    } catch {
+    }
+    throw new Error(errorMessage);
+  }
   return (await res.json()) as T;
 }
 // ----------------- API GET MOVIES 2025 -----------------
@@ -30,8 +40,22 @@ export async function loginApi(body: { email: string; password: string }) {
   });
 }
 // ----------------- API REGISTER -----------------
-export async function registerApi(body: { email: string; password: string }) {
+export async function registerApi(body: { email: string; password: string; name?: string }) {
   return request<{ status: string; message: string; user: any }>("/api/register", {
+    method: "POST",
+    body: JSON.stringify(body),
+  });
+}
+// ----------------- API FORGET PASS -----------------
+export async function forgetPassApi(body: { email: string;}) {
+  return request<{ status: string; message: string;}>("/api/forget-password", {
+    method: "POST",
+    body: JSON.stringify(body),
+  });
+}
+// ----------------- API RESET PASS -----------------
+export async function resetPasswordApi(body: { token: string; newPassword : string;}) {
+  return request<{ status: string; message: string; }>("/api/reset-password", {
     method: "POST",
     body: JSON.stringify(body),
   });

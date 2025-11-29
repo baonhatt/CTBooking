@@ -5,11 +5,11 @@ import { handleDemo } from "./routes/demo";
 import { handleMovies2025 } from "./routes/movies";
 import { handleLogin } from "./routes/login";
 import { handleRegister } from "./routes/register";
+import { handleForgetPass, handleResetPassword } from "./routes/forget-pass";
 
 
 export function createServer() {
   const app = express();
-
   // Middleware
   app.use(cors());
   app.use(express.json());
@@ -25,6 +25,8 @@ export function createServer() {
   app.get("/api/movies/2025", handleMovies2025);
   app.post("/api/login", handleLogin);
   app.post("/api/register", handleRegister);
+  app.post("/api/forget-password", handleForgetPass);
+  app.post("/api/reset-password", handleResetPassword);
 
   return app;
 }
