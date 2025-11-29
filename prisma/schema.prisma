@@ -55,7 +55,7 @@ model movies {
   genres        Json?
   rating        Decimal?  @db.Decimal(3, 1)
   duration_min  Int?
-  is_active  Boolean?  @default(true)
+  is_active     Boolean?  @default(true)
   price         Decimal    @db.Decimal(10, 2)
   
   release_date  DateTime?
@@ -69,23 +69,30 @@ model showtimes {
   id         Int       @id @default(autoincrement())
   movie_id   Int
   start_time DateTime
+  total_sold Int @default(0)
   price      Decimal    @db.Decimal(10, 2)
-
   created_at DateTime   @default(now())
   updated_at DateTime   @default(now())
+
 
   movie      movies     @relation(fields: [movie_id], references: [id], onDelete: Cascade)
   bookings   bookings[]
 }
 
 model bookings {
-  id           Int       @id @default(autoincrement())
-  user_id      Int
-  showtime_id  Int
-  ticket_count Int
-  total_price  Decimal   @db.Decimal(10, 2)
+  id            Int       @id @default(autoincrement())
+  user_id       Int
+  showtime_id   Int
+  
+  ticket_count    Int       @default(1)
+  total_price     Decimal   @db.Decimal(10, 2)
+  payment_method  String?   @default("cash") @db.VarChar(50)
+  payment_status  String?   @default("pending") @db.VarChar(50)
+  transaction_id  String?   @db.VarChar(255)
+  paid_at         DateTime?
 
   created_at   DateTime  @default(now())
+  updated_at DateTime   @default(now())
 
   user         users      @relation(fields: [user_id], references: [id], onDelete: Cascade)
   showtime     showtimes  @relation(fields: [showtime_id], references: [id], onDelete: Cascade)
