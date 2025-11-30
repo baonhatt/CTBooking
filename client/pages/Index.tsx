@@ -32,6 +32,7 @@ export default function Index() {
   }, []);
 
   const scrollToTop = () => {
+    setShowBackToTop(false);
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
@@ -66,14 +67,16 @@ export default function Index() {
           <ProductSection />
         </main>
         <Footer />
-        <motion.button 
-          onClick={scrollToTop} 
-          whileHover={{ scale: 1.1, y: -5 }} 
-          whileTap={{ scale: 0.95 }} 
-          className={`fixed bottom-8 right-8 w-12 h-12 rounded-full bg-black border border-white/20 flex items-center justify-center hover:border-blue-400 transition-colors z-50 ${showBackToTop ? "opacity-100" : "opacity-0 pointer-events-none"}`} 
-        > 
-          <ArrowUp className="h-5 w-5 text-blue-400" /> 
-        </motion.button>
+        {showBackToTop && (
+          <motion.button
+            onClick={scrollToTop}
+            whileHover={{ scale: 1.1, y: -5 }}
+            whileTap={{ scale: 0.95 }}
+            className="fixed bottom-8 right-8 w-12 h-12 rounded-full bg-black border border-white/20 flex items-center justify-center hover:border-blue-400 transition-colors z-50"
+          >
+            <ArrowUp className="h-5 w-5 text-blue-400" />
+          </motion.button>
+        )}
       </div>
     </ConfigProvider>
   );
