@@ -104,6 +104,32 @@ export async function createVnpayPaymentApi(body: {
     body: JSON.stringify(body),
   });
 }
+// ----------------- API CREATE BOOKING -----------------
+export async function createBookingApi(body: {
+  email: string;
+  showtimeId: number;
+  ticketCount: number;
+  paymentMethod: "cash" | "momo" | "vnpay";
+  totalPrice: number;
+}) {
+  return request<{ message: string; booking: any }>("/api/create-booking", {
+    method: "POST",
+    body: JSON.stringify(body),
+  });
+}
+// ----------------- API CONFIRM BOOKING -----------------
+export async function confirmBookingApi(body: {
+  user_id: number;
+  payment_id: number;
+  payment_status: string;
+  transaction_id?: string;
+  paid_at?: string;
+}) {
+  return request<{ message: string; booking: any }>("/api/confirm-booking", {
+    method: "POST",
+    body: JSON.stringify(body),
+  });
+}
 // ----------------- API ADMIN LOGIN -----------------
 export async function adminLoginApi(body: { email: string; password: string }) {
   return request<{ token: string; exp: number; user: { email: string } }>("/api/admin/login", {
