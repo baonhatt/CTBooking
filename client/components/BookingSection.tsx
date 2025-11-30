@@ -63,7 +63,7 @@ export default function BookingSection({ onBookClick }: BookingSectionProps) {
   const [countdown, setCountdown] = useState(600); // 10 minutes in seconds
   const timerRef = useRef<NodeJS.Timeout | null>(null);
   const countdownRef = useRef<NodeJS.Timeout | null>(null);
-  const { data: activeData, refetch: refetchActive } = useQuery({ queryKey: ["activeMovies"], queryFn: () => getAllActiveMoviesToday() });
+  const { data: activeData } = useQuery({ queryKey: ["activeMovies", "today"], queryFn: () => getAllActiveMoviesToday() });
   const movies = (activeData?.activeMovies || []).map((m: any) => ({ id: m.title, title: m.title }));
   const activeMoviesFull = activeData?.activeMovies || [];
   const [selectedShowtimeId, setSelectedShowtimeId] = useState<number | null>(null);
@@ -90,7 +90,7 @@ export default function BookingSection({ onBookClick }: BookingSectionProps) {
         if (extraDataParam) {
           try {
             pending = JSON.parse(decodeURIComponent(escape(atob(extraDataParam))));
-          } catch {}
+          } catch { }
         }
         if (!pending || Object.keys(pending).length === 0) {
           const pendingStr = localStorage.getItem("pendingOrder");
@@ -108,7 +108,7 @@ export default function BookingSection({ onBookClick }: BookingSectionProps) {
         setIsModalOpen(false);
         setIsProcessing(false);
         localStorage.removeItem("pendingOrder");
-      } catch {}
+      } catch { }
       window.history.replaceState({}, document.title, window.location.pathname);
     }
   }, []);
@@ -353,281 +353,286 @@ export default function BookingSection({ onBookClick }: BookingSectionProps) {
           onInteractOutside={(e) => {
             e.preventDefault();
           }}
-          className="bg-gradient-dark border-cyan-400/30 shadow-[0_0_40px_rgba(34,211,238,0.25)] max-w-md max-h-[90vh] overflow-y-auto scrollbar-neon">
+          className="bg-gradient-dark border-cyan-400/30 shadow-[0_0_40px_rgba(34,211,238,0.25)] w-[95vw] sm:w-auto sm:max-w-md md:max-w-lg max-h-[90vh] p-4 sm:p-6 rounded-xl overflow-y-auto scrollbar-neon">
           <DialogHeader>
-            <DialogTitle className="text-2xl font-bold text-cyan-300">
+            <DialogTitle className="text-xl sm:text-2xl font-bold text-cyan-300">
               Đặt Vé CINESPHERE
             </DialogTitle>
-            <DialogDescription className="text-gray-300">
+            <DialogDescription className="text-gray-300 text-sm sm:text-base">
               Vui lòng điền thông tin để hoàn tất đặt vé
             </DialogDescription>
           </DialogHeader>
 
           <form onSubmit={handleSubmit} className="space-y-4">
-            <Steps
-              current={currentStep}
-              onChange={(c) => {
-                const isStep0Valid = (
-                  !!formData.movie &&
-                  !!formData.name && formData.name.trim().length >= 2 &&
-                  /^[0-9]{9,11}$/.test(formData.phone) &&
-                  /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email) &&
-                  formData.quantity >= 1 && formData.quantity <= 10 &&
-                  !!formData.date &&
-                  !!formData.showtime && !!selectedShowtimeId
-                );
-                if (c <= currentStep) { setCurrentStep(c); return; }
-                if (currentStep === 0 && isStep0Valid) { setCurrentStep(1); return; }
-                if (currentStep === 1 && !!paymentMethod) { setCurrentStep(2); return; }
-              }}
-              items={[
-                { title: <span className="text-white">Thông tin</span> },
-                { title: <span className="text-white">Thanh toán</span> },
-                { title: <span className="text-white">Xác nhận</span> },
-              ]}
-            />
+            <div className="steps-white-text align-center [&_.ant-steps-item-title]:text-xs sm:[&_.ant-steps-item-title]:text-sm md:[&_.ant-steps-item-title]:text-base
+                          [&_.ant-steps-item-description]:text-xs sm:[&_.ant-steps-item-description]:text-sm md:[&_.ant-steps-item-description]:text-base
+                          ">
+              <Steps
+                current={currentStep}
+                size="small"
+                onChange={(c) => {
+                  const isStep0Valid = (
+                    !!formData.movie &&
+                    !!formData.name && formData.name.trim().length >= 2 &&
+                    /^[0-9]{9,11}$/.test(formData.phone) &&
+                    /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email) &&
+                    formData.quantity >= 1 && formData.quantity <= 10 &&
+                    !!formData.date &&
+                    !!formData.showtime && !!selectedShowtimeId
+                  );
+                  if (c <= currentStep) { setCurrentStep(c); return; }
+                  if (currentStep === 0 && isStep0Valid) { setCurrentStep(1); return; }
+                  if (currentStep === 1 && !!paymentMethod) { setCurrentStep(2); return; }
+                }}
+                className="[&_.ant-steps-item-title]:text-white [&_.ant-steps-item-description]:text-white/70"
+                items={[
+                  { title: <span className="text-white">Thông tin</span> },
+                  { title: <span className="text-white">Thanh toán</span> },
+                  { title: <span className="text-white">Xác nhận</span> },
+                ]}
+              />
+            </div>
             {currentStep === 0 && (
-            <div className="space-y-2">
-              <Label htmlFor="movie" className="text-white">
-                Chọn Phim *
-              </Label>
-              <motion.div animate={errors.movie ? { x: [0,-6,6,-6,6,0] } : {}} transition={{ duration: 0.35 }}>
-                <Select
-                  value={formData.movie}
-                  onValueChange={(value) => {
-                    setFormData({ ...formData, movie: value, date: new Date(), showtime: "" });
-                    setSelectedShowtimeId(null);
-                    refetchActive();
-                  }}
-                >
-                  <SelectTrigger disabled={isProcessing} className={`bg-black/40 text-white ${errors.movie ? "border-yellow-400" : "border-cyan-400/40"} ${errors.movie ? "focus:ring-yellow-400" : "focus:ring-cyan-400"}`}>
-                    <SelectValue placeholder="Chọn phim" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {movies.map((m) => (
-                      <SelectItem key={m.id} value={m.id}>
-                        {m.title}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </motion.div>
-              {selectedMovie && (
-                <div className="flex items-center gap-3 mt-2 p-2 rounded-lg bg-black/30 border border-white/10">
-                  <img src={(activeMoviesFull.find((x:any)=>x.title===selectedMovie.title)?.cover_image) || ""} alt={selectedMovie.title} className="w-12 h-12 rounded object-cover" />
-                  <div className="text-sm text-gray-300">
-                    <div className="font-semibold text-white">{selectedMovie.title}</div>
-                    <div className="text-cyan-300">{(activeMoviesFull.find((x:any)=>x.title===selectedMovie.title)?.duration_min) ? `${(activeMoviesFull.find((x:any)=>x.title===selectedMovie.title)?.duration_min)} phút` : ""}</div>
-                    <div className="text-fuchsia-400">{(activeMoviesFull.find((x:any)=>x.title===selectedMovie.title)?.genres) || ""}</div>
-                  </div>
-                </div>
-              )}
-              {errors.movie && <div className="text-red-400 text-xs mt-1">{errors.movie}</div>}
-              {selectedMovie && (
-                <div className="mt-4 grid gap-3">
-                  <Label className=" text-white">Chọn ngày</Label>
-                  <motion.div className={`flex flex-wrap gap-2 ${errors.date ? "ring-2 ring-yellow-400 rounded p-2" : ""}`} animate={errors.date ? { x: [0,-6,6,-6,6,0] } : {}} transition={{ duration: 0.35 }}>
-                    {Array.from(new Set(((activeMoviesFull.find((x:any)=>x.title===formData.movie)?.showtimes)||[]).map((s:any)=> new Date(s.start_time).toDateString()))).map((dateStr:string)=>{
-                      const d = new Date(dateStr);
-                      const isActive = !!formData.date && formData.date.toDateString() === dateStr;
-                      return (
-                        <Button
-                          key={dateStr}
-                          type="button"
-                          variant={isActive ? "default" : "outline"}
-                          className={isActive ? "bg-blue-600 text-white" : "border-gray-300 text-gray-900"}
-                          disabled={isProcessing}
-                          onClick={() => { setFormData({ ...formData, date: d, showtime: "" }); setSelectedShowtimeId(null); }}
-                        >
-                          {d.toLocaleDateString("vi-VN")}
-                        </Button>
-                      );
-                    })}
-                  </motion.div>
-                  {errors.date && <div className="text-red-500 text-xs">{errors.date}</div>}
-                  {formData.date && (
-                    <div className="mt-2">
-                      <Label className="text-white">Giờ chiếu</Label>
-                      <motion.div className={`flex flex-wrap gap-2 mt-2 ${errors.showtime ? "ring-2 ring-yellow-400 rounded p-2" : ""}`} animate={errors.showtime ? { x: [0,-6,6,-6,6,0] } : {}} transition={{ duration: 0.35 }}>
-                        {(activeMoviesFull.find((x:any)=>x.title===formData.movie)?.showtimes || [])
-                          .filter((st:any)=> new Date(st.start_time).toDateString() === (formData.date ? formData.date.toDateString() : ""))
-                          .map((st:any)=>{
-                            const t = new Date(st.start_time);
-                            const label = `${t.getHours().toString().padStart(2,"0")}:${t.getMinutes().toString().padStart(2,"0")}`;
-                            const isActive = formData.showtime === label;
-                            return (
-                              <Button
-                                key={st.id}
-                                type="button"
-                                variant={isActive ? "default" : "outline"}
-                                className={isActive ? "bg-blue-600 text-white" : "border-gray-300 text-gray-900"}
-                                disabled={isProcessing}
-                                onClick={() => { setFormData({ ...formData, showtime: label }); setSelectedShowtimeId(st.id); }}
-                              >
-                                {label}
-                              </Button>
-                            )
-                          })}
-                      </motion.div>
-                      {errors.showtime && <div className="text-red-500 text-xs mt-1">{errors.showtime}</div>}
+              <div className="space-y-2">
+                <Label htmlFor="movie" className="text-white text-sm sm:text-base">
+                  Chọn Phim *
+                </Label>
+                <motion.div animate={errors.movie ? { x: [0, -6, 6, -6, 6, 0] } : {}} transition={{ duration: 0.35 }}>
+                  <Select
+                    value={formData.movie}
+                    onValueChange={(value) => {
+                      setFormData({ ...formData, movie: value, date: new Date(), showtime: "" });
+                      setSelectedShowtimeId(null);
+                    }}
+                  >
+                    <SelectTrigger disabled={isProcessing} className={`bg-black/40 text-white h-10 sm:h-11 ${errors.movie ? "border-yellow-400" : "border-cyan-400/40"} ${errors.movie ? "focus:ring-yellow-400" : "focus:ring-cyan-400"}`}>
+                      <SelectValue placeholder="Chọn phim" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {movies.map((m) => (
+                        <SelectItem key={m.id} value={m.id}>
+                          {m.title}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </motion.div>
+                {selectedMovie && (
+                  <div className="flex items-center gap-3 mt-2 p-2 rounded-lg bg-black/30 border border-white/10">
+                    <img src={(activeMoviesFull.find((x: any) => x.title === selectedMovie.title)?.cover_image) || ""} alt={selectedMovie.title} className="w-10 h-10 sm:w-12 sm:h-12 rounded object-cover" />
+                    <div className="text-sm text-gray-300">
+                      <div className="font-semibold text-white">{selectedMovie.title}</div>
+                      <div className="text-cyan-300">{(activeMoviesFull.find((x: any) => x.title === selectedMovie.title)?.duration_min) ? `${(activeMoviesFull.find((x: any) => x.title === selectedMovie.title)?.duration_min)} phút` : ""}</div>
+                      <div className="text-fuchsia-400">{(activeMoviesFull.find((x: any) => x.title === selectedMovie.title)?.genres) || ""}</div>
                     </div>
-                  )}
-                </div>
-              )}
-            </div>
+                  </div>
+                )}
+                {errors.movie && <div className="text-red-400 text-xs mt-1">{errors.movie}</div>}
+                {selectedMovie && (
+                  <div className="mt-4 grid gap-3">
+                    <Label className=" text-white text-sm sm:text-base">Chọn ngày</Label>
+                    <motion.div className={`flex flex-wrap gap-2 ${errors.date ? "ring-2 ring-yellow-400 rounded p-2" : ""}`} animate={errors.date ? { x: [0, -6, 6, -6, 6, 0] } : {}} transition={{ duration: 0.35 }}>
+                      {Array.from(new Set(((activeMoviesFull.find((x: any) => x.title === formData.movie)?.showtimes) || []).map((s: any) => new Date(s.start_time).toDateString()))).map((dateStr: string) => {
+                        const d = new Date(dateStr);
+                        const isActive = !!formData.date && formData.date.toDateString() === dateStr;
+                        return (
+                          <Button
+                            key={dateStr}
+                            type="button"
+                            variant={isActive ? "default" : "outline"}
+                            className={isActive ? "bg-blue-600 text-white" : "border-gray-300 text-gray-900"}
+                            disabled={isProcessing}
+                            onClick={() => { setFormData({ ...formData, date: d, showtime: "" }); setSelectedShowtimeId(null); }}
+                          >
+                            {d.toLocaleDateString("vi-VN")}
+                          </Button>
+                        );
+                      })}
+                    </motion.div>
+                    {errors.date && <div className="text-red-500 text-xs">{errors.date}</div>}
+                    {formData.date && (
+                      <div className="mt-2">
+                        <Label className="text-white text-sm sm:text-base">Giờ chiếu</Label>
+                        <motion.div className={`flex flex-wrap gap-2 mt-2 ${errors.showtime ? "ring-2 ring-yellow-400 rounded p-2" : ""}`} animate={errors.showtime ? { x: [0, -6, 6, -6, 6, 0] } : {}} transition={{ duration: 0.35 }}>
+                          {(activeMoviesFull.find((x: any) => x.title === formData.movie)?.showtimes || [])
+                            .filter((st: any) => new Date(st.start_time).toDateString() === (formData.date ? formData.date.toDateString() : ""))
+                            .map((st: any) => {
+                              const t = new Date(st.start_time);
+                              const label = `${t.getHours().toString().padStart(2, "0")}:${t.getMinutes().toString().padStart(2, "0")}`;
+                              const isActive = formData.showtime === label;
+                              return (
+                                <Button
+                                  key={st.id}
+                                  type="button"
+                                  variant={isActive ? "default" : "outline"}
+                                  className={isActive ? "bg-blue-600 text-white" : "border-gray-300 text-gray-900"}
+                                  disabled={isProcessing}
+                                  onClick={() => { setFormData({ ...formData, showtime: label }); setSelectedShowtimeId(st.id); }}
+                                >
+                                  {label}
+                                </Button>
+                              )
+                            })}
+                        </motion.div>
+                        {errors.showtime && <div className="text-red-500 text-xs mt-1">{errors.showtime}</div>}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
             )}
             {currentStep === 0 && (
-            <div className="space-y-2">
-              <Label htmlFor="name" className="text-white">
-                Họ và Tên *
-              </Label>
-              <motion.div animate={errors.name ? { x: [0,-6,6,-6,6,0] } : {}} transition={{ duration: 0.35 }}>
-                <Input
-                  id="name"
-                  required
-                  value={formData.name}
-                  onChange={(e) =>
-                    setFormData({ ...formData, name: e.target.value })
-                  }
-                  disabled={isProcessing}
-                  className={`bg-black/40 text-white ${errors.name ? "border-yellow-400 ring-1 ring-yellow-300" : "border-cyan-400/40"} ${errors.name ? "focus-visible:ring-yellow-400" : "focus-visible:ring-cyan-400"}`}
-                  placeholder="Nhập họ và tên"
-                />
-              </motion.div>
-              {errors.name && <div className="text-red-400 text-xs mt-1">{errors.name}</div>}
-            </div>
-            )}
-            {currentStep === 0 && (
-            <div className="space-y-2">
-              <Label htmlFor="phone" className="text-white">
-                Số Điện Thoại *
-              </Label>
-              <motion.div animate={errors.phone ? { x: [0,-6,6,-6,6,0] } : {}} transition={{ duration: 0.35 }}>
-                <Input
-                  id="phone"
-                  type="tel"
-                  required
-                  value={formData.phone}
-                  onChange={(e) =>
-                    setFormData({ ...formData, phone: e.target.value })
-                  }
-                  disabled={isProcessing}
-                  className={`bg-black/40 text-white ${errors.phone ? "border-yellow-400 ring-1 ring-yellow-300" : "border-cyan-400/40"} ${errors.phone ? "focus-visible:ring-yellow-400" : "focus-visible:ring-cyan-400"}`}
-                  placeholder="Nhập số điện thoại"
-                />
-              </motion.div>
-              {errors.phone && <div className="text-red-400 text-xs mt-1">{errors.phone}</div>}
-            </div>
-            )}
-            {currentStep === 0 && (
-            <div className="space-y-2">
-              <Label htmlFor="email" className="text-white">
-                Email *
-              </Label>
-              <motion.div animate={errors.email ? { x: [0,-6,6,-6,6,0] } : {}} transition={{ duration: 0.35 }}>
-                <Input
-                  id="email"
-                  type="email"
-                  required
-                  value={formData.email}
-                  onChange={(e) =>
-                    setFormData({ ...formData, email: e.target.value })
-                  }
-                  disabled={isProcessing}
-                  className={`bg-black/40 text-white ${errors.email ? "border-yellow-400 ring-1 ring-yellow-300" : "border-cyan-400/40"} ${errors.email ? "focus-visible:ring-yellow-400" : "focus-visible:ring-cyan-400"}`}
-                  placeholder="Nhập email"
-                />
-              </motion.div>
-              {errors.email && <div className="text-red-400 text-xs mt-1">{errors.email}</div>}
-            </div>
-            )}
-            {currentStep === 0 && (
-            <div className="space-y-2">
-              <div className="flex items-center justify-between gap-3">
-                <Label htmlFor="quantity" className="text-white">Số Lượng Vé *</Label>
-                <div className="flex items-center gap-2">
-                  <Button disabled={isProcessing} type="button" variant="outline" className="h-10 w-10 border-cyan-400/40 hover:bg-cyan-500/10" onClick={() => setFormData({ ...formData, quantity: Math.max(1, formData.quantity - 1) })}>-</Button>
-                  <motion.div animate={errors.quantity ? { x: [0,-6,6,-6,6,0] } : {}} transition={{ duration: 0.35 }}>
+              <div className="space-y-2">
+                <Label htmlFor="name" className="text-white text-sm sm:text-base">
+                  Họ và Tên *
+                </Label>
+                <motion.div animate={errors.name ? { x: [0, -6, 6, -6, 6, 0] } : {}} transition={{ duration: 0.35 }}>
                   <Input
-                    id="quantity"
-                    type="number"
-                    min="1"
-                    max="10"
+                    id="name"
                     required
-                    value={formData.quantity}
+                    value={formData.name}
                     onChange={(e) =>
-                      setFormData({
-                        ...formData,
-                        quantity: Math.min(10, Math.max(1, parseInt(e.target.value) || 1)),
-                      })
+                      setFormData({ ...formData, name: e.target.value })
                     }
                     disabled={isProcessing}
-                    className={`w-24 bg-black/40 text-white text-center ${errors.quantity ? "border-yellow-400 ring-1 ring-yellow-300" : "border-cyan-400/40"} ${errors.quantity ? "focus-visible:ring-yellow-400" : "focus-visible:ring-cyan-400"}`}
+                    className={`bg-black/40 text-white h-10 sm:h-11 ${errors.name ? "border-yellow-400 ring-1 ring-yellow-300" : "border-cyan-400/40"} ${errors.name ? "focus-visible:ring-yellow-400" : "focus-visible:ring-cyan-400"}`}
+                    placeholder="Nhập họ và tên"
                   />
-                  </motion.div>
-                  <Button disabled={isProcessing} type="button" variant="outline" className="h-10 w-10 border-cyan-400/40 hover:bg-cyan-500/10" onClick={() => setFormData({ ...formData, quantity: Math.min(10, formData.quantity + 1) })}>+</Button>
-                </div>
+                </motion.div>
+                {errors.name && <div className="text-red-400 text-xs mt-1">{errors.name}</div>}
               </div>
-              {errors.quantity && <div className="text-red-400 text-xs mt-1">{errors.quantity}</div>}
-            </div>
+            )}
+            {currentStep === 0 && (
+              <div className="space-y-2">
+                <Label htmlFor="phone" className="text-white text-sm sm:text-base">
+                  Số Điện Thoại *
+                </Label>
+                <motion.div animate={errors.phone ? { x: [0, -6, 6, -6, 6, 0] } : {}} transition={{ duration: 0.35 }}>
+                  <Input
+                    id="phone"
+                    type="tel"
+                    required
+                    value={formData.phone}
+                    onChange={(e) =>
+                      setFormData({ ...formData, phone: e.target.value })
+                    }
+                    disabled={isProcessing}
+                    className={`bg-black/40 text-white h-10 sm:h-11 ${errors.phone ? "border-yellow-400 ring-1 ring-yellow-300" : "border-cyan-400/40"} ${errors.phone ? "focus-visible:ring-yellow-400" : "focus-visible:ring-cyan-400"}`}
+                    placeholder="Nhập số điện thoại"
+                  />
+                </motion.div>
+                {errors.phone && <div className="text-red-400 text-xs mt-1">{errors.phone}</div>}
+              </div>
+            )}
+            {currentStep === 0 && (
+              <div className="space-y-2">
+                <Label htmlFor="email" className="text-white text-sm sm:text-base">
+                  Email *
+                </Label>
+                <motion.div animate={errors.email ? { x: [0, -6, 6, -6, 6, 0] } : {}} transition={{ duration: 0.35 }}>
+                  <Input
+                    id="email"
+                    type="email"
+                    required
+                    value={formData.email}
+                    onChange={(e) =>
+                      setFormData({ ...formData, email: e.target.value })
+                    }
+                    disabled={isProcessing}
+                    className={`bg-black/40 text-white h-10 sm:h-11 ${errors.email ? "border-yellow-400 ring-1 ring-yellow-300" : "border-cyan-400/40"} ${errors.email ? "focus-visible:ring-yellow-400" : "focus-visible:ring-cyan-400"}`}
+                    placeholder="Nhập email"
+                  />
+                </motion.div>
+                {errors.email && <div className="text-red-400 text-xs mt-1">{errors.email}</div>}
+              </div>
+            )}
+            {currentStep === 0 && (
+              <div className="space-y-2">
+                <div className="flex items-center justify-between gap-3">
+                  <Label htmlFor="quantity" className="text-white text-sm sm:text-base">Số Lượng Vé *</Label>
+                  <div className="flex items-center gap-2">
+                    <Button disabled={isProcessing} type="button" variant="outline" className="h-10 w-10 border-cyan-400/40 hover:bg-cyan-500/10" onClick={() => setFormData({ ...formData, quantity: Math.max(1, formData.quantity - 1) })}>-</Button>
+                    <motion.div animate={errors.quantity ? { x: [0, -6, 6, -6, 6, 0] } : {}} transition={{ duration: 0.35 }}>
+                      <Input
+                        id="quantity"
+                        type="number"
+                        min="1"
+                        max="10"
+                        required
+                        value={formData.quantity}
+                        onChange={(e) =>
+                          setFormData({
+                            ...formData,
+                            quantity: Math.min(10, Math.max(1, parseInt(e.target.value) || 1)),
+                          })
+                        }
+                        disabled={isProcessing}
+                        className={`w-20 sm:w-24 bg-black/40 text-white text-center h-10 sm:h-11 ${errors.quantity ? "border-yellow-400 ring-1 ring-yellow-300" : "border-cyan-400/40"} ${errors.quantity ? "focus-visible:ring-yellow-400" : "focus-visible:ring-cyan-400"}`}
+                      />
+                    </motion.div>
+                    <Button disabled={isProcessing} type="button" variant="outline" className="h-10 w-10 border-cyan-400/40 hover:bg-cyan-500/10" onClick={() => setFormData({ ...formData, quantity: Math.min(10, formData.quantity + 1) })}>+</Button>
+                  </div>
+                </div>
+                {errors.quantity && <div className="text-red-400 text-xs mt-1">{errors.quantity}</div>}
+              </div>
             )}
             {currentStep === 1 && (
-            <div className="space-y-4">
-              <Label className="text-white">Phương Thức Thanh Toán *</Label>
-              <Radio.Group
-                value={paymentMethod}
-                onChange={(e: RadioChangeEvent) =>
-                  setPaymentMethod(e.target.value)
-                }
-                className="w-full"
-              >
-                <Space direction="vertical" className="w-full">
-                  <Radio
-                    value="momo"
-                    disabled={isProcessing}
-                    className="text-white [&>span]:text-white"
-                  >
-                    <div className="flex items-center gap-2">
-                      <CreditCard className="h-5 w-5 text-pink-400" />
-                      <span>MoMo</span>
-                    </div>
-                  </Radio>
-                  <Radio
-                    value="vnpay"
-                    disabled={isProcessing}
-                    className="text-white [&>span]:text-white"
-                  >
-                    <div className="flex items-center gap-2">
-                      <CreditCard className="h-5 w-5 text-blue-400" />
-                      <span>VNPay</span>
-                    </div>
-                  </Radio>
-                </Space>
-              </Radio.Group>
-            </div>
+              <div className="space-y-4">
+                <Label className="text-white">Phương Thức Thanh Toán *</Label>
+                <Radio.Group
+                  value={paymentMethod}
+                  onChange={(e: RadioChangeEvent) =>
+                    setPaymentMethod(e.target.value)
+                  }
+                  className="w-full"
+                >
+                  <Space direction="vertical" className="w-full">
+                    <Radio
+                      value="momo"
+                      disabled={isProcessing}
+                      className="text-white [&>span]:text-white"
+                    >
+                      <div className="flex items-center gap-2">
+                        <CreditCard className="h-5 w-5 text-pink-400" />
+                        <span>MoMo</span>
+                      </div>
+                    </Radio>
+                    <Radio
+                      value="vnpay"
+                      disabled={isProcessing}
+                      className="text-white [&>span]:text-white"
+                    >
+                      <div className="flex items-center gap-2">
+                        <CreditCard className="h-5 w-5 text-blue-400" />
+                        <span>VNPay</span>
+                      </div>
+                    </Radio>
+                  </Space>
+                </Radio.Group>
+              </div>
             )}
             {currentStep === 2 && (
-            <div className="space-y-4">
-              <div className="grid grid-cols-2 gap-2 text-sm">
-                <span className="text-cyan-200">Phim</span><span className="font-medium text-white">{selectedMovie?.title}</span>
-                <span className="text-cyan-200">Ngày</span><span className="font-medium text-white">{formData.date ? formData.date.toLocaleDateString("vi-VN") : ""}</span>
-                <span className="text-cyan-200">Giờ</span><span className="font-medium text-white">{formData.showtime}</span>
-                <span className="text-cyan-200">Họ tên</span><span className="font-medium text-white">{formData.name}</span>
-                <span className="text-cyan-200">Số lượng</span><span className="font-medium text-white">{formData.quantity}</span>
-                <span className="text-cyan-200">Thanh toán</span><span className="font-medium text-white">{paymentMethod === "momo" ? "MoMo" : "VNPay"}</span>
+              <div className="space-y-4">
+                <div className="grid grid-cols-2 gap-2 text-sm">
+                  <span className="text-cyan-200">Phim</span><span className="font-medium text-white">{selectedMovie?.title}</span>
+                  <span className="text-cyan-200">Ngày</span><span className="font-medium text-white">{formData.date ? formData.date.toLocaleDateString("vi-VN") : ""}</span>
+                  <span className="text-cyan-200">Giờ</span><span className="font-medium text-white">{formData.showtime}</span>
+                  <span className="text-cyan-200">Họ tên</span><span className="font-medium text-white">{formData.name}</span>
+                  <span className="text-cyan-200">Số lượng</span><span className="font-medium text-white">{formData.quantity}</span>
+                  <span className="text-cyan-200">Thanh toán</span><span className="font-medium text-white">{paymentMethod === "momo" ? "MoMo" : "VNPay"}</span>
+                </div>
               </div>
-            </div>
             )}
-            <div className="bg-black/40 rounded-lg p-4 border border-white/10">
+            <div className="bg-black/40 rounded-lg p-3 sm:p-4 border border-white/10">
               <div className="flex justify-between items-center mb-2">
-                <span className="text-white">Tổng Tiền:</span>
-                <span className="text-2xl font-bold text-blue-400">
+                <span className="text-white text-sm sm:text-base">Tổng Tiền:</span>
+                <span className="text-xl sm:text-2xl font-bold text-blue-400">
                   {totalPrice.toLocaleString("vi-VN")}₫
                 </span>
               </div>
-               {selectedMovie && (
-                 <div className="text-sm text-cyan-200">{selectedMovie.title} • {(activeMoviesFull.find((x:any)=>x.title===selectedMovie.title)?.duration_min) ? `${(activeMoviesFull.find((x:any)=>x.title===selectedMovie.title)?.duration_min)} phút` : ""}</div>
-               )}
+              {selectedMovie && (
+                <div className="text-xs sm:text-sm text-cyan-200">{selectedMovie.title} • {(activeMoviesFull.find((x: any) => x.title === selectedMovie.title)?.duration_min) ? `${(activeMoviesFull.find((x: any) => x.title === selectedMovie.title)?.duration_min)} phút` : ""}</div>
+              )}
             </div>
 
             {isProcessing && (
@@ -645,7 +650,7 @@ export default function BookingSection({ onBookClick }: BookingSectionProps) {
               </div>
             )}
 
-            <div className="flex gap-4">
+            <div className="flex gap-3 sm:gap-4">
               <Button
                 type="button"
                 variant="outline"
@@ -653,7 +658,7 @@ export default function BookingSection({ onBookClick }: BookingSectionProps) {
                   if (currentStep > 0) setCurrentStep(currentStep - 1);
                   else attemptClose();
                 }}
-                className="flex-1 border-white/20 text-black-400 hover:bg-gray-300"
+                className="flex-1 border-white/20 text-black-400 hover:bg-gray-300 h-10 sm:h-11"
               >
                 {currentStep > 0 ? "Quay lại" : "Hủy"}
               </Button>
@@ -672,7 +677,7 @@ export default function BookingSection({ onBookClick }: BookingSectionProps) {
                   const canProceed = currentStep === 0 ? isStep0Valid : currentStep === 1 ? !!paymentMethod : true;
                   return isProcessing || !canProceed;
                 })()}
-                className="flex-1 bg-gradient-to-r from-blue-500 to-purple-500 hover:from-blue-600 hover:to-purple-600 text-white"
+                className="flex-1 bg-gradient-to-r from-blue-500 to-purple-500 hover:from-blue-600 hover:to-purple-600 text-white h-10 sm:h-11"
               >
                 {isProcessing ? (
                   <span className="flex items-center justify-center gap-2">

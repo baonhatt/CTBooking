@@ -265,7 +265,19 @@
     color: black;
   }
   .ant-steps-item-wrapper .ant-steps-item-title,
-  .ant-steps-item-wrapper .ant-steps-item-description {
+  .ant-steps-item-wrapper .ant-steps-item-description,
+  .ant-steps-item-title,
+  .ant-steps-item-title span,
+  .ant-steps-item-title *,
+  .ant-steps-item-content .ant-steps-item-title,
+  .ant-steps-item-content .ant-steps-item-title span,
+  .ant-steps-item-content .ant-steps-item-title *,
+  .steps-white-text .ant-steps-item-title,
+  .steps-white-text .ant-steps-item-title span,
+  .steps-white-text .ant-steps-item-title *,
+  .steps-white-text .ant-steps-item-content .ant-steps-item-title,
+  .steps-white-text .ant-steps-item-content .ant-steps-item-title span,
+  .steps-white-text .ant-steps-item-content .ant-steps-item-title * {
     color: #ffffff !important;
   }
   .ant-steps-item-wrapper .ant-steps-item-icon.ant-wave-target {
@@ -278,5 +290,8 @@
 
   :global(span.ant-steps-item-icon-number) {
     color: #ffffff !important;
+  }
+  :global(.ant-steps-item-wrapper){
+    align-items: center !important;
   }
 }
