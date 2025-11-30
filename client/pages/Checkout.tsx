@@ -10,6 +10,7 @@ export default function Checkout() {
   const [order, setOrder] = useState<any>(null);
   const [status, setStatus] = useState<string>("");
   const [loading, setLoading] = useState(false);
+  const [isLoggedIn, setIsLoggedIn] = useState<boolean>(!!localStorage.getItem("authUser"));
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -47,6 +48,13 @@ export default function Checkout() {
       localStorage.removeItem("pendingOrder");
       window.history.replaceState({}, document.title, window.location.pathname);
     }
+    const onAuthChanged = () => setIsLoggedIn(!!localStorage.getItem("authUser"));
+    window.addEventListener("user-auth-changed", onAuthChanged as any);
+    window.addEventListener("storage", onAuthChanged as any);
+    return () => {
+      window.removeEventListener("user-auth-changed", onAuthChanged as any);
+      window.removeEventListener("storage", onAuthChanged as any);
+    };
   }, []);
 
   async function payWithMomo() {
@@ -124,8 +132,14 @@ export default function Checkout() {
         </CardContent>
         <CardFooter className="flex justify-between">
           <Button variant="outline" onClick={() => navigate("/")}>Quay lại</Button>
-          <Button disabled={!order || loading} onClick={payWithMomo}>Thanh toán MoMo</Button>
+          <Button disabled={!order || loading || !isLoggedIn} onClick={payWithMomo}>Thanh toán MoMo</Button>
         </CardFooter>
+        {!isLoggedIn && (
+          <div className="px-6 pb-6 text-sm text-red-600">
+            Vui lòng đăng nhập trước khi thanh toán.
+            <button className="ml-2 text-blue-600 underline" onClick={() => { window.dispatchEvent(new Event("open-login")); navigate("/"); }}>Đăng nhập</button>
+          </div>
+        )}
       </Card>
     </div>
   );
