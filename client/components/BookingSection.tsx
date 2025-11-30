@@ -20,9 +20,9 @@ import { Label } from "@/components/ui/label";
 import { Ticket, Users, UserCheck, CreditCard, Clock, Check, Loader2 } from "lucide-react";
 import { Radio, Space, DatePicker } from "antd";
 import type { RadioChangeEvent } from "antd";
-import type { Movie } from "@shared/api";
 import { useMovies2025 } from "@/hooks/useMovies";
 import { toast } from "@/components/ui/use-toast";
+import { createMomoPaymentApi, createVnpayPaymentApi, API_BASE_URL } from "@/lib/api";
 
 interface BookingSectionProps {
   onBookClick: () => void;
@@ -71,6 +71,41 @@ export default function BookingSection({ onBookClick }: BookingSectionProps) {
   }, []);
 
   // movies fetched via React Query; no manual effect needed
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const resultCode = params.get("resultCode");
+    const orderId = params.get("orderId");
+    const amountParam = params.get("amount");
+    const extraDataParam = params.get("extraData");
+    if (resultCode && orderId) {
+      try {
+        let pending: any = {};
+        if (extraDataParam) {
+          try {
+            pending = JSON.parse(decodeURIComponent(escape(atob(extraDataParam))));
+          } catch {}
+        }
+        if (!pending || Object.keys(pending).length === 0) {
+          const pendingStr = localStorage.getItem("pendingOrder");
+          pending = pendingStr ? JSON.parse(pendingStr) : {};
+        }
+        const status = resultCode === "0" ? "success" : "failed";
+        const summary = {
+          ...pending,
+          amount: amountParam ? Number(amountParam) : pending?.amount,
+          method: "momo",
+          status,
+        };
+        setOrderInfo(summary);
+        setIsResultOpen(true);
+        setIsModalOpen(false);
+        setIsProcessing(false);
+        localStorage.removeItem("pendingOrder");
+      } catch {}
+      window.history.replaceState({}, document.title, window.location.pathname);
+    }
+  }, []);
 
   const handleOpenModal = () => {
     setIsModalOpen(true);
@@ -139,7 +174,83 @@ export default function BookingSection({ onBookClick }: BookingSectionProps) {
     setIsProcessing(true);
     setCountdown(600);
 
-    // Simulate payment processing with countdown
+    if (paymentMethod === "momo") {
+      try {
+        const partnerCode = (import.meta as any).env?.VITE_MOMO_PARTNER_CODE || "";
+        const partnerName = (import.meta as any).env?.VITE_MOMO_PARTNER_NAME || "CineSphere";
+        const storeId = (import.meta as any).env?.VITE_MOMO_STORE_ID || "devstore";
+        const redirectUrl = (import.meta as any).env?.VITE_MOMO_REDIRECT_URL || window.location.origin + "/";
+        const ipnUrl = (import.meta as any).env?.VITE_MOMO_IPN_URL || (API_BASE_URL ? API_BASE_URL + "/api/momo/ipn" : window.location.origin + "/api/momo/ipn");
+        const accessKey = (import.meta as any).env?.VITE_MOMO_ACCESS_KEY || "";
+        const secretKey = (import.meta as any).env?.VITE_MOMO_SECRET_KEY || "";
+        const requestId = Date.now().toString();
+        const orderId = `ORDER_${Date.now()}`;
+        const orderInfo = `${selectedMovie?.title || "Movie"} | ${formData.quantity} vé | ${formData.showtime || "--:--"}`;
+        const summary = {
+          orderId,
+          movie: selectedMovie?.title,
+          dateDisplay: formData.date ? formData.date.toLocaleDateString("vi-VN") : "",
+          showtime: formData.showtime,
+          name: formData.name,
+          quantity: formData.quantity,
+          amount: totalPrice,
+          method: "momo",
+        };
+        localStorage.setItem("pendingOrder", JSON.stringify(summary));
+        const extraDataEncoded = btoa(unescape(encodeURIComponent(JSON.stringify(summary))));
+        const payload = {
+          partnerCode,
+          partnerName,
+          storeId,
+          requestId,
+          amount: totalPrice,
+          orderId,
+          orderInfo,
+          redirectUrl,
+          ipnUrl,
+          lang: "vi",
+          extraData: extraDataEncoded,
+          requestType: "captureWallet",
+          signature: "",
+          accessKey,
+          secretKey,
+        };
+        const res = await createMomoPaymentApi(payload as any);
+        if (res?.payUrl) {
+          window.location.href = res.payUrl;
+          console.log("🚀 ~ handleSubmit ~ window.location.href:", window.location.href)
+  
+          return;
+        }
+        throw new Error("Không nhận được liên kết thanh toán MoMo");
+      } catch (err: any) {
+        if (countdownRef.current) clearInterval(countdownRef.current);
+        setIsProcessing(false);
+        toast({ title: "Thanh toán MoMo thất bại", description: err?.message || "Vui lòng thử lại" , variant: "destructive" });
+        return;
+      }
+    }
+
+    if (paymentMethod === "vnpay") {
+      try {
+        const orderId = `ORDER_${Date.now()}`;
+        const orderInfo = `${selectedMovie?.title || "Movie"} | ${formData.quantity} vé | ${formData.showtime || "--:--"}`;
+        const tmnCode = (import.meta as any).env?.VITE_VNPAY_TMN_CODE || "";
+        const hashSecret = (import.meta as any).env?.VITE_VNPAY_HASH_SECRET || "";
+        const returnUrl = (import.meta as any).env?.VITE_VNPAY_RETURN_URL || window.location.origin + "/";
+        const res = await createVnpayPaymentApi({ amount: totalPrice, orderId, orderInfo, locale: "vn", tmnCode, hashSecret, returnUrl });
+        if (res?.payUrl) {
+          window.location.href = res.payUrl;
+          return;
+        }
+        throw new Error("Không nhận được liên kết thanh toán VNPay");
+      } catch (err: any) {
+        setIsProcessing(false);
+        toast({ title: "Thanh toán VNPay thất bại", description: err?.message || "Vui lòng thử lại", variant: "destructive" });
+        return;
+      }
+    }
+
     countdownRef.current = setInterval(() => {
       setCountdown((prev) => {
         if (prev <= 1) {
@@ -156,7 +267,6 @@ export default function BookingSection({ onBookClick }: BookingSectionProps) {
       });
     }, 1000);
 
-    // In real app, this would call payment API
     timerRef.current = setTimeout(() => {
       if (countdownRef.current) clearInterval(countdownRef.current);
       setIsProcessing(false);
