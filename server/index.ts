@@ -7,6 +7,8 @@ import { handleLogin } from "./routes/login";
 import { handleRegister } from "./routes/register";
 import { handleForgetPass, handleResetPassword } from "./routes/forget-pass";
 import { getAllActiveMoviesToday } from "./routes/movies";
+import { createMomoPayment, momoIpn } from "./routes/momo";
+import { createVnpayPayment, vnpayIpn } from "./routes/vnpay";
 
 
 export function createServer() {
@@ -29,6 +31,10 @@ export function createServer() {
   app.post("/api/forget-password", handleForgetPass);
   app.post("/api/reset-password", handleResetPassword);
   app.post("/api/getActiveMovies", getAllActiveMoviesToday);
+  app.post("/api/momo/create-payment", createMomoPayment);
+  app.post("/api/momo/ipn", momoIpn);
+  app.post("/api/vnpay/create-payment", createVnpayPayment);
+  app.post("/api/vnpay/ipn", vnpayIpn);
 
   return app;
 }

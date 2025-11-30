@@ -89,6 +89,21 @@ export async function createMomoPaymentApi(body: {
     body: JSON.stringify(body),
   });
 }
+// ----------------- API CREATE VNPAY PAYMENT -----------------
+export async function createVnpayPaymentApi(body: {
+  amount: number;
+  orderId: string;
+  orderInfo: string;
+  locale?: string;
+  tmnCode?: string;
+  hashSecret?: string;
+  returnUrl?: string;
+}) {
+  return request<{ payUrl: string }>("/api/vnpay/create-payment", {
+    method: "POST",
+    body: JSON.stringify(body),
+  });
+}
 // ----------------- API ADMIN LOGIN -----------------
 export async function adminLoginApi(body: { email: string; password: string }) {
   return request<{ token: string; exp: number; user: { email: string } }>("/api/admin/login", {
