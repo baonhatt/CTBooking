@@ -122,7 +122,7 @@
 
 @layer utilities {
   .bg-gradient-dark {
-    background: linear-gradient(135deg, #0e1b3d 0%, #123066 50%, #18408d 100%);
+    background: linear-gradient(135deg, #0e1b3d 0%, #123066 50%, #1e5dd8 100%);
   }
 
   .bg-gradient-section {

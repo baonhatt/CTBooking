@@ -118,8 +118,7 @@ export default function Footer() {
         </div>
       </div>
 
-      {/* Scroll to Top Button */}
-     
+      
     </footer>
   );
 }
