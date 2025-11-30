@@ -5,10 +5,17 @@ import { createRoot } from "react-dom/client";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { BrowserRouter, Routes, Route, useNavigate } from "react-router-dom";
 import Index from "./pages/Index";
 import NotFound from "./pages/NotFound";
 import ConfirmToken from "./components/ConfirmToken";
+import Admin from "./pages/Admin";
+import { useEffect, useState } from "react";
+import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Button } from "@/components/ui/button";
+import { adminLoginApi } from "@/lib/api";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -20,6 +27,72 @@ const queryClient = new QueryClient({
   },
 });
 
+const AdminLoginView = () => {
+  const navigate = useNavigate();
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+
+  return (
+    <div className="min-h-screen flex items-center justify-center bg-background">
+      <Card className="w-full max-w-sm bg-white">
+        <CardHeader>
+          <CardTitle>Đăng nhập Admin</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-3">
+            <div>
+              <Label>Email</Label>
+              <Input value={email} onChange={(e) => setEmail(e.target.value)} />
+            </div>
+            <div>
+              <Label>Mật khẩu</Label>
+              <Input type="password" value={password} onChange={(e) => setPassword(e.target.value)} />
+            </div>
+            {error && <div className="text-red-500 text-sm">{error}</div>}
+            <div className="flex justify-end">
+              <Button
+                disabled={loading}
+                onClick={async () => {
+                  try {
+                    setLoading(true);
+                    setError("");
+                    // const { token } = await adminLoginApi({ email, password });
+                    // localStorage.setItem("adminToken", token);
+                     if(email === 'admin@email.com' && password === 'admin'){
+                      localStorage.setItem("adminToken", 'adminToken');
+                      
+                    }
+                    window.dispatchEvent(new Event("admin-auth-changed"));
+                    navigate("/admin", { replace: true });
+                  } catch (err) {
+                    setError("Đăng nhập thất bại");
+                  } finally {
+                    setLoading(false);
+                  }
+                }}
+              >
+                {loading ? "Đang đăng nhập..." : "Đăng nhập"}
+              </Button>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  );
+};
+
+const AdminGate = () => {
+  const [hasToken, setHasToken] = useState<boolean>(!!localStorage.getItem("adminToken"));
+  useEffect(() => {
+    const onAuthChanged = () => setHasToken(!!localStorage.getItem("adminToken"));
+    window.addEventListener("admin-auth-changed", onAuthChanged as any);
+    return () => window.removeEventListener("admin-auth-changed", onAuthChanged as any);
+  }, []);
+  return hasToken ? <Admin /> : <AdminLoginView />;
+};
+
 const App = () => (
   <QueryClientProvider client={queryClient}>
     <TooltipProvider>
@@ -29,6 +102,7 @@ const App = () => (
         <Routes>
           <Route path="/" element={<Index />} />
           <Route path="/reset-password" element={<ConfirmToken />} />
+          <Route path="/admin" element={<AdminGate />} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
         </Routes>
