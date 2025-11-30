@@ -1,40 +1,20 @@
+import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { ArrowRight } from "lucide-react";
-
-const products = [
-  {
-    id: 1,
-    name: "Robo Nhảy Hip-hop",
-    category: "TOY",
-    price: 350000,
-    image: "https://images.unsplash.com/photo-1485827404703-89b55fcc595e?w=400&h=400&fit=crop",
-  },
-  {
-    id: 2,
-    name: "Labubu Secret Edition",
-    category: "COLLECTIBLE",
-    price: 1200000,
-    image: "https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=400&h=400&fit=crop",
-  },
-  {
-    id: 3,
-    name: "Máy Ảnh Film Retro",
-    category: "GADGET",
-    price: 850000,
-    image: "https://images.unsplash.com/photo-1606983340126-99ab4feaa64a?w=400&h=400&fit=crop",
-  },
-  {
-    id: 4,
-    name: "Lego Space Shuttle",
-    category: "TOY",
-    price: 550000,
-    image: "https://images.unsplash.com/photo-1606144042614-b2417e99c4e3?w=400&h=400&fit=crop",
-  },
-];
+import { getActiveToys } from "@/lib/api";
 
 export default function ProductSection() {
+  const [products, setProducts] = useState<any[]>([]);
+  useEffect(() => {
+    (async () => {
+      try {
+        const { items } = await getActiveToys();
+        setProducts(items.map((t: any) => ({ id: t.id, name: t.name, category: t.category || "TOY", price: Number(t.price), image: t.image_url })));
+      } catch {}
+    })();
+  }, []);
   return (
     <section id="products" className="py-20 bg-gradient-section relative overflow-hidden">
       <div className="container mx-auto px-4 relative z-10">

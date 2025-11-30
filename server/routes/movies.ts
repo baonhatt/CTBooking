@@ -128,3 +128,154 @@ export const getAllActiveMoviesToday: RequestHandler = async (_req, res) => {
     return res.status(500).json({ message: "Lỗi máy chủ nội bộ" });
   }
 };
+
+export const createMovie: RequestHandler = async (req, res) => {
+  let baseData: any
+  try {
+    const {
+      title,
+      description,
+      cover_image,
+      detail_images,
+      genres,
+      rating,
+      duration_min,
+      price,
+      is_active,
+      release_date,
+    } = req.body as any
+    if (!title || price === undefined) {
+      return res.status(400).json({ message: "Thiếu dữ liệu bắt buộc" })
+    }
+    const priceNum = Number(price)
+    if (!Number.isFinite(priceNum) || priceNum < 0) {
+      return res.status(400).json({ message: "Giá không hợp lệ" })
+    }
+    if (priceNum > 99999999.99) {
+      return res.status(400).json({ message: "Giá vượt quá giới hạn (tối đa 99,999,999.99)" })
+    }
+    let ratingNum: number | undefined = undefined
+    if (rating !== undefined && rating !== null && rating !== "") {
+      ratingNum = Number(rating)
+      if (!Number.isFinite(ratingNum) || ratingNum < 0 || ratingNum > 10) {
+        return res.status(400).json({ message: "Điểm đánh giá không hợp lệ" })
+      }
+    }
+    const durationNum = duration_min === undefined ? undefined : Number(duration_min)
+    if (durationNum !== undefined && (!Number.isInteger(durationNum) || durationNum < 0)) {
+      return res.status(400).json({ message: "Thời lượng không hợp lệ" })
+    }
+    baseData = {
+      title,
+      description,
+      cover_image,
+      detail_images,
+      genres,
+      rating: ratingNum,
+      duration_min: durationNum,
+      price: priceNum,
+      is_active: is_active === undefined ? true : Boolean(is_active),
+      release_date: release_date ? new Date(release_date) : undefined,
+    }
+    let movie = await (prisma as any).movies.create({ data: baseData })
+    res.status(201).json({ movie })
+  } catch (err: any) {
+    if (err?.code === "P2002" && String(err?.meta?.target || "").includes("id")) {
+      try {
+        const last = await (prisma as any).movies.findFirst({ orderBy: { id: "desc" } })
+        const nextId = ((last?.id as number) || 0) + 1
+        const movie = await (prisma as any).movies.create({ data: { ...baseData, id: nextId } })
+
+        return res.status(201).json({ movie })
+      } catch (retryErr: any) {
+        return res.status(500).json({ message: retryErr?.message || "Lỗi máy chủ nội bộ" })
+      }
+    }
+    res.status(500).json({ message: err?.message || "Lỗi máy chủ nội bộ" })
+  }
+}
+
+export const listMovies: RequestHandler = async (req, res) => {
+  try {
+    const page = Number(req.query.page || 1)
+    const pageSize = Number(req.query.pageSize || 20)
+    const q = String(req.query.q || "").toLowerCase()
+    const where: any = q
+      ? {
+          OR: [
+            { title: { contains: q, mode: "insensitive" } },
+            { description: { contains: q, mode: "insensitive" } },
+          ],
+        }
+      : {}
+    const total = await (prisma as any).movies.count({ where })
+    const items = await (prisma as any).movies.findMany({
+      where,
+      orderBy: { created_at: "desc" },
+      skip: (page - 1) * pageSize,
+      take: pageSize,
+    })
+    res.status(200).json({ items, page, pageSize, total })
+  } catch {
+    res.status(500).json({ message: "Lỗi máy chủ nội bộ" })
+  }
+}
+
+export const getMovie: RequestHandler = async (req, res) => {
+  try {
+    const id = Number(req.params.id)
+    const movie = await (prisma as any).movies.findUnique({ where: { id } })
+    if (!movie) return res.status(404).json({ message: "Không tìm thấy" })
+    res.status(200).json({ movie })
+  } catch {
+    res.status(500).json({ message: "Lỗi máy chủ nội bộ" })
+  }
+}
+
+export const updateMovie: RequestHandler = async (req, res) => {
+  try {
+    const id = Number(req.params.id)
+    const { title, description, cover_image, detail_images, genres, rating, duration_min, price, is_active, release_date } = req.body as any
+    const data: any = {}
+    if (title !== undefined) data.title = title
+    if (description !== undefined) data.description = description
+    if (cover_image !== undefined) data.cover_image = cover_image
+    if (detail_images !== undefined) data.detail_images = detail_images
+    if (genres !== undefined) data.genres = genres
+    if (rating !== undefined) {
+      const r = Number(rating)
+      if (!Number.isFinite(r) || r < 0 || r > 10) return res.status(400).json({ message: "Điểm đánh giá không hợp lệ" })
+      data.rating = r
+    }
+    if (duration_min !== undefined) {
+      const d = Number(duration_min)
+      if (!Number.isInteger(d) || d < 0) return res.status(400).json({ message: "Thời lượng không hợp lệ" })
+      data.duration_min = d
+    }
+    if (price !== undefined) {
+      const p = Number(price)
+      if (!Number.isFinite(p) || p < 0) return res.status(400).json({ message: "Giá không hợp lệ" })
+      if (p > 99999999.99) return res.status(400).json({ message: "Giá vượt quá giới hạn (tối đa 99,999,999.99)" })
+      data.price = p
+    }
+    if (is_active !== undefined) data.is_active = Boolean(is_active)
+    if (release_date !== undefined) data.release_date = release_date ? new Date(release_date) : null
+    data.updated_at = new Date()
+    const movie = await (prisma as any).movies.update({ where: { id }, data })
+    res.status(200).json({ movie })
+  } catch (err: any) {
+    if (err?.code === "P2025") return res.status(404).json({ message: "Không tìm thấy" })
+    res.status(500).json({ message: "Lỗi máy chủ nội bộ" })
+  }
+}
+
+export const deleteMovie: RequestHandler = async (req, res) => {
+  try {
+    const id = Number(req.params.id)
+    await (prisma as any).movies.delete({ where: { id } })
+    res.status(200).json({ ok: true })
+  } catch (err: any) {
+    if (err?.code === "P2025") return res.status(404).json({ message: "Không tìm thấy" })
+    res.status(500).json({ message: "Lỗi máy chủ nội bộ" })
+  }
+}
