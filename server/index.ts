@@ -9,6 +9,7 @@ import { handleForgetPass, handleResetPassword } from "./routes/forget-pass";
 import { getAllActiveMoviesToday } from "./routes/movies";
 import { createMomoPayment, momoIpn } from "./routes/momo";
 import { createVnpayPayment, vnpayIpn } from "./routes/vnpay";
+import { createPayment, updatePayment } from "./routes/payment";
 
 
 export function createServer() {
@@ -35,6 +36,9 @@ export function createServer() {
   app.post("/api/momo/ipn", momoIpn);
   app.post("/api/vnpay/create-payment", createVnpayPayment);
   app.post("/api/vnpay/ipn", vnpayIpn);
+  app.post("/api/create-booking", createPayment); // sử dụng để tạo đặt vé sau khi ấn nút thanh toán
+  app.post("/api/confirm-booking", updatePayment); // sử dụng để xử lý data do momo trả về sau khi người dùng thanh toán thành công
+  
 
   return app;
 }
