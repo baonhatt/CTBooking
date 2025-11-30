@@ -4,7 +4,6 @@ import { prisma } from '../lib/prisma'
 import bcrypt from "bcryptjs";
 
 export const handleLogin: RequestHandler = async (req, res) => {
-  console.log("🚀 ~ handleLogin ~ req:", req)
   const { email, password } = req.body as Partial<Login>;
   const useracc = await prisma.accounts.findFirst({
     where: {
