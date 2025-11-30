@@ -42,7 +42,7 @@ export default function Index() {
         token: {
           colorPrimary: "#22d3ee",
           colorBgBase: "#0e1b3d",
-          colorText: "#000000",
+          colorText: "#ffffff",
         },
         components: {
           DatePicker: {
@@ -52,6 +52,10 @@ export default function Index() {
             colorBorder: "#e5e7eb",
             controlItemBgHover: "#f1f5f9",
             colorTextDisabled: "#94a3b8",
+          },
+          Steps: {
+            colorText: "#ffffff",
+            colorTextDescription: "#ffffff",
           },
         },
       }}

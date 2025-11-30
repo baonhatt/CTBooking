@@ -264,4 +264,19 @@
   :global(.ant-picker-header-view) {
     color: black;
   }
+  .ant-steps-item-wrapper .ant-steps-item-title,
+  .ant-steps-item-wrapper .ant-steps-item-description {
+    color: #ffffff !important;
+  }
+  .ant-steps-item-wrapper .ant-steps-item-icon.ant-wave-target {
+    color: #ffffff !important;
+    border: 1px solid #ffffff !important;
+  }
+  .ant-steps-item-wrapper .ant-steps-item-icon .ant-steps-icon {
+    color: #ffffff !important;
+  }
+
+  :global(span.ant-steps-item-icon-number) {
+    color: #ffffff !important;
+  }
 }
