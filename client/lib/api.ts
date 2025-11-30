@@ -137,5 +137,71 @@ export async function adminLoginApi(body: { email: string; password: string }) {
     body: JSON.stringify(body),
   });
 }
+// ----------------- API TOYS CRUD -----------------
+export async function getToys(options?: { page?: number; pageSize?: number; q?: string; signal?: AbortSignal }) {
+  const params = new URLSearchParams()
+  if (options?.page) params.set("page", String(options.page))
+  if (options?.pageSize) params.set("pageSize", String(options.pageSize))
+  if (options?.q) params.set("q", options.q)
+  const path = `/api/toys${params.toString() ? `?${params.toString()}` : ""}`
+  return request<{ items: any[]; page: number; pageSize: number; total: number }>(path, { signal: options?.signal })
+}
+
+export async function getActiveToys(options?: { signal?: AbortSignal }) {
+  return request<{ items: any[] }>("/api/toys/active", { signal: options?.signal })
+}
+
+export async function getToyById(id: number) {
+  return request<{ toy: any }>(`/api/toys/${id}`)
+}
+
+export async function createToyApi(body: { name: string; category?: string; price: number; stock?: number; status?: string; image_url?: string }) {
+  return request<{ toy: any }>("/api/toys", { method: "POST", body: JSON.stringify(body) })
+}
+
+export async function updateToyApi(id: number, body: { name?: string; category?: string; price?: number; stock?: number; status?: string; image_url?: string }) {
+  return request<{ toy: any }>(`/api/toys/${id}`, { method: "PUT", body: JSON.stringify(body) })
+}
+
+export async function deleteToyApi(id: number) {
+  return request<{ ok: boolean }>(`/api/toys/${id}`, { method: "DELETE" })
+}
+// ----------------- API MOVIES CRUD -----------------
+export async function createMovieApi(body: {
+  title: string;
+  description?: string;
+  cover_image?: string;
+  detail_images?: any;
+  genres?: any;
+  rating?: number;
+  duration_min?: number;
+  price: number;
+  is_active?: boolean;
+  release_date?: string;
+}) {
+  return request<{ movie: any }>("/api/movies", { method: "POST", body: JSON.stringify(body) })
+}
+export async function getMoviesAdmin(options?: { page?: number; pageSize?: number; q?: string; signal?: AbortSignal }) {
+  const params = new URLSearchParams()
+  if (options?.page) params.set("page", String(options.page))
+  if (options?.pageSize) params.set("pageSize", String(options.pageSize))
+  if (options?.q) params.set("q", options.q)
+  const path = `/api/movies${params.toString() ? `?${params.toString()}` : ""}`
+  return request<{ items: any[]; page: number; pageSize: number; total: number }>(path, { signal: options?.signal })
+}
+export async function updateMovieApi(id: number, body: { title?: string; description?: string; cover_image?: string; detail_images?: any; genres?: any; rating?: number; duration_min?: number; price?: number; is_active?: boolean; release_date?: string }) {
+  return request<{ movie: any }>(`/api/movies/${id}`, { method: "PUT", body: JSON.stringify(body) })
+}
+export async function deleteMovieApi(id: number) {
+  return request<{ ok: boolean }>(`/api/movies/${id}`, { method: "DELETE" })
+}
+// ----------------- API ADMIN REVENUE -----------------
+export async function getAdminRevenue(options?: { from?: string; to?: string; signal?: AbortSignal }) {
+  const params = new URLSearchParams()
+  if (options?.from) params.set("from", options.from)
+  if (options?.to) params.set("to", options.to)
+  const path = `/api/admin/revenue${params.toString() ? `?${params.toString()}` : ""}`
+  return request<{ total: number; count: number }>(path, { signal: options?.signal })
+}
 // ----------------- DECLARE TYPE -----------------
 export type { Movie, MoviesResponse, Login, Register };

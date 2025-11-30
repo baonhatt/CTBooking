@@ -2,14 +2,15 @@ import "dotenv/config";
 import express from "express";
 import cors from "cors";
 import { handleDemo } from "./routes/demo";
-import { handleMovies2025 } from "./routes/movies";
+import { handleMovies2025, createMovie, listMovies, getMovie, updateMovie, deleteMovie } from "./routes/movies";
 import { handleLogin } from "./routes/login";
 import { handleRegister } from "./routes/register";
 import { handleForgetPass, handleResetPassword } from "./routes/forget-pass";
 import { getAllActiveMoviesToday } from "./routes/movies";
 import { createMomoPayment, momoIpn } from "./routes/momo";
 import { createVnpayPayment, vnpayIpn } from "./routes/vnpay";
-import { createPayment, updatePayment } from "./routes/payment";
+import { createPayment, updatePayment, getRevenue } from "./routes/payment";
+import { listToys, listActiveToys, createToy, getToy, updateToy, deleteToy } from "./routes/toys";
 
 
 export function createServer() {
@@ -27,6 +28,11 @@ export function createServer() {
 
   app.get("/api/demo", handleDemo);
   app.get("/api/movies/2025", handleMovies2025);
+  app.get("/api/movies", listMovies);
+  app.get("/api/movies/:id", getMovie);
+  app.post("/api/movies", createMovie);
+  app.put("/api/movies/:id", updateMovie);
+  app.delete("/api/movies/:id", deleteMovie);
   app.post("/api/login", handleLogin);
   app.post("/api/register", handleRegister);
   app.post("/api/forget-password", handleForgetPass);
@@ -38,6 +44,13 @@ export function createServer() {
   app.post("/api/vnpay/ipn", vnpayIpn);
   app.post("/api/create-booking", createPayment); // sử dụng để tạo đặt vé sau khi ấn nút thanh toán
   app.post("/api/confirm-booking", updatePayment); // sử dụng để xử lý data do momo trả về sau khi người dùng thanh toán thành công
+  app.get("/api/admin/revenue", getRevenue);
+  app.get("/api/toys", listToys);
+  app.get("/api/toys/active", listActiveToys);
+  app.get("/api/toys/:id", getToy);
+  app.post("/api/toys", createToy);
+  app.put("/api/toys/:id", updateToy);
+  app.delete("/api/toys/:id", deleteToy);
   
 
   return app;

@@ -85,3 +85,15 @@ model bookings {
   showtime       showtimes @relation(fields: [showtime_id], references: [id], onDelete: Cascade)
   user           users     @relation(fields: [user_id], references: [id], onDelete: Cascade)
 }
+
+model toys {
+  id          Int      @id @default(autoincrement())
+  name        String   @db.VarChar(255)
+  category    String?  @db.VarChar(100)
+  price       Decimal  @db.Decimal(10, 2)
+  stock       Int      @default(0)
+  status      String   @default("active") @db.VarChar(20)
+  image_url   String?
+  created_at  DateTime @default(now())
+  updated_at  DateTime @default(now())
+}

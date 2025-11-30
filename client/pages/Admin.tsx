@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect } from "react";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
@@ -15,15 +15,25 @@ import {
   SidebarMenuItem,
   SidebarMenuButton,
   SidebarInset,
+  SidebarTrigger,
+  SidebarRail,
 } from "@/components/ui/sidebar";
-import { LayoutDashboard, UserCircle, Film, Gamepad2, CreditCard } from "lucide-react";
+import { LayoutDashboard, UserCircle, Film, Gamepad2, CreditCard, Ticket, Users, ShieldCheck, Eye } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
-import { adminLoginApi } from "@/lib/api";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart";
+import { LineChart, Line, BarChart, Bar, CartesianGrid, XAxis, YAxis } from "recharts";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { useNavigate } from "react-router-dom";
+import { Pagination, PaginationContent, PaginationItem, PaginationLink, PaginationNext, PaginationPrevious } from "@/components/ui/pagination";
+import { getToys, createToyApi, updateToyApi, deleteToyApi, createMovieApi, getMoviesAdmin, updateMovieApi, deleteMovieApi, getAdminRevenue } from "@/lib/api";
 
 export default function Admin() {
   const { data: movies = [] } = useMovies2025();
+  const navigate = useNavigate();
   const [active, setActive] = useState<"dashboard" | "users" | "movies" | "toys" | "transactions">("dashboard");
+  const [moviesLoaded, setMoviesLoaded] = useState(false);
   const [userQuery, setUserQuery] = useState("");
   const [txQuery, setTxQuery] = useState("");
   const [users, setUsers] = useState(() => [
@@ -32,16 +42,22 @@ export default function Admin() {
   const [transactions] = useState(() => [] as Array<{ id: string; user: string; amount: number; method: string; status: string; createdAt: Date }>);
   const [moviesLocal, setMoviesLocal] = useState(movies);
   const [movieStatus, setMovieStatus] = useState<Record<string, "active" | "inactive">>({});
-  const [toys, setToys] = useState([] as Array<{ id: string; name: string; category: string; price: number; stock: number; status: string; imageUrl?: string }>)
+  const [toys, setToys] = useState([] as Array<{ id: number; name: string; category?: string; price: number; stock: number; status: string; image_url?: string }>)
+  const [toysLoaded, setToysLoaded] = useState(false)
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [editType, setEditType] = useState<"user" | "movie" | "toy" | null>(null);
   const [editData, setEditData] = useState<any>(null);
   const [adminToken, setAdminToken] = useState<string>(() => localStorage.getItem("adminToken") || "");
-  const [loginEmail, setLoginEmail] = useState("");
-  const [loginPassword, setLoginPassword] = useState("");
-  const isAuthed = !!adminToken;
+  const [adminEmailState, setAdminEmailState] = useState<string>(() => localStorage.getItem("adminEmail") || "admin@email.com");
+  const [usersPage, setUsersPage] = useState(1);
+  const [moviesPage, setMoviesPage] = useState(1);
+  const [toysPage, setToysPage] = useState(1);
+  const [txPage, setTxPage] = useState(1);
+  const pageSize = 5;
+  const [revenueTotal, setRevenueTotal] = useState(0);
+  const [revenueCount, setRevenueCount] = useState(0);
 
-  if (moviesLocal.length !== movies.length) {
+  if (!moviesLoaded && active !== "movies" && moviesLocal.length !== movies.length) {
     setMoviesLocal(movies);
   }
 
@@ -49,17 +65,101 @@ export default function Admin() {
     const q = userQuery.toLowerCase();
     return users.filter((u) => [u.name, u.email, u.phone].some((x) => x.toLowerCase().includes(q)));
   }, [userQuery, users]);
+  const usersTotalPages = Math.max(1, Math.ceil(filteredUsers.length / pageSize));
+  const usersPageData = useMemo(() => filteredUsers.slice((usersPage - 1) * pageSize, usersPage * pageSize), [filteredUsers, usersPage]);
 
   const filteredTransactions = useMemo(() => {
     const q = txQuery.toLowerCase();
     return transactions.filter((t) => [t.user, t.method, t.status, t.id].some((x) => String(x).toLowerCase().includes(q)));
   }, [txQuery, transactions]);
+  const txTotalPages = Math.max(1, Math.ceil(filteredTransactions.length / pageSize));
+  const txPageData = useMemo(() => filteredTransactions.slice((txPage - 1) * pageSize, txPage * pageSize), [filteredTransactions, txPage]);
 
   const metrics = useMemo(() => {
     const activeUsers = users.filter((u) => u.status === "active").length;
-    const totalRevenue = transactions.filter((t) => t.status === "success").reduce((s, t) => s + t.amount, 0);
-    return { movies: movies.length, activeUsers, totalRevenue, toys: 0, tx: transactions.length };
-  }, [movies, users, transactions]);
+    const totalRevenue = revenueTotal;
+    const tx = revenueCount;
+    return { movies: movies.length, activeUsers, totalRevenue, toys: 0, tx };
+  }, [movies, users, revenueTotal, revenueCount]);
+
+  const userStats = useMemo(() => (
+    [
+      { day: "Sat", value: 1.4 },
+      { day: "Sun", value: 1.5 },
+      { day: "Mon", value: 2.6 },
+      { day: "Tue", value: 2.1 },
+      { day: "Wed", value: 3.5 },
+      { day: "Thu", value: 2.6 },
+      { day: "Fri", value: 4.99 },
+    ]
+  ), []);
+
+  const movieStats = useMemo(() => (
+    [
+      { month: "Jan", value: 12 },
+      { month: "Feb", value: 18 },
+      { month: "Mar", value: 15 },
+      { month: "Apr", value: 22 },
+      { month: "May", value: 17 },
+      { month: "Jun", value: 26 },
+      { month: "Jul", value: 21 },
+      { month: "Aug", value: 23 },
+      { month: "Sep", value: 19 },
+      { month: "Oct", value: 20 },
+      { month: "Nov", value: 24 },
+      { month: "Dec", value: 28 },
+    ]
+  ), []);
+  const moviesTotalPages = Math.max(1, Math.ceil(moviesLocal.length / pageSize));
+  const moviesPageData = useMemo(() => moviesLocal.slice((moviesPage - 1) * pageSize, moviesPage * pageSize), [moviesLocal, moviesPage]);
+  const toysTotalPages = Math.max(1, Math.ceil(toys.length / pageSize));
+  const toysPageData = useMemo(() => toys.slice((toysPage - 1) * pageSize, toysPage * pageSize), [toys, toysPage]);
+
+  useEffect(() => {
+    if (active === "toys" && !toysLoaded) {
+      (async () => {
+        try {
+          const { items } = await getToys({ page: 1, pageSize: 100 });
+          setToys(items.map((t: any) => ({ id: t.id, name: t.name, category: t.category, price: Number(t.price), stock: t.stock, status: t.status, image_url: t.image_url })));
+          setToysLoaded(true)
+        } catch {}
+      })();
+    }
+  }, [active, toysLoaded]);
+
+  useEffect(() => {
+    if (active === "movies" && !moviesLoaded) {
+      (async () => {
+        try {
+          const { items } = await getMoviesAdmin({ page: 1, pageSize: 50 });
+          const mapped = items.map((m: any) => ({
+            id: String(m.id),
+            title: m.title,
+            year: new Date(m.release_date || Date.now()).getFullYear(),
+            duration: m?.duration_min ? `${Number(m.duration_min)} phút` : "",
+            genres: Array.isArray(m.genres) ? m.genres : [],
+            posterUrl: m.cover_image || "",
+          }))
+          setMoviesLocal(mapped)
+          setMoviesLoaded(true)
+        } catch {}
+      })()
+    }
+  }, [active, moviesLoaded])
+
+  useEffect(() => {
+    if (active === "dashboard") {
+      (async () => {
+        try {
+          const now = new Date();
+          const from = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+          const res = await getAdminRevenue({ from: from.toISOString(), to: now.toISOString() });
+          setRevenueTotal(res.total || 0);
+          setRevenueCount(res.count || 0);
+        } catch {}
+      })();
+    }
+  }, [active])
 
   return (
     <SidebarProvider
@@ -73,34 +173,34 @@ export default function Admin() {
         "--sidebar-ring": "217.2 91.2% 59.8%",
       } as React.CSSProperties}
     >
-      <Sidebar className="bg-[#0a1220] text-white">
+      <Sidebar collapsible="icon" className="bg-[#0a1220] text-white">
         <SidebarHeader>
           <div className="px-2 text-sm">Quản lý</div>
         </SidebarHeader>
         <SidebarContent>
           <SidebarMenu>
             <SidebarMenuItem>
-              <SidebarMenuButton isActive={active === "dashboard"} onClick={() => setActive("dashboard")}>
-                <LayoutDashboard className="mr-2" /> Dashboard
+              <SidebarMenuButton tooltip="Bảng điều khiển" isActive={active === "dashboard"} onClick={() => setActive("dashboard")}>
+                <LayoutDashboard className="mr-2" /> Bảng điều khiển
               </SidebarMenuButton>
             </SidebarMenuItem>
             <SidebarMenuItem>
-              <SidebarMenuButton isActive={active === "users"} onClick={() => setActive("users")}>
+              <SidebarMenuButton tooltip="Người dùng" isActive={active === "users"} onClick={() => setActive("users")}>
                 <UserCircle className="mr-2" /> Người dùng
               </SidebarMenuButton>
             </SidebarMenuItem>
             <SidebarMenuItem>
-              <SidebarMenuButton isActive={active === "movies"} onClick={() => setActive("movies")}>
+              <SidebarMenuButton tooltip="Phim" isActive={active === "movies"} onClick={() => setActive("movies")}>
                 <Film className="mr-2" /> Phim
               </SidebarMenuButton>
             </SidebarMenuItem>
             <SidebarMenuItem>
-              <SidebarMenuButton isActive={active === "toys"} onClick={() => setActive("toys")}>
+              <SidebarMenuButton tooltip="Đồ chơi" isActive={active === "toys"} onClick={() => setActive("toys")}>
                 <Gamepad2 className="mr-2" /> Đồ chơi
               </SidebarMenuButton>
             </SidebarMenuItem>
             <SidebarMenuItem>
-              <SidebarMenuButton isActive={active === "transactions"} onClick={() => setActive("transactions")}>
+              <SidebarMenuButton tooltip="Giao dịch" isActive={active === "transactions"} onClick={() => setActive("transactions")}>
                 <CreditCard className="mr-2" /> Giao dịch
               </SidebarMenuButton>
             </SidebarMenuItem>
@@ -112,60 +212,177 @@ export default function Admin() {
             className="justify-start"
             onClick={() => {
               localStorage.removeItem("adminToken");
+              localStorage.removeItem("adminEmail");
               setAdminToken("");
+              setAdminEmailState("admin@email.com");
+              window.dispatchEvent(new Event("admin-auth-changed"));
+              navigate("/admin", { replace: true });
             }}
           >
             Đăng xuất
           </Button>
         </SidebarFooter>
       </Sidebar>
+      <SidebarRail />
       <SidebarInset>
         <div className="border-b px-6 py-3 flex items-center justify-between bg-white/80">
-          <div className="font-semibold">Admin Portal</div>
-          <div className="text-sm text-gray-600">admin@email.com</div>
+          <div className="flex items-center gap-2">
+            <SidebarTrigger />
+            <div className="font-semibold">Bảng điều khiển</div>
+          </div>
+          <div className="flex items-center gap-2">
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button className="flex items-center gap-3 rounded-lg px-2 py-1 hover:bg-black/5">
+                  <div className="text-sm text-gray-700">{adminEmailState}</div>
+                  <Avatar className="h-8 w-8">
+                    <AvatarImage src="" />
+                    <AvatarFallback>{(adminEmailState?.split("@")[0] || "AD").slice(0,2).toUpperCase()}</AvatarFallback>
+                  </Avatar>
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent className="bg-white">
+                <DropdownMenuItem disabled>Quản trị viên</DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={() => {
+                  localStorage.removeItem("adminToken");
+                  localStorage.removeItem("adminEmail");
+                  setAdminToken("");
+                  setAdminEmailState("admin@email.com");
+                  window.dispatchEvent(new Event("admin-auth-changed"));
+                  navigate("/admin", { replace: true });
+                }}>Đăng xuất</DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
         </div>
         <div className="p-6">
           {active === "dashboard" && (
             <div className="space-y-6">
-              <div>
-                <h1 className="text-3xl font-bold">Dashboard</h1>
-                <p className="text-gray-500">Tổng quan hệ thống quản lý</p>
+              <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-4">
+                <Card className="rounded-xl">
+                  <CardContent className="pt-4 flex items-center gap-3">
+                    <div className="h-10 w-10 rounded-lg bg-purple-600 text-white flex items-center justify-center"><Film className="h-5 w-5" /></div>
+                    <div>
+                      <div className="text-xs text-gray-500">Tổng phim</div>
+                      <div className="text-xl font-bold">{metrics.movies}</div>
+                    </div>
+                  </CardContent>
+                </Card>
+                <Card className="rounded-xl">
+                  <CardContent className="pt-4 flex items-center gap-3">
+                    <div className="h-10 w-10 rounded-lg bg-green-600 text-white flex items-center justify-center"><ShieldCheck className="h-5 w-5" /></div>
+                    <div>
+                      <div className="text-xs text-gray-500">Vé đang mở</div>
+                      <div className="text-xl font-bold">260</div>
+                    </div>
+                  </CardContent>
+                </Card>
+                <Card className="rounded-xl">
+                  <CardContent className="pt-4 flex items-center gap-3">
+                    <div className="h-10 w-10 rounded-lg bg-red-600 text-white flex items-center justify-center"><ShieldCheck className="h-5 w-5" /></div>
+                    <div>
+                      <div className="text-xs text-gray-500">Vé đã đóng</div>
+                      <div className="text-xl font-bold">1</div>
+                    </div>
+                  </CardContent>
+                </Card>
+                <Card className="rounded-xl">
+                  <CardContent className="pt-4 flex items-center gap-3">
+                    <div className="h-10 w-10 rounded-lg bg-blue-600 text-white flex items-center justify-center"><Users className="h-5 w-5" /></div>
+                    <div>
+                      <div className="text-xs text-gray-500">Tổng người dùng</div>
+                      <div className="text-xl font-bold">{metrics.activeUsers}</div>
+                    </div>
+                  </CardContent>
+                </Card>
+                <Card className="rounded-xl">
+                  <CardContent className="pt-4 flex items-center gap-3">
+                    <div className="h-10 w-10 rounded-lg bg-indigo-600 text-white flex items-center justify-center"><UserCircle className="h-5 w-5" /></div>
+                    <div>
+                      <div className="text-xs text-gray-500">Tổng quản trị</div>
+                      <div className="text-xl font-bold">3</div>
+                    </div>
+                  </CardContent>
+                </Card>
+                <Card className="rounded-xl">
+                  <CardContent className="pt-4 flex items-center gap-3">
+                    <div className="h-10 w-10 rounded-lg bg-teal-600 text-white flex items-center justify-center"><CreditCard className="h-5 w-5" /></div>
+                    <div>
+                      <div className="text-xs text-gray-500">Tổng giao dịch</div>
+                      <div className="text-xl font-bold">{metrics.tx}</div>
+                    </div>
+                  </CardContent>
+                </Card>
               </div>
-              <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                <Card>
+
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <Card className="rounded-xl">
                   <CardHeader>
-                    <CardTitle className="text-sm">Tổng người dùng</CardTitle>
+                    <CardTitle className="text-sm">Đăng ký gần đây</CardTitle>
                   </CardHeader>
-                  <CardContent className="text-3xl font-bold">{metrics.activeUsers}</CardContent>
+                  <CardContent>
+                    <div className="space-y-3">
+                      {users.slice(0, 4).map((u) => (
+                        <div className="flex items-center justify-between" key={u.id}>
+                          <div className="flex items-center gap-3">
+                            <Avatar className="h-8 w-8"><AvatarImage src="" /><AvatarFallback>{(u.name || "U").slice(0, 1).toUpperCase()}</AvatarFallback></Avatar>
+                            <div>
+                              <div className="text-sm font-medium">{u.name}</div>
+                              <div className="text-xs text-gray-500">{u.email}</div>
+                            </div>
+                          </div>
+                          <Button variant="ghost" size="icon"><Eye className="h-4 w-4" /></Button>
+                        </div>
+                      ))}
+                    </div>
+                  </CardContent>
                 </Card>
-                <Card>
+             
+                <Card className="rounded-xl">
                   <CardHeader>
-                    <CardTitle className="text-sm">Phim</CardTitle>
+                    <CardTitle className="text-sm">Thống kê người dùng</CardTitle>
                   </CardHeader>
-                  <CardContent className="text-3xl font-bold">{metrics.movies}</CardContent>
-                </Card>
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="text-sm">Đồ chơi</CardTitle>
-                  </CardHeader>
-                  <CardContent className="text-3xl font-bold">{metrics.toys}</CardContent>
-                </Card>
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="text-sm">Giao dịch</CardTitle>
-                  </CardHeader>
-                  <CardContent className="text-3xl font-bold">{metrics.tx}</CardContent>
+                  <CardContent>
+                    <ChartContainer config={{ users: { label: "Người dùng", color: "#6366f1" } }}>
+                      <LineChart data={userStats}>
+                        <CartesianGrid strokeDasharray="3 3" />
+                        <XAxis dataKey="day" />
+                        <YAxis tickFormatter={(v) => `${v}M`} />
+                        <ChartTooltip content={<ChartTooltipContent />} />
+                        <Line type="monotone" dataKey="value" stroke="var(--color-users)" strokeWidth={2} dot={{ r: 3 }} />
+                      </LineChart>
+                    </ChartContainer>
+                  </CardContent>
                 </Card>
               </div>
-              <Card>
-                <CardHeader>
-                  <CardTitle>Tổng doanh thu</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="text-4xl font-bold text-blue-600">{metrics.totalRevenue.toLocaleString("vi-VN")} đ</div>
-                  <div className="text-gray-500">Từ {metrics.tx} giao dịch</div>
-                </CardContent>
-              </Card>
+   <Card className="rounded-xl">
+                  <CardHeader>
+                    <CardTitle className="text-sm">Doanh thu</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-3xl font-bold text-blue-600">{metrics.totalRevenue.toLocaleString("vi-VN")} đ</div>
+                    <div className="text-xs text-gray-500 mt-1">Trong 7 ngày gần đây</div>
+                  </CardContent>
+                </Card>
+                <Card className="rounded-xl">
+                  <CardHeader>
+                  <CardTitle className="text-sm">Thống kê phim</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                  <ChartContainer config={{ movies: { label: "Phim", color: "#8b5cf6" } }}>
+                    <BarChart data={movieStats}>
+                      <CartesianGrid strokeDasharray="3 3" />
+                      <XAxis dataKey="month" />
+                      <YAxis tickFormatter={(v)=>`${v}`} />
+                      <ChartTooltip content={<ChartTooltipContent />} />
+                      <Bar dataKey="value" fill="var(--color-movies)" radius={[8,8,0,0]} />
+                    </BarChart>
+                  </ChartContainer>
+                  </CardContent>
+                </Card>
+
+
             </div>
           )}
 
@@ -194,7 +411,7 @@ export default function Admin() {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {filteredUsers.map((u) => (
+                      {usersPageData.map((u) => (
                         <TableRow key={u.id}>
                           <TableCell>{u.name}</TableCell>
                           <TableCell>{u.id.slice(0, 7)}...</TableCell>
@@ -208,6 +425,23 @@ export default function Admin() {
                         </TableRow>
                       ))}
                     </TableBody>
+                    <Pagination className="mt-4">
+                      <PaginationContent>
+                        <PaginationItem>
+                          <PaginationPrevious href="#" onClick={(e) => { e.preventDefault(); setUsersPage(Math.max(1, usersPage - 1)); }} />
+                        </PaginationItem>
+                        {Array.from({ length: usersTotalPages }).map((_, i) => (
+                          <PaginationItem key={i}>
+                            <PaginationLink href="#" isActive={usersPage === i + 1} onClick={(e) => { e.preventDefault(); setUsersPage(i + 1); }}>
+                              {i + 1}
+                            </PaginationLink>
+                          </PaginationItem>
+                        ))}
+                        <PaginationItem>
+                          <PaginationNext href="#" onClick={(e) => { e.preventDefault(); setUsersPage(Math.min(usersTotalPages, usersPage + 1)); }} />
+                        </PaginationItem>
+                      </PaginationContent>
+                    </Pagination>
                   </Table>
                 </CardContent>
               </Card>
@@ -241,7 +475,7 @@ export default function Admin() {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {moviesLocal.map((m) => (
+                      {moviesPageData.map((m) => (
                         <TableRow key={m.id}>
                           <TableCell className="flex items-center gap-2"><img src={m.posterUrl} className="w-8 h-8 rounded" />{m.title}</TableCell>
                           <TableCell>{m.genres.join(", ")}</TableCell>
@@ -249,14 +483,31 @@ export default function Admin() {
                           <TableCell>—</TableCell>
                           <TableCell>—</TableCell>
                           <TableCell>
-                            <Badge variant={ (movieStatus[m.id] ?? "active") === "active" ? "secondary" : "outline" }>
-                              { (movieStatus[m.id] ?? "active") === "active" ? "Hoạt động" : "Đã ẩn" }
+                            <Badge variant={(movieStatus[m.id] ?? "active") === "active" ? "secondary" : "outline"}>
+                              {(movieStatus[m.id] ?? "active") === "active" ? "Hoạt động" : "Đã ẩn"}
                             </Badge>
                           </TableCell>
                           <TableCell><Button variant="outline" size="sm" onClick={() => { setEditType("movie"); setEditData(m); setIsEditOpen(true); }}>Sửa</Button></TableCell>
                         </TableRow>
                       ))}
                     </TableBody>
+                    <Pagination className="mt-4">
+                      <PaginationContent>
+                        <PaginationItem>
+                          <PaginationPrevious href="#" onClick={(e) => { e.preventDefault(); setMoviesPage(Math.max(1, moviesPage - 1)); }} />
+                        </PaginationItem>
+                        {Array.from({ length: moviesTotalPages }).map((_, i) => (
+                          <PaginationItem key={i}>
+                            <PaginationLink href="#" isActive={moviesPage === i + 1} onClick={(e) => { e.preventDefault(); setMoviesPage(i + 1); }}>
+                              {i + 1}
+                            </PaginationLink>
+                          </PaginationItem>
+                        ))}
+                        <PaginationItem>
+                          <PaginationNext href="#" onClick={(e) => { e.preventDefault(); setMoviesPage(Math.min(moviesTotalPages, moviesPage + 1)); }} />
+                        </PaginationItem>
+                      </PaginationContent>
+                    </Pagination>
                   </Table>
                 </CardContent>
               </Card>
@@ -270,7 +521,7 @@ export default function Admin() {
                   <h1 className="text-3xl font-bold">Quản lý đồ chơi</h1>
                   <p className="text-gray-500">Danh sách tất cả đồ chơi trong kho</p>
                 </div>
-                <Button onClick={() => { setEditType("toy"); setEditData({ id: "", name: "", category: "", price: 0, stock: 0, status: "active", imageUrl: "" }); setIsEditOpen(true); }}>Thêm đồ chơi</Button>
+                <Button onClick={() => { setEditType("toy"); setEditData({ id: 0, name: "", category: "", price: 0, stock: 0, status: "active", image_url: "" }); setIsEditOpen(true); }}>Thêm đồ chơi</Button>
               </div>
               <Card>
                 <CardHeader>
@@ -289,17 +540,37 @@ export default function Admin() {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {toys.map((t) => (
+                      {toysPageData.map((t) => (
                         <TableRow key={t.id}>
-                          <TableCell className="flex items-center gap-2">{t.imageUrl && <img src={t.imageUrl} className="w-8 h-8 rounded object-cover" />}<span>{t.name}</span></TableCell>
+                          <TableCell className="flex items-center gap-2">{t.image_url && <img src={t.image_url} className="w-8 h-8 rounded object-cover" />}<span>{t.name}</span></TableCell>
                           <TableCell>{t.category}</TableCell>
                           <TableCell>{t.price.toLocaleString("vi-VN")} đ</TableCell>
                           <TableCell>{t.stock}</TableCell>
                           <TableCell><Badge variant="secondary">{t.status}</Badge></TableCell>
-                          <TableCell><Button size="sm" variant="outline" onClick={() => { setEditType("toy"); setEditData(t); setIsEditOpen(true); }}>Sửa</Button></TableCell>
+                          <TableCell className="flex gap-2">
+                            <Button size="sm" variant="outline" onClick={() => { setEditType("toy"); setEditData(t); setIsEditOpen(true); }}>Sửa</Button>
+                            <Button size="sm" variant="destructive" onClick={async () => { try { await deleteToyApi(t.id as any); const { items } = await getToys({ page: 1, pageSize: 100 }); setToys(items.map((x: any) => ({ id: x.id, name: x.name, category: x.category, price: Number(x.price), stock: x.stock, status: x.status, image_url: x.image_url }))); } catch {} }}>Xóa</Button>
+                          </TableCell>
                         </TableRow>
                       ))}
                     </TableBody>
+                    <Pagination className="mt-4">
+                      <PaginationContent>
+                        <PaginationItem>
+                          <PaginationPrevious href="#" onClick={(e) => { e.preventDefault(); setToysPage(Math.max(1, toysPage - 1)); }} />
+                        </PaginationItem>
+                        {Array.from({ length: toysTotalPages }).map((_, i) => (
+                          <PaginationItem key={i}>
+                            <PaginationLink href="#" isActive={toysPage === i + 1} onClick={(e) => { e.preventDefault(); setToysPage(i + 1); }}>
+                              {i + 1}
+                            </PaginationLink>
+                          </PaginationItem>
+                        ))}
+                        <PaginationItem>
+                          <PaginationNext href="#" onClick={(e) => { e.preventDefault(); setToysPage(Math.min(toysTotalPages, toysPage + 1)); }} />
+                        </PaginationItem>
+                      </PaginationContent>
+                    </Pagination>
                   </Table>
                 </CardContent>
               </Card>
@@ -315,7 +586,7 @@ export default function Admin() {
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <Card><CardHeader><CardTitle>Tổng giao dịch</CardTitle></CardHeader><CardContent className="text-2xl font-bold">{metrics.tx}</CardContent></Card>
                 <Card><CardHeader><CardTitle>Doanh thu</CardTitle></CardHeader><CardContent className="text-2xl font-bold text-blue-600">{metrics.totalRevenue.toLocaleString("vi-VN")} đ</CardContent></Card>
-                <Card><CardHeader><CardTitle>Hoàn thành</CardTitle></CardHeader><CardContent className="text-2xl font-bold text-emerald-600">{transactions.filter(t=>t.status==='success').length}</CardContent></Card>
+                <Card><CardHeader><CardTitle>Hoàn thành</CardTitle></CardHeader><CardContent className="text-2xl font-bold text-emerald-600">{transactions.filter(t => t.status === 'success').length}</CardContent></Card>
               </div>
               <Card>
                 <CardHeader>
@@ -338,7 +609,7 @@ export default function Admin() {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {filteredTransactions.map((t) => (
+                      {txPageData.map((t) => (
                         <TableRow key={t.id}>
                           <TableCell>Vé</TableCell>
                           <TableCell>{t.user}</TableCell>
@@ -350,46 +621,30 @@ export default function Admin() {
                         </TableRow>
                       ))}
                     </TableBody>
+                    <Pagination className="mt-4">
+                      <PaginationContent>
+                        <PaginationItem>
+                          <PaginationPrevious href="#" onClick={(e) => { e.preventDefault(); setTxPage(Math.max(1, txPage - 1)); }} />
+                        </PaginationItem>
+                        {Array.from({ length: txTotalPages }).map((_, i) => (
+                          <PaginationItem key={i}>
+                            <PaginationLink href="#" isActive={txPage === i + 1} onClick={(e) => { e.preventDefault(); setTxPage(i + 1); }}>
+                              {i + 1}
+                            </PaginationLink>
+                          </PaginationItem>
+                        ))}
+                        <PaginationItem>
+                          <PaginationNext href="#" onClick={(e) => { e.preventDefault(); setTxPage(Math.min(txTotalPages, txPage + 1)); }} />
+                        </PaginationItem>
+                      </PaginationContent>
+                    </Pagination>
                   </Table>
                 </CardContent>
               </Card>
             </div>
           )}
         </div>
-        {!isAuthed && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
-            <Card className="w-full max-w-sm bg-white">
-              <CardHeader>
-                <CardTitle>Đăng nhập Admin</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-3">
-                  <div>
-                    <Label>Email</Label>
-                    <Input value={loginEmail} onChange={(e) => setLoginEmail(e.target.value)} />
-                  </div>
-                  <div>
-                    <Label>Mật khẩu</Label>
-                    <Input type="password" value={loginPassword} onChange={(e) => setLoginPassword(e.target.value)} />
-                  </div>
-                  <div className="flex justify-end">
-                    <Button
-                      onClick={async () => {
-                        try {
-                          const { token } = await adminLoginApi({ email: loginEmail, password: loginPassword });
-                          localStorage.setItem("adminToken", token);
-                          setAdminToken(token);
-                        } catch (err) {}
-                      }}
-                    >
-                      Đăng nhập
-                    </Button>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-        )}
+        {null}
       </SidebarInset>
       <Dialog open={isEditOpen} onOpenChange={setIsEditOpen}>
         <DialogContent>
@@ -437,6 +692,10 @@ export default function Admin() {
                 <Input value={editData?.title || ""} onChange={(e) => setEditData({ ...editData, title: e.target.value })} />
               </div>
               <div>
+                <Label>Giá</Label>
+                <Input type="number" value={editData?.price ?? 0} onChange={(e) => setEditData({ ...editData, price: Number(e.target.value) || 0 })} />
+              </div>
+              <div>
                 <Label>Thể loại</Label>
                 <Input value={(editData?.genres || []).join(", ")} onChange={(e) => setEditData({ ...editData, genres: e.target.value.split(",").map((x) => x.trim()).filter(Boolean) })} />
               </div>
@@ -457,16 +716,60 @@ export default function Admin() {
               </div>
               <div className="flex justify-end gap-2">
                 <Button variant="outline" onClick={() => setIsEditOpen(false)}>Hủy</Button>
-                <Button onClick={() => {
-                  if (!editData.id) {
-                    const id = `mv-${Date.now()}`;
-                    setMoviesLocal((prev) => [...prev, { ...editData, id }]);
-                    setMovieStatus((prev) => ({ ...prev, [id]: (editData?.status || "active") }));
-                  } else {
-                    setMoviesLocal((prev) => prev.map((m) => (m.id === editData.id ? { ...m, ...editData } : m)));
-                    setMovieStatus((prev) => ({ ...prev, [editData.id]: (editData?.status || (prev[editData.id] ?? "active")) }));
+                <Button onClick={async () => {
+                  try {
+                    if (!editData.id) {
+                      const payload = {
+                        title: editData.title,
+                        description: editData.description,
+                        cover_image: editData.posterUrl,
+                        detail_images: editData.detail_images,
+                        genres: editData.genres,
+                        rating: editData.rating ? Number(editData.rating) : undefined,
+                        duration_min: editData.duration ? Number(editData.duration) : undefined,
+                        price: Number(editData.price || 0),
+                        is_active: (editData?.status || "active") === "active",
+                      };
+                      const res = await createMovieApi(payload as any);
+                      const m = res.movie;
+                      setMoviesLocal((prev) => [
+                        ...prev,
+                        {
+                          id: String(m.id),
+                          title: m.title,
+                          posterUrl: m.cover_image || "",
+                          duration: m?.duration_min ? `${Number(m.duration_min)} phút` : "",
+                          year: new Date().getFullYear(),
+                          genres: Array.isArray(m.genres) ? m.genres : [],
+                        },
+                      ]);
+                      setMovieStatus((prev) => ({ ...prev, [m.id]: m.is_active ? "active" : "inactive" }));
+                    } else {
+                      await updateMovieApi(Number(editData.id), {
+                        title: editData.title,
+                        description: editData.description,
+                        cover_image: editData.posterUrl,
+                        genres: editData.genres,
+                        rating: editData.rating ? Number(editData.rating) : undefined,
+                        duration_min: editData.duration ? Number(editData.duration) : undefined,
+                        price: Number(editData.price || 0),
+                        is_active: (editData?.status || "active") === "active",
+                      })
+                      const { items } = await getMoviesAdmin({ page: 1, pageSize: 50 })
+                      const mapped = items.map((m: any) => ({
+                        id: String(m.id),
+                        title: m.title,
+                        year: new Date(m.release_date || Date.now()).getFullYear(),
+                        duration: m?.duration_min ? `${Number(m.duration_min)} phút` : "",
+                        genres: Array.isArray(m.genres) ? m.genres : [],
+                        posterUrl: m.cover_image || "",
+                      }))
+                      setMoviesLocal(mapped)
+                      setMovieStatus((prev) => ({ ...prev, ...Object.fromEntries(mapped.map((x:any) => [x.id, "active"])) }))
+                    }
+                  } finally {
+                    setIsEditOpen(false);
                   }
-                  setIsEditOpen(false);
                 }}>Lưu</Button>
               </div>
             </div>
@@ -479,10 +782,10 @@ export default function Admin() {
                   const file = e.target.files?.[0];
                   if (file) {
                     const url = URL.createObjectURL(file);
-                    setEditData({ ...editData, imageUrl: url, imageFile: file });
+                    setEditData({ ...editData, image_url: url, imageFile: file });
                   }
                 }} />
-                {editData?.imageUrl && (<div className="mt-2"><img src={editData?.imageUrl} className="w-full max-h-40 object-cover rounded" /></div>)}
+                {editData?.image_url && (<div className="mt-2"><img src={editData?.image_url} className="w-full max-h-40 object-cover rounded" /></div>)}
               </div>
               <div>
                 <Label>Tên đồ chơi</Label>
@@ -515,14 +818,18 @@ export default function Admin() {
               </div>
               <div className="flex justify-end gap-2">
                 <Button variant="outline" onClick={() => setIsEditOpen(false)}>Hủy</Button>
-                <Button onClick={() => {
-                  if (!editData.id) {
-                    const id = `toy-${Date.now()}`;
-                    setToys((prev) => [...prev, { ...editData, id }]);
-                  } else {
-                    setToys((prev) => prev.map((t) => (t.id === editData.id ? { ...t, ...editData } : t)));
+                <Button onClick={async () => {
+                  try {
+                    if (!editData.id || editData.id === 0) {
+                      await createToyApi({ name: editData.name, category: editData.category, price: Number(editData.price || 0), stock: Number(editData.stock || 0), status: editData.status, image_url: editData.image_url });
+                    } else {
+                      await updateToyApi(Number(editData.id), { name: editData.name, category: editData.category, price: Number(editData.price || 0), stock: Number(editData.stock || 0), status: editData.status, image_url: editData.image_url });
+                    }
+                    const { items } = await getToys({ page: 1, pageSize: 100 });
+                    setToys(items.map((t: any) => ({ id: t.id, name: t.name, category: t.category, price: Number(t.price), stock: t.stock, status: t.status, image_url: t.image_url })));
+                  } finally {
+                    setIsEditOpen(false);
                   }
-                  setIsEditOpen(false);
                 }}>Lưu</Button>
               </div>
             </div>

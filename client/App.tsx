@@ -35,6 +35,27 @@ const AdminLoginView = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
+  async function handleLogin(e?: React.FormEvent) {
+    e?.preventDefault();
+    try {
+      setLoading(true);
+      setError("");
+      // const { token } = await adminLoginApi({ email, password });
+      // localStorage.setItem("adminToken", token);
+      if (email === 'admin@email.com' && password === 'admin') {
+        localStorage.setItem("adminToken", 'adminToken');
+      } else {
+        setError("Đăng nhập thất bại");
+        return;
+      }
+      localStorage.setItem("adminEmail", email);
+      window.dispatchEvent(new Event("admin-auth-changed"));
+      navigate("/admin", { replace: true });
+    } finally {
+      setLoading(false);
+    }
+  }
+
   return (
     <div className="min-h-screen flex items-center justify-center bg-background">
       <Card className="w-full max-w-sm bg-white">
@@ -43,40 +64,22 @@ const AdminLoginView = () => {
         </CardHeader>
         <CardContent>
           <div className="space-y-3">
-            <div>
-              <Label>Email</Label>
-              <Input value={email} onChange={(e) => setEmail(e.target.value)} />
-            </div>
-            <div>
-              <Label>Mật khẩu</Label>
-              <Input type="password" value={password} onChange={(e) => setPassword(e.target.value)} />
-            </div>
-            {error && <div className="text-red-500 text-sm">{error}</div>}
-            <div className="flex justify-end">
-              <Button
-                disabled={loading}
-                onClick={async () => {
-                  try {
-                    setLoading(true);
-                    setError("");
-                    // const { token } = await adminLoginApi({ email, password });
-                    // localStorage.setItem("adminToken", token);
-                     if(email === 'admin@email.com' && password === 'admin'){
-                      localStorage.setItem("adminToken", 'adminToken');
-                      
-                    }
-                    window.dispatchEvent(new Event("admin-auth-changed"));
-                    navigate("/admin", { replace: true });
-                  } catch (err) {
-                    setError("Đăng nhập thất bại");
-                  } finally {
-                    setLoading(false);
-                  }
-                }}
-              >
-                {loading ? "Đang đăng nhập..." : "Đăng nhập"}
-              </Button>
-            </div>
+            <form onSubmit={handleLogin}>
+              <div>
+                <Label>Email</Label>
+                <Input value={email} onChange={(e) => setEmail(e.target.value)} />
+              </div>
+              <div>
+                <Label>Mật khẩu</Label>
+                <Input type="password" value={password} onChange={(e) => setPassword(e.target.value)} />
+              </div>
+              {error && <div className="text-red-500 text-sm">{error}</div>}
+              <div className="flex justify-end">
+                <Button disabled={loading} type="submit">
+                  {loading ? "Đang đăng nhập..." : "Đăng nhập"}
+                </Button>
+              </div>
+            </form>
           </div>
         </CardContent>
       </Card>
@@ -89,7 +92,11 @@ const AdminGate = () => {
   useEffect(() => {
     const onAuthChanged = () => setHasToken(!!localStorage.getItem("adminToken"));
     window.addEventListener("admin-auth-changed", onAuthChanged as any);
-    return () => window.removeEventListener("admin-auth-changed", onAuthChanged as any);
+    window.addEventListener("storage", onAuthChanged as any);
+    return () => {
+      window.removeEventListener("admin-auth-changed", onAuthChanged as any);
+      window.removeEventListener("storage", onAuthChanged as any);
+    };
   }, []);
   return hasToken ? <Admin /> : <AdminLoginView />;
 };
