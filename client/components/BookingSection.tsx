@@ -60,7 +60,7 @@ export default function BookingSection({ onBookClick }: BookingSectionProps) {
   const [countdown, setCountdown] = useState(600); // 10 minutes in seconds
   const timerRef = useRef<NodeJS.Timeout | null>(null);
   const countdownRef = useRef<NodeJS.Timeout | null>(null);
-  const { data: movies = [] } = useMovies2025();
+  const { data: movies = [], refetch: refetchMovies } = useMovies2025();
   const [errors, setErrors] = useState<Record<string, string>>({});
 
   useEffect(() => {
@@ -298,9 +298,10 @@ console.log(formData)
               </Label>
               <Select
                 value={formData.movie}
-                onValueChange={(value) =>
-                  setFormData({ ...formData, movie: value })
-                }
+                onValueChange={(value) => {
+                  setFormData({ ...formData, movie: value });
+                  refetchMovies();
+                }}
               >
                 <SelectTrigger disabled={isProcessing} className={`bg-black/40 text-white ${errors.movie ? "border-red-500" : "border-cyan-400/40"} focus:ring-cyan-400`}>
                   <SelectValue placeholder="Chọn phim" />
@@ -520,7 +521,7 @@ console.log(formData)
                     Đang xử lý...
                   </span>
                 ) : (
-                  "Thanh Toán"
+                  "Tiếp tục"
                 )}
               </Button>
             </div>
