@@ -3,9 +3,10 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { toast } from "@/components/ui/use-toast";
-import { Ticket, Loader2 } from "lucide-react";
+import { Ticket, Loader2, Menu, User } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/useAuth";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 
 interface HeaderProps {
   onBookClick: () => void;
@@ -38,22 +39,34 @@ export default function Header({ onBookClick }: HeaderProps) {
   }, []);
 
   useEffect(() => {
-    const raw = localStorage.getItem("authUser");
-    if (raw) {
+    const readAuth = () => {
+      const raw = localStorage.getItem("authUser");
+      if (!raw) { setUserName(null); return; }
       try {
         const parsed = JSON.parse(raw);
-        const email = parsed?.email as string | undefined;
-        if (email) {
-          const name = email.split("@")[0];
-          setUserName(name);
-        }
-      } catch { }
-    }
+        const name = parsed?.user?.username || parsed?.username || (parsed?.user?.email || parsed?.email || "").split("@")[0];
+        if (name) setUserName(name);
+      } catch {
+        setUserName(null);
+      }
+    };
+    readAuth();
+    const onAuthChanged = () => readAuth();
+    const onOpenLogin = () => setIsLoginOpen(true);
+    window.addEventListener("user-auth-changed", onAuthChanged as any);
+    window.addEventListener("storage", onAuthChanged as any);
+    window.addEventListener("open-login", onOpenLogin as any);
+    return () => {
+      window.removeEventListener("user-auth-changed", onAuthChanged as any);
+      window.removeEventListener("storage", onAuthChanged as any);
+      window.removeEventListener("open-login", onOpenLogin as any);
+    };
   }, []);
 
   const handleLogout = () => {
     localStorage.removeItem("authUser");
     setUserName(null);
+    window.dispatchEvent(new Event("user-auth-changed"));
     toast({ title: "Đã đăng xuất" });
   };
 
@@ -65,6 +78,7 @@ export default function Header({ onBookClick }: HeaderProps) {
       if (data?.status === "success") {
         localStorage.setItem("authUser", JSON.stringify({ user: data.user }));
         setUserName(data.user.username);
+        window.dispatchEvent(new Event("user-auth-changed"));
         toast({ title: "Đăng nhập thành công", description: data.user.email });
         setIsLoginOpen(false);
         setLoginEmail("");
@@ -101,6 +115,7 @@ export default function Header({ onBookClick }: HeaderProps) {
       if (data?.status === "success") {
         localStorage.setItem("authUser", JSON.stringify({ user: data.user }));
         setUserName(data.user.username);
+        window.dispatchEvent(new Event("user-auth-changed"));
         toast({ title: "Đăng ký thành công", description: data.user.email });
         setIsRegisterOpen(false);
         setRegisterEmail("");
@@ -176,17 +191,53 @@ export default function Header({ onBookClick }: HeaderProps) {
           </button>
         </nav>
         <div className="flex items-center gap-4 animate-fade-in delay-250">
+          <div className="md:hidden">
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" className="border-white/20 text-black">
+                  <Menu className="mr-2 h-4 w-4" /> Menu
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent className="bg-black/90 border border-white/20 text-white">
+                <DropdownMenuItem onClick={() => scrollToSection("hero")}>Phim Hot</DropdownMenuItem>
+                <DropdownMenuItem onClick={() => scrollToSection("technology")}>Công Nghệ</DropdownMenuItem>
+                <DropdownMenuItem onClick={() => scrollToSection("products")}>Cửa Hàng</DropdownMenuItem>
+                <DropdownMenuSeparator />
+                {userName ? (
+                  <>
+                    <DropdownMenuItem>Chào, {userName}</DropdownMenuItem>
+                    <DropdownMenuItem onClick={handleLogout}>Đăng xuất</DropdownMenuItem>
+                  </>
+                ) : (
+                  <>
+                    <DropdownMenuItem onClick={() => setIsLoginOpen(true)}>Đăng nhập</DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => setIsRegisterOpen(true)}>Đăng ký</DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => setIsForgetPassOpen(true)}>Quên mật khẩu</DropdownMenuItem>
+                  </>
+                )}
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
           {userName ? (
-            <div className="flex items-center gap-3">
-              <span className="text-white font-medium">Chào, {userName}</span>
-              <Button variant="outline" size="sm" onClick={handleLogout}>
-                Đăng xuất
-              </Button>
+            <div className="hidden md:flex items-center">
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <button className="flex items-center gap-2 text-white font-medium hover:text-blue-400">
+                    <div className="w-8 h-8 rounded-full bg-white/10 border border-white/20 flex items-center justify-center">
+                      <User className="h-4 w-4" />
+                    </div>
+                    <span>{userName}</span>
+                  </button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent className="bg-black/90 border border-white/20 text-white">
+                  <DropdownMenuItem onClick={handleLogout}>Đăng xuất</DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
             </div>
           ) : (
             <Dialog open={isLoginOpen} onOpenChange={setIsLoginOpen}>
               <DialogTrigger asChild>
-                <button className="text-white hover:text-blue-400 transition-colors duration-300 font-medium" onClick={openLogin}>
+                <button className="hidden md:inline-block text-white hover:text-blue-400 transition-colors duration-300 font-medium" onClick={openLogin}>
                   Đăng nhập
                 </button>
               </DialogTrigger>
@@ -392,7 +443,7 @@ export default function Header({ onBookClick }: HeaderProps) {
           </Dialog>
           <Button
             onClick={onBookClick}
-            className="bg-gradient-to-r md:text-[5px] md:text-base from-blue-500 to-purple-500 hover:from-blue-600 hover:to-purple-600 text-white font-semibold px-4 py-2 md:px-6 md:py-2 rounded-lg shadow-lg transition-all duration-300 hover:scale-105"
+            className="bg-gradient-to-r text-sm md:text-base from-blue-500 to-purple-500 hover:from-blue-600 hover:to-purple-600 text-white font-semibold px-3 py-2 md:px-6 md:py-2 rounded-lg shadow-lg transition-all duration-300 hover:scale-105"
           >
             <Ticket className="mr-2 h-4 w-4" />
             ĐẶT VÉ NGAY

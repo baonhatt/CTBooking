@@ -114,6 +114,19 @@ export default function BookingSection({ onBookClick }: BookingSectionProps) {
   }, []);
 
   const handleOpenModal = () => {
+    const raw = localStorage.getItem("authUser");
+    if (!raw) {
+      toast({ title: "Vui lòng đăng nhập", description: "Bạn cần đăng nhập trước khi đặt vé", variant: "default" });
+      window.dispatchEvent(new Event("open-login"));
+      return;
+    }
+    try {
+      const parsed = JSON.parse(raw);
+      const emailFromAuth = parsed?.user?.email || parsed?.email || "";
+      if (emailFromAuth) {
+        setFormData((prev) => ({ ...prev, email: emailFromAuth }));
+      }
+    } catch {}
     setIsModalOpen(true);
     onBookClick();
   };
@@ -188,23 +201,40 @@ export default function BookingSection({ onBookClick }: BookingSectionProps) {
     }
     if (currentStep === 2) {
       const orderId = `ORDER_${Date.now()}`;
+      const movieDetail = activeMoviesFull.find((x: any) => x.title === formData.movie);
+      const authRaw = localStorage.getItem("authUser");
+      if (!authRaw) {
+        toast({ title: "Vui lòng đăng nhập", description: "Bạn cần đăng nhập trước khi thanh toán", variant: "destructive" });
+        window.dispatchEvent(new Event("open-login"));
+        return;
+      }
+      let authEmail = formData.email;
+      let authName = formData.name;
+      try {
+        const parsed = JSON.parse(authRaw);
+        authEmail = parsed?.user?.email || parsed?.email || authEmail;
+        authName = parsed?.user?.username || parsed?.username || authName;
+      } catch {}
       const summary = {
         orderId,
         movie: selectedMovie?.title,
         dateDisplay: formData.date ? formData.date.toLocaleDateString("vi-VN") : "",
         showtime: formData.showtime,
         showtimeId: selectedShowtimeId,
-        name: formData.name,
+        name: authName,
         phone: formData.phone,
-        email: formData.email,
+        email: authEmail,
         quantity: formData.quantity,
         amount: totalPrice,
         method: paymentMethod,
+        poster: movieDetail?.cover_image || "",
+        duration: movieDetail?.duration_min ? `${movieDetail.duration_min} phút` : "",
+        genres: movieDetail?.genres || "",
       };
       try {
         const showtimeId = selectedShowtimeId as number;
         const { booking } = await createBookingApi({
-          email: formData.email,
+          email: authEmail,
           showtimeId,
           ticketCount: formData.quantity,
           paymentMethod: paymentMethod as any,
