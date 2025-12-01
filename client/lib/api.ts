@@ -155,11 +155,11 @@ export async function getToyById(id: number) {
   return request<{ toy: any }>(`/api/toys/${id}`)
 }
 
-export async function createToyApi(body: { name: string; category?: string; price: number; stock?: number; status?: string; image_url?: string }) {
+export async function createToyApi(body: { name: string; category?: string; price: number; stock?: number; status?: string; image_url?: string; image_base64?: string }) {
   return request<{ toy: any }>("/api/toys", { method: "POST", body: JSON.stringify(body) })
 }
 
-export async function updateToyApi(id: number, body: { name?: string; category?: string; price?: number; stock?: number; status?: string; image_url?: string }) {
+export async function updateToyApi(id: number, body: { name?: string; category?: string; price?: number; stock?: number; status?: string; image_url?: string; image_base64?: string }) {
   return request<{ toy: any }>(`/api/toys/${id}`, { method: "PUT", body: JSON.stringify(body) })
 }
 
@@ -171,6 +171,7 @@ export async function createMovieApi(body: {
   title: string;
   description?: string;
   cover_image?: string;
+  cover_image_base64?: string;
   detail_images?: any;
   genres?: any;
   rating?: number;
@@ -189,7 +190,7 @@ export async function getMoviesAdmin(options?: { page?: number; pageSize?: numbe
   const path = `/api/movies${params.toString() ? `?${params.toString()}` : ""}`
   return request<{ items: any[]; page: number; pageSize: number; total: number }>(path, { signal: options?.signal })
 }
-export async function updateMovieApi(id: number, body: { title?: string; description?: string; cover_image?: string; detail_images?: any; genres?: any; rating?: number; duration_min?: number; price?: number; is_active?: boolean; release_date?: string }) {
+export async function updateMovieApi(id: number, body: { title?: string; description?: string; cover_image?: string; cover_image_base64?: string; detail_images?: any; genres?: any; rating?: number; duration_min?: number; price?: number; is_active?: boolean; release_date?: string }) {
   return request<{ movie: any }>(`/api/movies/${id}`, { method: "PUT", body: JSON.stringify(body) })
 }
 export async function deleteMovieApi(id: number) {
@@ -202,6 +203,26 @@ export async function getAdminRevenue(options?: { from?: string; to?: string; si
   if (options?.to) params.set("to", options.to)
   const path = `/api/admin/revenue${params.toString() ? `?${params.toString()}` : ""}`
   return request<{ total: number; count: number }>(path, { signal: options?.signal })
+}
+
+// ----------------- API SHOWTIMES CRUD -----------------
+export async function getShowtimes(options?: { page?: number; pageSize?: number; from?: string; to?: string; signal?: AbortSignal }) {
+  const params = new URLSearchParams()
+  if (options?.page) params.set("page", String(options.page))
+  if (options?.pageSize) params.set("pageSize", String(options.pageSize))
+  if (options?.from) params.set("from", options.from)
+  if (options?.to) params.set("to", options.to)
+  const path = `/api/showtimes${params.toString() ? `?${params.toString()}` : ""}`
+  return request<{ items: any[]; page: number; pageSize: number; total: number }>(path, { signal: options?.signal })
+}
+export async function createShowtimeApi(body: { movie_id: number; start_time: string; price: number }) {
+  return request<{ showtime: any }>(`/api/showtimes`, { method: "POST", body: JSON.stringify(body) })
+}
+export async function updateShowtimeApi(id: number, body: { movie_id?: number; start_time?: string; price?: number }) {
+  return request<{ showtime: any }>(`/api/showtimes/${id}`, { method: "PUT", body: JSON.stringify(body) })
+}
+export async function deleteShowtimeApi(id: number) {
+  return request<{ ok: boolean }>(`/api/showtimes/${id}`, { method: "DELETE" })
 }
 // ----------------- DECLARE TYPE -----------------
 export type { Movie, MoviesResponse, Login, Register };

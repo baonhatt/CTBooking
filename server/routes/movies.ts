@@ -1,6 +1,8 @@
 import { RequestHandler } from "express";
 import type { Movie, ActiveMoviesTodayResponse } from "@shared/api";
 import { prisma } from '../lib/prisma'
+import fs from 'fs'
+import path from 'path'
 
 export const handleMovies2025: RequestHandler = (_req, res) => {
   const movies: Movie[] = [
@@ -136,6 +138,7 @@ export const createMovie: RequestHandler = async (req, res) => {
       title,
       description,
       cover_image,
+      cover_image_base64,
       detail_images,
       genres,
       rating,
@@ -165,10 +168,24 @@ export const createMovie: RequestHandler = async (req, res) => {
     if (durationNum !== undefined && (!Number.isInteger(durationNum) || durationNum < 0)) {
       return res.status(400).json({ message: "Thời lượng không hợp lệ" })
     }
+    let savedCover = cover_image as string | undefined
+    if (cover_image_base64 && typeof cover_image_base64 === 'string') {
+      try {
+        const match = cover_image_base64.match(/^data:(.+);base64,(.+)$/)
+        const ext = match ? (match[1].split('/')[1] || 'png') : 'png'
+        const buf = Buffer.from(match ? match[2] : cover_image_base64, 'base64')
+        const dir = path.resolve(process.cwd(), 'uploads', 'movies')
+        try { fs.mkdirSync(dir, { recursive: true }) } catch {}
+        const filename = `movie_${Date.now()}.${ext}`
+        const filepath = path.join(dir, filename)
+        fs.writeFileSync(filepath, buf)
+        savedCover = `/uploads/movies/${filename}`
+      } catch {}
+    }
     baseData = {
       title,
       description,
-      cover_image,
+      cover_image: savedCover,
       detail_images,
       genres,
       rating: ratingNum,
@@ -235,11 +252,24 @@ export const getMovie: RequestHandler = async (req, res) => {
 export const updateMovie: RequestHandler = async (req, res) => {
   try {
     const id = Number(req.params.id)
-    const { title, description, cover_image, detail_images, genres, rating, duration_min, price, is_active, release_date } = req.body as any
+    const { title, description, cover_image, cover_image_base64, detail_images, genres, rating, duration_min, price, is_active, release_date } = req.body as any
     const data: any = {}
     if (title !== undefined) data.title = title
     if (description !== undefined) data.description = description
     if (cover_image !== undefined) data.cover_image = cover_image
+    if (cover_image_base64 && typeof cover_image_base64 === 'string') {
+      try {
+        const match = cover_image_base64.match(/^data:(.+);base64,(.+)$/)
+        const ext = match ? (match[1].split('/')[1] || 'png') : 'png'
+        const buf = Buffer.from(match ? match[2] : cover_image_base64, 'base64')
+        const dir = path.resolve(process.cwd(), 'uploads', 'movies')
+        try { fs.mkdirSync(dir, { recursive: true }) } catch {}
+        const filename = `movie_${Date.now()}.${ext}`
+        const filepath = path.join(dir, filename)
+        fs.writeFileSync(filepath, buf)
+        data.cover_image = `/uploads/movies/${filename}`
+      } catch {}
+    }
     if (detail_images !== undefined) data.detail_images = detail_images
     if (genres !== undefined) data.genres = genres
     if (rating !== undefined) {
@@ -273,6 +303,134 @@ export const deleteMovie: RequestHandler = async (req, res) => {
   try {
     const id = Number(req.params.id)
     await (prisma as any).movies.delete({ where: { id } })
+    res.status(200).json({ ok: true })
+  } catch (err: any) {
+    if (err?.code === "P2025") return res.status(404).json({ message: "Không tìm thấy" })
+    res.status(500).json({ message: "Lỗi máy chủ nội bộ" })
+  }
+}
+
+export const listShowtimes: RequestHandler = async (req, res) => {
+  try {
+    const page = Number(req.query.page || 1)
+    const pageSize = Number(req.query.pageSize || 20)
+    const fromStr = String(req.query.from || "")
+    const toStr = String(req.query.to || "")
+    const from = fromStr ? new Date(fromStr) : undefined
+    const to = toStr ? new Date(toStr) : undefined
+    const where: any = {}
+    if (from && to) where.start_time = { gte: from, lte: to }
+    else if (from) where.start_time = { gte: from }
+    else if (to) where.start_time = { lte: to }
+    const total = await (prisma as any).showtimes.count({ where })
+    const items = await (prisma as any).showtimes.findMany({
+      where,
+      include: { movie: true },
+      orderBy: { start_time: "asc" },
+      skip: (page - 1) * pageSize,
+      take: pageSize,
+    })
+    res.status(200).json({ items, page, pageSize, total })
+  } catch {
+    res.status(500).json({ message: "Lỗi máy chủ nội bộ" })
+  }
+}
+
+export const createShowtime: RequestHandler = async (req, res) => {
+  try {
+    const { movie_id, start_time, price } = req.body as any
+    const mId = Number(movie_id)
+    const start = new Date(start_time)
+    const priceNum = Number(price)
+    if (!mId || !start_time || !Number.isFinite(priceNum) || priceNum < 0) {
+      return res.status(400).json({ message: "Thiếu dữ liệu hoặc dữ liệu không hợp lệ" })
+    }
+    if (priceNum > 9999999.99) {
+      return res.status(400).json({ message: "Giá vượt quá giới hạn (tối đa 9,999,999.99)" })
+    }
+    const movie = await (prisma as any).movies.findUnique({ where: { id: mId } })
+    if (!movie) return res.status(404).json({ message: "Không tìm thấy phim" })
+    const duration = Number(movie.duration_min || 0)
+    const end = new Date(start.getTime() + duration * 60 * 1000)
+    const dayStart = new Date(start)
+    dayStart.setHours(0, 0, 0, 0)
+    const dayEnd = new Date(start)
+    dayEnd.setHours(23, 59, 59, 999)
+    const existing = await (prisma as any).showtimes.findMany({
+      where: { start_time: { gte: dayStart, lte: dayEnd } },
+      include: { movie: true },
+      orderBy: { start_time: "asc" },
+    })
+    const overlaps = existing.some((s: any) => {
+      const sDur = Number(s.movie?.duration_min || 0)
+      const sEnd = new Date(new Date(s.start_time).getTime() + sDur * 60 * 1000)
+      return start < sEnd && new Date(s.start_time) < end
+    })
+    if (overlaps) return res.status(409).json({ message: "Thời gian lịch chiếu trùng với lịch khác" })
+    try {
+      const showtime = await (prisma as any).showtimes.create({ data: { movie_id: mId, start_time: start, price: priceNum > 0 ? priceNum.toFixed(2) : "0.00" } })
+      return res.status(201).json({ showtime })
+    } catch (e: any) {
+      if (e?.code === "P2002" && String(e?.meta?.target || "").includes("id")) {
+        try {
+          await (prisma as any).$executeRawUnsafe('SELECT setval(pg_get_serial_sequence("showtimes", "id"), COALESCE((SELECT MAX(id) FROM "showtimes"), 1), true);')
+          const showtime = await (prisma as any).showtimes.create({ data: { movie_id: mId, start_time: start, price: priceNum > 0 ? priceNum.toFixed(2) : "0.00" } })
+          return res.status(201).json({ showtime })
+        } catch (ee: any) {
+          return res.status(500).json({ message: ee?.message || "Lỗi máy chủ nội bộ" })
+        }
+      }
+      return res.status(500).json({ message: e?.message || "Lỗi máy chủ nội bộ" })
+    }
+  } catch (err: any) {
+    return res.status(500).json({ message: err?.message || "Lỗi máy chủ nội bộ" })
+  }
+}
+
+export const updateShowtime: RequestHandler = async (req, res) => {
+  try {
+    const id = Number(req.params.id)
+    const { movie_id, start_time, price } = req.body as any
+    const st = await (prisma as any).showtimes.findUnique({ where: { id }, include: { movie: true } })
+    if (!st) return res.status(404).json({ message: "Không tìm thấy lịch" })
+    const mId = movie_id !== undefined ? Number(movie_id) : st.movie_id
+    const start = start_time ? new Date(start_time) : new Date(st.start_time)
+    const priceNum = price === undefined ? undefined : Number(price)
+    if (priceNum !== undefined && (!Number.isFinite(priceNum) || priceNum < 0)) {
+      return res.status(400).json({ message: "Giá không hợp lệ" })
+    }
+    const movie = await (prisma as any).movies.findUnique({ where: { id: mId } })
+    if (!movie) return res.status(404).json({ message: "Không tìm thấy phim" })
+    const duration = Number(movie.duration_min || 0)
+    const end = new Date(start.getTime() + duration * 60 * 1000)
+    const dayStart = new Date(start)
+    dayStart.setHours(0, 0, 0, 0)
+    const dayEnd = new Date(start)
+    dayEnd.setHours(23, 59, 59, 999)
+    const existing = await (prisma as any).showtimes.findMany({
+      where: { start_time: { gte: dayStart, lte: dayEnd }, NOT: { id } },
+      include: { movie: true },
+      orderBy: { start_time: "asc" },
+    })
+    const overlaps = existing.some((s: any) => {
+      const sDur = Number(s.movie?.duration_min || 0)
+      const sEnd = new Date(new Date(s.start_time).getTime() + sDur * 60 * 1000)
+      return start < sEnd && new Date(s.start_time) < end
+    })
+    if (overlaps) return res.status(409).json({ message: "Thời gian lịch chiếu trùng với lịch khác" })
+    const data: any = { movie_id: mId, start_time: start, updated_at: new Date() }
+    if (priceNum !== undefined) data.price = priceNum > 0 ? priceNum.toFixed(2) : "0.00"
+    const showtime = await (prisma as any).showtimes.update({ where: { id }, data })
+    res.status(200).json({ showtime })
+  } catch (err: any) {
+    res.status(500).json({ message: err?.message || "Lỗi máy chủ nội bộ" })
+  }
+}
+
+export const deleteShowtime: RequestHandler = async (req, res) => {
+  try {
+    const id = Number(req.params.id)
+    await (prisma as any).showtimes.delete({ where: { id } })
     res.status(200).json({ ok: true })
   } catch (err: any) {
     if (err?.code === "P2025") return res.status(404).json({ message: "Không tìm thấy" })
