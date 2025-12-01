@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { toast } from "@/components/ui/use-toast";
-import { Ticket, Loader2, Menu, User } from "lucide-react";
+import { Ticket, Loader2, Menu, User, Eye, EyeOff } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/useAuth";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
@@ -28,6 +28,9 @@ export default function Header({ onBookClick }: HeaderProps) {
   const [registerPassword, setRegisterPassword] = useState("");
   const [registerConfirmPassword, setRegisterConfirmPassword] = useState("");
   const [forgetPassEmail, setForgetPassEmail] = useState("");
+  const [showLoginPass, setShowLoginPass] = useState(false);
+  const [showRegisterPass, setShowRegisterPass] = useState(false);
+  const [showRegisterConfirmPass, setShowRegisterConfirmPass] = useState(false);
 
   useEffect(() => {
     const handleScroll = () => {
@@ -260,17 +263,27 @@ export default function Header({ onBookClick }: HeaderProps) {
                   </div>
                   <div>
                     <label className="text-sm text-gray-300 mb-1 block">Mật khẩu</label>
-                  <Input
-                    type="password"
-                    placeholder="••••••••"
-                    value={loginPassword}
-                    onChange={(e) => setLoginPassword(e.target.value)}
-                    required
-                    maxLength={50}
-                    pattern="^(?=.*[A-Za-z])(?=.*\d)[A-Za-z\d]{6,}$"
-                    title="Mật khẩu phải có ít nhất 6 ký tự, bao gồm cả chữ cái và số"
-                    disabled={isLoginLoading}
-                  />
+                    <div className="relative">
+                      <Input
+                        type={showLoginPass ? "text" : "password"}
+                        placeholder="••••••••"
+                        value={loginPassword}
+                        onChange={(e) => setLoginPassword(e.target.value)}
+                        required
+                        maxLength={50}
+                        pattern="^(?=.*[A-Za-z])(?=.*\d)[A-Za-z\d]{6,}$"
+                        title="Mật khẩu phải có ít nhất 6 ký tự, bao gồm cả chữ cái và số"
+                        disabled={isLoginLoading}
+                      />
+                      <button
+                        type="button"
+                        className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-500 hover:text-black"
+                        onClick={() => setShowLoginPass((v) => !v)}
+                        aria-label={showLoginPass ? "Ẩn mật khẩu" : "Hiển thị mật khẩu"}
+                      >
+                        {showLoginPass ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                      </button>
+                    </div>
                   </div>
                   <Button type="submit" disabled={isLoginLoading} className="w-full bg-gradient-to-r from-blue-500 to-purple-500 hover:from-blue-600 hover:to-purple-600">
                     {isLoginLoading ? (
@@ -345,31 +358,51 @@ export default function Header({ onBookClick }: HeaderProps) {
                 </div>
                 <div>
                   <label className="text-sm text-gray-300 mb-1 block">Mật khẩu</label>
-                  <Input
-                    type="password"
-                    placeholder="••••••••"
-                    value={registerPassword}
-                    maxLength={50}
-                    onChange={(e) => setRegisterPassword(e.target.value)}
-                    required
-                    pattern="^(?=.*[A-Za-z])(?=.*\d)[A-Za-z\d]{6,}$"
-                    title="Mật khẩu phải có ít nhất 6 ký tự, bao gồm cả chữ cái và số"
-                    disabled={isRegisterLoading}
-                  />
+                  <div className="relative">
+                    <Input
+                      type={showRegisterPass ? "text" : "password"}
+                      placeholder="••••••••"
+                      value={registerPassword}
+                      maxLength={50}
+                      onChange={(e) => setRegisterPassword(e.target.value)}
+                      required
+                      pattern="^(?=.*[A-Za-z])(?=.*\d)[A-Za-z\d]{6,}$"
+                      title="Mật khẩu phải có ít nhất 6 ký tự, bao gồm cả chữ cái và số"
+                      disabled={isRegisterLoading}
+                    />
+                    <button
+                      type="button"
+                      className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-500 hover:text-black"
+                      onClick={() => setShowRegisterPass((v) => !v)}
+                      aria-label={showRegisterPass ? "Ẩn mật khẩu" : "Hiển thị mật khẩu"}
+                    >
+                      {showRegisterPass ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                    </button>
+                  </div>
                 </div>
                 <div>
                   <label className="text-sm text-gray-300 mb-1 block">Nhập Lại Mật khẩu</label>
-                  <Input
-                    type="password"
-                    placeholder="••••••••"
-                    value={registerConfirmPassword}
-                    maxLength={50}
-                    onChange={(e) => setRegisterConfirmPassword(e.target.value)}
-                    required
-                    pattern="^(?=.*[A-Za-z])(?=.*\d)[A-Za-z\d]{6,}$"
-                    title="Mật khẩu phải có ít nhất 6 ký tự, bao gồm cả chữ cái và số"
-                    disabled={isRegisterLoading}
-                  />
+                  <div className="relative">
+                    <Input
+                      type={showRegisterConfirmPass ? "text" : "password"}
+                      placeholder="••••••••"
+                      value={registerConfirmPassword}
+                      maxLength={50}
+                      onChange={(e) => setRegisterConfirmPassword(e.target.value)}
+                      required
+                      pattern="^(?=.*[A-Za-z])(?=.*\d)[A-Za-z\d]{6,}$"
+                      title="Mật khẩu phải có ít nhất 6 ký tự, bao gồm cả chữ cái và số"
+                      disabled={isRegisterLoading}
+                    />
+                    <button
+                      type="button"
+                      className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-500 hover:text-black"
+                      onClick={() => setShowRegisterConfirmPass((v) => !v)}
+                      aria-label={showRegisterConfirmPass ? "Ẩn mật khẩu" : "Hiển thị mật khẩu"}
+                    >
+                      {showRegisterConfirmPass ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                    </button>
+                  </div>
                 </div>
                 <Button type="submit" disabled={isRegisterLoading} className="w-full bg-gradient-to-r from-blue-500 to-purple-500 hover:from-blue-600 hover:to-purple-600">
                   {isRegisterLoading ? (

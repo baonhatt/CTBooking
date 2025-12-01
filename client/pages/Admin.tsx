@@ -27,12 +27,12 @@ import { LineChart, Line, BarChart, Bar, CartesianGrid, XAxis, YAxis } from "rec
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { useNavigate } from "react-router-dom";
 import { Pagination, PaginationContent, PaginationItem, PaginationLink, PaginationNext, PaginationPrevious } from "@/components/ui/pagination";
-import { getToys, createToyApi, updateToyApi, deleteToyApi, createMovieApi, getMoviesAdmin, updateMovieApi, deleteMovieApi, getAdminRevenue } from "@/lib/api";
+import { getToys, createToyApi, updateToyApi, deleteToyApi, createMovieApi, getMoviesAdmin, updateMovieApi, deleteMovieApi, getAdminRevenue, getShowtimes, createShowtimeApi, updateShowtimeApi, deleteShowtimeApi } from "@/lib/api";
 
 export default function Admin() {
   const { data: movies = [] } = useMovies2025();
   const navigate = useNavigate();
-  const [active, setActive] = useState<"dashboard" | "users" | "movies" | "toys" | "transactions">("dashboard");
+  const [active, setActive] = useState<"dashboard" | "users" | "movies" | "toys" | "showtimes" | "transactions">("dashboard");
   const [moviesLoaded, setMoviesLoaded] = useState(false);
   const [userQuery, setUserQuery] = useState("");
   const [txQuery, setTxQuery] = useState("");
@@ -44,8 +44,10 @@ export default function Admin() {
   const [movieStatus, setMovieStatus] = useState<Record<string, "active" | "inactive">>({});
   const [toys, setToys] = useState([] as Array<{ id: number; name: string; category?: string; price: number; stock: number; status: string; image_url?: string }>)
   const [toysLoaded, setToysLoaded] = useState(false)
+  const [showtimes, setShowtimes] = useState([] as Array<{ id: number; movie_id: number; movie_title: string; start_time: string; price: number; total_sold: number }>)
+  const [showtimesLoaded, setShowtimesLoaded] = useState(false)
   const [isEditOpen, setIsEditOpen] = useState(false);
-  const [editType, setEditType] = useState<"user" | "movie" | "toy" | null>(null);
+  const [editType, setEditType] = useState<"user" | "movie" | "toy" | "showtime" | null>(null);
   const [editData, setEditData] = useState<any>(null);
   const [adminToken, setAdminToken] = useState<string>(() => localStorage.getItem("adminToken") || "");
   const [adminEmailState, setAdminEmailState] = useState<string>(() => localStorage.getItem("adminEmail") || "admin@email.com");
@@ -139,6 +141,9 @@ export default function Admin() {
             duration: m?.duration_min ? `${Number(m.duration_min)} phút` : "",
             genres: Array.isArray(m.genres) ? m.genres : [],
             posterUrl: m.cover_image || "",
+            release_date: m.release_date || null,
+            rating: m.rating ?? null,
+            price: Number(m.price || 0),
           }))
           setMoviesLocal(mapped)
           setMoviesLoaded(true)
@@ -146,6 +151,43 @@ export default function Admin() {
       })()
     }
   }, [active, moviesLoaded])
+
+  useEffect(() => {
+    if (active === "showtimes" && !showtimesLoaded) {
+      (async () => {
+        try {
+          const { items } = await getShowtimes({ page: 1, pageSize: 100 });
+          setShowtimes(items.map((s: any) => ({ id: s.id, movie_id: s.movie_id, movie_title: s.movie?.title || "", start_time: new Date(s.start_time).toISOString(), price: Number(s.price), total_sold: Number(s.total_sold || 0) })))
+          setShowtimesLoaded(true)
+        } catch {}
+      })()
+    }
+  }, [active, showtimesLoaded])
+
+  useEffect(() => {
+    if (active === "showtimes") {
+      (async () => {
+        try {
+          if (!moviesLoaded || (Array.isArray(moviesLocal) && moviesLocal.every((m: any) => m.id === undefined))) {
+            const { items } = await getMoviesAdmin({ page: 1, pageSize: 100 });
+            const mapped = items.map((m: any) => ({
+              id: String(m.id),
+              title: m.title,
+              year: new Date(m.release_date || Date.now()).getFullYear(),
+              duration: m?.duration_min ? `${Number(m.duration_min)} phút` : "",
+              genres: Array.isArray(m.genres) ? m.genres : [],
+              posterUrl: m.cover_image || "",
+              release_date: m.release_date || null,
+              rating: m.rating ?? null,
+              price: Number(m.price || 0),
+            }))
+            setMoviesLocal(mapped)
+            setMoviesLoaded(true)
+          }
+        } catch {}
+      })()
+    }
+  }, [active, moviesLoaded, moviesLocal])
 
   useEffect(() => {
     if (active === "dashboard") {
@@ -192,6 +234,11 @@ export default function Admin() {
             <SidebarMenuItem>
               <SidebarMenuButton tooltip="Phim" isActive={active === "movies"} onClick={() => setActive("movies")}>
                 <Film className="mr-2" /> Phim
+              </SidebarMenuButton>
+            </SidebarMenuItem>
+            <SidebarMenuItem>
+              <SidebarMenuButton tooltip="Lịch chiếu" isActive={active === "showtimes"} onClick={() => setActive("showtimes")}>
+                <Ticket className="mr-2" /> Lịch chiếu
               </SidebarMenuButton>
             </SidebarMenuItem>
             <SidebarMenuItem>
@@ -514,6 +561,50 @@ export default function Admin() {
             </div>
           )}
 
+          {active === "showtimes" && (
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h1 className="text-3xl font-bold">Quản lý lịch chiếu</h1>
+                  <p className="text-gray-500">Tạo lịch chiếu thủ công, tránh trùng giờ</p>
+                </div>
+                <Button onClick={() => { setEditType("showtime"); setEditData({ id: 0, movie_id: 0, start_time: "", price: 0 }); setIsEditOpen(true); }}>Thêm lịch</Button>
+              </div>
+              <Card>
+                <CardHeader>
+                  <CardTitle>Danh sách lịch ({showtimes.length})</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Phim</TableHead>
+                        <TableHead>Thời gian</TableHead>
+                        <TableHead>Giá vé</TableHead>
+                        <TableHead>Đã bán</TableHead>
+                        <TableHead>Thao tác</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {showtimes.map((s) => (
+                        <TableRow key={s.id}>
+                          <TableCell>{s.movie_title}</TableCell>
+                          <TableCell>{new Date(s.start_time).toLocaleString("vi-VN")}</TableCell>
+                          <TableCell>{s.price.toLocaleString("vi-VN")} đ</TableCell>
+                          <TableCell>{s.total_sold}</TableCell>
+                          <TableCell className="flex gap-2">
+                            <Button size="sm" variant="outline" onClick={() => { setEditType("showtime"); setEditData(s); setIsEditOpen(true); }}>Sửa</Button>
+                            <Button size="sm" variant="destructive" onClick={async () => { try { await deleteShowtimeApi(s.id); const { items } = await getShowtimes({ page: 1, pageSize: 100 }); setShowtimes(items.map((x: any) => ({ id: x.id, movie_id: x.movie_id, movie_title: x.movie?.title || "", start_time: new Date(x.start_time).toISOString(), price: Number(x.price), total_sold: Number(x.total_sold || 0) }))); } catch (e: any) {} }}>Xóa</Button>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </CardContent>
+              </Card>
+            </div>
+          )}
+
           {active === "toys" && (
             <div className="space-y-4">
               <div className="flex items-center justify-between">
@@ -649,7 +740,7 @@ export default function Admin() {
       <Dialog open={isEditOpen} onOpenChange={setIsEditOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>{editType === "user" ? "Chỉnh sửa người dùng" : editType === "movie" ? "Chỉnh sửa phim" : editType === "toy" ? "Chỉnh sửa đồ chơi" : ""}</DialogTitle>
+            <DialogTitle>{editType === "user" ? "Chỉnh sửa người dùng" : editType === "movie" ? "Chỉnh sửa phim" : editType === "toy" ? "Chỉnh sửa đồ chơi" : editType === "showtime" ? "Chỉnh sửa lịch chiếu" : ""}</DialogTitle>
           </DialogHeader>
           {editType === "user" && (
             <div className="space-y-3">
@@ -692,6 +783,10 @@ export default function Admin() {
                 <Input value={editData?.title || ""} onChange={(e) => setEditData({ ...editData, title: e.target.value })} />
               </div>
               <div>
+                <Label>Mô tả</Label>
+                <textarea value={editData?.description || ""} onChange={(e) => setEditData({ ...editData, description: e.target.value })} className="w-full h-24 border rounded-md px-3 py-2" />
+              </div>
+              <div>
                 <Label>Giá</Label>
                 <Input type="number" value={editData?.price ?? 0} onChange={(e) => setEditData({ ...editData, price: Number(e.target.value) || 0 })} />
               </div>
@@ -702,6 +797,14 @@ export default function Admin() {
               <div>
                 <Label>Thời lượng</Label>
                 <Input value={editData?.duration || ""} onChange={(e) => setEditData({ ...editData, duration: e.target.value })} />
+              </div>
+              <div>
+                <Label>Đánh giá (0–10)</Label>
+                <Input type="number" min={0} max={10} step={0.1} value={editData?.rating ?? ""} onChange={(e) => setEditData({ ...editData, rating: e.target.value ? Number(e.target.value) : undefined })} />
+              </div>
+              <div>
+                <Label>Ngày phát hành</Label>
+                <Input type="datetime-local" value={editData?.release_date ? new Date(editData.release_date).toISOString().slice(0,16) : ""} onChange={(e) => setEditData({ ...editData, release_date: e.target.value ? new Date(e.target.value).toISOString() : undefined })} />
               </div>
               <div>
                 <Label>Trạng thái</Label>
@@ -719,16 +822,23 @@ export default function Admin() {
                 <Button onClick={async () => {
                   try {
                     if (!editData.id) {
+                      let coverBase64: string | undefined = undefined
+                      if (editData.posterFile) {
+                        const file = editData.posterFile as File
+                        coverBase64 = await new Promise<string>((resolve) => { const r = new FileReader(); r.onload = () => resolve(String(r.result)); r.readAsDataURL(file) })
+                      }
                       const payload = {
                         title: editData.title,
                         description: editData.description,
                         cover_image: editData.posterUrl,
+                        cover_image_base64: coverBase64,
                         detail_images: editData.detail_images,
                         genres: editData.genres,
                         rating: editData.rating ? Number(editData.rating) : undefined,
                         duration_min: editData.duration ? Number(editData.duration) : undefined,
                         price: Number(editData.price || 0),
                         is_active: (editData?.status || "active") === "active",
+                        release_date: editData?.release_date,
                       };
                       const res = await createMovieApi(payload as any);
                       const m = res.movie;
@@ -739,21 +849,31 @@ export default function Admin() {
                           title: m.title,
                           posterUrl: m.cover_image || "",
                           duration: m?.duration_min ? `${Number(m.duration_min)} phút` : "",
-                          year: new Date().getFullYear(),
+                          year: m?.release_date ? new Date(m.release_date).getFullYear() : new Date().getFullYear(),
                           genres: Array.isArray(m.genres) ? m.genres : [],
+                          release_date: m.release_date || null,
+                          rating: m.rating ?? null,
+                          price: Number(m.price || 0),
                         },
                       ]);
                       setMovieStatus((prev) => ({ ...prev, [m.id]: m.is_active ? "active" : "inactive" }));
                     } else {
+                      let coverBase64: string | undefined = undefined
+                      if (editData.posterFile) {
+                        const file = editData.posterFile as File
+                        coverBase64 = await new Promise<string>((resolve) => { const r = new FileReader(); r.onload = () => resolve(String(r.result)); r.readAsDataURL(file) })
+                      }
                       await updateMovieApi(Number(editData.id), {
                         title: editData.title,
                         description: editData.description,
                         cover_image: editData.posterUrl,
+                        cover_image_base64: coverBase64,
                         genres: editData.genres,
                         rating: editData.rating ? Number(editData.rating) : undefined,
                         duration_min: editData.duration ? Number(editData.duration) : undefined,
                         price: Number(editData.price || 0),
                         is_active: (editData?.status || "active") === "active",
+                        release_date: editData?.release_date,
                       })
                       const { items } = await getMoviesAdmin({ page: 1, pageSize: 50 })
                       const mapped = items.map((m: any) => ({
@@ -763,6 +883,9 @@ export default function Admin() {
                         duration: m?.duration_min ? `${Number(m.duration_min)} phút` : "",
                         genres: Array.isArray(m.genres) ? m.genres : [],
                         posterUrl: m.cover_image || "",
+                        release_date: m.release_date || null,
+                        rating: m.rating ?? null,
+                        price: Number(m.price || 0),
                       }))
                       setMoviesLocal(mapped)
                       setMovieStatus((prev) => ({ ...prev, ...Object.fromEntries(mapped.map((x:any) => [x.id, "active"])) }))
@@ -821,14 +944,67 @@ export default function Admin() {
                 <Button onClick={async () => {
                   try {
                     if (!editData.id || editData.id === 0) {
-                      await createToyApi({ name: editData.name, category: editData.category, price: Number(editData.price || 0), stock: Number(editData.stock || 0), status: editData.status, image_url: editData.image_url });
+                      let imageBase64: string | undefined = undefined
+                      if (editData.imageFile) {
+                        const file = editData.imageFile as File
+                        imageBase64 = await new Promise<string>((resolve) => { const r = new FileReader(); r.onload = () => resolve(String(r.result)); r.readAsDataURL(file) })
+                      }
+                      await createToyApi({ name: editData.name, category: editData.category, price: Number(editData.price || 0), stock: Number(editData.stock || 0), status: editData.status, image_url: editData.image_url, image_base64: imageBase64 });
                     } else {
-                      await updateToyApi(Number(editData.id), { name: editData.name, category: editData.category, price: Number(editData.price || 0), stock: Number(editData.stock || 0), status: editData.status, image_url: editData.image_url });
+                      let imageBase64: string | undefined = undefined
+                      if (editData.imageFile) {
+                        const file = editData.imageFile as File
+                        imageBase64 = await new Promise<string>((resolve) => { const r = new FileReader(); r.onload = () => resolve(String(r.result)); r.readAsDataURL(file) })
+                      }
+                      await updateToyApi(Number(editData.id), { name: editData.name, category: editData.category, price: Number(editData.price || 0), stock: Number(editData.stock || 0), status: editData.status, image_url: editData.image_url, image_base64: imageBase64 });
                     }
                     const { items } = await getToys({ page: 1, pageSize: 100 });
                     setToys(items.map((t: any) => ({ id: t.id, name: t.name, category: t.category, price: Number(t.price), stock: t.stock, status: t.status, image_url: t.image_url })));
                   } finally {
                     setIsEditOpen(false);
+                  }
+                }}>Lưu</Button>
+              </div>
+            </div>
+          )}
+          {editType === "showtime" && (
+            <div className="space-y-3">
+              <div>
+                <Label>Phim</Label>
+                <select
+                  value={String(editData?.movie_id ?? 0)}
+                  onChange={(e) => setEditData({ ...editData, movie_id: Number(e.target.value) })}
+                  className="w-full h-10 border rounded-md px-3"
+                >
+                  <option value="0">Chọn phim</option>
+                  {moviesLocal.map((m) => (
+                    <option key={String((m as any).id ?? m.title)} value={String((m as any).id ?? 0)}>{(m as any).title}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <Label>Thời gian bắt đầu</Label>
+                <Input type="datetime-local" value={editData?.start_time ? new Date(editData.start_time).toISOString().slice(0,16) : ""} onChange={(e) => setEditData({ ...editData, start_time: new Date(e.target.value).toISOString() })} />
+              </div>
+              <div>
+                <Label>Giá vé</Label>
+                <Input type="number" value={editData?.price ?? 0} onChange={(e) => setEditData({ ...editData, price: Number(e.target.value) || 0 })} />
+              </div>
+              <div className="flex justify-end gap-2">
+                <Button variant="outline" onClick={() => setIsEditOpen(false)}>Hủy</Button>
+                <Button onClick={async () => {
+                  try {
+                    if (!editData?.id || editData?.id === 0) {
+                      await createShowtimeApi({ movie_id: Number(editData.movie_id), start_time: editData.start_time, price: Number(editData.price || 0) })
+                    } else {
+                      await updateShowtimeApi(Number(editData.id), { movie_id: Number(editData.movie_id), start_time: editData.start_time, price: Number(editData.price || 0) })
+                    }
+                    const { items } = await getShowtimes({ page: 1, pageSize: 100 });
+                    setShowtimes(items.map((x: any) => ({ id: x.id, movie_id: x.movie_id, movie_title: x.movie?.title || "", start_time: new Date(x.start_time).toISOString(), price: Number(x.price), total_sold: Number(x.total_sold || 0) })))
+                  } catch (e: any) {
+                    alert(e?.message || "Lỗi")
+                  } finally {
+                    setIsEditOpen(false)
                   }
                 }}>Lưu</Button>
               </div>

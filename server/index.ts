@@ -1,8 +1,10 @@
 import "dotenv/config";
 import express from "express";
+import fs from "fs";
+import path from "path";
 import cors from "cors";
 import { handleDemo } from "./routes/demo";
-import { handleMovies2025, createMovie, listMovies, getMovie, updateMovie, deleteMovie } from "./routes/movies";
+import { handleMovies2025, createMovie, listMovies, getMovie, updateMovie, deleteMovie, listShowtimes, createShowtime, updateShowtime, deleteShowtime } from "./routes/movies";
 import { handleLogin } from "./routes/login";
 import { handleRegister } from "./routes/register";
 import { handleForgetPass, handleResetPassword } from "./routes/forget-pass";
@@ -17,8 +19,13 @@ export function createServer() {
   const app = express();
   // Middleware
   app.use(cors());
-  app.use(express.json());
-  app.use(express.urlencoded({ extended: true }));
+  app.use(express.json({ limit: "20mb" }));
+  app.use(express.urlencoded({ extended: true, limit: "20mb" }));
+
+  const uploadDir = path.resolve(process.cwd(), "uploads");
+  const uploadMoviesDir = path.join(uploadDir, "movies");
+  try { fs.mkdirSync(uploadDir, { recursive: true }); fs.mkdirSync(uploadMoviesDir, { recursive: true }); } catch {}
+  app.use("/uploads", express.static(uploadDir));
 
   // Example API routes
   app.get("/api/ping", (_req, res) => {
@@ -33,6 +40,10 @@ export function createServer() {
   app.post("/api/movies", createMovie);
   app.put("/api/movies/:id", updateMovie);
   app.delete("/api/movies/:id", deleteMovie);
+  app.get("/api/showtimes", listShowtimes);
+  app.post("/api/showtimes", createShowtime);
+  app.put("/api/showtimes/:id", updateShowtime);
+  app.delete("/api/showtimes/:id", deleteShowtime);
   app.post("/api/login", handleLogin);
   app.post("/api/register", handleRegister);
   app.post("/api/forget-password", handleForgetPass);
