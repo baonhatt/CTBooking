@@ -980,15 +980,19 @@ export default function Admin() {
                   {moviesLocal.map((m) => (
                     <option key={String((m as any).id ?? m.title)} value={String((m as any).id ?? 0)}>{(m as any).title}</option>
                   ))}
-                </select>
+              </select>
               </div>
               <div>
-                <Label>Thời gian bắt đầu</Label>
-                <Input type="datetime-local" value={editData?.start_time ? new Date(editData.start_time).toISOString().slice(0,16) : ""} onChange={(e) => setEditData({ ...editData, start_time: new Date(e.target.value).toISOString() })} />
+                <Label>Chọn ngày</Label>
+                <Input type="date" value={String(editData?.start_time || "").split("T")[0] || ""} onChange={(e) => { const d = e.target.value; const t = String(editData?.start_time || "").split("T")[1]?.slice(0,5) || "00:00"; setEditData({ ...editData, start_time: d ? `${d}T${t}` : "" }); }} />
+              </div>
+              <div>
+                <Label>Giờ bắt đầu</Label>
+                <Input type="time" step={60} value={String(editData?.start_time || "").split("T")[1]?.slice(0,5) || ""} onChange={(e) => { const t = e.target.value; const d = String(editData?.start_time || "").split("T")[0] || new Date().toISOString().slice(0,10); setEditData({ ...editData, start_time: t ? `${d}T${t}` : d ? `${d}T00:00` : "" }); }} />
               </div>
               <div>
                 <Label>Giá vé</Label>
-                <Input type="number" value={editData?.price ?? 0} onChange={(e) => setEditData({ ...editData, price: Number(e.target.value) || 0 })} />
+                <Input type="number" value={editData?.price ?? null} onChange={(e) => setEditData({ ...editData, price: Number(e.target.value) || null })} />
               </div>
               <div className="flex justify-end gap-2">
                 <Button variant="outline" onClick={() => setIsEditOpen(false)}>Hủy</Button>
