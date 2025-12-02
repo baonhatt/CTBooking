@@ -62,10 +62,11 @@ model showtimes {
   id         Int        @id @default(autoincrement())
   movie_id   Int
   start_time DateTime
+  end_time   DateTime?
   price      Decimal    @db.Decimal(10, 2)
+  total_sold Int        @default(0)
   created_at DateTime   @default(now())
   updated_at DateTime   @default(now())
-  total_sold Int        @default(0)
   bookings   bookings[]
   movie      movies     @relation(fields: [movie_id], references: [id], onDelete: Cascade)
 }

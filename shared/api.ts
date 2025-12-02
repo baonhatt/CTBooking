@@ -16,6 +16,9 @@ export interface Movie {
   title: string;
   year: number;
   duration: string;
+  price: number;
+  release_date: Date;
+  rating: number;
   genres: string[];
   posterUrl: string;
 }

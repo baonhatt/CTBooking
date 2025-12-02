@@ -3,66 +3,9 @@ import type { Movie, ActiveMoviesTodayResponse } from "@shared/api";
 import { prisma } from '../lib/prisma'
 import fs from 'fs'
 import path from 'path'
+import { DateTime } from "luxon";
 
 export const handleMovies2025: RequestHandler = (_req, res) => {
-  const movies: Movie[] = [
-    {
-      id: "mv-2025-01",
-      title: "CineSphere234234: Ocean Depths",
-      year: 2025,
-      duration: "15 phút",
-      genres: ["Adventure", "Sci-Fi"],
-      posterUrl:
-        "https://images.unsplash.com/photo-1559827260-dc66d52bef19?w=1200&h=800&fit=crop",
-    },
-    {
-      id: "mv-2025-02",
-      title: "Jurassic Rise",
-      year: 2025,
-      duration: "12 phút",
-      genres: ["Action", "Thriller"],
-      posterUrl:
-        "https://images.unsplash.com/photo-1446776653964-20c1d3a81b06?w=1200&h=800&fit=crop",
-    },
-    {
-      id: "mv-2025-03",
-      title: "Mountain Adventure",
-      year: 2025,
-      duration: "10 phút",
-      genres: ["Adventure", "Nature"],
-      posterUrl:
-        "https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=1200&h=800&fit=crop",
-    },
-    {
-      id: "mv-2025-04",
-      title: "City Lights",
-      year: 2025,
-      duration: "14 phút",
-      genres: ["Sci-Fi", "Action"],
-      posterUrl:
-        "https://images.unsplash.com/photo-1514565131-fce0801e5785?w=1200&h=800&fit=crop",
-    },
-    {
-      id: "mv-2025-05",
-      title: "Skyward Drift",
-      year: 2025,
-      duration: "11 phút",
-      genres: ["Sci-Fi", "Adventure"],
-      posterUrl:
-        "https://images.unsplash.com/photo-1497515114625-6f0e333e283b?w=1200&h=800&fit=crop",
-    },
-    {
-      id: "mv-2025-06",
-      title: "Aurora Trails",
-      year: 2025,
-      duration: "13 phút",
-      genres: ["Fantasy", "Nature"],
-      posterUrl:
-        "https://images.unsplash.com/photo-1500530855697-b586d89ba3ee?w=1200&h=800&fit=crop",
-    },
-  ];
-
-  res.status(200).json({ year: 2025, count: movies.length, items: movies });
 };
 
 export const getAllActiveMoviesToday: RequestHandler = async (_req, res) => {
@@ -175,12 +118,12 @@ export const createMovie: RequestHandler = async (req, res) => {
         const ext = match ? (match[1].split('/')[1] || 'png') : 'png'
         const buf = Buffer.from(match ? match[2] : cover_image_base64, 'base64')
         const dir = path.resolve(process.cwd(), 'uploads', 'movies')
-        try { fs.mkdirSync(dir, { recursive: true }) } catch {}
+        try { fs.mkdirSync(dir, { recursive: true }) } catch { }
         const filename = `movie_${Date.now()}.${ext}`
         const filepath = path.join(dir, filename)
         fs.writeFileSync(filepath, buf)
         savedCover = `/uploads/movies/${filename}`
-      } catch {}
+      } catch { }
     }
     baseData = {
       title,
@@ -219,16 +162,16 @@ export const listMovies: RequestHandler = async (req, res) => {
     const q = String(req.query.q || "").toLowerCase()
     const where: any = q
       ? {
-          OR: [
-            { title: { contains: q, mode: "insensitive" } },
-            { description: { contains: q, mode: "insensitive" } },
-          ],
-        }
+        OR: [
+          { title: { contains: q, mode: "insensitive" } },
+          { description: { contains: q, mode: "insensitive" } },
+        ],
+      }
       : {}
     const total = await (prisma as any).movies.count({ where })
     const items = await (prisma as any).movies.findMany({
       where,
-      orderBy: { created_at: "desc" },
+      orderBy: { id: "desc" },
       skip: (page - 1) * pageSize,
       take: pageSize,
     })
@@ -263,12 +206,12 @@ export const updateMovie: RequestHandler = async (req, res) => {
         const ext = match ? (match[1].split('/')[1] || 'png') : 'png'
         const buf = Buffer.from(match ? match[2] : cover_image_base64, 'base64')
         const dir = path.resolve(process.cwd(), 'uploads', 'movies')
-        try { fs.mkdirSync(dir, { recursive: true }) } catch {}
+        try { fs.mkdirSync(dir, { recursive: true }) } catch { }
         const filename = `movie_${Date.now()}.${ext}`
         const filepath = path.join(dir, filename)
         fs.writeFileSync(filepath, buf)
         data.cover_image = `/uploads/movies/${filename}`
-      } catch {}
+      } catch { }
     }
     if (detail_images !== undefined) data.detail_images = detail_images
     if (genres !== undefined) data.genres = genres
@@ -339,10 +282,14 @@ export const listShowtimes: RequestHandler = async (req, res) => {
 export const createShowtime: RequestHandler = async (req, res) => {
   try {
     const { movie_id, start_time, price } = req.body as any
+    const dt = DateTime.fromISO(start_time, { zone: "Asia/Ho_Chi_Minh" });
+    if (!dt.isValid) {
+      return res.status(400).json({ message: "start_time không hợp lệ" });
+    }
+    const start = dt.toJSDate();
     const mId = Number(movie_id)
-    const start = new Date(start_time)
     const priceNum = Number(price)
-    if (!mId || !start_time || !Number.isFinite(priceNum) || priceNum < 0) {
+    if (!mId || !Number.isFinite(priceNum) || priceNum < 0) {
       return res.status(400).json({ message: "Thiếu dữ liệu hoặc dữ liệu không hợp lệ" })
     }
     if (priceNum > 9999999.99) {
@@ -350,25 +297,31 @@ export const createShowtime: RequestHandler = async (req, res) => {
     }
     const movie = await (prisma as any).movies.findUnique({ where: { id: mId } })
     if (!movie) return res.status(404).json({ message: "Không tìm thấy phim" })
+
     const duration = Number(movie.duration_min || 0)
     const end = new Date(start.getTime() + duration * 60 * 1000)
+
     const dayStart = new Date(start)
     dayStart.setHours(0, 0, 0, 0)
     const dayEnd = new Date(start)
     dayEnd.setHours(23, 59, 59, 999)
-    const existing = await (prisma as any).showtimes.findMany({
-      where: { start_time: { gte: dayStart, lte: dayEnd } },
+
+    const overlap = await (prisma as any).showtimes.findFirst({
+      where: {
+        AND: [
+          { start_time: { lt: end } },
+          { end_time: { gt: start } },
+        ],
+      },
       include: { movie: true },
-      orderBy: { start_time: "asc" },
+
     })
-    const overlaps = existing.some((s: any) => {
-      const sDur = Number(s.movie?.duration_min || 0)
-      const sEnd = new Date(new Date(s.start_time).getTime() + sDur * 60 * 1000)
-      return start < sEnd && new Date(s.start_time) < end
+    const items = await (prisma as any).showtimes.findMany({
+      include: { movie: true },
     })
-    if (overlaps) return res.status(409).json({ message: "Thời gian lịch chiếu trùng với lịch khác" })
+    if (overlap) return res.status(409).json({ message: "Thời gian lịch chiếu trùng với lịch khác" })
     try {
-      const showtime = await (prisma as any).showtimes.create({ data: { movie_id: mId, start_time: start, price: priceNum > 0 ? priceNum.toFixed(2) : "0.00" } })
+      const showtime = await (prisma as any).showtimes.create({ data: { movie_id: mId, start_time: start, end_time: start, price: priceNum > 0 ? priceNum.toFixed(2) : "0.00" } })
       return res.status(201).json({ showtime })
     } catch (e: any) {
       if (e?.code === "P2002" && String(e?.meta?.target || "").includes("id")) {
