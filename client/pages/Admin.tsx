@@ -48,7 +48,7 @@ export default function Admin() {
   const [showtimesLoaded, setShowtimesLoaded] = useState(false)
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [editType, setEditType] = useState<"user" | "movie" | "toy" | "showtime" | null>(null);
-  const [editData, setEditData] = useState<any>(null);
+  const [editData, setEditData] = useState<any>({});
   const [adminToken, setAdminToken] = useState<string>(() => localStorage.getItem("adminToken") || "");
   const [adminEmailState, setAdminEmailState] = useState<string>(() => localStorage.getItem("adminEmail") || "admin@email.com");
   const [usersPage, setUsersPage] = useState(1);
@@ -124,7 +124,7 @@ export default function Admin() {
           const { items } = await getToys({ page: 1, pageSize: 100 });
           setToys(items.map((t: any) => ({ id: t.id, name: t.name, category: t.category, price: Number(t.price), stock: t.stock, status: t.status, image_url: t.image_url })));
           setToysLoaded(true)
-        } catch {}
+        } catch { }
       })();
     }
   }, [active, toysLoaded]);
@@ -147,7 +147,7 @@ export default function Admin() {
           }))
           setMoviesLocal(mapped)
           setMoviesLoaded(true)
-        } catch {}
+        } catch { }
       })()
     }
   }, [active, moviesLoaded])
@@ -159,7 +159,7 @@ export default function Admin() {
           const { items } = await getShowtimes({ page: 1, pageSize: 100 });
           setShowtimes(items.map((s: any) => ({ id: s.id, movie_id: s.movie_id, movie_title: s.movie?.title || "", start_time: new Date(s.start_time).toISOString(), price: Number(s.price), total_sold: Number(s.total_sold || 0) })))
           setShowtimesLoaded(true)
-        } catch {}
+        } catch { }
       })()
     }
   }, [active, showtimesLoaded])
@@ -184,7 +184,7 @@ export default function Admin() {
             setMoviesLocal(mapped)
             setMoviesLoaded(true)
           }
-        } catch {}
+        } catch { }
       })()
     }
   }, [active, moviesLoaded, moviesLocal])
@@ -198,11 +198,33 @@ export default function Admin() {
           const res = await getAdminRevenue({ from: from.toISOString(), to: now.toISOString() });
           setRevenueTotal(res.total || 0);
           setRevenueCount(res.count || 0);
-        } catch {}
+        } catch { }
       })();
     }
   }, [active])
-
+  function toLocalDateTimeString(date: Date) {
+    if (!date) return "";
+    const pad = (n: number) => n.toString().padStart(2, '0');
+    const yyyy = date.getFullYear();
+    const mm = pad(date.getMonth() + 1);
+    const dd = pad(date.getDate());
+    const hh = pad(date.getHours());
+    const min = pad(date.getMinutes());
+    return `${yyyy}-${mm}-${dd}T${hh}:${min}`;
+  }
+  function formatLocalDateTime(date: Date) {
+    const pad = (n: number) => n.toString().padStart(2, '0');
+    const year = date.getFullYear();
+    const month = pad(date.getMonth() + 1);
+    const day = pad(date.getDate());
+    const hours = pad(date.getHours());
+    const minutes = pad(date.getMinutes());
+    return (
+      <>
+        {year}-{month}-{day} <strong style={{ color: 'red' }}> / {hours}:{minutes}</strong>
+      </>
+    );
+  }
   return (
     <SidebarProvider
       style={{
@@ -284,7 +306,7 @@ export default function Admin() {
                   <div className="text-sm text-gray-700">{adminEmailState}</div>
                   <Avatar className="h-8 w-8">
                     <AvatarImage src="" />
-                    <AvatarFallback>{(adminEmailState?.split("@")[0] || "AD").slice(0,2).toUpperCase()}</AvatarFallback>
+                    <AvatarFallback>{(adminEmailState?.split("@")[0] || "AD").slice(0, 2).toUpperCase()}</AvatarFallback>
                   </Avatar>
                 </button>
               </DropdownMenuTrigger>
@@ -385,7 +407,7 @@ export default function Admin() {
                     </div>
                   </CardContent>
                 </Card>
-             
+
                 <Card className="rounded-xl">
                   <CardHeader>
                     <CardTitle className="text-sm">Thống kê người dùng</CardTitle>
@@ -403,31 +425,31 @@ export default function Admin() {
                   </CardContent>
                 </Card>
               </div>
-   <Card className="rounded-xl">
-                  <CardHeader>
-                    <CardTitle className="text-sm">Doanh thu</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="text-3xl font-bold text-blue-600">{metrics.totalRevenue.toLocaleString("vi-VN")} đ</div>
-                    <div className="text-xs text-gray-500 mt-1">Trong 7 ngày gần đây</div>
-                  </CardContent>
-                </Card>
-                <Card className="rounded-xl">
-                  <CardHeader>
+              <Card className="rounded-xl">
+                <CardHeader>
+                  <CardTitle className="text-sm">Doanh thu</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="text-3xl font-bold text-blue-600">{metrics.totalRevenue.toLocaleString("vi-VN")} đ</div>
+                  <div className="text-xs text-gray-500 mt-1">Trong 7 ngày gần đây</div>
+                </CardContent>
+              </Card>
+              <Card className="rounded-xl">
+                <CardHeader>
                   <CardTitle className="text-sm">Thống kê phim</CardTitle>
-                  </CardHeader>
-                  <CardContent>
+                </CardHeader>
+                <CardContent>
                   <ChartContainer config={{ movies: { label: "Phim", color: "#8b5cf6" } }}>
                     <BarChart data={movieStats}>
                       <CartesianGrid strokeDasharray="3 3" />
                       <XAxis dataKey="month" />
-                      <YAxis tickFormatter={(v)=>`${v}`} />
+                      <YAxis tickFormatter={(v) => `${v}`} />
                       <ChartTooltip content={<ChartTooltipContent />} />
-                      <Bar dataKey="value" fill="var(--color-movies)" radius={[8,8,0,0]} />
+                      <Bar dataKey="value" fill="var(--color-movies)" radius={[8, 8, 0, 0]} />
                     </BarChart>
                   </ChartContainer>
-                  </CardContent>
-                </Card>
+                </CardContent>
+              </Card>
 
 
             </div>
@@ -450,11 +472,11 @@ export default function Admin() {
                   <Table>
                     <TableHeader>
                       <TableRow>
-                        <TableHead>Họ tên</TableHead>
-                        <TableHead>ID</TableHead>
-                        <TableHead>Ngày tạo</TableHead>
-                        <TableHead>Trạng thái</TableHead>
-                        <TableHead>Thao tác</TableHead>
+                        <TableHead className="font-bold uppercase">Họ tên</TableHead>
+                        <TableHead className="font-bold uppercase">ID</TableHead>
+                        <TableHead className="font-bold uppercase">Ngày tạo</TableHead>
+                        <TableHead className="font-bold uppercase">Trạng thái</TableHead>
+                        <TableHead className="font-bold uppercase">Thao tác</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -472,26 +494,27 @@ export default function Admin() {
                         </TableRow>
                       ))}
                     </TableBody>
-                    <Pagination className="mt-4">
-                      <PaginationContent>
-                        <PaginationItem>
-                          <PaginationPrevious href="#" onClick={(e) => { e.preventDefault(); setUsersPage(Math.max(1, usersPage - 1)); }} />
-                        </PaginationItem>
-                        {Array.from({ length: usersTotalPages }).map((_, i) => (
-                          <PaginationItem key={i}>
-                            <PaginationLink href="#" isActive={usersPage === i + 1} onClick={(e) => { e.preventDefault(); setUsersPage(i + 1); }}>
-                              {i + 1}
-                            </PaginationLink>
-                          </PaginationItem>
-                        ))}
-                        <PaginationItem>
-                          <PaginationNext href="#" onClick={(e) => { e.preventDefault(); setUsersPage(Math.min(usersTotalPages, usersPage + 1)); }} />
-                        </PaginationItem>
-                      </PaginationContent>
-                    </Pagination>
                   </Table>
+                  <Pagination className="mt-4">
+                    <PaginationContent>
+                      <PaginationItem>
+                        <PaginationPrevious href="#" onClick={(e) => { e.preventDefault(); setUsersPage(Math.max(1, usersPage - 1)); }} />
+                      </PaginationItem>
+                      {Array.from({ length: usersTotalPages }).map((_, i) => (
+                        <PaginationItem key={i}>
+                          <PaginationLink href="#" isActive={usersPage === i + 1} onClick={(e) => { e.preventDefault(); setUsersPage(i + 1); }}>
+                            {i + 1}
+                          </PaginationLink>
+                        </PaginationItem>
+                      ))}
+                      <PaginationItem>
+                        <PaginationNext href="#" onClick={(e) => { e.preventDefault(); setUsersPage(Math.min(usersTotalPages, usersPage + 1)); }} />
+                      </PaginationItem>
+                    </PaginationContent>
+                  </Pagination>
                 </CardContent>
               </Card>
+
             </div>
           )}
 
@@ -512,23 +535,25 @@ export default function Admin() {
                   <Table>
                     <TableHeader>
                       <TableRow>
-                        <TableHead>Tên phim</TableHead>
-                        <TableHead>Thể loại</TableHead>
-                        <TableHead>Thời lượng</TableHead>
-                        <TableHead>Giá</TableHead>
-                        <TableHead>Đánh giá</TableHead>
-                        <TableHead>Trạng thái</TableHead>
-                        <TableHead>Thao tác</TableHead>
+                        <TableHead className="font-bold uppercase">Tên phim</TableHead>
+                        <TableHead className="font-bold uppercase">Thể loại</TableHead>
+                        <TableHead className="font-bold uppercase">Thời lượng</TableHead>
+                        <TableHead className="font-bold uppercase">Giá</TableHead>
+                        <TableHead className="font-bold uppercase">Đánh giá</TableHead>
+                        <TableHead className="font-bold uppercase">Ngày khởi chiếu</TableHead>
+                        <TableHead className="font-bold uppercase">Trạng thái</TableHead>
+                        <TableHead className="font-bold uppercase">Thao tác</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
                       {moviesPageData.map((m) => (
                         <TableRow key={m.id}>
-                          <TableCell className="flex items-center gap-2"><img src={m.posterUrl} className="w-8 h-8 rounded" />{m.title}</TableCell>
+                          <TableCell className="flex items-center gap-2 font-bold uppercase"><img src={m.posterUrl} className="w-8 h-8 rounded" />{m.title}</TableCell>
                           <TableCell>{m.genres.join(", ")}</TableCell>
                           <TableCell>{m.duration}</TableCell>
-                          <TableCell>—</TableCell>
-                          <TableCell>—</TableCell>
+                          <TableCell>{m.price ? Number(m.price).toLocaleString() : "0"}</TableCell>
+                          <TableCell>{m.rating}</TableCell>
+                          <TableCell>{m?.release_date ? formatLocalDateTime(new Date(m?.release_date)) : ""}</TableCell>
                           <TableCell>
                             <Badge variant={(movieStatus[m.id] ?? "active") === "active" ? "secondary" : "outline"}>
                               {(movieStatus[m.id] ?? "active") === "active" ? "Hoạt động" : "Đã ẩn"}
@@ -538,24 +563,24 @@ export default function Admin() {
                         </TableRow>
                       ))}
                     </TableBody>
-                    <Pagination className="mt-4">
-                      <PaginationContent>
-                        <PaginationItem>
-                          <PaginationPrevious href="#" onClick={(e) => { e.preventDefault(); setMoviesPage(Math.max(1, moviesPage - 1)); }} />
-                        </PaginationItem>
-                        {Array.from({ length: moviesTotalPages }).map((_, i) => (
-                          <PaginationItem key={i}>
-                            <PaginationLink href="#" isActive={moviesPage === i + 1} onClick={(e) => { e.preventDefault(); setMoviesPage(i + 1); }}>
-                              {i + 1}
-                            </PaginationLink>
-                          </PaginationItem>
-                        ))}
-                        <PaginationItem>
-                          <PaginationNext href="#" onClick={(e) => { e.preventDefault(); setMoviesPage(Math.min(moviesTotalPages, moviesPage + 1)); }} />
-                        </PaginationItem>
-                      </PaginationContent>
-                    </Pagination>
                   </Table>
+                  <Pagination className="mt-4">
+                    <PaginationContent>
+                      <PaginationItem>
+                        <PaginationPrevious href="#" onClick={(e) => { e.preventDefault(); setMoviesPage(Math.max(1, moviesPage - 1)); }} />
+                      </PaginationItem>
+                      {Array.from({ length: moviesTotalPages }).map((_, i) => (
+                        <PaginationItem key={i}>
+                          <PaginationLink href="#" isActive={moviesPage === i + 1} onClick={(e) => { e.preventDefault(); setMoviesPage(i + 1); }}>
+                            {i + 1}
+                          </PaginationLink>
+                        </PaginationItem>
+                      ))}
+                      <PaginationItem>
+                        <PaginationNext href="#" onClick={(e) => { e.preventDefault(); setMoviesPage(Math.min(moviesTotalPages, moviesPage + 1)); }} />
+                      </PaginationItem>
+                    </PaginationContent>
+                  </Pagination>
                 </CardContent>
               </Card>
             </div>
@@ -578,23 +603,25 @@ export default function Admin() {
                   <Table>
                     <TableHeader>
                       <TableRow>
-                        <TableHead>Phim</TableHead>
-                        <TableHead>Thời gian</TableHead>
-                        <TableHead>Giá vé</TableHead>
-                        <TableHead>Đã bán</TableHead>
-                        <TableHead>Thao tác</TableHead>
+                        <TableHead className="font-bold uppercase">Phim</TableHead>
+                        <TableHead className="font-bold uppercase">Thời gian</TableHead>
+                        <TableHead className="font-bold uppercase">Giá vé</TableHead>
+                        <TableHead className="font-bold uppercase">Đã bán</TableHead>
+                        <TableHead className="font-bold uppercase">Thao tác</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
                       {showtimes.map((s) => (
                         <TableRow key={s.id}>
-                          <TableCell>{s.movie_title}</TableCell>
-                          <TableCell>{new Date(s.start_time).toLocaleString("vi-VN")}</TableCell>
-                          <TableCell>{s.price.toLocaleString("vi-VN")} đ</TableCell>
+                          <TableCell className="font-bold uppercase">{s.movie_title}</TableCell>
+                          <TableCell>
+                            {s.start_time ? formatLocalDateTime(new Date(s.start_time)) : ""}
+                          </TableCell>
+                          <TableCell>{s.price ? Number(s.price).toLocaleString() : "0"}</TableCell>
                           <TableCell>{s.total_sold}</TableCell>
                           <TableCell className="flex gap-2">
                             <Button size="sm" variant="outline" onClick={() => { setEditType("showtime"); setEditData(s); setIsEditOpen(true); }}>Sửa</Button>
-                            <Button size="sm" variant="destructive" onClick={async () => { try { await deleteShowtimeApi(s.id); const { items } = await getShowtimes({ page: 1, pageSize: 100 }); setShowtimes(items.map((x: any) => ({ id: x.id, movie_id: x.movie_id, movie_title: x.movie?.title || "", start_time: new Date(x.start_time).toISOString(), price: Number(x.price), total_sold: Number(x.total_sold || 0) }))); } catch (e: any) {} }}>Xóa</Button>
+                            <Button size="sm" variant="destructive" onClick={async () => { try { await deleteShowtimeApi(s.id); const { items } = await getShowtimes({ page: 1, pageSize: 100 }); setShowtimes(items.map((x: any) => ({ id: x.id, movie_id: x.movie_id, movie_title: x.movie?.title || "", start_time: new Date(x.start_time).toISOString(), price: Number(x.price), total_sold: Number(x.total_sold || 0) }))); } catch (e: any) { } }}>Xóa</Button>
                           </TableCell>
                         </TableRow>
                       ))}
@@ -622,47 +649,47 @@ export default function Admin() {
                   <Table>
                     <TableHeader>
                       <TableRow>
-                        <TableHead>Tên đồ chơi</TableHead>
-                        <TableHead>Danh mục</TableHead>
-                        <TableHead>Giá</TableHead>
-                        <TableHead>Tồn kho</TableHead>
-                        <TableHead>Trạng thái</TableHead>
-                        <TableHead>Thao tác</TableHead>
+                        <TableHead className="font-bold uppercase">Tên đồ chơi</TableHead>
+                        <TableHead className="font-bold uppercase">Danh mục</TableHead>
+                        <TableHead className="font-bold uppercase">Giá</TableHead>
+                        <TableHead className="font-bold uppercase">Tồn kho</TableHead>
+                        <TableHead className="font-bold uppercase">Trạng thái</TableHead>
+                        <TableHead className="font-bold uppercase">Thao tác</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
                       {toysPageData.map((t) => (
                         <TableRow key={t.id}>
-                          <TableCell className="flex items-center gap-2">{t.image_url && <img src={t.image_url} className="w-8 h-8 rounded object-cover" />}<span>{t.name}</span></TableCell>
+                          <TableCell className="flex items-center gap-2 font-bold uppercase">{t.image_url && <img src={t.image_url} className="w-8 h-8 rounded object-cover" />}<span>{t.name}</span></TableCell>
                           <TableCell>{t.category}</TableCell>
-                          <TableCell>{t.price.toLocaleString("vi-VN")} đ</TableCell>
+                          <TableCell>{t.price ? Number(t.price).toLocaleString() : "0"}</TableCell>
                           <TableCell>{t.stock}</TableCell>
                           <TableCell><Badge variant="secondary">{t.status}</Badge></TableCell>
                           <TableCell className="flex gap-2">
                             <Button size="sm" variant="outline" onClick={() => { setEditType("toy"); setEditData(t); setIsEditOpen(true); }}>Sửa</Button>
-                            <Button size="sm" variant="destructive" onClick={async () => { try { await deleteToyApi(t.id as any); const { items } = await getToys({ page: 1, pageSize: 100 }); setToys(items.map((x: any) => ({ id: x.id, name: x.name, category: x.category, price: Number(x.price), stock: x.stock, status: x.status, image_url: x.image_url }))); } catch {} }}>Xóa</Button>
+                            <Button size="sm" variant="destructive" onClick={async () => { try { await deleteToyApi(t.id as any); const { items } = await getToys({ page: 1, pageSize: 100 }); setToys(items.map((x: any) => ({ id: x.id, name: x.name, category: x.category, price: Number(x.price), stock: x.stock, status: x.status, image_url: x.image_url }))); } catch { } }}>Xóa</Button>
                           </TableCell>
                         </TableRow>
                       ))}
                     </TableBody>
-                    <Pagination className="mt-4">
-                      <PaginationContent>
-                        <PaginationItem>
-                          <PaginationPrevious href="#" onClick={(e) => { e.preventDefault(); setToysPage(Math.max(1, toysPage - 1)); }} />
-                        </PaginationItem>
-                        {Array.from({ length: toysTotalPages }).map((_, i) => (
-                          <PaginationItem key={i}>
-                            <PaginationLink href="#" isActive={toysPage === i + 1} onClick={(e) => { e.preventDefault(); setToysPage(i + 1); }}>
-                              {i + 1}
-                            </PaginationLink>
-                          </PaginationItem>
-                        ))}
-                        <PaginationItem>
-                          <PaginationNext href="#" onClick={(e) => { e.preventDefault(); setToysPage(Math.min(toysTotalPages, toysPage + 1)); }} />
-                        </PaginationItem>
-                      </PaginationContent>
-                    </Pagination>
                   </Table>
+                  <Pagination className="mt-4">
+                    <PaginationContent>
+                      <PaginationItem>
+                        <PaginationPrevious href="#" onClick={(e) => { e.preventDefault(); setToysPage(Math.max(1, toysPage - 1)); }} />
+                      </PaginationItem>
+                      {Array.from({ length: toysTotalPages }).map((_, i) => (
+                        <PaginationItem key={i}>
+                          <PaginationLink href="#" isActive={toysPage === i + 1} onClick={(e) => { e.preventDefault(); setToysPage(i + 1); }}>
+                            {i + 1}
+                          </PaginationLink>
+                        </PaginationItem>
+                      ))}
+                      <PaginationItem>
+                        <PaginationNext href="#" onClick={(e) => { e.preventDefault(); setToysPage(Math.min(toysTotalPages, toysPage + 1)); }} />
+                      </PaginationItem>
+                    </PaginationContent>
+                  </Pagination>
                 </CardContent>
               </Card>
             </div>
@@ -690,13 +717,13 @@ export default function Admin() {
                   <Table>
                     <TableHeader>
                       <TableRow>
-                        <TableHead>Loại</TableHead>
-                        <TableHead>Sản phẩm</TableHead>
-                        <TableHead>Số lượng</TableHead>
-                        <TableHead>Số tiền</TableHead>
-                        <TableHead>Phương thức</TableHead>
-                        <TableHead>Trạng thái</TableHead>
-                        <TableHead>Ngày giao dịch</TableHead>
+                        <TableHead className="font-bold uppercase">Loại</TableHead>
+                        <TableHead className="font-bold uppercase">Sản phẩm</TableHead>
+                        <TableHead className="font-bold uppercase">Số lượng</TableHead>
+                        <TableHead className="font-bold uppercase">Số tiền</TableHead>
+                        <TableHead className="font-bold uppercase">Phương thức</TableHead>
+                        <TableHead className="font-bold uppercase">Trạng thái</TableHead>
+                        <TableHead className="font-bold uppercase">Ngày giao dịch</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -712,24 +739,24 @@ export default function Admin() {
                         </TableRow>
                       ))}
                     </TableBody>
-                    <Pagination className="mt-4">
-                      <PaginationContent>
-                        <PaginationItem>
-                          <PaginationPrevious href="#" onClick={(e) => { e.preventDefault(); setTxPage(Math.max(1, txPage - 1)); }} />
-                        </PaginationItem>
-                        {Array.from({ length: txTotalPages }).map((_, i) => (
-                          <PaginationItem key={i}>
-                            <PaginationLink href="#" isActive={txPage === i + 1} onClick={(e) => { e.preventDefault(); setTxPage(i + 1); }}>
-                              {i + 1}
-                            </PaginationLink>
-                          </PaginationItem>
-                        ))}
-                        <PaginationItem>
-                          <PaginationNext href="#" onClick={(e) => { e.preventDefault(); setTxPage(Math.min(txTotalPages, txPage + 1)); }} />
-                        </PaginationItem>
-                      </PaginationContent>
-                    </Pagination>
                   </Table>
+                  <Pagination className="mt-4">
+                    <PaginationContent>
+                      <PaginationItem>
+                        <PaginationPrevious href="#" onClick={(e) => { e.preventDefault(); setTxPage(Math.max(1, txPage - 1)); }} />
+                      </PaginationItem>
+                      {Array.from({ length: txTotalPages }).map((_, i) => (
+                        <PaginationItem key={i}>
+                          <PaginationLink href="#" isActive={txPage === i + 1} onClick={(e) => { e.preventDefault(); setTxPage(i + 1); }}>
+                            {i + 1}
+                          </PaginationLink>
+                        </PaginationItem>
+                      ))}
+                      <PaginationItem>
+                        <PaginationNext href="#" onClick={(e) => { e.preventDefault(); setTxPage(Math.min(txTotalPages, txPage + 1)); }} />
+                      </PaginationItem>
+                    </PaginationContent>
+                  </Pagination>
                 </CardContent>
               </Card>
             </div>
@@ -738,7 +765,7 @@ export default function Admin() {
         {null}
       </SidebarInset>
       <Dialog open={isEditOpen} onOpenChange={setIsEditOpen}>
-        <DialogContent>
+        <DialogContent className="max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>{editType === "user" ? "Chỉnh sửa người dùng" : editType === "movie" ? "Chỉnh sửa phim" : editType === "toy" ? "Chỉnh sửa đồ chơi" : editType === "showtime" ? "Chỉnh sửa lịch chiếu" : ""}</DialogTitle>
           </DialogHeader>
@@ -788,7 +815,18 @@ export default function Admin() {
               </div>
               <div>
                 <Label>Giá</Label>
-                <Input type="number" value={editData?.price ?? 0} onChange={(e) => setEditData({ ...editData, price: Number(e.target.value) || 0 })} />
+                <Input
+                  type="text"
+                  value={editData.price !== undefined && editData.price !== null
+                    ? editData.price.toLocaleString('en-US')
+                    : ''
+                  }
+                  onChange={(e) => {
+                    // Loại bỏ dấu phẩy để chuyển về số
+                    const numericValue = Number(e.target.value.replace(/,/g, ''));
+                    setEditData({ ...editData, price: isNaN(numericValue) ? 0 : numericValue });
+                  }}
+                />
               </div>
               <div>
                 <Label>Thể loại</Label>
@@ -804,7 +842,15 @@ export default function Admin() {
               </div>
               <div>
                 <Label>Ngày phát hành</Label>
-                <Input type="datetime-local" value={editData?.release_date ? new Date(editData.release_date).toISOString().slice(0,16) : ""} onChange={(e) => setEditData({ ...editData, release_date: e.target.value ? new Date(e.target.value).toISOString() : undefined })} />
+                <Input
+                  type="datetime-local"
+                  value={editData?.release_date ? toLocalDateTimeString(new Date(editData.release_date)) : ""}
+                  onChange={(e) => setEditData({
+                    ...editData,
+                    release_date: e.target.value ? new Date(e.target.value).toISOString() : undefined
+                  })}
+                />
+
               </div>
               <div>
                 <Label>Trạng thái</Label>
@@ -888,7 +934,7 @@ export default function Admin() {
                         price: Number(m.price || 0),
                       }))
                       setMoviesLocal(mapped)
-                      setMovieStatus((prev) => ({ ...prev, ...Object.fromEntries(mapped.map((x:any) => [x.id, "active"])) }))
+                      setMovieStatus((prev) => ({ ...prev, ...Object.fromEntries(mapped.map((x: any) => [x.id, "active"])) }))
                     }
                   } finally {
                     setIsEditOpen(false);
@@ -921,11 +967,33 @@ export default function Admin() {
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <Label>Giá</Label>
-                  <Input type="number" value={editData?.price ?? 0} onChange={(e) => setEditData({ ...editData, price: Number(e.target.value) || 0 })} />
+                  <Input
+                    type="text"
+                    value={editData.price !== undefined && editData.price !== null
+                      ? editData.price.toLocaleString('en-US')
+                      : ''
+                    }
+                    onChange={(e) => {
+                      // Loại bỏ dấu phẩy để chuyển về số
+                      const numericValue = Number(e.target.value.replace(/,/g, ''));
+                      setEditData({ ...editData, price: isNaN(numericValue) ? 0 : numericValue });
+                    }}
+                  />
                 </div>
                 <div>
                   <Label>Tồn kho</Label>
-                  <Input type="number" value={editData?.stock ?? 0} onChange={(e) => setEditData({ ...editData, stock: Number(e.target.value) || 0 })} />
+                  <Input
+                    type="text"
+                    value={editData.stock !== undefined && editData.stock !== null
+                      ? editData.stock.toLocaleString('en-US')
+                      : ''
+                    }
+                    onChange={(e) => {
+                      // Loại bỏ dấu phẩy để chuyển về số
+                      const numericValue = Number(e.target.value.replace(/,/g, ''));
+                      setEditData({ ...editData, stock: isNaN(numericValue) ? 0 : numericValue });
+                    }}
+                  />
                 </div>
               </div>
               <div>
@@ -980,19 +1048,30 @@ export default function Admin() {
                   {moviesLocal.map((m) => (
                     <option key={String((m as any).id ?? m.title)} value={String((m as any).id ?? 0)}>{(m as any).title}</option>
                   ))}
-              </select>
+                </select>
               </div>
               <div>
                 <Label>Chọn ngày</Label>
-                <Input type="date" value={String(editData?.start_time || "").split("T")[0] || ""} onChange={(e) => { const d = e.target.value; const t = String(editData?.start_time || "").split("T")[1]?.slice(0,5) || "00:00"; setEditData({ ...editData, start_time: d ? `${d}T${t}` : "" }); }} />
+                <Input type="date" value={String(editData?.start_time || "").split("T")[0] || ""} onChange={(e) => { const d = e.target.value; const t = String(editData?.start_time || "").split("T")[1]?.slice(0, 5) || "00:00"; setEditData({ ...editData, start_time: d ? `${d}T${t}` : "" }); }} />
               </div>
               <div>
                 <Label>Giờ bắt đầu</Label>
-                <Input type="time" step={60} value={String(editData?.start_time || "").split("T")[1]?.slice(0,5) || ""} onChange={(e) => { const t = e.target.value; const d = String(editData?.start_time || "").split("T")[0] || new Date().toISOString().slice(0,10); setEditData({ ...editData, start_time: t ? `${d}T${t}` : d ? `${d}T00:00` : "" }); }} />
+                <Input type="time" step={60} value={toLocalDateTimeString(new Date(editData?.start_time || "")).split("T")[1]?.slice(0, 5) || ""} onChange={(e) => { const t = e.target.value; const d = String(editData?.start_time || "").split("T")[0] || new Date().toISOString().slice(0, 10); setEditData({ ...editData, start_time: t ? `${d}T${t}` : d ? `${d}T00:00` : "" }); }} />
               </div>
               <div>
                 <Label>Giá vé</Label>
-                <Input type="number" value={editData?.price ?? null} onChange={(e) => setEditData({ ...editData, price: Number(e.target.value) || null })} />
+                <Input
+                  type="text"
+                  value={editData.price !== undefined && editData.price !== null
+                    ? editData.price.toLocaleString('en-US')
+                    : ''
+                  }
+                  onChange={(e) => {
+                    // Loại bỏ dấu phẩy để chuyển về số
+                    const numericValue = Number(e.target.value.replace(/,/g, ''));
+                    setEditData({ ...editData, price: isNaN(numericValue) ? 0 : numericValue });
+                  }}
+                />
               </div>
               <div className="flex justify-end gap-2">
                 <Button variant="outline" onClick={() => setIsEditOpen(false)}>Hủy</Button>

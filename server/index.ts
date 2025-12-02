@@ -4,7 +4,7 @@ import fs from "fs";
 import path from "path";
 import cors from "cors";
 import { handleDemo } from "./routes/demo";
-import { handleMovies2025, createMovie, listMovies, getMovie, updateMovie, deleteMovie, listShowtimes, createShowtime, updateShowtime, deleteShowtime } from "./routes/movies";
+import { handleMovies2025, createMovie, listMovies, getMovie, updateMovie, deleteMovie, listShowtimes, createShowtime, updateShowtime, deleteShowtime, createShowtimesBatch } from "./routes/movies";
 import { handleLogin } from "./routes/login";
 import { handleRegister } from "./routes/register";
 import { handleForgetPass, handleResetPassword } from "./routes/forget-pass";
@@ -42,6 +42,7 @@ export function createServer() {
   app.delete("/api/movies/:id", deleteMovie);
   app.get("/api/showtimes", listShowtimes);
   app.post("/api/showtimes", createShowtime);
+  app.post("/api/showtimes/batch", createShowtimesBatch);
   app.put("/api/showtimes/:id", updateShowtime);
   app.delete("/api/showtimes/:id", deleteShowtime);
   app.post("/api/login", handleLogin);
