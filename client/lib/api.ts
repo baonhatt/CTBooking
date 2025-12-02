@@ -224,5 +224,13 @@ export async function updateShowtimeApi(id: number, body: { movie_id?: number; s
 export async function deleteShowtimeApi(id: number) {
   return request<{ ok: boolean }>(`/api/showtimes/${id}`, { method: "DELETE" })
 }
+export const getAdminUsers = async ({ page, pageSize, query }: { page: number, pageSize: number, query: string }) => {
+  // Logic fetch API...
+  return { items: [], total: 0 }; // Trả về cấu trúc phù hợp
+}
+export const getTransactions = async ({ page, pageSize, query }: { page: number, pageSize: number, query: string }) => {
+  // Logic fetch API...
+  return { items: [], total: 0 }; // Trả về cấu trúc phù hợp
+}
 // ----------------- DECLARE TYPE -----------------
 export type { Movie, MoviesResponse, Login, Register };

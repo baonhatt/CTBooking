@@ -253,31 +253,31 @@ export const deleteMovie: RequestHandler = async (req, res) => {
   }
 }
 
-export const listShowtimes: RequestHandler = async (req, res) => {
-  try {
-    const page = Number(req.query.page || 1)
-    const pageSize = Number(req.query.pageSize || 20)
-    const fromStr = String(req.query.from || "")
-    const toStr = String(req.query.to || "")
-    const from = fromStr ? new Date(fromStr) : undefined
-    const to = toStr ? new Date(toStr) : undefined
-    const where: any = {}
-    if (from && to) where.start_time = { gte: from, lte: to }
-    else if (from) where.start_time = { gte: from }
-    else if (to) where.start_time = { lte: to }
-    const total = await (prisma as any).showtimes.count({ where })
-    const items = await (prisma as any).showtimes.findMany({
-      where,
-      include: { movie: true },
-      orderBy: { start_time: "asc" },
-      skip: (page - 1) * pageSize,
-      take: pageSize,
-    })
-    res.status(200).json({ items, page, pageSize, total })
-  } catch {
-    res.status(500).json({ message: "Lỗi máy chủ nội bộ" })
+  export const listShowtimes: RequestHandler = async (req, res) => {
+    try {
+      const page = Number(req.query.page || 1)
+      const pageSize = Number(req.query.pageSize || 20)
+      const fromStr = String(req.query.from || "")
+      const toStr = String(req.query.to || "")
+      const from = fromStr ? new Date(fromStr) : undefined
+      const to = toStr ? new Date(toStr) : undefined
+      const where: any = {}
+      if (from && to) where.start_time = { gte: from, lte: to }
+      else if (from) where.start_time = { gte: from }
+      else if (to) where.start_time = { lte: to }
+      const total = await (prisma as any).showtimes.count({ where })
+      const items = await (prisma as any).showtimes.findMany({
+        where,
+        include: { movie: true },
+        orderBy: { start_time: "asc" },
+        skip: (page - 1) * pageSize,
+        take: pageSize,
+      })
+      res.status(200).json({ items, page, pageSize, total })
+    } catch {
+      res.status(500).json({ message: "Lỗi máy chủ nội bộ" })
+    }
   }
-}
 
 export const createShowtime: RequestHandler = async (req, res) => {
   try {

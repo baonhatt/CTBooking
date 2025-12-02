@@ -285,7 +285,7 @@ const SidebarTrigger = React.forwardRef<
       {...props}
     >
       <PanelLeft />
-      <span className="sr-only">Toggle Sidebar</span>
+      <span className="sr-only text-">Toggle Sidebar</span>
     </Button>
   );
 });
@@ -358,15 +358,39 @@ SidebarInput.displayName = "SidebarInput";
 
 const SidebarHeader = React.forwardRef<
   HTMLDivElement,
-  React.ComponentProps<"div">
->(({ className, ...props }, ref) => {
+  React.ComponentProps<"div"> & {
+    collapsedLogo?: React.ReactNode;
+  }
+>(({ className, collapsedLogo, children, ...props }, ref) => {
+  // Sử dụng hook để lấy trạng thái
+  const { state } = useSidebar();
+  const isCollapsed = state === "collapsed";
+
+  // Icon/Logo mặc định nếu không có gì được truyền vào
+  const defaultCollapsedLogo = <PanelLeft className="w-6 h-6 mx-auto text-primary" />;
+
   return (
     <div
       ref={ref}
       data-sidebar="header"
-      className={cn("flex flex-col gap-2 p-2", className)}
+      className={cn(
+        "flex flex-col gap-2 p-2",
+        // Giảm padding khi thu gọn để logo nằm sát cạnh hơn
+        isCollapsed && "p-0",
+        className
+      )}
       {...props}
-    />
+    >
+      {isCollapsed ? (
+        // Trạng thái thu gọn: Hiển thị logo/icon
+        <div className="flex h-12 w-full items-center justify-center">
+          {collapsedLogo ?? " "}
+        </div>
+      ) : (
+        // Trạng thái mở rộng: Hiển thị nội dung con
+        children
+      )}
+    </div>
   );
 });
 SidebarHeader.displayName = "SidebarHeader";
@@ -620,7 +644,7 @@ const SidebarMenuAction = React.forwardRef<
         "peer-data-[size=lg]/menu-button:top-2.5",
         "group-data-[collapsible=icon]:hidden",
         showOnHover &&
-          "group-focus-within/menu-item:opacity-100 group-hover/menu-item:opacity-100 data-[state=open]:opacity-100 peer-data-[active=true]/menu-button:text-sidebar-accent-foreground md:opacity-0",
+        "group-focus-within/menu-item:opacity-100 group-hover/menu-item:opacity-100 data-[state=open]:opacity-100 peer-data-[active=true]/menu-button:text-sidebar-accent-foreground md:opacity-0",
         className,
       )}
       {...props}
