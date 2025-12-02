@@ -3,66 +3,9 @@ import type { Movie, ActiveMoviesTodayResponse } from "@shared/api";
 import { prisma } from '../lib/prisma'
 import fs from 'fs'
 import path from 'path'
+ 
 
 export const handleMovies2025: RequestHandler = (_req, res) => {
-  const movies: Movie[] = [
-    {
-      id: "mv-2025-01",
-      title: "CineSphere234234: Ocean Depths",
-      year: 2025,
-      duration: "15 phút",
-      genres: ["Adventure", "Sci-Fi"],
-      posterUrl:
-        "https://images.unsplash.com/photo-1559827260-dc66d52bef19?w=1200&h=800&fit=crop",
-    },
-    {
-      id: "mv-2025-02",
-      title: "Jurassic Rise",
-      year: 2025,
-      duration: "12 phút",
-      genres: ["Action", "Thriller"],
-      posterUrl:
-        "https://images.unsplash.com/photo-1446776653964-20c1d3a81b06?w=1200&h=800&fit=crop",
-    },
-    {
-      id: "mv-2025-03",
-      title: "Mountain Adventure",
-      year: 2025,
-      duration: "10 phút",
-      genres: ["Adventure", "Nature"],
-      posterUrl:
-        "https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=1200&h=800&fit=crop",
-    },
-    {
-      id: "mv-2025-04",
-      title: "City Lights",
-      year: 2025,
-      duration: "14 phút",
-      genres: ["Sci-Fi", "Action"],
-      posterUrl:
-        "https://images.unsplash.com/photo-1514565131-fce0801e5785?w=1200&h=800&fit=crop",
-    },
-    {
-      id: "mv-2025-05",
-      title: "Skyward Drift",
-      year: 2025,
-      duration: "11 phút",
-      genres: ["Sci-Fi", "Adventure"],
-      posterUrl:
-        "https://images.unsplash.com/photo-1497515114625-6f0e333e283b?w=1200&h=800&fit=crop",
-    },
-    {
-      id: "mv-2025-06",
-      title: "Aurora Trails",
-      year: 2025,
-      duration: "13 phút",
-      genres: ["Fantasy", "Nature"],
-      posterUrl:
-        "https://images.unsplash.com/photo-1500530855697-b586d89ba3ee?w=1200&h=800&fit=crop",
-    },
-  ];
-
-  res.status(200).json({ year: 2025, count: movies.length, items: movies });
 };
 
 export const getAllActiveMoviesToday: RequestHandler = async (_req, res) => {
@@ -175,12 +118,12 @@ export const createMovie: RequestHandler = async (req, res) => {
         const ext = match ? (match[1].split('/')[1] || 'png') : 'png'
         const buf = Buffer.from(match ? match[2] : cover_image_base64, 'base64')
         const dir = path.resolve(process.cwd(), 'uploads', 'movies')
-        try { fs.mkdirSync(dir, { recursive: true }) } catch {}
+        try { fs.mkdirSync(dir, { recursive: true }) } catch { }
         const filename = `movie_${Date.now()}.${ext}`
         const filepath = path.join(dir, filename)
         fs.writeFileSync(filepath, buf)
         savedCover = `/uploads/movies/${filename}`
-      } catch {}
+      } catch { }
     }
     baseData = {
       title,
@@ -219,16 +162,16 @@ export const listMovies: RequestHandler = async (req, res) => {
     const q = String(req.query.q || "").toLowerCase()
     const where: any = q
       ? {
-          OR: [
-            { title: { contains: q, mode: "insensitive" } },
-            { description: { contains: q, mode: "insensitive" } },
-          ],
-        }
+        OR: [
+          { title: { contains: q, mode: "insensitive" } },
+          { description: { contains: q, mode: "insensitive" } },
+        ],
+      }
       : {}
     const total = await (prisma as any).movies.count({ where })
     const items = await (prisma as any).movies.findMany({
       where,
-      orderBy: { created_at: "desc" },
+      orderBy: { id: "desc" },
       skip: (page - 1) * pageSize,
       take: pageSize,
     })
@@ -263,12 +206,12 @@ export const updateMovie: RequestHandler = async (req, res) => {
         const ext = match ? (match[1].split('/')[1] || 'png') : 'png'
         const buf = Buffer.from(match ? match[2] : cover_image_base64, 'base64')
         const dir = path.resolve(process.cwd(), 'uploads', 'movies')
-        try { fs.mkdirSync(dir, { recursive: true }) } catch {}
+        try { fs.mkdirSync(dir, { recursive: true }) } catch { }
         const filename = `movie_${Date.now()}.${ext}`
         const filepath = path.join(dir, filename)
         fs.writeFileSync(filepath, buf)
         data.cover_image = `/uploads/movies/${filename}`
-      } catch {}
+      } catch { }
     }
     if (detail_images !== undefined) data.detail_images = detail_images
     if (genres !== undefined) data.genres = genres
@@ -316,17 +259,31 @@ export const listShowtimes: RequestHandler = async (req, res) => {
     const pageSize = Number(req.query.pageSize || 20)
     const fromStr = String(req.query.from || "")
     const toStr = String(req.query.to || "")
-    const from = fromStr ? new Date(fromStr) : undefined
-    const to = toStr ? new Date(toStr) : undefined
+    const todayFlag = String(req.query.today || "")
+    const sortKey = String(req.query.sort || "start_time")
+    const dir = String(req.query.dir || "asc").toLowerCase() === "desc" ? "desc" : "asc"
+    let from = fromStr ? new Date(fromStr) : undefined
+    let to = toStr ? new Date(toStr) : undefined
+    if (!from && !to && (todayFlag === "1" || todayFlag === "true")) {
+      const now = new Date()
+      const tStart = new Date(now); tStart.setHours(0,0,0,0)
+      const tEnd = new Date(now); tEnd.setHours(23,59,59,999)
+      from = tStart
+      to = tEnd
+    }
     const where: any = {}
     if (from && to) where.start_time = { gte: from, lte: to }
     else if (from) where.start_time = { gte: from }
     else if (to) where.start_time = { lte: to }
     const total = await (prisma as any).showtimes.count({ where })
+    const orderBy: any =
+      sortKey === "created_at" ? { created_at: dir } :
+      sortKey === "movie_title" ? [{ movie: { title: dir } }, { start_time: "asc" }] :
+      { start_time: dir }
     const items = await (prisma as any).showtimes.findMany({
       where,
       include: { movie: true },
-      orderBy: { start_time: "asc" },
+      orderBy,
       skip: (page - 1) * pageSize,
       take: pageSize,
     })
@@ -339,10 +296,13 @@ export const listShowtimes: RequestHandler = async (req, res) => {
 export const createShowtime: RequestHandler = async (req, res) => {
   try {
     const { movie_id, start_time, price } = req.body as any
-    const mId = Number(movie_id)
     const start = new Date(start_time)
+    if (!start_time || Number.isNaN(start.getTime())) {
+      return res.status(400).json({ message: "start_time không hợp lệ" })
+    }
+    const mId = Number(movie_id)
     const priceNum = Number(price)
-    if (!mId || !start_time || !Number.isFinite(priceNum) || priceNum < 0) {
+    if (!mId || !Number.isFinite(priceNum) || priceNum < 0) {
       return res.status(400).json({ message: "Thiếu dữ liệu hoặc dữ liệu không hợp lệ" })
     }
     if (priceNum > 9999999.99) {
@@ -352,10 +312,12 @@ export const createShowtime: RequestHandler = async (req, res) => {
     if (!movie) return res.status(404).json({ message: "Không tìm thấy phim" })
     const duration = Number(movie.duration_min || 0)
     const end = new Date(start.getTime() + duration * 60 * 1000)
+
     const dayStart = new Date(start)
     dayStart.setHours(0, 0, 0, 0)
     const dayEnd = new Date(start)
     dayEnd.setHours(23, 59, 59, 999)
+
     const existing = await (prisma as any).showtimes.findMany({
       where: { start_time: { gte: dayStart, lte: dayEnd } },
       include: { movie: true },
@@ -435,5 +397,50 @@ export const deleteShowtime: RequestHandler = async (req, res) => {
   } catch (err: any) {
     if (err?.code === "P2025") return res.status(404).json({ message: "Không tìm thấy" })
     res.status(500).json({ message: "Lỗi máy chủ nội bộ" })
+  }
+}
+
+export const createShowtimesBatch: RequestHandler = async (req, res) => {
+  try {
+    const { movie_id, start_times, price } = req.body as any
+    const mId = Number(movie_id)
+    const defaultPriceNum = Number(price ?? 0)
+    if (!mId || !Array.isArray(start_times) || start_times.length === 0) {
+      return res.status(400).json({ message: "Thiếu dữ liệu" })
+    }
+    if (!Number.isFinite(defaultPriceNum) || defaultPriceNum < 0 || defaultPriceNum > 9999999.99) {
+      return res.status(400).json({ message: "Giá không hợp lệ" })
+    }
+    const movie = await (prisma as any).movies.findUnique({ where: { id: mId } })
+    if (!movie) return res.status(404).json({ message: "Không tìm thấy phim" })
+    const duration = Number(movie.duration_min || 0)
+    const created: any[] = []
+    const skipped: any[] = []
+    for (const item of start_times) {
+      const stStr = typeof item === 'string' ? item : item?.start_time
+      const rowPrice = typeof item === 'object' && item ? Number(item.price ?? defaultPriceNum) : defaultPriceNum
+      const start = new Date(stStr)
+      if (!stStr || Number.isNaN(start.getTime())) { skipped.push({ start_time: stStr, reason: "start_time không hợp lệ" }); continue }
+      if (!Number.isFinite(rowPrice) || rowPrice < 0 || rowPrice > 9999999.99) { skipped.push({ start_time: stStr, reason: "Giá không hợp lệ" }); continue }
+      const end = new Date(start.getTime() + duration * 60 * 1000)
+      const dayStart = new Date(start); dayStart.setHours(0,0,0,0)
+      const dayEnd = new Date(start); dayEnd.setHours(23,59,59,999)
+      const existing = await (prisma as any).showtimes.findMany({ where: { start_time: { gte: dayStart, lte: dayEnd } }, include: { movie: true }, orderBy: { start_time: "asc" } })
+      const overlaps = existing.some((s: any) => {
+        const sDur = Number(s.movie?.duration_min || 0)
+        const sEnd = new Date(new Date(s.start_time).getTime() + sDur * 60 * 1000)
+        return start < sEnd && new Date(s.start_time) < end
+      })
+      if (overlaps) { skipped.push({ start_time: stStr, reason: "trùng lịch" }); continue }
+      try {
+        const showtime = await (prisma as any).showtimes.create({ data: { movie_id: mId, start_time: start, price: rowPrice > 0 ? rowPrice.toFixed(2) : "0.00" } })
+        created.push(showtime)
+      } catch (e: any) {
+        skipped.push({ start_time: stStr, reason: e?.message || "lỗi tạo" })
+      }
+    }
+    return res.status(201).json({ created, skipped })
+  } catch (err: any) {
+    return res.status(500).json({ message: err?.message || "Lỗi máy chủ nội bộ" })
   }
 }

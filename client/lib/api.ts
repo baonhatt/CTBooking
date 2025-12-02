@@ -206,17 +206,23 @@ export async function getAdminRevenue(options?: { from?: string; to?: string; si
 }
 
 // ----------------- API SHOWTIMES CRUD -----------------
-export async function getShowtimes(options?: { page?: number; pageSize?: number; from?: string; to?: string; signal?: AbortSignal }) {
+export async function getShowtimes(options?: { page?: number; pageSize?: number; from?: string; to?: string; sort?: 'start_time'|'created_at'|'movie_title'; dir?: 'asc'|'desc'; today?: boolean; signal?: AbortSignal }) {
   const params = new URLSearchParams()
   if (options?.page) params.set("page", String(options.page))
   if (options?.pageSize) params.set("pageSize", String(options.pageSize))
   if (options?.from) params.set("from", options.from)
   if (options?.to) params.set("to", options.to)
+  if (options?.sort) params.set("sort", options.sort)
+  if (options?.dir) params.set("dir", options.dir)
+  if (options?.today) params.set("today", options.today ? "1" : "0")
   const path = `/api/showtimes${params.toString() ? `?${params.toString()}` : ""}`
   return request<{ items: any[]; page: number; pageSize: number; total: number }>(path, { signal: options?.signal })
 }
 export async function createShowtimeApi(body: { movie_id: number; start_time: string; price: number }) {
   return request<{ showtime: any }>(`/api/showtimes`, { method: "POST", body: JSON.stringify(body) })
+}
+export async function createShowtimesBatchApi(body: { movie_id: number; start_times: Array<string | { start_time: string; price?: number }>; price?: number }) {
+  return request<{ created: any[]; skipped: any[] }>(`/api/showtimes/batch`, { method: "POST", body: JSON.stringify(body) })
 }
 export async function updateShowtimeApi(id: number, body: { movie_id?: number; start_time?: string; price?: number }) {
   return request<{ showtime: any }>(`/api/showtimes/${id}`, { method: "PUT", body: JSON.stringify(body) })

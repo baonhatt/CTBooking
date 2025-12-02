@@ -5,11 +5,17 @@ import { createRoot } from "react-dom/client";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route, useNavigate } from "react-router-dom";
+import { BrowserRouter, Routes, Route, useNavigate, Navigate } from "react-router-dom";
 import Index from "./pages/Index";
 import NotFound from "./pages/NotFound";
 import ConfirmToken from "./components/ConfirmToken";
-import Admin from "./pages/Admin";
+import AdminIndex from "./pages/admin/AdminIndex";
+import DashboardPage from "./pages/admin/Dashboard";
+import UsersPage from "./pages/admin/Users";
+import MoviesPage from "./pages/admin/Movies";
+import ShowtimesPage from "./pages/admin/Showtimes";
+import ToysPage from "./pages/admin/Toys";
+import TransactionsPage from "./pages/admin/Transactions";
 import Checkout from "./pages/Checkout";
 import { useEffect, useState } from "react";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
@@ -98,7 +104,19 @@ const AdminGate = () => {
       window.removeEventListener("storage", onAuthChanged as any);
     };
   }, []);
-  return hasToken ? <Admin /> : <AdminLoginView />;
+  if (!hasToken) return <AdminLoginView />;
+  return (
+    <Routes>
+      <Route path="/" element={<AdminIndex />} />
+      <Route path="/dashboard" element={<DashboardPage />} />
+      <Route path="/users" element={<UsersPage />} />
+      <Route path="/movies" element={<MoviesPage />} />
+      <Route path="/showtimes" element={<ShowtimesPage />} />
+      <Route path="/toys" element={<ToysPage />} />
+      <Route path="/transactions" element={<TransactionsPage />} />
+      <Route path="*" element={<Navigate to="/admin/dashboard" replace />} />
+    </Routes>
+  );
 };
 
 const App = () => (
@@ -111,7 +129,7 @@ const App = () => (
           <Route path="/" element={<Index />} />
           <Route path="/checkout" element={<Checkout />} />
           <Route path="/reset-password" element={<ConfirmToken />} />
-          <Route path="/admin" element={<AdminGate />} />
+          <Route path="/admin/*" element={<AdminGate />} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
         </Routes>
