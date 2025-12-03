@@ -1,12 +1,24 @@
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { toast } from "@/components/ui/use-toast";
 import { Ticket, Loader2, Menu, User, Eye, EyeOff } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/useAuth";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 interface HeaderProps {
   onBookClick: () => void;
@@ -44,10 +56,16 @@ export default function Header({ onBookClick }: HeaderProps) {
   useEffect(() => {
     const readAuth = () => {
       const raw = localStorage.getItem("authUser");
-      if (!raw) { setUserName(null); return; }
+      if (!raw) {
+        setUserName(null);
+        return;
+      }
       try {
         const parsed = JSON.parse(raw);
-        const name = parsed?.user?.username || parsed?.username || (parsed?.user?.email || parsed?.email || "").split("@")[0];
+        const name =
+          parsed?.user?.username ||
+          parsed?.username ||
+          (parsed?.user?.email || parsed?.email || "").split("@")[0];
         if (name) setUserName(name);
       } catch {
         setUserName(null);
@@ -77,7 +95,7 @@ export default function Header({ onBookClick }: HeaderProps) {
     e.preventDefault();
     try {
       setIsLoginLoading(true);
-      const data = await auth.login(loginEmail,loginPassword);
+      const data = await auth.login(loginEmail, loginPassword);
       if (data?.status === "success") {
         localStorage.setItem("authUser", JSON.stringify({ user: data.user }));
         setUserName(data.user.username);
@@ -114,7 +132,11 @@ export default function Header({ onBookClick }: HeaderProps) {
     }
     try {
       setIsRegisterLoading(true);
-      const data = await auth.register(registerEmail, registerPassword, registerName);
+      const data = await auth.register(
+        registerEmail,
+        registerPassword,
+        registerName,
+      );
       if (data?.status === "success") {
         localStorage.setItem("authUser", JSON.stringify({ user: data.user }));
         setUserName(data.user.username);
@@ -147,7 +169,7 @@ export default function Header({ onBookClick }: HeaderProps) {
     } finally {
       setIsForgetLoading(false);
     }
-  }
+  };
 
   const scrollToSection = (id: string) => {
     const element = document.getElementById(id);
@@ -162,7 +184,7 @@ export default function Header({ onBookClick }: HeaderProps) {
         "fixed top-0 left-0 right-0 z-50 transition-all duration-300",
         isScrolled
           ? "bg-black/95 backdrop-blur-md border-b border-white/10"
-          : "bg-transparent"
+          : "bg-transparent",
       )}
     >
       <div className="container mx-auto px-4 py-4 flex items-center justify-between">
@@ -197,25 +219,42 @@ export default function Header({ onBookClick }: HeaderProps) {
           <div className="md:hidden">
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="outline" className="border-white/20 text-black">
+                <Button
+                  variant="outline"
+                  className="border-white/20 text-black"
+                >
                   <Menu className="mr-2 h-4 w-4" /> Menu
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent className="bg-black/90 border border-white/20 text-white">
-                <DropdownMenuItem onClick={() => scrollToSection("hero")}>Phim Hot</DropdownMenuItem>
-                <DropdownMenuItem onClick={() => scrollToSection("technology")}>Công Nghệ</DropdownMenuItem>
-                <DropdownMenuItem onClick={() => scrollToSection("products")}>Cửa Hàng</DropdownMenuItem>
+                <DropdownMenuItem onClick={() => scrollToSection("hero")}>
+                  Phim Hot
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => scrollToSection("technology")}>
+                  Công Nghệ
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => scrollToSection("products")}>
+                  Cửa Hàng
+                </DropdownMenuItem>
                 <DropdownMenuSeparator />
                 {userName ? (
                   <>
                     <DropdownMenuItem>Chào, {userName}</DropdownMenuItem>
-                    <DropdownMenuItem onClick={handleLogout}>Đăng xuất</DropdownMenuItem>
+                    <DropdownMenuItem onClick={handleLogout}>
+                      Đăng xuất
+                    </DropdownMenuItem>
                   </>
                 ) : (
                   <>
-                    <DropdownMenuItem onClick={() => setIsLoginOpen(true)}>Đăng nhập</DropdownMenuItem>
-                    <DropdownMenuItem onClick={() => setIsRegisterOpen(true)}>Đăng ký</DropdownMenuItem>
-                    <DropdownMenuItem onClick={() => setIsForgetPassOpen(true)}>Quên mật khẩu</DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => setIsLoginOpen(true)}>
+                      Đăng nhập
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => setIsRegisterOpen(true)}>
+                      Đăng ký
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => setIsForgetPassOpen(true)}>
+                      Quên mật khẩu
+                    </DropdownMenuItem>
                   </>
                 )}
               </DropdownMenuContent>
@@ -233,14 +272,19 @@ export default function Header({ onBookClick }: HeaderProps) {
                   </button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent className="bg-black/90 border border-white/20 text-white">
-                  <DropdownMenuItem onClick={handleLogout}>Đăng xuất</DropdownMenuItem>
+                  <DropdownMenuItem onClick={handleLogout}>
+                    Đăng xuất
+                  </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
             </div>
           ) : (
             <Dialog open={isLoginOpen} onOpenChange={setIsLoginOpen}>
               <DialogTrigger asChild>
-                <button className="hidden md:inline-block text-white hover:text-blue-400 transition-colors duration-300 font-medium" onClick={openLogin}>
+                <button
+                  className="hidden md:inline-block text-white hover:text-blue-400 transition-colors duration-300 font-medium"
+                  onClick={openLogin}
+                >
                   Đăng nhập
                 </button>
               </DialogTrigger>
@@ -250,19 +294,23 @@ export default function Header({ onBookClick }: HeaderProps) {
                 </DialogHeader>
                 <form className="space-y-4" onSubmit={handleLoginSubmit}>
                   <div>
-                    <label className="text-sm text-gray-300 mb-1 block">Email</label>
-                  <Input
-                    type="email"
-                    placeholder="you@email.com"
-                    value={loginEmail}
-                    onChange={(e) => setLoginEmail(e.target.value)}
-                    maxLength={50}
-                    disabled={isLoginLoading}
-                    required
-                  />
+                    <label className="text-sm text-gray-300 mb-1 block">
+                      Email
+                    </label>
+                    <Input
+                      type="email"
+                      placeholder="you@email.com"
+                      value={loginEmail}
+                      onChange={(e) => setLoginEmail(e.target.value)}
+                      maxLength={50}
+                      disabled={isLoginLoading}
+                      required
+                    />
                   </div>
                   <div>
-                    <label className="text-sm text-gray-300 mb-1 block">Mật khẩu</label>
+                    <label className="text-sm text-gray-300 mb-1 block">
+                      Mật khẩu
+                    </label>
                     <div className="relative">
                       <Input
                         type={showLoginPass ? "text" : "password"}
@@ -279,13 +327,23 @@ export default function Header({ onBookClick }: HeaderProps) {
                         type="button"
                         className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-500 hover:text-black"
                         onClick={() => setShowLoginPass((v) => !v)}
-                        aria-label={showLoginPass ? "Ẩn mật khẩu" : "Hiển thị mật khẩu"}
+                        aria-label={
+                          showLoginPass ? "Ẩn mật khẩu" : "Hiển thị mật khẩu"
+                        }
                       >
-                        {showLoginPass ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                        {showLoginPass ? (
+                          <EyeOff className="w-4 h-4" />
+                        ) : (
+                          <Eye className="w-4 h-4" />
+                        )}
                       </button>
                     </div>
                   </div>
-                  <Button type="submit" disabled={isLoginLoading} className="w-full bg-gradient-to-r from-blue-500 to-purple-500 hover:from-blue-600 hover:to-purple-600">
+                  <Button
+                    type="submit"
+                    disabled={isLoginLoading}
+                    className="w-full bg-gradient-to-r from-blue-500 to-purple-500 hover:from-blue-600 hover:to-purple-600"
+                  >
                     {isLoginLoading ? (
                       <span className="flex items-center justify-center gap-2">
                         <Loader2 className="h-4 w-4 animate-spin" />
@@ -330,11 +388,15 @@ export default function Header({ onBookClick }: HeaderProps) {
           <Dialog open={isRegisterOpen} onOpenChange={setIsRegisterOpen}>
             <DialogContent className="bg-gradient-dark border border-white/10">
               <DialogHeader>
-                <DialogTitle className="text-blue-400 text-center">ĐĂNG KÝ</DialogTitle>
+                <DialogTitle className="text-blue-400 text-center">
+                  ĐĂNG KÝ
+                </DialogTitle>
               </DialogHeader>
               <form className="space-y-4" onSubmit={handleRegisterSubmit}>
                 <div>
-                  <label className="text-sm text-gray-300 mb-1 block">Email</label>
+                  <label className="text-sm text-gray-300 mb-1 block">
+                    Email
+                  </label>
                   <Input
                     type="email"
                     placeholder="you@email.com"
@@ -346,7 +408,9 @@ export default function Header({ onBookClick }: HeaderProps) {
                   />
                 </div>
                 <div>
-                  <label className="text-sm text-gray-300 mb-1 block">Tên</label>
+                  <label className="text-sm text-gray-300 mb-1 block">
+                    Tên
+                  </label>
                   <Input
                     type="text"
                     placeholder="Họ và tên"
@@ -357,7 +421,9 @@ export default function Header({ onBookClick }: HeaderProps) {
                   />
                 </div>
                 <div>
-                  <label className="text-sm text-gray-300 mb-1 block">Mật khẩu</label>
+                  <label className="text-sm text-gray-300 mb-1 block">
+                    Mật khẩu
+                  </label>
                   <div className="relative">
                     <Input
                       type={showRegisterPass ? "text" : "password"}
@@ -374,21 +440,31 @@ export default function Header({ onBookClick }: HeaderProps) {
                       type="button"
                       className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-500 hover:text-black"
                       onClick={() => setShowRegisterPass((v) => !v)}
-                      aria-label={showRegisterPass ? "Ẩn mật khẩu" : "Hiển thị mật khẩu"}
+                      aria-label={
+                        showRegisterPass ? "Ẩn mật khẩu" : "Hiển thị mật khẩu"
+                      }
                     >
-                      {showRegisterPass ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                      {showRegisterPass ? (
+                        <EyeOff className="w-4 h-4" />
+                      ) : (
+                        <Eye className="w-4 h-4" />
+                      )}
                     </button>
                   </div>
                 </div>
                 <div>
-                  <label className="text-sm text-gray-300 mb-1 block">Nhập Lại Mật khẩu</label>
+                  <label className="text-sm text-gray-300 mb-1 block">
+                    Nhập Lại Mật khẩu
+                  </label>
                   <div className="relative">
                     <Input
                       type={showRegisterConfirmPass ? "text" : "password"}
                       placeholder="••••••••"
                       value={registerConfirmPassword}
                       maxLength={50}
-                      onChange={(e) => setRegisterConfirmPassword(e.target.value)}
+                      onChange={(e) =>
+                        setRegisterConfirmPassword(e.target.value)
+                      }
                       required
                       pattern="^(?=.*[A-Za-z])(?=.*\d)[A-Za-z\d]{6,}$"
                       title="Mật khẩu phải có ít nhất 6 ký tự, bao gồm cả chữ cái và số"
@@ -398,13 +474,25 @@ export default function Header({ onBookClick }: HeaderProps) {
                       type="button"
                       className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-500 hover:text-black"
                       onClick={() => setShowRegisterConfirmPass((v) => !v)}
-                      aria-label={showRegisterConfirmPass ? "Ẩn mật khẩu" : "Hiển thị mật khẩu"}
+                      aria-label={
+                        showRegisterConfirmPass
+                          ? "Ẩn mật khẩu"
+                          : "Hiển thị mật khẩu"
+                      }
                     >
-                      {showRegisterConfirmPass ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                      {showRegisterConfirmPass ? (
+                        <EyeOff className="w-4 h-4" />
+                      ) : (
+                        <Eye className="w-4 h-4" />
+                      )}
                     </button>
                   </div>
                 </div>
-                <Button type="submit" disabled={isRegisterLoading} className="w-full bg-gradient-to-r from-blue-500 to-purple-500 hover:from-blue-600 hover:to-purple-600">
+                <Button
+                  type="submit"
+                  disabled={isRegisterLoading}
+                  className="w-full bg-gradient-to-r from-blue-500 to-purple-500 hover:from-blue-600 hover:to-purple-600"
+                >
                   {isRegisterLoading ? (
                     <span className="flex items-center justify-center gap-2">
                       <Loader2 className="h-4 w-4 animate-spin" />
@@ -432,11 +520,15 @@ export default function Header({ onBookClick }: HeaderProps) {
           <Dialog open={isForgetPassOpen} onOpenChange={setIsForgetPassOpen}>
             <DialogContent className="bg-gradient-dark border border-white/10">
               <DialogHeader>
-                <DialogTitle className="text-blue-400 text-center">QUÊN MẬT KHẨU</DialogTitle>
+                <DialogTitle className="text-blue-400 text-center">
+                  QUÊN MẬT KHẨU
+                </DialogTitle>
               </DialogHeader>
               <form className="space-y-4" onSubmit={handleForgetPassSubmit}>
                 <div>
-                  <label className="text-sm text-gray-300 mb-1 block">Email</label>
+                  <label className="text-sm text-gray-300 mb-1 block">
+                    Email
+                  </label>
                   <Input
                     type="email"
                     placeholder="you@gmail.com"
@@ -448,7 +540,11 @@ export default function Header({ onBookClick }: HeaderProps) {
                     required
                   />
                 </div>
-                <Button type="submit" disabled={isForgetLoading} className="w-full bg-gradient-to-r from-blue-500 to-purple-500 hover:from-blue-600 hover:to-purple-600">
+                <Button
+                  type="submit"
+                  disabled={isForgetLoading}
+                  className="w-full bg-gradient-to-r from-blue-500 to-purple-500 hover:from-blue-600 hover:to-purple-600"
+                >
                   {isForgetLoading ? (
                     <span className="flex items-center justify-center gap-2">
                       <Loader2 className="h-4 w-4 animate-spin" />

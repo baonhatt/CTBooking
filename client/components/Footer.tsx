@@ -1,4 +1,12 @@
-import { MapPin, Phone, Mail, Facebook, Instagram, Youtube, ArrowUp } from "lucide-react";
+import {
+  MapPin,
+  Phone,
+  Mail,
+  Facebook,
+  Instagram,
+  Youtube,
+  ArrowUp,
+} from "lucide-react";
 import { motion } from "framer-motion";
 
 export default function Footer() {
@@ -16,9 +24,12 @@ export default function Footer() {
             viewport={{ once: true }}
             transition={{ duration: 0.6 }}
           >
-            <h3 className="text-2xl font-bold text-blue-400 mb-4">CINESPHERE</h3>
+            <h3 className="text-2xl font-bold text-blue-400 mb-4">
+              CINESPHERE
+            </h3>
             <p className="text-gray-400 mb-4">
-              Phòng chiếu phim 6D công nghệ cao, mang đến trải nghiệm giải trí đa giác quan chân thực nhất.
+              Phòng chiếu phim 6D công nghệ cao, mang đến trải nghiệm giải trí
+              đa giác quan chân thực nhất.
             </p>
             <div className="flex gap-4">
               <motion.a
@@ -59,19 +70,27 @@ export default function Footer() {
               <div className="flex items-start gap-3">
                 <MapPin className="h-5 w-5 text-red-500 mt-1 flex-shrink-0" />
                 <div className="text-gray-300">
-                  <p className="font-semibold text-white">Gian hàng CINESPHERE</p>
+                  <p className="font-semibold text-white">
+                    Gian hàng CINESPHERE
+                  </p>
                   <p>Tầng 4, TTMT Vạn Hạnh Mall</p>
                 </div>
               </div>
               <div className="flex items-center gap-3">
                 <Phone className="h-5 w-5 text-blue-400 flex-shrink-0" />
-                <a href="tel:+84123456789" className="text-gray-300 hover:text-blue-400 transition-colors">
+                <a
+                  href="tel:+84123456789"
+                  className="text-gray-300 hover:text-blue-400 transition-colors"
+                >
                   +84 123 456 789
                 </a>
               </div>
               <div className="flex items-center gap-3">
                 <Mail className="h-5 w-5 text-blue-400 flex-shrink-0" />
-                <a href="mailto:info@cinesphere.vn" className="text-gray-300 hover:text-blue-400 transition-colors">
+                <a
+                  href="mailto:info@cinesphere.vn"
+                  className="text-gray-300 hover:text-blue-400 transition-colors"
+                >
                   info@cinesphere.vn
                 </a>
               </div>
@@ -117,8 +136,6 @@ export default function Footer() {
           </p>
         </div>
       </div>
-
-      
     </footer>
   );
 }

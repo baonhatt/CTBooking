@@ -1,76 +1,133 @@
-import React, { useEffect, useMemo, useState } from "react"
-import AdminLayout from "@/components/admin/AdminLayout"
-import DashboardContent from "@/components/admin/content/DashboardContent"
-import { getMoviesAdmin, getShowtimes, getAdminRevenue } from "@/lib/api"
+import React, { useEffect, useState } from "react";
+import AdminLayout from "@/components/admin/AdminLayout";
+import DashboardContent from "@/components/admin/content/DashboardContent";
+import {
+  getDashboardMetrics,
+  getRevenueByDate,
+  getRevenue7Days,
+  getRevenueByMonth,
+} from "@/lib/api";
 
 export default function DashboardPage() {
-  const [totalMovies, setTotalMovies] = useState(0)
-  const [showtimesToday, setShowtimesToday] = useState(0)
-  const [revenueTotal, setRevenueTotal] = useState(0)
-  const [revenueCount, setRevenueCount] = useState(0)
-  const [showtimesByDay, setShowtimesByDay] = useState<Array<{ label: string; value: number }>>([])
-  const [revenueByDay, setRevenueByDay] = useState<Array<{ label: string; value: number }>>([])
-
-  useEffect(() => {
-    const now = new Date()
-    const todayStart = new Date(now); todayStart.setHours(0,0,0,0)
-    const todayEnd = new Date(now); todayEnd.setHours(23,59,59,999)
-    const iso = (d: Date) => d.toISOString()
-
-    ;(async () => {
-      try {
-        const [moviesRes, showtimesResToday, revenueResToday] = await Promise.all([
-          getMoviesAdmin({ page: 1, pageSize: 1 }),
-          getShowtimes({ page: 1, pageSize: 1, from: iso(todayStart), to: iso(todayEnd) }),
-          getAdminRevenue({ from: iso(todayStart), to: iso(now) })
-        ])
-        setTotalMovies(moviesRes.total || 0)
-        setShowtimesToday(showtimesResToday.total || 0)
-        setRevenueTotal(revenueResToday.total || 0)
-        setRevenueCount(revenueResToday.count || 0)
-
-        const last7Start = new Date(now); last7Start.setDate(last7Start.getDate() - 6); last7Start.setHours(0,0,0,0)
-        const stRes = await getShowtimes({ page: 1, pageSize: 500, from: iso(last7Start), to: iso(todayEnd) })
-        const buckets: Record<string, number> = {}
-        for (const s of stRes.items || []) {
-          const d = new Date(s.start_time)
-          const key = `${d.getFullYear()}-${(d.getMonth()+1).toString().padStart(2,'0')}-${d.getDate().toString().padStart(2,'0')}`
-          buckets[key] = (buckets[key] || 0) + 1
-        }
-        const series: Array<{ label: string; value: number }> = []
-        for (let i=6; i>=0; i--) {
-          const d = new Date(now); d.setDate(d.getDate()-i); d.setHours(0,0,0,0)
-          const key = `${d.getFullYear()}-${(d.getMonth()+1).toString().padStart(2,'0')}-${d.getDate().toString().padStart(2,'0')}`
-          series.push({ label: key.slice(5), value: buckets[key] || 0 })
-        }
-        setShowtimesByDay(series)
-
-        const revSeries: Array<{ label: string; value: number }> = []
-        for (let i=6; i>=0; i--) {
-          const dStart = new Date(now); dStart.setDate(dStart.getDate()-i); dStart.setHours(0,0,0,0)
-          const dEnd = new Date(dStart); dEnd.setHours(23,59,59,999)
-          const r = await getAdminRevenue({ from: iso(dStart), to: iso(dEnd) })
-          revSeries.push({ label: `${(dStart.getMonth()+1).toString().padStart(2,'0')}-${dStart.getDate().toString().padStart(2,'0')}`, value: r.total || 0 })
-        }
-        setRevenueByDay(revSeries)
-      } catch {}
-    })()
-  }, [])
-
-  const metrics = useMemo(() => ({
-    totalUsers: 0,
-    totalMovies,
-    revenueTotal,
-    revenueCount,
-    avgRevenuePerUser: 0,
-    totalShowtimes: showtimesToday,
+  const [metrics, setMetrics] = useState({
+    totalMovies: 0,
+    totalShowtimes: 0,
     totalToys: 0,
+    totalUsers: 0,
     totalTransactions: 0,
-  }), [totalMovies, revenueTotal, revenueCount, showtimesToday])
+    revenueTotal: 0,
+  });
+
+  // Date picker state
+  const [selectedDate, setSelectedDate] = useState<string>("");
+  const [dateFilterType, setDateFilterType] = useState<"all" | "day" | "month">("all");
+  const [dateRevenue, setDateRevenue] = useState({ total: 0, count: 0 });
+
+  // 7-day chart state
+  const [revenue7DaysData, setRevenue7DaysData] = useState<
+    Array<{ day: string; revenue: number }>
+  >([]);
+
+  // Monthly chart state
+  const [revenueByMonthYear, setRevenueByMonthYear] = useState(
+    new Date().getFullYear()
+  );
+  const [revenueByMonthData, setRevenueByMonthData] = useState<
+    Array<{ month: number; revenue: number }>
+  >([]);
+
+  // Load metrics on mount
+  useEffect(() => {
+    (async () => {
+      try {
+        const data = await getDashboardMetrics();
+        setMetrics(data);
+      } catch (err) {
+        console.error("Failed to load metrics:", err);
+      }
+    })();
+  }, []);
+
+  // Load all revenue on mount
+  useEffect(() => {
+    (async () => {
+      try {
+        const data = await getRevenueByDate(undefined);
+        setDateRevenue({ total: data.total, count: data.count });
+      } catch (err) {
+        console.error("Failed to load date revenue:", err);
+      }
+    })();
+  }, []);
+
+  // Handle date filter apply
+  const handleApplyDateFilter = async () => {
+    try {
+      if (dateFilterType === "all") {
+        const data = await getRevenueByDate(undefined);
+        setDateRevenue({ total: data.total, count: data.count });
+      } else if (dateFilterType === "day") {
+        const data = await getRevenueByDate(selectedDate);
+        setDateRevenue({ total: data.total, count: data.count });
+      } else if (dateFilterType === "month") {
+        // For month filtering, extract year-month and query all days in that month
+        const [year, month] = selectedDate.split("-");
+        const data = await getRevenueByMonth(parseInt(year), parseInt(month));
+        if ('total' in data) {
+          setDateRevenue({ total: data.total, count: data.count });
+        }
+      }
+    } catch (err) {
+      console.error("Failed to apply date filter:", err);
+    }
+  };
+
+  // Load 7-day revenue on mount
+  useEffect(() => {
+    (async () => {
+      try {
+        const data = await getRevenue7Days();
+        setRevenue7DaysData(data.data);
+      } catch (err) {
+        console.error("Failed to load 7-day revenue:", err);
+      }
+    })();
+  }, []);
+
+  // Load monthly revenue when year changes
+  useEffect(() => {
+    (async () => {
+      try {
+        const data = await getRevenueByMonth(revenueByMonthYear);
+        if ('data' in data) {
+          setRevenueByMonthData(data.data);
+        }
+      } catch (err) {
+        console.error("Failed to load monthly revenue:", err);
+      }
+    })();
+  }, [revenueByMonthYear]);
 
   return (
-    <AdminLayout active="dashboard" setActive={() => {}} adminEmailState={localStorage.getItem("adminEmail") || "admin@email.com"} handleLogout={() => {}}>
-      <DashboardContent metrics={metrics} showtimesByDay={showtimesByDay} revenueByDay={revenueByDay} />
+    <AdminLayout
+      active="dashboard"
+      setActive={() => { }}
+      adminEmailState={localStorage.getItem("adminEmail") || "admin@email.com"}
+      handleLogout={() => { }}
+    >
+      <DashboardContent
+        metrics={metrics}
+        selectedDate={selectedDate}
+        setSelectedDate={setSelectedDate}
+        dateRevenue={dateRevenue}
+        onApplyDateFilter={handleApplyDateFilter}
+        dateFilterType={dateFilterType}
+        setDateFilterType={setDateFilterType}
+        revenue7DaysData={revenue7DaysData}
+        revenueByMonthYear={revenueByMonthYear}
+        setRevenueByMonthYear={setRevenueByMonthYear}
+        revenueByMonthData={revenueByMonthData}
+      />
     </AdminLayout>
-  )
+  );
 }

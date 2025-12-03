@@ -10,12 +10,24 @@ function sortObject(obj: Record<string, any>) {
 
 const VNP_TMNCODE = process.env.VNPAY_TMN_CODE || "";
 const VNP_HASH_SECRET = process.env.VNPAY_HASH_SECRET || "";
-const VNP_GATEWAY = process.env.VNPAY_GATEWAY || "https://sandbox.vnpayment.vn/paymentv2/vpcpay.html";
+const VNP_GATEWAY =
+  process.env.VNPAY_GATEWAY ||
+  "https://sandbox.vnpayment.vn/paymentv2/vpcpay.html";
 const VNP_RETURN_URL = process.env.VNPAY_RETURN_URL || "http://localhost:8080/";
 
 export const createVnpayPayment: RequestHandler = async (req, res) => {
   try {
-    const { amount, orderId, orderInfo, locale = "vn" } = req.body as { amount: number; orderId: string; orderInfo: string; locale?: string };
+    const {
+      amount,
+      orderId,
+      orderInfo,
+      locale = "vn",
+    } = req.body as {
+      amount: number;
+      orderId: string;
+      orderInfo: string;
+      locale?: string;
+    };
     if (!amount || !orderId || !orderInfo) {
       return res.status(400).json({ message: "Invalid payload" });
     }
@@ -28,8 +40,12 @@ export const createVnpayPayment: RequestHandler = async (req, res) => {
     const vnp_TxnRef = orderId;
     const vnp_Version = "2.1.0";
     const vnp_Command = "pay";
-    const vnp_CreateDate = new Date().toISOString().replace(/[-:TZ.]/g, "").slice(0, 14);
-    const vnp_IpAddr = req.headers["x-forwarded-for"] || req.socket.remoteAddress || "127.0.0.1";
+    const vnp_CreateDate = new Date()
+      .toISOString()
+      .replace(/[-:TZ.]/g, "")
+      .slice(0, 14);
+    const vnp_IpAddr =
+      req.headers["x-forwarded-for"] || req.socket.remoteAddress || "127.0.0.1";
     const vnp_Amount = amount * 100;
     const params: Record<string, any> = {
       vnp_Version,
@@ -60,4 +76,3 @@ export const createVnpayPayment: RequestHandler = async (req, res) => {
 export const vnpayIpn: RequestHandler = async (_req, res) => {
   res.status(200).json({ result: true });
 };
-

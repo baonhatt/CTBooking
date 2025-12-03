@@ -1,12 +1,10 @@
 import { RequestHandler } from "express";
 import type { Movie, ActiveMoviesTodayResponse } from "@shared/api";
-import { prisma } from '../lib/prisma'
-import fs from 'fs'
-import path from 'path'
- 
+import { prisma } from "../lib/prisma";
+import fs from "fs";
+import path from "path";
 
-export const handleMovies2025: RequestHandler = (_req, res) => {
-};
+export const handleMovies2025: RequestHandler = (_req, res) => { };
 
 export const getAllActiveMoviesToday: RequestHandler = async (_req, res) => {
   let activeMovies: ActiveMoviesTodayResponse[] = [];
@@ -44,8 +42,8 @@ export const getAllActiveMoviesToday: RequestHandler = async (_req, res) => {
         },
       },
       orderBy: {
-        release_date: "desc"
-      }
+        release_date: "desc",
+      },
     });
     if (active_movies.length !== 0) {
       activeMovies = active_movies.map((m) => ({
@@ -75,7 +73,7 @@ export const getAllActiveMoviesToday: RequestHandler = async (_req, res) => {
 };
 
 export const createMovie: RequestHandler = async (req, res) => {
-  let baseData: any
+  let baseData: any;
   try {
     const {
       title,
@@ -89,40 +87,51 @@ export const createMovie: RequestHandler = async (req, res) => {
       price,
       is_active,
       release_date,
-    } = req.body as any
+    } = req.body as any;
     if (!title || price === undefined) {
-      return res.status(400).json({ message: "Thiếu dữ liệu bắt buộc" })
+      return res.status(400).json({ message: "Thiếu dữ liệu bắt buộc" });
     }
-    const priceNum = Number(price)
+    const priceNum = Number(price);
     if (!Number.isFinite(priceNum) || priceNum < 0) {
-      return res.status(400).json({ message: "Giá không hợp lệ" })
+      return res.status(400).json({ message: "Giá không hợp lệ" });
     }
     if (priceNum > 99999999.99) {
-      return res.status(400).json({ message: "Giá vượt quá giới hạn (tối đa 99,999,999.99)" })
+      return res
+        .status(400)
+        .json({ message: "Giá vượt quá giới hạn (tối đa 99,999,999.99)" });
     }
-    let ratingNum: number | undefined = undefined
+    let ratingNum: number | undefined = undefined;
     if (rating !== undefined && rating !== null && rating !== "") {
-      ratingNum = Number(rating)
+      ratingNum = Number(rating);
       if (!Number.isFinite(ratingNum) || ratingNum < 0 || ratingNum > 10) {
-        return res.status(400).json({ message: "Điểm đánh giá không hợp lệ" })
+        return res.status(400).json({ message: "Điểm đánh giá không hợp lệ" });
       }
     }
-    const durationNum = duration_min === undefined ? undefined : Number(duration_min)
-    if (durationNum !== undefined && (!Number.isInteger(durationNum) || durationNum < 0)) {
-      return res.status(400).json({ message: "Thời lượng không hợp lệ" })
+    const durationNum =
+      duration_min === undefined ? undefined : Number(duration_min);
+    if (
+      durationNum !== undefined &&
+      (!Number.isInteger(durationNum) || durationNum < 0)
+    ) {
+      return res.status(400).json({ message: "Thời lượng không hợp lệ" });
     }
-    let savedCover = cover_image as string | undefined
-    if (cover_image_base64 && typeof cover_image_base64 === 'string') {
+    let savedCover = cover_image as string | undefined;
+    if (cover_image_base64 && typeof cover_image_base64 === "string") {
       try {
-        const match = cover_image_base64.match(/^data:(.+);base64,(.+)$/)
-        const ext = match ? (match[1].split('/')[1] || 'png') : 'png'
-        const buf = Buffer.from(match ? match[2] : cover_image_base64, 'base64')
-        const dir = path.resolve(process.cwd(), 'uploads', 'movies')
-        try { fs.mkdirSync(dir, { recursive: true }) } catch { }
-        const filename = `movie_${Date.now()}.${ext}`
-        const filepath = path.join(dir, filename)
-        fs.writeFileSync(filepath, buf)
-        savedCover = `/uploads/movies/${filename}`
+        const match = cover_image_base64.match(/^data:(.+);base64,(.+)$/);
+        const ext = match ? match[1].split("/")[1] || "png" : "png";
+        const buf = Buffer.from(
+          match ? match[2] : cover_image_base64,
+          "base64",
+        );
+        const dir = path.resolve(process.cwd(), "uploads", "movies");
+        try {
+          fs.mkdirSync(dir, { recursive: true });
+        } catch { }
+        const filename = `movie_${Date.now()}.${ext}`;
+        const filepath = path.join(dir, filename);
+        fs.writeFileSync(filepath, buf);
+        savedCover = `/uploads/movies/${filename}`;
       } catch { }
     }
     baseData = {
@@ -136,30 +145,39 @@ export const createMovie: RequestHandler = async (req, res) => {
       price: priceNum,
       is_active: is_active === undefined ? true : Boolean(is_active),
       release_date: release_date ? new Date(release_date) : undefined,
-    }
-    let movie = await (prisma as any).movies.create({ data: baseData })
-    res.status(201).json({ movie })
+    };
+    let movie = await (prisma as any).movies.create({ data: baseData });
+    res.status(201).json({ message: "Thêm phim mới thành công", movie });
   } catch (err: any) {
-    if (err?.code === "P2002" && String(err?.meta?.target || "").includes("id")) {
+    if (
+      err?.code === "P2002" &&
+      String(err?.meta?.target || "").includes("id")
+    ) {
       try {
-        const last = await (prisma as any).movies.findFirst({ orderBy: { id: "desc" } })
-        const nextId = ((last?.id as number) || 0) + 1
-        const movie = await (prisma as any).movies.create({ data: { ...baseData, id: nextId } })
+        const last = await (prisma as any).movies.findFirst({
+          orderBy: { id: "desc" },
+        });
+        const nextId = ((last?.id as number) || 0) + 1;
+        const movie = await (prisma as any).movies.create({
+          data: { ...baseData, id: nextId },
+        });
 
-        return res.status(201).json({ movie })
+        return res.status(201).json({ message: "Thêm phim mới thành công", movie });
       } catch (retryErr: any) {
-        return res.status(500).json({ message: retryErr?.message || "Lỗi máy chủ nội bộ" })
+        return res
+          .status(500)
+          .json({ message: retryErr?.message || "Lỗi máy chủ nội bộ" });
       }
     }
-    res.status(500).json({ message: err?.message || "Lỗi máy chủ nội bộ" })
+    res.status(500).json({ message: err?.message || "Lỗi máy chủ nội bộ" });
   }
-}
+};
 
 export const listMovies: RequestHandler = async (req, res) => {
   try {
-    const page = Number(req.query.page || 1)
-    const pageSize = Number(req.query.pageSize || 20)
-    const q = String(req.query.q || "").toLowerCase()
+    const page = Number(req.query.page || 1);
+    const pageSize = Number(req.query.pageSize || 20);
+    const q = String(req.query.q || "").toLowerCase();
     const where: any = q
       ? {
         OR: [
@@ -167,280 +185,472 @@ export const listMovies: RequestHandler = async (req, res) => {
           { description: { contains: q, mode: "insensitive" } },
         ],
       }
-      : {}
-    const total = await (prisma as any).movies.count({ where })
+      : {};
+    const total = await (prisma as any).movies.count({ where });
     const items = await (prisma as any).movies.findMany({
       where,
       orderBy: { id: "desc" },
       skip: (page - 1) * pageSize,
       take: pageSize,
-    })
-    res.status(200).json({ items, page, pageSize, total })
+    });
+    res.status(200).json({ items, page, pageSize, total });
   } catch {
-    res.status(500).json({ message: "Lỗi máy chủ nội bộ" })
+    res.status(500).json({ message: "Lỗi máy chủ nội bộ" });
   }
-}
+};
 
 export const getMovie: RequestHandler = async (req, res) => {
   try {
-    const id = Number(req.params.id)
-    const movie = await (prisma as any).movies.findUnique({ where: { id } })
-    if (!movie) return res.status(404).json({ message: "Không tìm thấy" })
-    res.status(200).json({ movie })
+    const id = Number(req.params.id);
+    const movie = await (prisma as any).movies.findUnique({ where: { id } });
+    if (!movie) return res.status(404).json({ message: "Không tìm thấy" });
+    res.status(200).json({ movie });
   } catch {
-    res.status(500).json({ message: "Lỗi máy chủ nội bộ" })
+    res.status(500).json({ message: "Lỗi máy chủ nội bộ" });
   }
-}
+};
 
 export const updateMovie: RequestHandler = async (req, res) => {
   try {
-    const id = Number(req.params.id)
-    const { title, description, cover_image, cover_image_base64, detail_images, genres, rating, duration_min, price, is_active, release_date } = req.body as any
-    const data: any = {}
-    if (title !== undefined) data.title = title
-    if (description !== undefined) data.description = description
-    if (cover_image !== undefined) data.cover_image = cover_image
-    if (cover_image_base64 && typeof cover_image_base64 === 'string') {
+    const id = Number(req.params.id);
+    const {
+      title,
+      description,
+      cover_image,
+      cover_image_base64,
+      detail_images,
+      genres,
+      rating,
+      duration_min,
+      price,
+      is_active,
+      release_date,
+    } = req.body as any;
+    const data: any = {};
+    if (title !== undefined) data.title = title;
+    if (description !== undefined) data.description = description;
+    if (cover_image !== undefined) data.cover_image = cover_image;
+    if (cover_image_base64 && typeof cover_image_base64 === "string") {
       try {
-        const match = cover_image_base64.match(/^data:(.+);base64,(.+)$/)
-        const ext = match ? (match[1].split('/')[1] || 'png') : 'png'
-        const buf = Buffer.from(match ? match[2] : cover_image_base64, 'base64')
-        const dir = path.resolve(process.cwd(), 'uploads', 'movies')
-        try { fs.mkdirSync(dir, { recursive: true }) } catch { }
-        const filename = `movie_${Date.now()}.${ext}`
-        const filepath = path.join(dir, filename)
-        fs.writeFileSync(filepath, buf)
-        data.cover_image = `/uploads/movies/${filename}`
+        const match = cover_image_base64.match(/^data:(.+);base64,(.+)$/);
+        const ext = match ? match[1].split("/")[1] || "png" : "png";
+        const buf = Buffer.from(
+          match ? match[2] : cover_image_base64,
+          "base64",
+        );
+        const dir = path.resolve(process.cwd(), "uploads", "movies");
+        try {
+          fs.mkdirSync(dir, { recursive: true });
+        } catch { }
+        const filename = `movie_${Date.now()}.${ext}`;
+        const filepath = path.join(dir, filename);
+        fs.writeFileSync(filepath, buf);
+        data.cover_image = `/uploads/movies/${filename}`;
       } catch { }
     }
-    if (detail_images !== undefined) data.detail_images = detail_images
-    if (genres !== undefined) data.genres = genres
+    if (detail_images !== undefined) data.detail_images = detail_images;
+    if (genres !== undefined) data.genres = genres;
     if (rating !== undefined) {
-      const r = Number(rating)
-      if (!Number.isFinite(r) || r < 0 || r > 10) return res.status(400).json({ message: "Điểm đánh giá không hợp lệ" })
-      data.rating = r
+      const r = Number(rating);
+      if (!Number.isFinite(r) || r < 0 || r > 10)
+        return res.status(400).json({ message: "Điểm đánh giá không hợp lệ" });
+      data.rating = r;
     }
     if (duration_min !== undefined) {
-      const d = Number(duration_min)
-      if (!Number.isInteger(d) || d < 0) return res.status(400).json({ message: "Thời lượng không hợp lệ" })
-      data.duration_min = d
+      const d = Number(duration_min);
+      if (!Number.isInteger(d) || d < 0)
+        return res.status(400).json({ message: "Thời lượng không hợp lệ" });
+      data.duration_min = d;
     }
     if (price !== undefined) {
-      const p = Number(price)
-      if (!Number.isFinite(p) || p < 0) return res.status(400).json({ message: "Giá không hợp lệ" })
-      if (p > 99999999.99) return res.status(400).json({ message: "Giá vượt quá giới hạn (tối đa 99,999,999.99)" })
-      data.price = p
+      const p = Number(price);
+      if (!Number.isFinite(p) || p < 0)
+        return res.status(400).json({ message: "Giá không hợp lệ" });
+      if (p > 99999999.99)
+        return res
+          .status(400)
+          .json({ message: "Giá vượt quá giới hạn (tối đa 99,999,999.99)" });
+      data.price = p;
     }
-    if (is_active !== undefined) data.is_active = Boolean(is_active)
-    if (release_date !== undefined) data.release_date = release_date ? new Date(release_date) : null
-    data.updated_at = new Date()
-    const movie = await (prisma as any).movies.update({ where: { id }, data })
-    res.status(200).json({ movie })
+    if (is_active !== undefined) data.is_active = Boolean(is_active);
+    if (release_date !== undefined)
+      data.release_date = release_date ? new Date(release_date) : null;
+    data.updated_at = new Date();
+    const movie = await (prisma as any).movies.update({ where: { id }, data });
+    res.status(200).json({ message: "Cập nhật phim thành công", movie });
   } catch (err: any) {
-    if (err?.code === "P2025") return res.status(404).json({ message: "Không tìm thấy" })
-    res.status(500).json({ message: "Lỗi máy chủ nội bộ" })
+    if (err?.code === "P2025")
+      return res.status(404).json({ message: "Không tìm thấy" });
+    res.status(500).json({ message: "Lỗi máy chủ nội bộ" });
   }
-}
+};
 
 export const deleteMovie: RequestHandler = async (req, res) => {
   try {
-    const id = Number(req.params.id)
-    await (prisma as any).movies.delete({ where: { id } })
-    res.status(200).json({ ok: true })
+    const id = Number(req.params.id);
+    await (prisma as any).movies.delete({ where: { id } });
+    res.status(200).json({ message: "Xóa phim thành công", ok: true });
   } catch (err: any) {
-    if (err?.code === "P2025") return res.status(404).json({ message: "Không tìm thấy" })
-    res.status(500).json({ message: "Lỗi máy chủ nội bộ" })
+    if (err?.code === "P2025")
+      return res.status(404).json({ message: "Không tìm thấy" });
+    res.status(500).json({ message: "Lỗi máy chủ nội bộ" });
   }
-}
+};
 
 export const listShowtimes: RequestHandler = async (req, res) => {
   try {
-    const page = Number(req.query.page || 1)
-    const pageSize = Number(req.query.pageSize || 20)
-    const fromStr = String(req.query.from || "")
-    const toStr = String(req.query.to || "")
-    const todayFlag = String(req.query.today || "")
-    const sortKey = String(req.query.sort || "start_time")
-    const dir = String(req.query.dir || "asc").toLowerCase() === "desc" ? "desc" : "asc"
-    let from = fromStr ? new Date(fromStr) : undefined
-    let to = toStr ? new Date(toStr) : undefined
+    const page = Number(req.query.page || 1);
+    const pageSize = Number(req.query.pageSize || 20);
+    const fromStr = String(req.query.from || "");
+    const toStr = String(req.query.to || "");
+    const todayFlag = String(req.query.today || "");
+    const sortKey = String(req.query.sort || "start_time");
+    const dir =
+      String(req.query.dir || "asc").toLowerCase() === "desc" ? "desc" : "asc";
+    let from = fromStr ? new Date(fromStr) : undefined;
+    let to = toStr ? new Date(toStr) : undefined;
     if (!from && !to && (todayFlag === "1" || todayFlag === "true")) {
-      const now = new Date()
-      const tStart = new Date(now); tStart.setHours(0,0,0,0)
-      const tEnd = new Date(now); tEnd.setHours(23,59,59,999)
-      from = tStart
-      to = tEnd
+      const now = new Date();
+      const tStart = new Date(now);
+      tStart.setHours(0, 0, 0, 0);
+      const tEnd = new Date(now);
+      tEnd.setHours(23, 59, 59, 999);
+      from = tStart;
+      to = tEnd;
     }
-    const where: any = {}
-    if (from && to) where.start_time = { gte: from, lte: to }
-    else if (from) where.start_time = { gte: from }
-    else if (to) where.start_time = { lte: to }
-    const total = await (prisma as any).showtimes.count({ where })
+    const where: any = {};
+    if (from && to) where.start_time = { gte: from, lte: to };
+    else if (from) where.start_time = { gte: from };
+    else if (to) where.start_time = { lte: to };
+    const total = await (prisma as any).showtimes.count({ where });
     const orderBy: any =
-      sortKey === "created_at" ? { created_at: dir } :
-      sortKey === "movie_title" ? [{ movie: { title: dir } }, { start_time: "asc" }] :
-      { start_time: dir }
+      sortKey === "created_at"
+        ? { created_at: dir }
+        : sortKey === "movie_title"
+          ? [{ movie: { title: dir } }, { start_time: "asc" }]
+          : { start_time: dir };
     const items = await (prisma as any).showtimes.findMany({
       where,
       include: { movie: true },
       orderBy,
       skip: (page - 1) * pageSize,
       take: pageSize,
-    })
-    res.status(200).json({ items, page, pageSize, total })
+    });
+    res.status(200).json({ items, page, pageSize, total });
   } catch {
-    res.status(500).json({ message: "Lỗi máy chủ nội bộ" })
+    res.status(500).json({ message: "Lỗi máy chủ nội bộ" });
   }
-}
+};
 
 export const createShowtime: RequestHandler = async (req, res) => {
   try {
-    const { movie_id, start_time, price } = req.body as any
-    const start = new Date(start_time)
+    const { movie_id, start_time, price } = req.body as any;
+    const start = new Date(start_time);
     if (!start_time || Number.isNaN(start.getTime())) {
-      return res.status(400).json({ message: "start_time không hợp lệ" })
+      return res.status(400).json({ message: "start_time không hợp lệ" });
     }
-    const mId = Number(movie_id)
-    const priceNum = Number(price)
+    const mId = Number(movie_id);
+    const priceNum = Number(price);
     if (!mId || !Number.isFinite(priceNum) || priceNum < 0) {
-      return res.status(400).json({ message: "Thiếu dữ liệu hoặc dữ liệu không hợp lệ" })
+      return res
+        .status(400)
+        .json({ message: "Thiếu dữ liệu hoặc dữ liệu không hợp lệ" });
     }
     if (priceNum > 9999999.99) {
-      return res.status(400).json({ message: "Giá vượt quá giới hạn (tối đa 9,999,999.99)" })
+      return res
+        .status(400)
+        .json({ message: "Giá vượt quá giới hạn (tối đa 9,999,999.99)" });
     }
-    const movie = await (prisma as any).movies.findUnique({ where: { id: mId } })
-    if (!movie) return res.status(404).json({ message: "Không tìm thấy phim" })
-    const duration = Number(movie.duration_min || 0)
-    const end = new Date(start.getTime() + duration * 60 * 1000)
+    const movie = await (prisma as any).movies.findUnique({
+      where: { id: mId },
+    });
+    if (!movie) return res.status(404).json({ message: "Không tìm thấy phim" });
+    const duration = Number(movie.duration_min || 0);
+    const end = new Date(start.getTime() + duration * 60 * 1000);
 
-    const dayStart = new Date(start)
-    dayStart.setHours(0, 0, 0, 0)
-    const dayEnd = new Date(start)
-    dayEnd.setHours(23, 59, 59, 999)
+    const dayStart = new Date(start);
+    dayStart.setHours(0, 0, 0, 0);
+    const dayEnd = new Date(start);
+    dayEnd.setHours(23, 59, 59, 999);
 
     const existing = await (prisma as any).showtimes.findMany({
       where: { start_time: { gte: dayStart, lte: dayEnd } },
       include: { movie: true },
       orderBy: { start_time: "asc" },
-    })
+    });
     const overlaps = existing.some((s: any) => {
-      const sDur = Number(s.movie?.duration_min || 0)
-      const sEnd = new Date(new Date(s.start_time).getTime() + sDur * 60 * 1000)
-      return start < sEnd && new Date(s.start_time) < end
-    })
-    if (overlaps) return res.status(409).json({ message: "Thời gian lịch chiếu trùng với lịch khác" })
+      const sDur = Number(s.movie?.duration_min || 0);
+      const sEnd = new Date(
+        new Date(s.start_time).getTime() + sDur * 60 * 1000,
+      );
+      return start < sEnd && new Date(s.start_time) < end;
+    });
+    if (overlaps)
+      return res
+        .status(409)
+        .json({ message: "Thời gian lịch chiếu trùng với lịch khác" });
     try {
-      const showtime = await (prisma as any).showtimes.create({ data: { movie_id: mId, start_time: start, price: priceNum > 0 ? priceNum.toFixed(2) : "0.00" } })
-      return res.status(201).json({ showtime })
+      const showtime = await (prisma as any).showtimes.create({
+        data: {
+          movie_id: mId,
+          start_time: start,
+          price: priceNum > 0 ? priceNum.toFixed(2) : "0.00",
+        },
+      });
+      return res.status(201).json({ message: "Thêm lịch chiếu thành công", showtime });
     } catch (e: any) {
       if (e?.code === "P2002" && String(e?.meta?.target || "").includes("id")) {
         try {
-          await (prisma as any).$executeRawUnsafe('SELECT setval(pg_get_serial_sequence("showtimes", "id"), COALESCE((SELECT MAX(id) FROM "showtimes"), 1), true);')
-          const showtime = await (prisma as any).showtimes.create({ data: { movie_id: mId, start_time: start, price: priceNum > 0 ? priceNum.toFixed(2) : "0.00" } })
-          return res.status(201).json({ showtime })
+          await (prisma as any).$executeRawUnsafe(
+            'SELECT setval(pg_get_serial_sequence("showtimes", "id"), COALESCE((SELECT MAX(id) FROM "showtimes"), 1), true);',
+          );
+          const showtime = await (prisma as any).showtimes.create({
+            data: {
+              movie_id: mId,
+              start_time: start,
+              price: priceNum > 0 ? priceNum.toFixed(2) : "0.00",
+            },
+          });
+          return res.status(201).json({ message: "Thêm lịch chiếu thành công", showtime });
         } catch (ee: any) {
-          return res.status(500).json({ message: ee?.message || "Lỗi máy chủ nội bộ" })
+          return res
+            .status(500)
+            .json({ message: ee?.message || "Lỗi máy chủ nội bộ" });
         }
       }
-      return res.status(500).json({ message: e?.message || "Lỗi máy chủ nội bộ" })
+      return res
+        .status(500)
+        .json({ message: e?.message || "Lỗi máy chủ nội bộ" });
     }
   } catch (err: any) {
-    return res.status(500).json({ message: err?.message || "Lỗi máy chủ nội bộ" })
+    return res
+      .status(500)
+      .json({ message: err?.message || "Lỗi máy chủ nội bộ" });
   }
-}
+};
 
 export const updateShowtime: RequestHandler = async (req, res) => {
   try {
-    const id = Number(req.params.id)
-    const { movie_id, start_time, price } = req.body as any
-    const st = await (prisma as any).showtimes.findUnique({ where: { id }, include: { movie: true } })
-    if (!st) return res.status(404).json({ message: "Không tìm thấy lịch" })
-    const mId = movie_id !== undefined ? Number(movie_id) : st.movie_id
-    const start = start_time ? new Date(start_time) : new Date(st.start_time)
-    const priceNum = price === undefined ? undefined : Number(price)
-    if (priceNum !== undefined && (!Number.isFinite(priceNum) || priceNum < 0)) {
-      return res.status(400).json({ message: "Giá không hợp lệ" })
+    const id = Number(req.params.id);
+    const { movie_id, start_time, price } = req.body as any;
+    const st = await (prisma as any).showtimes.findUnique({
+      where: { id },
+      include: { movie: true },
+    });
+    if (!st) return res.status(404).json({ message: "Không tìm thấy lịch" });
+    const mId = movie_id !== undefined ? Number(movie_id) : st.movie_id;
+    const start = start_time ? new Date(start_time) : new Date(st.start_time);
+    const priceNum = price === undefined ? undefined : Number(price);
+    if (
+      priceNum !== undefined &&
+      (!Number.isFinite(priceNum) || priceNum < 0)
+    ) {
+      return res.status(400).json({ message: "Giá không hợp lệ" });
     }
-    const movie = await (prisma as any).movies.findUnique({ where: { id: mId } })
-    if (!movie) return res.status(404).json({ message: "Không tìm thấy phim" })
-    const duration = Number(movie.duration_min || 0)
-    const end = new Date(start.getTime() + duration * 60 * 1000)
-    const dayStart = new Date(start)
-    dayStart.setHours(0, 0, 0, 0)
-    const dayEnd = new Date(start)
-    dayEnd.setHours(23, 59, 59, 999)
+    const movie = await (prisma as any).movies.findUnique({
+      where: { id: mId },
+    });
+    if (!movie) return res.status(404).json({ message: "Không tìm thấy phim" });
+    const duration = Number(movie.duration_min || 0);
+    const end = new Date(start.getTime() + duration * 60 * 1000);
+    const dayStart = new Date(start);
+    dayStart.setHours(0, 0, 0, 0);
+    const dayEnd = new Date(start);
+    dayEnd.setHours(23, 59, 59, 999);
     const existing = await (prisma as any).showtimes.findMany({
       where: { start_time: { gte: dayStart, lte: dayEnd }, NOT: { id } },
       include: { movie: true },
       orderBy: { start_time: "asc" },
-    })
+    });
     const overlaps = existing.some((s: any) => {
-      const sDur = Number(s.movie?.duration_min || 0)
-      const sEnd = new Date(new Date(s.start_time).getTime() + sDur * 60 * 1000)
-      return start < sEnd && new Date(s.start_time) < end
-    })
-    if (overlaps) return res.status(409).json({ message: "Thời gian lịch chiếu trùng với lịch khác" })
-    const data: any = { movie_id: mId, start_time: start, updated_at: new Date() }
-    if (priceNum !== undefined) data.price = priceNum > 0 ? priceNum.toFixed(2) : "0.00"
-    const showtime = await (prisma as any).showtimes.update({ where: { id }, data })
-    res.status(200).json({ showtime })
+      const sDur = Number(s.movie?.duration_min || 0);
+      const sEnd = new Date(
+        new Date(s.start_time).getTime() + sDur * 60 * 1000,
+      );
+      return start < sEnd && new Date(s.start_time) < end;
+    });
+    if (overlaps)
+      return res
+        .status(409)
+        .json({ message: "Thời gian lịch chiếu trùng với lịch khác" });
+    const data: any = {
+      movie_id: mId,
+      start_time: start,
+      updated_at: new Date(),
+    };
+    if (priceNum !== undefined)
+      data.price = priceNum > 0 ? priceNum.toFixed(2) : "0.00";
+    const showtime = await (prisma as any).showtimes.update({
+      where: { id },
+      data,
+    });
+    res.status(200).json({ message: "Cập nhật lịch chiếu thành công", showtime });
   } catch (err: any) {
-    res.status(500).json({ message: err?.message || "Lỗi máy chủ nội bộ" })
+    res.status(500).json({ message: err?.message || "Lỗi máy chủ nội bộ" });
   }
-}
+};
 
 export const deleteShowtime: RequestHandler = async (req, res) => {
   try {
-    const id = Number(req.params.id)
-    await (prisma as any).showtimes.delete({ where: { id } })
-    res.status(200).json({ ok: true })
+    const id = Number(req.params.id);
+    await (prisma as any).showtimes.delete({ where: { id } });
+    res.status(200).json({ message: "Xóa lịch chiếu thành công", ok: true });
   } catch (err: any) {
-    if (err?.code === "P2025") return res.status(404).json({ message: "Không tìm thấy" })
-    res.status(500).json({ message: "Lỗi máy chủ nội bộ" })
+    if (err?.code === "P2025")
+      return res.status(404).json({ message: "Không tìm thấy" });
+    res.status(500).json({ message: "Lỗi máy chủ nội bộ" });
   }
-}
+};
 
 export const createShowtimesBatch: RequestHandler = async (req, res) => {
   try {
-    const { movie_id, start_times, price } = req.body as any
-    const mId = Number(movie_id)
-    const defaultPriceNum = Number(price ?? 0)
+    const { movie_id, start_times, price } = req.body as any;
+    const mId = Number(movie_id);
+    const defaultPriceNum = Number(price ?? 0);
     if (!mId || !Array.isArray(start_times) || start_times.length === 0) {
-      return res.status(400).json({ message: "Thiếu dữ liệu" })
+      return res.status(400).json({ message: "Thiếu dữ liệu" });
     }
-    if (!Number.isFinite(defaultPriceNum) || defaultPriceNum < 0 || defaultPriceNum > 9999999.99) {
-      return res.status(400).json({ message: "Giá không hợp lệ" })
+    if (
+      !Number.isFinite(defaultPriceNum) ||
+      defaultPriceNum < 0 ||
+      defaultPriceNum > 9999999.99
+    ) {
+      return res.status(400).json({ message: "Giá không hợp lệ" });
     }
-    const movie = await (prisma as any).movies.findUnique({ where: { id: mId } })
-    if (!movie) return res.status(404).json({ message: "Không tìm thấy phim" })
-    const duration = Number(movie.duration_min || 0)
-    const created: any[] = []
-    const skipped: any[] = []
+    const movie = await (prisma as any).movies.findUnique({
+      where: { id: mId },
+    });
+    if (!movie) return res.status(404).json({ message: "Không tìm thấy phim" });
+    const duration = Number(movie.duration_min || 0);
+    const created: any[] = [];
+    const skipped: any[] = [];
     for (const item of start_times) {
-      const stStr = typeof item === 'string' ? item : item?.start_time
-      const rowPrice = typeof item === 'object' && item ? Number(item.price ?? defaultPriceNum) : defaultPriceNum
-      const start = new Date(stStr)
-      if (!stStr || Number.isNaN(start.getTime())) { skipped.push({ start_time: stStr, reason: "start_time không hợp lệ" }); continue }
-      if (!Number.isFinite(rowPrice) || rowPrice < 0 || rowPrice > 9999999.99) { skipped.push({ start_time: stStr, reason: "Giá không hợp lệ" }); continue }
-      const end = new Date(start.getTime() + duration * 60 * 1000)
-      const dayStart = new Date(start); dayStart.setHours(0,0,0,0)
-      const dayEnd = new Date(start); dayEnd.setHours(23,59,59,999)
-      const existing = await (prisma as any).showtimes.findMany({ where: { start_time: { gte: dayStart, lte: dayEnd } }, include: { movie: true }, orderBy: { start_time: "asc" } })
+      const stStr = typeof item === "string" ? item : item?.start_time;
+      const rowPrice =
+        typeof item === "object" && item
+          ? Number(item.price ?? defaultPriceNum)
+          : defaultPriceNum;
+      const start = new Date(stStr);
+      if (!stStr || Number.isNaN(start.getTime())) {
+        skipped.push({ start_time: stStr, reason: "start_time không hợp lệ" });
+        continue;
+      }
+      if (!Number.isFinite(rowPrice) || rowPrice < 0 || rowPrice > 9999999.99) {
+        skipped.push({ start_time: stStr, reason: "Giá không hợp lệ" });
+        continue;
+      }
+      const end = new Date(start.getTime() + duration * 60 * 1000);
+      const dayStart = new Date(start);
+      dayStart.setHours(0, 0, 0, 0);
+      const dayEnd = new Date(start);
+      dayEnd.setHours(23, 59, 59, 999);
+      const existing = await (prisma as any).showtimes.findMany({
+        where: { start_time: { gte: dayStart, lte: dayEnd } },
+        include: { movie: true },
+        orderBy: { start_time: "asc" },
+      });
       const overlaps = existing.some((s: any) => {
-        const sDur = Number(s.movie?.duration_min || 0)
-        const sEnd = new Date(new Date(s.start_time).getTime() + sDur * 60 * 1000)
-        return start < sEnd && new Date(s.start_time) < end
-      })
-      if (overlaps) { skipped.push({ start_time: stStr, reason: "trùng lịch" }); continue }
+        const sDur = Number(s.movie?.duration_min || 0);
+        const sEnd = new Date(
+          new Date(s.start_time).getTime() + sDur * 60 * 1000,
+        );
+        return start < sEnd && new Date(s.start_time) < end;
+      });
+      if (overlaps) {
+        skipped.push({ start_time: stStr, reason: "trùng lịch" });
+        continue;
+      }
       try {
-        const showtime = await (prisma as any).showtimes.create({ data: { movie_id: mId, start_time: start, price: rowPrice > 0 ? rowPrice.toFixed(2) : "0.00" } })
-        created.push(showtime)
+        const showtime = await (prisma as any).showtimes.create({
+          data: {
+            movie_id: mId,
+            start_time: start,
+            price: rowPrice > 0 ? rowPrice.toFixed(2) : "0.00",
+          },
+        });
+        created.push(showtime);
       } catch (e: any) {
-        skipped.push({ start_time: stStr, reason: e?.message || "lỗi tạo" })
+        skipped.push({ start_time: stStr, reason: e?.message || "lỗi tạo" });
       }
     }
-    return res.status(201).json({ created, skipped })
+    return res.status(201).json({ created, skipped });
   } catch (err: any) {
-    return res.status(500).json({ message: err?.message || "Lỗi máy chủ nội bộ" })
+    return res
+      .status(500)
+      .json({ message: err?.message || "Lỗi máy chủ nội bộ" });
   }
-}
+};
+
+export const getMovieById: RequestHandler = async (req, res) => {
+  try {
+    const movieId = Number(req.params.id);
+
+    const movie = await (prisma as any).movies.findUnique({
+      where: { id: movieId },
+      include: {
+        showtimes: {
+          select: {
+            id: true,
+            start_time: true,
+            price: true,
+            total_sold: true,
+          },
+        },
+      },
+    });
+
+    if (!movie) {
+      return res.status(404).json({ message: "Không tìm thấy phim" });
+    }
+
+    // Calculate stats
+    const totalShowtimes = movie.showtimes.length;
+    const totalTicketsSold = movie.showtimes.reduce(
+      (sum, st) => sum + (st.total_sold || 0),
+      0
+    );
+    const totalRevenue = await (prisma as any).bookings.aggregate({
+      where: {
+        showtime: {
+          movie_id: movieId,
+        },
+        payment_status: { in: ["paid", "PAID", "success", "SUCCESS"] },
+      },
+      _sum: { total_price: true },
+    });
+
+    const successfulBookings = await (prisma as any).bookings.count({
+      where: {
+        showtime: {
+          movie_id: movieId,
+        },
+        payment_status: { in: ["paid", "PAID", "success", "SUCCESS"] },
+      },
+    });
+
+    const mapped = {
+      id: movie.id,
+      title: movie.title,
+      description: movie.description || "Không có mô tả",
+      cover_image: movie.cover_image,
+      genres: movie.genres || [],
+      rating: Number(movie.rating || 0),
+      duration_min: movie.duration_min || 0,
+      price: Number(movie.price),
+      is_active: movie.is_active,
+      release_date: movie.release_date,
+      created_at: movie.created_at,
+      updated_at: movie.updated_at,
+      stats: {
+        totalShowtimes,
+        totalTicketsSold,
+        totalRevenue: Number(totalRevenue._sum?.total_price || 0),
+        successfulBookings,
+      },
+    };
+
+    res.status(200).json(mapped);
+  } catch (err: any) {
+    res.status(500).json({ message: "Lỗi máy chủ nội bộ" });
+  }
+};
