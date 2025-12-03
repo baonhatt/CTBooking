@@ -1,26 +1,123 @@
-import React, { useEffect, useMemo, useState } from "react"
-import { getAdminRevenue } from "@/lib/api"
-import AdminLayout from "@/components/admin/AdminLayout"
-import TransactionsContent from "@/components/admin/content/TransactionsContent"
+import React, { useEffect, useMemo, useState } from "react";
+import { getAdminRevenue, getTransactions } from "@/lib/api";
+import AdminLayout from "@/components/admin/AdminLayout";
+import TransactionsContent from "@/components/admin/content/TransactionsContent";
 
 export default function TransactionsPage() {
-  const [transactions, setTransactions] = useState<any[]>([])
-  const [totalTransactions, setTotalTransactions] = useState(0)
-  const [txPage, setTxPage] = useState(1)
-  const pageSize = 10
-  const [txQuery, setTxQuery] = useState("")
-  const [revenueTotal, setRevenueTotal] = useState(0)
-  const [revenueCount, setRevenueCount] = useState(0)
+  const [transactions, setTransactions] = useState<any[]>([]);
+  const [totalTransactions, setTotalTransactions] = useState(0);
+  const [txPage, setTxPage] = useState(1);
+  const pageSize = 10;
+  const [txQuery, setTxQuery] = useState("");
+  const [revenueTotal, setRevenueTotal] = useState(0);
+  const [revenueCount, setRevenueCount] = useState(0);
 
-  useEffect(() => { setTransactions([]); setTotalTransactions(0) }, [txPage, pageSize, txQuery])
-  useEffect(() => { (async () => { const { total, count } = await getAdminRevenue({}); setRevenueTotal(total); setRevenueCount(count) })() }, [])
+  // Load transactions khi page hoặc query thay đổi
+  useEffect(() => {
+    (async () => {
+      try {
+        const { items, total } = await getTransactions({
+          page: txPage,
+          pageSize,
+          email: txQuery,
+        });
+        setTransactions(
+          items.map((t: any) => ({
+            id: String(t.id),
+            email: t.email,
+            userName: t.userName,
+            movieTitle: t.movieTitle,
+            ticketCount: t.ticketCount,
+            totalPrice: t.totalPrice,
+            paymentMethod: t.paymentMethod,
+            paymentStatus: t.paymentStatus,
+            createdAt: new Date(t.createdAt),
+          })),
+        );
+        setTotalTransactions(total);
+      } catch (error) {
+        console.error("Lỗi load giao dịch:", error);
+      }
+    })();
+  }, [txPage, pageSize, txQuery]);
 
-  const txTotalPages = useMemo(() => Math.max(1, Math.ceil(totalTransactions / pageSize)), [totalTransactions])
-  const metrics = useMemo(() => ({ totalUsers: 0, totalMovies: 0, revenueTotal, revenueCount, avgRevenuePerUser: 0, totalShowtimes: 0, totalToys: 0, totalTransactions }), [revenueTotal, revenueCount, totalTransactions])
+  useEffect(() => {
+    (async () => {
+      try {
+        const { total, count } = await getAdminRevenue({});
+        setRevenueTotal(total);
+        setRevenueCount(count);
+      } catch (error) {
+        console.error("Lỗi load doanh thu:", error);
+      }
+    })();
+  }, []);
+
+  const txTotalPages = useMemo(
+    () => Math.max(1, Math.ceil(totalTransactions / pageSize)),
+    [totalTransactions],
+  );
+  const metrics = useMemo(
+    () => ({
+      totalUsers: 0,
+      totalMovies: 0,
+      revenueTotal,
+      revenueCount,
+      avgRevenuePerUser: 0,
+      totalShowtimes: 0,
+      totalToys: 0,
+      totalTransactions,
+    }),
+    [revenueTotal, revenueCount, totalTransactions],
+  );
+
+  const handleRefresh = async () => {
+    try {
+      const { items, total } = await getTransactions({
+        page: txPage,
+        pageSize,
+        email: txQuery,
+      });
+      setTransactions(
+        items.map((t: any) => ({
+          id: String(t.id),
+          email: t.email,
+          userName: t.userName,
+          movieTitle: t.movieTitle,
+          ticketCount: t.ticketCount,
+          totalPrice: t.totalPrice,
+          paymentMethod: t.paymentMethod,
+          paymentStatus: t.paymentStatus,
+          createdAt: new Date(t.createdAt),
+        })),
+      );
+      setTotalTransactions(total);
+      const { total: revTotal, count: revCount } = await getAdminRevenue({});
+      setRevenueTotal(revTotal);
+      setRevenueCount(revCount);
+    } catch (error) {
+      console.error("Lỗi refresh giao dịch:", error);
+    }
+  };
 
   return (
-    <AdminLayout active="transactions" setActive={() => {}} adminEmailState={localStorage.getItem("adminEmail") || "admin@email.com"} handleLogout={() => {}}>
-      <TransactionsContent data={transactions} totalPages={txTotalPages} currentPage={txPage} setPage={setTxPage} txQuery={txQuery} setTxQuery={setTxQuery} metrics={metrics} transactions={transactions} transactionsLength={totalTransactions} />
+    <AdminLayout
+      active="transactions"
+      setActive={() => { }}
+      adminEmailState={localStorage.getItem("adminEmail") || "admin@email.com"}
+      handleLogout={() => { }}
+    >
+      <TransactionsContent
+        data={transactions}
+        totalPages={txTotalPages}
+        currentPage={txPage}
+        setPage={setTxPage}
+        txQuery={txQuery}
+        setTxQuery={setTxQuery}
+        metrics={metrics}
+        transactionsLength={totalTransactions}
+        onRefresh={handleRefresh}
+      />
     </AdminLayout>
-  )
+  );
 }

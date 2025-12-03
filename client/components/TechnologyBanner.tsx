@@ -24,7 +24,10 @@ const technologies = [
 
 export default function TechnologyBanner() {
   return (
-    <section id="technology" className="py-20 bg-gradient-section relative overflow-hidden">
+    <section
+      id="technology"
+      className="py-20 bg-gradient-section relative overflow-hidden"
+    >
       <div className="container mx-auto px-4 relative z-10">
         <motion.div
           initial={{ opacity: 0, y: 30 }}
@@ -37,7 +40,8 @@ export default function TechnologyBanner() {
             CÔNG NGHỆ ĐỈNH CAO
           </h2>
           <p className="text-xl text-gray-300 max-w-2xl mx-auto">
-            CineSphere mang đến trải nghiệm nhập vai chưa từng có với hệ thống mô phỏng 6D hiện đại nhất.
+            CineSphere mang đến trải nghiệm nhập vai chưa từng có với hệ thống
+            mô phỏng 6D hiện đại nhất.
           </p>
         </motion.div>
 
@@ -53,13 +57,17 @@ export default function TechnologyBanner() {
                 transition={{ duration: 0.6, delay: index * 0.2 }}
                 className="bg-black/40 backdrop-blur-sm rounded-xl p-8 border border-white/10 hover:border-white/30 transition-all duration-300 hover:shadow-xl hover:shadow-blue-500/20 hover:-translate-y-2"
               >
-                <div className={`w-16 h-16 rounded-full bg-gradient-to-br ${tech.color} flex items-center justify-center mb-6 mx-auto shadow-lg`}>
+                <div
+                  className={`w-16 h-16 rounded-full bg-gradient-to-br ${tech.color} flex items-center justify-center mb-6 mx-auto shadow-lg`}
+                >
                   <Icon className="h-8 w-8 text-white" />
                 </div>
                 <h3 className="text-xl font-semibold text-white mb-3 text-center">
                   {tech.title}
                 </h3>
-                <p className="text-gray-400 text-center leading-relaxed">{tech.description}</p>
+                <p className="text-gray-400 text-center leading-relaxed">
+                  {tech.description}
+                </p>
               </motion.div>
             );
           })}

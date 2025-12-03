@@ -62,11 +62,11 @@ model showtimes {
   id         Int        @id @default(autoincrement())
   movie_id   Int
   start_time DateTime
-  end_time   DateTime?
   price      Decimal    @db.Decimal(10, 2)
-  total_sold Int        @default(0)
   created_at DateTime   @default(now())
   updated_at DateTime   @default(now())
+  total_sold Int        @default(0)
+  end_time   DateTime?
   bookings   bookings[]
   movie      movies     @relation(fields: [movie_id], references: [id], onDelete: Cascade)
 }
@@ -88,13 +88,13 @@ model bookings {
 }
 
 model toys {
-  id          Int      @id @default(autoincrement())
-  name        String   @db.VarChar(255)
-  category    String?  @db.VarChar(100)
-  price       Decimal  @db.Decimal(10, 2)
-  stock       Int      @default(0)
-  status      String   @default("active") @db.VarChar(20)
-  image_url   String?
-  created_at  DateTime @default(now())
-  updated_at  DateTime @default(now())
+  id         Int      @id @default(autoincrement())
+  name       String   @db.VarChar(255)
+  category   String?  @db.VarChar(100)
+  price      Decimal  @db.Decimal(10, 2)
+  stock      Int      @default(0)
+  status     String   @default("active") @db.VarChar(20)
+  image_url  String?
+  created_at DateTime @default(now())
+  updated_at DateTime @default(now())
 }

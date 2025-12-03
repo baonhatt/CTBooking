@@ -1,4 +1,9 @@
-import { forgetPassApi, loginApi, registerApi, resetPasswordApi } from "@/lib/api";
+import {
+  forgetPassApi,
+  loginApi,
+  registerApi,
+  resetPasswordApi,
+} from "@/lib/api";
 
 export function useAuth() {
   async function login(email: string, password: string) {

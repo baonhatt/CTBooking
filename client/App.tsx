@@ -5,7 +5,13 @@ import { createRoot } from "react-dom/client";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route, useNavigate, Navigate } from "react-router-dom";
+import {
+  BrowserRouter,
+  Routes,
+  Route,
+  useNavigate,
+  Navigate,
+} from "react-router-dom";
 import Index from "./pages/Index";
 import NotFound from "./pages/NotFound";
 import ConfirmToken from "./components/ConfirmToken";
@@ -48,8 +54,8 @@ const AdminLoginView = () => {
       setError("");
       // const { token } = await adminLoginApi({ email, password });
       // localStorage.setItem("adminToken", token);
-      if (email === 'admin@email.com' && password === 'admin') {
-        localStorage.setItem("adminToken", 'adminToken');
+      if (email === "admin@email.com" && password === "admin") {
+        localStorage.setItem("adminToken", "adminToken");
       } else {
         setError("Đăng nhập thất bại");
         return;
@@ -73,11 +79,18 @@ const AdminLoginView = () => {
             <form onSubmit={handleLogin}>
               <div>
                 <Label>Email</Label>
-                <Input value={email} onChange={(e) => setEmail(e.target.value)} />
+                <Input
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                />
               </div>
               <div>
                 <Label>Mật khẩu</Label>
-                <Input type="password" value={password} onChange={(e) => setPassword(e.target.value)} />
+                <Input
+                  type="password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                />
               </div>
               {error && <div className="text-red-500 text-sm">{error}</div>}
               <div className="flex justify-end">
@@ -94,9 +107,12 @@ const AdminLoginView = () => {
 };
 
 const AdminGate = () => {
-  const [hasToken, setHasToken] = useState<boolean>(!!localStorage.getItem("adminToken"));
+  const [hasToken, setHasToken] = useState<boolean>(
+    !!localStorage.getItem("adminToken"),
+  );
   useEffect(() => {
-    const onAuthChanged = () => setHasToken(!!localStorage.getItem("adminToken"));
+    const onAuthChanged = () =>
+      setHasToken(!!localStorage.getItem("adminToken"));
     window.addEventListener("admin-auth-changed", onAuthChanged as any);
     window.addEventListener("storage", onAuthChanged as any);
     return () => {

@@ -16,14 +16,20 @@ import { getAllActiveMoviesToday } from "@/lib/api";
 export default function HeroSection() {
   const [api, setApi] = useState<CarouselApi | null>(null);
   const [currentIndex, setCurrentIndex] = useState(0);
-  const { data } = useQuery({ queryKey: ["activeMovies", "today"], queryFn: ({ signal }) => getAllActiveMoviesToday({ signal }) });
+  const { data } = useQuery({
+    queryKey: ["activeMovies", "today"],
+    queryFn: ({ signal }) => getAllActiveMoviesToday({ signal }),
+  });
   const movies = (data?.activeMovies || []).map((m) => {
     let genres: string[] = [];
     try {
       const parsed = JSON.parse(m.genres);
       if (Array.isArray(parsed)) genres = parsed as string[];
     } catch {}
-    const id = m.title.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
+    const id = m.title
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-+|-+$/g, "");
     const year = new Date(m.release_date as any).getFullYear();
     return {
       id,
@@ -56,11 +62,21 @@ export default function HeroSection() {
   }, [api]);
 
   return (
-    <section id="hero" className="relative min-h-[70vh] md:min-h-screen bg-gradient-dark overflow-hidden">
-      <Carousel setApi={setApi} opts={{ loop: true }} className="w-full h-[70vh] md:h-screen">
+    <section
+      id="hero"
+      className="relative min-h-[70vh] md:min-h-screen bg-gradient-dark overflow-hidden"
+    >
+      <Carousel
+        setApi={setApi}
+        opts={{ loop: true }}
+        className="w-full h-[70vh] md:h-screen"
+      >
         <CarouselContent>
           {displayMovies.map((m, idx) => (
-            <CarouselItem key={m.id} className="relative h-screen flex items-center">
+            <CarouselItem
+              key={m.id}
+              className="relative h-screen flex items-center"
+            >
               <div className="absolute inset-0">
                 <motion.img
                   key={idx}
@@ -86,7 +102,9 @@ export default function HeroSection() {
                     transition={{ delay: 0.2, duration: 0.5 }}
                     className="inline-block mb-6 px-6 py-2 border-2 border-blue-400/50 rounded-lg bg-black/30 backdrop-blur-sm"
                   >
-                    <span className="text-blue-400 font-semibold tracking-wider">NOW SHOWING</span>
+                    <span className="text-blue-400 font-semibold tracking-wider">
+                      NOW SHOWING
+                    </span>
                   </motion.div>
                   <motion.h1
                     initial={{ opacity: 0, y: 30 }}
@@ -104,12 +122,18 @@ export default function HeroSection() {
                   >
                     <div className="flex items-center gap-2">
                       <Star className="h-5 w-5 text-yellow-400 fill-yellow-400" />
-                      <span className="text-xl font-semibold text-white">4.8</span>
+                      <span className="text-xl font-semibold text-white">
+                        4.8
+                      </span>
                     </div>
                     <span className="text-gray-300">•</span>
                     <span className="text-lg text-white">{m.duration}</span>
                     <span className="text-gray-300">•</span>
-                    <span className="text-lg text-purple-400 font-medium">{Array.isArray((m as any).genres) ? (m as any).genres.join(" / ") : (m as any).genres}</span>
+                    <span className="text-lg text-purple-400 font-medium">
+                      {Array.isArray((m as any).genres)
+                        ? (m as any).genres.join(" / ")
+                        : (m as any).genres}
+                    </span>
                   </motion.div>
                 </motion.div>
               </div>
@@ -128,7 +152,9 @@ export default function HeroSection() {
               onClick={() => api?.scrollTo(index)}
               className={cn(
                 "w-2 h-2 rounded-full transition-all duration-300",
-                index === currentIndex ? "w-8 bg-blue-400" : "bg-gray-600 hover:bg-gray-500",
+                index === currentIndex
+                  ? "w-8 bg-blue-400"
+                  : "bg-gray-600 hover:bg-gray-500",
               )}
             />
           ))}

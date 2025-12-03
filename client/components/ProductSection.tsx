@@ -11,12 +11,23 @@ export default function ProductSection() {
     (async () => {
       try {
         const { items } = await getActiveToys();
-        setProducts(items.map((t: any) => ({ id: t.id, name: t.name, category: t.category || "TOY", price: Number(t.price), image: t.image_url })));
+        setProducts(
+          items.map((t: any) => ({
+            id: t.id,
+            name: t.name,
+            category: t.category || "TOY",
+            price: Number(t.price),
+            image: t.image_url,
+          })),
+        );
       } catch {}
     })();
   }, []);
   return (
-    <section id="products" className="py-20 bg-gradient-section relative overflow-hidden">
+    <section
+      id="products"
+      className="py-20 bg-gradient-section relative overflow-hidden"
+    >
       <div className="container mx-auto px-4 relative z-10">
         <div className="flex items-center justify-between mb-12">
           <motion.div
@@ -28,9 +39,11 @@ export default function ProductSection() {
             <h2 className="text-4xl md:text-5xl font-bold text-white mb-2">
               CINESPHERE STORE
             </h2>
-            <p className="text-xl text-gray-300">Mang trải nghiệm về nhà cùng bạn</p>
+            <p className="text-xl text-gray-300">
+              Mang trải nghiệm về nhà cùng bạn
+            </p>
           </motion.div>
-          
+
           <motion.button
             initial={{ opacity: 0, x: 50 }}
             whileInView={{ opacity: 1, x: 0 }}
@@ -69,7 +82,9 @@ export default function ProductSection() {
                   </div>
                 </div>
                 <CardContent className="p-6">
-                  <h3 className="text-xl font-semibold text-white mb-2">{product.name}</h3>
+                  <h3 className="text-xl font-semibold text-white mb-2">
+                    {product.name}
+                  </h3>
                   <div className="flex items-center justify-between">
                     <span className="text-2xl font-bold text-white">
                       {product.price.toLocaleString("vi-VN")}₫

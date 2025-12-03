@@ -17,14 +17,27 @@ import {
   SelectItem,
 } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
-import { Ticket, Users, UserCheck, CreditCard, Clock, Check, Loader2 } from "lucide-react";
+import {
+  Ticket,
+  Users,
+  UserCheck,
+  CreditCard,
+  Clock,
+  Check,
+  Loader2,
+} from "lucide-react";
 import { Radio, Space, Steps } from "antd";
 import { motion } from "framer-motion";
 import type { RadioChangeEvent } from "antd";
 import { useQuery } from "@tanstack/react-query";
 import { getAllActiveMoviesToday } from "@/lib/api";
 import { toast } from "@/components/ui/use-toast";
-import { createMomoPaymentApi, createVnpayPaymentApi, API_BASE_URL, createBookingApi } from "@/lib/api";
+import {
+  createMomoPaymentApi,
+  createVnpayPaymentApi,
+  API_BASE_URL,
+  createBookingApi,
+} from "@/lib/api";
 
 interface BookingSectionProps {
   onBookClick: () => void;
@@ -63,10 +76,18 @@ export default function BookingSection({ onBookClick }: BookingSectionProps) {
   const [countdown, setCountdown] = useState(600); // 10 minutes in seconds
   const timerRef = useRef<NodeJS.Timeout | null>(null);
   const countdownRef = useRef<NodeJS.Timeout | null>(null);
-  const { data: activeData } = useQuery({ queryKey: ["activeMovies", "today"], queryFn: () => getAllActiveMoviesToday() });
-  const movies = (activeData?.activeMovies || []).map((m: any) => ({ id: m.title, title: m.title }));
+  const { data: activeData } = useQuery({
+    queryKey: ["activeMovies", "today"],
+    queryFn: () => getAllActiveMoviesToday(),
+  });
+  const movies = (activeData?.activeMovies || []).map((m: any) => ({
+    id: m.title,
+    title: m.title,
+  }));
   const activeMoviesFull = activeData?.activeMovies || [];
-  const [selectedShowtimeId, setSelectedShowtimeId] = useState<number | null>(null);
+  const [selectedShowtimeId, setSelectedShowtimeId] = useState<number | null>(
+    null,
+  );
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [currentStep, setCurrentStep] = useState<number>(0);
 
@@ -76,7 +97,6 @@ export default function BookingSection({ onBookClick }: BookingSectionProps) {
       if (countdownRef.current) clearTimeout(countdownRef.current);
     };
   }, []);
-
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -89,8 +109,10 @@ export default function BookingSection({ onBookClick }: BookingSectionProps) {
         let pending: any = {};
         if (extraDataParam) {
           try {
-            pending = JSON.parse(decodeURIComponent(escape(atob(extraDataParam))));
-          } catch { }
+            pending = JSON.parse(
+              decodeURIComponent(escape(atob(extraDataParam))),
+            );
+          } catch {}
         }
         if (!pending || Object.keys(pending).length === 0) {
           const pendingStr = localStorage.getItem("pendingOrder");
@@ -108,7 +130,7 @@ export default function BookingSection({ onBookClick }: BookingSectionProps) {
         setIsModalOpen(false);
         setIsProcessing(false);
         localStorage.removeItem("pendingOrder");
-      } catch { }
+      } catch {}
       window.history.replaceState({}, document.title, window.location.pathname);
     }
   }, []);
@@ -116,7 +138,11 @@ export default function BookingSection({ onBookClick }: BookingSectionProps) {
   const handleOpenModal = () => {
     const raw = localStorage.getItem("authUser");
     if (!raw) {
-      toast({ title: "Vui lòng đăng nhập", description: "Bạn cần đăng nhập trước khi đặt vé", variant: "default" });
+      toast({
+        title: "Vui lòng đăng nhập",
+        description: "Bạn cần đăng nhập trước khi đặt vé",
+        variant: "default",
+      });
       window.dispatchEvent(new Event("open-login"));
       return;
     }
@@ -149,8 +175,17 @@ export default function BookingSection({ onBookClick }: BookingSectionProps) {
   };
 
   const isFormDirty = () => {
-    const defaults = { name: "", phone: "", email: "", ticketType: "standard", quantity: 1, movie: "" };
-    const changed = Object.keys(defaults).some((k) => (formData as any)[k] !== (defaults as any)[k]);
+    const defaults = {
+      name: "",
+      phone: "",
+      email: "",
+      ticketType: "standard",
+      quantity: 1,
+      movie: "",
+    };
+    const changed = Object.keys(defaults).some(
+      (k) => (formData as any)[k] !== (defaults as any)[k],
+    );
     return changed || Object.keys(errors).length > 0 || isProcessing;
   };
 
@@ -165,9 +200,13 @@ export default function BookingSection({ onBookClick }: BookingSectionProps) {
   const disableOutOfRangeDate = (current: any) => {
     if (!current) return false;
     const d: Date = current.toDate();
-    const movieDetail = activeMoviesFull.find((x: any) => x.title === formData.movie);
+    const movieDetail = activeMoviesFull.find(
+      (x: any) => x.title === formData.movie,
+    );
     const sts = movieDetail?.showtimes || [];
-    const set = new Set(sts.map((s: any) => new Date(s.start_time).toDateString()));
+    const set = new Set(
+      sts.map((s: any) => new Date(s.start_time).toDateString()),
+    );
     return !set.has(d.toDateString());
   };
 
@@ -176,15 +215,24 @@ export default function BookingSection({ onBookClick }: BookingSectionProps) {
     const nextErrors: Record<string, string> = {};
     if (currentStep === 0) {
       if (!formData.movie) nextErrors.movie = "Vui lòng chọn phim";
-      if (!formData.name || formData.name.trim().length < 2) nextErrors.name = "Họ tên chưa hợp lệ";
-      if (!/^[0-9]{9,11}$/.test(formData.phone)) nextErrors.phone = "Số điện thoại 9-11 chữ số";
-      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) nextErrors.email = "Email chưa hợp lệ";
-      if (formData.quantity < 1 || formData.quantity > 10) nextErrors.quantity = "Số lượng từ 1 đến 10";
+      if (!formData.name || formData.name.trim().length < 2)
+        nextErrors.name = "Họ tên chưa hợp lệ";
+      if (!/^[0-9]{9,11}$/.test(formData.phone))
+        nextErrors.phone = "Số điện thoại 9-11 chữ số";
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email))
+        nextErrors.email = "Email chưa hợp lệ";
+      if (formData.quantity < 1 || formData.quantity > 10)
+        nextErrors.quantity = "Số lượng từ 1 đến 10";
       if (!formData.date) nextErrors.date = "Vui lòng chọn ngày";
-      if (!formData.showtime || !selectedShowtimeId) nextErrors.showtime = "Vui lòng chọn giờ";
+      if (!formData.showtime || !selectedShowtimeId)
+        nextErrors.showtime = "Vui lòng chọn giờ";
       if (Object.keys(nextErrors).length) {
         setErrors(nextErrors);
-        toast({ title: "Thông tin chưa hợp lệ", description: "Vui lòng kiểm tra lại các trường", variant: "destructive" });
+        toast({
+          title: "Thông tin chưa hợp lệ",
+          description: "Vui lòng kiểm tra lại các trường",
+          variant: "destructive",
+        });
         return;
       }
       setErrors({});
@@ -193,7 +241,11 @@ export default function BookingSection({ onBookClick }: BookingSectionProps) {
     }
     if (currentStep === 1) {
       if (!paymentMethod) {
-        toast({ title: "Chọn phương thức", description: "Vui lòng chọn phương thức thanh toán", variant: "destructive" });
+        toast({
+          title: "Chọn phương thức",
+          description: "Vui lòng chọn phương thức thanh toán",
+          variant: "destructive",
+        });
         return;
       }
       setCurrentStep(2);
@@ -201,10 +253,16 @@ export default function BookingSection({ onBookClick }: BookingSectionProps) {
     }
     if (currentStep === 2) {
       const orderId = `ORDER_${Date.now()}`;
-      const movieDetail = activeMoviesFull.find((x: any) => x.title === formData.movie);
+      const movieDetail = activeMoviesFull.find(
+        (x: any) => x.title === formData.movie,
+      );
       const authRaw = localStorage.getItem("authUser");
       if (!authRaw) {
-        toast({ title: "Vui lòng đăng nhập", description: "Bạn cần đăng nhập trước khi thanh toán", variant: "destructive" });
+        toast({
+          title: "Vui lòng đăng nhập",
+          description: "Bạn cần đăng nhập trước khi thanh toán",
+          variant: "destructive",
+        });
         window.dispatchEvent(new Event("open-login"));
         return;
       }
@@ -218,7 +276,9 @@ export default function BookingSection({ onBookClick }: BookingSectionProps) {
       const summary = {
         orderId,
         movie: selectedMovie?.title,
-        dateDisplay: formData.date ? formData.date.toLocaleDateString("vi-VN") : "",
+        dateDisplay: formData.date
+          ? formData.date.toLocaleDateString("vi-VN")
+          : "",
         showtime: formData.showtime,
         showtimeId: selectedShowtimeId,
         name: authName,
@@ -228,7 +288,9 @@ export default function BookingSection({ onBookClick }: BookingSectionProps) {
         amount: totalPrice,
         method: paymentMethod,
         poster: movieDetail?.cover_image || "",
-        duration: movieDetail?.duration_min ? `${movieDetail.duration_min} phút` : "",
+        duration: movieDetail?.duration_min
+          ? `${movieDetail.duration_min} phút`
+          : "",
         genres: movieDetail?.genres || "",
       };
       try {
@@ -240,12 +302,31 @@ export default function BookingSection({ onBookClick }: BookingSectionProps) {
           paymentMethod: paymentMethod as any,
           totalPrice,
         });
-        const extraDataEncoded = btoa(unescape(encodeURIComponent(JSON.stringify({ ...summary, booking_id: booking?.id, user_id: booking?.user_id }))));
-        const partnerCode = (import.meta as any).env?.VITE_MOMO_PARTNER_CODE || "";
-        const partnerName = (import.meta as any).env?.VITE_MOMO_PARTNER_NAME || "CineSphere";
-        const storeId = (import.meta as any).env?.VITE_MOMO_STORE_ID || "devstore";
-        const redirectUrl = (import.meta as any).env?.VITE_MOMO_REDIRECT_URL || window.location.origin + "/checkout";
-        const ipnUrl = (import.meta as any).env?.VITE_MOMO_IPN_URL || (API_BASE_URL ? API_BASE_URL + "/api/momo/ipn" : window.location.origin + "/api/momo/ipn");
+        const extraDataEncoded = btoa(
+          unescape(
+            encodeURIComponent(
+              JSON.stringify({
+                ...summary,
+                booking_id: booking?.id,
+                user_id: booking?.user_id,
+              }),
+            ),
+          ),
+        );
+        const partnerCode =
+          (import.meta as any).env?.VITE_MOMO_PARTNER_CODE || "";
+        const partnerName =
+          (import.meta as any).env?.VITE_MOMO_PARTNER_NAME || "CineSphere";
+        const storeId =
+          (import.meta as any).env?.VITE_MOMO_STORE_ID || "devstore";
+        const redirectUrl =
+          (import.meta as any).env?.VITE_MOMO_REDIRECT_URL ||
+          window.location.origin + "/checkout";
+        const ipnUrl =
+          (import.meta as any).env?.VITE_MOMO_IPN_URL ||
+          (API_BASE_URL
+            ? API_BASE_URL + "/api/momo/ipn"
+            : window.location.origin + "/api/momo/ipn");
         const accessKey = (import.meta as any).env?.VITE_MOMO_ACCESS_KEY || "";
         const secretKey = (import.meta as any).env?.VITE_MOMO_SECRET_KEY || "";
         const requestId = Date.now().toString();
@@ -267,7 +348,14 @@ export default function BookingSection({ onBookClick }: BookingSectionProps) {
           accessKey,
           secretKey,
         } as any;
-        localStorage.setItem("pendingOrder", JSON.stringify({ ...summary, booking_id: booking?.id, user_id: booking?.user_id }));
+        localStorage.setItem(
+          "pendingOrder",
+          JSON.stringify({
+            ...summary,
+            booking_id: booking?.id,
+            user_id: booking?.user_id,
+          }),
+        );
         const res = await createMomoPaymentApi(payload);
         if (res?.payUrl) {
           setIsModalOpen(false);
@@ -276,7 +364,11 @@ export default function BookingSection({ onBookClick }: BookingSectionProps) {
         }
         throw new Error("Không nhận được liên kết thanh toán MoMo");
       } catch (err: any) {
-        toast({ title: "Không thể tạo đặt vé", description: err?.message || "Vui lòng thử lại", variant: "destructive" });
+        toast({
+          title: "Không thể tạo đặt vé",
+          description: err?.message || "Vui lòng thử lại",
+          variant: "destructive",
+        });
         return;
       }
     }
@@ -318,15 +410,28 @@ export default function BookingSection({ onBookClick }: BookingSectionProps) {
                 transition={{ duration: 0.6, delay: 0.1 }}
                 className="rounded-2xl p-6 border border-white/10 text-left bg-black/30 backdrop-blur-sm hover:bg-gradient-to-br hover:from-cyan-900/40 hover:via-cyan-700/20 hover:to-fuchsia-800/40 hover:shadow-[0_0_35px_rgba(99,102,241,0.25)] transition-all duration-300"
               >
-                <div className="text-white font-semibold text-lg mb-3">Vé Tiêu Chuẩn</div>
+                <div className="text-white font-semibold text-lg mb-3">
+                  Vé Tiêu Chuẩn
+                </div>
                 <div className="text-4xl md:text-5xl font-extrabold text-cyan-400 mb-1">
                   {ticketPrice.toLocaleString("vi-VN")}₫
                 </div>
-                <div className="text-sm text-gray-300 mb-5">/ phim (10-15 phút)</div>
+                <div className="text-sm text-gray-300 mb-5">
+                  / phim (10-15 phút)
+                </div>
                 <ul className="space-y-2 mb-6">
-                  <li className="flex items-center gap-2 text-gray-100"><Check className="h-4 w-4 text-emerald-400" /> Ghế chuyển động 6D</li>
-                  <li className="flex items-center gap-2 text-gray-100"><Check className="h-4 w-4 text-emerald-400" /> Mắt kính 3D active</li>
-                  <li className="flex items-center gap-2 text-gray-100"><Check className="h-4 w-4 text-emerald-400" /> Hiệu ứng môi trường</li>
+                  <li className="flex items-center gap-2 text-gray-100">
+                    <Check className="h-4 w-4 text-emerald-400" /> Ghế chuyển
+                    động 6D
+                  </li>
+                  <li className="flex items-center gap-2 text-gray-100">
+                    <Check className="h-4 w-4 text-emerald-400" /> Mắt kính 3D
+                    active
+                  </li>
+                  <li className="flex items-center gap-2 text-gray-100">
+                    <Check className="h-4 w-4 text-emerald-400" /> Hiệu ứng môi
+                    trường
+                  </li>
                 </ul>
                 <Button
                   onClick={handleOpenModal}
@@ -344,10 +449,16 @@ export default function BookingSection({ onBookClick }: BookingSectionProps) {
                 className="bg-black/30 rounded-2xl p-6 border border-white/10 text-center"
               >
                 <Users className="h-8 w-8 text-gray-400 mx-auto mb-2" />
-                <div className="text-xl font-semibold text-white mb-1">Vé Nhóm</div>
+                <div className="text-xl font-semibold text-white mb-1">
+                  Vé Nhóm
+                </div>
                 <div className="text-sm text-gray-400 mb-2">Đang cập nhật</div>
-                <div className="text-xs text-gray-500 mb-6">Dành cho nhóm 4-6 người</div>
-                <Button disabled className="bg-gray-700/60 text-gray-300">Sắp ra mắt</Button>
+                <div className="text-xs text-gray-500 mb-6">
+                  Dành cho nhóm 4-6 người
+                </div>
+                <Button disabled className="bg-gray-700/60 text-gray-300">
+                  Sắp ra mắt
+                </Button>
               </motion.div>
 
               <motion.div
@@ -358,17 +469,22 @@ export default function BookingSection({ onBookClick }: BookingSectionProps) {
                 className="bg-black/30 rounded-2xl p-6 border border-white/10 text-center"
               >
                 <UserCheck className="h-8 w-8 text-gray-400 mx-auto mb-2" />
-                <div className="text-xl font-semibold text-white mb-1">Thành Viên</div>
+                <div className="text-xl font-semibold text-white mb-1">
+                  Thành Viên
+                </div>
                 <div className="text-sm text-gray-400 mb-2">Đang cập nhật</div>
-                <div className="text-xs text-gray-500 mb-6">Ưu đãi đặc biệt cho hội viên</div>
-                <Button disabled className="bg-gray-700/60 text-gray-300">Sắp ra mắt</Button>
+                <div className="text-xs text-gray-500 mb-6">
+                  Ưu đãi đặc biệt cho hội viên
+                </div>
+                <Button disabled className="bg-gray-700/60 text-gray-300">
+                  Sắp ra mắt
+                </Button>
               </motion.div>
             </div>
           </div>
         </div>
       </section>
       <Dialog
-
         open={isModalOpen}
         onOpenChange={(open) => {
           if (!open) {
@@ -383,7 +499,8 @@ export default function BookingSection({ onBookClick }: BookingSectionProps) {
           onInteractOutside={(e) => {
             e.preventDefault();
           }}
-          className="bg-gradient-dark border-cyan-400/30 shadow-[0_0_40px_rgba(34,211,238,0.25)] w-[95vw] sm:w-auto sm:max-w-md md:max-w-lg max-h-[90vh] p-4 sm:p-6 rounded-xl overflow-y-auto scrollbar-neon">
+          className="bg-gradient-dark border-cyan-400/30 shadow-[0_0_40px_rgba(34,211,238,0.25)] w-[95vw] sm:w-auto sm:max-w-md md:max-w-lg max-h-[90vh] p-4 sm:p-6 rounded-xl overflow-y-auto scrollbar-neon"
+        >
           <DialogHeader>
             <DialogTitle className="text-xl sm:text-2xl font-bold text-cyan-300">
               Đặt Vé CINESPHERE
@@ -394,25 +511,38 @@ export default function BookingSection({ onBookClick }: BookingSectionProps) {
           </DialogHeader>
 
           <form onSubmit={handleSubmit} className="space-y-4">
-            <div className="steps-white-text align-center [&_.ant-steps-item-title]:text-xs sm:[&_.ant-steps-item-title]:text-sm md:[&_.ant-steps-item-title]:text-base
+            <div
+              className="steps-white-text align-center [&_.ant-steps-item-title]:text-xs sm:[&_.ant-steps-item-title]:text-sm md:[&_.ant-steps-item-title]:text-base
                           [&_.ant-steps-item-description]:text-xs sm:[&_.ant-steps-item-description]:text-sm md:[&_.ant-steps-item-description]:text-base
-                          ">
+                          "
+            >
               <Steps
                 current={currentStep}
                 size="small"
                 onChange={(c) => {
-                  const isStep0Valid = (
+                  const isStep0Valid =
                     !!formData.movie &&
-                    !!formData.name && formData.name.trim().length >= 2 &&
+                    !!formData.name &&
+                    formData.name.trim().length >= 2 &&
                     /^[0-9]{9,11}$/.test(formData.phone) &&
                     /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email) &&
-                    formData.quantity >= 1 && formData.quantity <= 10 &&
+                    formData.quantity >= 1 &&
+                    formData.quantity <= 10 &&
                     !!formData.date &&
-                    !!formData.showtime && !!selectedShowtimeId
-                  );
-                  if (c <= currentStep) { setCurrentStep(c); return; }
-                  if (currentStep === 0 && isStep0Valid) { setCurrentStep(1); return; }
-                  if (currentStep === 1 && !!paymentMethod) { setCurrentStep(2); return; }
+                    !!formData.showtime &&
+                    !!selectedShowtimeId;
+                  if (c <= currentStep) {
+                    setCurrentStep(c);
+                    return;
+                  }
+                  if (currentStep === 0 && isStep0Valid) {
+                    setCurrentStep(1);
+                    return;
+                  }
+                  if (currentStep === 1 && !!paymentMethod) {
+                    setCurrentStep(2);
+                    return;
+                  }
                 }}
                 className="[&_.ant-steps-item-title]:text-white [&_.ant-steps-item-description]:text-white/70"
                 items={[
@@ -424,18 +554,32 @@ export default function BookingSection({ onBookClick }: BookingSectionProps) {
             </div>
             {currentStep === 0 && (
               <div className="space-y-2">
-                <Label htmlFor="movie" className="text-white text-sm sm:text-base">
+                <Label
+                  htmlFor="movie"
+                  className="text-white text-sm sm:text-base"
+                >
                   Chọn Phim *
                 </Label>
-                <motion.div animate={errors.movie ? { x: [0, -6, 6, -6, 6, 0] } : {}} transition={{ duration: 0.35 }}>
+                <motion.div
+                  animate={errors.movie ? { x: [0, -6, 6, -6, 6, 0] } : {}}
+                  transition={{ duration: 0.35 }}
+                >
                   <Select
                     value={formData.movie}
                     onValueChange={(value) => {
-                      setFormData({ ...formData, movie: value, date: new Date(), showtime: "" });
+                      setFormData({
+                        ...formData,
+                        movie: value,
+                        date: new Date(),
+                        showtime: "",
+                      });
                       setSelectedShowtimeId(null);
                     }}
                   >
-                    <SelectTrigger disabled={isProcessing} className={`bg-black/40 text-white h-10 sm:h-11 ${errors.movie ? "border-yellow-400" : "border-cyan-400/40"} ${errors.movie ? "focus:ring-yellow-400" : "focus:ring-cyan-400"}`}>
+                    <SelectTrigger
+                      disabled={isProcessing}
+                      className={`bg-black/40 text-white h-10 sm:h-11 ${errors.movie ? "border-yellow-400" : "border-cyan-400/40"} ${errors.movie ? "focus:ring-yellow-400" : "focus:ring-cyan-400"}`}
+                    >
                       <SelectValue placeholder="Chọn phim" />
                     </SelectTrigger>
                     <SelectContent>
@@ -449,43 +593,116 @@ export default function BookingSection({ onBookClick }: BookingSectionProps) {
                 </motion.div>
                 {selectedMovie && (
                   <div className="flex items-center gap-3 mt-2 p-2 rounded-lg bg-black/30 border border-white/10">
-                    <img src={(activeMoviesFull.find((x: any) => x.title === selectedMovie.title)?.cover_image) || ""} alt={selectedMovie.title} className="w-10 h-10 sm:w-12 sm:h-12 rounded object-cover" />
+                    <img
+                      src={
+                        activeMoviesFull.find(
+                          (x: any) => x.title === selectedMovie.title,
+                        )?.cover_image || ""
+                      }
+                      alt={selectedMovie.title}
+                      className="w-10 h-10 sm:w-12 sm:h-12 rounded object-cover"
+                    />
                     <div className="text-sm text-gray-300">
-                      <div className="font-semibold text-white">{selectedMovie.title}</div>
-                      <div className="text-cyan-300">{(activeMoviesFull.find((x: any) => x.title === selectedMovie.title)?.duration_min) ? `${(activeMoviesFull.find((x: any) => x.title === selectedMovie.title)?.duration_min)} phút` : ""}</div>
-                      <div className="text-fuchsia-400">{(activeMoviesFull.find((x: any) => x.title === selectedMovie.title)?.genres) || ""}</div>
+                      <div className="font-semibold text-white">
+                        {selectedMovie.title}
+                      </div>
+                      <div className="text-cyan-300">
+                        {activeMoviesFull.find(
+                          (x: any) => x.title === selectedMovie.title,
+                        )?.duration_min
+                          ? `${activeMoviesFull.find((x: any) => x.title === selectedMovie.title)?.duration_min} phút`
+                          : ""}
+                      </div>
+                      <div className="text-fuchsia-400">
+                        {activeMoviesFull.find(
+                          (x: any) => x.title === selectedMovie.title,
+                        )?.genres || ""}
+                      </div>
                     </div>
                   </div>
                 )}
-                {errors.movie && <div className="text-red-400 text-xs mt-1">{errors.movie}</div>}
+                {errors.movie && (
+                  <div className="text-red-400 text-xs mt-1">
+                    {errors.movie}
+                  </div>
+                )}
                 {selectedMovie && (
                   <div className="mt-4 grid gap-3">
-                    <Label className=" text-white text-sm sm:text-base">Chọn ngày</Label>
-                    <motion.div className={`flex flex-wrap gap-2 ${errors.date ? "ring-2 ring-yellow-400 rounded p-2" : ""}`} animate={errors.date ? { x: [0, -6, 6, -6, 6, 0] } : {}} transition={{ duration: 0.35 }}>
-                      {Array.from(new Set(((activeMoviesFull.find((x: any) => x.title === formData.movie)?.showtimes) || []).map((s: any) => new Date(s.start_time).toDateString()))).map((dateStr: string) => {
+                    <Label className=" text-white text-sm sm:text-base">
+                      Chọn ngày
+                    </Label>
+                    <motion.div
+                      className={`flex flex-wrap gap-2 ${errors.date ? "ring-2 ring-yellow-400 rounded p-2" : ""}`}
+                      animate={errors.date ? { x: [0, -6, 6, -6, 6, 0] } : {}}
+                      transition={{ duration: 0.35 }}
+                    >
+                      {Array.from(
+                        new Set(
+                          (
+                            activeMoviesFull.find(
+                              (x: any) => x.title === formData.movie,
+                            )?.showtimes || []
+                          ).map((s: any) =>
+                            new Date(s.start_time).toDateString(),
+                          ),
+                        ),
+                      ).map((dateStr: string) => {
                         const d = new Date(dateStr);
-                        const isActive = !!formData.date && formData.date.toDateString() === dateStr;
+                        const isActive =
+                          !!formData.date &&
+                          formData.date.toDateString() === dateStr;
                         return (
                           <Button
                             key={dateStr}
                             type="button"
                             variant={isActive ? "default" : "outline"}
-                            className={isActive ? "bg-blue-600 text-white" : "border-gray-300 text-gray-900"}
+                            className={
+                              isActive
+                                ? "bg-blue-600 text-white"
+                                : "border-gray-300 text-gray-900"
+                            }
                             disabled={isProcessing}
-                            onClick={() => { setFormData({ ...formData, date: d, showtime: "" }); setSelectedShowtimeId(null); }}
+                            onClick={() => {
+                              setFormData({
+                                ...formData,
+                                date: d,
+                                showtime: "",
+                              });
+                              setSelectedShowtimeId(null);
+                            }}
                           >
                             {d.toLocaleDateString("vi-VN")}
                           </Button>
                         );
                       })}
                     </motion.div>
-                    {errors.date && <div className="text-red-500 text-xs">{errors.date}</div>}
+                    {errors.date && (
+                      <div className="text-red-500 text-xs">{errors.date}</div>
+                    )}
                     {formData.date && (
                       <div className="mt-2">
-                        <Label className="text-white text-sm sm:text-base">Giờ chiếu</Label>
-                        <motion.div className={`flex flex-wrap gap-2 mt-2 ${errors.showtime ? "ring-2 ring-yellow-400 rounded p-2" : ""}`} animate={errors.showtime ? { x: [0, -6, 6, -6, 6, 0] } : {}} transition={{ duration: 0.35 }}>
-                          {(activeMoviesFull.find((x: any) => x.title === formData.movie)?.showtimes || [])
-                            .filter((st: any) => new Date(st.start_time).toDateString() === (formData.date ? formData.date.toDateString() : ""))
+                        <Label className="text-white text-sm sm:text-base">
+                          Giờ chiếu
+                        </Label>
+                        <motion.div
+                          className={`flex flex-wrap gap-2 mt-2 ${errors.showtime ? "ring-2 ring-yellow-400 rounded p-2" : ""}`}
+                          animate={
+                            errors.showtime ? { x: [0, -6, 6, -6, 6, 0] } : {}
+                          }
+                          transition={{ duration: 0.35 }}
+                        >
+                          {(
+                            activeMoviesFull.find(
+                              (x: any) => x.title === formData.movie,
+                            )?.showtimes || []
+                          )
+                            .filter(
+                              (st: any) =>
+                                new Date(st.start_time).toDateString() ===
+                                (formData.date
+                                  ? formData.date.toDateString()
+                                  : ""),
+                            )
                             .map((st: any) => {
                               const t = new Date(st.start_time);
                               const label = `${t.getHours().toString().padStart(2, "0")}:${t.getMinutes().toString().padStart(2, "0")}`;
@@ -495,16 +712,30 @@ export default function BookingSection({ onBookClick }: BookingSectionProps) {
                                   key={st.id}
                                   type="button"
                                   variant={isActive ? "default" : "outline"}
-                                  className={isActive ? "bg-blue-600 text-white" : "border-gray-300 text-gray-900"}
+                                  className={
+                                    isActive
+                                      ? "bg-blue-600 text-white"
+                                      : "border-gray-300 text-gray-900"
+                                  }
                                   disabled={isProcessing}
-                                  onClick={() => { setFormData({ ...formData, showtime: label }); setSelectedShowtimeId(st.id); }}
+                                  onClick={() => {
+                                    setFormData({
+                                      ...formData,
+                                      showtime: label,
+                                    });
+                                    setSelectedShowtimeId(st.id);
+                                  }}
                                 >
                                   {label}
                                 </Button>
-                              )
+                              );
                             })}
                         </motion.div>
-                        {errors.showtime && <div className="text-red-500 text-xs mt-1">{errors.showtime}</div>}
+                        {errors.showtime && (
+                          <div className="text-red-500 text-xs mt-1">
+                            {errors.showtime}
+                          </div>
+                        )}
                       </div>
                     )}
                   </div>
@@ -513,10 +744,16 @@ export default function BookingSection({ onBookClick }: BookingSectionProps) {
             )}
             {currentStep === 0 && (
               <div className="space-y-2">
-                <Label htmlFor="name" className="text-white text-sm sm:text-base">
+                <Label
+                  htmlFor="name"
+                  className="text-white text-sm sm:text-base"
+                >
                   Họ và Tên *
                 </Label>
-                <motion.div animate={errors.name ? { x: [0, -6, 6, -6, 6, 0] } : {}} transition={{ duration: 0.35 }}>
+                <motion.div
+                  animate={errors.name ? { x: [0, -6, 6, -6, 6, 0] } : {}}
+                  transition={{ duration: 0.35 }}
+                >
                   <Input
                     id="name"
                     required
@@ -529,15 +766,23 @@ export default function BookingSection({ onBookClick }: BookingSectionProps) {
                     placeholder="Nhập họ và tên"
                   />
                 </motion.div>
-                {errors.name && <div className="text-red-400 text-xs mt-1">{errors.name}</div>}
+                {errors.name && (
+                  <div className="text-red-400 text-xs mt-1">{errors.name}</div>
+                )}
               </div>
             )}
             {currentStep === 0 && (
               <div className="space-y-2">
-                <Label htmlFor="phone" className="text-white text-sm sm:text-base">
+                <Label
+                  htmlFor="phone"
+                  className="text-white text-sm sm:text-base"
+                >
                   Số Điện Thoại *
                 </Label>
-                <motion.div animate={errors.phone ? { x: [0, -6, 6, -6, 6, 0] } : {}} transition={{ duration: 0.35 }}>
+                <motion.div
+                  animate={errors.phone ? { x: [0, -6, 6, -6, 6, 0] } : {}}
+                  transition={{ duration: 0.35 }}
+                >
                   <Input
                     id="phone"
                     type="tel"
@@ -551,15 +796,25 @@ export default function BookingSection({ onBookClick }: BookingSectionProps) {
                     placeholder="Nhập số điện thoại"
                   />
                 </motion.div>
-                {errors.phone && <div className="text-red-400 text-xs mt-1">{errors.phone}</div>}
+                {errors.phone && (
+                  <div className="text-red-400 text-xs mt-1">
+                    {errors.phone}
+                  </div>
+                )}
               </div>
             )}
             {currentStep === 0 && (
               <div className="space-y-2">
-                <Label htmlFor="email" className="text-white text-sm sm:text-base">
+                <Label
+                  htmlFor="email"
+                  className="text-white text-sm sm:text-base"
+                >
                   Email *
                 </Label>
-                <motion.div animate={errors.email ? { x: [0, -6, 6, -6, 6, 0] } : {}} transition={{ duration: 0.35 }}>
+                <motion.div
+                  animate={errors.email ? { x: [0, -6, 6, -6, 6, 0] } : {}}
+                  transition={{ duration: 0.35 }}
+                >
                   <Input
                     id="email"
                     type="email"
@@ -573,16 +828,43 @@ export default function BookingSection({ onBookClick }: BookingSectionProps) {
                     placeholder="Nhập email"
                   />
                 </motion.div>
-                {errors.email && <div className="text-red-400 text-xs mt-1">{errors.email}</div>}
+                {errors.email && (
+                  <div className="text-red-400 text-xs mt-1">
+                    {errors.email}
+                  </div>
+                )}
               </div>
             )}
             {currentStep === 0 && (
               <div className="space-y-2">
                 <div className="flex items-center justify-between gap-3">
-                  <Label htmlFor="quantity" className="text-white text-sm sm:text-base">Số Lượng Vé *</Label>
+                  <Label
+                    htmlFor="quantity"
+                    className="text-white text-sm sm:text-base"
+                  >
+                    Số Lượng Vé *
+                  </Label>
                   <div className="flex items-center gap-2">
-                    <Button disabled={isProcessing} type="button" variant="outline" className="h-10 w-10 border-cyan-400/40 hover:bg-cyan-500/10" onClick={() => setFormData({ ...formData, quantity: Math.max(1, formData.quantity - 1) })}>-</Button>
-                    <motion.div animate={errors.quantity ? { x: [0, -6, 6, -6, 6, 0] } : {}} transition={{ duration: 0.35 }}>
+                    <Button
+                      disabled={isProcessing}
+                      type="button"
+                      variant="outline"
+                      className="h-10 w-10 border-cyan-400/40 hover:bg-cyan-500/10"
+                      onClick={() =>
+                        setFormData({
+                          ...formData,
+                          quantity: Math.max(1, formData.quantity - 1),
+                        })
+                      }
+                    >
+                      -
+                    </Button>
+                    <motion.div
+                      animate={
+                        errors.quantity ? { x: [0, -6, 6, -6, 6, 0] } : {}
+                      }
+                      transition={{ duration: 0.35 }}
+                    >
                       <Input
                         id="quantity"
                         type="number"
@@ -593,17 +875,37 @@ export default function BookingSection({ onBookClick }: BookingSectionProps) {
                         onChange={(e) =>
                           setFormData({
                             ...formData,
-                            quantity: Math.min(10, Math.max(1, parseInt(e.target.value) || 1)),
+                            quantity: Math.min(
+                              10,
+                              Math.max(1, parseInt(e.target.value) || 1),
+                            ),
                           })
                         }
                         disabled={isProcessing}
                         className={`w-20 sm:w-24 bg-black/40 text-white text-center h-10 sm:h-11 ${errors.quantity ? "border-yellow-400 ring-1 ring-yellow-300" : "border-cyan-400/40"} ${errors.quantity ? "focus-visible:ring-yellow-400" : "focus-visible:ring-cyan-400"}`}
                       />
                     </motion.div>
-                    <Button disabled={isProcessing} type="button" variant="outline" className="h-10 w-10 border-cyan-400/40 hover:bg-cyan-500/10" onClick={() => setFormData({ ...formData, quantity: Math.min(10, formData.quantity + 1) })}>+</Button>
+                    <Button
+                      disabled={isProcessing}
+                      type="button"
+                      variant="outline"
+                      className="h-10 w-10 border-cyan-400/40 hover:bg-cyan-500/10"
+                      onClick={() =>
+                        setFormData({
+                          ...formData,
+                          quantity: Math.min(10, formData.quantity + 1),
+                        })
+                      }
+                    >
+                      +
+                    </Button>
                   </div>
                 </div>
-                {errors.quantity && <div className="text-red-400 text-xs mt-1">{errors.quantity}</div>}
+                {errors.quantity && (
+                  <div className="text-red-400 text-xs mt-1">
+                    {errors.quantity}
+                  </div>
+                )}
               </div>
             )}
             {currentStep === 1 && (
@@ -644,24 +946,53 @@ export default function BookingSection({ onBookClick }: BookingSectionProps) {
             {currentStep === 2 && (
               <div className="space-y-4">
                 <div className="grid grid-cols-2 gap-2 text-sm">
-                  <span className="text-cyan-200">Phim</span><span className="font-medium text-white">{selectedMovie?.title}</span>
-                  <span className="text-cyan-200">Ngày</span><span className="font-medium text-white">{formData.date ? formData.date.toLocaleDateString("vi-VN") : ""}</span>
-                  <span className="text-cyan-200">Giờ</span><span className="font-medium text-white">{formData.showtime}</span>
-                  <span className="text-cyan-200">Họ tên</span><span className="font-medium text-white">{formData.name}</span>
-                  <span className="text-cyan-200">Số lượng</span><span className="font-medium text-white">{formData.quantity}</span>
-                  <span className="text-cyan-200">Thanh toán</span><span className="font-medium text-white">{paymentMethod === "momo" ? "MoMo" : "VNPay"}</span>
+                  <span className="text-cyan-200">Phim</span>
+                  <span className="font-medium text-white">
+                    {selectedMovie?.title}
+                  </span>
+                  <span className="text-cyan-200">Ngày</span>
+                  <span className="font-medium text-white">
+                    {formData.date
+                      ? formData.date.toLocaleDateString("vi-VN")
+                      : ""}
+                  </span>
+                  <span className="text-cyan-200">Giờ</span>
+                  <span className="font-medium text-white">
+                    {formData.showtime}
+                  </span>
+                  <span className="text-cyan-200">Họ tên</span>
+                  <span className="font-medium text-white">
+                    {formData.name}
+                  </span>
+                  <span className="text-cyan-200">Số lượng</span>
+                  <span className="font-medium text-white">
+                    {formData.quantity}
+                  </span>
+                  <span className="text-cyan-200">Thanh toán</span>
+                  <span className="font-medium text-white">
+                    {paymentMethod === "momo" ? "MoMo" : "VNPay"}
+                  </span>
                 </div>
               </div>
             )}
             <div className="bg-black/40 rounded-lg p-3 sm:p-4 border border-white/10">
               <div className="flex justify-between items-center mb-2">
-                <span className="text-white text-sm sm:text-base">Tổng Tiền:</span>
+                <span className="text-white text-sm sm:text-base">
+                  Tổng Tiền:
+                </span>
                 <span className="text-xl sm:text-2xl font-bold text-blue-400">
                   {totalPrice.toLocaleString("vi-VN")}₫
                 </span>
               </div>
               {selectedMovie && (
-                <div className="text-xs sm:text-sm text-cyan-200">{selectedMovie.title} • {(activeMoviesFull.find((x: any) => x.title === selectedMovie.title)?.duration_min) ? `${(activeMoviesFull.find((x: any) => x.title === selectedMovie.title)?.duration_min)} phút` : ""}</div>
+                <div className="text-xs sm:text-sm text-cyan-200">
+                  {selectedMovie.title} •{" "}
+                  {activeMoviesFull.find(
+                    (x: any) => x.title === selectedMovie.title,
+                  )?.duration_min
+                    ? `${activeMoviesFull.find((x: any) => x.title === selectedMovie.title)?.duration_min} phút`
+                    : ""}
+                </div>
               )}
             </div>
 
@@ -695,16 +1026,23 @@ export default function BookingSection({ onBookClick }: BookingSectionProps) {
               <Button
                 type="submit"
                 disabled={(() => {
-                  const isStep0Valid = (
+                  const isStep0Valid =
                     !!formData.movie &&
-                    !!formData.name && formData.name.trim().length >= 2 &&
+                    !!formData.name &&
+                    formData.name.trim().length >= 2 &&
                     /^[0-9]{9,11}$/.test(formData.phone) &&
                     /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email) &&
-                    formData.quantity >= 1 && formData.quantity <= 10 &&
+                    formData.quantity >= 1 &&
+                    formData.quantity <= 10 &&
                     !!formData.date &&
-                    !!formData.showtime && !!selectedShowtimeId
-                  );
-                  const canProceed = currentStep === 0 ? isStep0Valid : currentStep === 1 ? !!paymentMethod : true;
+                    !!formData.showtime &&
+                    !!selectedShowtimeId;
+                  const canProceed =
+                    currentStep === 0
+                      ? isStep0Valid
+                      : currentStep === 1
+                        ? !!paymentMethod
+                        : true;
                   return isProcessing || !canProceed;
                 })()}
                 className="flex-1 bg-gradient-to-r from-blue-500 to-purple-500 hover:from-blue-600 hover:to-purple-600 text-white h-10 sm:h-11"
@@ -714,8 +1052,10 @@ export default function BookingSection({ onBookClick }: BookingSectionProps) {
                     <Loader2 className="h-4 w-4 animate-spin" />
                     Đang xử lý...
                   </span>
+                ) : currentStep < 2 ? (
+                  "Tiếp tục"
                 ) : (
-                  currentStep < 2 ? "Tiếp tục" : "Xác nhận"
+                  "Xác nhận"
                 )}
               </Button>
             </div>
@@ -727,11 +1067,24 @@ export default function BookingSection({ onBookClick }: BookingSectionProps) {
         <DialogContent className="max-w-sm bg-black/80 border border-white/20">
           <DialogHeader>
             <DialogTitle className="text-white">Xác nhận đóng</DialogTitle>
-            <DialogDescription className="text-gray-300">Bạn có chắc muốn đóng form? Dữ liệu đang nhập sẽ bị mất.</DialogDescription>
+            <DialogDescription className="text-gray-300">
+              Bạn có chắc muốn đóng form? Dữ liệu đang nhập sẽ bị mất.
+            </DialogDescription>
           </DialogHeader>
           <div className="flex gap-3">
-            <Button variant="outline" className="flex-1" onClick={() => setIsConfirmOpen(false)}>Tiếp tục chỉnh sửa</Button>
-            <Button className="flex-1 bg-red-600 hover:bg-red-700" onClick={handleCloseModal}>Tiếp tục đóng</Button>
+            <Button
+              variant="outline"
+              className="flex-1"
+              onClick={() => setIsConfirmOpen(false)}
+            >
+              Tiếp tục chỉnh sửa
+            </Button>
+            <Button
+              className="flex-1 bg-red-600 hover:bg-red-700"
+              onClick={handleCloseModal}
+            >
+              Tiếp tục đóng
+            </Button>
           </div>
         </DialogContent>
       </Dialog>
@@ -739,29 +1092,61 @@ export default function BookingSection({ onBookClick }: BookingSectionProps) {
       <Dialog open={isResultOpen} onOpenChange={setIsResultOpen}>
         <DialogContent className="max-w-md bg-white text-black border border-gray-200">
           <DialogHeader>
-            <DialogTitle className="text-xl font-bold">Thông tin mua vé</DialogTitle>
-            <DialogDescription className="text-gray-600">Quét QR để thanh toán và lưu vé của bạn</DialogDescription>
+            <DialogTitle className="text-xl font-bold">
+              Thông tin mua vé
+            </DialogTitle>
+            <DialogDescription className="text-gray-600">
+              Quét QR để thanh toán và lưu vé của bạn
+            </DialogDescription>
           </DialogHeader>
           {orderInfo && (
             <div className="space-y-3">
               <div className="grid grid-cols-2 gap-2 text-sm">
-                <span className="text-gray-600">Phim</span><span className="font-medium">{orderInfo.movie}</span>
-                <span className="text-gray-600">Ngày</span><span className="font-medium">{orderInfo.dateDisplay}</span>
-                <span className="text-gray-600">Giờ</span><span className="font-medium">{orderInfo.showtime}</span>
-                <span className="text-gray-600">Họ tên</span><span className="font-medium">{orderInfo.name}</span>
-                <span className="text-gray-600">Số lượng</span><span className="font-medium">{orderInfo.quantity}</span>
-                <span className="text-gray-600">Thanh toán</span><span className="font-medium">{orderInfo.method === "momo" ? "MoMo" : "VNPay"}</span>
-                <span className="text-gray-600">Tổng tiền</span><span className="font-semibold text-blue-600">{orderInfo.amount.toLocaleString("vi-VN")}₫</span>
+                <span className="text-gray-600">Phim</span>
+                <span className="font-medium">{orderInfo.movie}</span>
+                <span className="text-gray-600">Ngày</span>
+                <span className="font-medium">{orderInfo.dateDisplay}</span>
+                <span className="text-gray-600">Giờ</span>
+                <span className="font-medium">{orderInfo.showtime}</span>
+                <span className="text-gray-600">Họ tên</span>
+                <span className="font-medium">{orderInfo.name}</span>
+                <span className="text-gray-600">Số lượng</span>
+                <span className="font-medium">{orderInfo.quantity}</span>
+                <span className="text-gray-600">Thanh toán</span>
+                <span className="font-medium">
+                  {orderInfo.method === "momo" ? "MoMo" : "VNPay"}
+                </span>
+                <span className="text-gray-600">Tổng tiền</span>
+                <span className="font-semibold text-blue-600">
+                  {orderInfo.amount.toLocaleString("vi-VN")}₫
+                </span>
               </div>
               <div className="flex items-center justify-center py-4">
-                {qrUrl && <img src={qrUrl} alt="QR thanh toán" className="rounded-md border" />}
+                {qrUrl && (
+                  <img
+                    src={qrUrl}
+                    alt="QR thanh toán"
+                    className="rounded-md border"
+                  />
+                )}
               </div>
               <div className="flex gap-3">
-                <Button variant="outline" className="flex-1" onClick={() => setIsResultOpen(false)}>Đóng</Button>
-                <Button className="flex-1 bg-blue-600 hover:bg-blue-700" onClick={() => {
-                  setIsResultOpen(false);
-                  handleCloseModal();
-                }}>Hoàn tất</Button>
+                <Button
+                  variant="outline"
+                  className="flex-1"
+                  onClick={() => setIsResultOpen(false)}
+                >
+                  Đóng
+                </Button>
+                <Button
+                  className="flex-1 bg-blue-600 hover:bg-blue-700"
+                  onClick={() => {
+                    setIsResultOpen(false);
+                    handleCloseModal();
+                  }}
+                >
+                  Hoàn tất
+                </Button>
               </div>
             </div>
           )}
@@ -770,4 +1155,3 @@ export default function BookingSection({ onBookClick }: BookingSectionProps) {
     </>
   );
 }
-
