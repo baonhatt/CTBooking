@@ -12,6 +12,8 @@
   },
   "scripts": {
     "dev": "vite",
+    "prebuild": "prisma generate",
+    "pretypecheck": "prisma generate",
     "build": "npm run build:client && npm run build:server",
     "build:client": "vite build",
     "build:server": "vite build --config vite.config.server.ts",
@@ -22,6 +24,7 @@
   },
   "dependencies": {
     "@ant-design/icons": "^6.1.0",
+    "@prisma/client": "^7.0.1",
     "@prisma/adapter-pg": "^7.0.1",
     "antd": "^6.0.0",
     "bcryptjs": "^3.0.3",
@@ -35,7 +38,6 @@
   },
   "devDependencies": {
     "@hookform/resolvers": "^5.2.1",
-    "@prisma/client": "^7.0.1",
     "@radix-ui/react-accordion": "^1.2.11",
     "@radix-ui/react-alert-dialog": "^1.1.14",
     "@radix-ui/react-aspect-ratio": "^1.1.7",

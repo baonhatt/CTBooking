@@ -12,6 +12,18 @@ export default function UsersPage() {
   const pageSize = 10;
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [editData, setEditData] = useState<any>(null);
+  const [moviesLocal, setMoviesLocal] = useState<any[]>([]);
+  const [movieStatus, setMovieStatus] = useState<Record<string, "active" | "inactive">>({});
+
+  function toLocalDateTimeString(date: Date) {
+    const pad = (n: number) => n.toString().padStart(2, "0");
+    const yyyy = date.getFullYear();
+    const mm = pad(date.getMonth() + 1);
+    const dd = pad(date.getDate());
+    const hh = pad(date.getHours());
+    const min = pad(date.getMinutes());
+    return `${yyyy}-${mm}-${dd}T${hh}:${min}`;
+  }
 
   useEffect(() => {
     (async () => {
@@ -92,8 +104,14 @@ export default function UsersPage() {
         editData={editData}
         setIsEditOpen={setIsEditOpen}
         isEditOpen={isEditOpen}
+        setEditData={setEditData}
         setUsers={setUsers}
-        setMoviesLocal={() => { }}
+        moviesLocal={moviesLocal}
+        toLocalDateTimeString={toLocalDateTimeString}
+        pageSize={pageSize}
+        currentPage={usersPage}
+        setMoviesLocal={setMoviesLocal}
+        setMovieStatus={setMovieStatus}
         setToys={() => { }}
         setShowtimes={() => { }}
       />
