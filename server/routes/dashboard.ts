@@ -34,6 +34,7 @@ export const getDashboardMetrics: RequestHandler = async (req, res) => {
 export const getRevenueByDate: RequestHandler = async (req, res) => {
   try {
     const dateStr = String(req.query.date || "");
+    const status = String(req.query.status || "paid").toLowerCase();
     let where: any = {};
 
     if (dateStr && dateStr !== "all") {
@@ -50,7 +51,9 @@ export const getRevenueByDate: RequestHandler = async (req, res) => {
       };
     }
 
-    where.payment_status = { in: ["paid", "PAID", "success", "SUCCESS"] };
+    if (status !== "all") {
+      where.payment_status = { in: ["paid", "PAID", "success", "SUCCESS"] };
+    }
 
     const total = await (prisma as any).bookings.aggregate({
       where,
@@ -122,6 +125,7 @@ export const getRevenueByMonth: RequestHandler = async (req, res) => {
   try {
     const yearStr = String(req.query.year || "");
     const monthStr = String(req.query.month || "");
+    const status = String(req.query.status || "paid").toLowerCase();
 
     // If month is provided, return revenue for that specific month
     if (monthStr && yearStr) {
@@ -133,26 +137,21 @@ export const getRevenueByMonth: RequestHandler = async (req, res) => {
       const monthEnd = new Date(year, month, 0);
       monthEnd.setHours(23, 59, 59, 999);
 
+      const whereMonth: any = {
+        OR: [
+          { created_at: { gte: monthStart, lte: monthEnd } },
+          { paid_at: { gte: monthStart, lte: monthEnd } },
+        ],
+      };
+      if (status !== "all") {
+        whereMonth.payment_status = { in: ["paid", "PAID", "success", "SUCCESS"] };
+      }
       const revenue = await (prisma as any).bookings.aggregate({
-        where: {
-          OR: [
-            { created_at: { gte: monthStart, lte: monthEnd } },
-            { paid_at: { gte: monthStart, lte: monthEnd } },
-          ],
-          payment_status: { in: ["paid", "PAID", "success", "SUCCESS"] },
-        },
+        where: whereMonth,
         _sum: { total_price: true },
       });
 
-      const count = await (prisma as any).bookings.count({
-        where: {
-          OR: [
-            { created_at: { gte: monthStart, lte: monthEnd } },
-            { paid_at: { gte: monthStart, lte: monthEnd } },
-          ],
-          payment_status: { in: ["paid", "PAID", "success", "SUCCESS"] },
-        },
-      });
+      const count = await (prisma as any).bookings.count({ where: whereMonth });
 
       return res.status(200).json({
         total: Number(revenue._sum?.total_price || 0),
@@ -178,14 +177,17 @@ export const getRevenueByMonth: RequestHandler = async (req, res) => {
       const monthEnd = new Date(targetYear, m + 1, 0);
       monthEnd.setHours(23, 59, 59, 999);
 
+      const whereMonth: any = {
+        OR: [
+          { created_at: { gte: monthStart, lte: monthEnd } },
+          { paid_at: { gte: monthStart, lte: monthEnd } },
+        ],
+      };
+      if (status !== "all") {
+        whereMonth.payment_status = { in: ["paid", "PAID", "success", "SUCCESS"] };
+      }
       const revenue = await (prisma as any).bookings.aggregate({
-        where: {
-          OR: [
-            { created_at: { gte: monthStart, lte: monthEnd } },
-            { paid_at: { gte: monthStart, lte: monthEnd } },
-          ],
-          payment_status: { in: ["paid", "PAID", "success", "SUCCESS"] },
-        },
+        where: whereMonth,
         _sum: { total_price: true },
       });
 

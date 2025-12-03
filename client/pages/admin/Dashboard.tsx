@@ -21,6 +21,7 @@ export default function DashboardPage() {
   // Date picker state
   const [selectedDate, setSelectedDate] = useState<string>("");
   const [dateFilterType, setDateFilterType] = useState<"all" | "day" | "month">("all");
+  const [dateStatus, setDateStatus] = useState<"all" | "paid">("paid");
   const [dateRevenue, setDateRevenue] = useState({ total: 0, count: 0 });
 
   // 7-day chart state
@@ -52,27 +53,27 @@ export default function DashboardPage() {
   useEffect(() => {
     (async () => {
       try {
-        const data = await getRevenueByDate(undefined);
+        const data = await getRevenueByDate(undefined, dateStatus);
         setDateRevenue({ total: data.total, count: data.count });
       } catch (err) {
         console.error("Failed to load date revenue:", err);
       }
     })();
-  }, []);
+  }, [dateStatus]);
 
   // Handle date filter apply
   const handleApplyDateFilter = async () => {
     try {
       if (dateFilterType === "all") {
-        const data = await getRevenueByDate(undefined);
+        const data = await getRevenueByDate(undefined, dateStatus);
         setDateRevenue({ total: data.total, count: data.count });
       } else if (dateFilterType === "day") {
-        const data = await getRevenueByDate(selectedDate);
+        const data = await getRevenueByDate(selectedDate, dateStatus);
         setDateRevenue({ total: data.total, count: data.count });
       } else if (dateFilterType === "month") {
         // For month filtering, extract year-month and query all days in that month
         const [year, month] = selectedDate.split("-");
-        const data = await getRevenueByMonth(parseInt(year), parseInt(month));
+        const data = await getRevenueByMonth(parseInt(year), parseInt(month), dateStatus);
         if ('total' in data) {
           setDateRevenue({ total: data.total, count: data.count });
         }
@@ -98,7 +99,7 @@ export default function DashboardPage() {
   useEffect(() => {
     (async () => {
       try {
-        const data = await getRevenueByMonth(revenueByMonthYear);
+        const data = await getRevenueByMonth(revenueByMonthYear, undefined, dateStatus);
         if ('data' in data) {
           setRevenueByMonthData(data.data);
         }
@@ -106,7 +107,7 @@ export default function DashboardPage() {
         console.error("Failed to load monthly revenue:", err);
       }
     })();
-  }, [revenueByMonthYear]);
+  }, [revenueByMonthYear, dateStatus]);
 
   return (
     <AdminLayout
@@ -127,6 +128,8 @@ export default function DashboardPage() {
         revenueByMonthYear={revenueByMonthYear}
         setRevenueByMonthYear={setRevenueByMonthYear}
         revenueByMonthData={revenueByMonthData}
+        dateStatus={dateStatus}
+        setDateStatus={setDateStatus}
       />
     </AdminLayout>
   );

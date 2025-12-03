@@ -97,3 +97,20 @@ model toys {
   created_at DateTime @default(now())
   updated_at DateTime @default(now())
 }
+
+model ticket_packages {
+  id             Int      @id @default(autoincrement())
+  name           String   @db.VarChar(255)
+  code           String?  @unique @db.VarChar(50)
+  description    String?
+  price          Decimal  @db.Decimal(10, 2)
+  features       Json?
+  type           String?  @db.VarChar(50)
+  min_group_size Int?
+  max_group_size Int?
+  is_member_only Boolean? @default(false)
+  is_active      Boolean? @default(true)
+  display_order  Int?     @default(0)
+  created_at     DateTime @default(now())
+  updated_at     DateTime @default(now())
+}

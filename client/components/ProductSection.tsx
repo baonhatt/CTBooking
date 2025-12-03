@@ -55,7 +55,7 @@ export default function ProductSection() {
           </motion.button>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        <div className="flex gap-4 overflow-x-auto pb-2 md:pb-0 md:grid md:grid-cols-2 lg:grid-cols-4 md:gap-6 md:overflow-visible snap-x snap-mandatory">
           {products.map((product, index) => (
             <motion.div
               key={product.id}
@@ -64,7 +64,7 @@ export default function ProductSection() {
               viewport={{ once: true }}
               transition={{ duration: 0.6, delay: index * 0.1 }}
               whileHover={{ y: -10 }}
-              className="group"
+              className="group min-w-[260px] max-w-[280px] md:min-w-0 md:max-w-none snap-start"
             >
               <Card className="bg-black/40 backdrop-blur-sm border border-white/10 hover:border-white/30 transition-all duration-300 overflow-hidden h-full">
                 <div className="relative h-64 overflow-hidden">
