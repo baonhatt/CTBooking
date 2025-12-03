@@ -19,6 +19,8 @@ interface Props {
   onApplyDateFilter: () => void;
   dateFilterType: "all" | "day" | "month";
   setDateFilterType: (type: "all" | "day" | "month") => void;
+  dateStatus: "all" | "paid";
+  setDateStatus: (s: "all" | "paid") => void;
   revenue7DaysData: Array<{ day: string; revenue: number }>;
   revenueByMonthYear: number;
   setRevenueByMonthYear: (year: number) => void;
@@ -37,6 +39,8 @@ export default function DashboardContent({
   revenueByMonthYear,
   setRevenueByMonthYear,
   revenueByMonthData,
+  dateStatus,
+  setDateStatus,
 }: Props) {
   const BarChart = ({
     data,
@@ -190,6 +194,32 @@ export default function DashboardContent({
                   className="w-4 h-4"
                 />
                 <span className="text-sm">Theo tháng</span>
+              </label>
+            </div>
+
+            {/* Status Selection */}
+            <div className="flex gap-3">
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="radio"
+                  name="status"
+                  value="paid"
+                  checked={dateStatus === "paid"}
+                  onChange={(e) => setDateStatus(e.target.value as "all" | "paid")}
+                  className="w-4 h-4"
+                />
+                <span className="text-sm">Chỉ giao dịch đã thanh toán</span>
+              </label>
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="radio"
+                  name="status"
+                  value="all"
+                  checked={dateStatus === "all"}
+                  onChange={(e) => setDateStatus(e.target.value as "all" | "paid")}
+                  className="w-4 h-4"
+                />
+                <span className="text-sm">Tất cả trạng thái</span>
               </label>
             </div>
 

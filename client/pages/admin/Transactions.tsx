@@ -44,7 +44,15 @@ export default function TransactionsPage() {
   useEffect(() => {
     (async () => {
       try {
-        const { total, count } = await getAdminRevenue({});
+        const todayStart = new Date();
+        todayStart.setHours(0, 0, 0, 0);
+        const todayEnd = new Date();
+        todayEnd.setHours(23, 59, 59, 999);
+        const { total, count } = await getAdminRevenue({
+          from: todayStart.toISOString(),
+          to: todayEnd.toISOString(),
+          status: "all",
+        });
         setRevenueTotal(total);
         setRevenueCount(count);
       } catch (error) {
@@ -92,7 +100,15 @@ export default function TransactionsPage() {
         })),
       );
       setTotalTransactions(total);
-      const { total: revTotal, count: revCount } = await getAdminRevenue({});
+      const todayStart = new Date();
+      todayStart.setHours(0, 0, 0, 0);
+      const todayEnd = new Date();
+      todayEnd.setHours(23, 59, 59, 999);
+      const { total: revTotal, count: revCount } = await getAdminRevenue({
+        from: todayStart.toISOString(),
+        to: todayEnd.toISOString(),
+        status: "all",
+      });
       setRevenueTotal(revTotal);
       setRevenueCount(revCount);
     } catch (error) {

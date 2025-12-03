@@ -293,11 +293,13 @@ export async function deleteMovieApi(id: number) {
 export async function getAdminRevenue(options?: {
   from?: string;
   to?: string;
+  status?: "all" | "paid";
   signal?: AbortSignal;
 }) {
   const params = new URLSearchParams();
   if (options?.from) params.set("from", options.from);
   if (options?.to) params.set("to", options.to);
+  if (options?.status) params.set("status", options.status);
   const path = `/api/admin/revenue${params.toString() ? `?${params.toString()}` : ""}`;
   return request<{ total: number; count: number }>(path, {
     signal: options?.signal,
@@ -396,9 +398,10 @@ export async function getDashboardMetrics() {
   }>("/api/admin/dashboard/metrics");
 }
 
-export async function getRevenueByDate(date?: string) {
+export async function getRevenueByDate(date?: string, status?: "all" | "paid") {
   const params = new URLSearchParams();
   if (date) params.append("date", date);
+  if (status) params.append("status", status);
   return request<{ date: string; total: number; count: number }>(
     `/api/admin/dashboard/revenue-date?${params.toString()}`
   );
@@ -410,10 +413,11 @@ export async function getRevenue7Days() {
   }>("/api/admin/dashboard/revenue-7days");
 }
 
-export async function getRevenueByMonth(year?: number, month?: number) {
+export async function getRevenueByMonth(year?: number, month?: number, status?: "all" | "paid") {
   const params = new URLSearchParams();
   if (year) params.append("year", String(year));
   if (month) params.append("month", String(month));
+  if (status) params.append("status", status);
 
   if (month) {
     // When filtering by specific month, return total and count
@@ -578,3 +582,77 @@ export async function getTransactionById(id: number) {
 
 // ----------------- DECLARE TYPE -----------------
 export type { Movie, MoviesResponse, Login, Register };
+// ----------------- API TICKET PACKAGES -----------------
+export async function getTickets(options?: {
+  page?: number;
+  pageSize?: number;
+  q?: string;
+  signal?: AbortSignal;
+}) {
+  const params = new URLSearchParams();
+  if (options?.page) params.set("page", String(options.page));
+  if (options?.pageSize) params.set("pageSize", String(options.pageSize));
+  if (options?.q) params.set("q", options.q);
+  const path = `/api/tickets${params.toString() ? `?${params.toString()}` : ""}`;
+  return request<{
+    items: any[];
+    page: number;
+    pageSize: number;
+    total: number;
+  }>(path, { signal: options?.signal });
+}
+
+export async function getActiveTickets(options?: { signal?: AbortSignal }) {
+  return request<{ items: any[] }>(`/api/tickets/active`, {
+    signal: options?.signal,
+  });
+}
+
+export async function getTicketById(id: number) {
+  return request<{ item: any }>(`/api/tickets/${id}`);
+}
+
+export async function createTicketApi(body: {
+  name: string;
+  code?: string;
+  description?: string;
+  price: number;
+  features?: string[];
+  type?: string;
+  min_group_size?: number;
+  max_group_size?: number;
+  is_member_only?: boolean;
+  is_active?: boolean;
+  display_order?: number;
+}) {
+  return request<{ item: any }>(`/api/tickets`, {
+    method: "POST",
+    body: JSON.stringify(body),
+  });
+}
+
+export async function updateTicketApi(
+  id: number,
+  body: {
+    name?: string;
+    code?: string;
+    description?: string;
+    price?: number;
+    features?: string[] | string;
+    type?: string;
+    min_group_size?: number;
+    max_group_size?: number;
+    is_member_only?: boolean;
+    is_active?: boolean;
+    display_order?: number;
+  },
+) {
+  return request<{ item: any }>(`/api/tickets/${id}`, {
+    method: "PUT",
+    body: JSON.stringify(body),
+  });
+}
+
+export async function deleteTicketApi(id: number) {
+  return request<{ ok: boolean }>(`/api/tickets/${id}`, { method: "DELETE" });
+}

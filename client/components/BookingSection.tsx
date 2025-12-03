@@ -30,7 +30,7 @@ import { Radio, Space, Steps } from "antd";
 import { motion } from "framer-motion";
 import type { RadioChangeEvent } from "antd";
 import { useQuery } from "@tanstack/react-query";
-import { getAllActiveMoviesToday } from "@/lib/api";
+import { getAllActiveMoviesToday, getActiveTickets } from "@/lib/api";
 import { toast } from "@/components/ui/use-toast";
 import {
   createMomoPaymentApi,
@@ -79,6 +79,10 @@ export default function BookingSection({ onBookClick }: BookingSectionProps) {
   const { data: activeData } = useQuery({
     queryKey: ["activeMovies", "today"],
     queryFn: () => getAllActiveMoviesToday(),
+  });
+  const { data: ticketsData } = useQuery({
+    queryKey: ["activeTickets"],
+    queryFn: ({ signal }) => getActiveTickets({ signal }),
   });
   const movies = (activeData?.activeMovies || []).map((m: any) => ({
     id: m.title,
@@ -302,52 +306,7 @@ export default function BookingSection({ onBookClick }: BookingSectionProps) {
           paymentMethod: paymentMethod as any,
           totalPrice,
         });
-        const extraDataEncoded = btoa(
-          unescape(
-            encodeURIComponent(
-              JSON.stringify({
-                ...summary,
-                booking_id: booking?.id,
-                user_id: booking?.user_id,
-              }),
-            ),
-          ),
-        );
-        const partnerCode =
-          (import.meta as any).env?.VITE_MOMO_PARTNER_CODE || "";
-        const partnerName =
-          (import.meta as any).env?.VITE_MOMO_PARTNER_NAME || "CineSphere";
-        const storeId =
-          (import.meta as any).env?.VITE_MOMO_STORE_ID || "devstore";
-        const redirectUrl =
-          (import.meta as any).env?.VITE_MOMO_REDIRECT_URL ||
-          window.location.origin + "/checkout";
-        const ipnUrl =
-          (import.meta as any).env?.VITE_MOMO_IPN_URL ||
-          (API_BASE_URL
-            ? API_BASE_URL + "/api/momo/ipn"
-            : window.location.origin + "/api/momo/ipn");
-        const accessKey = (import.meta as any).env?.VITE_MOMO_ACCESS_KEY || "";
-        const secretKey = (import.meta as any).env?.VITE_MOMO_SECRET_KEY || "";
-        const requestId = Date.now().toString();
-        const orderInfo = `${selectedMovie?.title || "Movie"} | ${formData.quantity} vé | ${formData.showtime || "--:--"}`;
-        const payload = {
-          partnerCode,
-          partnerName,
-          storeId,
-          requestId,
-          amount: totalPrice,
-          orderId,
-          orderInfo,
-          redirectUrl,
-          ipnUrl,
-          lang: "vi",
-          extraData: extraDataEncoded,
-          requestType: "captureWallet",
-          signature: "",
-          accessKey,
-          secretKey,
-        } as any;
+
         localStorage.setItem(
           "pendingOrder",
           JSON.stringify({
@@ -356,13 +315,85 @@ export default function BookingSection({ onBookClick }: BookingSectionProps) {
             user_id: booking?.user_id,
           }),
         );
-        const res = await createMomoPaymentApi(payload);
-        if (res?.payUrl) {
-          setIsModalOpen(false);
-          window.location.href = res.payUrl;
-          return;
+
+        const orderInfoText = `${selectedMovie?.title || "Movie"} | ${formData.quantity} vé | ${formData.showtime || "--:--"}`;
+
+        if (paymentMethod === "momo") {
+          const extraDataEncoded = btoa(
+            unescape(
+              encodeURIComponent(
+                JSON.stringify({
+                  ...summary,
+                  booking_id: booking?.id,
+                  user_id: booking?.user_id,
+                }),
+              ),
+            ),
+          );
+          const partnerCode =
+            (import.meta as any).env?.VITE_MOMO_PARTNER_CODE || "";
+          const partnerName =
+            (import.meta as any).env?.VITE_MOMO_PARTNER_NAME || "CineSphere";
+          const storeId =
+            (import.meta as any).env?.VITE_MOMO_STORE_ID || "devstore";
+          const redirectUrl =
+            (import.meta as any).env?.VITE_MOMO_REDIRECT_URL ||
+            window.location.origin + "/checkout";
+          const ipnUrl =
+            (import.meta as any).env?.VITE_MOMO_IPN_URL ||
+            (API_BASE_URL
+              ? API_BASE_URL + "/api/momo/ipn"
+              : window.location.origin + "/api/momo/ipn");
+          const accessKey =
+            (import.meta as any).env?.VITE_MOMO_ACCESS_KEY || "";
+          const secretKey =
+            (import.meta as any).env?.VITE_MOMO_SECRET_KEY || "";
+          const requestId = Date.now().toString();
+          const payload = {
+            partnerCode,
+            partnerName,
+            storeId,
+            requestId,
+            amount: totalPrice,
+            orderId,
+            orderInfo: orderInfoText,
+            redirectUrl,
+            ipnUrl,
+            lang: "vi",
+            extraData: extraDataEncoded,
+            requestType: "captureWallet",
+            signature: "",
+            accessKey,
+            secretKey,
+          } as any;
+          const res = await createMomoPaymentApi(payload);
+          if (res?.payUrl) {
+            setIsModalOpen(false);
+            window.location.href = res.payUrl;
+            return;
+          }
+          throw new Error("Không nhận được liên kết thanh toán MoMo");
+        } else if (paymentMethod === "vnpay") {
+          const returnUrl =
+            (import.meta as any).env?.VITE_VNPAY_RETURN_URL ||
+            window.location.origin + "/checkout";
+          const locale = "vn";
+          const res = await createVnpayPaymentApi({
+            amount: totalPrice,
+            orderId,
+            orderInfo: orderInfoText,
+            locale,
+            returnUrl,
+          });
+          if (res?.payUrl) {
+            setIsModalOpen(false);
+            window.location.href = res.payUrl;
+            return;
+          }
+          throw new Error("Không nhận được liên kết thanh toán VNPay");
+        } else {
+          throw new Error("Phương thức thanh toán không hợp lệ");
         }
-        throw new Error("Không nhận được liên kết thanh toán MoMo");
       } catch (err: any) {
         toast({
           title: "Không thể tạo đặt vé",
@@ -380,7 +411,26 @@ export default function BookingSection({ onBookClick }: BookingSectionProps) {
     return `${mins}:${secs.toString().padStart(2, "0")}`;
   };
 
-  const ticketPrice = 250000;
+  const ticketPackages = (ticketsData?.items || []).map((t: any) => ({
+    id: t.id,
+    name: t.name,
+    price: Number(t.price || 0),
+    features: Array.isArray(t.features) ? t.features : [],
+    type: t.type || "",
+  }));
+  const standardPkg =
+    ticketPackages.find(
+      (p) =>
+        (p.type || "").toLowerCase() === "standard" ||
+        (p.name || "").toLowerCase().includes("tiêu chuẩn"),
+    ) || ticketPackages[0];
+  const [selectedPackage, setSelectedPackage] = useState<any>(null);
+  useEffect(() => {
+    if (standardPkg && !selectedPackage) {
+      setSelectedPackage(standardPkg);
+    }
+  }, [standardPkg]);
+  const ticketPrice = selectedPackage ? Number(selectedPackage.price || 0) : 250000;
   const totalPrice = ticketPrice * formData.quantity;
   const selectedMovie = movies.find((m) => m.id === formData.movie);
 
@@ -411,7 +461,7 @@ export default function BookingSection({ onBookClick }: BookingSectionProps) {
                 className="rounded-2xl p-6 border border-white/10 text-left bg-black/30 backdrop-blur-sm hover:bg-gradient-to-br hover:from-cyan-900/40 hover:via-cyan-700/20 hover:to-fuchsia-800/40 hover:shadow-[0_0_35px_rgba(99,102,241,0.25)] transition-all duration-300"
               >
                 <div className="text-white font-semibold text-lg mb-3">
-                  Vé Tiêu Chuẩn
+                  {selectedPackage?.name || "Vé Tiêu Chuẩn"}
                 </div>
                 <div className="text-4xl md:text-5xl font-extrabold text-cyan-400 mb-1">
                   {ticketPrice.toLocaleString("vi-VN")}₫
@@ -420,66 +470,57 @@ export default function BookingSection({ onBookClick }: BookingSectionProps) {
                   / phim (10-15 phút)
                 </div>
                 <ul className="space-y-2 mb-6">
-                  <li className="flex items-center gap-2 text-gray-100">
-                    <Check className="h-4 w-4 text-emerald-400" /> Ghế chuyển
-                    động 6D
-                  </li>
-                  <li className="flex items-center gap-2 text-gray-100">
-                    <Check className="h-4 w-4 text-emerald-400" /> Mắt kính 3D
-                    active
-                  </li>
-                  <li className="flex items-center gap-2 text-gray-100">
-                    <Check className="h-4 w-4 text-emerald-400" /> Hiệu ứng môi
-                    trường
-                  </li>
+                  {(selectedPackage?.features?.length
+                    ? selectedPackage.features
+                    : [
+                        "Ghế chuyển động 6D",
+                        "Mắt kính 3D active",
+                        "Hiệu ứng môi trường",
+                      ]
+                  ).map((f: string, idx: number) => (
+                    <li key={idx} className="flex items-center gap-2 text-gray-100">
+                      <Check className="h-4 w-4 text-emerald-400" /> {f}
+                    </li>
+                  ))}
                 </ul>
                 <Button
-                  onClick={handleOpenModal}
+                  onClick={() => {
+                    setSelectedPackage(selectedPackage || standardPkg);
+                    handleOpenModal();
+                  }}
                   className="bg-white text-black hover:bg-white/90 font-semibold px-6 py-5 rounded-lg"
                 >
                   Đặt Ngay
                 </Button>
               </motion.div>
-
+              {ticketPackages.slice(1, 3).map((pkg, i) => (
               <motion.div
                 initial={{ opacity: 0, y: 50 }}
                 whileInView={{ opacity: 1, y: 0 }}
                 viewport={{ once: true }}
-                transition={{ duration: 0.6, delay: 0.2 }}
+                transition={{ duration: 0.6, delay: 0.2 + i * 0.1 }}
                 className="bg-black/30 rounded-2xl p-6 border border-white/10 text-center"
               >
-                <Users className="h-8 w-8 text-gray-400 mx-auto mb-2" />
                 <div className="text-xl font-semibold text-white mb-1">
-                  Vé Nhóm
+                  {pkg.name}
                 </div>
-                <div className="text-sm text-gray-400 mb-2">Đang cập nhật</div>
+                <div className="text-3xl font-bold text-white mb-2">
+                  {Number(pkg.price || 0).toLocaleString("vi-VN")}₫
+                </div>
                 <div className="text-xs text-gray-500 mb-6">
-                  Dành cho nhóm 4-6 người
+                  {(pkg.features || []).slice(0,3).join(" • ")}
                 </div>
-                <Button disabled className="bg-gray-700/60 text-gray-300">
-                  Sắp ra mắt
+                <Button
+                  onClick={() => {
+                    setSelectedPackage(pkg);
+                    handleOpenModal();
+                  }}
+                  className="bg-white text-black hover:bg-white/90 font-semibold"
+                >
+                  Đặt Ngay
                 </Button>
               </motion.div>
-
-              <motion.div
-                initial={{ opacity: 0, y: 50 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true }}
-                transition={{ duration: 0.6, delay: 0.3 }}
-                className="bg-black/30 rounded-2xl p-6 border border-white/10 text-center"
-              >
-                <UserCheck className="h-8 w-8 text-gray-400 mx-auto mb-2" />
-                <div className="text-xl font-semibold text-white mb-1">
-                  Thành Viên
-                </div>
-                <div className="text-sm text-gray-400 mb-2">Đang cập nhật</div>
-                <div className="text-xs text-gray-500 mb-6">
-                  Ưu đãi đặc biệt cho hội viên
-                </div>
-                <Button disabled className="bg-gray-700/60 text-gray-300">
-                  Sắp ra mắt
-                </Button>
-              </motion.div>
+              ))}
             </div>
           </div>
         </div>
@@ -499,7 +540,7 @@ export default function BookingSection({ onBookClick }: BookingSectionProps) {
           onInteractOutside={(e) => {
             e.preventDefault();
           }}
-          className="bg-gradient-dark border-cyan-400/30 shadow-[0_0_40px_rgba(34,211,238,0.25)] w-[95vw] sm:w-auto sm:max-w-md md:max-w-lg max-h-[90vh] p-4 sm:p-6 rounded-xl overflow-y-auto scrollbar-neon"
+          className="bg-gradient-dark border-cyan-400/30 shadow-[0_0_40px_rgba(34,211,238,0.25)] w-full h-[100vh] max-h-[100vh] rounded-none sm:rounded-xl sm:w-auto sm:max-w-md md:max-w-lg sm:h-auto sm:max-h-[90vh] p-4 sm:p-6 overflow-y-auto scrollbar-neon"
         >
           <DialogHeader>
             <DialogTitle className="text-xl sm:text-2xl font-bold text-cyan-300">

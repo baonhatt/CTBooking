@@ -110,15 +110,36 @@ export const getRevenue: RequestHandler = async (req, res) => {
     const toStr = String(req.query.to || "");
     const from = fromStr ? new Date(fromStr) : undefined;
     const to = toStr ? new Date(toStr) : undefined;
-    const where: any = {
-      payment_status: { in: ["success", "SUCCESS", "paid", "PAID"] },
-    };
+    const status = String(req.query.status || "paid").toLowerCase();
+    const whereBase: any =
+      status === "all"
+        ? {}
+        : { payment_status: { in: ["success", "SUCCESS", "paid", "PAID"] } };
+    let where: any = whereBase;
     if (from && to) {
-      where.paid_at = { gte: from, lte: to };
+      where = {
+        ...whereBase,
+        OR: [
+          { paid_at: { gte: from, lte: to } },
+          { created_at: { gte: from, lte: to } },
+        ],
+      };
     } else if (from) {
-      where.paid_at = { gte: from };
+      where = {
+        ...whereBase,
+        OR: [
+          { paid_at: { gte: from } },
+          { created_at: { gte: from } },
+        ],
+      };
     } else if (to) {
-      where.paid_at = { lte: to };
+      where = {
+        ...whereBase,
+        OR: [
+          { paid_at: { lte: to } },
+          { created_at: { lte: to } },
+        ],
+      };
     }
     const agg = await (prisma as any).bookings.aggregate({
       _sum: { total_price: true },
