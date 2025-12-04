@@ -4,11 +4,11 @@ import { prisma } from "../lib/prisma";
 
 export const createPayment: RequestHandler = async (req, res) => {
   try {
-    const { email, showtimeId, ticketCount, paymentMethod } =
-      req.body as PaymentRequest;
+    const { email, phone, name, showtimeId, ticketCount, paymentMethod } =
+      req.body as PaymentRequest & { phone: string; name: string };
 
     // ====== VALIDATION ======
-    if (!email || !showtimeId || !ticketCount || ticketCount <= 0) {
+    if (!email || !phone || !name || !showtimeId || !ticketCount || ticketCount <= 0) {
       return res.status(400).json({
         message: "Vui lòng nhập đầy đủ thông tin hợp lệ.",
       });
@@ -39,13 +39,16 @@ export const createPayment: RequestHandler = async (req, res) => {
     const totalPrice = Number(showtime.price) * ticketCount;
 
     // ====== TẠO BOOKING ======
-    const booking = await prisma.bookings.create({
+    const booking = await (prisma as any).bookings.create({
       data: {
         user_id: user.id,
         showtime_id: showtimeId,
         ticket_count: ticketCount,
         total_price: totalPrice,
         payment_method: paymentMethod,
+        phone,
+        name,
+        email,
       },
     });
 
@@ -181,7 +184,7 @@ export const listTransactions: RequestHandler = async (req, res) => {
     const total = await prisma.bookings.count({ where });
 
     // Get transactions with pagination
-    const transactions = await prisma.bookings.findMany({
+    const transactions = await (prisma as any).bookings.findMany({
       where,
       include: {
         user: {
@@ -207,7 +210,9 @@ export const listTransactions: RequestHandler = async (req, res) => {
     const items = transactions.map((tx) => ({
       id: tx.id,
       bookingId: tx.id,
-      email: tx.user.accounts[0]?.email || "",
+      email: tx.email || tx.user.accounts[0]?.email || "",
+      phone: tx.phone || "",
+      name: tx.name || tx.user.fullname || "",
       userName: tx.user.fullname || "",
       movieTitle: tx.showtime?.movie?.title || "",
       ticketCount: tx.ticket_count,
@@ -272,8 +277,9 @@ export const getTransactionById: RequestHandler = async (req, res) => {
       user: {
         id: booking.user.id,
         fullname: booking.user.fullname,
-        email: booking.user.accounts[0]?.email || "N/A",
-        phone: booking.user.phone,
+        email: booking.email || booking.user.accounts[0]?.email || "N/A",
+        phone: booking.phone || booking.user.phone || "N/A",
+        name: booking.name || booking.user.fullname || "N/A",
         is_active: booking.user.accounts[0]?.is_active ?? true,
         account_created_at: booking.user.accounts[0]?.created_at,
       },

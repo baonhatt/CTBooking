@@ -76,6 +76,9 @@ model bookings {
   showtime_id    Int
   ticket_count   Int       @default(1)
   total_price    Decimal   @db.Decimal(10, 2)
+  phone          String    @db.VarChar(20)  @default("")
+  name           String    @db.VarChar(200)  @default("")
+  email          String    @db.VarChar(100)  @default("")
   created_at     DateTime  @default(now())
   paid_at        DateTime?
   payment_method String?   @default("cash") @db.VarChar(50)

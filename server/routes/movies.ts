@@ -8,30 +8,24 @@ export const handleMovies2025: RequestHandler = (_req, res) => { };
 
 export const getAllActiveMoviesToday: RequestHandler = async (_req, res) => {
   let activeMovies: ActiveMoviesTodayResponse[] = [];
-  const todayStart = new Date();
-  todayStart.setHours(0, 0, 0, 0);
-  const todayEnd = new Date();
-  todayEnd.setHours(23, 59, 59, 999);
+  // Use UTC date to avoid timezone issues
+  const now = new Date();
+  const todayStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), 0, 0, 0, 0));
   try {
+    // Get all active movies with their showtimes (from today onwards)
     const active_movies = await (prisma as any).movies.findMany({
       where: {
         is_active: true,
-        showtimes: {
-          some: {
-            start_time: {
-              gte: todayStart,
-              lte: todayEnd,
-            },
-          },
-        },
       },
       include: {
         showtimes: {
           where: {
             start_time: {
               gte: todayStart,
-              lte: todayEnd,
             },
+          },
+          orderBy: {
+            start_time: "asc",
           },
           select: {
             id: true,
@@ -45,8 +39,12 @@ export const getAllActiveMoviesToday: RequestHandler = async (_req, res) => {
         release_date: "desc",
       },
     });
-    if (active_movies.length !== 0) {
-      activeMovies = active_movies.map((m) => ({
+
+    // Filter to only include movies that have showtimes from today onwards
+    const moviesWithShowtimes = active_movies.filter(m => m.showtimes.length > 0);
+
+    if (moviesWithShowtimes.length !== 0) {
+      activeMovies = moviesWithShowtimes.map((m) => ({
         title: m.title,
         description: m.description ?? "",
         cover_image: m.cover_image ?? "",
