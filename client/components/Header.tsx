@@ -192,7 +192,7 @@ export default function Header({ onBookClick }: HeaderProps) {
           <div className="w-12 h-12 rounded-full bg-gradient-to-br from-purple-500 to-blue-500 flex items-center justify-center shadow-lg">
             <span className="text-2xl font-bold text-white">C</span>
           </div>
-          <h1 className="text-2xl font-bold text-blue-400">CINESPHERE</h1>
+          <h1 className="hidden md:block text-2xl font-bold text-blue-400">CINESPHERE</h1>
         </div>
 
         <nav className="hidden md:flex items-center gap-8 animate-fade-in delay-200">

@@ -9,7 +9,8 @@ interface Props {
     | "movies"
     | "toys"
     | "showtimes"
-    | "transactions";
+    | "transactions"
+    | "tickets";
   setActive: (x: any) => void;
   adminEmailState: string;
   handleLogout: () => void;
@@ -67,6 +68,13 @@ export default function AdminLayout({
             className="w-full"
           >
             Đồ chơi
+          </Button>
+          <Button
+            variant={active === "tickets" ? "default" : "outline"}
+            onClick={() => go("tickets")}
+            className="w-full"
+          >
+            Gói vé
           </Button>
           <Button
             variant={active === "transactions" ? "default" : "outline"}
