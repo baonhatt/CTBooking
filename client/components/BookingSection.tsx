@@ -270,8 +270,9 @@ export default function BookingSection({ onBookClick }: BookingSectionProps) {
         window.dispatchEvent(new Event("open-login"));
         return;
       }
-      let authEmail = formData.email;
+      let emailBook = formData.email;
       let authName = formData.name;
+      let authEmail = "";
       try {
         const parsed = JSON.parse(authRaw);
         authEmail = parsed?.user?.email || parsed?.email || authEmail;
@@ -288,6 +289,7 @@ export default function BookingSection({ onBookClick }: BookingSectionProps) {
         name: authName,
         phone: formData.phone,
         email: authEmail,
+        emailBook: emailBook,
         quantity: formData.quantity,
         amount: totalPrice,
         method: paymentMethod,
@@ -301,6 +303,7 @@ export default function BookingSection({ onBookClick }: BookingSectionProps) {
         const showtimeId = selectedShowtimeId as number;
         const { booking } = await createBookingApi({
           email: authEmail,
+          emailBook: emailBook,
           phone: formData.phone,
           name: authName,
           showtimeId,

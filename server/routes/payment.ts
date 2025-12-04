@@ -4,11 +4,11 @@ import { prisma } from "../lib/prisma";
 
 export const createPayment: RequestHandler = async (req, res) => {
   try {
-    const { email, phone, name, showtimeId, ticketCount, paymentMethod } =
-      req.body as PaymentRequest & { phone: string; name: string };
+    const { email, emailBook, phone, name, showtimeId, ticketCount, paymentMethod, totalPrice } =
+      req.body as PaymentRequest
 
     // ====== VALIDATION ======
-    if (!email || !phone || !name || !showtimeId || !ticketCount || ticketCount <= 0) {
+    if (!email || !phone || !emailBook || !name || !showtimeId || !ticketCount || ticketCount <= 0) {
       return res.status(400).json({
         message: "Vui lòng nhập đầy đủ thông tin hợp lệ.",
       });
@@ -36,10 +36,11 @@ export const createPayment: RequestHandler = async (req, res) => {
     }
 
     // ====== TÍNH TOTAL PRICE (SERVER TỰ TÍNH) ======
-    const totalPrice = Number(showtime.price) * ticketCount;
+    // const totalPrice = Number(showtime.price) * ticketCount;
+    // total price lấy từ formdata create booking
 
     // ====== TẠO BOOKING ======
-    const booking = await (prisma as any).bookings.create({
+    const booking = await prisma.bookings.create({
       data: {
         user_id: user.id,
         showtime_id: showtimeId,
@@ -48,7 +49,7 @@ export const createPayment: RequestHandler = async (req, res) => {
         payment_method: paymentMethod,
         phone,
         name,
-        email,
+        email: emailBook,
       },
     });
 

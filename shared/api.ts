@@ -62,6 +62,9 @@ export interface ActiveMoviesTodayResponse {
 
 export interface PaymentRequest {
   email: string;
+  emailBook: string;
+  phone: string;
+  name: string;
   showtimeId: number;
   ticketCount: number;
   paymentMethod: 'cash' | 'momo' | 'vnpay';
