@@ -1,6 +1,6 @@
 import "dotenv/config";
 import { PrismaPg } from "@prisma/adapter-pg";
-import { PrismaClient } from "../../generated/prisma/client";
+import { PrismaClient } from "@prisma/client";
 
 // Use a sanitized connection string to avoid passing an empty password token
 // (e.g. "postgresql://postgres:@..."), which can cause `pg`/SCRAM auth errors.

@@ -47,6 +47,14 @@ import {
 } from "./routes/dashboard";
 import { getUsers, getUserById } from "./routes/users";
 import { getShowtimeById } from "./routes/showtimes";
+import {
+  listTicketPackages,
+  listActiveTicketPackages,
+  getTicketPackage,
+  createTicketPackage,
+  updateTicketPackage,
+  deleteTicketPackage,
+} from "./routes/tickets";
 
 export function createServer() {
   const app = express();
@@ -109,6 +117,12 @@ export function createServer() {
   app.get("/api/admin/dashboard/revenue-month", getRevenueByMonth);
   app.get("/api/users", getUsers);
   app.get("/api/users/:id", getUserById);
+  app.get("/api/tickets", listTicketPackages);
+  app.get("/api/tickets/active", listActiveTicketPackages);
+  app.get("/api/tickets/:id", getTicketPackage);
+  app.post("/api/tickets", createTicketPackage);
+  app.put("/api/tickets/:id", updateTicketPackage);
+  app.delete("/api/tickets/:id", deleteTicketPackage);
 
   return app;
 }

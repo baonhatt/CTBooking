@@ -132,7 +132,7 @@ export default function Footer() {
 
         <div className="border-t border-white/10 pt-8 text-center">
           <p className="text-gray-400">
-            © 2024 CINESPHERE. Tất cả quyền được bảo lưu.
+            © 2025 CINESPHERE. Tất cả quyền được bảo lưu.
           </p>
         </div>
       </div>
