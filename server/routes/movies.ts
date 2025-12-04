@@ -7,6 +7,7 @@ import path from "path";
 export const handleMovies2025: RequestHandler = (_req, res) => { };
 
 export const getAllActiveMoviesToday: RequestHandler = async (_req, res) => {
+  
   let activeMovies: ActiveMoviesTodayResponse[] = [];
   // Use UTC date to avoid timezone issues
   const now = new Date();
@@ -31,7 +32,6 @@ export const getAllActiveMoviesToday: RequestHandler = async (_req, res) => {
             id: true,
             start_time: true,
             total_sold: true,
-            price: true,
           },
         },
       },
@@ -52,13 +52,12 @@ export const getAllActiveMoviesToday: RequestHandler = async (_req, res) => {
         genres: JSON.stringify(m.genres ?? []),
         rating: m.rating?.toString() ?? "0",
         duration_min: m.duration_min ?? 0,
-        price: Number(m.price),
+        price: 0,
         release_date: m.release_date,
         showtimes: m.showtimes.map((s) => ({
           id: s.id,
           start_time: s.start_time,
           total_sold: s.total_sold,
-          price: Number(s.price),
         })),
       }));
       return res.status(200).json({ activeMovies });
