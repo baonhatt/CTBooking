@@ -16,8 +16,8 @@ export default function ToysPage() {
 
   useEffect(() => {
     (async () => {
-      const { items, total } = await getToys({ 
-        page: toysPage, 
+      const { items, total } = await getToys({
+        page: toysPage,
         pageSize,
         q: searchQuery,
       });

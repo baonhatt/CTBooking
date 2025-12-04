@@ -54,7 +54,7 @@ export default function ToysContent({
   setToys,
   onRefresh,
   searchQuery = "",
-  onSearchChange = () => {},
+  onSearchChange = () => { },
 }: Props) {
   const handleDelete = async (id: number) => {
     try {

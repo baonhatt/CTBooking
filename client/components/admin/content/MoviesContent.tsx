@@ -64,7 +64,7 @@ export default function MoviesContent({
   formatLocalDateTime,
   onRefresh,
   searchQuery = "",
-  onSearchChange = () => {},
+  onSearchChange = () => { },
 }: Props) {
   const [isDetailsOpen, setIsDetailsOpen] = useState(false);
   const [selectedMovieId, setSelectedMovieId] = useState<number | null>(null);

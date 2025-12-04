@@ -36,8 +36,8 @@ export default function ShowtimesPage() {
           start_time: new Date(s.start_time).toISOString(),
           price: Number(s.price),
           total_sold: Number(s.total_sold || 0),
-        })).filter(s => 
-          searchQuery === "" || 
+        })).filter(s =>
+          searchQuery === "" ||
           s.movie_title.toLowerCase().includes(searchQuery.toLowerCase())
         ),
       );

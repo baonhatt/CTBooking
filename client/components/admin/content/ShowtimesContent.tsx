@@ -69,7 +69,7 @@ export default function ShowtimesContent({
   setTodayOnly,
   onRefresh,
   searchQuery = "",
-  onSearchChange = () => {},
+  onSearchChange = () => { },
 }: Props) {
   const [isDetailsOpen, setIsDetailsOpen] = useState(false);
   const [selectedShowtimeId, setSelectedShowtimeId] = useState<number | null>(
