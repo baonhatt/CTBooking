@@ -22,7 +22,7 @@ export function useMovies2025() {
           id,
           title: m.title,
           year,
-          duration: `${m.duration_min} phút`,
+          duration: `${m.duration_min}`,
           genres,
           posterUrl: m.cover_image,
         } as Movie;

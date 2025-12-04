@@ -38,6 +38,8 @@ interface Props {
   deleteToyApi: (id: number) => Promise<any>;
   setToys: React.Dispatch<React.SetStateAction<ToyData[]>>;
   onRefresh: () => void;
+  searchQuery?: string;
+  onSearchChange?: (query: string) => void;
 }
 
 export default function ToysContent({
@@ -51,6 +53,8 @@ export default function ToysContent({
   deleteToyApi,
   setToys,
   onRefresh,
+  searchQuery = "",
+  onSearchChange = () => {},
 }: Props) {
   const handleDelete = async (id: number) => {
     try {
@@ -62,9 +66,18 @@ export default function ToysContent({
   };
   return (
     <div className="space-y-6">
-      <div className="flex justify-between items-center">
-        <h3 className="text-lg font-semibold">
-          Tổng cộng: {toysLength} đồ chơi
+      <div className="flex justify-between items-center gap-4">
+        <div className="flex-1">
+          <input
+            type="text"
+            placeholder="Tìm kiếm đồ chơi theo tên hoặc danh mục..."
+            value={searchQuery}
+            onChange={(e) => onSearchChange(e.target.value)}
+            className="w-full px-4 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+          />
+        </div>
+        <h3 className="text-lg font-semibold whitespace-nowrap">
+          Tổng: {toysLength}
         </h3>
         <div className="flex gap-2">
           <Button onClick={onRefresh} variant="outline">

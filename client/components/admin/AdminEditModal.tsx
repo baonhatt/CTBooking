@@ -43,6 +43,8 @@ interface AdminEditModalProps {
 
 const AdminEditModal: React.FC<AdminEditModalProps> = (props) => {
   const { toast } = useToast();
+  const [selectedMovieInfo, setSelectedMovieInfo] = useState<any>(null);
+  const [isMovieInfoValid, setIsMovieInfoValid] = useState(false);
   const {
     isEditOpen,
     setIsEditOpen,
@@ -60,6 +62,14 @@ const AdminEditModal: React.FC<AdminEditModalProps> = (props) => {
     currentPage,
   } = props;
 
+  // Reset movie info when modal closes
+  React.useEffect(() => {
+    if (!isEditOpen) {
+      setSelectedMovieInfo(null);
+      setIsMovieInfoValid(false);
+    }
+  }, [isEditOpen]);
+
   async function refetch(type: "movie" | "toy" | "showtime") {
     if (type === "movie") {
       const { items } = await getMoviesAdmin({ page: currentPage, pageSize });
@@ -67,7 +77,7 @@ const AdminEditModal: React.FC<AdminEditModalProps> = (props) => {
         id: String(m.id),
         title: m.title,
         year: new Date(m.release_date || Date.now()).getFullYear(),
-        duration: m?.duration_min ? `${Number(m.duration_min)} phút` : "",
+        duration: m?.duration_min ? `${Number(m.duration_min)}` : "",
         genres: Array.isArray(m.genres) ? m.genres : [],
         posterUrl: m.cover_image || "",
         release_date: m.release_date || null,
@@ -237,17 +247,16 @@ const AdminEditModal: React.FC<AdminEditModalProps> = (props) => {
             <div>
               <Label>Giá</Label>
               <Input
-                type="text"
-                value={
-                  editData.price !== undefined && editData.price !== null
-                    ? editData.price.toLocaleString("en-US")
-                    : ""
-                }
+                type="number"
+                min="0"
+                step="1"
+                value={editData.price !== undefined && editData.price !== null ? editData.price : ""}
                 onChange={(e) => {
-                  const numericValue = Number(e.target.value.replace(/,/g, ""));
+                  let numericValue = e.target.value === "" ? 0 : Number(e.target.value);
+                  if (numericValue < 0) numericValue = 0;
                   setEditData({
                     ...editData,
-                    price: isNaN(numericValue) ? 0 : numericValue,
+                    price: numericValue,
                   });
                 }}
               />
@@ -268,12 +277,17 @@ const AdminEditModal: React.FC<AdminEditModalProps> = (props) => {
               />
             </div>
             <div>
-              <Label>Thời lượng</Label>
+              <Label>Thời lượng (phút)</Label>
               <Input
+                type="number"
+                min="0"
+                step="1"
                 value={editData?.duration || ""}
-                onChange={(e) =>
-                  setEditData({ ...editData, duration: e.target.value })
-                }
+                onChange={(e) => {
+                  let numericValue = e.target.value === "" ? "" : Number(e.target.value);
+                  if (typeof numericValue === "number" && numericValue < 0) numericValue = 0;
+                  setEditData({ ...editData, duration: numericValue })
+                }}
               />
             </div>
             <div>
@@ -330,6 +344,40 @@ const AdminEditModal: React.FC<AdminEditModalProps> = (props) => {
               </Button>
               <Button
                 onClick={async () => {
+                  // Validation for movies
+                  if (!editData.title || editData.title.trim() === "") {
+                    toast({
+                      title: "Lỗi",
+                      description: "Tên phim là bắt buộc",
+                      variant: "destructive",
+                    });
+                    return;
+                  }
+                  if (editData.price === undefined || editData.price === null || editData.price <= 0) {
+                    toast({
+                      title: "Lỗi",
+                      description: "Giá là bắt buộc",
+                      variant: "destructive",
+                    });
+                    return;
+                  }
+                  if (editData.duration === undefined || editData.duration === null || editData.duration === "" || Number(editData.duration) <= 0) {
+                    toast({
+                      title: "Lỗi",
+                      description: "Thời lượng là bắt buộc",
+                      variant: "destructive",
+                    });
+                    return;
+                  }
+                  if (!editData.release_date) {
+                    toast({
+                      title: "Lỗi",
+                      description: "Ngày phát hành là bắt buộc",
+                      variant: "destructive",
+                    });
+                    return;
+                  }
+
                   try {
                     if (!editData.id) {
                       let coverBase64: string | undefined = undefined;
@@ -452,19 +500,16 @@ const AdminEditModal: React.FC<AdminEditModalProps> = (props) => {
               <div>
                 <Label>Giá</Label>
                 <Input
-                  type="text"
-                  value={
-                    editData.price !== undefined && editData.price !== null
-                      ? editData.price.toLocaleString("en-US")
-                      : ""
-                  }
+                  type="number"
+                  min="0"
+                  step="1"
+                  value={editData.price !== undefined && editData.price !== null ? editData.price : ""}
                   onChange={(e) => {
-                    const numericValue = Number(
-                      e.target.value.replace(/,/g, ""),
-                    );
+                    let numericValue = e.target.value === "" ? 0 : Number(e.target.value);
+                    if (numericValue < 0) numericValue = 0;
                     setEditData({
                       ...editData,
-                      price: isNaN(numericValue) ? 0 : numericValue,
+                      price: numericValue,
                     });
                   }}
                 />
@@ -472,19 +517,16 @@ const AdminEditModal: React.FC<AdminEditModalProps> = (props) => {
               <div>
                 <Label>Tồn kho</Label>
                 <Input
-                  type="text"
-                  value={
-                    editData.stock !== undefined && editData.stock !== null
-                      ? editData.stock.toLocaleString("en-US")
-                      : ""
-                  }
+                  type="number"
+                  min="0"
+                  step="1"
+                  value={editData.stock !== undefined && editData.stock !== null ? editData.stock : ""}
                   onChange={(e) => {
-                    const numericValue = Number(
-                      e.target.value.replace(/,/g, ""),
-                    );
+                    let numericValue = e.target.value === "" ? 0 : Number(e.target.value);
+                    if (numericValue < 0) numericValue = 0;
                     setEditData({
                       ...editData,
-                      stock: isNaN(numericValue) ? 0 : numericValue,
+                      stock: numericValue,
                     });
                   }}
                 />
@@ -571,10 +613,43 @@ const AdminEditModal: React.FC<AdminEditModalProps> = (props) => {
               <Label>Phim</Label>
               <select
                 value={String(editData?.movie_id ?? 0)}
-                onChange={(e) =>
-                  setEditData({ ...editData, movie_id: Number(e.target.value) })
-                }
-                className="w-full h-10 border rounded-md px-3"
+                onChange={(e) => {
+                  const movieId = Number(e.target.value);
+                  setEditData({ ...editData, movie_id: movieId });
+                  // Find and set selected movie info for create mode
+                  if (!editData?.id || editData?.id === 0) {
+                    if (movieId) {
+                      const selectedMovie = moviesLocal.find(
+                        (m) => String((m as any).id) === String(movieId)
+                      );
+                      if (selectedMovie) {
+                        const movie = selectedMovie as any;
+                        // Check if all required fields have data
+                        const isValid = movie.price && movie.release_date && movie.duration;
+
+                        console.log("Selected Movie:", movie);
+                        console.log("Is Valid:", isValid, { price: movie.price, release_date: movie.release_date, duration: movie.duration });
+
+                        setSelectedMovieInfo({
+                          title: movie.title,
+                          price: movie.price,
+                          release_date: movie.release_date,
+                          duration: movie.duration,
+                          genres: movie.genres,
+                        });
+                        setIsMovieInfoValid(isValid);
+                      } else {
+                        setSelectedMovieInfo(null);
+                        setIsMovieInfoValid(false);
+                      }
+                    } else {
+                      setSelectedMovieInfo(null);
+                      setIsMovieInfoValid(false);
+                    }
+                  }
+                }}
+                disabled={editData?.id && editData?.id !== 0}
+                className="w-full h-10 border rounded-md px-3 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 <option value="0">Chọn phim</option>
                 {moviesLocal.map((m) => (
@@ -598,9 +673,60 @@ const AdminEditModal: React.FC<AdminEditModalProps> = (props) => {
 
             {!editData?.id || editData?.id === 0 ? (
               <>
+                {/* Show selected movie info in create mode */}
+                {selectedMovieInfo && (
+                  <div className={`border-2 rounded-lg p-4 space-y-2 ${!isMovieInfoValid ? 'bg-red-50 border-red-200' : 'bg-blue-50 border-blue-200'}`}>
+                    <h4 className={`font-semibold ${!isMovieInfoValid ? 'text-red-900' : 'text-blue-900'}`}>
+                      Thông tin phim {!isMovieInfoValid && '⚠️ (Chưa đủ thông tin)'}
+                    </h4>
+                    <div className="grid grid-cols-2 gap-3 text-sm">
+                      <div>
+                        <p className={!isMovieInfoValid ? 'text-red-600 font-semibold' : 'text-gray-600'}>
+                          Tên phim
+                        </p>
+                        <p className="font-medium">{selectedMovieInfo.title}</p>
+                      </div>
+                      <div>
+                        <p className={!selectedMovieInfo.price ? 'text-red-600 font-semibold' : 'text-gray-600'}>
+                          Giá phim {!selectedMovieInfo.price && '❌'}
+                        </p>
+                        <p className="font-medium text-blue-600">
+                          {selectedMovieInfo.price
+                            ? selectedMovieInfo.price.toLocaleString("en-US") + ' đ'
+                            : 'Chưa nhập'}
+                        </p>
+                      </div>
+                      <div>
+                        <p className={!selectedMovieInfo.release_date ? 'text-red-600 font-semibold' : 'text-gray-600'}>
+                          Ngày phát hành {!selectedMovieInfo.release_date && '❌'}
+                        </p>
+                        <p className="font-medium">
+                          {selectedMovieInfo.release_date
+                            ? new Date(selectedMovieInfo.release_date).toLocaleDateString("vi-VN")
+                            : 'Chưa nhập'}
+                        </p>
+                      </div>
+                      <div>
+                        <p className={!selectedMovieInfo.duration ? 'text-red-600 font-semibold' : 'text-gray-600'}>
+                          Thời lượng(phút) {!selectedMovieInfo.duration && '❌'}
+                        </p>
+                        <p className="font-medium">
+                          {selectedMovieInfo.duration ? selectedMovieInfo.duration : 'Chưa nhập'}
+                        </p>
+                      </div>
+                    </div>
+                    {!isMovieInfoValid && (
+                      <p className="text-sm text-red-700 mt-2">
+                        ⚠️ Vui lòng hoàn thành thông tin phim (giá, ngày phát hành, thời lượng) trước khi tạo suất chiếu
+                      </p>
+                    )}
+                  </div>
+                )}
+
                 <div>
                   <Button
                     variant="outline"
+                    disabled={!isMovieInfoValid}
                     onClick={() => {
                       const rows = Array.isArray(editData.rows)
                         ? editData.rows
@@ -616,11 +742,12 @@ const AdminEditModal: React.FC<AdminEditModalProps> = (props) => {
                           {
                             day: "",
                             time: "",
-                            price: Number(editData.price || 0),
+                            price: Number(selectedMovieInfo?.price || editData.price || 0),
                           },
                         ],
                       });
                     }}
+                    className={isMovieInfoValid ? '' : 'opacity-50 cursor-not-allowed'}
                   >
                     Thêm row
                   </Button>
@@ -659,20 +786,17 @@ const AdminEditModal: React.FC<AdminEditModalProps> = (props) => {
                       <div>
                         <Label>Giá</Label>
                         <Input
-                          type="text"
-                          value={
-                            row.price !== undefined && row.price !== null
-                              ? Number(row.price).toLocaleString("en-US")
-                              : ""
-                          }
+                          type="number"
+                          min="0"
+                          step="1"
+                          value={row.price !== undefined && row.price !== null ? row.price : ""}
                           onChange={(e) => {
-                            const numericValue = Number(
-                              e.target.value.replace(/,/g, ""),
-                            );
+                            let numericValue = e.target.value === "" ? 0 : Number(e.target.value);
+                            if (numericValue < 0) numericValue = 0;
                             const rows = [...(editData.rows || [])];
                             rows[idx] = {
                               ...rows[idx],
-                              price: isNaN(numericValue) ? 0 : numericValue,
+                              price: numericValue,
                             };
                             setEditData({ ...editData, rows });
                           }}
@@ -702,6 +826,24 @@ const AdminEditModal: React.FC<AdminEditModalProps> = (props) => {
                   </Button>
                   <Button
                     onClick={async () => {
+                      // Validation for new showtime
+                      if (!editData.movie_id) {
+                        toast({
+                          title: "Lỗi",
+                          description: "Vui lòng chọn phim",
+                          variant: "destructive",
+                        });
+                        return;
+                      }
+                      if (!isMovieInfoValid) {
+                        toast({
+                          title: "Lỗi",
+                          description: "Phim chưa có đủ thông tin (giá, ngày phát hành, thời lượng)",
+                          variant: "destructive",
+                        });
+                        return;
+                      }
+
                       try {
                         const rows: Array<{
                           day: string;
@@ -709,14 +851,23 @@ const AdminEditModal: React.FC<AdminEditModalProps> = (props) => {
                           price: number;
                         }> = Array.isArray(editData.rows) ? editData.rows : [];
                         if (rows.length > 0) {
+                          // Validate all rows
+                          const invalidRows = rows.filter(r => !r.day || !r.time || !r.price);
+                          if (invalidRows.length > 0) {
+                            toast({
+                              title: "Lỗi",
+                              description: "Vui lòng điền đầy đủ thông tin ngày, giờ, giá cho tất cả các dòng",
+                              variant: "destructive",
+                            });
+                            return;
+                          }
+
                           const payload = {
                             movie_id: Number(editData.movie_id),
-                            start_times: rows
-                              .filter((r) => r.day && r.time)
-                              .map((r) => ({
-                                start_time: `${r.day}T${r.time}`,
-                                price: Number(r.price || editData.price || 0),
-                              })),
+                            start_times: rows.map((r) => ({
+                              start_time: `${r.day}T${r.time}`,
+                              price: Number(r.price || editData.price || 0),
+                            })),
                             price: Number(editData.price || 0),
                           };
                           const res = await createShowtimesBatchApi(payload);
@@ -739,10 +890,6 @@ const AdminEditModal: React.FC<AdminEditModalProps> = (props) => {
                           });
                         }
                         await refetch("showtime");
-                        toast({
-                          title: "Thành công",
-                          description: editData.id ? "Cập nhật lịch chiếu thành công" : "Thêm lịch chiếu mới thành công",
-                        });
                       } catch (e: any) {
                         toast({
                           title: "Lỗi",
@@ -854,6 +1001,24 @@ const AdminEditModal: React.FC<AdminEditModalProps> = (props) => {
                   </Button>
                   <Button
                     onClick={async () => {
+                      // Validation for showtime edit
+                      if (!editData.start_time) {
+                        toast({
+                          title: "Lỗi",
+                          description: "Ngày và giờ là bắt buộc",
+                          variant: "destructive",
+                        });
+                        return;
+                      }
+                      if (editData.price === undefined || editData.price === null) {
+                        toast({
+                          title: "Lỗi",
+                          description: "Giá vé là bắt buộc",
+                          variant: "destructive",
+                        });
+                        return;
+                      }
+
                       try {
                         await updateShowtimeApi(Number(editData.id), {
                           movie_id: Number(editData.movie_id),

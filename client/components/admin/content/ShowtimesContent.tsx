@@ -49,6 +49,8 @@ interface Props {
   todayOnly: boolean;
   setTodayOnly: (v: boolean) => void;
   onRefresh: () => void;
+  searchQuery?: string;
+  onSearchChange?: (query: string) => void;
 }
 
 export default function ShowtimesContent({
@@ -66,6 +68,8 @@ export default function ShowtimesContent({
   todayOnly,
   setTodayOnly,
   onRefresh,
+  searchQuery = "",
+  onSearchChange = () => {},
 }: Props) {
   const [isDetailsOpen, setIsDetailsOpen] = useState(false);
   const [selectedShowtimeId, setSelectedShowtimeId] = useState<number | null>(
@@ -108,10 +112,19 @@ export default function ShowtimesContent({
   };
   return (
     <div className="space-y-6">
-      <div className="flex justify-between items-center">
+      <div className="flex justify-between items-center gap-4">
+        <div className="flex-1">
+          <input
+            type="text"
+            placeholder="Tìm kiếm suất chiếu theo tên phim..."
+            value={searchQuery}
+            onChange={(e) => onSearchChange(e.target.value)}
+            className="w-full px-4 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+          />
+        </div>
         <div className="flex items-center gap-3">
-          <h3 className="text-lg font-semibold">
-            Tổng cộng: {data.length} suất chiếu
+          <h3 className="text-lg font-semibold whitespace-nowrap">
+            Tổng: {data.length}
           </h3>
           <select
             value={sortKey}
@@ -275,8 +288,8 @@ export default function ShowtimesContent({
                         : "N/A"}
                     </p>
                     <p>
-                      <span className="text-gray-600">Thời lượng:</span>{" "}
-                      {showtimeDetails.movie.duration_min} phút
+                      <span className="text-gray-600">Thời lượng(phút):</span>{" "}
+                      {showtimeDetails.movie.duration_min}
                     </p>
                     <p>
                       <span className="text-gray-600">Rating:</span>{" "}

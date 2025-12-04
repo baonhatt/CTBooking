@@ -289,7 +289,7 @@ export default function BookingSection({ onBookClick }: BookingSectionProps) {
         method: paymentMethod,
         poster: movieDetail?.cover_image || "",
         duration: movieDetail?.duration_min
-          ? `${movieDetail.duration_min} phút`
+          ? `${movieDetail.duration_min}`
           : "",
         genres: movieDetail?.genres || "",
       };
@@ -610,7 +610,7 @@ export default function BookingSection({ onBookClick }: BookingSectionProps) {
                         {activeMoviesFull.find(
                           (x: any) => x.title === selectedMovie.title,
                         )?.duration_min
-                          ? `${activeMoviesFull.find((x: any) => x.title === selectedMovie.title)?.duration_min} phút`
+                          ? `${activeMoviesFull.find((x: any) => x.title === selectedMovie.title)?.duration_min}`
                           : ""}
                       </div>
                       <div className="text-fuchsia-400">
@@ -990,7 +990,7 @@ export default function BookingSection({ onBookClick }: BookingSectionProps) {
                   {activeMoviesFull.find(
                     (x: any) => x.title === selectedMovie.title,
                   )?.duration_min
-                    ? `${activeMoviesFull.find((x: any) => x.title === selectedMovie.title)?.duration_min} phút`
+                    ? `${activeMoviesFull.find((x: any) => x.title === selectedMovie.title)?.duration_min}`
                     : ""}
                 </div>
               )}

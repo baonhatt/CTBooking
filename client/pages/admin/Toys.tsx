@@ -9,13 +9,18 @@ export default function ToysPage() {
   const [totalToys, setTotalToys] = useState(0);
   const [toysPage, setToysPage] = useState(1);
   const pageSize = 10;
+  const [searchQuery, setSearchQuery] = useState("");
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [editType, setEditType] = useState<"toy" | null>(null);
   const [editData, setEditData] = useState<any>({});
 
   useEffect(() => {
     (async () => {
-      const { items, total } = await getToys({ page: toysPage, pageSize });
+      const { items, total } = await getToys({ 
+        page: toysPage, 
+        pageSize,
+        q: searchQuery,
+      });
       setToys(
         items.map((t: any) => ({
           id: t.id,
@@ -29,7 +34,7 @@ export default function ToysPage() {
       );
       setTotalToys(total);
     })();
-  }, [toysPage, pageSize]);
+  }, [toysPage, pageSize, searchQuery]);
 
   const toysTotalPages = useMemo(
     () => Math.max(1, Math.ceil(totalToys / pageSize)),
@@ -89,6 +94,11 @@ export default function ToysPage() {
         deleteToyApi={deleteToyApi as any}
         setToys={setToys}
         onRefresh={handleRefresh}
+        searchQuery={searchQuery}
+        onSearchChange={(query) => {
+          setSearchQuery(query);
+          setToysPage(1);
+        }}
       />
       <AdminEditModal
         isEditOpen={isEditOpen}
