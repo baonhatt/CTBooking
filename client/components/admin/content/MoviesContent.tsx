@@ -48,6 +48,8 @@ interface Props {
   moviesLength: number;
   formatLocalDateTime: (date: Date) => React.ReactNode;
   onRefresh: () => void;
+  searchQuery?: string;
+  onSearchChange?: (query: string) => void;
 }
 
 export default function MoviesContent({
@@ -61,6 +63,8 @@ export default function MoviesContent({
   moviesLength,
   formatLocalDateTime,
   onRefresh,
+  searchQuery = "",
+  onSearchChange = () => {},
 }: Props) {
   const [isDetailsOpen, setIsDetailsOpen] = useState(false);
   const [selectedMovieId, setSelectedMovieId] = useState<number | null>(null);
@@ -92,9 +96,18 @@ export default function MoviesContent({
   };
   return (
     <div className="space-y-6">
-      <div className="flex justify-between items-center">
-        <h3 className="text-lg font-semibold">
-          Tổng cộng: {moviesLength} phim
+      <div className="flex justify-between items-center gap-4">
+        <div className="flex-1">
+          <input
+            type="text"
+            placeholder="Tìm kiếm phim theo tên hoặc mô tả..."
+            value={searchQuery}
+            onChange={(e) => onSearchChange(e.target.value)}
+            className="w-full px-4 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+          />
+        </div>
+        <h3 className="text-lg font-semibold whitespace-nowrap">
+          Tổng: {moviesLength}
         </h3>
         <div className="flex gap-2">
           <Button onClick={onRefresh} variant="outline">
@@ -111,7 +124,7 @@ export default function MoviesContent({
                 <TableHead>ID</TableHead>
                 <TableHead>Tên phim</TableHead>
                 <TableHead>Thể loại</TableHead>
-                <TableHead>Thời lượng</TableHead>
+                <TableHead>Thời lượng(phút)</TableHead>
                 <TableHead>Giá vé TB</TableHead>
                 <TableHead>Rating</TableHead>
                 <TableHead>Ngày ra mắt</TableHead>
@@ -274,9 +287,9 @@ export default function MoviesContent({
                       </span>
                     </p>
                     <p>
-                      <span className="text-gray-600">Thời lượng:</span>{" "}
+                      <span className="text-gray-600">Thời lượng(phút):</span>{" "}
                       <span className="font-medium">
-                        {movieDetails.duration_min} phút
+                        {movieDetails.duration_min}
                       </span>
                     </p>
                     <p>

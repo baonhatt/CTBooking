@@ -13,6 +13,7 @@ export default function ShowtimesPage() {
     "start_time" | "created_at" | "movie_title"
   >("start_time");
   const [todayOnly, setTodayOnly] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [editType, setEditType] = useState<"showtime" | null>(null);
   const [editData, setEditData] = useState<any>({});
@@ -35,11 +36,14 @@ export default function ShowtimesPage() {
           start_time: new Date(s.start_time).toISOString(),
           price: Number(s.price),
           total_sold: Number(s.total_sold || 0),
-        })),
+        })).filter(s => 
+          searchQuery === "" || 
+          s.movie_title.toLowerCase().includes(searchQuery.toLowerCase())
+        ),
       );
       setTotalShowtimes(total);
     })();
-  }, [showtimesPage, pageSize, sortKey, todayOnly]);
+  }, [showtimesPage, pageSize, sortKey, todayOnly, searchQuery]);
 
   useEffect(() => {
     setShowtimesPage(1);
@@ -90,7 +94,14 @@ export default function ShowtimesPage() {
     (async () => {
       const { items } = await getMoviesAdmin({ page: 1, pageSize: 50 });
       setMoviesLocal(
-        items.map((m: any) => ({ id: String(m.id), title: m.title })),
+        items.map((m: any) => ({
+          id: String(m.id),
+          title: m.title,
+          price: m.price,
+          duration: m.duration_min,
+          release_date: m.release_date,
+          genres: m.genres,
+        })),
       );
     })();
   };
@@ -138,6 +149,11 @@ export default function ShowtimesPage() {
         todayOnly={todayOnly}
         setTodayOnly={setTodayOnly}
         onRefresh={handleRefresh}
+        searchQuery={searchQuery}
+        onSearchChange={(query) => {
+          setSearchQuery(query);
+          setShowtimesPage(1);
+        }}
       />
       <AdminEditModal
         isEditOpen={isEditOpen}

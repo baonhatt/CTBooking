@@ -331,7 +331,7 @@ export default function TransactionsContent({
                         <Badge variant="outline">⭐ N/A</Badge>
                       )}
                       <Badge variant="outline">
-                        {txDetails.showtime?.movie?.duration_min || "N/A"} phút
+                        {txDetails.showtime?.movie?.duration_min || "N/A"}
                       </Badge>
                     </div>
                     <div className="pt-2 border-t space-y-1 text-sm">

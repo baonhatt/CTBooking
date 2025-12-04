@@ -88,32 +88,50 @@ export const createMovie: RequestHandler = async (req, res) => {
       is_active,
       release_date,
     } = req.body as any;
-    if (!title || price === undefined) {
-      return res.status(400).json({ message: "Thiếu dữ liệu bắt buộc" });
+    // Verify required fields
+    if (!title || title.trim() === "") {
+      return res.status(400).json({ message: "Tên phim là bắt buộc" });
+    }
+
+    // Validate price
+    if (price === undefined || price === null) {
+      return res.status(400).json({ message: "Giá là bắt buộc" });
     }
     const priceNum = Number(price);
     if (!Number.isFinite(priceNum) || priceNum < 0) {
-      return res.status(400).json({ message: "Giá không hợp lệ" });
+      return res.status(400).json({ message: "Giá không hợp lệ (phải là số dương)" });
+    }
+    if (priceNum === 0) {
+      return res.status(400).json({ message: "Giá phải lớn hơn 0" });
     }
     if (priceNum > 99999999.99) {
-      return res
-        .status(400)
-        .json({ message: "Giá vượt quá giới hạn (tối đa 99,999,999.99)" });
+      return res.status(400).json({ message: "Giá vượt quá giới hạn (tối đa 99,999,999.99)" });
     }
+
+    // Validate duration
+    if (duration_min === undefined || duration_min === null) {
+      return res.status(400).json({ message: "Thời lượng là bắt buộc" });
+    }
+    const durationNum = Number(duration_min);
+    if (!Number.isInteger(durationNum) || durationNum <= 0) {
+      return res.status(400).json({ message: "Thời lượng phải là số nguyên dương" });
+    }
+    if (durationNum > 600) {
+      return res.status(400).json({ message: "Thời lượng không hợp lệ (tối đa 600 phút)" });
+    }
+
+    // Validate release_date
+    if (!release_date) {
+      return res.status(400).json({ message: "Ngày phát hành là bắt buộc" });
+    }
+
+    // Validate rating
     let ratingNum: number | undefined = undefined;
     if (rating !== undefined && rating !== null && rating !== "") {
       ratingNum = Number(rating);
       if (!Number.isFinite(ratingNum) || ratingNum < 0 || ratingNum > 10) {
-        return res.status(400).json({ message: "Điểm đánh giá không hợp lệ" });
+        return res.status(400).json({ message: "Điểm đánh giá phải từ 0 đến 10" });
       }
-    }
-    const durationNum =
-      duration_min === undefined ? undefined : Number(duration_min);
-    if (
-      durationNum !== undefined &&
-      (!Number.isInteger(durationNum) || durationNum < 0)
-    ) {
-      return res.status(400).json({ message: "Thời lượng không hợp lệ" });
     }
     let savedCover = cover_image as string | undefined;
     if (cover_image_base64 && typeof cover_image_base64 === "string") {
@@ -250,33 +268,59 @@ export const updateMovie: RequestHandler = async (req, res) => {
     }
     if (detail_images !== undefined) data.detail_images = detail_images;
     if (genres !== undefined) data.genres = genres;
+
+    // Validate rating
     if (rating !== undefined) {
       const r = Number(rating);
       if (!Number.isFinite(r) || r < 0 || r > 10)
-        return res.status(400).json({ message: "Điểm đánh giá không hợp lệ" });
+        return res.status(400).json({ message: "Điểm đánh giá phải từ 0 đến 10" });
       data.rating = r;
     }
+
+    // Validate duration
     if (duration_min !== undefined) {
       const d = Number(duration_min);
-      if (!Number.isInteger(d) || d < 0)
-        return res.status(400).json({ message: "Thời lượng không hợp lệ" });
+      if (!Number.isInteger(d) || d <= 0)
+        return res.status(400).json({ message: "Thời lượng phải là số nguyên dương" });
+      if (d > 600)
+        return res.status(400).json({ message: "Thời lượng không hợp lệ (tối đa 600 phút)" });
       data.duration_min = d;
     }
+
+    // Validate price
     if (price !== undefined) {
       const p = Number(price);
       if (!Number.isFinite(p) || p < 0)
-        return res.status(400).json({ message: "Giá không hợp lệ" });
+        return res.status(400).json({ message: "Giá không hợp lệ (phải là số dương)" });
+      if (p === 0)
+        return res.status(400).json({ message: "Giá phải lớn hơn 0" });
       if (p > 99999999.99)
-        return res
-          .status(400)
-          .json({ message: "Giá vượt quá giới hạn (tối đa 99,999,999.99)" });
+        return res.status(400).json({ message: "Giá vượt quá giới hạn (tối đa 99,999,999.99)" });
       data.price = p;
     }
+
     if (is_active !== undefined) data.is_active = Boolean(is_active);
     if (release_date !== undefined)
       data.release_date = release_date ? new Date(release_date) : null;
     data.updated_at = new Date();
     const movie = await (prisma as any).movies.update({ where: { id }, data });
+
+    // Update end_time for all showtimes of this movie if duration_min changed
+    if (duration_min !== undefined) {
+      const durationMinutes = Number(duration_min);
+      const showtimes = await (prisma as any).showtimes.findMany({
+        where: { movie_id: id },
+      });
+      for (const st of showtimes) {
+        const startDate = new Date(st.start_time);
+        const endDate = new Date(startDate.getTime() + durationMinutes * 60 * 1000);
+        await (prisma as any).showtimes.update({
+          where: { id: st.id },
+          data: { end_time: endDate },
+        });
+      }
+    }
+
     res.status(200).json({ message: "Cập nhật phim thành công", movie });
   } catch (err: any) {
     if (err?.code === "P2025")
@@ -347,24 +391,39 @@ export const createShowtime: RequestHandler = async (req, res) => {
     const { movie_id, start_time, price } = req.body as any;
     const start = new Date(start_time);
     if (!start_time || Number.isNaN(start.getTime())) {
-      return res.status(400).json({ message: "start_time không hợp lệ" });
+      return res.status(400).json({ message: "Thời gian bắt đầu không hợp lệ" });
     }
     const mId = Number(movie_id);
     const priceNum = Number(price);
-    if (!mId || !Number.isFinite(priceNum) || priceNum < 0) {
-      return res
-        .status(400)
-        .json({ message: "Thiếu dữ liệu hoặc dữ liệu không hợp lệ" });
+
+    // Validate movie_id
+    if (!mId) {
+      return res.status(400).json({ message: "Phim là bắt buộc" });
+    }
+
+    // Validate price
+    if (!Number.isFinite(priceNum) || priceNum <= 0) {
+      return res.status(400).json({ message: "Giá phải là số dương" });
     }
     if (priceNum > 9999999.99) {
-      return res
-        .status(400)
-        .json({ message: "Giá vượt quá giới hạn (tối đa 9,999,999.99)" });
+      return res.status(400).json({ message: "Giá vượt quá giới hạn (tối đa 9,999,999.99)" });
     }
+
     const movie = await (prisma as any).movies.findUnique({
       where: { id: mId },
     });
     if (!movie) return res.status(404).json({ message: "Không tìm thấy phim" });
+
+    // Verify start_time >= movie.release_date
+    if (movie.release_date) {
+      const releaseDate = new Date(movie.release_date);
+      if (start < releaseDate) {
+        return res.status(400).json({
+          message: `Ngày bắt đầu suất chiếu không được nhỏ hơn ngày phát hành phim (${releaseDate.toLocaleDateString("vi-VN")})`,
+        });
+      }
+    }
+
     const duration = Number(movie.duration_min || 0);
     const end = new Date(start.getTime() + duration * 60 * 1000);
 
@@ -438,19 +497,26 @@ export const updateShowtime: RequestHandler = async (req, res) => {
       include: { movie: true },
     });
     if (!st) return res.status(404).json({ message: "Không tìm thấy lịch" });
+
     const mId = movie_id !== undefined ? Number(movie_id) : st.movie_id;
     const start = start_time ? new Date(start_time) : new Date(st.start_time);
     const priceNum = price === undefined ? undefined : Number(price);
-    if (
-      priceNum !== undefined &&
-      (!Number.isFinite(priceNum) || priceNum < 0)
-    ) {
-      return res.status(400).json({ message: "Giá không hợp lệ" });
+
+    // Validate price if provided
+    if (priceNum !== undefined) {
+      if (!Number.isFinite(priceNum) || priceNum <= 0) {
+        return res.status(400).json({ message: "Giá phải là số dương" });
+      }
+      if (priceNum > 9999999.99) {
+        return res.status(400).json({ message: "Giá vượt quá giới hạn (tối đa 9,999,999.99)" });
+      }
     }
+
     const movie = await (prisma as any).movies.findUnique({
       where: { id: mId },
     });
     if (!movie) return res.status(404).json({ message: "Không tìm thấy phim" });
+
     const duration = Number(movie.duration_min || 0);
     const end = new Date(start.getTime() + duration * 60 * 1000);
     const dayStart = new Date(start);
@@ -507,23 +573,34 @@ export const createShowtimesBatch: RequestHandler = async (req, res) => {
     const { movie_id, start_times, price } = req.body as any;
     const mId = Number(movie_id);
     const defaultPriceNum = Number(price ?? 0);
-    if (!mId || !Array.isArray(start_times) || start_times.length === 0) {
-      return res.status(400).json({ message: "Thiếu dữ liệu" });
+
+    // Validate movie_id
+    if (!mId) {
+      return res.status(400).json({ message: "Phim là bắt buộc" });
     }
-    if (
-      !Number.isFinite(defaultPriceNum) ||
-      defaultPriceNum < 0 ||
-      defaultPriceNum > 9999999.99
-    ) {
-      return res.status(400).json({ message: "Giá không hợp lệ" });
+
+    // Validate start_times array
+    if (!Array.isArray(start_times) || start_times.length === 0) {
+      return res.status(400).json({ message: "Phải có ít nhất một thời gian chiếu" });
     }
+
+    // Validate default price
+    if (!Number.isFinite(defaultPriceNum) || defaultPriceNum <= 0) {
+      return res.status(400).json({ message: "Giá phải là số dương" });
+    }
+    if (defaultPriceNum > 9999999.99) {
+      return res.status(400).json({ message: "Giá vượt quá giới hạn (tối đa 9,999,999.99)" });
+    }
+
     const movie = await (prisma as any).movies.findUnique({
       where: { id: mId },
     });
     if (!movie) return res.status(404).json({ message: "Không tìm thấy phim" });
+
     const duration = Number(movie.duration_min || 0);
     const created: any[] = [];
     const skipped: any[] = [];
+
     for (const item of start_times) {
       const stStr = typeof item === "string" ? item : item?.start_time;
       const rowPrice =
@@ -531,14 +608,35 @@ export const createShowtimesBatch: RequestHandler = async (req, res) => {
           ? Number(item.price ?? defaultPriceNum)
           : defaultPriceNum;
       const start = new Date(stStr);
+
+      // Validate start_time format
       if (!stStr || Number.isNaN(start.getTime())) {
-        skipped.push({ start_time: stStr, reason: "start_time không hợp lệ" });
+        skipped.push({ start_time: stStr, reason: "Thời gian không hợp lệ" });
         continue;
       }
-      if (!Number.isFinite(rowPrice) || rowPrice < 0 || rowPrice > 9999999.99) {
-        skipped.push({ start_time: stStr, reason: "Giá không hợp lệ" });
+
+      // Validate row price
+      if (!Number.isFinite(rowPrice) || rowPrice <= 0) {
+        skipped.push({ start_time: stStr, reason: "Giá phải là số dương" });
         continue;
       }
+      if (rowPrice > 9999999.99) {
+        skipped.push({ start_time: stStr, reason: "Giá vượt quá giới hạn" });
+        continue;
+      }
+
+      // Verify start_time >= movie.release_date
+      if (movie.release_date) {
+        const releaseDate = new Date(movie.release_date);
+        if (start < releaseDate) {
+          skipped.push({
+            start_time: stStr,
+            reason: `Ngày bắt đầu không được nhỏ hơn ngày phát hành (${releaseDate.toLocaleDateString("vi-VN")})`,
+          });
+          continue;
+        }
+      }
+
       const end = new Date(start.getTime() + duration * 60 * 1000);
       const dayStart = new Date(start);
       dayStart.setHours(0, 0, 0, 0);

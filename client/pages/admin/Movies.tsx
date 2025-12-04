@@ -11,6 +11,7 @@ export default function MoviesPage() {
   >({});
   const [totalMovies, setTotalMovies] = useState(0);
   const [moviesPage, setMoviesPage] = useState(1);
+  const [searchQuery, setSearchQuery] = useState("");
   const pageSize = 10;
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [editType, setEditType] = useState<"movie" | null>(null);
@@ -21,12 +22,13 @@ export default function MoviesPage() {
       const { items, total } = await getMoviesAdmin({
         page: moviesPage,
         pageSize,
+        q: searchQuery,
       });
       const mapped = items.map((m: any) => ({
         id: String(m.id),
         title: m.title,
         year: new Date(m.release_date || Date.now()).getFullYear(),
-        duration: m?.duration_min ? `${Number(m.duration_min)} phút` : "",
+        duration: m?.duration_min ? `${Number(m.duration_min)}` : "",
         genres: Array.isArray(m.genres) ? m.genres : [],
         posterUrl: m.cover_image || "",
         release_date: m.release_date
@@ -42,7 +44,7 @@ export default function MoviesPage() {
         ...Object.fromEntries(mapped.map((x: any) => [x.id, "active"])),
       }));
     })();
-  }, [moviesPage, pageSize]);
+  }, [moviesPage, pageSize, searchQuery]);
 
   const moviesTotalPages = useMemo(
     () => Math.max(1, Math.ceil(totalMovies / pageSize)),
@@ -104,7 +106,7 @@ export default function MoviesPage() {
       id: String(m.id),
       title: m.title,
       year: new Date(m.release_date || Date.now()).getFullYear(),
-      duration: m?.duration_min ? `${Number(m.duration_min)} phút` : "",
+      duration: m?.duration_min ? `${Number(m.duration_min)}` : "",
       genres: Array.isArray(m.genres) ? m.genres : [],
       posterUrl: m.cover_image || "",
       release_date: m.release_date
@@ -139,6 +141,11 @@ export default function MoviesPage() {
         moviesLength={totalMovies}
         formatLocalDateTime={formatLocalDateTime}
         onRefresh={handleRefresh}
+        searchQuery={searchQuery}
+        onSearchChange={(query) => {
+          setSearchQuery(query);
+          setMoviesPage(1);
+        }}
       />
       <AdminEditModal
         isEditOpen={isEditOpen}
