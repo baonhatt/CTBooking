@@ -116,7 +116,7 @@ export default function BookingSection({ onBookClick }: BookingSectionProps) {
             pending = JSON.parse(
               decodeURIComponent(escape(atob(extraDataParam))),
             );
-          } catch {}
+          } catch { }
         }
         if (!pending || Object.keys(pending).length === 0) {
           const pendingStr = localStorage.getItem("pendingOrder");
@@ -134,7 +134,7 @@ export default function BookingSection({ onBookClick }: BookingSectionProps) {
         setIsModalOpen(false);
         setIsProcessing(false);
         localStorage.removeItem("pendingOrder");
-      } catch {}
+      } catch { }
       window.history.replaceState({}, document.title, window.location.pathname);
     }
   }, []);
@@ -156,7 +156,7 @@ export default function BookingSection({ onBookClick }: BookingSectionProps) {
       if (emailFromAuth) {
         setFormData((prev) => ({ ...prev, email: emailFromAuth }));
       }
-    } catch {}
+    } catch { }
     setIsModalOpen(true);
     onBookClick();
   };
@@ -276,7 +276,7 @@ export default function BookingSection({ onBookClick }: BookingSectionProps) {
         const parsed = JSON.parse(authRaw);
         authEmail = parsed?.user?.email || parsed?.email || authEmail;
         authName = parsed?.user?.username || parsed?.username || authName;
-      } catch {}
+      } catch { }
       const summary = {
         orderId,
         movie: selectedMovie?.title,
@@ -301,6 +301,8 @@ export default function BookingSection({ onBookClick }: BookingSectionProps) {
         const showtimeId = selectedShowtimeId as number;
         const { booking } = await createBookingApi({
           email: authEmail,
+          phone: formData.phone,
+          name: authName,
           showtimeId,
           ticketCount: formData.quantity,
           paymentMethod: paymentMethod as any,
@@ -473,10 +475,10 @@ export default function BookingSection({ onBookClick }: BookingSectionProps) {
                   {(selectedPackage?.features?.length
                     ? selectedPackage.features
                     : [
-                        "Ghế chuyển động 6D",
-                        "Mắt kính 3D active",
-                        "Hiệu ứng môi trường",
-                      ]
+                      "Ghế chuyển động 6D",
+                      "Mắt kính 3D active",
+                      "Hiệu ứng môi trường",
+                    ]
                   ).map((f: string, idx: number) => (
                     <li key={idx} className="flex items-center gap-2 text-gray-100">
                       <Check className="h-4 w-4 text-emerald-400" /> {f}
@@ -494,32 +496,32 @@ export default function BookingSection({ onBookClick }: BookingSectionProps) {
                 </Button>
               </motion.div>
               {ticketPackages.slice(1, 3).map((pkg, i) => (
-              <motion.div
-                initial={{ opacity: 0, y: 50 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true }}
-                transition={{ duration: 0.6, delay: 0.2 + i * 0.1 }}
-                className="bg-black/30 rounded-2xl p-6 border border-white/10 text-center"
-              >
-                <div className="text-xl font-semibold text-white mb-1">
-                  {pkg.name}
-                </div>
-                <div className="text-3xl font-bold text-white mb-2">
-                  {Number(pkg.price || 0).toLocaleString("vi-VN")}₫
-                </div>
-                <div className="text-xs text-gray-500 mb-6">
-                  {(pkg.features || []).slice(0,3).join(" • ")}
-                </div>
-                <Button
-                  onClick={() => {
-                    setSelectedPackage(pkg);
-                    handleOpenModal();
-                  }}
-                  className="bg-white text-black hover:bg-white/90 font-semibold"
+                <motion.div
+                  initial={{ opacity: 0, y: 50 }}
+                  whileInView={{ opacity: 1, y: 0 }}
+                  viewport={{ once: true }}
+                  transition={{ duration: 0.6, delay: 0.2 + i * 0.1 }}
+                  className="bg-black/30 rounded-2xl p-6 border border-white/10 text-center"
                 >
-                  Đặt Ngay
-                </Button>
-              </motion.div>
+                  <div className="text-xl font-semibold text-white mb-1">
+                    {pkg.name}
+                  </div>
+                  <div className="text-3xl font-bold text-white mb-2">
+                    {Number(pkg.price || 0).toLocaleString("vi-VN")}₫
+                  </div>
+                  <div className="text-xs text-gray-500 mb-6">
+                    {(pkg.features || []).slice(0, 3).join(" • ")}
+                  </div>
+                  <Button
+                    onClick={() => {
+                      setSelectedPackage(pkg);
+                      handleOpenModal();
+                    }}
+                    className="bg-white text-black hover:bg-white/90 font-semibold"
+                  >
+                    Đặt Ngay
+                  </Button>
+                </motion.div>
               ))}
             </div>
           </div>
