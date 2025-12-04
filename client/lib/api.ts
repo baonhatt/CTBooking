@@ -129,6 +129,7 @@ export async function createVnpayPaymentApi(body: {
 // ----------------- API CREATE BOOKING -----------------
 export async function createBookingApi(body: {
   email: string;
+  emailBook: string;
   phone: string;
   name: string;
   showtimeId: number;
