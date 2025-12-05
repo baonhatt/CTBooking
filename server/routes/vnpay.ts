@@ -33,7 +33,7 @@ export const createVnpayPayment: RequestHandler = async (req, res) => {
     }
     const tmnCode = VNP_TMNCODE || req.body.tmnCode || "";
     const hashSecret = VNP_HASH_SECRET || req.body.hashSecret || "";
-    const returnUrl = VNP_RETURN_URL || req.body.returnUrl || "";
+    const returnUrl = req.body.returnUrl || VNP_RETURN_URL || "";
     if (!tmnCode || !hashSecret || !returnUrl) {
       return res.status(400).json({ message: "VNPay configuration missing" });
     }
