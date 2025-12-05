@@ -7,12 +7,26 @@ export const getDashboardMetrics: RequestHandler = async (req, res) => {
     const totalShowtimes = await (prisma as any).showtimes.count();
     const totalToys = await (prisma as any).toys.count();
     const totalUsers = await (prisma as any).users.count();
-    const totalTransactions = await (prisma as any).bookings.count();
 
-    // Revenue total - only count PAID/SUCCESS transactions
+    // Only count PAID/SUCCESS transactions (ALL-TIME)
+    const totalTransactions = await (prisma as any).bookings.count({
+      where: {
+        payment_status: { in: ["paid"] },
+      },
+    });
+
+    // Revenue total - TODAY only
+    const now = new Date();
+    const todayStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), 0, 0, 0, 0));
+    const todayEnd = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), 23, 59, 59, 999));
+
     const revenueData = await (prisma as any).bookings.aggregate({
       where: {
-        payment_status: { in: ["paid", "PAID", "success", "SUCCESS"] },
+        payment_status: { in: ["paid"] },
+        OR: [
+          { created_at: { gte: todayStart, lte: todayEnd } },
+          { paid_at: { gte: todayStart, lte: todayEnd } },
+        ],
       },
       _sum: { total_price: true },
     });
@@ -52,7 +66,7 @@ export const getRevenueByDate: RequestHandler = async (req, res) => {
     }
 
     if (status !== "all") {
-      where.payment_status = { in: ["paid", "PAID", "success", "SUCCESS"] };
+      where.payment_status = { in: ["paid"] };
     }
 
     const total = await (prisma as any).bookings.aggregate({
@@ -99,7 +113,7 @@ export const getRevenue7Days: RequestHandler = async (req, res) => {
             { created_at: { gte: dayStart, lte: dayEnd } },
             { paid_at: { gte: dayStart, lte: dayEnd } },
           ],
-          payment_status: { in: ["paid", "PAID", "success", "SUCCESS"] },
+          payment_status: { in: ["paid"] },
         },
         _sum: { total_price: true },
       });
@@ -144,7 +158,7 @@ export const getRevenueByMonth: RequestHandler = async (req, res) => {
         ],
       };
       if (status !== "all") {
-        whereMonth.payment_status = { in: ["paid", "PAID", "success", "SUCCESS"] };
+        whereMonth.payment_status = { in: ["paid"] };
       }
       const revenue = await (prisma as any).bookings.aggregate({
         where: whereMonth,
@@ -184,7 +198,7 @@ export const getRevenueByMonth: RequestHandler = async (req, res) => {
         ],
       };
       if (status !== "all") {
-        whereMonth.payment_status = { in: ["paid", "PAID", "success", "SUCCESS"] };
+        whereMonth.payment_status = { in: ["paid"] };
       }
       const revenue = await (prisma as any).bookings.aggregate({
         where: whereMonth,

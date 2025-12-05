@@ -7,7 +7,7 @@ import path from "path";
 export const handleMovies2025: RequestHandler = (_req, res) => { };
 
 export const getAllActiveMoviesToday: RequestHandler = async (_req, res) => {
-  
+
   let activeMovies: ActiveMoviesTodayResponse[] = [];
   // Use UTC date to avoid timezone issues
   const now = new Date();
@@ -220,7 +220,6 @@ export const updateMovie: RequestHandler = async (req, res) => {
       rating,
       duration_min,
       is_active,
-      release_date,
     } = req.body as any;
     const data: any = {};
     if (title !== undefined) data.title = title;
@@ -265,9 +264,39 @@ export const updateMovie: RequestHandler = async (req, res) => {
       data.duration_min = d;
     }
 
-    if (is_active !== undefined) data.is_active = Boolean(is_active);
-    if (release_date !== undefined)
-      data.release_date = release_date ? new Date(release_date) : null;
+    // Check khi thay đổi is_active từ true sang false (tạm ẩn)
+    if (is_active !== undefined && is_active === false) {
+      const movie = await (prisma as any).movies.findUnique({
+        where: { id },
+      });
+
+      if (movie && movie.is_active === true) {
+        // Phim đang hoạt động, check xem có suất chiếu từ hôm nay trở đi không
+        const now = new Date();
+        const todayStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), 0, 0, 0, 0));
+
+        const futureShowtimes = await (prisma as any).showtimes.findFirst({
+          where: {
+            movie_id: id,
+            start_time: {
+              gte: todayStart,
+            },
+          },
+        });
+
+        if (futureShowtimes) {
+          return res.status(400).json({
+            message: "Không thể tạm ẩn phim có suất chiếu từ hôm nay trở đi",
+          });
+        }
+      }
+      data.is_active = false;
+    } else if (is_active !== undefined) {
+      data.is_active = Boolean(is_active);
+    }
+
+    // Note: release_date không được phép sửa đổi
+
     data.updated_at = new Date();
     const movie = await (prisma as any).movies.update({ where: { id }, data });
 
@@ -642,7 +671,7 @@ export const getMovieById: RequestHandler = async (req, res) => {
         showtime: {
           movie_id: movieId,
         },
-        payment_status: { in: ["paid", "PAID", "success", "SUCCESS"] },
+        payment_status: { in: ["paid"] },
       },
       _sum: { total_price: true },
     });
@@ -652,7 +681,7 @@ export const getMovieById: RequestHandler = async (req, res) => {
         showtime: {
           movie_id: movieId,
         },
-        payment_status: { in: ["paid", "PAID", "success", "SUCCESS"] },
+        payment_status: { in: ["paid"] },
       },
     });
 

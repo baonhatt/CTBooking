@@ -23,6 +23,7 @@ import ShowtimesPage from "./pages/admin/Showtimes";
 import ToysPage from "./pages/admin/Toys";
 import TransactionsPage from "./pages/admin/Transactions";
 import TicketsPage from "./pages/admin/Tickets";
+import TicketCheckPage from "./pages/admin/TicketCheck";
 import Checkout from "./pages/Checkout";
 import { useEffect, useState } from "react";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
@@ -132,6 +133,7 @@ const AdminGate = () => {
       <Route path="/toys" element={<ToysPage />} />
       <Route path="/tickets" element={<TicketsPage />} />
       <Route path="/transactions" element={<TransactionsPage />} />
+      <Route path="/ticket-check" element={<TicketCheckPage />} />
       <Route path="*" element={<Navigate to="/admin/dashboard" replace />} />
     </Routes>
   );

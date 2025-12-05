@@ -11,6 +11,7 @@ export default function TransactionsPage() {
   const [txQuery, setTxQuery] = useState("");
   const [revenueTotal, setRevenueTotal] = useState(0);
   const [revenueCount, setRevenueCount] = useState(0);
+  const [txStatus, setTxStatus] = useState<"paid" | "all">("paid");
 
   // Load transactions khi page hoặc query thay đổi
   useEffect(() => {
@@ -20,6 +21,7 @@ export default function TransactionsPage() {
           page: txPage,
           pageSize,
           email: txQuery,
+          status: txStatus,
         });
         setTransactions(
           items.map((t: any) => ({
@@ -39,7 +41,7 @@ export default function TransactionsPage() {
         console.error("Lỗi load giao dịch:", error);
       }
     })();
-  }, [txPage, pageSize, txQuery]);
+  }, [txPage, pageSize, txQuery, txStatus]);
 
   useEffect(() => {
     (async () => {
@@ -51,7 +53,7 @@ export default function TransactionsPage() {
         const { total, count } = await getAdminRevenue({
           from: todayStart.toISOString(),
           to: todayEnd.toISOString(),
-          status: "all",
+          status: "paid",
         });
         setRevenueTotal(total);
         setRevenueCount(count);
@@ -131,8 +133,10 @@ export default function TransactionsPage() {
         txQuery={txQuery}
         setTxQuery={setTxQuery}
         metrics={metrics}
-        transactionsLength={totalTransactions}
+        transactionsLength={transactions.length}
         onRefresh={handleRefresh}
+        txStatus={txStatus}
+        setTxStatus={setTxStatus}
       />
     </AdminLayout>
   );

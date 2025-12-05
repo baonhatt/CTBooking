@@ -105,8 +105,8 @@ export const updatePayment: RequestHandler = async (req, res) => {
       payment_status.toLowerCase() === "paid" &&
       !bookingCode
     ) {
-      // Generate unique booking code
-      bookingCode = generateBookingCode();
+      // Generate unique booking code (checks for duplicates)
+      bookingCode = await generateBookingCode();
     }
 
     // Cập nhật booking
@@ -192,7 +192,7 @@ export const getRevenue: RequestHandler = async (req, res) => {
     const whereBase: any =
       status === "all"
         ? {}
-        : { payment_status: { in: ["success", "SUCCESS", "paid", "PAID"] } };
+        : { payment_status: { in: ["success"] } };
     let where: any = whereBase;
     if (from && to) {
       where = {
@@ -237,6 +237,7 @@ export const listTransactions: RequestHandler = async (req, res) => {
     const page = Number(req.query.page || 1);
     const pageSize = Number(req.query.pageSize || 10);
     const email = String(req.query.email || "");
+    const status = String(req.query.status || "");
     const skip = (page - 1) * pageSize;
 
     // Build where clause
@@ -252,6 +253,11 @@ export const listTransactions: RequestHandler = async (req, res) => {
           },
         },
       };
+    }
+
+    // Filter by payment status
+    if (status && status !== "all") {
+      where.payment_status = status;
     }
 
     // Get total count
@@ -466,6 +472,80 @@ export const getBookingById: RequestHandler = async (req, res) => {
     });
   } catch (err: any) {
     console.error("Error getting booking:", err);
+    res.status(500).json({ message: "Lỗi máy chủ nội bộ" });
+  }
+};
+
+// ===== GET BOOKING BY CODE (cho ticket check) =====
+export const getBookingByCode: RequestHandler = async (req, res) => {
+  try {
+    const { code } = req.params;
+
+    if (!code || code.trim() === "") {
+      return res.status(400).json({ message: "Vui lòng nhập mã vé" });
+    }
+
+    // Normalize code: uppercase and trim
+    const normalizedCode = code.trim().toUpperCase();
+
+    const booking = await prisma.bookings.findUnique({
+      where: { booking_code: normalizedCode },
+      include: {
+        showtime: {
+          include: {
+            movie: {
+              select: {
+                id: true,
+                title: true,
+                genres: true,
+                duration_min: true,
+                cover_image: true,
+              },
+            },
+          },
+        },
+        user: {
+          select: {
+            fullname: true,
+          },
+        },
+      },
+    });
+
+    if (!booking) {
+      return res.status(404).json({ message: "Không tìm thấy vé với mã này" });
+    }
+
+    res.status(200).json({
+      id: booking.id,
+      booking_code: booking.booking_code,
+      payment_status: booking.payment_status,
+      user_id: booking.user_id,
+      name: booking.name,
+      phone: booking.phone,
+      email: booking.email,
+      ticket_count: booking.ticket_count,
+      total_price: booking.total_price,
+      showtime_id: booking.showtime_id,
+      created_at: booking.created_at,
+      paid_at: booking.paid_at,
+      payment_method: booking.payment_method,
+      showtime: booking.showtime ? {
+        id: booking.showtime.id,
+        start_time: booking.showtime.start_time,
+        end_time: booking.showtime.end_time,
+        movie: {
+          id: booking.showtime.movie.id,
+          title: booking.showtime.movie.title,
+          genres: booking.showtime.movie.genres,
+          duration_min: booking.showtime.movie.duration_min,
+          cover_image: booking.showtime.movie.cover_image,
+        },
+      } : null,
+      userName: booking.user?.fullname || "N/A",
+    });
+  } catch (err: any) {
+    console.error("Error getting booking by code:", err);
     res.status(500).json({ message: "Lỗi máy chủ nội bộ" });
   }
 };

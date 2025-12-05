@@ -4,13 +4,14 @@ import { useNavigate } from "react-router-dom";
 
 interface Props {
   active:
-    | "dashboard"
-    | "users"
-    | "movies"
-    | "toys"
-    | "showtimes"
-    | "transactions"
-    | "tickets";
+  | "dashboard"
+  | "users"
+  | "movies"
+  | "toys"
+  | "showtimes"
+  | "transactions"
+  | "tickets"
+  | "ticket-check";
   setActive: (x: any) => void;
   adminEmailState: string;
   handleLogout: () => void;
@@ -27,7 +28,11 @@ export default function AdminLayout({
   const navigate = useNavigate();
   function go(tab: Props["active"]) {
     setActive(tab);
-    navigate(`/admin/${tab === "dashboard" ? "dashboard" : tab}`);
+    if (tab === "ticket-check") {
+      navigate("/admin/ticket-check");
+    } else {
+      navigate(`/admin/${tab === "dashboard" ? "dashboard" : tab}`);
+    }
   }
   return (
     <div className="min-h-screen grid grid-cols-[240px_1fr]">
@@ -82,6 +87,13 @@ export default function AdminLayout({
             className="w-full"
           >
             Giao dịch
+          </Button>
+          <Button
+            variant={active === "ticket-check" ? "default" : "outline"}
+            onClick={() => go("ticket-check")}
+            className="w-full"
+          >
+            Kiểm Tra Vé
           </Button>
         </div>
         <Button variant="destructive" onClick={handleLogout} className="w-full">

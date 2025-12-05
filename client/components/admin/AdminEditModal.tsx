@@ -82,11 +82,12 @@ const AdminEditModal: React.FC<AdminEditModalProps> = (props) => {
         posterUrl: m.cover_image || "",
         release_date: m.release_date || null,
         rating: m.rating ?? null,
+        is_active: m.is_active !== false,
       }));
       setMoviesLocal(mapped);
       setMovieStatus((prev) => ({
         ...prev,
-        ...Object.fromEntries(mapped.map((x: any) => [x.id, "active"])),
+        ...Object.fromEntries(mapped.map((x: any) => [x.id, x.is_active ? "active" : "inactive"])),
       }));
     }
     if (type === "toy") {
@@ -296,6 +297,7 @@ const AdminEditModal: React.FC<AdminEditModalProps> = (props) => {
                     ? toLocalDateTimeString(new Date(editData.release_date))
                     : ""
                 }
+                disabled={!!editData?.id}
                 onChange={(e) =>
                   setEditData({
                     ...editData,
@@ -304,19 +306,21 @@ const AdminEditModal: React.FC<AdminEditModalProps> = (props) => {
                       : undefined,
                   })
                 }
+                className={!!editData?.id ? "opacity-50 cursor-not-allowed" : ""}
               />
+              {editData?.id && <p className="text-xs text-gray-500 mt-1">Không thể sửa đổi ngày phát hành</p>}
             </div>
             <div>
               <Label>Trạng thái</Label>
               <select
-                value={editData?.status || "active"}
+                value={editData?.is_active !== false ? "active" : "inactive"}
                 onChange={(e) =>
-                  setEditData({ ...editData, status: e.target.value })
+                  setEditData({ ...editData, is_active: e.target.value === "active" })
                 }
                 className="w-full h-10 border rounded-md px-3"
               >
                 <option value="active">Hoạt động</option>
-                <option value="inactive">Đã ẩn</option>
+                <option value="inactive">Tạm ẩn</option>
               </select>
             </div>
             <div className="flex justify-end gap-2">
@@ -401,8 +405,7 @@ const AdminEditModal: React.FC<AdminEditModalProps> = (props) => {
                         duration_min: editData.duration
                           ? Number(editData.duration)
                           : undefined,
-                        is_active: (editData?.status || "active") === "active",
-                        release_date: editData?.release_date,
+                        is_active: editData?.is_active !== false,
                       });
                     }
                     await refetch("movie");
@@ -410,6 +413,13 @@ const AdminEditModal: React.FC<AdminEditModalProps> = (props) => {
                       title: "Thành công",
                       description: editData.id ? "Cập nhật phim thành công" : "Thêm phim mới thành công",
                     });
+                  } catch (err: any) {
+                    toast({
+                      title: "Lỗi",
+                      description: err?.message || "Có lỗi xảy ra",
+                      variant: "destructive",
+                    });
+                    return;
                   } finally {
                     setIsEditOpen(false);
                   }

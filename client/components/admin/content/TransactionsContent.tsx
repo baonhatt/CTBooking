@@ -58,6 +58,8 @@ interface Props {
   metrics: Metrics;
   transactionsLength: number;
   onRefresh: () => void;
+  txStatus?: "paid" | "all";
+  setTxStatus?: (status: "paid" | "all") => void;
 }
 
 export default function TransactionsContent({
@@ -70,6 +72,8 @@ export default function TransactionsContent({
   metrics,
   transactionsLength,
   onRefresh,
+  txStatus = "paid",
+  setTxStatus,
 }: Props) {
   const [isDetailsOpen, setIsDetailsOpen] = useState(false);
   const [selectedTxId, setSelectedTxId] = useState<number | null>(null);
@@ -120,6 +124,14 @@ export default function TransactionsContent({
               value={txQuery}
               onChange={(e) => setTxQuery(e.target.value)}
             />
+            <select
+              value={txStatus}
+              onChange={(e) => setTxStatus?.(e.target.value as "paid" | "all")}
+              className="px-3 py-2 border rounded-md bg-white"
+            >
+              <option value="paid">Đã thanh toán</option>
+              <option value="all">Tất cả giao dịch</option>
+            </select>
           </div>
           <Table>
             <TableHeader>

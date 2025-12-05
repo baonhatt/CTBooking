@@ -302,14 +302,14 @@ export default function UsersContent({
                               </div>
                               <Badge
                                 variant={
-                                  ["success", "paid", "PAID", "SUCCESS"].includes(
+                                  ["paid"].includes(
                                     booking.payment_status
                                   )
                                     ? "default"
                                     : "secondary"
                                 }
                               >
-                                {["success", "paid", "PAID", "SUCCESS"].includes(
+                                {["paid"].includes(
                                   booking.payment_status
                                 )
                                   ? "Đã thanh toán"

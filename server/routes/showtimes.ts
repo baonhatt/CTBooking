@@ -43,7 +43,7 @@ export const getShowtimeById: RequestHandler = async (req, res) => {
     // Calculate stats
     const totalBookings = showtime.bookings.length;
     const successfulBookings = showtime.bookings.filter((b) =>
-      ["paid", "PAID", "success", "SUCCESS"].includes(b.payment_status)
+      ["paid"].includes(b.payment_status)
     );
     const totalRevenue = successfulBookings.reduce(
       (sum, b) => sum + Number(b.total_price),
