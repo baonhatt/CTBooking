@@ -31,6 +31,7 @@ import {
   listTransactions,
   getTransactionById,
   getBooking,
+  getBookingById,
 } from "./routes/payment";
 import {
   listToys,
@@ -103,7 +104,7 @@ export function createServer() {
   app.post("/api/vnpay/ipn", vnpayIpn);
   app.post("/api/create-booking", createPayment); // sử dụng để tạo đặt vé sau khi ấn nút thanh toán
   app.post("/api/confirm-booking", updatePayment); // sử dụng để xử lý data do momo trả về sau khi người dùng thanh toán thành công
-  app.get("/api/bookings/:id", getBooking); // lấy booking info + booking code
+  app.get("/api/bookings/:id", getBookingById); // lấy booking info đầy đủ cho checkout page
   app.get("/api/admin/revenue", getRevenue);
   app.get("/api/admin/transactions", listTransactions);
   app.get("/api/admin/transactions/:id", getTransactionById);

@@ -14,7 +14,7 @@ export async function sendMail(toEmail, subject, text) {
     from: `"Your App Name" <${process.env.GMAIL_USER}>`,
     to: toEmail,
     subject: subject,
-    text: text,
+    html: text,
   };
 
   try {

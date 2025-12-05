@@ -158,7 +158,26 @@ export async function confirmBookingApi(body: {
 
 // --------- API GET BOOKING BY ID (for booking code) ---------
 export async function getBookingByIdApi(bookingId: number) {
-  return request<{ id: number; booking_code?: string; status: string }>(
+  return request<{
+    id: number;
+    booking_code?: string;
+    payment_status: string;
+    user_id: number;
+    name: string;
+    phone: string;
+    email: string;
+    ticket_count: number;
+    total_price: number;
+    showtime_id: number;
+    showtime?: {
+      id: number;
+      start_time: string;
+      movie?: {
+        id: number;
+        title: string;
+      };
+    };
+  }>(
     `/api/bookings/${bookingId}`
   );
 }

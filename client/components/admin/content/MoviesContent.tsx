@@ -155,10 +155,10 @@ export default function MoviesContent({
                   </TableCell>
                   <TableCell>
                     <Badge
-                      variant={
+                      className={
                         movieStatus[movie.id] === "active"
-                          ? "default"
-                          : "secondary"
+                          ? "bg-green-100 text-green-800 hover:bg-green-100"
+                          : "bg-gray-100 text-gray-800 hover:bg-gray-100"
                       }
                     >
                       {movieStatus[movie.id] === "active"

@@ -158,11 +158,12 @@ export default function TransactionsContent({
                   </TableCell>
                   <TableCell>
                     <Badge
-                      variant={
-                        t.paymentStatus === "success" ||
-                          t.paymentStatus === "paid"
-                          ? "secondary"
-                          : "outline"
+                      className={
+                        t.paymentStatus === "paid"
+                          ? "bg-green-100 text-green-800 hover:bg-green-100"
+                          : t.paymentStatus === "pending"
+                            ? "bg-yellow-100 text-yellow-800 hover:bg-yellow-100"
+                            : "bg-red-100 text-red-800 hover:bg-red-100"
                       }
                     >
                       {t.paymentStatus}
@@ -353,11 +354,12 @@ export default function TransactionsContent({
                   <div className="flex justify-between">
                     <span className="text-gray-600">Trạng thái:</span>
                     <Badge
-                      variant={
-                        txDetails.payment_info?.payment_status === "success" ||
-                          txDetails.payment_info?.payment_status === "paid"
-                          ? "secondary"
-                          : "outline"
+                      className={
+                        txDetails.payment_info?.payment_status === "paid"
+                          ? "bg-green-100 text-green-800 hover:bg-green-100"
+                          : txDetails.payment_info?.payment_status === "pending"
+                            ? "bg-yellow-100 text-yellow-800 hover:bg-yellow-100"
+                            : "bg-red-100 text-red-800 hover:bg-red-100"
                       }
                     >
                       {txDetails.payment_info?.payment_status || "N/A"}
