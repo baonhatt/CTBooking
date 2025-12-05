@@ -105,7 +105,13 @@ export default function TicketsContent(props: Props) {
                   <TableCell>{Number(t.price).toLocaleString("vi-VN")} đ</TableCell>
                   <TableCell>{t.display_order ?? 0}</TableCell>
                   <TableCell>
-                    <Badge variant={t.is_active ? "default" : "secondary"}>
+                    <Badge
+                      className={
+                        t.is_active
+                          ? "bg-green-100 text-green-800 hover:bg-green-100"
+                          : "bg-gray-100 text-gray-800 hover:bg-gray-100"
+                      }
+                    >
                       {t.is_active ? "Hoạt động" : "Đã ẩn"}
                     </Badge>
                   </TableCell>

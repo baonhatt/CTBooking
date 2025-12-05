@@ -102,7 +102,7 @@ export const updatePayment: RequestHandler = async (req, res) => {
     let bookingCode = booking.booking_code;
     if (
       payment_status &&
-      ["paid", "PAID", "success", "SUCCESS"].includes(payment_status) &&
+      payment_status.toLowerCase() === "paid" &&
       !bookingCode
     ) {
       // Generate unique booking code
@@ -123,8 +123,10 @@ export const updatePayment: RequestHandler = async (req, res) => {
     // Nếu thanh toán thành công, update total_sold và gửi email
     if (
       payment_status &&
-      ["paid", "PAID", "success", "SUCCESS"].includes(payment_status)
+      payment_status.toLowerCase() === "paid"
     ) {
+      console.log(`[Payment Success] Booking ID: ${booking.id}, Status: ${payment_status}`);
+
       // Update total_sold
       await prisma.showtimes.update({
         where: { id: booking.showtime_id },
@@ -155,11 +157,15 @@ export const updatePayment: RequestHandler = async (req, res) => {
           movieImage: booking.showtime.movie.cover_image || undefined,
         });
 
+        console.log(`[Email] Sending to: ${booking.email}, Code: ${bookingCode}`);
+
         await sendMail(
           booking.email,
           `🎬 Xác nhận đặt vé - Mã: ${bookingCode}`,
           emailTemplate
         );
+
+        console.log(`[Email] Sent successfully to: ${booking.email}`);
       } catch (emailError) {
         console.error("Lỗi gửi email:", emailError);
         // Không fail request nếu lỗi gửi email
@@ -391,6 +397,11 @@ export const getBooking: RequestHandler = async (req, res) => {
         total_price: true,
         ticket_count: true,
         created_at: true,
+        name: true,
+        email: true,
+        phone: true,
+        user_id: true,
+        showtime_id: true,
       },
     });
 
@@ -407,6 +418,54 @@ export const getBooking: RequestHandler = async (req, res) => {
       created_at: booking.created_at,
     });
   } catch (err: any) {
+    res.status(500).json({ message: "Lỗi máy chủ nội bộ" });
+  }
+};
+
+// ===== GET BOOKING BY ID (cho checkout page) =====
+export const getBookingById: RequestHandler = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const booking = await prisma.bookings.findUnique({
+      where: { id: Number(id) },
+      include: {
+        showtime: {
+          include: {
+            movie: {
+              select: {
+                id: true,
+                title: true,
+              },
+            },
+          },
+        },
+      },
+    });
+
+    if (!booking) {
+      return res.status(404).json({ message: "Không tìm thấy đặt vé" });
+    }
+
+    res.status(200).json({
+      id: booking.id,
+      booking_code: booking.booking_code || null,
+      payment_status: booking.payment_status,
+      user_id: booking.user_id,
+      name: booking.name,
+      phone: booking.phone,
+      email: booking.email,
+      ticket_count: booking.ticket_count,
+      total_price: booking.total_price,
+      showtime_id: booking.showtime_id,
+      showtime: booking.showtime ? {
+        id: booking.showtime.id,
+        start_time: booking.showtime.start_time,
+        movie: booking.showtime.movie,
+      } : null,
+    });
+  } catch (err: any) {
+    console.error("Error getting booking:", err);
     res.status(500).json({ message: "Lỗi máy chủ nội bộ" });
   }
 };

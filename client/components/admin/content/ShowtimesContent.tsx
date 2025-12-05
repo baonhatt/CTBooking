@@ -159,43 +159,59 @@ export default function ShowtimesContent({
                 <TableHead>Phim</TableHead>
                 <TableHead>Thời gian chiếu</TableHead>
                 <TableHead>Vé đã bán</TableHead>
+                <TableHead>Trạng thái</TableHead>
                 <TableHead className="text-right">Hành động</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {data.map((showtime) => (
-                <TableRow key={showtime.id}>
-                  <TableCell className="font-medium">{showtime.id}</TableCell>
-                  <TableCell>{showtime.movie_title}</TableCell>
-                  <TableCell>
-                    {formatLocalDateTime(new Date(showtime.start_time))}
-                  </TableCell>
-                  <TableCell>{showtime.total_sold}</TableCell>
-                  <TableCell className="text-right space-x-2">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => handleViewDetails(showtime.id)}
-                    >
-                      Xem
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => onEdit("showtime", showtime)}
-                    >
-                      Sửa
-                    </Button>
-                    <Button
-                      variant="destructive"
-                      size="sm"
-                      onClick={() => handleDelete(showtime.id)}
-                    >
-                      Xóa
-                    </Button>
-                  </TableCell>
-                </TableRow>
-              ))}
+              {data.map((showtime) => {
+                const CAPACITY = 100;
+                const isFull = showtime.total_sold >= CAPACITY;
+                return (
+                  <TableRow key={showtime.id}>
+                    <TableCell className="font-medium">{showtime.id}</TableCell>
+                    <TableCell>{showtime.movie_title}</TableCell>
+                    <TableCell>
+                      {formatLocalDateTime(new Date(showtime.start_time))}
+                    </TableCell>
+                    <TableCell>{showtime.total_sold}</TableCell>
+                    <TableCell>
+                      <Badge
+                        className={
+                          isFull
+                            ? "bg-green-100 text-green-800 hover:bg-green-100"
+                            : "bg-yellow-100 text-yellow-800 hover:bg-yellow-100"
+                        }
+                      >
+                        {isFull ? "FULL" : "Đang chiếu"}
+                      </Badge>
+                    </TableCell>
+                    <TableCell className="text-right space-x-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleViewDetails(showtime.id)}
+                      >
+                        Xem
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => onEdit("showtime", showtime)}
+                      >
+                        Sửa
+                      </Button>
+                      <Button
+                        variant="destructive"
+                        size="sm"
+                        onClick={() => handleDelete(showtime.id)}
+                      >
+                        Xóa
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                );
+              })}
             </TableBody>
           </Table>
           <Pagination className="mt-4">

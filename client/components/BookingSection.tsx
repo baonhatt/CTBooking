@@ -353,9 +353,8 @@ export default function BookingSection({ onBookClick }: BookingSectionProps) {
             user_id: booking?.user_id,
           }),
         );
-
-        const orderInfoText = `${selectedMovie?.title || "Movie"} | ${formData.quantity} vé | ${formData.showtime || "--:--"}`;
-
+        let orderInfoText = `${selectedMovie?.title || "Movie"} | ${formData.quantity} vé | ${formData.showtime || "--:--"}`;
+        
         if (paymentMethod === "momo") {
           const extraDataEncoded = btoa(
             unescape(
@@ -412,6 +411,8 @@ export default function BookingSection({ onBookClick }: BookingSectionProps) {
           }
           throw new Error("Không nhận được liên kết thanh toán MoMo");
         } else if (paymentMethod === "vnpay") {
+          debugger;
+          orderInfoText = booking?.id;
           const returnUrl =
             (import.meta as any).env?.VITE_VNPAY_RETURN_URL ||
             window.location.origin + "/checkout";
