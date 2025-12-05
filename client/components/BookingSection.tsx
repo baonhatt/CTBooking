@@ -37,6 +37,7 @@ import {
   createVnpayPaymentApi,
   API_BASE_URL,
   createBookingApi,
+  getBookingByIdApi,
 } from "@/lib/api";
 
 interface BookingSectionProps {
@@ -134,6 +135,38 @@ export default function BookingSection({ onBookClick }: BookingSectionProps) {
         setIsModalOpen(false);
         setIsProcessing(false);
         localStorage.removeItem("pendingOrder");
+
+        // Fetch booking code nếu thanh toán thành công
+        if (status === "success" && pending.booking_id) {
+          (async () => {
+            try {
+              const bookingData = await getBookingByIdApi(pending.booking_id);
+              if (bookingData.booking_code) {
+                setOrderInfo((prev: any) => ({
+                  ...prev,
+                  bookingCode: bookingData.booking_code,
+                }));
+              }
+            } catch (err) {
+              console.error("Lỗi fetch booking code:", err);
+            }
+          })();
+        }
+
+        // Show notification based on payment status
+        if (status === "success") {
+          toast({
+            title: "✅ Thanh toán thành công",
+            description: "Vui lòng kiểm tra email để nhận mã đặt vé",
+            variant: "default",
+          });
+        } else {
+          toast({
+            title: "❌ Thanh toán không thành công",
+            description: "Vui lòng thử lại",
+            variant: "destructive",
+          });
+        }
       } catch { }
       window.history.replaceState({}, document.title, window.location.pathname);
     }
@@ -286,7 +319,7 @@ export default function BookingSection({ onBookClick }: BookingSectionProps) {
           : "",
         showtime: formData.showtime,
         showtimeId: selectedShowtimeId,
-        name: authName,
+        name: formData.name,
         phone: formData.phone,
         email: authEmail,
         emailBook: emailBook,
@@ -305,7 +338,7 @@ export default function BookingSection({ onBookClick }: BookingSectionProps) {
           email: authEmail,
           emailBook: emailBook,
           phone: formData.phone,
-          name: authName,
+          name: formData.name,
           showtimeId,
           ticketCount: formData.quantity,
           paymentMethod: paymentMethod as any,
@@ -415,27 +448,19 @@ export default function BookingSection({ onBookClick }: BookingSectionProps) {
     const secs = seconds % 60;
     return `${mins}:${secs.toString().padStart(2, "0")}`;
   };
-
   const ticketPackages = (ticketsData?.items || []).map((t: any) => ({
     id: t.id,
     name: t.name,
     price: Number(t.price || 0),
     features: Array.isArray(t.features) ? t.features : [],
     type: t.type || "",
+    display_order: t.display_order || 0,
+
   }));
-  const standardPkg =
-    ticketPackages.find(
-      (p) =>
-        (p.type || "").toLowerCase() === "standard" ||
-        (p.name || "").toLowerCase().includes("tiêu chuẩn"),
-    ) || ticketPackages[0];
   const [selectedPackage, setSelectedPackage] = useState<any>(null);
-  useEffect(() => {
-    if (standardPkg && !selectedPackage) {
-      setSelectedPackage(standardPkg);
-    }
-  }, [standardPkg]);
-  const ticketPrice = selectedPackage ? Number(selectedPackage.price || 0) : 250000;
+  const ticketPrice = selectedPackage
+    ? Number(selectedPackage.price || 0)
+    : 250000;
   const totalPrice = ticketPrice * formData.quantity;
   const selectedMovie = movies.find((m) => m.id === formData.movie);
 
@@ -443,84 +468,54 @@ export default function BookingSection({ onBookClick }: BookingSectionProps) {
     <>
       <section className="py-20 bg-gradient-section relative overflow-hidden">
         <div className="container mx-auto px-4 relative z-10">
-          <div className="max-w-4xl mx-auto">
-            <motion.div
-              initial={{ opacity: 0, y: 30 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true }}
-              transition={{ duration: 0.6 }}
-              className="text-center mb-12"
-            >
-              <h2 className="text-4xl md:text-5xl font-bold bg-gradient-to-r from-blue-400 to-purple-400 bg-clip-text text-transparent mb-4">
-                BẢNG GIÁ VÉ
-              </h2>
-              <div className="w-24 h-1 bg-gradient-to-r from-blue-400 to-purple-400 mx-auto mb-4"></div>
-            </motion.div>
-
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-              <motion.div
-                initial={{ opacity: 0, y: 50 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true }}
-                transition={{ duration: 0.6, delay: 0.1 }}
-                className="rounded-2xl p-6 border border-white/10 text-left bg-black/30 backdrop-blur-sm hover:bg-gradient-to-br hover:from-cyan-900/40 hover:via-cyan-700/20 hover:to-fuchsia-800/40 hover:shadow-[0_0_35px_rgba(99,102,241,0.25)] transition-all duration-300"
-              >
-                <div className="text-white font-semibold text-lg mb-3">
-                  {selectedPackage?.name || "Vé Tiêu Chuẩn"}
-                </div>
-                <div className="text-4xl md:text-5xl font-extrabold text-cyan-400 mb-1">
-                  {ticketPrice.toLocaleString("vi-VN")}₫
-                </div>
-                <div className="text-sm text-gray-300 mb-5">
-                  / phim (10-15 phút)
-                </div>
-                <ul className="space-y-2 mb-6">
-                  {(selectedPackage?.features?.length
-                    ? selectedPackage.features
-                    : [
-                      "Ghế chuyển động 6D",
-                      "Mắt kính 3D active",
-                      "Hiệu ứng môi trường",
-                    ]
-                  ).map((f: string, idx: number) => (
-                    <li key={idx} className="flex items-center gap-2 text-gray-100">
-                      <Check className="h-4 w-4 text-emerald-400" /> {f}
-                    </li>
-                  ))}
-                </ul>
-                <Button
-                  onClick={() => {
-                    setSelectedPackage(selectedPackage || standardPkg);
-                    handleOpenModal();
-                  }}
-                  className="bg-white text-black hover:bg-white/90 font-semibold px-6 py-5 rounded-lg"
-                >
-                  Đặt Ngay
-                </Button>
-              </motion.div>
-              {ticketPackages.slice(1, 3).map((pkg, i) => (
+          <div className="max-w-7xl mx-auto">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-10 mb-8">
+              {ticketPackages.map((pkg, i) => (
                 <motion.div
                   initial={{ opacity: 0, y: 50 }}
                   whileInView={{ opacity: 1, y: 0 }}
                   viewport={{ once: true }}
                   transition={{ duration: 0.6, delay: 0.2 + i * 0.1 }}
-                  className="bg-black/30 rounded-2xl p-6 border border-white/10 text-center"
+                  className="
+                    rounded-2xl p-6 border border-white/10 bg-black/30 backdrop-blur-sm
+                    hover:bg-gradient-to-br hover:from-cyan-900/40 hover:via-cyan-700/20 hover:to-fuchsia-800/40
+                    hover:shadow-[0_0_35px_rgba(99,102,241,0.25)]
+                    transition-all duration-300
+                    h-full flex flex-col
+                  "
                 >
                   <div className="text-xl font-semibold text-white mb-1">
                     {pkg.name}
                   </div>
-                  <div className="text-3xl font-bold text-white mb-2">
+
+                  <div className="h-20 text-4xl md:text-4xl font-extrabold text-cyan-400 mb-1">
                     {Number(pkg.price || 0).toLocaleString("vi-VN")}₫
                   </div>
-                  <div className="text-xs text-gray-500 mb-6">
-                    {(pkg.features || []).slice(0, 3).join(" • ")}
-                  </div>
+
+                  <ul className="space-y-2 mb-6 flex-grow">
+                    {(pkg.features?.length
+                      ? pkg.features
+                      : [
+                        "Ghế chuyển động 6D",
+                        "Mắt kính 3D active",
+                        "Hiệu ứng môi trường",
+                      ]
+                    ).map((f, idx) => (
+                      <li
+                        key={idx}
+                        className="flex items-center gap-2 text-gray-100"
+                      >
+                        <Check className="h-4 w-4 text-emerald-400" /> {f}
+                      </li>
+                    ))}
+                  </ul>
+
                   <Button
                     onClick={() => {
                       setSelectedPackage(pkg);
                       handleOpenModal();
                     }}
-                    className="bg-white text-black hover:bg-white/90 font-semibold"
+                    className="bg-white text-black hover:bg-white/90 font-semibold mt-auto"
                   >
                     Đặt Ngay
                   </Button>
@@ -1139,14 +1134,40 @@ export default function BookingSection({ onBookClick }: BookingSectionProps) {
         <DialogContent className="max-w-md bg-white text-black border border-gray-200">
           <DialogHeader>
             <DialogTitle className="text-xl font-bold">
-              Thông tin mua vé
+              ✅ Đặt vé thành công
             </DialogTitle>
             <DialogDescription className="text-gray-600">
-              Quét QR để thanh toán và lưu vé của bạn
+              {orderInfo?.status === "success"
+                ? "Vui lòng kiểm tra email để nhận mã đặt vé"
+                : "Thanh toán không thành công"}
             </DialogDescription>
           </DialogHeader>
           {orderInfo && (
-            <div className="space-y-3">
+            <div className="space-y-4">
+              {orderInfo?.status === "success" && (
+                <>
+                  <div className="bg-green-50 border-l-4 border-green-500 p-4 rounded">
+                    <p className="text-sm text-green-700">
+                      <strong>📧 Mã đặt vé đã được gửi đến:</strong><br />
+                      {orderInfo.emailBook || orderInfo.email}
+                    </p>
+                    <p className="text-xs text-green-600 mt-2">
+                      Vui lòng kiểm tra email (cả thư mục spam) để lấy mã vé của bạn
+                    </p>
+                  </div>
+                  {orderInfo.bookingCode && (
+                    <div className="bg-blue-50 border-l-4 border-blue-500 p-4 rounded">
+                      <p className="text-xs text-blue-600 font-semibold mb-2">MÃ ĐẶT VÉ</p>
+                      <p className="text-2xl font-bold text-blue-700 font-mono tracking-wider">
+                        {orderInfo.bookingCode}
+                      </p>
+                      <p className="text-xs text-blue-600 mt-2">
+                        Lưu lại mã này để check-in tại rạp
+                      </p>
+                    </div>
+                  )}
+                </>
+              )}
               <div className="grid grid-cols-2 gap-2 text-sm">
                 <span className="text-gray-600">Phim</span>
                 <span className="font-medium">{orderInfo.movie}</span>

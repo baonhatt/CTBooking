@@ -31,7 +31,6 @@ export const getAllActiveMoviesToday: RequestHandler = async (_req, res) => {
             id: true,
             start_time: true,
             total_sold: true,
-            price: true,
           },
         },
       },
@@ -52,13 +51,11 @@ export const getAllActiveMoviesToday: RequestHandler = async (_req, res) => {
         genres: JSON.stringify(m.genres ?? []),
         rating: m.rating?.toString() ?? "0",
         duration_min: m.duration_min ?? 0,
-        price: Number(m.price),
         release_date: m.release_date,
         showtimes: m.showtimes.map((s) => ({
           id: s.id,
           start_time: s.start_time,
           total_sold: s.total_sold,
-          price: Number(s.price),
         })),
       }));
       return res.status(200).json({ activeMovies });
@@ -82,28 +79,12 @@ export const createMovie: RequestHandler = async (req, res) => {
       genres,
       rating,
       duration_min,
-      price,
       is_active,
       release_date,
     } = req.body as any;
     // Verify required fields
     if (!title || title.trim() === "") {
       return res.status(400).json({ message: "Tên phim là bắt buộc" });
-    }
-
-    // Validate price
-    if (price === undefined || price === null) {
-      return res.status(400).json({ message: "Giá là bắt buộc" });
-    }
-    const priceNum = Number(price);
-    if (!Number.isFinite(priceNum) || priceNum < 0) {
-      return res.status(400).json({ message: "Giá không hợp lệ (phải là số dương)" });
-    }
-    if (priceNum === 0) {
-      return res.status(400).json({ message: "Giá phải lớn hơn 0" });
-    }
-    if (priceNum > 99999999.99) {
-      return res.status(400).json({ message: "Giá vượt quá giới hạn (tối đa 99,999,999.99)" });
     }
 
     // Validate duration
@@ -158,7 +139,6 @@ export const createMovie: RequestHandler = async (req, res) => {
       genres,
       rating: ratingNum,
       duration_min: durationNum,
-      price: priceNum,
       is_active: is_active === undefined ? true : Boolean(is_active),
       release_date: release_date ? new Date(release_date) : undefined,
     };
@@ -238,7 +218,6 @@ export const updateMovie: RequestHandler = async (req, res) => {
       genres,
       rating,
       duration_min,
-      price,
       is_active,
       release_date,
     } = req.body as any;
@@ -283,18 +262,6 @@ export const updateMovie: RequestHandler = async (req, res) => {
       if (d > 600)
         return res.status(400).json({ message: "Thời lượng không hợp lệ (tối đa 600 phút)" });
       data.duration_min = d;
-    }
-
-    // Validate price
-    if (price !== undefined) {
-      const p = Number(price);
-      if (!Number.isFinite(p) || p < 0)
-        return res.status(400).json({ message: "Giá không hợp lệ (phải là số dương)" });
-      if (p === 0)
-        return res.status(400).json({ message: "Giá phải lớn hơn 0" });
-      if (p > 99999999.99)
-        return res.status(400).json({ message: "Giá vượt quá giới hạn (tối đa 99,999,999.99)" });
-      data.price = p;
     }
 
     if (is_active !== undefined) data.is_active = Boolean(is_active);
@@ -386,25 +353,16 @@ export const listShowtimes: RequestHandler = async (req, res) => {
 
 export const createShowtime: RequestHandler = async (req, res) => {
   try {
-    const { movie_id, start_time, price } = req.body as any;
+    const { movie_id, start_time } = req.body as any;
     const start = new Date(start_time);
     if (!start_time || Number.isNaN(start.getTime())) {
       return res.status(400).json({ message: "Thời gian bắt đầu không hợp lệ" });
     }
     const mId = Number(movie_id);
-    const priceNum = Number(price);
 
     // Validate movie_id
     if (!mId) {
       return res.status(400).json({ message: "Phim là bắt buộc" });
-    }
-
-    // Validate price
-    if (!Number.isFinite(priceNum) || priceNum <= 0) {
-      return res.status(400).json({ message: "Giá phải là số dương" });
-    }
-    if (priceNum > 9999999.99) {
-      return res.status(400).json({ message: "Giá vượt quá giới hạn (tối đa 9,999,999.99)" });
     }
 
     const movie = await (prisma as any).movies.findUnique({
@@ -451,7 +409,6 @@ export const createShowtime: RequestHandler = async (req, res) => {
         data: {
           movie_id: mId,
           start_time: start,
-          price: priceNum > 0 ? priceNum.toFixed(2) : "0.00",
         },
       });
       return res.status(201).json({ message: "Thêm lịch chiếu thành công", showtime });
@@ -465,7 +422,6 @@ export const createShowtime: RequestHandler = async (req, res) => {
             data: {
               movie_id: mId,
               start_time: start,
-              price: priceNum > 0 ? priceNum.toFixed(2) : "0.00",
             },
           });
           return res.status(201).json({ message: "Thêm lịch chiếu thành công", showtime });
@@ -489,7 +445,7 @@ export const createShowtime: RequestHandler = async (req, res) => {
 export const updateShowtime: RequestHandler = async (req, res) => {
   try {
     const id = Number(req.params.id);
-    const { movie_id, start_time, price } = req.body as any;
+    const { movie_id, start_time } = req.body as any;
     const st = await (prisma as any).showtimes.findUnique({
       where: { id },
       include: { movie: true },
@@ -498,17 +454,6 @@ export const updateShowtime: RequestHandler = async (req, res) => {
 
     const mId = movie_id !== undefined ? Number(movie_id) : st.movie_id;
     const start = start_time ? new Date(start_time) : new Date(st.start_time);
-    const priceNum = price === undefined ? undefined : Number(price);
-
-    // Validate price if provided
-    if (priceNum !== undefined) {
-      if (!Number.isFinite(priceNum) || priceNum <= 0) {
-        return res.status(400).json({ message: "Giá phải là số dương" });
-      }
-      if (priceNum > 9999999.99) {
-        return res.status(400).json({ message: "Giá vượt quá giới hạn (tối đa 9,999,999.99)" });
-      }
-    }
 
     const movie = await (prisma as any).movies.findUnique({
       where: { id: mId },
@@ -542,8 +487,6 @@ export const updateShowtime: RequestHandler = async (req, res) => {
       start_time: start,
       updated_at: new Date(),
     };
-    if (priceNum !== undefined)
-      data.price = priceNum > 0 ? priceNum.toFixed(2) : "0.00";
     const showtime = await (prisma as any).showtimes.update({
       where: { id },
       data,
@@ -557,6 +500,19 @@ export const updateShowtime: RequestHandler = async (req, res) => {
 export const deleteShowtime: RequestHandler = async (req, res) => {
   try {
     const id = Number(req.params.id);
+
+    // Check if showtime has any bookings
+    const bookingCount = await prisma.bookings.count({
+      where: { showtime_id: id },
+    });
+
+    if (bookingCount > 0) {
+      return res.status(400).json({
+        message: `Không thể xóa suất chiếu này vì đã có ${bookingCount} đơn đặt vé`,
+        ok: false,
+      });
+    }
+
     await (prisma as any).showtimes.delete({ where: { id } });
     res.status(200).json({ message: "Xóa lịch chiếu thành công", ok: true });
   } catch (err: any) {
@@ -568,9 +524,8 @@ export const deleteShowtime: RequestHandler = async (req, res) => {
 
 export const createShowtimesBatch: RequestHandler = async (req, res) => {
   try {
-    const { movie_id, start_times, price } = req.body as any;
+    const { movie_id, start_times } = req.body as any;
     const mId = Number(movie_id);
-    const defaultPriceNum = Number(price ?? 0);
 
     // Validate movie_id
     if (!mId) {
@@ -580,14 +535,6 @@ export const createShowtimesBatch: RequestHandler = async (req, res) => {
     // Validate start_times array
     if (!Array.isArray(start_times) || start_times.length === 0) {
       return res.status(400).json({ message: "Phải có ít nhất một thời gian chiếu" });
-    }
-
-    // Validate default price
-    if (!Number.isFinite(defaultPriceNum) || defaultPriceNum <= 0) {
-      return res.status(400).json({ message: "Giá phải là số dương" });
-    }
-    if (defaultPriceNum > 9999999.99) {
-      return res.status(400).json({ message: "Giá vượt quá giới hạn (tối đa 9,999,999.99)" });
     }
 
     const movie = await (prisma as any).movies.findUnique({
@@ -601,25 +548,11 @@ export const createShowtimesBatch: RequestHandler = async (req, res) => {
 
     for (const item of start_times) {
       const stStr = typeof item === "string" ? item : item?.start_time;
-      const rowPrice =
-        typeof item === "object" && item
-          ? Number(item.price ?? defaultPriceNum)
-          : defaultPriceNum;
       const start = new Date(stStr);
 
       // Validate start_time format
       if (!stStr || Number.isNaN(start.getTime())) {
         skipped.push({ start_time: stStr, reason: "Thời gian không hợp lệ" });
-        continue;
-      }
-
-      // Validate row price
-      if (!Number.isFinite(rowPrice) || rowPrice <= 0) {
-        skipped.push({ start_time: stStr, reason: "Giá phải là số dương" });
-        continue;
-      }
-      if (rowPrice > 9999999.99) {
-        skipped.push({ start_time: stStr, reason: "Giá vượt quá giới hạn" });
         continue;
       }
 
@@ -661,7 +594,6 @@ export const createShowtimesBatch: RequestHandler = async (req, res) => {
           data: {
             movie_id: mId,
             start_time: start,
-            price: rowPrice > 0 ? rowPrice.toFixed(2) : "0.00",
           },
         });
         created.push(showtime);
@@ -688,7 +620,6 @@ export const getMovieById: RequestHandler = async (req, res) => {
           select: {
             id: true,
             start_time: true,
-            price: true,
             total_sold: true,
           },
         },
@@ -732,7 +663,6 @@ export const getMovieById: RequestHandler = async (req, res) => {
       genres: movie.genres || [],
       rating: Number(movie.rating || 0),
       duration_min: movie.duration_min || 0,
-      price: Number(movie.price),
       is_active: movie.is_active,
       release_date: movie.release_date,
       created_at: movie.created_at,

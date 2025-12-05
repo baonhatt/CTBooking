@@ -31,7 +31,6 @@ interface ShowtimeData {
   movie_id: number;
   movie_title: string;
   start_time: string;
-  price: number;
   total_sold: number;
 }
 interface Props {
@@ -159,7 +158,6 @@ export default function ShowtimesContent({
                 <TableHead>ID</TableHead>
                 <TableHead>Phim</TableHead>
                 <TableHead>Thời gian chiếu</TableHead>
-                <TableHead>Giá vé</TableHead>
                 <TableHead>Vé đã bán</TableHead>
                 <TableHead className="text-right">Hành động</TableHead>
               </TableRow>
@@ -171,9 +169,6 @@ export default function ShowtimesContent({
                   <TableCell>{showtime.movie_title}</TableCell>
                   <TableCell>
                     {formatLocalDateTime(new Date(showtime.start_time))}
-                  </TableCell>
-                  <TableCell>
-                    {showtime.price.toLocaleString("en-US")}
                   </TableCell>
                   <TableCell>{showtime.total_sold}</TableCell>
                   <TableCell className="text-right space-x-2">
@@ -322,12 +317,6 @@ export default function ShowtimesContent({
                     </p>
                   </div>
                   <div>
-                    <p className="text-sm text-gray-600">Giá vé</p>
-                    <p className="font-medium text-blue-600">
-                      {showtimeDetails.price.toLocaleString("vi-VN")}₫
-                    </p>
-                  </div>
-                  <div>
                     <p className="text-sm text-gray-600">Tổng vé đã bán</p>
                     <p className="font-medium">
                       {showtimeDetails.total_sold} vé
@@ -375,66 +364,7 @@ export default function ShowtimesContent({
                 </div>
               </div>
 
-              {/* Recent Bookings */}
-              {showtimeDetails.recent_bookings &&
-                showtimeDetails.recent_bookings.length > 0 && (
-                  <div className="border-t pt-4">
-                    <h3 className="font-semibold mb-3">
-                      Đơn đặt vé gần đây (10 mới nhất - chỉ thanh toán thành công)
-                    </h3>
-                    <div className="space-y-2 max-h-64 overflow-y-auto">
-                      {showtimeDetails.recent_bookings.map(
-                        (booking: any, idx: number) => (
-                          <div
-                            key={idx}
-                            className="border rounded p-3 hover:bg-gray-50"
-                          >
-                            <div className="flex justify-between items-start mb-2">
-                              <div>
-                                <p className="font-medium">
-                                  {booking.user.fullname}
-                                </p>
-                                <p className="text-sm text-gray-600">
-                                  {booking.user.email}
-                                </p>
-                              </div>
-                              <Badge variant="default">
-                                {booking.payment_status === "success"
-                                  ? "Đã thanh toán"
-                                  : "Chưa thanh toán"}
-                              </Badge>
-                            </div>
-                            <div className="grid grid-cols-3 gap-2 text-sm">
-                              <p>
-                                <span className="text-gray-600">Số vé:</span>{" "}
-                                <span className="font-medium">
-                                  {booking.ticket_count}
-                                </span>
-                              </p>
-                              <p>
-                                <span className="text-gray-600">Phương thức:</span>{" "}
-                                <span className="font-medium">
-                                  {booking.payment_method}
-                                </span>
-                              </p>
-                              <p>
-                                <span className="text-gray-600">Số tiền:</span>{" "}
-                                <span className="font-medium text-blue-600">
-                                  {booking.total_price.toLocaleString("vi-VN")}₫
-                                </span>
-                              </p>
-                            </div>
-                            <p className="text-xs text-gray-500 mt-2">
-                              {new Date(booking.created_at).toLocaleDateString(
-                                "vi-VN"
-                              )}
-                            </p>
-                          </div>
-                        )
-                      )}
-                    </div>
-                  </div>
-                )}
+
             </div>
           ) : null}
         </DialogContent>

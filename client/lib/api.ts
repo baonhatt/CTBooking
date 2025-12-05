@@ -155,6 +155,14 @@ export async function confirmBookingApi(body: {
     body: JSON.stringify(body),
   });
 }
+
+// --------- API GET BOOKING BY ID (for booking code) ---------
+export async function getBookingByIdApi(bookingId: number) {
+  return request<{ id: number; booking_code?: string; status: string }>(
+    `/api/bookings/${bookingId}`
+  );
+}
+
 // ----------------- API ADMIN LOGIN -----------------
 export async function adminLoginApi(body: { email: string; password: string }) {
   return request<{ token: string; exp: number; user: { email: string } }>(
@@ -241,7 +249,6 @@ export async function createMovieApi(body: {
   genres?: any;
   rating?: number;
   duration_min?: number;
-  price: number;
   is_active?: boolean;
   release_date?: string;
 }) {
@@ -279,7 +286,6 @@ export async function updateMovieApi(
     genres?: any;
     rating?: number;
     duration_min?: number;
-    price?: number;
     is_active?: boolean;
     release_date?: string;
   },
@@ -359,7 +365,6 @@ export async function getShowtimes(options?: {
 export async function createShowtimeApi(body: {
   movie_id: number;
   start_time: string;
-  price: number;
 }) {
   return request<{ showtime: any }>(`/api/showtimes`, {
     method: "POST",
@@ -368,8 +373,7 @@ export async function createShowtimeApi(body: {
 }
 export async function createShowtimesBatchApi(body: {
   movie_id: number;
-  start_times: Array<string | { start_time: string; price?: number }>;
-  price?: number;
+  start_times: Array<string | { start_time: string }>;
 }) {
   return request<{ created: any[]; skipped: any[] }>(`/api/showtimes/batch`, {
     method: "POST",
@@ -378,7 +382,7 @@ export async function createShowtimesBatchApi(body: {
 }
 export async function updateShowtimeApi(
   id: number,
-  body: { movie_id?: number; start_time?: string; price?: number },
+  body: { movie_id?: number; start_time?: string },
 ) {
   return request<{ showtime: any }>(`/api/showtimes/${id}`, {
     method: "PUT",
@@ -513,7 +517,6 @@ export async function getShowtimeById(id: number) {
     movie: any;
     start_time: string;
     end_time: string | null;
-    price: number;
     total_sold: number;
     created_at: string;
     updated_at: string;

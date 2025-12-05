@@ -225,14 +225,11 @@ export default function TicketsContent(props: Props) {
             <div>
               <Label>Tính năng (phân tách bằng dấu phẩy)</Label>
               <Input
-                value={(editData?.features || []).join(", ")}
+                value={editData?.features || ""}
                 onChange={(e) =>
                   setEditData({
                     ...editData,
-                    features: e.target.value
-                      .split(",")
-                      .map((x) => x.trim())
-                      .filter(Boolean),
+                    features: e.target.value, // chỉ lưu thẳng chuỗi
                   })
                 }
               />
