@@ -182,6 +182,38 @@ export async function getBookingByIdApi(bookingId: number) {
   );
 }
 
+// --------- API GET BOOKING BY CODE (for ticket check) ---------
+export async function getBookingByCodeApi(code: string) {
+  return request<{
+    id: number;
+    booking_code: string;
+    payment_status: string;
+    user_id: number;
+    name: string;
+    phone: string;
+    email: string;
+    ticket_count: number;
+    total_price: number;
+    showtime_id: number;
+    created_at: string;
+    paid_at: string | null;
+    payment_method: string | null;
+    userName: string;
+    showtime?: {
+      id: number;
+      start_time: string;
+      end_time: string | null;
+      movie?: {
+        id: number;
+        title: string;
+        genres: any;
+        duration_min: number | null;
+        cover_image: string | null;
+      };
+    };
+  }>(`/api/bookings/code/${code}`);
+}
+
 // ----------------- API ADMIN LOGIN -----------------
 export async function adminLoginApi(body: { email: string; password: string }) {
   return request<{ token: string; exp: number; user: { email: string } }>(
@@ -339,12 +371,14 @@ export async function getTransactions(options?: {
   page?: number;
   pageSize?: number;
   email?: string;
+  status?: "all" | "paid" | "failed" | "pending";
   signal?: AbortSignal;
 }) {
   const params = new URLSearchParams();
   if (options?.page) params.set("page", String(options.page));
   if (options?.pageSize) params.set("pageSize", String(options.pageSize));
   if (options?.email) params.set("email", options.email);
+  if (options?.status) params.set("status", options.status);
   const path = `/api/admin/transactions${params.toString() ? `?${params.toString()}` : ""}`;
   return request<{
     items: any[];

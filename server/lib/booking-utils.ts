@@ -1,22 +1,33 @@
-/**
- * Generate unique booking code
- * Format: BK-YYYYMMDD-XXXXX (e.g., BK-20251204-A7K9M)
- */
-export function generateBookingCode(): string {
-  const date = new Date();
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, "0");
-  const day = String(date.getDate()).padStart(2, "0");
-  const dateStr = `${year}${month}${day}`;
+import { prisma } from "./prisma";
 
-  // Generate random alphanumeric string (5 chars)
+/**
+ * Generate unique booking code (8 random alphanumeric characters)
+ * Check database to avoid duplicates
+ * Format: XXXXXXXX (e.g., A7K9M2B5)
+ */
+export async function generateBookingCode(): Promise<string> {
   const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
-  let randomStr = "";
-  for (let i = 0; i < 5; i++) {
-    randomStr += chars.charAt(Math.floor(Math.random() * chars.length));
+  let isUnique = false;
+  let bookingCode = "";
+
+  while (!isUnique) {
+    // Generate random string (8 chars)
+    bookingCode = "";
+    for (let i = 0; i < 8; i++) {
+      bookingCode += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+
+    // Check if code already exists in database
+    const existing = await prisma.bookings.findUnique({
+      where: { booking_code: bookingCode },
+    });
+
+    if (!existing) {
+      isUnique = true;
+    }
   }
 
-  return `BK-${dateStr}-${randomStr}`;
+  return bookingCode;
 }
 
 /**
