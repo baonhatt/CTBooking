@@ -7,6 +7,7 @@ import path from "path";
 export const handleMovies2025: RequestHandler = (_req, res) => { };
 
 export const getAllActiveMoviesToday: RequestHandler = async (_req, res) => {
+  
   let activeMovies: ActiveMoviesTodayResponse[] = [];
   // Use UTC date to avoid timezone issues
   const now = new Date();
