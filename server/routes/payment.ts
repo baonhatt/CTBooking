@@ -1,6 +1,8 @@
 import { RequestHandler } from "express";
 import { PaymentRequest } from "@shared/api";
 import { prisma } from "../lib/prisma";
+import { generateBookingCode, getBookingEmailTemplate } from "../lib/booking-utils";
+import { sendMail } from "./mail-service";
 
 export const createPayment: RequestHandler = async (req, res) => {
   try {
@@ -83,10 +85,28 @@ export const updatePayment: RequestHandler = async (req, res) => {
         id: Number(payment_id),
         user_id: Number(user_id),
       },
+      include: {
+        showtime: {
+          include: {
+            movie: true,
+          },
+        },
+      },
     });
 
     if (!booking) {
       return res.status(404).json({ message: "Không tìm thấy đặt vé." });
+    }
+
+    // Nếu thanh toán thành công và chưa có booking_code
+    let bookingCode = booking.booking_code;
+    if (
+      payment_status &&
+      ["paid", "PAID", "success", "SUCCESS"].includes(payment_status) &&
+      !bookingCode
+    ) {
+      // Generate unique booking code
+      bookingCode = generateBookingCode();
     }
 
     // Cập nhật booking
@@ -96,12 +116,60 @@ export const updatePayment: RequestHandler = async (req, res) => {
         payment_status,
         transaction_id: transaction_id ?? undefined,
         paid_at: paid_at ? new Date(paid_at) : undefined,
+        booking_code: bookingCode ?? undefined,
       },
     });
+
+    // Nếu thanh toán thành công, update total_sold và gửi email
+    if (
+      payment_status &&
+      ["paid", "PAID", "success", "SUCCESS"].includes(payment_status)
+    ) {
+      // Update total_sold
+      await prisma.showtimes.update({
+        where: { id: booking.showtime_id },
+        data: {
+          total_sold: {
+            increment: booking.ticket_count,
+          },
+        },
+      });
+
+      // Gửi email xác nhận
+      try {
+        const showtimeDate = new Date(booking.showtime.start_time).toLocaleDateString("vi-VN");
+        const showtimeTime = new Date(booking.showtime.start_time).toLocaleTimeString("vi-VN", {
+          hour: "2-digit",
+          minute: "2-digit",
+        });
+        const totalPrice = Number(booking.total_price).toLocaleString("vi-VN");
+
+        const emailTemplate = getBookingEmailTemplate({
+          bookingCode: bookingCode || "",
+          customerName: booking.name || "Khách hàng",
+          movieTitle: booking.showtime.movie.title,
+          showtimeDate,
+          showtimeTime,
+          ticketCount: booking.ticket_count,
+          totalPrice,
+          movieImage: booking.showtime.movie.cover_image || undefined,
+        });
+
+        await sendMail(
+          booking.email,
+          `🎬 Xác nhận đặt vé - Mã: ${bookingCode}`,
+          emailTemplate
+        );
+      } catch (emailError) {
+        console.error("Lỗi gửi email:", emailError);
+        // Không fail request nếu lỗi gửi email
+      }
+    }
 
     return res.status(200).json({
       message: "Thanh toán thành công",
       booking: updatedBooking,
+      bookingCode,
     });
   } catch (error) {
     return res.status(500).json({ message: "Lỗi máy chủ nội bộ" });
@@ -163,7 +231,6 @@ export const listTransactions: RequestHandler = async (req, res) => {
     const page = Number(req.query.page || 1);
     const pageSize = Number(req.query.pageSize || 10);
     const email = String(req.query.email || "");
-
     const skip = (page - 1) * pageSize;
 
     // Build where clause
@@ -306,6 +373,39 @@ export const getTransactionById: RequestHandler = async (req, res) => {
     };
 
     res.status(200).json(mapped);
+  } catch (err: any) {
+    res.status(500).json({ message: "Lỗi máy chủ nội bộ" });
+  }
+};
+
+export const getBooking: RequestHandler = async (req, res) => {
+  try {
+    const bookingId = Number(req.params.id);
+
+    const booking = await prisma.bookings.findUnique({
+      where: { id: bookingId },
+      select: {
+        id: true,
+        booking_code: true,
+        payment_status: true,
+        total_price: true,
+        ticket_count: true,
+        created_at: true,
+      },
+    });
+
+    if (!booking) {
+      return res.status(404).json({ message: "Không tìm thấy đặt vé" });
+    }
+
+    res.status(200).json({
+      id: booking.id,
+      booking_code: booking.booking_code || null,
+      payment_status: booking.payment_status,
+      total_price: booking.total_price,
+      ticket_count: booking.ticket_count,
+      created_at: booking.created_at,
+    });
   } catch (err: any) {
     res.status(500).json({ message: "Lỗi máy chủ nội bộ" });
   }

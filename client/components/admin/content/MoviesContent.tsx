@@ -35,7 +35,6 @@ interface MovieData {
   posterUrl: string;
   release_date: string | null;
   rating: number | null;
-  price: number;
 }
 interface Props {
   data: MovieData[];
@@ -125,7 +124,6 @@ export default function MoviesContent({
                 <TableHead>Tên phim</TableHead>
                 <TableHead>Thể loại</TableHead>
                 <TableHead>Thời lượng(phút)</TableHead>
-                <TableHead>Giá vé TB</TableHead>
                 <TableHead>Rating</TableHead>
                 <TableHead>Ngày ra mắt</TableHead>
                 <TableHead>Trạng thái</TableHead>
@@ -149,7 +147,6 @@ export default function MoviesContent({
                   </TableCell>
                   <TableCell>{movie.genres.join(", ")}</TableCell>
                   <TableCell>{movie.duration}</TableCell>
-                  <TableCell>{movie.price.toLocaleString("en-US")}</TableCell>
                   <TableCell>{movie.rating ?? ""}</TableCell>
                   <TableCell>
                     {movie.release_date
@@ -293,9 +290,9 @@ export default function MoviesContent({
                       </span>
                     </p>
                     <p>
-                      <span className="text-gray-600">Giá vé:</span>{" "}
-                      <span className="font-medium text-blue-600">
-                        {movieDetails.price.toLocaleString("vi-VN")}₫
+                      <span className="text-gray-600">Thời lượng(phút):</span>{" "}
+                      <span className="font-medium">
+                        {movieDetails.duration_min}
                       </span>
                     </p>
                   </div>

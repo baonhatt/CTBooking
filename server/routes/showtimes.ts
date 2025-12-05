@@ -16,7 +16,6 @@ export const getShowtimeById: RequestHandler = async (req, res) => {
             genres: true,
             rating: true,
             duration_min: true,
-            price: true,
           },
         },
         bookings: {
@@ -60,7 +59,6 @@ export const getShowtimeById: RequestHandler = async (req, res) => {
       movie: showtime.movie,
       start_time: showtime.start_time,
       end_time: showtime.end_time,
-      price: Number(showtime.price),
       total_sold: showtime.total_sold,
       created_at: showtime.created_at,
       updated_at: showtime.updated_at,

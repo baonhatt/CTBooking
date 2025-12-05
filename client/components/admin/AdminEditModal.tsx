@@ -82,7 +82,6 @@ const AdminEditModal: React.FC<AdminEditModalProps> = (props) => {
         posterUrl: m.cover_image || "",
         release_date: m.release_date || null,
         rating: m.rating ?? null,
-        price: Number(m.price || 0),
       }));
       setMoviesLocal(mapped);
       setMovieStatus((prev) => ({
@@ -112,7 +111,6 @@ const AdminEditModal: React.FC<AdminEditModalProps> = (props) => {
           movie_id: x.movie_id,
           movie_title: x.movie?.title || "",
           start_time: new Date(x.start_time).toISOString(),
-          price: Number(x.price),
           total_sold: Number(x.total_sold || 0),
         })),
       );
@@ -245,23 +243,6 @@ const AdminEditModal: React.FC<AdminEditModalProps> = (props) => {
               />
             </div>
             <div>
-              <Label>Giá</Label>
-              <Input
-                type="number"
-                min="0"
-                step="1"
-                value={editData.price !== undefined && editData.price !== null ? editData.price : ""}
-                onChange={(e) => {
-                  let numericValue = e.target.value === "" ? 0 : Number(e.target.value);
-                  if (numericValue < 0) numericValue = 0;
-                  setEditData({
-                    ...editData,
-                    price: numericValue,
-                  });
-                }}
-              />
-            </div>
-            <div>
               <Label>Thể loại</Label>
               <Input
                 value={(editData?.genres || []).join(", ")}
@@ -353,14 +334,6 @@ const AdminEditModal: React.FC<AdminEditModalProps> = (props) => {
                     });
                     return;
                   }
-                  if (editData.price === undefined || editData.price === null || editData.price <= 0) {
-                    toast({
-                      title: "Lỗi",
-                      description: "Giá là bắt buộc",
-                      variant: "destructive",
-                    });
-                    return;
-                  }
                   if (editData.duration === undefined || editData.duration === null || editData.duration === "" || Number(editData.duration) <= 0) {
                     toast({
                       title: "Lỗi",
@@ -402,7 +375,6 @@ const AdminEditModal: React.FC<AdminEditModalProps> = (props) => {
                         duration_min: editData.duration
                           ? Number(editData.duration)
                           : undefined,
-                        price: Number(editData.price || 0),
                         is_active: (editData?.status || "active") === "active",
                         release_date: editData?.release_date,
                       };
@@ -429,7 +401,6 @@ const AdminEditModal: React.FC<AdminEditModalProps> = (props) => {
                         duration_min: editData.duration
                           ? Number(editData.duration)
                           : undefined,
-                        price: Number(editData.price || 0),
                         is_active: (editData?.status || "active") === "active",
                         release_date: editData?.release_date,
                       });
@@ -625,14 +596,13 @@ const AdminEditModal: React.FC<AdminEditModalProps> = (props) => {
                       if (selectedMovie) {
                         const movie = selectedMovie as any;
                         // Check if all required fields have data
-                        const isValid = movie.price && movie.release_date && movie.duration;
+                        const isValid = movie.release_date && movie.duration;
 
                         console.log("Selected Movie:", movie);
-                        console.log("Is Valid:", isValid, { price: movie.price, release_date: movie.release_date, duration: movie.duration });
+                        console.log("Is Valid:", isValid, { release_date: movie.release_date, duration: movie.duration });
 
                         setSelectedMovieInfo({
                           title: movie.title,
-                          price: movie.price,
                           release_date: movie.release_date,
                           duration: movie.duration,
                           genres: movie.genres,
@@ -687,16 +657,6 @@ const AdminEditModal: React.FC<AdminEditModalProps> = (props) => {
                         <p className="font-medium">{selectedMovieInfo.title}</p>
                       </div>
                       <div>
-                        <p className={!selectedMovieInfo.price ? 'text-red-600 font-semibold' : 'text-gray-600'}>
-                          Giá phim {!selectedMovieInfo.price && '❌'}
-                        </p>
-                        <p className="font-medium text-blue-600">
-                          {selectedMovieInfo.price
-                            ? selectedMovieInfo.price.toLocaleString("en-US") + ' đ'
-                            : 'Chưa nhập'}
-                        </p>
-                      </div>
-                      <div>
                         <p className={!selectedMovieInfo.release_date ? 'text-red-600 font-semibold' : 'text-gray-600'}>
                           Ngày phát hành {!selectedMovieInfo.release_date && '❌'}
                         </p>
@@ -717,7 +677,7 @@ const AdminEditModal: React.FC<AdminEditModalProps> = (props) => {
                     </div>
                     {!isMovieInfoValid && (
                       <p className="text-sm text-red-700 mt-2">
-                        ⚠️ Vui lòng hoàn thành thông tin phim (giá, ngày phát hành, thời lượng) trước khi tạo suất chiếu
+                        ⚠️ Vui lòng hoàn thành thông tin phim (ngày phát hành, thời lượng) trước khi tạo suất chiếu
                       </p>
                     )}
                   </div>
@@ -742,7 +702,6 @@ const AdminEditModal: React.FC<AdminEditModalProps> = (props) => {
                           {
                             day: "",
                             time: "",
-                            price: Number(selectedMovieInfo?.price || editData.price || 0),
                           },
                         ],
                       });
@@ -779,25 +738,6 @@ const AdminEditModal: React.FC<AdminEditModalProps> = (props) => {
                           onChange={(e) => {
                             const rows = [...(editData.rows || [])];
                             rows[idx] = { ...rows[idx], time: e.target.value };
-                            setEditData({ ...editData, rows });
-                          }}
-                        />
-                      </div>
-                      <div>
-                        <Label>Giá</Label>
-                        <Input
-                          type="number"
-                          min="0"
-                          step="1"
-                          value={row.price !== undefined && row.price !== null ? row.price : ""}
-                          onChange={(e) => {
-                            let numericValue = e.target.value === "" ? 0 : Number(e.target.value);
-                            if (numericValue < 0) numericValue = 0;
-                            const rows = [...(editData.rows || [])];
-                            rows[idx] = {
-                              ...rows[idx],
-                              price: numericValue,
-                            };
                             setEditData({ ...editData, rows });
                           }}
                         />
@@ -848,15 +788,14 @@ const AdminEditModal: React.FC<AdminEditModalProps> = (props) => {
                         const rows: Array<{
                           day: string;
                           time: string;
-                          price: number;
                         }> = Array.isArray(editData.rows) ? editData.rows : [];
                         if (rows.length > 0) {
                           // Validate all rows
-                          const invalidRows = rows.filter(r => !r.day || !r.time || !r.price);
+                          const invalidRows = rows.filter(r => !r.day || !r.time);
                           if (invalidRows.length > 0) {
                             toast({
                               title: "Lỗi",
-                              description: "Vui lòng điền đầy đủ thông tin ngày, giờ, giá cho tất cả các dòng",
+                              description: "Vui lòng điền đầy đủ thông tin ngày, giờ cho tất cả các dòng",
                               variant: "destructive",
                             });
                             return;
@@ -866,9 +805,7 @@ const AdminEditModal: React.FC<AdminEditModalProps> = (props) => {
                             movie_id: Number(editData.movie_id),
                             start_times: rows.map((r) => ({
                               start_time: `${r.day}T${r.time}`,
-                              price: Number(r.price || editData.price || 0),
                             })),
-                            price: Number(editData.price || 0),
                           };
                           const res = await createShowtimesBatchApi(payload);
                           const createdCount = (res.created || []).length;
@@ -882,7 +819,6 @@ const AdminEditModal: React.FC<AdminEditModalProps> = (props) => {
                           await createShowtimeApi({
                             movie_id: Number(editData.movie_id),
                             start_time: editData.start_time,
-                            price: Number(editData.price || 0),
                           });
                           toast({
                             title: "Thành công",
@@ -971,26 +907,6 @@ const AdminEditModal: React.FC<AdminEditModalProps> = (props) => {
                       }}
                     />
                   </div>
-                  <div>
-                    <Label>Giá vé</Label>
-                    <Input
-                      type="text"
-                      value={
-                        editData.price !== undefined && editData.price !== null
-                          ? editData.price.toLocaleString("en-US")
-                          : ""
-                      }
-                      onChange={(e) => {
-                        const numericValue = Number(
-                          e.target.value.replace(/,/g, ""),
-                        );
-                        setEditData({
-                          ...editData,
-                          price: isNaN(numericValue) ? 0 : numericValue,
-                        });
-                      }}
-                    />
-                  </div>
                 </div>
                 <div className="flex justify-end gap-2">
                   <Button
@@ -1010,20 +926,11 @@ const AdminEditModal: React.FC<AdminEditModalProps> = (props) => {
                         });
                         return;
                       }
-                      if (editData.price === undefined || editData.price === null) {
-                        toast({
-                          title: "Lỗi",
-                          description: "Giá vé là bắt buộc",
-                          variant: "destructive",
-                        });
-                        return;
-                      }
 
                       try {
                         await updateShowtimeApi(Number(editData.id), {
                           movie_id: Number(editData.movie_id),
                           start_time: editData.start_time,
-                          price: Number(editData.price || 0),
                         });
                         await refetch("showtime");
                         toast({

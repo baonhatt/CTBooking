@@ -34,7 +34,6 @@ export default function ShowtimesPage() {
           movie_id: s.movie_id,
           movie_title: s.movie?.title || "",
           start_time: new Date(s.start_time).toISOString(),
-          price: Number(s.price),
           total_sold: Number(s.total_sold || 0),
         })).filter(s =>
           searchQuery === "" ||
@@ -88,7 +87,7 @@ export default function ShowtimesPage() {
   };
   const handleOpenCreate = () => {
     setEditType("showtime");
-    setEditData({ id: 0, movie_id: 0, start_time: "", price: 0 });
+    setEditData({ id: 0, movie_id: 0, start_time: "" });
     setIsEditOpen(true);
     // Load movies when creating showtime
     (async () => {
@@ -97,7 +96,6 @@ export default function ShowtimesPage() {
         items.map((m: any) => ({
           id: String(m.id),
           title: m.title,
-          price: m.price,
           duration: m.duration_min,
           release_date: m.release_date,
           genres: m.genres,
@@ -120,7 +118,6 @@ export default function ShowtimesPage() {
         movie_id: s.movie_id,
         movie_title: s.movie?.title || "",
         start_time: new Date(s.start_time).toISOString(),
-        price: Number(s.price),
         total_sold: Number(s.total_sold || 0),
       })),
     );

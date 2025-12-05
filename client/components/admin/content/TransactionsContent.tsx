@@ -101,37 +101,6 @@ export default function TransactionsContent({
   };
   return (
     <div className="space-y-6">
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-sm">Tổng giao dịch</CardTitle>
-          </CardHeader>
-          <CardContent className="text-2xl font-bold">
-            {metrics.totalTransactions}
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-sm">Doanh thu</CardTitle>
-          </CardHeader>
-          <CardContent className="text-2xl font-bold text-blue-600">
-            {metrics.revenueTotal.toLocaleString("vi-VN")} đ
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-sm">Hoàn thành</CardTitle>
-          </CardHeader>
-          <CardContent className="text-2xl font-bold text-emerald-600">
-            {
-              data.filter(
-                (t) =>
-                  t.paymentStatus === "success" || t.paymentStatus === "paid",
-              ).length
-            }
-          </CardContent>
-        </Card>
-      </div>
       <Card>
         <CardHeader>
           <div className="flex justify-between items-center">
@@ -347,12 +316,7 @@ export default function TransactionsContent({
                           {txDetails.showtime?.end_time ? new Date(txDetails.showtime.end_time).toLocaleString("vi-VN") : "N/A"}
                         </span>
                       </p>
-                      <p>
-                        <span className="text-gray-600">Giá vé:</span>{" "}
-                        <span className="font-medium text-green-600">
-                          {txDetails.showtime?.price ? txDetails.showtime.price.toLocaleString("vi-VN") : "N/A"} đ
-                        </span>
-                      </p>
+
                     </div>
                   </div>
                 </div>
@@ -368,12 +332,7 @@ export default function TransactionsContent({
                       {txDetails.booking_details?.ticket_count || "N/A"}
                     </p>
                   </div>
-                  <div>
-                    <p className="text-sm text-gray-600">Giá vé</p>
-                    <p className="font-medium">
-                      {txDetails.booking_details?.price_per_ticket ? txDetails.booking_details.price_per_ticket.toLocaleString("vi-VN") : "N/A"} đ
-                    </p>
-                  </div>
+
                   <div>
                     <p className="text-sm text-gray-600">Tổng tiền</p>
                     <p className="text-xl font-bold text-green-600">
