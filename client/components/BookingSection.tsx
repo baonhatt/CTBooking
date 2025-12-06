@@ -354,7 +354,7 @@ export default function BookingSection({ onBookClick }: BookingSectionProps) {
           }),
         );
         let orderInfoText = `${selectedMovie?.title || "Movie"} | ${formData.quantity} vé | ${formData.showtime || "--:--"}`;
-        
+
         if (paymentMethod === "momo") {
           const extraDataEncoded = btoa(
             unescape(
