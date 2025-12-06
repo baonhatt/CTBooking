@@ -9,6 +9,7 @@ import {
   TableCell,
 } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
+import { Skeleton } from "@/components/ui/skeleton";
 import {
   Pagination,
   PaginationContent,
@@ -40,6 +41,7 @@ interface Props {
   onRefresh: () => void;
   searchQuery?: string;
   onSearchChange?: (query: string) => void;
+  isLoading?: boolean;
 }
 
 export default function ToysContent({
@@ -55,6 +57,7 @@ export default function ToysContent({
   onRefresh,
   searchQuery = "",
   onSearchChange = () => { },
+  isLoading = false,
 }: Props) {
   const handleDelete = async (id: number) => {
     try {
@@ -101,7 +104,19 @@ export default function ToysContent({
               </TableRow>
             </TableHeader>
             <TableBody>
-              {data.map((x) => (
+              {isLoading
+                ? Array.from({ length: 5 }).map((_, idx) => (
+                    <TableRow key={`sk-${idx}`}>
+                      <TableCell><Skeleton className="h-4 w-16" /></TableCell>
+                      <TableCell><Skeleton className="h-4 w-32" /></TableCell>
+                      <TableCell><Skeleton className="h-4 w-24" /></TableCell>
+                      <TableCell><Skeleton className="h-4 w-16" /></TableCell>
+                      <TableCell><Skeleton className="h-4 w-16" /></TableCell>
+                      <TableCell><Skeleton className="h-5 w-20" /></TableCell>
+                      <TableCell className="text-right"><Skeleton className="h-8 w-24 ml-auto" /></TableCell>
+                    </TableRow>
+                  ))
+                : data.map((x) => (
                 <TableRow key={x.id}>
                   <TableCell className="font-medium">{x.id}</TableCell>
                   <TableCell>{x.name}</TableCell>

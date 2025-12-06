@@ -14,6 +14,7 @@ export default function UsersPage() {
   const [editData, setEditData] = useState<any>(null);
   const [moviesLocal, setMoviesLocal] = useState<any[]>([]);
   const [movieStatus, setMovieStatus] = useState<Record<string, "active" | "inactive">>({});
+  const [isLoading, setIsLoading] = useState(false);
 
   function toLocalDateTimeString(date: Date) {
     const pad = (n: number) => n.toString().padStart(2, "0");
@@ -28,6 +29,7 @@ export default function UsersPage() {
   useEffect(() => {
     (async () => {
       try {
+        setIsLoading(true);
         const { items, total } = await getUsers({
           page: usersPage,
           pageSize,
@@ -47,6 +49,8 @@ export default function UsersPage() {
         setTotalUsers(total);
       } catch (err) {
         console.error("Lỗi load users:", err);
+      } finally {
+        setIsLoading(false);
       }
     })();
   }, [usersPage, userQuery, pageSize]);
@@ -62,6 +66,7 @@ export default function UsersPage() {
   };
 
   const handleRefresh = async () => {
+    setIsLoading(true);
     const { items, total } = await getUsers({
       page: usersPage,
       pageSize,
@@ -79,6 +84,7 @@ export default function UsersPage() {
       })),
     );
     setTotalUsers(total);
+    setIsLoading(false);
   };
 
   return (
@@ -98,6 +104,7 @@ export default function UsersPage() {
         onEdit={handleOpenEdit}
         usersLength={totalUsers}
         onRefresh={handleRefresh}
+        isLoading={isLoading}
       />
       <AdminEditModal
         editType={editData ? "user" : null}

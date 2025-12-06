@@ -36,15 +36,19 @@ export default function DashboardPage() {
   const [revenueByMonthData, setRevenueByMonthData] = useState<
     Array<{ month: number; revenue: number }>
   >([]);
+  const [isLoading, setIsLoading] = useState(false);
 
   // Load metrics on mount
   useEffect(() => {
     (async () => {
       try {
+        setIsLoading(true);
         const data = await getDashboardMetrics();
         setMetrics(data);
       } catch (err) {
         console.error("Failed to load metrics:", err);
+      } finally {
+        setIsLoading(false);
       }
     })();
   }, []);
@@ -130,6 +134,7 @@ export default function DashboardPage() {
         revenueByMonthData={revenueByMonthData}
         dateStatus={dateStatus}
         setDateStatus={setDateStatus}
+        isLoading={isLoading}
       />
     </AdminLayout>
   );

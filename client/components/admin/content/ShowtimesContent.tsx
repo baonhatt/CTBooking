@@ -10,6 +10,7 @@ import {
 } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Skeleton } from "@/components/ui/skeleton";
 import {
   Pagination,
   PaginationContent,
@@ -50,6 +51,7 @@ interface Props {
   onRefresh: () => void;
   searchQuery?: string;
   onSearchChange?: (query: string) => void;
+  isLoading?: boolean;
 }
 
 export default function ShowtimesContent({
@@ -69,6 +71,7 @@ export default function ShowtimesContent({
   onRefresh,
   searchQuery = "",
   onSearchChange = () => { },
+  isLoading = false,
 }: Props) {
   const [isDetailsOpen, setIsDetailsOpen] = useState(false);
   const [selectedShowtimeId, setSelectedShowtimeId] = useState<number | null>(
@@ -164,7 +167,18 @@ export default function ShowtimesContent({
               </TableRow>
             </TableHeader>
             <TableBody>
-              {data.map((showtime) => {
+              {isLoading
+                ? Array.from({ length: 5 }).map((_, idx) => (
+                    <TableRow key={`sk-${idx}`}>
+                      <TableCell><Skeleton className="h-4 w-16" /></TableCell>
+                      <TableCell><Skeleton className="h-4 w-40" /></TableCell>
+                      <TableCell><Skeleton className="h-4 w-36" /></TableCell>
+                      <TableCell><Skeleton className="h-4 w-12" /></TableCell>
+                      <TableCell><Skeleton className="h-5 w-20" /></TableCell>
+                      <TableCell className="text-right"><Skeleton className="h-8 w-24 ml-auto" /></TableCell>
+                    </TableRow>
+                  ))
+                : data.map((showtime) => {
                 const CAPACITY = 100;
                 const isFull = showtime.total_sold >= CAPACITY;
                 return (

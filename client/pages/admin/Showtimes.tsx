@@ -18,9 +18,11 @@ export default function ShowtimesPage() {
   const [editType, setEditType] = useState<"showtime" | null>(null);
   const [editData, setEditData] = useState<any>({});
   const [moviesLocal, setMoviesLocal] = useState<any[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
 
   useEffect(() => {
     (async () => {
+      setIsLoading(true);
       const { items, total } = await getShowtimes({
         page: showtimesPage,
         pageSize,
@@ -41,6 +43,7 @@ export default function ShowtimesPage() {
         ),
       );
       setTotalShowtimes(total);
+      setIsLoading(false);
     })();
   }, [showtimesPage, pageSize, sortKey, todayOnly, searchQuery]);
 
@@ -105,6 +108,7 @@ export default function ShowtimesPage() {
   };
 
   const handleRefresh = async () => {
+    setIsLoading(true);
     const { items, total } = await getShowtimes({
       page: showtimesPage,
       pageSize,
@@ -122,6 +126,7 @@ export default function ShowtimesPage() {
       })),
     );
     setTotalShowtimes(total);
+    setIsLoading(false);
   };
 
   return (
@@ -151,6 +156,7 @@ export default function ShowtimesPage() {
           setSearchQuery(query);
           setShowtimesPage(1);
         }}
+        isLoading={isLoading}
       />
       <AdminEditModal
         isEditOpen={isEditOpen}

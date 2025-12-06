@@ -411,7 +411,6 @@ export default function BookingSection({ onBookClick }: BookingSectionProps) {
           }
           throw new Error("Không nhận được liên kết thanh toán MoMo");
         } else if (paymentMethod === "vnpay") {
-          debugger;
           orderInfoText = booking?.id;
           const returnUrl =
             (import.meta as any).env?.VITE_VNPAY_RETURN_URL ||

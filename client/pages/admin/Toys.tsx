@@ -13,9 +13,11 @@ export default function ToysPage() {
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [editType, setEditType] = useState<"toy" | null>(null);
   const [editData, setEditData] = useState<any>({});
+  const [isLoading, setIsLoading] = useState(false);
 
   useEffect(() => {
     (async () => {
+      setIsLoading(true);
       const { items, total } = await getToys({
         page: toysPage,
         pageSize,
@@ -33,6 +35,7 @@ export default function ToysPage() {
         })),
       );
       setTotalToys(total);
+      setIsLoading(false);
     })();
   }, [toysPage, pageSize, searchQuery]);
 
@@ -61,6 +64,7 @@ export default function ToysPage() {
   };
 
   const handleRefresh = async () => {
+    setIsLoading(true);
     const { items, total } = await getToys({ page: toysPage, pageSize });
     setToys(
       items.map((t: any) => ({
@@ -74,6 +78,7 @@ export default function ToysPage() {
       })),
     );
     setTotalToys(total);
+    setIsLoading(false);
   };
 
   return (
@@ -99,6 +104,7 @@ export default function ToysPage() {
           setSearchQuery(query);
           setToysPage(1);
         }}
+        isLoading={isLoading}
       />
       <AdminEditModal
         isEditOpen={isEditOpen}

@@ -1,6 +1,7 @@
 import React from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Skeleton } from "@/components/ui/skeleton";
 
 interface Metrics {
   totalMovies: number;
@@ -25,6 +26,7 @@ interface Props {
   revenueByMonthYear: number;
   setRevenueByMonthYear: (year: number) => void;
   revenueByMonthData: Array<{ month: number; revenue: number }>;
+  isLoading?: boolean;
 }
 
 export default function DashboardContent({
@@ -41,6 +43,7 @@ export default function DashboardContent({
   revenueByMonthData,
   dateStatus,
   setDateStatus,
+  isLoading = false,
 }: Props) {
   const BarChart = ({
     data,
@@ -105,7 +108,9 @@ export default function DashboardContent({
             <CardTitle className="text-sm">Phim</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-semibold">{metrics.totalMovies}</div>
+            {isLoading ? <Skeleton className="h-8 w-20" /> : (
+              <div className="text-2xl font-semibold">{metrics.totalMovies}</div>
+            )}
           </CardContent>
         </Card>
         <Card>
@@ -113,9 +118,11 @@ export default function DashboardContent({
             <CardTitle className="text-sm">Lịch chiếu</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-semibold">
-              {metrics.totalShowtimes}
-            </div>
+            {isLoading ? <Skeleton className="h-8 w-20" /> : (
+              <div className="text-2xl font-semibold">
+                {metrics.totalShowtimes}
+              </div>
+            )}
           </CardContent>
         </Card>
         <Card>
@@ -123,7 +130,9 @@ export default function DashboardContent({
             <CardTitle className="text-sm">Đồ chơi</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-semibold">{metrics.totalToys}</div>
+            {isLoading ? <Skeleton className="h-8 w-20" /> : (
+              <div className="text-2xl font-semibold">{metrics.totalToys}</div>
+            )}
           </CardContent>
         </Card>
         <Card>
@@ -131,7 +140,9 @@ export default function DashboardContent({
             <CardTitle className="text-sm">Người dùng</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-semibold">{metrics.totalUsers}</div>
+            {isLoading ? <Skeleton className="h-8 w-20" /> : (
+              <div className="text-2xl font-semibold">{metrics.totalUsers}</div>
+            )}
           </CardContent>
         </Card>
         <Card>
@@ -139,9 +150,11 @@ export default function DashboardContent({
             <CardTitle className="text-sm">Giao dịch</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-semibold">
-              {metrics.totalTransactions}
-            </div>
+            {isLoading ? <Skeleton className="h-8 w-24" /> : (
+              <div className="text-2xl font-semibold">
+                {metrics.totalTransactions}
+              </div>
+            )}
           </CardContent>
         </Card>
       </div>
@@ -149,7 +162,11 @@ export default function DashboardContent({
       {/* Total Revenue */}
       <Card>
         <CardHeader>
-          <CardTitle>Tổng doanh thu: {metrics.revenueTotal.toLocaleString("en-US")}</CardTitle>
+          <CardTitle>
+            Tổng doanh thu: {isLoading ? (
+              <Skeleton className="inline-block align-middle h-6 w-32" />
+            ) : metrics.revenueTotal.toLocaleString("en-US")}
+          </CardTitle>
         </CardHeader>
       </Card>
 

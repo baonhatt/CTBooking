@@ -223,7 +223,7 @@ export default function Header({ onBookClick }: HeaderProps) {
                   variant="outline"
                   className="border-white/20 text-black"
                 >
-                  <Menu className="mr-2 h-4 w-4" /> Menu
+                  <Menu className="h-4 w-4" aria-label="Menu" />
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent className="bg-black/90 border border-white/20 text-white">
@@ -574,8 +574,8 @@ export default function Header({ onBookClick }: HeaderProps) {
             onClick={onBookClick}
             className="bg-gradient-to-r text-sm md:text-base from-blue-500 to-purple-500 hover:from-blue-600 hover:to-purple-600 text-white font-semibold px-3 py-2 md:px-6 md:py-2 rounded-lg shadow-lg transition-all duration-300 hover:scale-105"
           >
-            <Ticket className="mr-2 h-4 w-4" />
-            ĐẶT VÉ NGAY
+            <Ticket className="h-4 w-4 md:mr-2" />
+            <span className="hidden md:inline">ĐẶT VÉ NGAY</span>
           </Button>
         </div>
       </div>

@@ -12,11 +12,13 @@ export default function TransactionsPage() {
   const [revenueTotal, setRevenueTotal] = useState(0);
   const [revenueCount, setRevenueCount] = useState(0);
   const [txStatus, setTxStatus] = useState<"paid" | "all">("paid");
+  const [isLoading, setIsLoading] = useState(false);
 
   // Load transactions khi page hoặc query thay đổi
   useEffect(() => {
     (async () => {
       try {
+        setIsLoading(true);
         const { items, total } = await getTransactions({
           page: txPage,
           pageSize,
@@ -39,6 +41,8 @@ export default function TransactionsPage() {
         setTotalTransactions(total);
       } catch (error) {
         console.error("Lỗi load giao dịch:", error);
+      } finally {
+        setIsLoading(false);
       }
     })();
   }, [txPage, pageSize, txQuery, txStatus]);
@@ -83,6 +87,7 @@ export default function TransactionsPage() {
 
   const handleRefresh = async () => {
     try {
+      setIsLoading(true);
       const { items, total } = await getTransactions({
         page: txPage,
         pageSize,
@@ -115,6 +120,8 @@ export default function TransactionsPage() {
       setRevenueCount(revCount);
     } catch (error) {
       console.error("Lỗi refresh giao dịch:", error);
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -137,6 +144,7 @@ export default function TransactionsPage() {
         onRefresh={handleRefresh}
         txStatus={txStatus}
         setTxStatus={setTxStatus}
+        isLoading={isLoading}
       />
     </AdminLayout>
   );
