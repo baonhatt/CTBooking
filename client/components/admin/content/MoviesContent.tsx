@@ -10,6 +10,7 @@ import {
 } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Skeleton } from "@/components/ui/skeleton";
 import {
   Pagination,
   PaginationContent,
@@ -49,6 +50,7 @@ interface Props {
   onRefresh: () => void;
   searchQuery?: string;
   onSearchChange?: (query: string) => void;
+  isLoading?: boolean;
 }
 
 export default function MoviesContent({
@@ -64,6 +66,7 @@ export default function MoviesContent({
   onRefresh,
   searchQuery = "",
   onSearchChange = () => { },
+  isLoading = false,
 }: Props) {
   const [isDetailsOpen, setIsDetailsOpen] = useState(false);
   const [selectedMovieId, setSelectedMovieId] = useState<number | null>(null);
@@ -131,7 +134,23 @@ export default function MoviesContent({
               </TableRow>
             </TableHeader>
             <TableBody>
-              {data.map((movie) => (
+              {isLoading
+                ? Array.from({ length: 5 }).map((_, idx) => (
+                    <TableRow key={`sk-${idx}`}>
+                      <TableCell><Skeleton className="h-4 w-16" /></TableCell>
+                      <TableCell className="flex items-center space-x-3">
+                        <Skeleton className="h-15 w-20" />
+                        <Skeleton className="h-4 w-32" />
+                      </TableCell>
+                      <TableCell><Skeleton className="h-4 w-28" /></TableCell>
+                      <TableCell><Skeleton className="h-4 w-20" /></TableCell>
+                      <TableCell><Skeleton className="h-4 w-12" /></TableCell>
+                      <TableCell><Skeleton className="h-4 w-28" /></TableCell>
+                      <TableCell><Skeleton className="h-5 w-20" /></TableCell>
+                      <TableCell className="text-right"><Skeleton className="h-8 w-32 ml-auto" /></TableCell>
+                    </TableRow>
+                  ))
+                : data.map((movie) => (
                 <TableRow key={movie.id}>
                   <TableCell className="font-medium w-16">{movie.id}</TableCell>
                   <TableCell className="flex items-center space-x-3">

@@ -16,9 +16,11 @@ export default function MoviesPage() {
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [editType, setEditType] = useState<"movie" | null>(null);
   const [editData, setEditData] = useState<any>({});
+  const [isLoading, setIsLoading] = useState(false);
 
   useEffect(() => {
     (async () => {
+      setIsLoading(true);
       const { items, total } = await getMoviesAdmin({
         page: moviesPage,
         pageSize,
@@ -43,6 +45,7 @@ export default function MoviesPage() {
         ...prev,
         ...Object.fromEntries(mapped.map((x: any) => [x.id, "active"])),
       }));
+      setIsLoading(false);
     })();
   }, [moviesPage, pageSize, searchQuery]);
 
@@ -98,6 +101,7 @@ export default function MoviesPage() {
   };
 
   const handleRefresh = async () => {
+    setIsLoading(true);
     const { items, total } = await getMoviesAdmin({
       page: moviesPage,
       pageSize,
@@ -121,6 +125,7 @@ export default function MoviesPage() {
       ...prev,
       ...Object.fromEntries(mapped.map((x: any) => [x.id, "active"])),
     }));
+    setIsLoading(false);
   };
 
   return (
@@ -146,6 +151,7 @@ export default function MoviesPage() {
           setSearchQuery(query);
           setMoviesPage(1);
         }}
+        isLoading={isLoading}
       />
       <AdminEditModal
         isEditOpen={isEditOpen}

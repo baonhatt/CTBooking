@@ -11,6 +11,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
+import { Skeleton } from "@/components/ui/skeleton";
 import {
   Pagination,
   PaginationContent,
@@ -60,6 +61,7 @@ interface Props {
   onRefresh: () => void;
   txStatus?: "paid" | "all";
   setTxStatus?: (status: "paid" | "all") => void;
+  isLoading?: boolean;
 }
 
 export default function TransactionsContent({
@@ -74,6 +76,7 @@ export default function TransactionsContent({
   onRefresh,
   txStatus = "paid",
   setTxStatus,
+  isLoading = false,
 }: Props) {
   const [isDetailsOpen, setIsDetailsOpen] = useState(false);
   const [selectedTxId, setSelectedTxId] = useState<number | null>(null);
@@ -154,44 +157,60 @@ export default function TransactionsContent({
               </TableRow>
             </TableHeader>
             <TableBody>
-              {data.map((t) => (
-                <TableRow key={t.id}>
-                  <TableCell className="font-semibold text-sm">
-                    {t.email}
-                  </TableCell>
-                  <TableCell>{t.userName || "-"}</TableCell>
-                  <TableCell>{t.movieTitle}</TableCell>
-                  <TableCell>{t.ticketCount}</TableCell>
-                  <TableCell>
-                    {t.totalPrice.toLocaleString("vi-VN")} đ
-                  </TableCell>
-                  <TableCell className="capitalize">
-                    {t.paymentMethod}
-                  </TableCell>
-                  <TableCell>
-                    <Badge
-                      className={
-                        t.paymentStatus === "paid"
-                          ? "bg-green-100 text-green-800 hover:bg-green-100"
-                          : t.paymentStatus === "pending"
-                            ? "bg-yellow-100 text-yellow-800 hover:bg-yellow-100"
-                            : "bg-red-100 text-red-800 hover:bg-red-100"
-                      }
-                    >
-                      {t.paymentStatus}
-                    </Badge>
-                  </TableCell>
-                  <TableCell>{t.createdAt.toLocaleString("vi-VN")}</TableCell>
-                  <TableCell>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => handleViewDetails(Number(t.id))}
-                    >
-                      Xem
-                    </Button>
-                  </TableCell>
-                </TableRow>
+              {isLoading
+                ? Array.from({ length: 5 }).map((_, idx) => (
+                    <TableRow key={`sk-${idx}`}>
+                      <TableCell><Skeleton className="h-4 w-40" /></TableCell>
+                      <TableCell><Skeleton className="h-4 w-24" /></TableCell>
+                      <TableCell><Skeleton className="h-4 w-32" /></TableCell>
+                      <TableCell><Skeleton className="h-4 w-12" /></TableCell>
+                      <TableCell><Skeleton className="h-4 w-20" /></TableCell>
+                      <TableCell><Skeleton className="h-4 w-16" /></TableCell>
+                      <TableCell><Skeleton className="h-6 w-20" /></TableCell>
+                      <TableCell><Skeleton className="h-4 w-36" /></TableCell>
+                      <TableCell>
+                        <Skeleton className="h-8 w-16" />
+                      </TableCell>
+                    </TableRow>
+                  ))
+                : data.map((t) => (
+                  <TableRow key={t.id}>
+                    <TableCell className="font-semibold text-sm">
+                      {t.email}
+                    </TableCell>
+                    <TableCell>{t.userName || "-"}</TableCell>
+                    <TableCell>{t.movieTitle}</TableCell>
+                    <TableCell>{t.ticketCount}</TableCell>
+                    <TableCell>
+                      {t.totalPrice.toLocaleString("vi-VN")} đ
+                    </TableCell>
+                    <TableCell className="capitalize">
+                      {t.paymentMethod}
+                    </TableCell>
+                    <TableCell>
+                      <Badge
+                        className={
+                          t.paymentStatus === "paid"
+                            ? "bg-green-100 text-green-800 hover:bg-green-100"
+                            : t.paymentStatus === "pending"
+                              ? "bg-yellow-100 text-yellow-800 hover:bg-yellow-100"
+                              : "bg-red-100 text-red-800 hover:bg-red-100"
+                        }
+                      >
+                        {t.paymentStatus}
+                      </Badge>
+                    </TableCell>
+                    <TableCell>{t.createdAt.toLocaleString("vi-VN")}</TableCell>
+                    <TableCell>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleViewDetails(Number(t.id))}
+                      >
+                        Xem
+                      </Button>
+                    </TableCell>
+                  </TableRow>
               ))}
             </TableBody>
           </Table>

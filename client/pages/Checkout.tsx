@@ -29,7 +29,6 @@ export default function Checkout() {
     const params = new URLSearchParams(window.location.search);
     const raw = params.get("vnp_OrderInfo");
     let bookingId_vnpay = "";
-    debugger;
     if (raw) {
       // raw chỉ là số dạng chuỗi "54"
       bookingId_vnpay = raw;
@@ -96,7 +95,6 @@ export default function Checkout() {
               user_id: bookingData.user_id,
               payment_status: bookingData.payment_status,
             };
-            debugger;
             setOrder(pendingFromApi);
 
             // Chỉ gọi handleVNPayCallback nếu là lần đầu callback (URL có vnp params)
@@ -292,7 +290,7 @@ export default function Checkout() {
                 <span className="font-medium">{order.movie}</span>
                 <span className="text-gray-600">Ngày</span>
                 <span className="font-medium">{order.dateDisplay}</span>
-                <span className="text-gray-600">Giờ</span>
+                <span className="text-gray-600">Giờ chiếu</span>
                 <span className="font-medium">{order.showtime}</span>
                 <span className="text-gray-600">Họ tên</span>
                 <span className="font-medium">{order.name}</span>

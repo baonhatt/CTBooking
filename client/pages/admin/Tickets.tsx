@@ -27,8 +27,10 @@ export default function TicketsPage() {
 
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [editData, setEditData] = useState<any>(null);
+  const [isLoading, setIsLoading] = useState(false);
 
   const handleRefresh = async () => {
+    setIsLoading(true);
     const { items, total } = await getTickets({ page, pageSize });
     setTickets(
       items.map((t: any) => ({
@@ -47,6 +49,7 @@ export default function TicketsPage() {
       })),
     );
     setTotal(total);
+    setIsLoading(false);
   };
 
   useEffect(() => {
@@ -84,6 +87,7 @@ export default function TicketsPage() {
         setEditData={setEditData}
         onRefresh={handleRefresh}
         deleteTicketApi={deleteTicketApi as any}
+        isLoading={isLoading}
       />
     </AdminLayout>
   );

@@ -23,6 +23,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { createTicketApi, updateTicketApi } from "@/lib/api";
+import { Skeleton } from "@/components/ui/skeleton";
 
 interface TicketPackage {
   id: number;
@@ -53,6 +54,7 @@ interface Props {
   setEditData: (data: any) => void;
   onRefresh: () => Promise<void>;
   deleteTicketApi: (id: number) => Promise<any>;
+  isLoading?: boolean;
 }
 
 export default function TicketsContent(props: Props) {
@@ -72,6 +74,7 @@ export default function TicketsContent(props: Props) {
     onRefresh,
     deleteTicketApi,
   } = props;
+  const { isLoading = false } = props as any;
 
   const [isDeletingId, setIsDeletingId] = useState<number | null>(null);
 
@@ -98,7 +101,18 @@ export default function TicketsContent(props: Props) {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {data.map((t) => (
+              {isLoading
+                ? Array.from({ length: 5 }).map((_, idx) => (
+                    <TableRow key={`sk-${idx}`}>
+                      <TableCell><Skeleton className="h-4 w-40" /></TableCell>
+                      <TableCell><Skeleton className="h-4 w-28" /></TableCell>
+                      <TableCell><Skeleton className="h-4 w-20" /></TableCell>
+                      <TableCell><Skeleton className="h-4 w-16" /></TableCell>
+                      <TableCell><Skeleton className="h-5 w-20" /></TableCell>
+                      <TableCell className="text-right"><Skeleton className="h-8 w-24 ml-auto" /></TableCell>
+                    </TableRow>
+                  ))
+                : data.map((t) => (
                 <TableRow key={t.id}>
                   <TableCell className="font-medium">{t.name}</TableCell>
                   <TableCell>{t.type || ""}</TableCell>
