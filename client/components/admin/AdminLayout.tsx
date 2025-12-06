@@ -1,6 +1,18 @@
 import React from "react";
 import { Button } from "@/components/ui/button";
 import { useNavigate } from "react-router-dom";
+import iconCine from "@/assets/images/iconCine.svg";
+import {
+  LayoutDashboard,
+  Users as UsersIcon,
+  Clapperboard,
+  CalendarDays,
+  Package,
+  Ticket as TicketIcon,
+  CreditCard,
+  ScanLine,
+  LogOut,
+} from "lucide-react";
 
 interface Props {
   active:
@@ -34,73 +46,88 @@ export default function AdminLayout({
       navigate(`/admin/${tab === "dashboard" ? "dashboard" : tab}`);
     }
   }
+  const itemClass = (isActive: boolean) =>
+    `w-full justify-start gap-2 rounded-md ${
+      isActive ? "bg-white/10 text-white" : "text-white/90"
+    } hover:bg-white/10`;
+
   return (
-    <div className="min-h-screen grid grid-cols-[240px_1fr]">
-      <div className="border-r p-3 space-y-2">
-        <div className="text-sm">{adminEmailState}</div>
+    <div className="min-h-screen grid grid-cols-[260px_1fr]">
+      <aside className="sticky top-0 h-screen overflow-y-auto bg-gradient-to-b from-[#0e1b3d] to-[#15325f] border-r border-white/10 p-4 text-white">
+        <div className="flex items-center gap-3 mb-4 px-1">
+          <img src={iconCine} alt="CINESPHERE" className="h-10 w-auto" />
+          <div className="font-bold tracking-widest">CINESPHERE ADMIN</div>
+        </div>
+        <div className="text-xs text-white/70 mb-3">{adminEmailState}</div>
         <div className="space-y-1">
           <Button
-            variant={active === "dashboard" ? "default" : "outline"}
+            variant="ghost"
             onClick={() => go("dashboard")}
-            className="w-full"
+            className={itemClass(active === "dashboard")}
           >
-            Bảng điều khiển
+            <LayoutDashboard className="h-4 w-4" /> Bảng điều khiển
           </Button>
           <Button
-            variant={active === "users" ? "default" : "outline"}
+            variant="ghost"
             onClick={() => go("users")}
-            className="w-full"
+            className={itemClass(active === "users")}
           >
-            Người dùng
+            <UsersIcon className="h-4 w-4" /> Người dùng
           </Button>
           <Button
-            variant={active === "movies" ? "default" : "outline"}
+            variant="ghost"
             onClick={() => go("movies")}
-            className="w-full"
+            className={itemClass(active === "movies")}
           >
-            Phim
+            <Clapperboard className="h-4 w-4" /> Phim
           </Button>
           <Button
-            variant={active === "showtimes" ? "default" : "outline"}
+            variant="ghost"
             onClick={() => go("showtimes")}
-            className="w-full"
+            className={itemClass(active === "showtimes")}
           >
-            Lịch chiếu
+            <CalendarDays className="h-4 w-4" /> Lịch chiếu
           </Button>
           <Button
-            variant={active === "toys" ? "default" : "outline"}
+            variant="ghost"
             onClick={() => go("toys")}
-            className="w-full"
+            className={itemClass(active === "toys")}
           >
-            Đồ chơi
+            <Package className="h-4 w-4" /> Đồ chơi
           </Button>
           <Button
-            variant={active === "tickets" ? "default" : "outline"}
+            variant="ghost"
             onClick={() => go("tickets")}
-            className="w-full"
+            className={itemClass(active === "tickets")}
           >
-            Gói vé
+            <TicketIcon className="h-4 w-4" /> Gói vé
           </Button>
           <Button
-            variant={active === "transactions" ? "default" : "outline"}
+            variant="ghost"
             onClick={() => go("transactions")}
-            className="w-full"
+            className={itemClass(active === "transactions")}
           >
-            Giao dịch
+            <CreditCard className="h-4 w-4" /> Giao dịch
           </Button>
           <Button
-            variant={active === "ticket-check" ? "default" : "outline"}
+            variant="ghost"
             onClick={() => go("ticket-check")}
-            className="w-full"
+            className={itemClass(active === "ticket-check")}
           >
-            Kiểm Tra Vé
+            <ScanLine className="h-4 w-4" /> Kiểm Tra Vé
           </Button>
         </div>
-        <Button variant="destructive" onClick={handleLogout} className="w-full">
-          Đăng xuất
-        </Button>
-      </div>
-      <div className="p-6">{children}</div>
+        <div className="mt-4">
+          <Button
+            variant="destructive"
+            onClick={handleLogout}
+            className="w-full justify-center gap-2"
+          >
+            <LogOut className="h-4 w-4" /> Đăng xuất
+          </Button>
+        </div>
+      </aside>
+      <main className="p-6">{children}</main>
     </div>
   );
 }

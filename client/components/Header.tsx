@@ -19,6 +19,9 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import iconCine from "@/assets/images/iconCine.svg";
+import labelCine from "@/assets/images/group1.png";
+
 
 interface HeaderProps {
   onBookClick: () => void;
@@ -43,7 +46,6 @@ export default function Header({ onBookClick }: HeaderProps) {
   const [showLoginPass, setShowLoginPass] = useState(false);
   const [showRegisterPass, setShowRegisterPass] = useState(false);
   const [showRegisterConfirmPass, setShowRegisterConfirmPass] = useState(false);
-
   useEffect(() => {
     const handleScroll = () => {
       setIsScrolled(window.scrollY > 50);
@@ -183,16 +185,14 @@ export default function Header({ onBookClick }: HeaderProps) {
       className={cn(
         "fixed top-0 left-0 right-0 z-50 transition-all duration-300",
         isScrolled
-          ? "bg-black/95 backdrop-blur-md border-b border-white/10"
+          ? "bg-black/5 backdrop-blur-md border-b border-white/10"
           : "bg-transparent",
       )}
     >
       <div className="container mx-auto px-4 py-4 flex items-center justify-between">
         <div className="flex items-center gap-3 animate-fade-in">
-          <div className="w-12 h-12 rounded-full bg-gradient-to-br from-purple-500 to-blue-500 flex items-center justify-center shadow-lg">
-            <span className="text-2xl font-bold text-white">C</span>
-          </div>
-          <h1 className="hidden md:block text-2xl font-bold text-blue-400">CINESPHERE</h1>
+          <img src={iconCine} style={{ width: "4rem" }} alt="CINESPHERE logo" />
+          <img src={labelCine} className="hidden sm:block text-2xl font-bold" style={{ width: "16rem", height: "2rem" }} alt="CINESPHERE logo" />
         </div>
 
         <nav className="hidden md:flex items-center gap-8 animate-fade-in delay-200">
