@@ -237,7 +237,7 @@ export const listTransactions: RequestHandler = async (req, res) => {
     const page = Number(req.query.page || 1);
     const pageSize = Number(req.query.pageSize || 10);
     const email = String(req.query.email || "");
-    const status = String(req.query.status || "all").toLowerCase();
+    const status = String(req.query.status || "");
     const skip = (page - 1) * pageSize;
 
     // Build where clause
@@ -254,12 +254,10 @@ export const listTransactions: RequestHandler = async (req, res) => {
         },
       };
     }
-    if (status === "paid") {
-      where.payment_status = { in: ["success", "SUCCESS", "paid", "PAID"] } as any;
-    }
 
-    else if (status && status !== "all") {
-      where.payment_status = status
+    // Filter by payment status
+    if (status && status !== "all") {
+      where.payment_status = status;
     }
 
     // Get total count
