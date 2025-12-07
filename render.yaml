@@ -1,0 +1,13 @@
+services:
+  - type: web
+    name: ctbooking
+    env: node
+    region: singapore
+    plan: free
+    buildCommand: rm -rf node_modules package-lock.json && npm install && npm run build
+    startCommand: node dist/server/node-build.mjs
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 3000
