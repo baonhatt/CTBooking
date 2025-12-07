@@ -10,18 +10,18 @@
       "dist/server/**/*.js"
     ]
   },
-  "scripts": {
-    "dev": "vite",
-    "prebuild": "prisma generate",
-    "pretypecheck": "prisma generate",
-    "build": "npm run build:client && npm run build:server",
-    "build:client": "vite build",
-    "build:server": "vite build --config vite.config.server.ts",
-    "start": "node dist/server/node-build.mjs",
-    "test": "vitest --run",
-    "format.fix": "prettier --write .",
-    "typecheck": "tsc"
-  },
+    "scripts": {
+      "dev": "vite",
+      "prebuild": "prisma generate",
+      "pretypecheck": "prisma generate",
+      "build": "npm run build:client && npm run build:server",
+      "build:client": "vite build",
+      "build:server": "vite build --config vite.config.server.ts",
+      "start": "node dist/server/node-build.mjs",
+      "test": "vitest --run",
+      "format.fix": "prettier --write .",
+      "typecheck": "tsc"
+    },
   "dependencies": {
     "@ant-design/icons": "^6.1.0",
     "@prisma/adapter-pg": "^7.0.1",
