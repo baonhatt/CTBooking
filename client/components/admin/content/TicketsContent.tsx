@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import { Loader2 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import {
@@ -77,6 +78,7 @@ export default function TicketsContent(props: Props) {
   const { isLoading = false } = props as any;
 
   const [isDeletingId, setIsDeletingId] = useState<number | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
 
   return (
     <div className="space-y-4">
@@ -293,8 +295,10 @@ export default function TicketsContent(props: Props) {
             <div className="flex justify-end gap-2">
               <Button variant="outline" onClick={() => setIsEditOpen(false)}>Hủy</Button>
               <Button
+                disabled={isSaving}
                 onClick={async () => {
                   try {
+                    setIsSaving(true);
                     if (!editData?.id) {
                       await createTicketApi({
                         name: editData.name,
@@ -327,11 +331,16 @@ export default function TicketsContent(props: Props) {
                     await onRefresh();
                     toast({ title: "Thành công", description: editData?.id ? "Cập nhật gói vé thành công" : "Thêm gói vé thành công" });
                   } finally {
+                    setIsSaving(false);
                     setIsEditOpen(false);
                   }
                 }}
               >
-                Lưu
+                {isSaving ? (
+                  <span className="flex items-center gap-2"><Loader2 className="h-4 w-4 animate-spin" /> Đang lưu...</span>
+                ) : (
+                  "Lưu"
+                )}
               </Button>
             </div>
           </div>

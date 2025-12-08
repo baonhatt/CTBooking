@@ -30,6 +30,7 @@ import { getTransactionById } from "@/lib/api";
 
 interface Tx {
   id: string;
+  transactionId: string;
   email: string;
   userName: string;
   movieTitle: string;
@@ -83,7 +84,7 @@ export default function TransactionsContent({
   const [txDetails, setTxDetails] = useState<any>(null);
   const [isLoadingDetails, setIsLoadingDetails] = useState(false);
   const [detailsError, setDetailsError] = useState<string | null>(null);
-
+  console.log(data);
   useEffect(() => {
     if (isDetailsOpen && selectedTxId) {
       (async () => {
@@ -139,6 +140,7 @@ export default function TransactionsContent({
           <Table>
             <TableHeader>
               <TableRow>
+                <TableHead className="font-bold uppercase">Mã giao dịch</TableHead>
                 <TableHead className="font-bold uppercase">Email</TableHead>
                 <TableHead className="font-bold uppercase">Tên</TableHead>
                 <TableHead className="font-bold uppercase">Phim</TableHead>
@@ -161,6 +163,7 @@ export default function TransactionsContent({
                 ? Array.from({ length: 5 }).map((_, idx) => (
                     <TableRow key={`sk-${idx}`}>
                       <TableCell><Skeleton className="h-4 w-40" /></TableCell>
+                      <TableCell><Skeleton className="h-4 w-40" /></TableCell>
                       <TableCell><Skeleton className="h-4 w-24" /></TableCell>
                       <TableCell><Skeleton className="h-4 w-32" /></TableCell>
                       <TableCell><Skeleton className="h-4 w-12" /></TableCell>
@@ -175,6 +178,9 @@ export default function TransactionsContent({
                   ))
                 : data.map((t) => (
                   <TableRow key={t.id}>
+                    <TableCell className="font-semibold text-sm">
+                      {t.id}
+                    </TableCell>
                     <TableCell className="font-semibold text-sm">
                       {t.email}
                     </TableCell>

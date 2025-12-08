@@ -20,7 +20,8 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import iconCine from "@/assets/images/iconCine.svg";
-import labelCine from "@/assets/images/group1.png";
+import icon from "@/assets/images/icon.svg";
+import brand from "@/assets/images/brand.svg";
 
 
 interface HeaderProps {
@@ -191,8 +192,7 @@ export default function Header({ onBookClick }: HeaderProps) {
     >
       <div className="container mx-auto px-4 py-4 flex items-center justify-between">
         <div className="flex items-center gap-3 animate-fade-in">
-          <img src={iconCine} style={{ width: "4rem" }} alt="CINESPHERE logo" />
-          <img src={labelCine} className="hidden sm:block text-2xl font-bold" style={{ width: "16rem", height: "2rem" }} alt="CINESPHERE logo" />
+          <img src={icon} className="w-[10rem] h-12 md:w-20 sm:w-20 md:h-16"  alt="CINESPHERE logo" />
         </div>
 
         <nav className="hidden md:flex items-center gap-8 animate-fade-in delay-200">

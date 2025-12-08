@@ -5,6 +5,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
+import { Loader2 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import React, { useState } from "react";
@@ -19,6 +20,7 @@ import {
   updateShowtimeApi,
   getShowtimes,
   createShowtimesBatchApi,
+  getMovieById,
 } from "@/lib/api";
 import { useToast } from "@/hooks/use-toast";
 
@@ -43,8 +45,10 @@ interface AdminEditModalProps {
 
 const AdminEditModal: React.FC<AdminEditModalProps> = (props) => {
   const { toast } = useToast();
+  const [isSaving, setIsSaving] = useState(false);
   const [selectedMovieInfo, setSelectedMovieInfo] = useState<any>(null);
   const [isMovieInfoValid, setIsMovieInfoValid] = useState(false);
+  const [movieHasShowtimes, setMovieHasShowtimes] = useState(false);
   const {
     isEditOpen,
     setIsEditOpen,
@@ -67,8 +71,24 @@ const AdminEditModal: React.FC<AdminEditModalProps> = (props) => {
     if (!isEditOpen) {
       setSelectedMovieInfo(null);
       setIsMovieInfoValid(false);
+      setMovieHasShowtimes(false);
     }
   }, [isEditOpen]);
+
+  React.useEffect(() => {
+    (async () => {
+      try {
+        if (isEditOpen && editType === "movie" && editData?.id) {
+          const details = await getMovieById(Number(editData.id));
+          setMovieHasShowtimes(Boolean(details?.hasShowtimes));
+        } else {
+          setMovieHasShowtimes(false);
+        }
+      } catch {
+        setMovieHasShowtimes(false);
+      }
+    })();
+  }, [isEditOpen, editType, editData?.id]);
 
   async function refetch(type: "movie" | "toy" | "showtime") {
     if (type === "movie") {
@@ -169,8 +189,10 @@ const AdminEditModal: React.FC<AdminEditModalProps> = (props) => {
                 Hủy
               </Button>
               <Button
+                disabled={isSaving}
                 onClick={async () => {
                   try {
+                    setIsSaving(true);
                     setUsers((prev) =>
                       prev.map((u) =>
                         u.id === editData.id ? { ...u, ...editData } : u,
@@ -187,10 +209,16 @@ const AdminEditModal: React.FC<AdminEditModalProps> = (props) => {
                       description: e?.message || "Có lỗi xảy ra",
                       variant: "destructive",
                     });
+                  } finally {
+                    setIsSaving(false);
                   }
                 }}
               >
-                Lưu
+                {isSaving ? (
+                  <span className="flex items-center gap-2"><Loader2 className="h-4 w-4 animate-spin" /> Đang lưu...</span>
+                ) : (
+                  "Lưu"
+                )}
               </Button>
             </div>
           </div>
@@ -297,7 +325,7 @@ const AdminEditModal: React.FC<AdminEditModalProps> = (props) => {
                     ? toLocalDateTimeString(new Date(editData.release_date))
                     : ""
                 }
-                disabled={!!editData?.id}
+                disabled={movieHasShowtimes}
                 onChange={(e) =>
                   setEditData({
                     ...editData,
@@ -306,9 +334,9 @@ const AdminEditModal: React.FC<AdminEditModalProps> = (props) => {
                       : undefined,
                   })
                 }
-                className={!!editData?.id ? "opacity-50 cursor-not-allowed" : ""}
+                className={movieHasShowtimes ? "opacity-50 cursor-not-allowed" : ""}
               />
-              {editData?.id && <p className="text-xs text-gray-500 mt-1">Không thể sửa đổi ngày phát hành</p>}
+              {movieHasShowtimes && <p className="text-xs text-gray-500 mt-1">Không thể sửa đổi ngày phát hành vì phim đã có suất chiếu</p>}
             </div>
             <div>
               <Label>Trạng thái</Label>
@@ -328,6 +356,7 @@ const AdminEditModal: React.FC<AdminEditModalProps> = (props) => {
                 Hủy
               </Button>
               <Button
+                disabled={isSaving}
                 onClick={async () => {
                   // Validation for movies
                   if (!editData.title || editData.title.trim() === "") {
@@ -356,6 +385,7 @@ const AdminEditModal: React.FC<AdminEditModalProps> = (props) => {
                   }
 
                   try {
+                    setIsSaving(true);
                     if (!editData.id) {
                       let coverBase64: string | undefined = undefined;
                       if (editData.posterFile) {
@@ -406,6 +436,7 @@ const AdminEditModal: React.FC<AdminEditModalProps> = (props) => {
                           ? Number(editData.duration)
                           : undefined,
                         is_active: editData?.is_active !== false,
+                        release_date: movieHasShowtimes ? undefined : editData?.release_date,
                       });
                     }
                     await refetch("movie");
@@ -421,11 +452,16 @@ const AdminEditModal: React.FC<AdminEditModalProps> = (props) => {
                     });
                     return;
                   } finally {
+                    setIsSaving(false);
                     setIsEditOpen(false);
                   }
                 }}
               >
-                Lưu
+                {isSaving ? (
+                  <span className="flex items-center gap-2"><Loader2 className="h-4 w-4 animate-spin" /> Đang lưu...</span>
+                ) : (
+                  "Lưu"
+                )}
               </Button>
             </div>
           </div>
@@ -531,8 +567,10 @@ const AdminEditModal: React.FC<AdminEditModalProps> = (props) => {
                 Hủy
               </Button>
               <Button
+                disabled={isSaving}
                 onClick={async () => {
                   try {
+                    setIsSaving(true);
                     if (!editData.id || editData.id === 0) {
                       let imageBase64: string | undefined = undefined;
                       if (editData.imageFile) {
@@ -578,11 +616,16 @@ const AdminEditModal: React.FC<AdminEditModalProps> = (props) => {
                       description: editData.id ? "Cập nhật đồ chơi thành công" : "Thêm đồ chơi mới thành công",
                     });
                   } finally {
+                    setIsSaving(false);
                     setIsEditOpen(false);
                   }
                 }}
               >
-                Lưu
+                {isSaving ? (
+                  <span className="flex items-center gap-2"><Loader2 className="h-4 w-4 animate-spin" /> Đang lưu...</span>
+                ) : (
+                  "Lưu"
+                )}
               </Button>
             </div>
           </div>
@@ -775,6 +818,85 @@ const AdminEditModal: React.FC<AdminEditModalProps> = (props) => {
                     Hủy
                   </Button>
                   <Button
+                    variant="outline"
+                    onClick={() => {
+                      if (!editData.movie_id) {
+                        toast({
+                          title: "Lỗi",
+                          description: "Vui lòng chọn phim",
+                          variant: "destructive",
+                        });
+                        return;
+                      }
+                      if (!isMovieInfoValid) {
+                        toast({
+                          title: "Lỗi",
+                          description: "Phim chưa có đủ thông tin (giá, ngày phát hành, thời lượng)",
+                          variant: "destructive",
+                        });
+                        return;
+                      }
+                      const rows: Array<{ day: string; time: string }> = Array.isArray(editData.rows) ? editData.rows : [];
+                      if (rows.length > 0) {
+                        const invalidRows = rows.filter(r => !r.day || !r.time);
+                        if (invalidRows.length > 0) {
+                          toast({ title: "Lỗi", description: "Vui lòng điền đầy đủ thông tin ngày, giờ cho tất cả các dòng", variant: "destructive" });
+                          return;
+                        }
+                        const releaseDate = selectedMovieInfo?.release_date ? new Date(selectedMovieInfo.release_date) : null;
+                        const now = new Date();
+                        const starts: string[] = [];
+                        for (let i = 0; i < rows.length; i++) {
+                          const r = rows[i];
+                          const startStr = `${r.day}T${r.time}`;
+                          const start = new Date(startStr);
+                          if (Number.isNaN(start.getTime())) {
+                            toast({ title: "Lỗi", description: `Dòng ${i + 1}: ngày/giờ không hợp lệ`, variant: "destructive" });
+                            return;
+                          }
+                          if (releaseDate && start < releaseDate) {
+                            toast({ title: "Lỗi", description: `Dòng ${i + 1}: thời gian bắt đầu không nhỏ hơn ngày phát hành`, variant: "destructive" });
+                            return;
+                          }
+                          if (start < now) {
+                            toast({ title: "Lỗi", description: `Dòng ${i + 1}: thời gian bắt đầu không được ở quá khứ`, variant: "destructive" });
+                            return;
+                          }
+                          const key = start.toISOString();
+                          if (starts.includes(key)) {
+                            toast({ title: "Lỗi", description: `Có dòng trùng thời gian bắt đầu`, variant: "destructive" });
+                            return;
+                          }
+                          starts.push(key);
+                        }
+                        toast({ title: "OK", description: "Dữ liệu hợp lệ. Bạn có thể lưu." });
+                        return;
+                      }
+                      if (!editData.start_time) {
+                        toast({ title: "Lỗi", description: "Ngày và giờ là bắt buộc", variant: "destructive" });
+                        return;
+                      }
+                      const releaseDate = selectedMovieInfo?.release_date ? new Date(selectedMovieInfo.release_date) : null;
+                      const start = new Date(editData.start_time);
+                      if (Number.isNaN(start.getTime())) {
+                        toast({ title: "Lỗi", description: "Ngày/giờ không hợp lệ", variant: "destructive" });
+                        return;
+                      }
+                      if (releaseDate && start < releaseDate) {
+                        toast({ title: "Lỗi", description: "Thời gian bắt đầu không nhỏ hơn ngày phát hành", variant: "destructive" });
+                        return;
+                      }
+                      if (start < new Date()) {
+                        toast({ title: "Lỗi", description: "Thời gian bắt đầu không được ở quá khứ", variant: "destructive" });
+                        return;
+                      }
+                      toast({ title: "OK", description: "Dữ liệu hợp lệ. Bạn có thể lưu." });
+                    }}
+                  >
+                    Kiểm tra
+                  </Button>
+                  <Button
+                    disabled={isSaving}
                     onClick={async () => {
                       // Validation for new showtime
                       if (!editData.movie_id) {
@@ -795,21 +917,66 @@ const AdminEditModal: React.FC<AdminEditModalProps> = (props) => {
                       }
 
                       try {
+                        setIsSaving(true);
                         const rows: Array<{
                           day: string;
                           time: string;
                         }> = Array.isArray(editData.rows) ? editData.rows : [];
-                        if (rows.length > 0) {
-                          // Validate all rows
-                          const invalidRows = rows.filter(r => !r.day || !r.time);
-                          if (invalidRows.length > 0) {
-                            toast({
-                              title: "Lỗi",
-                              description: "Vui lòng điền đầy đủ thông tin ngày, giờ cho tất cả các dòng",
-                              variant: "destructive",
-                            });
-                            return;
-                          }
+                    if (rows.length > 0) {
+                      // Validate all rows
+                      const invalidRows = rows.filter(r => !r.day || !r.time);
+                      if (invalidRows.length > 0) {
+                        toast({
+                          title: "Lỗi",
+                          description: "Vui lòng điền đầy đủ thông tin ngày, giờ cho tất cả các dòng",
+                          variant: "destructive",
+                        });
+                        return;
+                      }
+
+                      // Extra validations: format, after release_date, not in past, no duplicates
+                      const releaseDate = selectedMovieInfo?.release_date ? new Date(selectedMovieInfo.release_date) : null;
+                      const now = new Date();
+                      const starts: string[] = [];
+                      for (let i = 0; i < rows.length; i++) {
+                        const r = rows[i];
+                        const startStr = `${r.day}T${r.time}`;
+                        const start = new Date(startStr);
+                        if (Number.isNaN(start.getTime())) {
+                          toast({
+                            title: "Lỗi",
+                            description: `Dòng ${i + 1}: ngày/giờ không hợp lệ`,
+                            variant: "destructive",
+                          });
+                          return;
+                        }
+                        if (releaseDate && start < releaseDate) {
+                          toast({
+                            title: "Lỗi",
+                            description: `Dòng ${i + 1}: thời gian bắt đầu không nhỏ hơn ngày phát hành`,
+                            variant: "destructive",
+                          });
+                          return;
+                        }
+                        if (start < now) {
+                          toast({
+                            title: "Lỗi",
+                            description: `Dòng ${i + 1}: thời gian bắt đầu không được ở quá khứ`,
+                            variant: "destructive",
+                          });
+                          return;
+                        }
+                        const key = start.toISOString();
+                        if (starts.includes(key)) {
+                          toast({
+                            title: "Lỗi",
+                            description: `Có dòng trùng thời gian bắt đầu`,
+                            variant: "destructive",
+                          });
+                          return;
+                        }
+                        starts.push(key);
+                      }
 
                           const payload = {
                             movie_id: Number(editData.movie_id),
@@ -826,6 +993,30 @@ const AdminEditModal: React.FC<AdminEditModalProps> = (props) => {
                             description: `Tạo ${createdCount} lịch chiếu${skippedCount > 0 ? `, bỏ qua ${skippedCount}` : ""}`,
                           });
                         } else {
+                          // Validate single start_time in new modal
+                          if (!editData.start_time) {
+                            toast({
+                              title: "Lỗi",
+                              description: "Ngày và giờ là bắt buộc",
+                              variant: "destructive",
+                            });
+                            return;
+                          }
+                          const releaseDate = selectedMovieInfo?.release_date ? new Date(selectedMovieInfo.release_date) : null;
+                          const start = new Date(editData.start_time);
+                          if (Number.isNaN(start.getTime())) {
+                            toast({ title: "Lỗi", description: "Ngày/giờ không hợp lệ", variant: "destructive" });
+                            return;
+                          }
+                          if (releaseDate && start < releaseDate) {
+                            toast({ title: "Lỗi", description: "Thời gian bắt đầu không nhỏ hơn ngày phát hành", variant: "destructive" });
+                            return;
+                          }
+                          if (start < new Date()) {
+                            toast({ title: "Lỗi", description: "Thời gian bắt đầu không được ở quá khứ", variant: "destructive" });
+                            return;
+                          }
+
                           await createShowtimeApi({
                             movie_id: Number(editData.movie_id),
                             start_time: editData.start_time,
@@ -843,11 +1034,16 @@ const AdminEditModal: React.FC<AdminEditModalProps> = (props) => {
                           variant: "destructive",
                         });
                       } finally {
-                        setIsEditOpen(false);
+                        setIsSaving(false);
+                        if (editData?.id) setIsEditOpen(false);
                       }
                     }}
                   >
-                    Lưu
+                    {isSaving ? (
+                      <span className="flex items-center gap-2"><Loader2 className="h-4 w-4 animate-spin" /> Đang lưu...</span>
+                    ) : (
+                      "Lưu"
+                    )}
                   </Button>
                 </div>
               </>
@@ -926,6 +1122,7 @@ const AdminEditModal: React.FC<AdminEditModalProps> = (props) => {
                     Hủy
                   </Button>
                   <Button
+                    disabled={isSaving}
                     onClick={async () => {
                       // Validation for showtime edit
                       if (!editData.start_time) {
@@ -936,8 +1133,25 @@ const AdminEditModal: React.FC<AdminEditModalProps> = (props) => {
                         });
                         return;
                       }
+                      // Ensure start_time >= movie release_date and not in the past
+                      const movie = moviesLocal.find((m) => String((m as any).id) === String(editData.movie_id)) as any;
+                      const releaseDate = movie?.release_date ? new Date(movie.release_date) : null;
+                      const start = new Date(editData.start_time);
+                      if (Number.isNaN(start.getTime())) {
+                        toast({ title: "Lỗi", description: "Ngày/giờ không hợp lệ", variant: "destructive" });
+                        return;
+                      }
+                      if (releaseDate && start < releaseDate) {
+                        toast({ title: "Lỗi", description: "Thời gian bắt đầu không nhỏ hơn ngày phát hành", variant: "destructive" });
+                        return;
+                      }
+                      if (start < new Date()) {
+                        toast({ title: "Lỗi", description: "Thời gian bắt đầu không được ở quá khứ", variant: "destructive" });
+                        return;
+                      }
 
                       try {
+                        setIsSaving(true);
                         await updateShowtimeApi(Number(editData.id), {
                           movie_id: Number(editData.movie_id),
                           start_time: editData.start_time,
@@ -954,11 +1168,16 @@ const AdminEditModal: React.FC<AdminEditModalProps> = (props) => {
                           variant: "destructive",
                         });
                       } finally {
+                        setIsSaving(false);
                         setIsEditOpen(false);
                       }
                     }}
                   >
-                    Lưu
+                    {isSaving ? (
+                      <span className="flex items-center gap-2"><Loader2 className="h-4 w-4 animate-spin" /> Đang lưu...</span>
+                    ) : (
+                      "Lưu"
+                    )}
                   </Button>
                 </div>
               </>

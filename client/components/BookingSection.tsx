@@ -77,9 +77,14 @@ export default function BookingSection({ onBookClick }: BookingSectionProps) {
   const [countdown, setCountdown] = useState(600); // 10 minutes in seconds
   const timerRef = useRef<NodeJS.Timeout | null>(null);
   const countdownRef = useRef<NodeJS.Timeout | null>(null);
-  const { data: activeData } = useQuery({
+  const {
+    data: activeData,
+    refetch: refetchActiveMovies,
+    isFetching: isFetchingActive,
+  } = useQuery({
     queryKey: ["activeMovies", "today"],
     queryFn: () => getAllActiveMoviesToday(),
+    staleTime: 60000,
   });
   const { data: ticketsData } = useQuery({
     queryKey: ["activeTickets"],
@@ -95,6 +100,20 @@ export default function BookingSection({ onBookClick }: BookingSectionProps) {
   );
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [currentStep, setCurrentStep] = useState<number>(0);
+
+  const formatDateShort = (date: Date) =>
+    date.toLocaleDateString("vi-VN", {
+      weekday: "short",
+      day: "2-digit",
+      month: "2-digit",
+    });
+
+  const formatDateLong = (date: Date) =>
+    date.toLocaleDateString("vi-VN", {
+      weekday: "long",
+      day: "2-digit",
+      month: "2-digit",
+    });
 
   useEffect(() => {
     return () => {
@@ -191,9 +210,9 @@ export default function BookingSection({ onBookClick }: BookingSectionProps) {
       }
     } catch { }
     setIsModalOpen(true);
+    try { refetchActiveMovies(); } catch { }
     onBookClick();
   };
-
   const handleCloseModal = () => {
     setIsModalOpen(false);
     setFormData({
@@ -209,6 +228,7 @@ export default function BookingSection({ onBookClick }: BookingSectionProps) {
     setPaymentMethod("momo");
     setErrors({});
     setIsConfirmOpen(false);
+    setCurrentStep(0)
   };
 
   const isFormDirty = () => {
@@ -289,6 +309,17 @@ export default function BookingSection({ onBookClick }: BookingSectionProps) {
       return;
     }
     if (currentStep === 2) {
+      setIsProcessing(true);
+      setCountdown(600);
+      if (timerRef.current) clearInterval(timerRef.current);
+      timerRef.current = setInterval(() => {
+        setCountdown((prev) => Math.max(0, prev - 1));
+      }, 1000);
+      if (countdownRef.current) clearTimeout(countdownRef.current);
+      countdownRef.current = setTimeout(() => {
+        setIsProcessing(false);
+        if (timerRef.current) clearInterval(timerRef.current);
+      }, 600000);
       const orderId = `ORDER_${Date.now()}`;
       const movieDetail = activeMoviesFull.find(
         (x: any) => x.title === formData.movie,
@@ -433,6 +464,9 @@ export default function BookingSection({ onBookClick }: BookingSectionProps) {
           throw new Error("Phương thức thanh toán không hợp lệ");
         }
       } catch (err: any) {
+        if (timerRef.current) clearInterval(timerRef.current);
+        if (countdownRef.current) clearTimeout(countdownRef.current);
+        setIsProcessing(false);
         toast({
           title: "Không thể tạo đặt vé",
           description: err?.message || "Vui lòng thử lại",
@@ -472,6 +506,7 @@ export default function BookingSection({ onBookClick }: BookingSectionProps) {
             <div className="grid grid-cols-1 md:grid-cols-3 gap-10 mb-8">
               {ticketPackages.map((pkg, i) => (
                 <motion.div
+                key={pkg.id}
                   initial={{ opacity: 0, y: 50 }}
                   whileInView={{ opacity: 1, y: 0 }}
                   viewport={{ once: true }}
@@ -540,7 +575,7 @@ export default function BookingSection({ onBookClick }: BookingSectionProps) {
           onInteractOutside={(e) => {
             e.preventDefault();
           }}
-          className="bg-gradient-dark border-cyan-400/30 shadow-[0_0_40px_rgba(34,211,238,0.25)] w-full h-[100vh] max-h-[100vh] rounded-none sm:rounded-xl sm:w-auto sm:max-w-md md:max-w-lg sm:h-auto sm:max-h-[90vh] p-4 sm:p-6 overflow-y-auto scrollbar-neon"
+          className="bg-gradient-dark border-orange-400/30 shadow-[0_0_40px_rgba(247,148,29,0.25)] w-full h-[100vh] max-h-[100vh] rounded-none sm:rounded-xl sm:w-auto sm:max-w-md md:max-w-lg sm:h-auto sm:max-h-[90vh] p-4 sm:p-6 overflow-y-auto scrollbar-neon"
         >
           <DialogHeader>
             <DialogTitle className="text-xl sm:text-2xl font-bold text-cyan-300">
@@ -615,6 +650,7 @@ export default function BookingSection({ onBookClick }: BookingSectionProps) {
                         showtime: "",
                       });
                       setSelectedShowtimeId(null);
+                      try { refetchActiveMovies(); } catch { }
                     }}
                   >
                     <SelectTrigger
@@ -647,6 +683,12 @@ export default function BookingSection({ onBookClick }: BookingSectionProps) {
                       <div className="font-semibold text-white">
                         {selectedMovie.title}
                       </div>
+                      {isFetchingActive && (
+                        <div className="flex items-center gap-2 text-yellow-300">
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                          Đang tải lịch chiếu mới
+                        </div>
+                      )}
                       <div className="text-cyan-300">
                         {activeMoviesFull.find(
                           (x: any) => x.title === selectedMovie.title,
@@ -712,7 +754,7 @@ export default function BookingSection({ onBookClick }: BookingSectionProps) {
                               setSelectedShowtimeId(null);
                             }}
                           >
-                            {d.toLocaleDateString("vi-VN")}
+                            {formatDateShort(d)}
                           </Button>
                         );
                       })}
@@ -993,9 +1035,7 @@ export default function BookingSection({ onBookClick }: BookingSectionProps) {
                   </span>
                   <span className="text-cyan-200">Ngày</span>
                   <span className="font-medium text-white">
-                    {formData.date
-                      ? formData.date.toLocaleDateString("vi-VN")
-                      : ""}
+                    {formData.date ? formatDateLong(formData.date) : ""}
                   </span>
                   <span className="text-cyan-200">Giờ</span>
                   <span className="font-medium text-white">
@@ -1086,7 +1126,7 @@ export default function BookingSection({ onBookClick }: BookingSectionProps) {
                         : true;
                   return isProcessing || !canProceed;
                 })()}
-                className="flex-1 bg-gradient-to-r from-blue-500 to-purple-500 hover:from-blue-600 hover:to-purple-600 text-white h-10 sm:h-11"
+                className="flex-1 bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white h-10 sm:h-11"
               >
                 {isProcessing ? (
                   <span className="flex items-center justify-center gap-2">
