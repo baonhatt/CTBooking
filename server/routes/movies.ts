@@ -220,6 +220,7 @@ export const updateMovie: RequestHandler = async (req, res) => {
       rating,
       duration_min,
       is_active,
+      release_date,
     } = req.body as any;
     const data: any = {};
     if (title !== undefined) data.title = title;
@@ -295,7 +296,28 @@ export const updateMovie: RequestHandler = async (req, res) => {
       data.is_active = Boolean(is_active);
     }
 
-    // Note: release_date không được phép sửa đổi
+    // Cho phép sửa release_date khi phim CHƯA có suất chiếu
+    if (release_date !== undefined) {
+      const showtimeCount = await (prisma as any).showtimes.count({
+        where: { movie_id: id },
+      });
+      if (showtimeCount > 0) {
+        return res.status(400).json({
+          message: "Không thể sửa đổi ngày phát hành vì phim đã có suất chiếu",
+        });
+      }
+      if (release_date === null || release_date === "") {
+        data.release_date = null;
+      } else {
+        const rd = new Date(release_date);
+        if (Number.isNaN(rd.getTime())) {
+          return res
+            .status(400)
+            .json({ message: "Ngày phát hành không hợp lệ" });
+        }
+        data.release_date = rd;
+      }
+    }
 
     data.updated_at = new Date();
     const movie = await (prisma as any).movies.update({ where: { id }, data });
@@ -660,9 +682,10 @@ export const getMovieById: RequestHandler = async (req, res) => {
       return res.status(404).json({ message: "Không tìm thấy phim" });
     }
 
-    // Calculate stats
-    const totalShowtimes = movie.showtimes.length;
-    const totalTicketsSold = movie.showtimes.reduce(
+    // Calculate stats (only count showtimes that have PAID bookings)
+    const paidShowtimes = movie.showtimes.filter((st: any) => (st.total_sold || 0) > 0);
+    const totalShowtimes = paidShowtimes.length;
+    const totalTicketsSold = paidShowtimes.reduce(
       (sum, st) => sum + (st.total_sold || 0),
       0
     );
@@ -697,6 +720,7 @@ export const getMovieById: RequestHandler = async (req, res) => {
       release_date: movie.release_date,
       created_at: movie.created_at,
       updated_at: movie.updated_at,
+      hasShowtimes: movie.showtimes.length > 0,
       stats: {
         totalShowtimes,
         totalTicketsSold,
