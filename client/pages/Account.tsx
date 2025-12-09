@@ -51,10 +51,11 @@ export default function Account() {
 
   useEffect(() => {
     (async () => {
+      debugger
       try {
         const email = profile.email;
         if (!email) return;
-        const { items } = await getUserTransactionsApi({ email, status: "all" });
+        const { items } = await getUserTransactionsApi({ email, status: "paid" });
         setTransactions(items || []);
       } catch (e: any) {
         console.error(e);

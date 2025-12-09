@@ -169,7 +169,7 @@ export function createServer() {
   app.get("/api/users/:id", getUserById);
   app.post("/api/users/profile", updateUserProfile);
   app.post("/api/users/password", changePassword);
-  app.get("/api/users/transactions", listUserTransactions);
+  app.get("/api/usersprofile/transactions", listUserTransactions);
   app.get("/api/tickets", listTicketPackages);
   app.get("/api/tickets/active", listActiveTicketPackages);
   app.get("/api/tickets/:id", getTicketPackage);
