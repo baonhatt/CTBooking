@@ -50,6 +50,10 @@ interface Props {
   onRefresh: () => void;
   searchQuery?: string;
   onSearchChange?: (query: string) => void;
+  sortKey?: "updated_at" | "release_date" | "title" | "rating";
+  sortDir?: "asc" | "desc";
+  setSortKey?: (k: "updated_at" | "release_date" | "title" | "rating") => void;
+  setSortDir?: (d: "asc" | "desc") => void;
   isLoading?: boolean;
 }
 
@@ -66,6 +70,10 @@ export default function MoviesContent({
   onRefresh,
   searchQuery = "",
   onSearchChange = () => { },
+  sortKey = "updated_at",
+  sortDir = "desc",
+  setSortKey = () => {},
+  setSortDir = () => {},
   isLoading = false,
 }: Props) {
   const [isDetailsOpen, setIsDetailsOpen] = useState(false);
@@ -98,8 +106,8 @@ export default function MoviesContent({
   };
   return (
     <div className="space-y-6">
-      <div className="flex justify-between items-center gap-4">
-        <div className="flex-1">
+      <div className="flex flex-wrap justify-between items-center gap-4">
+        <div className="flex-1 min-w-[320px]">
           <input
             type="text"
             placeholder="Tìm kiếm phim theo tên hoặc mô tả..."
@@ -108,13 +116,47 @@ export default function MoviesContent({
             className="w-full px-4 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
           />
         </div>
-        <h3 className="text-lg font-semibold whitespace-nowrap">
-          Tổng: {moviesLength}
-        </h3>
+        <div className="flex flex-wrap items-center gap-3">
+          <h3 className="text-lg font-semibold whitespace-nowrap">
+            Tổng: {moviesLength}
+          </h3>
+          <select
+            value={sortKey}
+            onChange={(e) => setSortKey(e.target.value as any)}
+            className="border rounded px-2 py-1 w-48"
+          >
+            <option value="updated_at">Cập nhật gần đây</option>
+            <option value="release_date">Ngày phát hành</option>
+            <option value="title">Tên phim</option>
+            <option value="rating">Rating</option>
+          </select>
+          <select
+            value={sortDir}
+            onChange={(e) => setSortDir(e.target.value as any)}
+            className="border rounded px-2 py-1 w-36"
+          >
+            <option value="desc">Giảm dần</option>
+            <option value="asc">Tăng dần</option>
+          </select>
+          
+        </div>
         <div className="flex gap-2">
           <Button onClick={onRefresh} variant="outline">
-            ↻ Refresh
+            ↻ Làm mới
           </Button>
+          <Button
+            variant="secondary"
+            onClick={() => {
+              onSearchChange?.("");
+              setSortKey?.("updated_at");
+              setSortDir?.("desc");
+              setPage(1);
+            }}
+          >
+            Xóa bộ lọc
+          </Button>
+        </div>
+        <div className="flex justify-end w-full">
           <Button onClick={onCreate}>+ Thêm phim mới</Button>
         </div>
       </div>
@@ -300,12 +342,6 @@ export default function MoviesContent({
                       <span className="text-gray-600">Rating:</span>{" "}
                       <span className="font-medium">
                         {movieDetails.rating}/10
-                      </span>
-                    </p>
-                    <p>
-                      <span className="text-gray-600">Thời lượng(phút):</span>{" "}
-                      <span className="font-medium">
-                        {movieDetails.duration_min}
                       </span>
                     </p>
                     <p>

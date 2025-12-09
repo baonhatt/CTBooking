@@ -155,22 +155,7 @@ export default function BookingSection({ onBookClick }: BookingSectionProps) {
         setIsProcessing(false);
         localStorage.removeItem("pendingOrder");
 
-        // Fetch booking code nếu thanh toán thành công
-        if (status === "success" && pending.booking_id) {
-          (async () => {
-            try {
-              const bookingData = await getBookingByIdApi(pending.booking_id);
-              if (bookingData.booking_code) {
-                setOrderInfo((prev: any) => ({
-                  ...prev,
-                  bookingCode: bookingData.booking_code,
-                }));
-              }
-            } catch (err) {
-              console.error("Lỗi fetch booking code:", err);
-            }
-          })();
-        }
+        // Không fetch booking code; mã sẽ được gửi qua email
 
         // Show notification based on payment status
         if (status === "success") {

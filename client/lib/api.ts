@@ -160,7 +160,6 @@ export async function confirmBookingApi(body: {
 export async function getBookingByIdApi(bookingId: number) {
   return request<{
     id: number;
-    booking_code?: string;
     payment_status: string;
     user_id: number;
     name: string;
@@ -312,12 +311,16 @@ export async function getMoviesAdmin(options?: {
   page?: number;
   pageSize?: number;
   q?: string;
+  sort?: "updated_at" | "release_date" | "title" | "rating";
+  dir?: "asc" | "desc";
   signal?: AbortSignal;
 }) {
   const params = new URLSearchParams();
   if (options?.page) params.set("page", String(options.page));
   if (options?.pageSize) params.set("pageSize", String(options.pageSize));
   if (options?.q) params.set("q", options.q);
+  if (options?.sort) params.set("sort", options.sort);
+  if (options?.dir) params.set("dir", options.dir);
   const path = `/api/movies${params.toString() ? `?${params.toString()}` : ""}`;
   return request<{
     items: any[];
@@ -372,6 +375,11 @@ export async function getTransactions(options?: {
   pageSize?: number;
   email?: string;
   status?: "all" | "paid" | "failed" | "pending";
+  payment_method?: string;
+  from?: string;
+  to?: string;
+  sort?: "created_at" | "paid_at";
+  dir?: "asc" | "desc";
   signal?: AbortSignal;
 }) {
   const params = new URLSearchParams();
@@ -379,6 +387,11 @@ export async function getTransactions(options?: {
   if (options?.pageSize) params.set("pageSize", String(options.pageSize));
   if (options?.email) params.set("email", options.email);
   if (options?.status) params.set("status", options.status);
+  if (options?.payment_method) params.set("payment_method", options.payment_method);
+  if (options?.from) params.set("from", options.from);
+  if (options?.to) params.set("to", options.to);
+  if (options?.sort) params.set("sort", options.sort);
+  if (options?.dir) params.set("dir", options.dir);
   const path = `/api/admin/transactions${params.toString() ? `?${params.toString()}` : ""}`;
   return request<{
     items: any[];
@@ -397,6 +410,9 @@ export async function getShowtimes(options?: {
   sort?: "start_time" | "created_at" | "movie_title";
   dir?: "asc" | "desc";
   today?: boolean;
+  q?: string;
+  void?: boolean;
+  id?: number;
   signal?: AbortSignal;
 }) {
   const params = new URLSearchParams();
@@ -407,6 +423,9 @@ export async function getShowtimes(options?: {
   if (options?.sort) params.set("sort", options.sort);
   if (options?.dir) params.set("dir", options.dir);
   if (options?.today) params.set("today", options.today ? "1" : "0");
+  if (options?.q) params.set("q", options.q);
+  if (options?.void) params.set("void", options.void ? "1" : "0");
+  if (options?.id) params.set("id", String(options.id));
   const path = `/api/showtimes${params.toString() ? `?${params.toString()}` : ""}`;
   return request<{
     items: any[];
@@ -435,7 +454,7 @@ export async function createShowtimesBatchApi(body: {
 }
 export async function updateShowtimeApi(
   id: number,
-  body: { movie_id?: number; start_time?: string },
+  body: { movie_id?: number; start_time?: string; is_active?: boolean },
 ) {
   return request<{ showtime: any }>(`/api/showtimes/${id}`, {
     method: "PUT",
@@ -455,6 +474,11 @@ export async function getDashboardMetrics() {
     totalUsers: number;
     totalTransactions: number;
     revenueTotal: number;
+    revenueByMethod: { cash: number; momo: number; vnpay: number };
+    totalShowtimesToday: number;
+    totalShowtimesFuture: number;
+    occupancyTodayPercent: number;
+    topMoviesWeek: Array<{ id: number; title: string; revenue: number }>;
   }>("/api/admin/dashboard/metrics");
 }
 
@@ -462,7 +486,7 @@ export async function getRevenueByDate(date?: string, status?: "all" | "paid") {
   const params = new URLSearchParams();
   if (date) params.append("date", date);
   if (status) params.append("status", status);
-  return request<{ date: string; total: number; count: number }>(
+  return request<{ date: string; total: number; count: number; revenueByMethod: { cash: number; momo: number; vnpay: number } }>(
     `/api/admin/dashboard/revenue-date?${params.toString()}`
   );
 }
@@ -484,6 +508,7 @@ export async function getRevenueByMonth(year?: number, month?: number, status?: 
     return request<{
       total: number;
       count: number;
+      revenueByMethod: { cash: number; momo: number; vnpay: number };
     }>(`/api/admin/dashboard/revenue-month?${params.toString()}`);
   } else {
     // When getting 12-month data, return year and data array

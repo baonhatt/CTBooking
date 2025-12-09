@@ -175,6 +175,8 @@ export const listMovies: RequestHandler = async (req, res) => {
     const page = Number(req.query.page || 1);
     const pageSize = Number(req.query.pageSize || 20);
     const q = String(req.query.q || "").toLowerCase();
+    const sortKey = String(req.query.sort || "updated_at");
+    const dir = String(req.query.dir || "desc").toLowerCase() === "asc" ? "asc" : "desc";
     const where: any = q
       ? {
         OR: [
@@ -184,9 +186,17 @@ export const listMovies: RequestHandler = async (req, res) => {
       }
       : {};
     const total = await (prisma as any).movies.count({ where });
+    const orderBy: any =
+      sortKey === "release_date"
+        ? { release_date: dir }
+        : sortKey === "title"
+          ? { title: dir }
+          : sortKey === "rating"
+            ? { rating: dir }
+            : { updated_at: dir };
     const items = await (prisma as any).movies.findMany({
       where,
-      orderBy: { id: "desc" },
+      orderBy,
       skip: (page - 1) * pageSize,
       take: pageSize,
     });
@@ -368,6 +378,7 @@ export const listShowtimes: RequestHandler = async (req, res) => {
     const sortKey = String(req.query.sort || "start_time");
     const dir =
       String(req.query.dir || "asc").toLowerCase() === "desc" ? "desc" : "asc";
+    const q = String(req.query.q || "");
     let from = fromStr ? new Date(fromStr) : undefined;
     let to = toStr ? new Date(toStr) : undefined;
     if (!from && !to && (todayFlag === "1" || todayFlag === "true")) {
@@ -380,9 +391,16 @@ export const listShowtimes: RequestHandler = async (req, res) => {
       to = tEnd;
     }
     const where: any = {};
+    const voidFlag = String(req.query.void || "");
+    if (voidFlag === "1" || voidFlag === "true") where.is_active = false;
+    else where.is_active = true;
+    const idStr = String(req.query.id || "");
+    const idNum = Number(idStr);
+    if (Number.isInteger(idNum) && idNum > 0) where.id = idNum;
     if (from && to) where.start_time = { gte: from, lte: to };
     else if (from) where.start_time = { gte: from };
     else if (to) where.start_time = { lte: to };
+    if (q) where.movie = { title: { contains: q, mode: "insensitive" } };
     const total = await (prisma as any).showtimes.count({ where });
     const orderBy: any =
       sortKey === "created_at"
@@ -390,13 +408,33 @@ export const listShowtimes: RequestHandler = async (req, res) => {
         : sortKey === "movie_title"
           ? [{ movie: { title: dir } }, { start_time: "asc" }]
           : { start_time: dir };
-    const items = await (prisma as any).showtimes.findMany({
+    const baseItems = await (prisma as any).showtimes.findMany({
       where,
       include: { movie: true },
       orderBy,
       skip: (page - 1) * pageSize,
       take: pageSize,
     });
+    const items = await Promise.all(
+      baseItems.map(async (s: any) => {
+        const paidCount = await (prisma as any).bookings.count({
+          where: { showtime_id: s.id, payment_status: { in: ["paid"] } },
+        });
+        const tenMinAgo = new Date(Date.now() - 10 * 60 * 1000);
+        const recentPendingCount = await (prisma as any).bookings.count({
+          where: {
+            showtime_id: s.id,
+            payment_status: "pending",
+            created_at: { gte: tenMinAgo },
+          },
+        });
+        return {
+          ...s,
+          hasPaidBookings: paidCount > 0,
+          hasRecentPending: recentPendingCount > 0,
+        };
+      })
+    );
     res.status(200).json({ items, page, pageSize, total });
   } catch {
     res.status(500).json({ message: "Lỗi máy chủ nội bộ" });
@@ -461,6 +499,7 @@ export const createShowtime: RequestHandler = async (req, res) => {
         data: {
           movie_id: mId,
           start_time: start,
+          end_time: end,
         },
       });
       return res.status(201).json({ message: "Thêm lịch chiếu thành công", showtime });
@@ -474,6 +513,7 @@ export const createShowtime: RequestHandler = async (req, res) => {
             data: {
               movie_id: mId,
               start_time: start,
+              end_time: end,
             },
           });
           return res.status(201).json({ message: "Thêm lịch chiếu thành công", showtime });
@@ -497,12 +537,36 @@ export const createShowtime: RequestHandler = async (req, res) => {
 export const updateShowtime: RequestHandler = async (req, res) => {
   try {
     const id = Number(req.params.id);
-    const { movie_id, start_time } = req.body as any;
+    const { movie_id, start_time, is_active } = req.body as any;
     const st = await (prisma as any).showtimes.findUnique({
       where: { id },
       include: { movie: true },
     });
     if (!st) return res.status(404).json({ message: "Không tìm thấy lịch" });
+
+    // Block edits if there are PAID bookings or recent PENDING bookings (<= 10 minutes)
+    const paidCount = await (prisma as any).bookings.count({
+      where: { showtime_id: id, payment_status: { in: ["paid"] } },
+    });
+    if (paidCount > 0) {
+      return res.status(400).json({
+        message: "Không thể sửa vì suất chiếu đã có đơn thanh toán (paid)",
+      });
+    }
+    const tenMinAgo = new Date(Date.now() - 10 * 60 * 1000);
+    const recentPendingCount = await (prisma as any).bookings.count({
+      where: {
+        showtime_id: id,
+        payment_status: "pending",
+        created_at: { gte: tenMinAgo },
+      },
+    });
+    if (recentPendingCount > 0) {
+      return res.status(400).json({
+        message:
+          "Không thể sửa vì đang có đơn đặt vé pending trong 10 phút gần đây",
+      });
+    }
 
     const mId = movie_id !== undefined ? Number(movie_id) : st.movie_id;
     const start = start_time ? new Date(start_time) : new Date(st.start_time);
@@ -534,11 +598,21 @@ export const updateShowtime: RequestHandler = async (req, res) => {
       return res
         .status(409)
         .json({ message: "Thời gian lịch chiếu trùng với lịch khác" });
-    const data: any = {
-      movie_id: mId,
-      start_time: start,
-      updated_at: new Date(),
-    };
+    const data: any = { updated_at: new Date() };
+    if (movie_id !== undefined || start_time !== undefined) {
+      data.movie_id = mId;
+      data.start_time = start;
+      data.end_time = end;
+    }
+    if (is_active !== undefined) {
+      const paid = await (prisma as any).bookings.count({ where: { showtime_id: id, payment_status: { in: ["paid"] } } });
+      const tenMinAgo2 = new Date(Date.now() - 10 * 60 * 1000);
+      const recentPending = await (prisma as any).bookings.count({ where: { showtime_id: id, payment_status: "pending", created_at: { gte: tenMinAgo2 } } });
+      if (paid > 0 || recentPending > 0) {
+        return res.status(400).json({ message: "Không thể thay đổi trạng thái vì có booking paid hoặc pending 10 phút gần đây" });
+      }
+      data.is_active = Boolean(is_active);
+    }
     const showtime = await (prisma as any).showtimes.update({
       where: { id },
       data,
@@ -553,20 +627,26 @@ export const deleteShowtime: RequestHandler = async (req, res) => {
   try {
     const id = Number(req.params.id);
 
-    // Check if showtime has any bookings
-    const bookingCount = await prisma.bookings.count({
-      where: { showtime_id: id },
+    const tenMinAgo = new Date(Date.now() - 10 * 60 * 1000);
+    const paidCount = await prisma.bookings.count({
+      where: { showtime_id: id, payment_status: { in: ["paid"] } },
     });
-
-    if (bookingCount > 0) {
+    const recentPendingCount = await prisma.bookings.count({
+      where: {
+        showtime_id: id,
+        payment_status: "pending",
+        created_at: { gte: tenMinAgo },
+      },
+    });
+    if (paidCount > 0 || recentPendingCount > 0) {
       return res.status(400).json({
-        message: `Không thể xóa suất chiếu này vì đã có ${bookingCount} đơn đặt vé`,
+        message: "Không thể vô hiệu hóa vì có đơn paid hoặc pending 10 phút gần đây",
         ok: false,
       });
     }
 
-    await (prisma as any).showtimes.delete({ where: { id } });
-    res.status(200).json({ message: "Xóa lịch chiếu thành công", ok: true });
+    await (prisma as any).showtimes.update({ where: { id }, data: { is_active: false } });
+    res.status(200).json({ message: "Đã vô hiệu hóa (inactive) lịch chiếu", ok: true });
   } catch (err: any) {
     if (err?.code === "P2025")
       return res.status(404).json({ message: "Không tìm thấy" });
@@ -646,6 +726,7 @@ export const createShowtimesBatch: RequestHandler = async (req, res) => {
           data: {
             movie_id: mId,
             start_time: start,
+            end_time: end,
           },
         });
         created.push(showtime);

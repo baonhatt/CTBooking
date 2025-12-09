@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { getShowtimes, getMoviesAdmin, deleteShowtimeApi } from "@/lib/api";
+import { getShowtimes, getMoviesAdmin, deleteShowtimeApi, updateShowtimeApi } from "@/lib/api";
 import AdminLayout from "@/components/admin/AdminLayout";
 import ShowtimesContent from "@/components/admin/content/ShowtimesContent";
 import AdminEditModal from "@/components/admin/AdminEditModal";
@@ -9,11 +9,12 @@ export default function ShowtimesPage() {
   const [totalShowtimes, setTotalShowtimes] = useState(0);
   const [showtimesPage, setShowtimesPage] = useState(1);
   const pageSize = 10;
-  const [sortKey, setSortKey] = useState<
-    "start_time" | "created_at" | "movie_title"
-  >("start_time");
-  const [todayOnly, setTodayOnly] = useState(false);
+  const [sortKey, setSortKey] = useState<"start_time" | "created_at" | "movie_title">("start_time");
+  const [selectedDate, setSelectedDate] = useState<Date | null>(null);
+  const [voidOnly, setVoidOnly] = useState(false);
+  const [futureOnly, setFutureOnly] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
+  const [searchId, setSearchId] = useState<string>("");
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [editType, setEditType] = useState<"showtime" | null>(null);
   const [editData, setEditData] = useState<any>({});
@@ -23,12 +24,33 @@ export default function ShowtimesPage() {
   useEffect(() => {
     (async () => {
       setIsLoading(true);
+      const fromTo = (() => {
+        if (selectedDate) {
+          const d = new Date(selectedDate);
+          const start = new Date(d);
+          start.setHours(0, 0, 0, 0);
+          const end = new Date(d);
+          end.setHours(23, 59, 59, 999);
+          return { from: start.toISOString(), to: end.toISOString() };
+        }
+        if (futureOnly) {
+          const now = new Date();
+          return { from: now.toISOString() } as any;
+        }
+        return {} as any;
+      })();
+      const input = (searchQuery || "").trim();
+      const idNum = Number(input);
+      const isId = Number.isInteger(idNum) && idNum > 0;
       const { items, total } = await getShowtimes({
         page: showtimesPage,
         pageSize,
         sort: sortKey,
         dir: "asc",
-        today: todayOnly,
+        ...fromTo,
+        q: isId ? undefined : searchQuery,
+        void: voidOnly,
+        id: isId ? idNum : undefined,
       });
       setShowtimes(
         items.map((s: any) => ({
@@ -37,19 +59,19 @@ export default function ShowtimesPage() {
           movie_title: s.movie?.title || "",
           start_time: new Date(s.start_time).toISOString(),
           total_sold: Number(s.total_sold || 0),
-        })).filter(s =>
-          searchQuery === "" ||
-          s.movie_title.toLowerCase().includes(searchQuery.toLowerCase())
-        ),
+          is_active: s.is_active !== false,
+          hasPaidBookings: !!s.hasPaidBookings,
+          hasRecentPending: !!s.hasRecentPending,
+        })),
       );
       setTotalShowtimes(total);
       setIsLoading(false);
     })();
-  }, [showtimesPage, pageSize, sortKey, todayOnly, searchQuery]);
+  }, [showtimesPage, pageSize, sortKey, selectedDate, searchQuery, voidOnly, futureOnly]);
 
   useEffect(() => {
     setShowtimesPage(1);
-  }, [sortKey, todayOnly]);
+  }, [sortKey, selectedDate]);
 
   const showtimesTotalPages = useMemo(
     () => Math.max(1, Math.ceil(totalShowtimes / pageSize)),
@@ -109,12 +131,33 @@ export default function ShowtimesPage() {
 
   const handleRefresh = async () => {
     setIsLoading(true);
+    const fromTo = (() => {
+      if (selectedDate) {
+        const d = new Date(selectedDate);
+        const start = new Date(d);
+        start.setHours(0, 0, 0, 0);
+        const end = new Date(d);
+        end.setHours(23, 59, 59, 999);
+        return { from: start.toISOString(), to: end.toISOString() };
+      }
+      if (futureOnly) {
+        const now = new Date();
+        return { from: now.toISOString() } as any;
+      }
+      return {} as any;
+    })();
+    const input = (searchQuery || "").trim();
+    const idNum = Number(input);
+    const isId = Number.isInteger(idNum) && idNum > 0;
     const { items, total } = await getShowtimes({
       page: showtimesPage,
       pageSize,
       sort: sortKey,
       dir: "asc",
-      today: todayOnly,
+      ...fromTo,
+      q: isId ? undefined : searchQuery,
+      void: voidOnly,
+      id: isId ? idNum : undefined,
     });
     setShowtimes(
       items.map((s: any) => ({
@@ -123,6 +166,9 @@ export default function ShowtimesPage() {
         movie_title: s.movie?.title || "",
         start_time: new Date(s.start_time).toISOString(),
         total_sold: Number(s.total_sold || 0),
+        is_active: s.is_active !== false,
+        hasPaidBookings: !!s.hasPaidBookings,
+        hasRecentPending: !!s.hasRecentPending,
       })),
     );
     setTotalShowtimes(total);
@@ -148,12 +194,40 @@ export default function ShowtimesPage() {
         setPage={setShowtimesPage}
         sortKey={sortKey}
         setSortKey={setSortKey}
-        todayOnly={todayOnly}
-        setTodayOnly={setTodayOnly}
+        selectedDate={selectedDate}
+        setSelectedDate={(d) => {
+          setSelectedDate(d);
+          setShowtimesPage(1);
+        }}
+        futureOnly={futureOnly}
+        setFutureOnly={(v) => {
+          setFutureOnly(v);
+          setShowtimesPage(1);
+        }}
+        voidOnly={voidOnly}
+        setVoidOnly={(v) => {
+          setVoidOnly(v);
+          if (v) setFutureOnly(false);
+          setShowtimesPage(1);
+        }}
+        totalItems={totalShowtimes}
+        onReactivate={async (id: number) => {
+          try {
+            await updateShowtimeApi(id, { is_active: true });
+            await handleRefresh();
+          } catch (e: any) {
+            alert(e?.message || "Không thể kích hoạt lại suất chiếu");
+          }
+        }}
         onRefresh={handleRefresh}
         searchQuery={searchQuery}
         onSearchChange={(query) => {
           setSearchQuery(query);
+          setShowtimesPage(1);
+        }}
+        searchId={searchId}
+        setSearchId={(v) => {
+          setSearchId(v);
           setShowtimesPage(1);
         }}
         isLoading={isLoading}

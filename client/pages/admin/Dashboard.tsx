@@ -16,13 +16,18 @@ export default function DashboardPage() {
     totalUsers: 0,
     totalTransactions: 0,
     revenueTotal: 0,
+    revenueByMethod: { cash: 0, momo: 0, vnpay: 0 },
+    totalShowtimesToday: 0,
+    totalShowtimesFuture: 0,
+    occupancyTodayPercent: 0,
+    topMoviesWeek: [],
   });
 
   // Date picker state
   const [selectedDate, setSelectedDate] = useState<string>("");
   const [dateFilterType, setDateFilterType] = useState<"all" | "day" | "month">("all");
   const [dateStatus, setDateStatus] = useState<"all" | "paid">("paid");
-  const [dateRevenue, setDateRevenue] = useState({ total: 0, count: 0 });
+  const [dateRevenue, setDateRevenue] = useState({ total: 0, count: 0, revenueByMethod: { cash: 0, momo: 0, vnpay: 0 } });
 
   // 7-day chart state
   const [revenue7DaysData, setRevenue7DaysData] = useState<
@@ -58,7 +63,7 @@ export default function DashboardPage() {
     (async () => {
       try {
         const data = await getRevenueByDate(undefined, dateStatus);
-        setDateRevenue({ total: data.total, count: data.count });
+        setDateRevenue({ total: data.total, count: data.count, revenueByMethod: data.revenueByMethod });
       } catch (err) {
         console.error("Failed to load date revenue:", err);
       }
@@ -70,16 +75,16 @@ export default function DashboardPage() {
     try {
       if (dateFilterType === "all") {
         const data = await getRevenueByDate(undefined, dateStatus);
-        setDateRevenue({ total: data.total, count: data.count });
+        setDateRevenue({ total: data.total, count: data.count, revenueByMethod: data.revenueByMethod });
       } else if (dateFilterType === "day") {
         const data = await getRevenueByDate(selectedDate, dateStatus);
-        setDateRevenue({ total: data.total, count: data.count });
+        setDateRevenue({ total: data.total, count: data.count, revenueByMethod: data.revenueByMethod });
       } else if (dateFilterType === "month") {
         // For month filtering, extract year-month and query all days in that month
         const [year, month] = selectedDate.split("-");
         const data = await getRevenueByMonth(parseInt(year), parseInt(month), dateStatus);
         if ('total' in data) {
-          setDateRevenue({ total: data.total, count: data.count });
+          setDateRevenue({ total: data.total, count: data.count, revenueByMethod: (data as any).revenueByMethod || { cash: 0, momo: 0, vnpay: 0 } });
         }
       }
     } catch (err) {

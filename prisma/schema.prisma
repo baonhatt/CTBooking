@@ -64,6 +64,7 @@ model showtimes {
   updated_at DateTime   @default(now())
   total_sold Int        @default(0)
   end_time   DateTime?
+  is_active  Boolean?   @default(true)
   bookings   bookings[]
   movie      movies     @relation(fields: [movie_id], references: [id], onDelete: Cascade)
 }

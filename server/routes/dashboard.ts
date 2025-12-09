@@ -4,7 +4,7 @@ import { prisma } from "../lib/prisma";
 export const getDashboardMetrics: RequestHandler = async (req, res) => {
   try {
     const totalMovies = await (prisma as any).movies.count();
-    const totalShowtimes = await (prisma as any).showtimes.count();
+    const totalShowtimes = await (prisma as any).showtimes.count({ where: { is_active: true } });
     const totalToys = await (prisma as any).toys.count();
     const totalUsers = await (prisma as any).users.count();
 
@@ -17,8 +17,10 @@ export const getDashboardMetrics: RequestHandler = async (req, res) => {
 
     // Revenue total - TODAY only
     const now = new Date();
-    const todayStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), 0, 0, 0, 0));
-    const todayEnd = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), 23, 59, 59, 999));
+    const todayStart = new Date(now);
+    todayStart.setHours(0, 0, 0, 0);
+    const todayEnd = new Date(now);
+    todayEnd.setHours(23, 59, 59, 999);
 
     const revenueData = await (prisma as any).bookings.aggregate({
       where: {
@@ -32,6 +34,104 @@ export const getDashboardMetrics: RequestHandler = async (req, res) => {
     });
     const revenueTotal = Number(revenueData._sum?.total_price || 0);
 
+    // Revenue by payment method (today, paid only)
+    const revenueCashTodayAgg = await (prisma as any).bookings.aggregate({
+      where: {
+        payment_status: { in: ["paid"] },
+        payment_method: { in: ["cash", "Cash"] },
+        OR: [
+          { created_at: { gte: todayStart, lte: todayEnd } },
+          { paid_at: { gte: todayStart, lte: todayEnd } },
+        ],
+      },
+      _sum: { total_price: true },
+    });
+    const revenueMomoTodayAgg = await (prisma as any).bookings.aggregate({
+      where: {
+        payment_status: { in: ["paid"] },
+        payment_method: { in: ["momo", "MoMo"] },
+        OR: [
+          { created_at: { gte: todayStart, lte: todayEnd } },
+          { paid_at: { gte: todayStart, lte: todayEnd } },
+        ],
+      },
+      _sum: { total_price: true },
+    });
+    const revenueVnpayTodayAgg = await (prisma as any).bookings.aggregate({
+      where: {
+        payment_status: { in: ["paid"] },
+        payment_method: { in: ["vnpay", "VNPay"] },
+        OR: [
+          { created_at: { gte: todayStart, lte: todayEnd } },
+          { paid_at: { gte: todayStart, lte: todayEnd } },
+        ],
+      },
+      _sum: { total_price: true },
+    });
+
+    const revenueByMethod = {
+      cash: Number(revenueCashTodayAgg._sum?.total_price || 0),
+      momo: Number(revenueMomoTodayAgg._sum?.total_price || 0),
+      vnpay: Number(revenueVnpayTodayAgg._sum?.total_price || 0),
+    };
+
+    // Showtimes today and future (active only)
+    const showtimesToday = await (prisma as any).showtimes.count({
+      where: {
+        is_active: true,
+        start_time: { gte: todayStart, lte: todayEnd },
+      },
+    });
+    const showtimesFuture = await (prisma as any).showtimes.count({
+      where: {
+        is_active: true,
+        start_time: { gt: todayEnd },
+      },
+    });
+
+    // Occupancy today: average occupancy across active showtimes today
+    const capacityEnv = Number(process.env.SHOWTIME_FULL_CAPACITY);
+    const CAPACITY = Number.isFinite(capacityEnv) && capacityEnv > 0 ? capacityEnv : 50;
+    const todayShowtimesList = await (prisma as any).showtimes.findMany({
+      where: { is_active: true, start_time: { gte: todayStart, lte: todayEnd } },
+      select: { id: true, total_sold: true },
+    });
+    let occupancyTodayPercent = 0;
+    if (todayShowtimesList.length > 0) {
+      const totalSold = todayShowtimesList.reduce((sum: number, s: any) => sum + Number(s.total_sold || 0), 0);
+      occupancyTodayPercent = Math.round((totalSold / (todayShowtimesList.length * CAPACITY)) * 100);
+    }
+
+    // Top 3 movies by revenue in the last 7 days (paid only)
+    const weekStart = new Date(todayStart);
+    weekStart.setDate(weekStart.getDate() - 6);
+    const weekBookings = await (prisma as any).bookings.findMany({
+      where: {
+        payment_status: { in: ["paid"] },
+        OR: [
+          { created_at: { gte: weekStart, lte: todayEnd } },
+          { paid_at: { gte: weekStart, lte: todayEnd } },
+        ],
+      },
+      include: { showtime: { include: { movie: true } } },
+    });
+    const movieRevenueMap = new Map<number, { title: string; revenue: number }>();
+    for (const b of weekBookings) {
+      const movieId = b.showtime?.movie_id;
+      const title = b.showtime?.movie?.title || "";
+      const price = Number(b.total_price || 0);
+      if (movieId) {
+        const prev = movieRevenueMap.get(movieId) || { title, revenue: 0 };
+        prev.revenue += price;
+        prev.title = title || prev.title;
+        movieRevenueMap.set(movieId, prev);
+      }
+    }
+    const topMoviesWeek = Array.from(movieRevenueMap.entries())
+      .map(([id, v]) => ({ id, title: v.title, revenue: v.revenue }))
+      .sort((a, b) => b.revenue - a.revenue)
+      .slice(0, 3);
+
     res.status(200).json({
       totalMovies,
       totalShowtimes,
@@ -39,6 +139,11 @@ export const getDashboardMetrics: RequestHandler = async (req, res) => {
       totalUsers,
       totalTransactions,
       revenueTotal,
+      revenueByMethod,
+      totalShowtimesToday: showtimesToday,
+      totalShowtimesFuture: showtimesFuture,
+      occupancyTodayPercent,
+      topMoviesWeek,
     });
   } catch (err: any) {
     res.status(500).json({ message: "Lỗi máy chủ nội bộ" });
@@ -76,10 +181,29 @@ export const getRevenueByDate: RequestHandler = async (req, res) => {
 
     const count = await (prisma as any).bookings.count({ where });
 
+    // Breakdown by payment method under the same filter
+    const revenueCashAgg = await (prisma as any).bookings.aggregate({
+      where: { ...where, payment_method: { in: ["cash", "Cash"] } },
+      _sum: { total_price: true },
+    });
+    const revenueMomoAgg = await (prisma as any).bookings.aggregate({
+      where: { ...where, payment_method: { in: ["momo", "MoMo"] } },
+      _sum: { total_price: true },
+    });
+    const revenueVnpayAgg = await (prisma as any).bookings.aggregate({
+      where: { ...where, payment_method: { in: ["vnpay", "VNPay"] } },
+      _sum: { total_price: true },
+    });
+
     res.status(200).json({
       date: dateStr || "all",
       total: Number(total._sum?.total_price || 0),
       count,
+      revenueByMethod: {
+        cash: Number(revenueCashAgg._sum?.total_price || 0),
+        momo: Number(revenueMomoAgg._sum?.total_price || 0),
+        vnpay: Number(revenueVnpayAgg._sum?.total_price || 0),
+      },
     });
   } catch (err: any) {
     res.status(500).json({ message: "Lỗi máy chủ nội bộ" });
@@ -167,9 +291,28 @@ export const getRevenueByMonth: RequestHandler = async (req, res) => {
 
       const count = await (prisma as any).bookings.count({ where: whereMonth });
 
+      // Breakdown by payment method under the same filter
+      const revenueCashAgg = await (prisma as any).bookings.aggregate({
+        where: { ...whereMonth, payment_method: { in: ["cash", "Cash"] } },
+        _sum: { total_price: true },
+      });
+      const revenueMomoAgg = await (prisma as any).bookings.aggregate({
+        where: { ...whereMonth, payment_method: { in: ["momo", "MoMo"] } },
+        _sum: { total_price: true },
+      });
+      const revenueVnpayAgg = await (prisma as any).bookings.aggregate({
+        where: { ...whereMonth, payment_method: { in: ["vnpay", "VNPay"] } },
+        _sum: { total_price: true },
+      });
+
       return res.status(200).json({
         total: Number(revenue._sum?.total_price || 0),
         count,
+        revenueByMethod: {
+          cash: Number(revenueCashAgg._sum?.total_price || 0),
+          momo: Number(revenueMomoAgg._sum?.total_price || 0),
+          vnpay: Number(revenueVnpayAgg._sum?.total_price || 0),
+        },
       });
     }
 
