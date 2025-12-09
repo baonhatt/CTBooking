@@ -48,7 +48,7 @@ import {
   getRevenue7Days,
   getRevenueByMonth,
 } from "./routes/dashboard";
-import { getUsers, getUserById } from "./routes/users";
+import { getUsers, getUserById, updateUserProfile, changePassword, listUserTransactions } from "./routes/users";
 import { getShowtimeById } from "./routes/showtimes";
 import {
   listTicketPackages,
@@ -167,6 +167,9 @@ export function createServer() {
   app.get("/api/admin/dashboard/revenue-month", getRevenueByMonth);
   app.get("/api/users", getUsers);
   app.get("/api/users/:id", getUserById);
+  app.post("/api/users/profile", updateUserProfile);
+  app.post("/api/users/password", changePassword);
+  app.get("/api/users/transactions", listUserTransactions);
   app.get("/api/tickets", listTicketPackages);
   app.get("/api/tickets/active", listActiveTicketPackages);
   app.get("/api/tickets/:id", getTicketPackage);

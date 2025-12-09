@@ -532,8 +532,9 @@ export default function BookingSection({ onBookClick }: BookingSectionProps) {
 
                   <Button
                     onClick={() => {
+                      try { localStorage.setItem('selectedTicketPackage', JSON.stringify(pkg)); } catch {}
                       setSelectedPackage(pkg);
-                      handleOpenModal();
+                      navigate('/booking');
                     }}
                     className="bg-white text-black hover:bg-white/90 font-semibold mt-auto"
                   >
