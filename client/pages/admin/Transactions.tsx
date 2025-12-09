@@ -12,7 +12,43 @@ export default function TransactionsPage() {
   const [revenueTotal, setRevenueTotal] = useState(0);
   const [revenueCount, setRevenueCount] = useState(0);
   const [txStatus, setTxStatus] = useState<"paid" | "all">("paid");
+  const [sortKey, setSortKey] = useState<"created_at" | "paid_at">("created_at");
+  const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
+  const [paymentMethod, setPaymentMethod] = useState<string>("");
+  const [fromDate, setFromDate] = useState<string>("");
+  const [toDate, setToDate] = useState<string>("");
   const [isLoading, setIsLoading] = useState(false);
+
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem("admin_transactions_filters");
+      if (raw) {
+        const s = JSON.parse(raw);
+        if (typeof s.txQuery === "string") setTxQuery(s.txQuery);
+        if (typeof s.txStatus === "string" && (s.txStatus === "paid" || s.txStatus === "all")) setTxStatus(s.txStatus);
+        if (typeof s.sortKey === "string" && (s.sortKey === "created_at" || s.sortKey === "paid_at")) setSortKey(s.sortKey);
+        if (typeof s.sortDir === "string" && (s.sortDir === "asc" || s.sortDir === "desc")) setSortDir(s.sortDir);
+        if (typeof s.paymentMethod === "string") setPaymentMethod(s.paymentMethod);
+        if (typeof s.fromDate === "string") setFromDate(s.fromDate);
+        if (typeof s.toDate === "string") setToDate(s.toDate);
+      }
+    } catch {}
+  }, []);
+
+  useEffect(() => {
+    try {
+      const state = {
+        txQuery,
+        txStatus,
+        sortKey,
+        sortDir,
+        paymentMethod,
+        fromDate,
+        toDate,
+      };
+      localStorage.setItem("admin_transactions_filters", JSON.stringify(state));
+    } catch {}
+  }, [txQuery, txStatus, sortKey, sortDir, paymentMethod, fromDate, toDate]);
 
   // Load transactions khi page hoặc query thay đổi
   useEffect(() => {
@@ -24,6 +60,11 @@ export default function TransactionsPage() {
           pageSize,
           email: txQuery,
           status: txStatus,
+          sort: sortKey,
+          dir: sortDir,
+          payment_method: paymentMethod || undefined,
+          from: fromDate || undefined,
+          to: toDate || undefined,
         });
         setTransactions(
           items.map((t: any) => ({
@@ -45,7 +86,7 @@ export default function TransactionsPage() {
         setIsLoading(false);
       }
     })();
-  }, [txPage, pageSize, txQuery, txStatus]);
+  }, [txPage, pageSize, txQuery, txStatus, sortKey, sortDir, paymentMethod, fromDate, toDate]);
 
   useEffect(() => {
     (async () => {
@@ -92,6 +133,12 @@ export default function TransactionsPage() {
         page: txPage,
         pageSize,
         email: txQuery,
+        status: txStatus,
+        sort: sortKey,
+        dir: sortDir,
+        payment_method: paymentMethod || undefined,
+        from: fromDate || undefined,
+        to: toDate || undefined,
       });
       setTransactions(
         items.map((t: any) => ({
@@ -140,10 +187,20 @@ export default function TransactionsPage() {
         txQuery={txQuery}
         setTxQuery={setTxQuery}
         metrics={metrics}
-        transactionsLength={transactions.length}
+        transactionsLength={totalTransactions}
         onRefresh={handleRefresh}
         txStatus={txStatus}
         setTxStatus={setTxStatus}
+        sortKey={sortKey}
+        sortDir={sortDir}
+        setSortKey={setSortKey}
+        setSortDir={setSortDir}
+        paymentMethod={paymentMethod}
+        setPaymentMethod={setPaymentMethod}
+        fromDate={fromDate}
+        toDate={toDate}
+        setFromDate={setFromDate}
+        setToDate={setToDate}
         isLoading={isLoading}
       />
     </AdminLayout>

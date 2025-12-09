@@ -12,11 +12,25 @@ export default function MoviesPage() {
   const [totalMovies, setTotalMovies] = useState(0);
   const [moviesPage, setMoviesPage] = useState(1);
   const [searchQuery, setSearchQuery] = useState("");
+  const [sortKey, setSortKey] = useState<"updated_at" | "release_date" | "title" | "rating">("updated_at");
+  const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
   const pageSize = 10;
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [editType, setEditType] = useState<"movie" | null>(null);
   const [editData, setEditData] = useState<any>({});
   const [isLoading, setIsLoading] = useState(false);
+
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem("admin_movies_filters");
+      if (raw) {
+        const s = JSON.parse(raw);
+        if (typeof s.searchQuery === "string") setSearchQuery(s.searchQuery);
+        if (typeof s.sortKey === "string") setSortKey(s.sortKey);
+        if (typeof s.sortDir === "string") setSortDir(s.sortDir);
+      }
+    } catch {}
+  }, []);
 
   useEffect(() => {
     (async () => {
@@ -25,6 +39,8 @@ export default function MoviesPage() {
         page: moviesPage,
         pageSize,
         q: searchQuery,
+        sort: sortKey,
+        dir: sortDir,
       });
       const mapped = items.map((m: any) => ({
         id: String(m.id),
@@ -47,7 +63,11 @@ export default function MoviesPage() {
       }));
       setIsLoading(false);
     })();
-  }, [moviesPage, pageSize, searchQuery]);
+    try {
+      const state = { searchQuery, sortKey, sortDir };
+      localStorage.setItem("admin_movies_filters", JSON.stringify(state));
+    } catch {}
+  }, [moviesPage, pageSize, searchQuery, sortKey, sortDir]);
 
   const moviesTotalPages = useMemo(
     () => Math.max(1, Math.ceil(totalMovies / pageSize)),
@@ -105,6 +125,9 @@ export default function MoviesPage() {
     const { items, total } = await getMoviesAdmin({
       page: moviesPage,
       pageSize,
+      q: searchQuery,
+      sort: sortKey,
+      dir: sortDir,
     });
     const mapped = items.map((m: any) => ({
       id: String(m.id),
@@ -151,6 +174,10 @@ export default function MoviesPage() {
           setSearchQuery(query);
           setMoviesPage(1);
         }}
+        sortKey={sortKey}
+        sortDir={sortDir}
+        setSortKey={setSortKey}
+        setSortDir={setSortDir}
         isLoading={isLoading}
       />
       <AdminEditModal

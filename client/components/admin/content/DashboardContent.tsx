@@ -10,13 +10,18 @@ interface Metrics {
   totalUsers: number;
   totalTransactions: number;
   revenueTotal: number;
+  revenueByMethod: { cash: number; momo: number; vnpay: number };
+  totalShowtimesToday: number;
+  totalShowtimesFuture: number;
+  occupancyTodayPercent: number;
+  topMoviesWeek: Array<{ id: number; title: string; revenue: number }>;
 }
 
 interface Props {
   metrics: Metrics;
   selectedDate: string;
   setSelectedDate: (date: string) => void;
-  dateRevenue: { total: number; count: number };
+  dateRevenue: { total: number; count: number; revenueByMethod: { cash: number; momo: number; vnpay: number } };
   onApplyDateFilter: () => void;
   dateFilterType: "all" | "day" | "month";
   setDateFilterType: (type: "all" | "day" | "month") => void;
@@ -159,15 +164,65 @@ export default function DashboardContent({
         </Card>
       </div>
 
-      {/* Total Revenue */}
+      {/* Showtimes Breakdown */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-sm">Suất chiếu hôm nay (active)</CardTitle>
+          </CardHeader>
+          <CardContent>
+            {isLoading ? <Skeleton className="h-8 w-20" /> : (
+              <div className="text-2xl font-semibold">{metrics.totalShowtimesToday}</div>
+            )}
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-sm">Suất chiếu tương lai (active)</CardTitle>
+          </CardHeader>
+          <CardContent>
+            {isLoading ? <Skeleton className="h-8 w-20" /> : (
+              <div className="text-2xl font-semibold">{metrics.totalShowtimesFuture}</div>
+            )}
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-sm">Tỉ lệ lấp đầy hôm nay</CardTitle>
+          </CardHeader>
+          <CardContent>
+            {isLoading ? <Skeleton className="h-8 w-24" /> : (
+              <div className="text-2xl font-semibold">{metrics.occupancyTodayPercent}%</div>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Revenue Box (shared filters) */}
       <Card>
         <CardHeader>
           <CardTitle>
-            Tổng doanh thu: {isLoading ? (
+            Tổng doanh thu (theo bộ lọc): {isLoading ? (
               <Skeleton className="inline-block align-middle h-6 w-32" />
-            ) : metrics.revenueTotal.toLocaleString("en-US")}
+            ) : dateRevenue.total.toLocaleString("en-US")}
           </CardTitle>
         </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div>
+              <div className="text-sm text-gray-600">Tiền mặt</div>
+              <div className="text-xl font-semibold">{dateRevenue.revenueByMethod.cash.toLocaleString("en-US")}</div>
+            </div>
+            <div>
+              <div className="text-sm text-gray-600">MoMo</div>
+              <div className="text-xl font-semibold">{dateRevenue.revenueByMethod.momo.toLocaleString("en-US")}</div>
+            </div>
+            <div>
+              <div className="text-sm text-gray-600">VNPay</div>
+              <div className="text-xl font-semibold">{dateRevenue.revenueByMethod.vnpay.toLocaleString("en-US")}</div>
+            </div>
+          </div>
+        </CardContent>
       </Card>
 
       {/* Date Revenue Selector */}
@@ -214,30 +269,9 @@ export default function DashboardContent({
               </label>
             </div>
 
-            {/* Status Selection */}
-            <div className="flex gap-3">
-              <label className="flex items-center gap-2 cursor-pointer">
-                <input
-                  type="radio"
-                  name="status"
-                  value="paid"
-                  checked={dateStatus === "paid"}
-                  onChange={(e) => setDateStatus(e.target.value as "all" | "paid")}
-                  className="w-4 h-4"
-                />
-                <span className="text-sm">Chỉ giao dịch đã thanh toán</span>
-              </label>
-              <label className="flex items-center gap-2 cursor-pointer">
-                <input
-                  type="radio"
-                  name="status"
-                  value="all"
-                  checked={dateStatus === "all"}
-                  onChange={(e) => setDateStatus(e.target.value as "all" | "paid")}
-                  className="w-4 h-4"
-                />
-                <span className="text-sm">Tất cả trạng thái</span>
-              </label>
+            {/* Status: Paid only */}
+            <div className="flex items-center">
+              <span className="text-sm text-gray-700">Chỉ tính các giao dịch đã thanh toán</span>
             </div>
 
             {/* Date/Month Picker */}
@@ -283,7 +317,7 @@ export default function DashboardContent({
       {/* 7-Day Revenue Chart */}
       <Card className="w-fit">
         <CardHeader>
-          <CardTitle>Doanh thu 7 ngày gần nhất</CardTitle>
+          <CardTitle>Doanh thu 7 ngày gần nhất (đã thanh toán)</CardTitle>
         </CardHeader>
         <CardContent>
           <BarChart data={revenue7DaysData} dataKey="revenue" />
@@ -294,7 +328,7 @@ export default function DashboardContent({
       <Card className="w-fit">
         <CardHeader>
           <div className="flex justify-between items-center">
-            <CardTitle>Doanh thu 12 tháng</CardTitle>
+            <CardTitle>Doanh thu 12 tháng (đã thanh toán)</CardTitle>
             <select
               value={revenueByMonthYear}
               onChange={(e) => setRevenueByMonthYear(Number(e.target.value))}
@@ -319,6 +353,31 @@ export default function DashboardContent({
             }))}
             dataKey="revenue"
           />
+        </CardContent>
+      </Card>
+
+      {/* Top 3 Movies by Revenue This Week */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Top 3 phim theo doanh thu tuần này (đã thanh toán)</CardTitle>
+        </CardHeader>
+        <CardContent>
+          {isLoading ? (
+            <Skeleton className="h-8 w-40" />
+          ) : (
+            <div className="space-y-2">
+              {metrics.topMoviesWeek.length === 0 ? (
+                <div className="text-sm text-gray-600">Chưa có dữ liệu</div>
+              ) : (
+                metrics.topMoviesWeek.map((m) => (
+                  <div key={m.id} className="flex justify-between">
+                    <span className="font-medium">{m.title || `Phim #${m.id}`}</span>
+                    <span>{m.revenue.toLocaleString("en-US")} đ</span>
+                  </div>
+                ))
+              )}
+            </div>
+          )}
         </CardContent>
       </Card>
     </div>

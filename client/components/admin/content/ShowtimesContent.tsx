@@ -26,6 +26,20 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { getShowtimeById } from "@/lib/api";
+import { useToast } from "@/hooks/use-toast";
+import { Input } from "@/components/ui/input";
+import { X } from "lucide-react";
+import {
+  AlertDialog,
+  AlertDialogTrigger,
+  AlertDialogContent,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogCancel,
+  AlertDialogAction,
+} from "@/components/ui/alert-dialog";
 
 interface ShowtimeData {
   id: number;
@@ -33,6 +47,9 @@ interface ShowtimeData {
   movie_title: string;
   start_time: string;
   total_sold: number;
+  is_active?: boolean;
+  hasPaidBookings?: boolean;
+  hasRecentPending?: boolean;
 }
 interface Props {
   data: ShowtimeData[];
@@ -46,12 +63,20 @@ interface Props {
   setPage: React.Dispatch<React.SetStateAction<number>>;
   sortKey: "start_time" | "created_at" | "movie_title";
   setSortKey: (k: "start_time" | "created_at" | "movie_title") => void;
-  todayOnly: boolean;
-  setTodayOnly: (v: boolean) => void;
+  selectedDate?: Date | null;
+  setSelectedDate?: (d: Date | null) => void;
+  futureOnly?: boolean;
+  setFutureOnly?: (v: boolean) => void;
+  voidOnly?: boolean;
+  setVoidOnly?: (v: boolean) => void;
   onRefresh: () => void;
   searchQuery?: string;
   onSearchChange?: (query: string) => void;
   isLoading?: boolean;
+  totalItems?: number;
+  onReactivate?: (id: number) => void;
+  searchId?: string;
+  setSearchId?: (v: string) => void;
 }
 
 export default function ShowtimesContent({
@@ -66,16 +91,25 @@ export default function ShowtimesContent({
   setPage,
   sortKey,
   setSortKey,
-  todayOnly,
-  setTodayOnly,
+  selectedDate = null,
+  setSelectedDate = () => {},
+  futureOnly = true,
+  setFutureOnly = () => {},
+  voidOnly = false,
+  setVoidOnly = () => {},
   onRefresh,
   searchQuery = "",
-  onSearchChange = () => { },
+  onSearchChange = () => {},
   isLoading = false,
+  totalItems,
+  onReactivate = () => {},
+  searchId = "",
+  setSearchId = () => {},
 }: Props) {
+  const { toast } = useToast();
   const [isDetailsOpen, setIsDetailsOpen] = useState(false);
   const [selectedShowtimeId, setSelectedShowtimeId] = useState<number | null>(
-    null
+    null,
   );
   const [showtimeDetails, setShowtimeDetails] = useState<any>(null);
   const [isLoadingDetails, setIsLoadingDetails] = useState(false);
@@ -108,6 +142,7 @@ export default function ShowtimesContent({
     try {
       await deleteShowtimeApi(id);
       setShowtimes((prev) => prev.filter((s) => s.id !== id));
+      toast({ title: "Thành công", description: `Đã xóa suất chiếu #${id}` });
     } catch (e: any) {
       alert(e?.message || "Lỗi xóa suất chiếu");
     }
@@ -118,7 +153,7 @@ export default function ShowtimesContent({
         <div className="flex-1">
           <input
             type="text"
-            placeholder="Tìm kiếm suất chiếu theo tên phim..."
+            placeholder="Tìm theo tên phim hoặc ID..."
             value={searchQuery}
             onChange={(e) => onSearchChange(e.target.value)}
             className="w-full px-4 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
@@ -126,7 +161,7 @@ export default function ShowtimesContent({
         </div>
         <div className="flex items-center gap-3">
           <h3 className="text-lg font-semibold whitespace-nowrap">
-            Tổng: {data.length}
+            Tổng: {typeof totalItems === "number" ? totalItems : data.length}
           </h3>
           <select
             value={sortKey}
@@ -137,21 +172,76 @@ export default function ShowtimesContent({
             <option value="created_at">Thời gian tạo</option>
             <option value="movie_title">Tên phim</option>
           </select>
-          <label className="flex items-center gap-1 text-sm">
-            <input
-              type="checkbox"
-              checked={todayOnly}
-              onChange={(e) => setTodayOnly(e.target.checked)}
-            />{" "}
-            Hôm nay
-          </label>
+          <div className="flex items-center gap-2">
+            <Input
+              type="date"
+              value={
+                selectedDate
+                  ? (() => {
+                      const pad = (n: number) => n.toString().padStart(2, "0");
+                      const y = selectedDate.getFullYear();
+                      const m = pad(selectedDate.getMonth() + 1);
+                      const d = pad(selectedDate.getDate());
+                      return `${y}-${m}-${d}`;
+                    })()
+                  : ""
+              }
+              onChange={(e) => {
+                const v = e.target.value;
+                setSelectedDate(v ? new Date(`${v}T00:00:00`) : null);
+              }}
+              className="w-[180px]"
+            />
+            {selectedDate && (
+              <Button
+                variant="ghost"
+                size="sm"
+                className="w-9 h-9 p-0"
+                aria-label="Xóa ngày lọc"
+                onClick={() => setSelectedDate(null)}
+              >
+                <X className="w-4 h-4" />
+              </Button>
+            )}
+            <label className="flex items-center gap-1 text-sm">
+              <input
+                type="checkbox"
+                checked={futureOnly}
+                onChange={(e) => setFutureOnly(e.target.checked)}
+              />
+              Chỉ tương lai
+            </label>
+            <label className="flex items-center gap-1 text-sm">
+              <input
+                type="checkbox"
+                checked={voidOnly}
+                onChange={(e) => setVoidOnly(e.target.checked)}
+              />
+              Void
+            </label>
+          </div>
         </div>
         <div className="flex gap-2">
           <Button onClick={onRefresh} variant="outline">
-            ↻ Refresh
+            ↻ Làm mới
           </Button>
-          <Button onClick={onCreate}>+ Thêm suất chiếu mới</Button>
+          <Button
+            variant="secondary"
+            onClick={() => {
+              setSelectedDate?.(null);
+              onSearchChange?.("");
+              setFutureOnly?.(true);
+              setVoidOnly?.(false);
+              setSortKey?.("start_time");
+              setPage(1);
+            }}
+          >
+            Xóa bộ lọc
+          </Button>
         </div>
+      </div>
+      <div className="flex justify-end">
+        <Button onClick={onCreate}>+ Thêm suất chiếu</Button>
       </div>
       <Card>
         <CardContent className="p-0">
@@ -170,62 +260,108 @@ export default function ShowtimesContent({
               {isLoading
                 ? Array.from({ length: 5 }).map((_, idx) => (
                     <TableRow key={`sk-${idx}`}>
-                      <TableCell><Skeleton className="h-4 w-16" /></TableCell>
-                      <TableCell><Skeleton className="h-4 w-40" /></TableCell>
-                      <TableCell><Skeleton className="h-4 w-36" /></TableCell>
-                      <TableCell><Skeleton className="h-4 w-12" /></TableCell>
-                      <TableCell><Skeleton className="h-5 w-20" /></TableCell>
-                      <TableCell className="text-right"><Skeleton className="h-8 w-24 ml-auto" /></TableCell>
+                      <TableCell>
+                        <Skeleton className="h-4 w-16" />
+                      </TableCell>
+                      <TableCell>
+                        <Skeleton className="h-4 w-40" />
+                      </TableCell>
+                      <TableCell>
+                        <Skeleton className="h-4 w-36" />
+                      </TableCell>
+                      <TableCell>
+                        <Skeleton className="h-4 w-12" />
+                      </TableCell>
+                      <TableCell>
+                        <Skeleton className="h-5 w-20" />
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <Skeleton className="h-8 w-24 ml-auto" />
+                      </TableCell>
                     </TableRow>
                   ))
                 : data.map((showtime) => {
-                const CAPACITY = 100;
+                const capEnv = Number((import.meta as any).env?.VITE_SHOWTIME_FULL_CAPACITY);
+                const CAPACITY = Number.isFinite(capEnv) && capEnv > 0 ? capEnv : 50;
                 const isFull = showtime.total_sold >= CAPACITY;
+                const isVoid = showtime.is_active === false;
+                const editable = !(showtime.hasPaidBookings || showtime.hasRecentPending);
                 return (
                   <TableRow key={showtime.id}>
-                    <TableCell className="font-medium">{showtime.id}</TableCell>
-                    <TableCell>{showtime.movie_title}</TableCell>
-                    <TableCell>
-                      {formatLocalDateTime(new Date(showtime.start_time))}
-                    </TableCell>
-                    <TableCell>{showtime.total_sold}</TableCell>
+                        <TableCell className="font-medium">
+                          {showtime.id}
+                        </TableCell>
+                        <TableCell>{showtime.movie_title}</TableCell>
+                        <TableCell>
+                          {formatLocalDateTime(new Date(showtime.start_time))}
+                        </TableCell>
+                        <TableCell>{showtime.total_sold}</TableCell>
                     <TableCell>
                       <Badge
                         className={
-                          isFull
-                            ? "bg-green-100 text-green-800 hover:bg-green-100"
-                            : "bg-yellow-100 text-yellow-800 hover:bg-yellow-100"
+                          isVoid
+                            ? "bg-red-100 text-red-800 hover:bg-red-100"
+                            : isFull
+                              ? "bg-green-100 text-green-800 hover:bg-green-100"
+                              : "bg-yellow-100 text-yellow-800 hover:bg-yellow-100"
                         }
                       >
-                        {isFull ? "FULL" : "Đang chiếu"}
+                        {isVoid ? "VOID" : isFull ? "FULL" : "Đang chiếu"}
                       </Badge>
                     </TableCell>
-                    <TableCell className="text-right space-x-2">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => handleViewDetails(showtime.id)}
-                      >
-                        Xem
-                      </Button>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => onEdit("showtime", showtime)}
-                      >
-                        Sửa
-                      </Button>
-                      <Button
-                        variant="destructive"
-                        size="sm"
-                        onClick={() => handleDelete(showtime.id)}
-                      >
-                        Xóa
-                      </Button>
-                    </TableCell>
-                  </TableRow>
-                );
-              })}
+                        <TableCell className="text-right space-x-2">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleViewDetails(showtime.id)}
+                          >
+                            Xem
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            disabled={!editable || isVoid}
+                            onClick={() => onEdit("showtime", showtime)}
+                          >
+                            Sửa
+                          </Button>
+                          {isVoid && (
+                            <Button
+                              className="ml-2"
+                              variant="secondary"
+                              size="sm"
+                              onClick={() => onReactivate(showtime.id)}
+                              disabled={!editable}
+                            >
+                              Kích hoạt
+                            </Button>
+                          )}
+                          <AlertDialog>
+                            <AlertDialogTrigger asChild>
+                              <Button variant="destructive" size="sm">Xóa</Button>
+                            </AlertDialogTrigger>
+                            <AlertDialogContent>
+                              <AlertDialogHeader>
+                                <AlertDialogTitle>Xóa suất chiếu?</AlertDialogTitle>
+                                <AlertDialogDescription>
+                                  Hành động này không thể hoàn tác. Bạn có chắc muốn xóa suất chiếu này?
+                                </AlertDialogDescription>
+                              </AlertDialogHeader>
+                              <AlertDialogFooter>
+                                <AlertDialogCancel>Hủy</AlertDialogCancel>
+                                <AlertDialogAction
+                                  className="bg-red-600 hover:bg-red-700 text-white"
+                                  onClick={() => handleDelete(showtime.id)}
+                                >
+                                  Xóa
+                                </AlertDialogAction>
+                              </AlertDialogFooter>
+                            </AlertDialogContent>
+                          </AlertDialog>
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
             </TableBody>
           </Table>
           <Pagination className="mt-4">
@@ -331,27 +467,29 @@ export default function ShowtimesContent({
                   <div>
                     <p className="text-sm text-gray-600">Thời gian bắt đầu</p>
                     <p className="font-medium">
-                      {new Date(showtimeDetails.start_time).toLocaleString(
-                        "vi-VN"
-                      )}
+                      {formatLocalDateTime(new Date(showtimeDetails.start_time))}
                     </p>
                   </div>
                   <div>
                     <p className="text-sm text-gray-600">Thời gian kết thúc</p>
                     <p className="font-medium">
                       {showtimeDetails.end_time
-                        ? new Date(showtimeDetails.end_time).toLocaleString(
-                          "vi-VN"
-                        )
+                        ? formatLocalDateTime(new Date(showtimeDetails.end_time))
                         : "N/A"}
                     </p>
                   </div>
-                  <div>
+                  {showtimeDetails.is_active === false && (
+                    <div>
+                      <p className="text-sm text-gray-600">Trạng thái</p>
+                      <p className="font-medium text-red-700">VOID</p>
+                    </div>
+                  )}
+                  {/* <div>
                     <p className="text-sm text-gray-600">Tổng vé đã bán</p>
                     <p className="font-medium">
                       {showtimeDetails.total_sold} vé
                     </p>
-                  </div>
+                  </div> */}
                 </div>
               </div>
 
@@ -366,13 +504,17 @@ export default function ShowtimesContent({
                     </p>
                   </div>
                   <div className="bg-green-50 p-4 rounded-lg border border-green-200">
-                    <p className="text-sm text-gray-600">Đơn thanh toán thành công</p>
+                    <p className="text-sm text-gray-600">
+                      Đơn thanh toán thành công
+                    </p>
                     <p className="text-2xl font-bold text-green-600">
                       {showtimeDetails.stats.successfulBookings}
                     </p>
                   </div>
                   <div className="bg-red-50 p-4 rounded-lg border border-red-200">
-                    <p className="text-sm text-gray-600">Đơn thanh toán thất bại</p>
+                    <p className="text-sm text-gray-600">
+                      Đơn thanh toán thất bại
+                    </p>
                     <p className="text-2xl font-bold text-red-600">
                       {showtimeDetails.stats.failedBookings}
                     </p>
@@ -380,21 +522,20 @@ export default function ShowtimesContent({
                   <div className="bg-purple-50 p-4 rounded-lg border border-purple-200">
                     <p className="text-sm text-gray-600">Tổng vé bán được</p>
                     <p className="text-2xl font-bold text-purple-600">
-                      {showtimeDetails.stats.totalTickets} vé
+                      {showtimeDetails.total_sold} vé
                     </p>
                   </div>
                   <div className="bg-yellow-50 p-4 rounded-lg border border-yellow-200 col-span-2">
                     <p className="text-sm text-gray-600">Tổng doanh thu</p>
                     <p className="text-2xl font-bold text-yellow-600">
                       {showtimeDetails.stats.totalRevenue.toLocaleString(
-                        "vi-VN"
-                      )}₫
+                        "vi-VN",
+                      )}
+                      ₫
                     </p>
                   </div>
                 </div>
               </div>
-
-
             </div>
           ) : null}
         </DialogContent>

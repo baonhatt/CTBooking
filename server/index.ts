@@ -80,6 +80,51 @@ export function createServer() {
     res.json({ message: ping });
   });
 
+  // ===== Security middlewares for sensitive endpoints =====
+  const noStore: express.RequestHandler = (_req, res, next) => {
+    res.set("Cache-Control", "no-store");
+    next();
+  };
+  const attempts = new Map<string, number[]>();
+  const RL_MAX = (() => {
+    const raw = process.env.RATE_LIMIT_BOOKING_CHECK_MAX;
+    const n = Number(raw);
+    return Number.isFinite(n) && n > 0 ? n : 5;
+  })();
+  const RL_WINDOW_MS = (() => {
+    const raw = process.env.RATE_LIMIT_BOOKING_CHECK_WINDOWMS;
+    const n = Number(raw);
+    return Number.isFinite(n) && n >= 1000 ? n : 60_000;
+  })();
+  const rateLimitCheckCode = (max = RL_MAX, windowMs = RL_WINDOW_MS): express.RequestHandler => {
+    return (req, res, next) => {
+      const key = req.ip || "unknown";
+      const now = Date.now();
+      const list = attempts.get(key) ?? [];
+      const filtered = list.filter((ts) => now - ts < windowMs);
+      if (filtered.length >= max) {
+        const oldest = filtered[0];
+        const retryMs = Math.max(0, windowMs - (now - oldest));
+        const retrySec = Math.ceil(retryMs / 1000);
+        res.set("Retry-After", String(retrySec));
+        res.set("X-RateLimit-Limit", String(max));
+        res.set("X-RateLimit-Remaining", "0");
+        res.set("X-RateLimit-WindowMS", String(windowMs));
+        return res.status(429).json({ message: `Quá nhiều yêu cầu, vui lòng thử lại sau ${retrySec}s` });
+      }
+      const remaining = Math.max(0, max - (filtered.length + 1));
+      res.locals.rateLimitRemaining = remaining;
+      res.locals.rateLimitMax = max;
+      res.locals.rateLimitWindowMs = windowMs;
+      res.set("X-RateLimit-Limit", String(max));
+      res.set("X-RateLimit-Remaining", String(remaining));
+      res.set("X-RateLimit-WindowMS", String(windowMs));
+      filtered.push(now);
+      attempts.set(key, filtered);
+      next();
+    };
+  };
+
   app.get("/api/demo", handleDemo);
   app.get("/api/movies/2025", handleMovies2025);
   app.get("/api/movies", listMovies);
@@ -106,7 +151,7 @@ export function createServer() {
   app.post("/api/create-booking", createPayment); // sử dụng để tạo đặt vé sau khi ấn nút thanh toán
   app.post("/api/confirm-booking", updatePayment); // sử dụng để xử lý data do momo trả về sau khi người dùng thanh toán thành công
   app.get("/api/bookings/:id", getBookingById); // lấy booking info đầy đủ cho checkout page
-  app.get("/api/bookings/code/:code", getBookingByCode); // lấy booking info theo mã vé cho ticket check
+  app.get("/api/bookings/code/:code", noStore, rateLimitCheckCode(), getBookingByCode); // lấy booking info theo mã vé cho ticket check
   app.get("/api/admin/revenue", getRevenue);
   app.get("/api/admin/transactions", listTransactions);
   app.get("/api/admin/transactions/:id", getTransactionById);

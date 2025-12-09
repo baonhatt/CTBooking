@@ -48,7 +48,7 @@ export const createPayment: RequestHandler = async (req, res) => {
         showtime_id: showtimeId,
         ticket_count: ticketCount,
         total_price: totalPrice,
-        payment_method: paymentMethod,
+        payment_method: (paymentMethod || "cash").toLowerCase(),
         phone,
         name,
         email: emailBook,
@@ -57,7 +57,19 @@ export const createPayment: RequestHandler = async (req, res) => {
 
     return res.status(201).json({
       message: "Khởi tạo đặt vé thành công",
-      booking,
+      booking: {
+        id: booking.id,
+        user_id: booking.user_id,
+        showtime_id: booking.showtime_id,
+        ticket_count: booking.ticket_count,
+        total_price: booking.total_price,
+        payment_method: booking.payment_method,
+        phone: booking.phone,
+        name: booking.name,
+        email: booking.email,
+        payment_status: booking.payment_status,
+        created_at: booking.created_at,
+      },
     });
   } catch (error) {
     return res.status(500).json({
@@ -157,7 +169,7 @@ export const updatePayment: RequestHandler = async (req, res) => {
           movieImage: booking.showtime.movie.cover_image || undefined,
         });
 
-        console.log(`[Email] Sending to: ${booking.email}, Code: ${bookingCode}`);
+        console.log(`[Email] Sending to: ${booking.email}`);
 
         await sendMail(
           booking.email,
@@ -174,8 +186,18 @@ export const updatePayment: RequestHandler = async (req, res) => {
 
     return res.status(200).json({
       message: "Thanh toán thành công",
-      booking: updatedBooking,
-      bookingCode,
+      booking: {
+        id: updatedBooking.id,
+        user_id: updatedBooking.user_id,
+        showtime_id: updatedBooking.showtime_id,
+        ticket_count: updatedBooking.ticket_count,
+        total_price: updatedBooking.total_price,
+        payment_method: updatedBooking.payment_method,
+        payment_status: updatedBooking.payment_status,
+        transaction_id: updatedBooking.transaction_id,
+        created_at: updatedBooking.created_at,
+        paid_at: updatedBooking.paid_at,
+      },
     });
   } catch (error) {
     return res.status(500).json({ message: "Lỗi máy chủ nội bộ" });
@@ -238,6 +260,11 @@ export const listTransactions: RequestHandler = async (req, res) => {
     const pageSize = Number(req.query.pageSize || 10);
     const email = String(req.query.email || "");
     const status = String(req.query.status || "");
+    const sortKey = String(req.query.sort || "created_at");
+    const dir = String(req.query.dir || "desc").toLowerCase() === "asc" ? "asc" : "desc";
+    const paymentMethod = String(req.query.payment_method || "");
+    const fromStr = String(req.query.from || "");
+    const toStr = String(req.query.to || "");
     const skip = (page - 1) * pageSize;
 
     // Build where clause
@@ -259,11 +286,35 @@ export const listTransactions: RequestHandler = async (req, res) => {
     if (status && status !== "all") {
       where.payment_status = status;
     }
+    if (paymentMethod) {
+      where.payment_method = paymentMethod;
+    }
+    if (fromStr || toStr) {
+      const from = fromStr ? new Date(fromStr) : undefined;
+      const to = toStr ? new Date(toStr) : undefined;
+      if (from && to) {
+        where.OR = [
+          { created_at: { gte: from, lte: to } },
+          { paid_at: { gte: from, lte: to } },
+        ];
+      } else if (from) {
+        where.OR = [
+          { created_at: { gte: from } },
+          { paid_at: { gte: from } },
+        ];
+      } else if (to) {
+        where.OR = [
+          { created_at: { lte: to } },
+          { paid_at: { lte: to } },
+        ];
+      }
+    }
 
     // Get total count
     const total = await prisma.bookings.count({ where });
 
     // Get transactions with pagination
+    const orderBy: any = sortKey === "paid_at" ? { paid_at: dir } : { created_at: dir };
     const transactions = await (prisma as any).bookings.findMany({
       where,
       include: {
@@ -282,7 +333,7 @@ export const listTransactions: RequestHandler = async (req, res) => {
           },
         },
       },
-      orderBy: { created_at: "desc" },
+      orderBy,
       skip,
       take: pageSize,
     });
@@ -398,7 +449,6 @@ export const getBooking: RequestHandler = async (req, res) => {
       where: { id: bookingId },
       select: {
         id: true,
-        booking_code: true,
         payment_status: true,
         total_price: true,
         ticket_count: true,
@@ -417,7 +467,6 @@ export const getBooking: RequestHandler = async (req, res) => {
 
     res.status(200).json({
       id: booking.id,
-      booking_code: booking.booking_code || null,
       payment_status: booking.payment_status,
       total_price: booking.total_price,
       ticket_count: booking.ticket_count,
@@ -455,7 +504,6 @@ export const getBookingById: RequestHandler = async (req, res) => {
 
     res.status(200).json({
       id: booking.id,
-      booking_code: booking.booking_code || null,
       payment_status: booking.payment_status,
       user_id: booking.user_id,
       name: booking.name,
@@ -513,7 +561,16 @@ export const getBookingByCode: RequestHandler = async (req, res) => {
     });
 
     if (!booking) {
-      return res.status(404).json({ message: "Không tìm thấy vé với mã này" });
+      const remaining = typeof (res.locals as any).rateLimitRemaining === "number"
+        ? (res.locals as any).rateLimitRemaining
+        : undefined;
+      const windowMs = typeof (res.locals as any).rateLimitWindowMs === "number"
+        ? (res.locals as any).rateLimitWindowMs
+        : undefined;
+      const suffix = remaining !== undefined && windowMs !== undefined
+        ? ` Bạn còn ${remaining} lần thử trong ${Math.ceil(windowMs / 1000)}s`
+        : "";
+      return res.status(404).json({ message: `Không tìm thấy vé với mã này.${suffix}` });
     }
 
     res.status(200).json({

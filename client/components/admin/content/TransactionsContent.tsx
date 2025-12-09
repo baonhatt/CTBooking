@@ -62,6 +62,16 @@ interface Props {
   onRefresh: () => void;
   txStatus?: "paid" | "all";
   setTxStatus?: (status: "paid" | "all") => void;
+  sortKey?: "created_at" | "paid_at";
+  sortDir?: "asc" | "desc";
+  setSortKey?: (k: "created_at" | "paid_at") => void;
+  setSortDir?: (d: "asc" | "desc") => void;
+  paymentMethod?: string;
+  setPaymentMethod?: (m: string) => void;
+  fromDate?: string;
+  toDate?: string;
+  setFromDate?: (v: string) => void;
+  setToDate?: (v: string) => void;
   isLoading?: boolean;
 }
 
@@ -77,6 +87,16 @@ export default function TransactionsContent({
   onRefresh,
   txStatus = "paid",
   setTxStatus,
+  sortKey = "created_at",
+  sortDir = "desc",
+  setSortKey = () => {},
+  setSortDir = () => {},
+  paymentMethod = "",
+  setPaymentMethod = () => {},
+  fromDate = "",
+  toDate = "",
+  setFromDate = () => {},
+  setToDate = () => {},
   isLoading = false,
 }: Props) {
   const [isDetailsOpen, setIsDetailsOpen] = useState(false);
@@ -117,25 +137,74 @@ export default function TransactionsContent({
               onClick={onRefresh}
               className="px-3 py-1 border border-gray-300 rounded text-sm hover:bg-gray-100 transition"
             >
-              ↻ Refresh
+              ↻ Làm mới
             </button>
           </div>
         </CardHeader>
         <CardContent>
-          <div className="flex gap-3 mb-4">
+          <div className="flex flex-wrap items-center gap-3 mb-4">
             <Input
               placeholder="Tìm kiếm theo email"
               value={txQuery}
               onChange={(e) => setTxQuery(e.target.value)}
+              className="flex-1 min-w-[320px]"
             />
             <select
               value={txStatus}
               onChange={(e) => setTxStatus?.(e.target.value as "paid" | "all")}
-              className="px-3 py-2 border rounded-md bg-white"
+              className="px-3 py-2 border rounded-md bg-white w-44"
             >
               <option value="paid">Đã thanh toán</option>
               <option value="all">Tất cả giao dịch</option>
             </select>
+            <select
+              value={paymentMethod}
+              onChange={(e) => setPaymentMethod?.(e.target.value)}
+              className="px-3 py-2 border rounded-md bg-white w-44"
+            >
+              <option value="">Tất cả phương thức</option>
+              <option value="cash">Tiền mặt</option>
+              <option value="momo">MoMo</option>
+              <option value="vnpay">VNPay</option>
+            </select>
+            <select
+              value={sortKey}
+              onChange={(e) => setSortKey(e.target.value as any)}
+              className="px-3 py-2 border rounded-md bg-white w-52"
+            >
+              <option value="created_at">Theo thời gian tạo</option>
+              <option value="paid_at">Theo thời gian thanh toán</option>
+            </select>
+            <select
+              value={sortDir}
+              onChange={(e) => setSortDir(e.target.value as any)}
+              className="px-3 py-2 border rounded-md bg-white w-36"
+            >
+              <option value="desc">Giảm dần</option>
+              <option value="asc">Tăng dần</option>
+            </select>
+            <Button
+              variant="secondary"
+              className="ml-auto"
+              onClick={() => {
+                setTxQuery("");
+                setTxStatus?.("paid");
+                setSortKey?.("created_at");
+                setSortDir?.("desc");
+                setPaymentMethod?.("");
+                setFromDate?.("");
+                setToDate?.("");
+                setPage(1);
+              }}
+            >
+              Xóa bộ lọc
+            </Button>
+          </div>
+          <div className="flex items-center gap-3 mb-4">
+            <span className="text-sm text-gray-600">Từ</span>
+            <Input type="date" value={fromDate} onChange={(e) => setFromDate?.(e.target.value)} className="w-44" />
+            <span className="text-sm text-gray-600">Đến</span>
+            <Input type="date" value={toDate} onChange={(e) => setToDate?.(e.target.value)} className="w-44" />
           </div>
           <Table>
             <TableHeader>
