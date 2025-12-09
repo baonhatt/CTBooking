@@ -169,7 +169,6 @@ export const changePassword: RequestHandler = async (req, res) => {
 };
 
 export const listUserTransactions: RequestHandler = async (req, res) => {
-  debugger
   try {
     const emailRaw = String(req.query.email || "");
     const status = String(req.query.status || "paid");

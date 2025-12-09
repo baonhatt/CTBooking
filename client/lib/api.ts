@@ -590,7 +590,6 @@ export async function changePasswordApi(body: { email: string; oldPassword: stri
 
 // ----------------- API USER TRANSACTIONS -----------------
 export async function getUserTransactionsApi(options: { email: string; status?: "paid"; signal?: AbortSignal }) {
-  debugger
   const params = new URLSearchParams();
   params.set("email", options.email);
   if (options.status) params.set("status", options.status);

@@ -51,7 +51,6 @@ export default function Account() {
 
   useEffect(() => {
     (async () => {
-      debugger
       try {
         const email = profile.email;
         if (!email) return;
@@ -124,8 +123,8 @@ export default function Account() {
   return (
     <div className="min-h-screen bg-gradient-dark">
       <Header onBookClick={() => { }} />
-      <div className="max-w-4xl mx-auto p-4 pt-24">
-        <Card className="w-full bg-black/40 border border-white/10 text-white">
+      <div className="max-w-4xl mx-auto p-4 ">
+        <Card className="w-full bg-black/40 border border-white/10 text-white mt-[20rem]">
           <CardHeader>
             <CardTitle className="text-blue-400">Tài Khoản</CardTitle>
           </CardHeader>
@@ -198,7 +197,7 @@ export default function Account() {
                               </div>
                               <div className="mt-2 text-sm text-gray-200">Số vé: {t.quantity}</div>
                               <div className="mt-3 flex justify-end">
-                                <Button size="sm" variant="outline" className="border-white/20 text-white hover:bg-white/10"
+                                <Button size="sm" variant="outline" className="border-white/20 text-black hover:bg-white/10"
                                   onClick={() => { setSelectedTx(t); setIsDetailOpen(true); }}>
                                   Chi tiết
                                 </Button>
