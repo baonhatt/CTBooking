@@ -22,13 +22,15 @@ import {
 import iconCine from "@/assets/images/iconCine.svg";
 import icon from "@/assets/images/icon.svg";
 import brand from "@/assets/images/brand.svg";
+import { Navigate, useNavigate, useLocation } from "react-router-dom";
 
 
 interface HeaderProps {
   onBookClick: () => void;
+  disableNav?: boolean;
 }
 const auth = useAuth();
-export default function Header({ onBookClick }: HeaderProps) {
+export default function Header({ onBookClick, disableNav = false }: HeaderProps) {
   const [isScrolled, setIsScrolled] = useState(false);
   const [userName, setUserName] = useState<string | null>(null);
   const [isLoginOpen, setIsLoginOpen] = useState(false);
@@ -55,7 +57,9 @@ export default function Header({ onBookClick }: HeaderProps) {
     window.addEventListener("scroll", handleScroll);
     return () => window.removeEventListener("scroll", handleScroll);
   }, []);
-
+  const navigator = useNavigate();
+  const location = useLocation();
+  const effectiveDisable = disableNav || location.pathname !== "/";
   useEffect(() => {
     const readAuth = () => {
       const raw = localStorage.getItem("authUser");
@@ -101,6 +105,11 @@ export default function Header({ onBookClick }: HeaderProps) {
       const data = await auth.login(loginEmail, loginPassword);
       if (data?.status === "success") {
         localStorage.setItem("authUser", JSON.stringify({ user: data.user }));
+        try {
+          const derivedName = data.user.username || (data.user.email || "").split("@")[0];
+          const profile = { email: data.user.email, name: derivedName, phone: (data.user as any)?.phone || "" };
+          localStorage.setItem("userProfile", JSON.stringify(profile));
+        } catch {}
         setUserName(data.user.username);
         window.dispatchEvent(new Event("user-auth-changed"));
         toast({ title: "Đăng nhập thành công", description: data.user.email });
@@ -142,6 +151,11 @@ export default function Header({ onBookClick }: HeaderProps) {
       );
       if (data?.status === "success") {
         localStorage.setItem("authUser", JSON.stringify({ user: data.user }));
+        try {
+          const derivedName = data.user.username || (data.user.email || "").split("@")[0];
+          const profile = { email: data.user.email, name: derivedName, phone: (data.user as any)?.phone || "" };
+          localStorage.setItem("userProfile", JSON.stringify(profile));
+        } catch {}
         setUserName(data.user.username);
         window.dispatchEvent(new Event("user-auth-changed"));
         toast({ title: "Đăng ký thành công", description: data.user.email });
@@ -187,30 +201,30 @@ export default function Header({ onBookClick }: HeaderProps) {
         "fixed top-0 left-0 right-0 z-50 transition-all duration-300",
         isScrolled
           ? "bg-black/5 backdrop-blur-md border-b border-white/10"
-          : "bg-transparent",
+          : "bg-transparent border-b border-white/10",
       )}
     >
       <div className="container mx-auto px-4 py-4 flex items-center justify-between">
         <div className="flex items-center gap-3 animate-fade-in">
-          <img src={icon} className="w-[10rem] h-12 md:w-20 sm:w-20 md:h-16"  alt="CINESPHERE logo" />
+          <img onClick={() => navigator('/')} src={icon} className="w-[10rem] h-12 md:w-20 sm:w-20 md:h-16"  alt="CINESPHERE logo" />
         </div>
 
         <nav className="hidden md:flex items-center gap-8 animate-fade-in delay-200">
           <button
-            onClick={() => scrollToSection("hero")}
-            className="text-white hover:text-blue-400 transition-colors duration-300 font-medium"
+            onClick={effectiveDisable ? undefined : () => scrollToSection("hero")}
+            className={cn("text-white transition-colors duration-300 font-medium", effectiveDisable ? "opacity-50 cursor-not-allowed" : "hover:text-blue-400")}
           >
             Phim Hot
           </button>
           <button
-            onClick={() => scrollToSection("technology")}
-            className="text-white hover:text-blue-400 transition-colors duration-300 font-medium"
+            onClick={effectiveDisable ? undefined : () => scrollToSection("technology")}
+            className={cn("text-white transition-colors duration-300 font-medium", effectiveDisable ? "opacity-50 cursor-not-allowed" : "hover:text-blue-400")}
           >
             Công Nghệ
           </button>
           <button
-            onClick={() => scrollToSection("products")}
-            className="text-white hover:text-blue-400 transition-colors duration-300 font-medium"
+            onClick={effectiveDisable ? undefined : () => scrollToSection("products")}
+            className={cn("text-white transition-colors duration-300 font-medium", effectiveDisable ? "opacity-50 cursor-not-allowed" : "hover:text-blue-400")}
           >
             Cửa Hàng
           </button>
@@ -227,19 +241,22 @@ export default function Header({ onBookClick }: HeaderProps) {
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent className="bg-black/90 border border-white/20 text-white">
-                <DropdownMenuItem onClick={() => scrollToSection("hero")}>
+                <DropdownMenuItem className={cn(effectiveDisable ? "opacity-50 cursor-not-allowed" : "")} onClick={effectiveDisable ? undefined : () => scrollToSection("hero")}>
                   Phim Hot
                 </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => scrollToSection("technology")}>
+                <DropdownMenuItem className={cn(effectiveDisable ? "opacity-50 cursor-not-allowed" : "")} onClick={effectiveDisable ? undefined : () => scrollToSection("technology")}>
                   Công Nghệ
                 </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => scrollToSection("products")}>
+                <DropdownMenuItem className={cn(effectiveDisable ? "opacity-50 cursor-not-allowed" : "")} onClick={effectiveDisable ? undefined : () => scrollToSection("products")}>
                   Cửa Hàng
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
                 {userName ? (
                   <>
                     <DropdownMenuItem>Chào, {userName}</DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => navigator("/tai-khoan")}>
+                      Tài khoản
+                    </DropdownMenuItem>
                     <DropdownMenuItem onClick={handleLogout}>
                       Đăng xuất
                     </DropdownMenuItem>
@@ -272,6 +289,9 @@ export default function Header({ onBookClick }: HeaderProps) {
                   </button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent className="bg-black/90 border border-white/20 text-white">
+                  <DropdownMenuItem onClick={() => navigator("/tai-khoan")}>
+                    Tài khoản
+                  </DropdownMenuItem>
                   <DropdownMenuItem onClick={handleLogout}>
                     Đăng xuất
                   </DropdownMenuItem>
@@ -570,13 +590,15 @@ export default function Header({ onBookClick }: HeaderProps) {
               </form>
             </DialogContent>
           </Dialog>
-          <Button
-            onClick={onBookClick}
-            className="bg-gradient-to-r text-sm md:text-base from-blue-500 to-purple-500 hover:from-blue-600 hover:to-purple-600 text-white font-semibold px-3 py-2 md:px-6 md:py-2 rounded-lg shadow-lg transition-all duration-300 hover:scale-105"
-          >
-            <Ticket className="h-4 w-4 md:mr-2" />
-            <span className="hidden md:inline">ĐẶT VÉ NGAY</span>
-          </Button>
+          {!effectiveDisable && (
+            <Button
+              onClick={onBookClick}
+              className="bg-gradient-to-r text-sm md:text-base from-blue-500 to-purple-500 hover:from-blue-600 hover:to-purple-600 text-white font-semibold px-3 py-2 md:px-6 md:py-2 rounded-lg shadow-lg transition-all duration-300 hover:scale-105"
+            >
+              <Ticket className="h-4 w-4 md:mr-2" />
+              <span className="hidden md:inline">ĐẶT VÉ NGAY</span>
+            </Button>
+          )}
         </div>
       </div>
     </header>

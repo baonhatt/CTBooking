@@ -6,7 +6,15 @@ import type {
   ActiveMoviesTodayResponse,
 } from "@shared/api";
 
-export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "";
+export const API_BASE_URL = (() => {
+  const env = (import.meta as any).env || {};
+  const base = env?.VITE_API_BASE_URL || env?.VITE_API_URL || "";
+  if (typeof window !== "undefined") {
+    const h = window.location.hostname;
+    if (h === "localhost" || h === "127.0.0.1") return "";
+  }
+  return base;
+})();
 
 function buildUrl(path: string) {
   return API_BASE_URL ? `${API_BASE_URL}${path}` : path;
@@ -562,6 +570,31 @@ export async function getUserById(id: number) {
     }>;
     total_bookings: number;
   }>(`/api/users/${id}`);
+}
+
+// ----------------- API UPDATE USER PROFILE -----------------
+export async function updateUserProfileApi(body: { email: string; name?: string; phone?: string }) {
+  return request<{ ok: boolean; user: any }>(`/api/users/profile`, {
+    method: "POST",
+    body: JSON.stringify(body),
+  });
+}
+
+// ----------------- API CHANGE PASSWORD -----------------
+export async function changePasswordApi(body: { email: string; oldPassword: string; newPassword: string }) {
+  return request<{ ok: boolean }>(`/api/users/password`, {
+    method: "POST",
+    body: JSON.stringify(body),
+  });
+}
+
+// ----------------- API USER TRANSACTIONS -----------------
+export async function getUserTransactionsApi(options: { email: string; status?: "paid" | "all"; signal?: AbortSignal }) {
+  const params = new URLSearchParams();
+  params.set("email", options.email);
+  if (options.status) params.set("status", options.status);
+  const path = `/api/users/transactions?${params.toString()}`;
+  return request<{ items: any[] }>(path, { signal: options.signal });
 }
 
 // ----------------- API MOVIE DETAILS -----------------

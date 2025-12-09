@@ -31,6 +31,14 @@ export default function Index() {
     return () => window.removeEventListener("scroll", onScroll);
   }, []);
 
+  useEffect(() => {
+    try {
+      localStorage.removeItem("pendingOrder");
+      localStorage.removeItem("lastCheckoutOrder");
+      localStorage.removeItem("lastVnpayBookingId");
+    } catch {}
+  }, []);
+
   const scrollToTop = () => {
     setShowBackToTop(false);
     window.scrollTo({ top: 0, behavior: "smooth" });

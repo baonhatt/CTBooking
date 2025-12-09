@@ -25,6 +25,8 @@ import TransactionsPage from "./pages/admin/Transactions";
 import TicketsPage from "./pages/admin/Tickets";
 import TicketCheckPage from "./pages/admin/TicketCheck";
 import Checkout from "./pages/Checkout";
+import Booking from "./pages/Booking";
+import Account from "./pages/Account";
 import { useEffect, useState } from "react";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -148,6 +150,8 @@ const App = () => (
         <Routes>
           <Route path="/" element={<Index />} />
           <Route path="/checkout" element={<Checkout />} />
+          <Route path="/booking" element={<Booking />} />
+          <Route path="/tai-khoan" element={<Account />} />
           <Route path="/reset-password" element={<ConfirmToken />} />
           <Route path="/admin/*" element={<AdminGate />} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
