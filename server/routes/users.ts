@@ -169,6 +169,7 @@ export const changePassword: RequestHandler = async (req, res) => {
 };
 
 export const listUserTransactions: RequestHandler = async (req, res) => {
+  debugger
   try {
     const emailRaw = String(req.query.email || "");
     const status = String(req.query.status || "paid");
@@ -188,12 +189,10 @@ export const listUserTransactions: RequestHandler = async (req, res) => {
     if (!account) return res.status(200).json({ items: [], page, pageSize, total: 0 });
 
     const where: any = { user_id: account.user_id };
-    if (status && status !== "all") {
+    if (status) {
       const s = status.toLowerCase();
       if (s === "paid") {
-        where.payment_status = { in: ["paid", "success"] };
-      } else {
-        where.payment_status = s;
+        where.payment_status = { in: ["paid"] };
       }
     }
     if (paymentMethod) where.payment_method = paymentMethod;
