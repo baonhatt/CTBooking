@@ -4,44 +4,138 @@ import { prisma } from "../../lib/prisma";
 import { generateBookingCode, getBookingEmailTemplate } from "../../lib/booking-utils";
 import { sendMail } from "../mail-service";
 
+class HttpError extends Error {
+  status: number;
+  constructor(status: number, message: string) {
+    super(message);
+    this.status = status;
+  }
+}
+
+const MAX_TICKET_PER_ORDER = 10;
+
+type BookingValidationResult = {
+  user: { id: number; email: string; fullname?: string | null; phone?: string | null };
+  showtime: any;
+  movie: any;
+  ticketPackage: any;
+  unitPrice: number;
+  totalPrice: number;
+};
+
+async function validateBookingInput(body: PaymentRequest): Promise<BookingValidationResult> {
+  const { email, emailBook, phone, name, showtimeId, ticketCount, ticketPackageId } = body;
+
+  if (!email || !phone || !emailBook || !name || !showtimeId || !ticketCount || ticketCount <= 0) {
+    throw new HttpError(400, "Vui lòng nhập đầy đủ thông tin hợp lệ.");
+  }
+  if (ticketCount > MAX_TICKET_PER_ORDER) {
+    throw new HttpError(400, `Mỗi lượt chỉ đặt tối đa ${MAX_TICKET_PER_ORDER} vé.`);
+  }
+
+  const user = await prisma.users.findFirst({
+    where: { accounts: { some: { email } } },
+    select: { id: true, fullname: true, phone: true, accounts: { select: { email: true }, take: 1 } },
+  });
+  if (!user) {
+    throw new HttpError(404, "Người dùng không tồn tại.");
+  }
+  const userEmail = user.accounts?.[0]?.email;
+  if (!userEmail || userEmail.toLowerCase() !== email.toLowerCase()) {
+    throw new HttpError(400, "Email người dùng không trùng khớp.");
+  }
+
+  const showtime = await prisma.showtimes.findUnique({
+    where: { id: showtimeId },
+    include: { movie: true },
+  });
+  if (!showtime || showtime.is_active === false) {
+    throw new HttpError(404, "Không thể tìm thấy suất chiếu.");
+  }
+  if (!showtime.movie || showtime.movie.is_active === false) {
+    throw new HttpError(400, "Phim không hợp lệ hoặc đã ngừng hoạt động.");
+  }
+  const now = Date.now();
+  if (new Date(showtime.start_time).getTime() < now) {
+    throw new HttpError(400, "Suất chiếu đã bắt đầu hoặc đã kết thúc.");
+  }
+
+  let ticketPackage: any = null;
+  if (ticketPackageId) {
+    ticketPackage = await (prisma as any).ticket_packages.findUnique({ where: { id: ticketPackageId } });
+    if (!ticketPackage || ticketPackage.is_active === false) {
+      throw new HttpError(404, "Gói vé không hợp lệ hoặc đã tắt.");
+    }
+  } else {
+    ticketPackage = await (prisma as any).ticket_packages.findFirst({
+      where: { is_active: true },
+      orderBy: [{ display_order: "asc" }, { price: "asc" }],
+    });
+    if (!ticketPackage) {
+      throw new HttpError(400, "Không tìm thấy gói vé khả dụng.");
+    }
+  }
+
+  const unitPrice = Number(ticketPackage.price || 0);
+  if (!Number.isFinite(unitPrice) || unitPrice <= 0) {
+    throw new HttpError(400, "Giá vé không hợp lệ.");
+  }
+  const totalPrice = unitPrice * ticketCount;
+
+  return {
+    user: { id: user.id, email: userEmail, fullname: user.fullname, phone: user.phone },
+    showtime,
+    movie: showtime.movie,
+    ticketPackage,
+    unitPrice,
+    totalPrice,
+  };
+}
+
+export const validateBooking: RequestHandler = async (req, res) => {
+  try {
+    const result = await validateBookingInput(req.body as PaymentRequest);
+    return res.status(200).json({
+      ok: true,
+      user: result.user,
+      showtime: {
+        id: result.showtime.id,
+        start_time: result.showtime.start_time,
+        end_time: result.showtime.end_time,
+        is_active: result.showtime.is_active,
+      },
+      movie: {
+        id: result.movie.id,
+        title: result.movie.title,
+        is_active: result.movie.is_active,
+        duration_min: result.movie.duration_min,
+      },
+      ticketPackage: {
+        id: result.ticketPackage.id,
+        name: result.ticketPackage.name,
+        price: Number(result.ticketPackage.price || 0),
+      },
+      unitPrice: result.unitPrice,
+      totalPrice: result.totalPrice,
+    });
+  } catch (error: any) {
+    const status = error instanceof HttpError ? error.status : 500;
+    const message = error instanceof HttpError ? error.message : "Lỗi máy chủ nội bộ";
+    return res.status(status).json({ ok: false, message });
+  }
+};
+
 export const createPayment: RequestHandler = async (req, res) => {
   try {
-    const { email, emailBook, phone, name, showtimeId, ticketCount, paymentMethod, totalPrice } =
-      req.body as PaymentRequest;
-
-    // ====== VALIDATION ======
-    if (!email || !phone || !emailBook || !name || !showtimeId || !ticketCount || ticketCount <= 0) {
-      return res.status(400).json({
-        message: "Vui lòng nhập đầy đủ thông tin hợp lệ.",
-      });
-    }
-
-    // ====== LẤY USER ======
-    const user = await prisma.users.findFirst({
-      where: { accounts: { some: { email } } },
-    });
-
-    if (!user) {
-      return res.status(404).json({ message: "Người dùng không tồn tại." });
-    }
-
-    // ====== LẤY SUẤT CHIẾU ======
-    const showtime = await prisma.showtimes.findUnique({
-      where: { id: showtimeId },
-      include: { movie: true },
-    });
-
-    if (!showtime) {
-      return res
-        .status(404)
-        .json({ message: "Không thể tìm thấy suất chiếu." });
-    }
+    const validation = await validateBookingInput(req.body as PaymentRequest);
+    const { user, showtime, totalPrice } = validation;
+    const { emailBook, phone, name, ticketCount, paymentMethod } = req.body as PaymentRequest;
 
     // ====== TẠO BOOKING ======
     const booking = await prisma.bookings.create({
       data: {
         user_id: user.id,
-        showtime_id: showtimeId,
+        showtime_id: showtime.id,
         ticket_count: ticketCount,
         total_price: totalPrice,
         payment_method: (paymentMethod || "cash").toLowerCase(),

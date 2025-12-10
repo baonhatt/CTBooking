@@ -8,9 +8,34 @@ export async function createBookingApi(body: {
   showtimeId: number;
   ticketCount: number;
   paymentMethod: "cash" | "momo" | "vnpay";
-  totalPrice: number;
+  totalPrice?: number;
+  ticketPackageId?: number;
 }) {
   return request<{ message: string; booking: any }>("/api/create-booking", {
+    method: "POST",
+    body: JSON.stringify(body),
+  });
+}
+
+export async function validateBookingApi(body: {
+  email: string;
+  emailBook: string;
+  phone: string;
+  name: string;
+  showtimeId: number;
+  ticketCount: number;
+  ticketPackageId?: number;
+}) {
+  return request<{
+    ok: boolean;
+    message?: string;
+    user?: { id: number; email: string; fullname?: string; phone?: string };
+    showtime?: { id: number; start_time: string; end_time?: string | null; is_active?: boolean | null };
+    movie?: { id: number; title: string; is_active?: boolean | null; duration_min?: number | null };
+    ticketPackage?: { id: number; name: string; price: number };
+    unitPrice?: number;
+    totalPrice?: number;
+  }>("/api/validate-booking", {
     method: "POST",
     body: JSON.stringify(body),
   });

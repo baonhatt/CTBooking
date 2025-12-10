@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@/components/ui/select";
 import { toast } from "@/components/ui/use-toast";
-import { getAllActiveMoviesToday, getActiveTickets, createBookingApi, createMomoPaymentApi, createVnpayPaymentApi, API_BASE_URL } from "@/lib/api";
+import { getAllActiveMoviesToday, getActiveTickets, createBookingApi, createMomoPaymentApi, createVnpayPaymentApi, API_BASE_URL, validateBookingApi } from "@/lib/api";
 import UserLayout from "@/user/layouts/UserLayout";
 
 export default function BookingPage() {
@@ -113,7 +113,7 @@ export default function BookingPage() {
   const formatDateLong = (date: Date) => date.toLocaleDateString("vi-VN", { weekday: "long", day: "2-digit", month: "2-digit" });
 
   const handleCreateAndPay = async () => {
-    if (!selectedShowtimeId || !selectedDate) return;
+    if (!selectedShowtimeId || !selectedDate || isProcessing) return;
     const authRaw = localStorage.getItem("authUser");
     if (!authRaw) {
       toast({ title: "Vui lòng đăng nhập", description: "Bạn cần đăng nhập trước khi thanh toán" });
@@ -121,10 +121,29 @@ export default function BookingPage() {
       return;
     }
     try {
+      setIsProcessing(true);
       const parsed = JSON.parse(authRaw);
       const authEmail = parsed?.user?.email || parsed?.email || "";
       const orderId = `ORDER_${Date.now()}`;
       const movieDetail = selectedMovie;
+      const ticketPackageId = selectedPackage?.id || defaultTicket?.id;
+      // Validate booking data on server to prevent tampering
+      const validation = await validateBookingApi({
+        email: authEmail,
+        emailBook: email,
+        phone,
+        name,
+        showtimeId: selectedShowtimeId,
+        ticketCount,
+        ticketPackageId,
+      });
+
+      if (!validation?.ok) {
+        throw new Error(validation?.message || "Không thể xác thực thông tin đặt vé");
+      }
+
+      const canonicalTotal = Number(validation.totalPrice ?? totalPrice);
+
       const summary = {
         orderId,
         movie: selectedMovie?.title,
@@ -136,11 +155,12 @@ export default function BookingPage() {
         email: authEmail,
         emailBook: email,
         quantity: ticketCount,
-        amount: totalPrice,
+        amount: canonicalTotal,
         method: paymentMethod,
         poster: movieDetail?.cover_image || "",
         duration: movieDetail?.duration_min ? `${movieDetail.duration_min}` : "",
         genres: movieDetail?.genres || "",
+        ticketPackageId,
       };
 
       countdownRef.current = setInterval(() => setCountdown((c) => c - 1), 1000);
@@ -153,7 +173,8 @@ export default function BookingPage() {
         showtimeId: selectedShowtimeId,
         ticketCount,
         paymentMethod,
-        totalPrice,
+        totalPrice: canonicalTotal,
+        ticketPackageId,
       });
       localStorage.setItem("pendingOrder", JSON.stringify({ ...summary, booking_id: booking?.id, user_id: booking?.user_id }));
 
@@ -168,7 +189,7 @@ export default function BookingPage() {
         const accessKey = (import.meta as any).env?.VITE_MOMO_ACCESS_KEY || "";
         const secretKey = (import.meta as any).env?.VITE_MOMO_SECRET_KEY || "";
         const requestId = Date.now().toString();
-        const payload: any = { partnerCode, partnerName, storeId, requestId, amount: totalPrice, orderId, orderInfo: orderInfoText, redirectUrl, ipnUrl, lang: "vi", extraData: extraDataEncoded, requestType: "captureWallet", signature: "", accessKey, secretKey };
+        const payload: any = { partnerCode, partnerName, storeId, requestId, amount: canonicalTotal, orderId, orderInfo: orderInfoText, redirectUrl, ipnUrl, lang: "vi", extraData: extraDataEncoded, requestType: "captureWallet", signature: "", accessKey, secretKey };
         const res = await createMomoPaymentApi(payload);
         if (res?.payUrl) { window.location.href = res.payUrl; return; }
         throw new Error("Không nhận được liên kết thanh toán MoMo");
@@ -176,13 +197,15 @@ export default function BookingPage() {
         orderInfoText = booking?.id;
         const returnUrl = (import.meta as any).env?.VITE_VNPAY_RETURN_URL || window.location.origin + "/checkout";
         const locale = "vn";
-        const res = await createVnpayPaymentApi({ amount: totalPrice, orderId, orderInfo: orderInfoText, locale, returnUrl });
+        const res = await createVnpayPaymentApi({ amount: canonicalTotal, orderId, orderInfo: orderInfoText, locale, returnUrl });
         if (res?.payUrl) { window.location.href = res.payUrl; return; }
         throw new Error("Không nhận được liên kết thanh toán VNPay");
       }
     } catch (err: any) {
       setIsProcessing(false);
       toast({ title: "Không thể tạo đặt vé", description: err?.message || "Vui lòng thử lại" });
+    } finally {
+      setIsProcessing(false);
     }
   };
 
