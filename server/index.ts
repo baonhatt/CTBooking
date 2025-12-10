@@ -11,7 +11,7 @@ import { handleLogin, handleRegister } from "./routes/user/auth";
 import { handleForgetPass, handleResetPassword, changePassword } from "./routes/user/password";
 import { createMomoPayment, momoIpn } from "./routes/user/momo";
 import { createVnpayPayment, vnpayIpn } from "./routes/user/vnpay";
-import { createPayment, updatePayment, getBooking, getBookingById, getBookingByCode } from "./routes/user/payments";
+import { createPayment, updatePayment, getBooking, getBookingById, getBookingByCode, validateBooking } from "./routes/user/payments";
 import { getRevenue, listTransactions, getTransactionById } from "./routes/admin/payments";
 import { listActiveToys } from "./routes/user/toys";
 import { listToys, createToy, getToy, updateToy, deleteToy } from "./routes/admin/toys";
@@ -110,6 +110,7 @@ export function createServer() {
   app.post("/api/momo/ipn", momoIpn);
   app.post("/api/vnpay/create-payment", createVnpayPayment);
   app.post("/api/vnpay/ipn", vnpayIpn);
+  app.post("/api/validate-booking", validateBooking); // kiểm tra dữ liệu trước khi tạo booking
   app.post("/api/create-booking", createPayment); // sử dụng để tạo đặt vé sau khi ấn nút thanh toán
   app.post("/api/confirm-booking", updatePayment); // sử dụng để xử lý data do momo trả về sau khi người dùng thanh toán thành công
   app.get("/api/bookings/:id", getBookingById); // lấy booking info đầy đủ cho checkout page

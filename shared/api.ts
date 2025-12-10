@@ -68,5 +68,6 @@ export interface PaymentRequest {
   showtimeId: number;
   ticketCount: number;
   paymentMethod: 'cash' | 'momo' | 'vnpay';
-  totalPrice: number;
+  totalPrice?: number;
+  ticketPackageId?: number;
 }
