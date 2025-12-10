@@ -12,6 +12,7 @@
   },
   "scripts": {
     "dev": "vite",
+    "dev:debug": "tsx --inspect=9229 --tsconfig tsconfig.json node_modules/vite/bin/vite.js",
     "prebuild": "prisma generate",
     "pretypecheck": "prisma generate",
     "build": "npm run build:client && npm run build:server",
