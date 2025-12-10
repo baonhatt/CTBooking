@@ -8,7 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@/components/ui/select";
 import { toast } from "@/components/ui/use-toast";
 import { getAllActiveMoviesToday, getActiveTickets, createBookingApi, createMomoPaymentApi, createVnpayPaymentApi, API_BASE_URL } from "@/lib/api";
-import Header from "@/components/Header";
+import UserLayout from "@/user/layouts/UserLayout";
 
 export default function BookingPage() {
   const navigate = useNavigate();
@@ -57,7 +57,7 @@ export default function BookingPage() {
         const pkg = JSON.parse(raw);
         setSelectedPackage(pkg);
       }
-    } catch {}
+    } catch { }
   }, []);
 
   useEffect(() => {
@@ -70,7 +70,7 @@ export default function BookingPage() {
         if (!phone && p?.phone) setPhone(p.phone);
         return;
       }
-    } catch {}
+    } catch { }
     try {
       const raw = localStorage.getItem("authUser");
       if (raw) {
@@ -82,16 +82,16 @@ export default function BookingPage() {
         if (!name && authName) setName(authName);
         if (!phone && authPhone) setPhone(authPhone);
       }
-    } catch {}
+    } catch { }
   }, [email, name, phone]);
 
   const availableDates = useMemo(() => {
     const today = new Date();
-    today.setHours(0,0,0,0);
+    today.setHours(0, 0, 0, 0);
     const list = (selectedMovie?.showtimes || [])
       .map((st: any) => {
         const d = new Date(st.start_time);
-        d.setHours(0,0,0,0);
+        d.setHours(0, 0, 0, 0);
         return d;
       })
       .filter((d: Date) => d.getTime() >= today.getTime())
@@ -187,9 +187,13 @@ export default function BookingPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-dark">
-      <Header onBookClick={() => {}} disableNav />
-      <div className="max-w-5xl mx-auto p-4 pt-28 text-white">
+    <UserLayout
+      className="bg-gradient-dark"
+      headerProps={{ onBookClick: () => { }, disableNav: true }}
+      hideFooter
+      contentClassName="text-white"
+    >
+      <div className="max-w-5xl mx-auto p-4 pt-28">
         <div className="mb-4 text-sm py-3">
           <button className="text-blue-300 hover:text-blue-400 underline" onClick={() => navigate("/")}>Home</button>
           <span className="mx-2 text-white/60">&gt;</span>
@@ -203,7 +207,7 @@ export default function BookingPage() {
             <CardContent className="space-y-6">
               <div className="space-y-4">
                 <div className="text-sm text-cyan-200">Chọn phim</div>
-                <Select value={movie} onValueChange={(v) => { setMovie(v); setSelectedDate(null); setSelectedShowtimeId(null); setSelectedShowtimeLabel(""); try { refetchActive(); } catch {} }}>
+                <Select value={movie} onValueChange={(v) => { setMovie(v); setSelectedDate(null); setSelectedShowtimeId(null); setSelectedShowtimeLabel(""); try { refetchActive(); } catch { } }}>
                   <SelectTrigger className="w-full bg-black/40 text-white border-white/10">
                     <span className="truncate">{selectedMovie?.title || "Chọn phim"}</span>
                   </SelectTrigger>
@@ -308,10 +312,10 @@ export default function BookingPage() {
 
         {step === 1 && (
           <>
-              <Card className="bg-black/40 border border-white/10 text-white">
-                <CardHeader>
-                  <CardTitle>Thông tin đặt vé</CardTitle>
-                </CardHeader>
+            <Card className="bg-black/40 border border-white/10 text-white">
+              <CardHeader>
+                <CardTitle>Thông tin đặt vé</CardTitle>
+              </CardHeader>
               <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-3">
                   <div className="grid grid-cols-2 gap-2 text-sm">
@@ -361,7 +365,7 @@ export default function BookingPage() {
                   </div>
                 </div>
               </CardContent>
-              </Card>
+            </Card>
             <div className="flex justify-between">
               <Button variant="outline" className="bg-transparent border-white/30 text-white hover:bg-white/10" onClick={() => setStep(0)}>Quay lại</Button>
               <Button className="bg-gradient-to-r from-blue-500 to-purple-500 hover:from-blue-600 hover:to-purple-600 text-white font-semibold shadow-lg disabled:opacity-50" disabled={!isConfirmed} onClick={handleCreateAndPay}>Thanh toán</Button>
@@ -369,6 +373,6 @@ export default function BookingPage() {
           </>
         )}
       </div>
-    </div>
+    </UserLayout>
   );
 }

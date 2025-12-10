@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import Header from "@/components/Header";
+import UserLayout from "@/user/layouts/UserLayout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Input } from "@/components/ui/input";
@@ -35,7 +35,7 @@ export default function Account() {
           email = parsed?.user?.email || parsed?.email || email;
           name = parsed?.user?.username || parsed?.username || name;
           phone = (parsed?.user as any)?.phone || phone;
-        } catch {}
+        } catch { }
       }
       if (raw) {
         try {
@@ -43,10 +43,10 @@ export default function Account() {
           email = p?.email || email;
           name = p?.name || name;
           phone = p?.phone || phone;
-        } catch {}
+        } catch { }
       }
       setProfile({ name: name || "", phone: phone || "", email: email || "" });
-    } catch {}
+    } catch { }
   }, []);
 
   useEffect(() => {
@@ -94,7 +94,7 @@ export default function Account() {
             (parsed.user as any).phone = profile.phone || (parsed.user as any).phone;
           }
           localStorage.setItem("authUser", JSON.stringify(parsed));
-        } catch {}
+        } catch { }
       }
       window.dispatchEvent(new Event("user-auth-changed"));
       toast({ title: "Cập nhật thành công" });
@@ -121,8 +121,11 @@ export default function Account() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-dark">
-      <Header onBookClick={() => { }} />
+    <UserLayout
+      className="bg-gradient-dark"
+      headerProps={{ onBookClick: () => { } }}
+      hideFooter
+    >
       <div className="max-w-4xl mx-auto p-4 ">
         <Card className="w-full bg-black/40 border border-white/10 text-white mt-[20rem]">
           <CardHeader>
@@ -267,6 +270,6 @@ export default function Account() {
           ) : null}
         </DialogContent>
       </Dialog>
-    </div>
+    </UserLayout>
   );
 }

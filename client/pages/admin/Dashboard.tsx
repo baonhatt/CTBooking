@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import AdminLayout from "@/components/admin/AdminLayout";
+import AdminLayout from "@/admin/layouts/AdminLayout";
 import DashboardContent from "@/components/admin/content/DashboardContent";
 import {
   getDashboardMetrics,

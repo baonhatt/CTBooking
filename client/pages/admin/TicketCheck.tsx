@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import AdminLayout from "@/components/admin/AdminLayout";
+import AdminLayout from "@/admin/layouts/AdminLayout";
 import TicketCheckContent from "@/components/admin/content/TicketCheckContent";
 
 export default function TicketCheckPage() {

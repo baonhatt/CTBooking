@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import AdminLayout from "@/components/admin/AdminLayout";
+import AdminLayout from "@/admin/layouts/AdminLayout";
 import TicketsContent from "@/components/admin/content/TicketsContent";
 import { getTickets, deleteTicketApi } from "@/lib/api";
 

@@ -1,12 +1,11 @@
 import { RequestHandler } from "express";
-import type { Login } from "@shared/api";
-import { prisma } from "../lib/prisma";
+import { prisma } from "../../lib/prisma";
 import crypto from "crypto";
 import bcrypt from "bcryptjs";
-import { sendMail } from "./mail-service";
+import { sendMail } from "../mail-service";
 
 export const handleForgetPass: RequestHandler = async (req, res) => {
-  const email = req.body.email;
+  const email = (req.body as any).email;
   const useracc = await prisma.accounts.findFirst({
     where: {
       email: email,
@@ -43,7 +42,7 @@ export const handleForgetPass: RequestHandler = async (req, res) => {
 };
 
 export const handleResetPassword: RequestHandler = async (req, res) => {
-  const { token, newPassword } = req.body;
+  const { token, newPassword } = req.body as { token?: string; newPassword?: string };
 
   const tokenRecord = await prisma.tokens.findFirst({
     where: {
@@ -64,8 +63,7 @@ export const handleResetPassword: RequestHandler = async (req, res) => {
       });
   }
 
-  const hashedPassword = await bcrypt.hash(newPassword, 10);
-  console.log(hashedPassword);
+  const hashedPassword = await bcrypt.hash(String(newPassword), 10);
   await prisma.accounts.update({
     where: { id: tokenRecord.account_id },
     data: { password: hashedPassword },
@@ -82,3 +80,24 @@ export const handleResetPassword: RequestHandler = async (req, res) => {
       message: "Mật khẩu đã được đặt lại thành công!",
     });
 };
+
+export const changePassword: RequestHandler = async (req, res) => {
+  try {
+    const { email, oldPassword, newPassword } = req.body as { email?: string; oldPassword?: string; newPassword?: string };
+    if (!email || !oldPassword || !newPassword) {
+      return res.status(400).json({ message: "Thiếu thông tin đổi mật khẩu" });
+    }
+    const account = await prisma.accounts.findUnique({ where: { email } });
+    if (!account || !account.password) {
+      return res.status(404).json({ message: "Không tìm thấy tài khoản" });
+    }
+    const ok = await bcrypt.compare(oldPassword, account.password);
+    if (!ok) return res.status(400).json({ message: "Mật khẩu hiện tại không đúng" });
+    const hashed = await bcrypt.hash(newPassword, 10);
+    await prisma.accounts.update({ where: { id: account.id }, data: { password: hashed, updated_at: new Date() } });
+    return res.status(200).json({ ok: true });
+  } catch (err) {
+    return res.status(500).json({ message: "Lỗi máy chủ nội bộ" });
+  }
+};
+

@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { getShowtimes, getMoviesAdmin, deleteShowtimeApi, updateShowtimeApi } from "@/lib/api";
-import AdminLayout from "@/components/admin/AdminLayout";
+import AdminLayout from "@/admin/layouts/AdminLayout";
 import ShowtimesContent from "@/components/admin/content/ShowtimesContent";
 import AdminEditModal from "@/components/admin/AdminEditModal";
 

@@ -1,7 +1,39 @@
 import { RequestHandler } from "express";
-import type { Register } from "@shared/api";
-import { prisma } from "../lib/prisma";
+import type { Login, Register } from "@shared/api";
+import { prisma } from "../../lib/prisma";
 import bcrypt from "bcryptjs";
+
+export const handleLogin: RequestHandler = async (req, res) => {
+  const { email, password } = req.body as Partial<Login>;
+  const useracc = await prisma.accounts.findFirst({
+    where: {
+      email: email,
+    },
+  });
+  if (!useracc) {
+    return res
+      .status(400)
+      .json({ status: "error", message: "Email không tồn tại!" });
+  }
+  const isPasswordValid = await bcrypt.compare(password, useracc.password);
+  if (!isPasswordValid) {
+    return res
+      .status(400)
+      .json({ status: "error", message: "Mật khẩu không đúng!" });
+  }
+  const user = await prisma.users.findFirst({
+    where: {
+      id: useracc.user_id,
+    },
+  });
+  return res
+    .status(200)
+    .json({
+      status: "success",
+      message: "Đăng nhập thành công!",
+      user: { username: user?.fullname, email: email },
+    });
+};
 
 export const handleRegister: RequestHandler = async (req, res) => {
   try {
@@ -25,7 +57,7 @@ export const handleRegister: RequestHandler = async (req, res) => {
 
     const hashedPassword = await bcrypt.hash(password, 10);
 
-    let fullname = req.body.name;
+    let fullname = (req.body as any).name as string | undefined;
     if (!fullname || fullname.trim() === "") {
       fullname = email.split("@")[0];
     }
@@ -55,3 +87,4 @@ export const handleRegister: RequestHandler = async (req, res) => {
     return res.status(500).json({ status: "error", message: "Server error" });
   }
 };
+

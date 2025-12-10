@@ -9,7 +9,7 @@ import {
   CardFooter,
 } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
-import Header from "@/components/Header";
+import UserLayout from "@/user/layouts/UserLayout";
 import {
   createMomoPaymentApi,
   API_BASE_URL,
@@ -98,7 +98,7 @@ export default function Checkout() {
               payment_status: bookingData.payment_status,
             };
             setOrder(pendingFromApi);
-            try { localStorage.setItem("lastCheckoutOrder", JSON.stringify(pendingFromApi)); } catch {}
+            try { localStorage.setItem("lastCheckoutOrder", JSON.stringify(pendingFromApi)); } catch { }
 
             // Chỉ gọi handleVNPayCallback nếu là lần đầu callback (URL có vnp params)
             if (isFirstCallback) {
@@ -166,19 +166,19 @@ export default function Checkout() {
                 bookingData.payment_status === "paid"
                   ? "success"
                   : bookingData.payment_status === "failed"
-                  ? "failed"
-                  : "",
+                    ? "failed"
+                    : "",
               );
               localStorage.setItem("lastCheckoutOrder", JSON.stringify(pendingFromApi));
             }
-          } catch {}
+          } catch { }
         })();
       } else if (savedOrder) {
         try {
           const o = JSON.parse(savedOrder);
           setOrder(o);
           setStatus(o.payment_status === "paid" ? "success" : o.payment_status === "failed" ? "failed" : "");
-        } catch {}
+        } catch { }
       } else {
         navigate("/");
       }
@@ -216,7 +216,7 @@ export default function Checkout() {
       try {
         const snap = { ...(pending || {}), payment_status };
         localStorage.setItem("lastCheckoutOrder", JSON.stringify(snap));
-      } catch {}
+      } catch { }
       localStorage.removeItem("pendingOrder");
     }
 
@@ -240,8 +240,8 @@ export default function Checkout() {
             bookingData.payment_status === "paid"
               ? "success"
               : bookingData.payment_status === "failed"
-              ? "failed"
-              : "";
+                ? "failed"
+                : "";
           if (newStatus) setStatus(newStatus);
           const merged = {
             ...order,
@@ -259,9 +259,9 @@ export default function Checkout() {
               : order.showtime,
           } as any;
           setOrder(merged);
-          try { localStorage.setItem("lastCheckoutOrder", JSON.stringify(merged)); } catch {}
+          try { localStorage.setItem("lastCheckoutOrder", JSON.stringify(merged)); } catch { }
         }
-      } catch {}
+      } catch { }
     })();
   }, [order?.booking_id]);
 
@@ -362,88 +362,91 @@ export default function Checkout() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-dark">
-      <Header onBookClick={() => {}} />
+    <UserLayout
+      className="bg-gradient-dark"
+      headerProps={{ onBookClick: () => { } }}
+      hideFooter
+    >
       <div className="max-w-3xl mx-auto p-4 pt-24">
-      <Card className="w-full bg-black/40 border border-white/10 text-white">
-        <CardHeader>
-          <CardTitle className="text-blue-400">Thanh toán</CardTitle>
-        </CardHeader>
-        <CardContent>
-          {order ? (
-            <div className="space-y-3 text-sm">
-              {status === "success" && (
-                <div className="bg-green-600/20 border border-green-500/50 rounded-lg p-4 mb-4">
-                  <h3 className="font-semibold text-green-300 mb-2">✓ Vé đã thanh toán thành công!</h3>
-                  <p className="text-green-200">Vui lòng kiểm tra email để nhận mã vé.</p>
+        <Card className="w-full bg-black/40 border border-white/10 text-white">
+          <CardHeader>
+            <CardTitle className="text-blue-400">Thanh toán</CardTitle>
+          </CardHeader>
+          <CardContent>
+            {order ? (
+              <div className="space-y-3 text-sm">
+                {status === "success" && (
+                  <div className="bg-green-600/20 border border-green-500/50 rounded-lg p-4 mb-4">
+                    <h3 className="font-semibold text-green-300 mb-2">✓ Vé đã thanh toán thành công!</h3>
+                    <p className="text-green-200">Vui lòng kiểm tra email để nhận mã vé.</p>
+                  </div>
+                )}
+                {status === "failed" && (
+                  <div className="bg-red-600/20 border border-red-500/50 rounded-lg p-4 mb-4">
+                    <h3 className="font-semibold text-red-300 mb-2">✗ Thanh toán thất bại</h3>
+                    <p className="text-red-200">Vui lòng thử lại hoặc liên hệ hỗ trợ.</p>
+                  </div>
+                )}
+                <div className="grid grid-cols-2 gap-2">
+                  <span className="text-cyan-200">Phim</span>
+                  <span className="font-medium text-white">{order.movie}</span>
+                  <span className="text-cyan-200">Ngày</span>
+                  <span className="font-medium text-white">{order.dateDisplay}</span>
+                  <span className="text-cyan-200">Giờ chiếu</span>
+                  <span className="font-medium text-white">{order.showtime}</span>
+                  <span className="text-cyan-200">Họ tên</span>
+                  <span className="font-medium text-white">{order.name}</span>
+                  <span className="text-cyan-200">Email</span>
+                  <span className="font-medium text-white">{order.email}</span>
+                  <span className="text-cyan-200">Số lượng</span>
+                  <span className="font-medium text-white">{order.quantity}</span>
+                  <span className="text-white">Tổng tiền</span>
+                  <span className="font-semibold text-blue-400">
+                    {formatMoney(order.amount)}₫
+                  </span>
                 </div>
-              )}
-              {status === "failed" && (
-                <div className="bg-red-600/20 border border-red-500/50 rounded-lg p-4 mb-4">
-                  <h3 className="font-semibold text-red-300 mb-2">✗ Thanh toán thất bại</h3>
-                  <p className="text-red-200">Vui lòng thử lại hoặc liên hệ hỗ trợ.</p>
+                {status === "success" && (
+                  <div className="text-xs sm:text-sm text-yellow-300 mt-1">
+                    Vui lòng kiểm tra kỹ email, mã đặt vé sẽ gửi tới email này.
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div className="space-y-3">
+                <div className="h-6 bg-white/10 rounded animate-pulse"></div>
+                <div className="space-y-2">
+                  <div className="h-4 bg-white/10 rounded animate-pulse w-3/4"></div>
+                  <div className="h-4 bg-white/10 rounded animate-pulse w-1/2"></div>
                 </div>
-              )}
-              <div className="grid grid-cols-2 gap-2">
-                <span className="text-cyan-200">Phim</span>
-                <span className="font-medium text-white">{order.movie}</span>
-                <span className="text-cyan-200">Ngày</span>
-                <span className="font-medium text-white">{order.dateDisplay}</span>
-                <span className="text-cyan-200">Giờ chiếu</span>
-                <span className="font-medium text-white">{order.showtime}</span>
-                <span className="text-cyan-200">Họ tên</span>
-                <span className="font-medium text-white">{order.name}</span>
-                <span className="text-cyan-200">Email</span>
-                <span className="font-medium text-white">{order.email}</span>
-                <span className="text-cyan-200">Số lượng</span>
-                <span className="font-medium text-white">{order.quantity}</span>
-                <span className="text-white">Tổng tiền</span>
-                <span className="font-semibold text-blue-400">
-                  {formatMoney(order.amount)}₫
-                </span>
-              </div>
-              {status === "success" && (
-                <div className="text-xs sm:text-sm text-yellow-300 mt-1">
-                  Vui lòng kiểm tra kỹ email, mã đặt vé sẽ gửi tới email này.
+                <div className="grid grid-cols-2 gap-2">
+                  {[...Array(6)].map((_, i) => (
+                    <div key={i} className="h-4 bg-white/10 rounded animate-pulse"></div>
+                  ))}
                 </div>
-              )}
-            </div>
-          ) : (
-            <div className="space-y-3">
-              <div className="h-6 bg-white/10 rounded animate-pulse"></div>
-              <div className="space-y-2">
-                <div className="h-4 bg-white/10 rounded animate-pulse w-3/4"></div>
-                <div className="h-4 bg-white/10 rounded animate-pulse w-1/2"></div>
               </div>
-              <div className="grid grid-cols-2 gap-2">
-                {[...Array(6)].map((_, i) => (
-                  <div key={i} className="h-4 bg-white/10 rounded animate-pulse"></div>
-                ))}
-              </div>
+            )}
+          </CardContent>
+          <CardFooter className="flex justify-between">
+            <Button variant="outline" className="bg-transparent border-white/30 text-white hover:bg-white/10" onClick={() => { try { localStorage.removeItem("pendingOrder"); localStorage.removeItem("lastCheckoutOrder"); localStorage.removeItem("lastVnpayBookingId"); } catch { }; navigate("/"); }}>
+              Quay lại
+            </Button>
+          </CardFooter>
+          {!isLoggedIn && (
+            <div className="px-6 pb-6 text-sm text-red-300">
+              Vui lòng đăng nhập trước khi thanh toán.
+              <button
+                className="ml-2 text-blue-300 underline"
+                onClick={() => {
+                  window.dispatchEvent(new Event("open-login"));
+                  navigate("/");
+                }}
+              >
+                Đăng nhập
+              </button>
             </div>
           )}
-        </CardContent>
-        <CardFooter className="flex justify-between">
-          <Button variant="outline" className="bg-transparent border-white/30 text-white hover:bg-white/10" onClick={() => { try { localStorage.removeItem("pendingOrder"); localStorage.removeItem("lastCheckoutOrder"); localStorage.removeItem("lastVnpayBookingId"); } catch {} ; navigate("/"); }}>
-            Quay lại
-          </Button>
-        </CardFooter>
-        {!isLoggedIn && (
-          <div className="px-6 pb-6 text-sm text-red-300">
-            Vui lòng đăng nhập trước khi thanh toán.
-            <button
-              className="ml-2 text-blue-300 underline"
-              onClick={() => {
-                window.dispatchEvent(new Event("open-login"));
-                navigate("/");
-              }}
-            >
-              Đăng nhập
-            </button>
-          </div>
-        )}
-      </Card>
+        </Card>
       </div>
-    </div>
+    </UserLayout>
   );
 }

@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { getMoviesAdmin } from "@/lib/api";
-import AdminLayout from "@/components/admin/AdminLayout";
+import AdminLayout from "@/admin/layouts/AdminLayout";
 import MoviesContent from "@/components/admin/content/MoviesContent";
 import AdminEditModal from "@/components/admin/AdminEditModal";
 
@@ -29,7 +29,7 @@ export default function MoviesPage() {
         if (typeof s.sortKey === "string") setSortKey(s.sortKey);
         if (typeof s.sortDir === "string") setSortDir(s.sortDir);
       }
-    } catch {}
+    } catch { }
   }, []);
 
   useEffect(() => {
@@ -66,7 +66,7 @@ export default function MoviesPage() {
     try {
       const state = { searchQuery, sortKey, sortDir };
       localStorage.setItem("admin_movies_filters", JSON.stringify(state));
-    } catch {}
+    } catch { }
   }, [moviesPage, pageSize, searchQuery, sortKey, sortDir]);
 
   const moviesTotalPages = useMemo(

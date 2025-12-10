@@ -1,0 +1,332 @@
+import { RequestHandler } from "express";
+import { prisma } from "../../lib/prisma";
+import fs from "fs";
+import path from "path";
+
+export const createMovie: RequestHandler = async (req, res) => {
+  let baseData: any;
+  try {
+    const {
+      title,
+      description,
+      cover_image,
+      cover_image_base64,
+      detail_images,
+      genres,
+      rating,
+      duration_min,
+      is_active,
+      release_date,
+    } = req.body as any;
+    // Verify required fields
+    if (!title || title.trim() === "") {
+      return res.status(400).json({ message: "Tên phim là bắt buộc" });
+    }
+
+    // Validate duration
+    if (duration_min === undefined || duration_min === null) {
+      return res.status(400).json({ message: "Thời lượng là bắt buộc" });
+    }
+    const durationNum = Number(duration_min);
+    if (!Number.isInteger(durationNum) || durationNum <= 0) {
+      return res.status(400).json({ message: "Thời lượng phải là số nguyên dương" });
+    }
+    if (durationNum > 600) {
+      return res.status(400).json({ message: "Thời lượng không hợp lệ (tối đa 600 phút)" });
+    }
+
+    // Validate release_date
+    if (!release_date) {
+      return res.status(400).json({ message: "Ngày phát hành là bắt buộc" });
+    }
+
+    // Validate rating
+    let ratingNum: number | undefined = undefined;
+    if (rating !== undefined && rating !== null && rating !== "") {
+      ratingNum = Number(rating);
+      if (!Number.isFinite(ratingNum) || ratingNum < 0 || ratingNum > 10) {
+        return res.status(400).json({ message: "Điểm đánh giá phải từ 0 đến 10" });
+      }
+    }
+    let savedCover = cover_image as string | undefined;
+    if (cover_image_base64 && typeof cover_image_base64 === "string") {
+      try {
+        const match = cover_image_base64.match(/^data:(.+);base64,(.+)$/);
+        const ext = match ? match[1].split("/")[1] || "png" : "png";
+        const buf = Buffer.from(
+          match ? match[2] : cover_image_base64,
+          "base64",
+        );
+        const dir = path.resolve(process.cwd(), "uploads", "movies");
+        try {
+          fs.mkdirSync(dir, { recursive: true });
+        } catch { }
+        const filename = `movie_${Date.now()}.${ext}`;
+        const filepath = path.join(dir, filename);
+        fs.writeFileSync(filepath, buf);
+        savedCover = `/uploads/movies/${filename}`;
+      } catch { }
+    }
+    baseData = {
+      title,
+      description,
+      cover_image: savedCover,
+      detail_images,
+      genres,
+      rating: ratingNum,
+      duration_min: durationNum,
+      is_active: is_active === undefined ? true : Boolean(is_active),
+      release_date: release_date ? new Date(release_date) : undefined,
+    };
+    let movie = await (prisma as any).movies.create({ data: baseData });
+    res.status(201).json({ message: "Thêm phim mới thành công", movie });
+  } catch (err: any) {
+    if (
+      err?.code === "P2002" &&
+      String(err?.meta?.target || "").includes("id")
+    ) {
+      try {
+        const last = await (prisma as any).movies.findFirst({
+          orderBy: { id: "desc" },
+        });
+        const nextId = ((last?.id as number) || 0) + 1;
+        const movie = await (prisma as any).movies.create({
+          data: { ...baseData, id: nextId },
+        });
+
+        return res.status(201).json({ message: "Thêm phim mới thành công", movie });
+      } catch (retryErr: any) {
+        return res
+          .status(500)
+          .json({ message: retryErr?.message || "Lỗi máy chủ nội bộ" });
+      }
+    }
+    res.status(500).json({ message: err?.message || "Lỗi máy chủ nội bộ" });
+  }
+};
+
+export const updateMovie: RequestHandler = async (req, res) => {
+  try {
+    const id = Number(req.params.id);
+    const {
+      title,
+      description,
+      cover_image,
+      cover_image_base64,
+      detail_images,
+      genres,
+      rating,
+      duration_min,
+      is_active,
+      release_date,
+    } = req.body as any;
+    const data: any = {};
+    if (title !== undefined) data.title = title;
+    if (description !== undefined) data.description = description;
+    if (cover_image !== undefined) data.cover_image = cover_image;
+    if (cover_image_base64 && typeof cover_image_base64 === "string") {
+      try {
+        const match = cover_image_base64.match(/^data:(.+);base64,(.+)$/);
+        const ext = match ? match[1].split("/")[1] || "png" : "png";
+        const buf = Buffer.from(
+          match ? match[2] : cover_image_base64,
+          "base64",
+        );
+        const dir = path.resolve(process.cwd(), "uploads", "movies");
+        try {
+          fs.mkdirSync(dir, { recursive: true });
+        } catch { }
+        const filename = `movie_${Date.now()}.${ext}`;
+        const filepath = path.join(dir, filename);
+        fs.writeFileSync(filepath, buf);
+        data.cover_image = `/uploads/movies/${filename}`;
+      } catch { }
+    }
+    if (detail_images !== undefined) data.detail_images = detail_images;
+    if (genres !== undefined) data.genres = genres;
+
+    // Validate rating
+    if (rating !== undefined) {
+      const r = Number(rating);
+      if (!Number.isFinite(r) || r < 0 || r > 10)
+        return res.status(400).json({ message: "Điểm đánh giá phải từ 0 đến 10" });
+      data.rating = r;
+    }
+
+    // Validate duration
+    if (duration_min !== undefined) {
+      const d = Number(duration_min);
+      if (!Number.isInteger(d) || d <= 0)
+        return res.status(400).json({ message: "Thời lượng phải là số nguyên dương" });
+      if (d > 600)
+        return res.status(400).json({ message: "Thời lượng không hợp lệ (tối đa 600 phút)" });
+      data.duration_min = d;
+    }
+
+    // Check khi thay đổi is_active từ true sang false (tạm ẩn)
+    if (is_active !== undefined && is_active === false) {
+      const movie = await (prisma as any).movies.findUnique({
+        where: { id },
+      });
+
+      if (movie && movie.is_active === true) {
+        // Phim đang hoạt động, check xem có suất chiếu từ hôm nay trở đi không
+        const now = new Date();
+        const todayStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), 0, 0, 0, 0));
+
+        const futureShowtimes = await (prisma as any).showtimes.findFirst({
+          where: {
+            movie_id: id,
+            start_time: {
+              gte: todayStart,
+            },
+          },
+        });
+
+        if (futureShowtimes) {
+          return res.status(400).json({
+            message: "Không thể tạm ẩn phim có suất chiếu từ hôm nay trở đi",
+          });
+        }
+      }
+      data.is_active = false;
+    } else if (is_active !== undefined) {
+      data.is_active = Boolean(is_active);
+    }
+
+    // Cho phép sửa release_date khi phim CHƯA có suất chiếu
+    if (release_date !== undefined) {
+      const showtimeCount = await (prisma as any).showtimes.count({
+        where: { movie_id: id },
+      });
+      if (showtimeCount > 0) {
+        return res.status(400).json({
+          message: "Không thể sửa đổi ngày phát hành vì phim đã có suất chiếu",
+        });
+      }
+      if (release_date === null || release_date === "") {
+        data.release_date = null;
+      } else {
+        const rd = new Date(release_date);
+        if (Number.isNaN(rd.getTime())) {
+          return res
+            .status(400)
+            .json({ message: "Ngày phát hành không hợp lệ" });
+        }
+        data.release_date = rd;
+      }
+    }
+
+    data.updated_at = new Date();
+    const movie = await (prisma as any).movies.update({ where: { id }, data });
+
+    // Update end_time for all showtimes of this movie if duration_min changed
+    if (duration_min !== undefined) {
+      const durationMinutes = Number(duration_min);
+      const showtimes = await (prisma as any).showtimes.findMany({
+        where: { movie_id: id },
+      });
+      for (const st of showtimes) {
+        const startDate = new Date(st.start_time);
+        const endDate = new Date(startDate.getTime() + durationMinutes * 60 * 1000);
+        await (prisma as any).showtimes.update({
+          where: { id: st.id },
+          data: { end_time: endDate },
+        });
+      }
+    }
+
+    res.status(200).json({ message: "Cập nhật phim thành công", movie });
+  } catch (err: any) {
+    if (err?.code === "P2025")
+      return res.status(404).json({ message: "Không tìm thấy" });
+    res.status(500).json({ message: "Lỗi máy chủ nội bộ" });
+  }
+};
+
+export const deleteMovie: RequestHandler = async (req, res) => {
+  try {
+    const id = Number(req.params.id);
+    await (prisma as any).movies.delete({ where: { id } });
+    res.status(200).json({ message: "Xóa phim thành công", ok: true });
+  } catch (err: any) {
+    if (err?.code === "P2025")
+      return res.status(404).json({ message: "Không tìm thấy" });
+    res.status(500).json({ message: "Lỗi máy chủ nội bộ" });
+  }
+};
+
+export const getMovieById: RequestHandler = async (req, res) => {
+  try {
+    const movieId = Number(req.params.id);
+
+    const movie = await (prisma as any).movies.findUnique({
+      where: { id: movieId },
+      include: {
+        showtimes: {
+          select: {
+            id: true,
+            start_time: true,
+            total_sold: true,
+          },
+        },
+      },
+    });
+
+    if (!movie) {
+      return res.status(404).json({ message: "Không tìm thấy phim" });
+    }
+
+    // Calculate stats (only count showtimes that have PAID bookings)
+    const paidShowtimes = movie.showtimes.filter((st: any) => (st.total_sold || 0) > 0);
+    const totalShowtimes = paidShowtimes.length;
+    const totalTicketsSold = paidShowtimes.reduce(
+      (sum, st) => sum + (st.total_sold || 0),
+      0
+    );
+    const totalRevenue = await (prisma as any).bookings.aggregate({
+      where: {
+        showtime: {
+          movie_id: movieId,
+        },
+        payment_status: { in: ["paid"] },
+      },
+      _sum: { total_price: true },
+    });
+
+    const successfulBookings = await (prisma as any).bookings.count({
+      where: {
+        showtime: {
+          movie_id: movieId,
+        },
+        payment_status: { in: ["paid"] },
+      },
+    });
+
+    const mapped = {
+      id: movie.id,
+      title: movie.title,
+      description: movie.description || "Không có mô tả",
+      cover_image: movie.cover_image,
+      genres: movie.genres || [],
+      rating: Number(movie.rating || 0),
+      duration_min: movie.duration_min || 0,
+      is_active: movie.is_active,
+      release_date: movie.release_date,
+      created_at: movie.created_at,
+      updated_at: movie.updated_at,
+      hasShowtimes: movie.showtimes.length > 0,
+      stats: {
+        totalShowtimes,
+        totalTicketsSold,
+        totalRevenue: Number(totalRevenue._sum?.total_price || 0),
+        successfulBookings,
+      },
+    };
+
+    res.status(200).json(mapped);
+  } catch (err: any) {
+    res.status(500).json({ message: "Lỗi máy chủ nội bộ" });
+  }
+};
+

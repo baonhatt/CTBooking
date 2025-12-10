@@ -1,10 +1,9 @@
 import { useEffect, useState } from "react";
-import Header from "@/components/Header";
 import HeroSection from "@/components/HeroSection";
 import TechnologyBanner from "@/components/TechnologyBanner";
 import BookingSection from "@/components/BookingSection";
 import ProductSection from "@/components/ProductSection";
-import Footer from "@/components/Footer";
+import UserLayout from "@/user/layouts/UserLayout";
 import { ConfigProvider } from "antd";
 import { motion } from "framer-motion";
 import { ArrowUp } from "lucide-react";
@@ -36,7 +35,7 @@ export default function Index() {
       localStorage.removeItem("pendingOrder");
       localStorage.removeItem("lastCheckoutOrder");
       localStorage.removeItem("lastVnpayBookingId");
-    } catch {}
+    } catch { }
   }, []);
 
   const scrollToTop = () => {
@@ -68,8 +67,10 @@ export default function Index() {
         },
       }}
     >
-      <div className="min-h-screen bg-gradient-light">
-        <Header onBookClick={handleBookClick} />
+      <UserLayout
+        headerProps={{ onBookClick: handleBookClick }}
+        className="bg-gradient-light"
+      >
         <main>
           <HeroSection />
           <TechnologyBanner />
@@ -78,7 +79,6 @@ export default function Index() {
           </div>
           <ProductSection />
         </main>
-        <Footer />
         {showBackToTop && (
           <motion.button
             onClick={scrollToTop}
@@ -89,7 +89,7 @@ export default function Index() {
             <ArrowUp className="h-5 w-5 text-blue-400" />
           </motion.button>
         )}
-      </div>
+      </UserLayout>
     </ConfigProvider>
   );
 }
