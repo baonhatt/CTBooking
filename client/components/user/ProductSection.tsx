@@ -26,7 +26,7 @@ export default function ProductSection() {
   return (
     <section
       id="products"
-      className="py-20 bg-gradient-section relative overflow-hidden"
+      className="py-20 bg-gradient-dark relative overflow-hidden"
     >
       <div className="container mx-auto px-4 relative z-10">
         <div className="flex items-center justify-between mb-12">

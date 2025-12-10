@@ -23,7 +23,11 @@ import iconCine from "@/assets/images/iconCine.svg";
 import icon from "@/assets/images/icon.svg";
 import brand from "@/assets/images/brand.svg";
 import { Navigate, useNavigate, useLocation } from "react-router-dom";
-
+import {
+  Sheet,
+  SheetContent,
+  SheetTrigger,
+} from "@/components/ui/sheet";
 
 interface HeaderProps {
   onBookClick?: () => void;
@@ -211,9 +215,9 @@ export default function Header({ onBookClick = () => { }, disableNav = false }: 
           : "bg-transparent border-b border-white/10",
       )}
     >
-      <div className="container mx-auto px-4 py-4 flex items-center justify-between">
+      <div className="container mx-auto px-4 py-4 flex items-center justify-between ">
         <div className="flex items-center gap-3 animate-fade-in">
-          <img onClick={() => navigator('/')} src={icon} className="w-[10rem] h-12 md:w-20 sm:w-20 md:h-16" alt="CINESPHERE logo" />
+          <img onClick={() => navigator('/')} src={icon} className="cursor-pointer w-[19rem] h-12 md:w-20 sm:w-20 md:h-16" alt="CINESPHERE logo" />
         </div>
 
         <nav className="hidden md:flex items-center gap-8 animate-fade-in delay-200">
@@ -238,52 +242,114 @@ export default function Header({ onBookClick = () => { }, disableNav = false }: 
         </nav>
         <div className="flex items-center gap-4 animate-fade-in delay-250">
           <div className="md:hidden">
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button
-                  variant="outline"
-                  className="border-white/20 text-black"
-                >
-                  <Menu className="h-4 w-4" aria-label="Menu" />
+            <Sheet>
+              <SheetTrigger asChild>
+                <Button variant="default" className="bg-opacity-20 border-white/20 text-white">
+                  <Menu className="h-4 w-4" />
                 </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent className="bg-black/90 border border-white/20 text-white">
-                <DropdownMenuItem className={cn(effectiveDisable ? "opacity-50 cursor-not-allowed" : "")} onClick={effectiveDisable ? undefined : () => scrollToSection("hero")}>
-                  Phim Hot
-                </DropdownMenuItem>
-                <DropdownMenuItem className={cn(effectiveDisable ? "opacity-50 cursor-not-allowed" : "")} onClick={effectiveDisable ? undefined : () => scrollToSection("technology")}>
-                  Công Nghệ
-                </DropdownMenuItem>
-                <DropdownMenuItem className={cn(effectiveDisable ? "opacity-50 cursor-not-allowed" : "")} onClick={effectiveDisable ? undefined : () => scrollToSection("products")}>
-                  Cửa Hàng
-                </DropdownMenuItem>
-                <DropdownMenuSeparator />
-                {userName ? (
-                  <>
-                    <DropdownMenuItem>Chào, {userName}</DropdownMenuItem>
-                    <DropdownMenuItem onClick={() => navigator("/tai-khoan")}>
-                      Tài khoản
-                    </DropdownMenuItem>
-                    <DropdownMenuItem onClick={handleLogout}>
-                      Đăng xuất
-                    </DropdownMenuItem>
-                  </>
-                ) : (
-                  <>
-                    <DropdownMenuItem onClick={() => setIsLoginOpen(true)}>
-                      Đăng nhập
-                    </DropdownMenuItem>
-                    <DropdownMenuItem onClick={() => setIsRegisterOpen(true)}>
-                      Đăng ký
-                    </DropdownMenuItem>
-                    <DropdownMenuItem onClick={() => setIsForgetPassOpen(true)}>
-                      Quên mật khẩu
-                    </DropdownMenuItem>
-                  </>
-                )}
-              </DropdownMenuContent>
-            </DropdownMenu>
+              </SheetTrigger>
+
+              <SheetContent side="right" className="bg-gradient-dark border border-white/10 text-white">
+                {/* Header panel */}
+                <div className="flex items-center justify-between mb-8">
+                  <img
+                    src={icon}
+                    alt="CINESPHERE"
+                    className="h-8 cursor-pointer"
+                    onClick={() => navigator("/")}
+                  />
+                </div>
+
+                {/* Danh mục */}
+                <nav className="flex flex-col gap-6 text-lg">
+                  <button
+                    className={cn(
+                      "text-left font-medium",
+                      effectiveDisable ? "opacity-50 cursor-not-allowed" : ""
+                    )}
+                    disabled={effectiveDisable}
+                    onClick={() => {
+                      if (!effectiveDisable) {
+                        scrollToSection("hero");
+                      }
+                    }}
+                  >
+                    Phim Hot
+                  </button>
+                  <button
+                    className={cn(
+                      "text-left font-medium",
+                      effectiveDisable ? "opacity-50 cursor-not-allowed" : ""
+                    )}
+                    disabled={effectiveDisable}
+                    onClick={() => {
+                      if (!effectiveDisable) {
+                        scrollToSection("technology");
+                      }
+                    }}
+                  >
+                    Công Nghệ
+                  </button>
+                  <button
+                    className={cn(
+                      "text-left font-medium",
+                      effectiveDisable ? "opacity-50 cursor-not-allowed" : ""
+                    )}
+                    disabled={effectiveDisable}
+                    onClick={() => {
+                      if (!effectiveDisable) {
+                        scrollToSection("products");
+                      }
+                    }}
+                  >
+                    Cửa Hàng
+                  </button>
+                </nav>
+
+                {/* Khối account bên dưới */}
+                <div className="mt-10 border-t border-white/10 pt-4 space-y-2 text-sm">
+                  {userName ? (
+                    <>
+                      <button
+                        className="block w-full text-left"
+                        onClick={() => navigator("/account")}
+                      >
+                        Tài khoản ({userName})
+                      </button>
+                      <button
+                        className="block w-full text-left"
+                        onClick={handleLogout}
+                      >
+                        Đăng xuất
+                      </button>
+                    </>
+                  ) : (
+                    <>
+                      <button
+                        className="block w-full text-left"
+                        onClick={() => setIsLoginOpen(true)}
+                      >
+                        Đăng nhập
+                      </button>
+                      <button
+                        className="block w-full text-left"
+                        onClick={() => setIsRegisterOpen(true)}
+                      >
+                        Đăng ký
+                      </button>
+                      <button
+                        className="block w-full text-left"
+                        onClick={() => setIsForgetPassOpen(true)}
+                      >
+                        Quên mật khẩu
+                      </button>
+                    </>
+                  )}
+                </div>
+              </SheetContent>
+            </Sheet>
           </div>
+
           {userName ? (
             <div className="hidden md:flex items-center">
               <DropdownMenu>
@@ -296,7 +362,7 @@ export default function Header({ onBookClick = () => { }, disableNav = false }: 
                   </button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent className="bg-black/90 border border-white/20 text-white">
-                  <DropdownMenuItem onClick={() => navigator("/tai-khoan")}>
+                  <DropdownMenuItem onClick={() => navigator("/account")}>
                     Tài khoản
                   </DropdownMenuItem>
                   <DropdownMenuItem onClick={handleLogout}>
@@ -600,7 +666,7 @@ export default function Header({ onBookClick = () => { }, disableNav = false }: 
           {!effectiveDisable && (
             <Button
               onClick={handleBookNow}
-              className="bg-gradient-to-r text-sm md:text-base from-blue-500 to-purple-500 hover:from-blue-600 hover:to-purple-600 text-white font-semibold px-3 py-2 md:px-6 md:py-2 rounded-lg shadow-lg transition-all duration-300 hover:scale-105"
+              className="hidden md:inline-flex bg-gradient-to-r text-sm md:text-base from-blue-500 to-purple-500 hover:from-blue-600 hover:to-purple-600 text-white font-semibold px-3 py-2 md:px-6 md:py-2 rounded-lg shadow-lg transition-all duration-300 hover:scale-105"
             >
               <Ticket className="h-4 w-4 md:mr-2" />
               <span className="hidden md:inline">ĐẶT VÉ NGAY</span>

@@ -69,7 +69,7 @@ export default function Index() {
     >
       <UserLayout
         headerProps={{ onBookClick: handleBookClick }}
-        className="bg-gradient-light"
+        className="bg-gradient-dark"
       >
         <main>
           <HeroSection />
