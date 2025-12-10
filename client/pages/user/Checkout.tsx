@@ -367,7 +367,7 @@ export default function Checkout() {
       headerProps={{ onBookClick: () => { } }}
       hideFooter
     >
-      <div className="max-w-3xl mx-auto p-4 pt-24">
+      <div className="max-w-3xl mx-auto p-4 pt-44">
         <Card className="w-full bg-black/40 border border-white/10 text-white">
           <CardHeader>
             <CardTitle className="text-blue-400">Thanh toán</CardTitle>
@@ -388,17 +388,17 @@ export default function Checkout() {
                   </div>
                 )}
                 <div className="grid grid-cols-2 gap-2">
-                  <span className="text-cyan-200">Phim</span>
+                  <span className="text-orange-400">Phim</span>
                   <span className="font-medium text-white">{order.movie}</span>
-                  <span className="text-cyan-200">Ngày</span>
+                  <span className="text-orange-400">Ngày</span>
                   <span className="font-medium text-white">{order.dateDisplay}</span>
-                  <span className="text-cyan-200">Giờ chiếu</span>
+                  <span className="text-orange-400">Giờ chiếu</span>
                   <span className="font-medium text-white">{order.showtime}</span>
-                  <span className="text-cyan-200">Họ tên</span>
+                  <span className="text-orange-400">Họ tên</span>
                   <span className="font-medium text-white">{order.name}</span>
-                  <span className="text-cyan-200">Email</span>
+                  <span className="text-orange-400">Email</span>
                   <span className="font-medium text-white">{order.email}</span>
-                  <span className="text-cyan-200">Số lượng</span>
+                  <span className="text-orange-400">Số lượng</span>
                   <span className="font-medium text-white">{order.quantity}</span>
                   <span className="text-white">Tổng tiền</span>
                   <span className="font-semibold text-blue-400">

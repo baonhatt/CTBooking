@@ -1,8 +1,11 @@
-import { useLocation } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import { useEffect } from "react";
+import UserLayout from "@/user/layouts/UserLayout";
+import { Button } from "@/components/ui/button";
 
 const NotFound = () => {
   const location = useLocation();
+  const navigate = useNavigate();
 
   useEffect(() => {
     console.error(
@@ -12,15 +15,31 @@ const NotFound = () => {
   }, [location.pathname]);
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-100">
-      <div className="text-center">
-        <h1 className="text-4xl font-bold mb-4">404</h1>
-        <p className="text-xl text-gray-600 mb-4">Oops! Page not found</p>
-        <a href="/" className="text-blue-500 hover:text-blue-700 underline">
-          Return to Home
-        </a>
+    <UserLayout className="bg-gradient-dark" contentClassName="text-white">
+      <div className="min-h-screen flex items-center justify-center px-4 pt-24">
+        <div className="w-full max-w-xl">
+          <div className="bg-black/40 border border-white/10 rounded-2xl p-8 text-center shadow-xl">
+            <div className="text-6xl font-extrabold bg-gradient-to-r from-blue-400 via-purple-400 to-pink-400 bg-clip-text text-transparent">404</div>
+            <p className="mt-3 text-gray-300">Trang bạn tìm không tồn tại hoặc đã được di chuyển.</p>
+            <div className="mt-6 flex justify-center gap-3">
+              <Button
+                className="bg-gradient-to-r from-blue-500 to-purple-500 hover:from-blue-600 hover:to-purple-600 text-white font-semibold"
+                onClick={() => navigate("/")}
+              >
+                Về Trang Chủ
+              </Button>
+              <Button
+                variant="outline"
+                className="bg-transparent border-white/30 text-white hover:bg-white/10"
+                onClick={() => navigate("/booking")}
+              >
+                Đặt vé
+              </Button>
+            </div>
+          </div>
+        </div>
       </div>
-    </div>
+    </UserLayout>
   );
 };
 

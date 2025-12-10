@@ -24,7 +24,6 @@ export default function BookingPage() {
   const [email, setEmail] = useState<string>("");
   const [paymentMethod, setPaymentMethod] = useState<"momo" | "vnpay">("momo");
   const [isProcessing, setIsProcessing] = useState(false);
-  const [isConfirmed, setIsConfirmed] = useState(false);
   const countdownRef = useRef<NodeJS.Timeout | null>(null);
   const [countdown, setCountdown] = useState(600);
 
@@ -242,7 +241,7 @@ export default function BookingPage() {
             <CardHeader>
               <CardTitle>Đang tải dữ liệu đặt vé</CardTitle>
             </CardHeader>
-            <CardContent className="flex items-center gap-3 text-sm text-cyan-200">
+            <CardContent className="flex items-center gap-3 text-sm text-orange-400">
               <div className="w-5 h-5 border-2 border-cyan-300 border-t-transparent rounded-full animate-spin" />
               Vui lòng chờ trong giây lát...
             </CardContent>
@@ -256,7 +255,7 @@ export default function BookingPage() {
             </CardHeader>
             <CardContent className="space-y-6">
               <div className="space-y-4">
-                <div className="text-sm text-cyan-200">Chọn phim</div>
+                <div className="text-sm text-orange-400">Chọn phim</div>
                 <Select value={movie} onValueChange={(v) => { setMovie(v); setSelectedDate(null); setSelectedShowtimeId(null); setSelectedShowtimeLabel(""); try { refetchActive(); } catch { } }}>
                   <SelectTrigger className="w-full bg-black/40 text-white border-white/10">
                     <span className="truncate">{selectedMovie?.title || "Chọn phim"}</span>
@@ -268,7 +267,7 @@ export default function BookingPage() {
                           <img src={resolveImageUrl(m.cover_image)} alt={m.title} className="w-10 h-14 object-cover rounded border border-white/10" />
                           <div className="flex flex-col">
                             <span className="font-medium">{m.title}</span>
-                            <span className="text-xs text-cyan-200">{m.duration_min ? `${m.duration_min} phút` : "--"}</span>
+                            <span className="text-xs text-orange-400">{m.duration_min ? `${m.duration_min} phút` : "--"}</span>
                           </div>
                         </div>
                       </SelectItem>
@@ -278,17 +277,17 @@ export default function BookingPage() {
                 {selectedMovie && (
                   <div className="mt-3 overflow-hidden rounded-lg border border-white/10">
                     <img src={resolveImageUrl(selectedMovie.cover_image)} alt={selectedMovie.title} className="w-full h-40 object-cover" />
-                    <div className="px-3 py-2 text-sm text-cyan-200">Thời lượng: {selectedMovie.duration_min ? `${selectedMovie.duration_min} phút` : "--"}</div>
+                    <div className="px-3 py-2 text-sm text-orange-400">Thời lượng: {selectedMovie.duration_min ? `${selectedMovie.duration_min} phút` : "--"}</div>
                   </div>
                 )}
               </div>
 
               {selectedMovie && (
                 <div>
-                  <div className="text-sm text-cyan-200 mb-2">Chọn lịch chiếu</div>
+                  <div className="text-sm text-orange-400 mb-2">Chọn lịch chiếu</div>
                   <div className="flex gap-2 bg-black/40 text-white rounded px-3 py-2 mb-4 border border-white/20">
                     {availableDates.length === 0 ? (
-                      <span className="text-cyan-200">Hiện chưa có lịch chiếu</span>
+                      <span className="text-orange-400">Hiện chưa có lịch chiếu</span>
                     ) : (
                       availableDates.map((d, idx) => {
                         const active = selectedDate && d.toDateString() === selectedDate.toDateString();
@@ -311,7 +310,7 @@ export default function BookingPage() {
                   </div>
                   {selectedDate && (
                     <div className="space-y-3">
-                      <div className="text-sm text-cyan-200">Giờ chiếu</div>
+                      <div className="text-sm text-orange-400">Giờ chiếu</div>
                       <div className="flex flex-wrap gap-2 border border-white/20 rounded px-2 py-2">
                         {(selectedMovie.showtimes || [])
                           .filter((st: any) => new Date(st.start_time).toDateString() === selectedDate.toDateString())
@@ -341,7 +340,7 @@ export default function BookingPage() {
               )}
 
               <div>
-                <div className="text-sm text-cyan-200 mb-2">Thông tin khách hàng</div>
+                <div className="text-sm text-orange-400 mb-2">Thông tin khách hàng</div>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                   <div>
                     <Label className="text-white">Họ và Tên</Label>
@@ -364,7 +363,7 @@ export default function BookingPage() {
 
               {(selectedPackage || defaultTicket) && (
                 <div className="bg-black/40 rounded-lg p-3 border border-white/10">
-                  <div className="text-sm text-cyan-200">Loại vé đã chọn</div>
+                  <div className="text-sm text-orange-400">Loại vé đã chọn</div>
                   <div className="flex justify-between items-center">
                     <span className="text-white font-medium">{selectedPackage?.name || defaultTicket?.name || "Vé tiêu chuẩn"}</span>
                     <span className="text-white">{unitPrice.toLocaleString("vi-VN")}₫</span>
@@ -389,13 +388,13 @@ export default function BookingPage() {
               <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-3">
                   <div className="grid grid-cols-2 gap-2 text-sm">
-                    <span className="text-cyan-200">Phim</span><span className="font-medium text-white">{selectedMovie?.title}</span>
-                    <span className="text-cyan-200">Ngày</span><span className="font-medium text-white">{selectedDate ? formatDateLong(selectedDate) : ""}</span>
-                    <span className="text-cyan-200">Giờ</span><span className="font-medium text-white">{selectedShowtimeLabel}</span>
-                    <span className="text-cyan-200">Thời lượng</span><span className="font-medium text-white">{selectedMovie?.duration_min ? `${selectedMovie.duration_min} phút` : "--"}</span>
-                    <span className="text-cyan-200">Họ tên</span><span className="font-medium text-white">{name}</span>
-                    <span className="text-cyan-200">Email</span><span className="font-medium text-white">{email}</span>
-                    <span className="text-cyan-200">Số lượng</span><span className="font-medium text-white">{ticketCount}</span>
+                    <span className="text-orange-400">Phim</span><span className="font-medium text-white">{selectedMovie?.title}</span>
+                    <span className="text-orange-400">Ngày</span><span className="font-medium text-white">{selectedDate ? formatDateLong(selectedDate) : ""}</span>
+                    <span className="text-orange-400">Giờ</span><span className="font-medium text-white">{selectedShowtimeLabel}</span>
+                    <span className="text-orange-400">Thời lượng</span><span className="font-medium text-white">{selectedMovie?.duration_min ? `${selectedMovie.duration_min} phút` : "--"}</span>
+                    <span className="text-orange-400">Họ tên</span><span className="font-medium text-white">{name}</span>
+                    <span className="text-orange-400">Email</span><span className="font-medium text-white">{email}</span>
+                    <span className="text-orange-400">Số lượng</span><span className="font-medium text-white">{ticketCount}</span>
                   </div>
                   <div className="text-xs sm:text-sm text-yellow-300 mt-1">Vui lòng kiểm tra kỹ email, mã đặt vé sẽ gửi tới email này.</div>
                   {selectedMovie?.cover_image && (
@@ -403,33 +402,40 @@ export default function BookingPage() {
                       <img src={resolveImageUrl(selectedMovie.cover_image)} alt={selectedMovie.title} className="w-full h-40 object-cover" />
                     </div>
                   )}
-                  <label className="flex items-center gap-2 mt-2 text-white">
-                    <input type="checkbox" checked={isConfirmed} onChange={(e) => setIsConfirmed(e.target.checked)} />
-                    <span>Tôi xác nhận thanh toán</span>
-                  </label>
+                  
                 </div>
                 <div className="space-y-3">
-                  <div className="text-sm text-cyan-200">Phương thức thanh toán</div>
+                  <div className="text-sm text-orange-400">Phương thức thanh toán</div>
                   <div className="grid grid-cols-2 gap-3">
-                    <label className={`cursor-pointer rounded-lg border ${paymentMethod === 'momo' ? 'border-pink-500 bg-pink-600/20' : 'border-white/10 bg-black/20'} p-3 flex items-center gap-3`}>
-                      <input type="checkbox" checked={paymentMethod === "momo"} onChange={() => setPaymentMethod("momo")} />
+                    <button
+                      type="button"
+                      onClick={() => setPaymentMethod("momo")}
+                      className={`${paymentMethod === 'momo' ? 'border-pink-500 bg-pink-600/20' : 'border-white/10 bg-black/20'} cursor-pointer rounded-lg border p-3 flex items-center gap-3 focus:outline-none focus:ring-2 focus:ring-pink-500`}
+                      aria-pressed={paymentMethod === 'momo'}
+                    >
                       <span className="inline-flex items-center gap-2 text-white">
-                        <span className="w-6 h-6 rounded bg-pink-600 text-white grid place-items-center text-xs font-bold">M</span> MoMo
+                        <span className="w-7 h-7 rounded bg-pink-600 text-white grid place-items-center text-xs font-extrabold">Mo</span>
+                        <span>MoMo</span>
                       </span>
-                    </label>
-                    <label className={`cursor-pointer rounded-lg border ${paymentMethod === 'vnpay' ? 'border-blue-500 bg-blue-600/20' : 'border-white/10 bg-black/20'} p-3 flex items-center gap-3`}>
-                      <input type="checkbox" checked={paymentMethod === "vnpay"} onChange={() => setPaymentMethod("vnpay")} />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setPaymentMethod("vnpay")}
+                      className={`${paymentMethod === 'vnpay' ? 'border-blue-500 bg-blue-600/20' : 'border-white/10 bg-black/20'} cursor-pointer rounded-lg border p-3 flex items-center gap-3 focus:outline-none focus:ring-2 focus:ring-blue-500`}
+                      aria-pressed={paymentMethod === 'vnpay'}
+                    >
                       <span className="inline-flex items-center gap-2 text-white">
-                        <span className="w-6 h-6 rounded bg-blue-600 text-white grid place-items-center text-xs font-bold">V</span> VNPay
+                        <span className="w-7 h-7 rounded bg-blue-600 text-white grid place-items-center text-[10px] font-extrabold">VN</span>
+                        <span>VNPay</span>
                       </span>
-                    </label>
+                    </button>
                   </div>
                   <div className="bg-black/40 rounded-lg p-4 border border-white/10">
                     <div className="text-white font-semibold mb-2">Booking Summary</div>
                     <div className="space-y-2 text-sm">
-                      <div className="flex justify-between"><span className="text-cyan-200">Loại vé</span><span className="text-white font-medium">{selectedPackage?.name || defaultTicket?.name || 'Vé tiêu chuẩn'}</span></div>
-                      <div className="flex justify-between"><span className="text-cyan-200">Đơn giá</span><span className="text-white">{unitPrice.toLocaleString('vi-VN')}₫</span></div>
-                      <div className="flex justify-between"><span className="text-cyan-200">Số lượng</span><span className="text-white">{ticketCount}</span></div>
+                      <div className="flex justify-between"><span className="text-orange-400">Loại vé</span><span className="text-white font-medium">{selectedPackage?.name || defaultTicket?.name || 'Vé tiêu chuẩn'}</span></div>
+                      <div className="flex justify-between"><span className="text-orange-400">Đơn giá</span><span className="text-white">{unitPrice.toLocaleString('vi-VN')}₫</span></div>
+                      <div className="flex justify-between"><span className="text-orange-400">Số lượng</span><span className="text-white">{ticketCount}</span></div>
                       <div className="flex justify-between border-t border-white/10 pt-2"><span className="text-white">Tổng Tiền</span><span className="text-blue-400 font-bold">{totalPrice.toLocaleString('vi-VN')}₫</span></div>
                     </div>
                   </div>
@@ -437,8 +443,8 @@ export default function BookingPage() {
               </CardContent>
             </Card>
             <div className="flex justify-between">
-              <Button variant="outline" className="bg-transparent border-white/30 text-white hover:bg-white/10" onClick={() => setStep(0)} disabled={isProcessing}>Quay lại</Button>
-              <Button className="bg-gradient-to-r from-blue-500 to-purple-500 hover:from-blue-600 hover:to-purple-600 text-white font-semibold shadow-lg disabled:opacity-50" disabled={!isConfirmed || isProcessing} onClick={handleCreateAndPay}>
+              <Button variant="outline" className="bg-transparent mt-2 border-white/30 text-white hover:bg-white/10" onClick={() => setStep(0)} disabled={isProcessing}>Quay lại</Button>
+              <Button className="bg-gradient-to-r mt-2 from-blue-500 to-purple-500 hover:from-blue-600 hover:to-purple-600 text-white font-semibold shadow-lg disabled:opacity-50" disabled={isProcessing} onClick={handleCreateAndPay}>
                 {isProcessing ? "Đang xử lý..." : "Thanh toán"}
               </Button>
             </div>
