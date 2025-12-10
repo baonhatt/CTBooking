@@ -100,10 +100,11 @@ export const createMomoPayment: RequestHandler = async (req, res) => {
   }
 };
 
-export const momoIpn: RequestHandler = async (req, res) => {
+export const momoIpn: RequestHandler = async (_req, res) => {
   try {
     res.status(200).json({ result: true });
   } catch {
     res.status(500).json({ result: false });
   }
 };
+

@@ -1,4 +1,4 @@
-import AdminLayout from "@/components/admin/AdminLayout";
+import AdminLayout from "@/admin/layouts/AdminLayout";
 import UsersContent from "@/components/admin/content/UsersContent";
 import AdminEditModal from "@/components/admin/AdminEditModal";
 import React, { useMemo, useState, useEffect } from "react";

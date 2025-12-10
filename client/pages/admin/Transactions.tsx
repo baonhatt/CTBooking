@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { getAdminRevenue, getTransactions } from "@/lib/api";
-import AdminLayout from "@/components/admin/AdminLayout";
+import AdminLayout from "@/admin/layouts/AdminLayout";
 import TransactionsContent from "@/components/admin/content/TransactionsContent";
 
 export default function TransactionsPage() {
@@ -32,7 +32,7 @@ export default function TransactionsPage() {
         if (typeof s.fromDate === "string") setFromDate(s.fromDate);
         if (typeof s.toDate === "string") setToDate(s.toDate);
       }
-    } catch {}
+    } catch { }
   }, []);
 
   useEffect(() => {
@@ -47,7 +47,7 @@ export default function TransactionsPage() {
         toDate,
       };
       localStorage.setItem("admin_transactions_filters", JSON.stringify(state));
-    } catch {}
+    } catch { }
   }, [txQuery, txStatus, sortKey, sortDir, paymentMethod, fromDate, toDate]);
 
   // Load transactions khi page hoặc query thay đổi

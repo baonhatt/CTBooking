@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { getToys, deleteToyApi } from "@/lib/api";
-import AdminLayout from "@/components/admin/AdminLayout";
+import AdminLayout from "@/admin/layouts/AdminLayout";
 import ToysContent from "@/components/admin/content/ToysContent";
 import AdminEditModal from "@/components/admin/AdminEditModal";
 

@@ -1,5 +1,5 @@
 import type { RequestHandler } from "express";
-import { prisma } from "../lib/prisma";
+import { prisma } from "../../lib/prisma";
 
 export const listTicketPackages: RequestHandler = async (req, res) => {
   try {
@@ -23,18 +23,6 @@ export const listTicketPackages: RequestHandler = async (req, res) => {
       take: pageSize,
     });
     res.status(200).json({ items, page, pageSize, total });
-  } catch {
-    res.status(500).json({ message: "Lỗi máy chủ nội bộ" });
-  }
-};
-
-export const listActiveTicketPackages: RequestHandler = async (_req, res) => {
-  try {
-    const items = await (prisma as any).ticket_packages.findMany({
-      where: { is_active: true },
-      orderBy: [{ display_order: "asc" }, { price: "asc" }],
-    });
-    res.status(200).json({ items });
   } catch {
     res.status(500).json({ message: "Lỗi máy chủ nội bộ" });
   }

@@ -31,9 +31,9 @@ export const createVnpayPayment: RequestHandler = async (req, res) => {
     if (!amount || !orderId || !orderInfo) {
       return res.status(400).json({ message: "Invalid payload" });
     }
-    const tmnCode = VNP_TMNCODE || req.body.tmnCode || "";
-    const hashSecret = VNP_HASH_SECRET || req.body.hashSecret || "";
-    const returnUrl = req.body.returnUrl || VNP_RETURN_URL || "";
+    const tmnCode = VNP_TMNCODE || (req.body as any).tmnCode || "";
+    const hashSecret = VNP_HASH_SECRET || (req.body as any).hashSecret || "";
+    const returnUrl = (req.body as any).returnUrl || VNP_RETURN_URL || "";
     if (!tmnCode || !hashSecret || !returnUrl) {
       return res.status(400).json({ message: "VNPay configuration missing" });
     }
@@ -76,3 +76,4 @@ export const createVnpayPayment: RequestHandler = async (req, res) => {
 export const vnpayIpn: RequestHandler = async (_req, res) => {
   res.status(200).json({ result: true });
 };
+

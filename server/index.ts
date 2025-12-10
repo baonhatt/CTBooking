@@ -3,61 +3,23 @@ import express from "express";
 import fs from "fs";
 import path from "path";
 import cors from "cors";
-import { handleDemo } from "./routes/demo";
-import {
-  handleMovies2025,
-  createMovie,
-  listMovies,
-  getMovie,
-  updateMovie,
-  deleteMovie,
-  listShowtimes,
-  createShowtime,
-  updateShowtime,
-  deleteShowtime,
-  createShowtimesBatch,
-  getMovieById,
-} from "./routes/movies";
-import { handleLogin } from "./routes/login";
-import { handleRegister } from "./routes/register";
-import { handleForgetPass, handleResetPassword } from "./routes/forget-pass";
-import { getAllActiveMoviesToday } from "./routes/movies";
-import { createMomoPayment, momoIpn } from "./routes/momo";
-import { createVnpayPayment, vnpayIpn } from "./routes/vnpay";
-import {
-  createPayment,
-  updatePayment,
-  getRevenue,
-  listTransactions,
-  getTransactionById,
-  getBooking,
-  getBookingById,
-  getBookingByCode,
-} from "./routes/payment";
-import {
-  listToys,
-  listActiveToys,
-  createToy,
-  getToy,
-  updateToy,
-  deleteToy,
-} from "./routes/toys";
-import {
-  getDashboardMetrics,
-  getRevenueByDate,
-  getRevenue7Days,
-  getRevenueByMonth,
-} from "./routes/dashboard";
-import { getUsers, getUserById, updateUserProfile, changePassword, listUserTransactions } from "./routes/users";
-import { getShowtimeById } from "./routes/showtimes";
-import {
-  listTicketPackages,
-  listActiveTicketPackages,
-  getTicketPackage,
-  createTicketPackage,
-  updateTicketPackage,
-  deleteTicketPackage,
-} from "./routes/tickets";
+import { handleDemo } from "./routes/user/demo";
+import { handleMovies2025, listMovies, getMovie, getAllActiveMoviesToday } from "./routes/user/movies";
+import { createMovie, updateMovie, deleteMovie, getMovieById } from "./routes/admin/movies";
+import { listShowtimes, createShowtime, updateShowtime, deleteShowtime, createShowtimesBatch, getShowtimeById } from "./routes/admin/showtimes";
+import { handleLogin, handleRegister } from "./routes/user/auth";
+import { handleForgetPass, handleResetPassword, changePassword } from "./routes/user/password";
+import { createMomoPayment, momoIpn } from "./routes/user/momo";
+import { createVnpayPayment, vnpayIpn } from "./routes/user/vnpay";
+import { createPayment, updatePayment, getBooking, getBookingById, getBookingByCode } from "./routes/user/payments";
+import { getRevenue, listTransactions, getTransactionById } from "./routes/admin/payments";
+import { listActiveToys } from "./routes/user/toys";
+import { listToys, createToy, getToy, updateToy, deleteToy } from "./routes/admin/toys";
+import { getDashboardMetrics, getRevenueByDate, getRevenue7Days, getRevenueByMonth } from "./routes/admin/dashboard";
+import { getUsers, getUserById } from "./routes/admin/users";
+import { updateUserProfile, listUserTransactions } from "./routes/user/users";
+import { listTicketPackages, getTicketPackage, createTicketPackage, updateTicketPackage, deleteTicketPackage } from "./routes/admin/tickets";
+import { listActiveTicketPackages } from "./routes/user/tickets";
 
 export function createServer() {
   const app = express();

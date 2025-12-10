@@ -1,7 +1,7 @@
 import { RequestHandler } from "express";
-import { prisma } from "../lib/prisma";
+import { prisma } from "../../lib/prisma";
 
-export const getDashboardMetrics: RequestHandler = async (req, res) => {
+export const getDashboardMetrics: RequestHandler = async (_req, res) => {
   try {
     const totalMovies = await (prisma as any).movies.count();
     const totalShowtimes = await (prisma as any).showtimes.count({ where: { is_active: true } });
@@ -210,7 +210,7 @@ export const getRevenueByDate: RequestHandler = async (req, res) => {
   }
 };
 
-export const getRevenue7Days: RequestHandler = async (req, res) => {
+export const getRevenue7Days: RequestHandler = async (_req, res) => {
   try {
     // Get last 7 days from today
     const today = new Date();
@@ -362,3 +362,4 @@ export const getRevenueByMonth: RequestHandler = async (req, res) => {
     res.status(500).json({ message: "Lỗi máy chủ nội bộ" });
   }
 };
+
