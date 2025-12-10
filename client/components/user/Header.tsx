@@ -26,11 +26,12 @@ import { Navigate, useNavigate, useLocation } from "react-router-dom";
 
 
 interface HeaderProps {
-  onBookClick: () => void;
+  onBookClick?: () => void;
   disableNav?: boolean;
 }
-const auth = useAuth();
-export default function Header({ onBookClick, disableNav = false }: HeaderProps) {
+
+export default function Header({ onBookClick = () => { }, disableNav = false }: HeaderProps) {
+  const auth = useAuth();
   const [isScrolled, setIsScrolled] = useState(false);
   const [userName, setUserName] = useState<string | null>(null);
   const [isLoginOpen, setIsLoginOpen] = useState(false);
@@ -109,7 +110,7 @@ export default function Header({ onBookClick, disableNav = false }: HeaderProps)
           const derivedName = data.user.username || (data.user.email || "").split("@")[0];
           const profile = { email: data.user.email, name: derivedName, phone: (data.user as any)?.phone || "" };
           localStorage.setItem("userProfile", JSON.stringify(profile));
-        } catch {}
+        } catch { }
         setUserName(data.user.username);
         window.dispatchEvent(new Event("user-auth-changed"));
         toast({ title: "Đăng nhập thành công", description: data.user.email });
@@ -155,7 +156,7 @@ export default function Header({ onBookClick, disableNav = false }: HeaderProps)
           const derivedName = data.user.username || (data.user.email || "").split("@")[0];
           const profile = { email: data.user.email, name: derivedName, phone: (data.user as any)?.phone || "" };
           localStorage.setItem("userProfile", JSON.stringify(profile));
-        } catch {}
+        } catch { }
         setUserName(data.user.username);
         window.dispatchEvent(new Event("user-auth-changed"));
         toast({ title: "Đăng ký thành công", description: data.user.email });
@@ -206,7 +207,7 @@ export default function Header({ onBookClick, disableNav = false }: HeaderProps)
     >
       <div className="container mx-auto px-4 py-4 flex items-center justify-between">
         <div className="flex items-center gap-3 animate-fade-in">
-          <img onClick={() => navigator('/')} src={icon} className="w-[10rem] h-12 md:w-20 sm:w-20 md:h-16"  alt="CINESPHERE logo" />
+          <img onClick={() => navigator('/')} src={icon} className="w-[10rem] h-12 md:w-20 sm:w-20 md:h-16" alt="CINESPHERE logo" />
         </div>
 
         <nav className="hidden md:flex items-center gap-8 animate-fade-in delay-200">
