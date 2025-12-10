@@ -28,15 +28,16 @@ export default function BookingPage() {
   const countdownRef = useRef<NodeJS.Timeout | null>(null);
   const [countdown, setCountdown] = useState(600);
 
-  const { data: activeData, refetch: refetchActive } = useQuery({
+  const { data: activeData, refetch: refetchActive, isLoading: isLoadingActive } = useQuery({
     queryKey: ["activeMovies", "today"],
     queryFn: () => getAllActiveMoviesToday(),
     staleTime: 60000,
   });
-  const { data: ticketsData } = useQuery({
+  const { data: ticketsData, isLoading: isLoadingTickets } = useQuery({
     queryKey: ["activeTickets"],
     queryFn: ({ signal }) => getActiveTickets({ signal }),
   });
+  const isLoadingPage = isLoadingActive || isLoadingTickets;
 
   const movies = (activeData?.activeMovies || []).map((m: any) => ({ id: m.title, title: m.title }));
   const activeMoviesFull = activeData?.activeMovies || [];
@@ -59,6 +60,21 @@ export default function BookingPage() {
       }
     } catch { }
   }, []);
+
+  // Nếu cần chặn rời trang khi đang xử lý thanh toán, bật lại hook này.
+  // Hiện tại tắt để tránh popup confirm rời trang làm gián đoạn UX.
+  // useEffect(() => {
+  //   const handler = (e: BeforeUnloadEvent) => {
+  //     e.preventDefault();
+  //     e.returnValue = "";
+  //   };
+  //   if (isProcessing) {
+  //     window.addEventListener("beforeunload", handler);
+  //   }
+  //   return () => {
+  //     window.removeEventListener("beforeunload", handler);
+  //   };
+  // }, [isProcessing]);
 
   useEffect(() => {
     try {
@@ -177,7 +193,6 @@ export default function BookingPage() {
         ticketPackageId,
       });
       localStorage.setItem("pendingOrder", JSON.stringify({ ...summary, booking_id: booking?.id, user_id: booking?.user_id }));
-
       let orderInfoText = `${selectedMovie?.title || "Movie"} | ${ticketCount} vé | ${selectedShowtimeLabel || "--:--"}`;
       if (paymentMethod === "momo") {
         const extraDataEncoded = btoa(unescape(encodeURIComponent(JSON.stringify({ ...summary, booking_id: booking?.id, user_id: booking?.user_id }))));
@@ -222,7 +237,19 @@ export default function BookingPage() {
           <span className="mx-2 text-white/60">&gt;</span>
           <span className="text-white">Đặt vé</span>
         </div>
-        {step === 0 && (
+        {isLoadingPage && (
+          <Card className="bg-black/40 border border-white/10 text-white">
+            <CardHeader>
+              <CardTitle>Đang tải dữ liệu đặt vé</CardTitle>
+            </CardHeader>
+            <CardContent className="flex items-center gap-3 text-sm text-cyan-200">
+              <div className="w-5 h-5 border-2 border-cyan-300 border-t-transparent rounded-full animate-spin" />
+              Vui lòng chờ trong giây lát...
+            </CardContent>
+          </Card>
+        )}
+
+        {!isLoadingPage && step === 0 && (
           <Card className="bg-black/40 border border-white/10 text-white">
             <CardHeader>
               <CardTitle>Đặt vé</CardTitle>
@@ -259,14 +286,25 @@ export default function BookingPage() {
               {selectedMovie && (
                 <div>
                   <div className="text-sm text-cyan-200 mb-2">Chọn lịch chiếu</div>
-                  <div className="flex gap-2 bg-black/40 text-white rounded px-3 py-2 mb-4 border border-white/10">
+                  <div className="flex gap-2 bg-black/40 text-white rounded px-3 py-2 mb-4 border border-white/20">
                     {availableDates.length === 0 ? (
                       <span className="text-cyan-200">Hiện chưa có lịch chiếu</span>
                     ) : (
                       availableDates.map((d, idx) => {
                         const active = selectedDate && d.toDateString() === selectedDate.toDateString();
                         return (
-                          <Button key={idx} variant={active ? "default" : "ghost"} className={active ? "bg-blue-600 text-white" : "bg-transparent text-white hover:bg-white/10"} onClick={() => setSelectedDate(new Date(d))}>{formatDateShort(d)}</Button>
+                          <Button
+                            key={idx}
+                            variant={active ? "default" : "ghost"}
+                            className={
+                              active
+                                ? "bg-blue-600 text-white border border-white/30"
+                                : "bg-transparent text-white hover:bg-white/10 border border-white/20"
+                            }
+                            onClick={() => setSelectedDate(new Date(d))}
+                          >
+                            {formatDateShort(d)}
+                          </Button>
                         );
                       })
                     )}
@@ -274,7 +312,7 @@ export default function BookingPage() {
                   {selectedDate && (
                     <div className="space-y-3">
                       <div className="text-sm text-cyan-200">Giờ chiếu</div>
-                      <div className="flex flex-wrap gap-2">
+                      <div className="flex flex-wrap gap-2 border border-white/20 rounded px-2 py-2">
                         {(selectedMovie.showtimes || [])
                           .filter((st: any) => new Date(st.start_time).toDateString() === selectedDate.toDateString())
                           .map((st: any) => {
@@ -282,7 +320,16 @@ export default function BookingPage() {
                             const label = `${t.getHours().toString().padStart(2, "0")}:${t.getMinutes().toString().padStart(2, "0")}`;
                             const active = selectedShowtimeId === st.id;
                             return (
-                              <Button key={st.id} variant={active ? "default" : "outline"} className={active ? "bg-blue-600 text-white" : "bg-transparent border-white/20 text-white hover:bg-white/10"} onClick={() => { setSelectedShowtimeId(st.id); setSelectedShowtimeLabel(label); }}>
+                              <Button
+                                key={st.id}
+                                variant={active ? "default" : "outline"}
+                                className={
+                                  active
+                                    ? "bg-blue-600 text-white border border-white/30"
+                                    : "bg-transparent border-white/30 text-white hover:bg-white/10"
+                                }
+                                onClick={() => { setSelectedShowtimeId(st.id); setSelectedShowtimeLabel(label); }}
+                              >
                                 {label}
                               </Button>
                             );
@@ -326,8 +373,8 @@ export default function BookingPage() {
               )}
 
               <div className="flex justify-end gap-3">
-                <Button variant="outline" className="bg-transparent border-white/30 text-white hover:bg-white/10" onClick={() => navigate("/")}>Hủy</Button>
-                <Button className="bg-gradient-to-r from-blue-500 to-purple-500 hover:from-blue-600 hover:to-purple-600 text-white font-semibold shadow-lg" onClick={() => setStep(1)} disabled={!movie || !selectedDate || !selectedShowtimeId || !name || !phone || !email}>Tiếp tục</Button>
+                <Button variant="outline" className="bg-transparent border-white/30 text-white hover:bg-white/10" onClick={() => navigate("/")} disabled={isProcessing}>Hủy</Button>
+                <Button className="bg-gradient-to-r from-blue-500 to-purple-500 hover:from-blue-600 hover:to-purple-600 text-white font-semibold shadow-lg" onClick={() => setStep(1)} disabled={!movie || !selectedDate || !selectedShowtimeId || !name || !phone || !email || isProcessing}>Tiếp tục</Button>
               </div>
             </CardContent>
           </Card>
@@ -390,12 +437,21 @@ export default function BookingPage() {
               </CardContent>
             </Card>
             <div className="flex justify-between">
-              <Button variant="outline" className="bg-transparent border-white/30 text-white hover:bg-white/10" onClick={() => setStep(0)}>Quay lại</Button>
-              <Button className="bg-gradient-to-r from-blue-500 to-purple-500 hover:from-blue-600 hover:to-purple-600 text-white font-semibold shadow-lg disabled:opacity-50" disabled={!isConfirmed} onClick={handleCreateAndPay}>Thanh toán</Button>
+              <Button variant="outline" className="bg-transparent border-white/30 text-white hover:bg-white/10" onClick={() => setStep(0)} disabled={isProcessing}>Quay lại</Button>
+              <Button className="bg-gradient-to-r from-blue-500 to-purple-500 hover:from-blue-600 hover:to-purple-600 text-white font-semibold shadow-lg disabled:opacity-50" disabled={!isConfirmed || isProcessing} onClick={handleCreateAndPay}>
+                {isProcessing ? "Đang xử lý..." : "Thanh toán"}
+              </Button>
             </div>
           </>
         )}
       </div>
+      {isProcessing && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex flex-col items-center justify-center text-white">
+          <div className="w-12 h-12 border-4 border-blue-400 border-t-transparent rounded-full animate-spin mb-4" />
+          <div className="text-lg font-semibold">Đang xử lý thanh toán...</div>
+          <div className="text-sm text-white/70 mt-1">Vui lòng không đóng hoặc rời khỏi trang cho đến khi chuyển sang cổng thanh toán.</div>
+        </div>
+      )}
     </UserLayout>
   );
 }

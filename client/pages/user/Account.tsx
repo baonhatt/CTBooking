@@ -19,6 +19,7 @@ export default function Account() {
   const [confirmPwd, setConfirmPwd] = useState("");
 
   const [transactions, setTransactions] = useState<any[]>([]);
+  const [isLoadingTx, setIsLoadingTx] = useState(false);
   const [isDetailOpen, setIsDetailOpen] = useState(false);
   const [selectedTx, setSelectedTx] = useState<any | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
@@ -64,6 +65,7 @@ export default function Account() {
   useEffect(() => {
     (async () => {
       try {
+        setIsLoadingTx(true);
         const email = profile.email;
         if (!email) return;
         const { items } = await getUserTransactionsApi({ email, status: "paid" });
@@ -75,6 +77,8 @@ export default function Account() {
         setTransactions(mapped);
       } catch (e: any) {
         console.error(e);
+      } finally {
+        setIsLoadingTx(false);
       }
     })();
   }, [profile.email]);
@@ -294,7 +298,12 @@ export default function Account() {
               </TabsContent>
 
               <TabsContent value="history" className="mt-6">
-                {groups.length === 0 ? (
+                {isLoadingTx ? (
+                  <div className="flex items-center gap-3 text-sm text-gray-200 bg-white/5 border border-white/10 rounded-lg px-4 py-3">
+                    <div className="w-5 h-5 border-2 border-blue-300 border-t-transparent rounded-full animate-spin" />
+                    Đang tải lịch sử giao dịch...
+                  </div>
+                ) : groups.length === 0 ? (
                   <div className="text-sm text-gray-300">Chưa có giao dịch</div>
                 ) : (
                   <div className="space-y-6">
