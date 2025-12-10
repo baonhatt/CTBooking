@@ -7,6 +7,7 @@ import {
 import { motion } from "framer-motion";
 import { useQuery } from "@tanstack/react-query";
 import { getActiveTickets } from "@/lib/api";
+import { toast } from "@/components/ui/use-toast";
 interface BookingSectionProps {
   onBookClick: () => void;
 }
@@ -38,7 +39,7 @@ export default function BookingSection({ onBookClick }: BookingSectionProps) {
             <div className="grid grid-cols-1 md:grid-cols-3 gap-10 mb-8">
               {ticketPackages.map((pkg, i) => (
                 <motion.div
-                key={pkg.id}
+                  key={pkg.id}
                   initial={{ opacity: 0, y: 50 }}
                   whileInView={{ opacity: 1, y: 0 }}
                   viewport={{ once: true }}
@@ -79,7 +80,13 @@ export default function BookingSection({ onBookClick }: BookingSectionProps) {
 
                   <Button
                     onClick={() => {
-                      try { localStorage.setItem('selectedTicketPackage', JSON.stringify(pkg)); } catch {}
+                      const authRaw = localStorage.getItem("authUser");
+                      if (!authRaw) {
+                        toast({ title: "Vui lòng đăng nhập trước!" });
+                        window.dispatchEvent(new Event("open-login"));
+                        return;
+                      }
+                      try { localStorage.setItem('selectedTicketPackage', JSON.stringify(pkg)); } catch { }
                       setSelectedPackage(pkg);
                       navigate('/booking');
                     }}

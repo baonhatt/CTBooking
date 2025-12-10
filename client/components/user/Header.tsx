@@ -94,6 +94,7 @@ export default function Header({ onBookClick = () => { }, disableNav = false }: 
 
   const handleLogout = () => {
     localStorage.removeItem("authUser");
+    localStorage.removeItem("userProfile");
     setUserName(null);
     window.dispatchEvent(new Event("user-auth-changed"));
     toast({ title: "Đã đăng xuất" });
@@ -187,6 +188,11 @@ export default function Header({ onBookClick = () => { }, disableNav = false }: 
     } finally {
       setIsForgetLoading(false);
     }
+  };
+
+  // Nav "Đặt vé ngay" chỉ để cuộn xuống section đặt vé, không cần check đăng nhập
+  const handleBookNow = () => {
+    onBookClick();
   };
 
   const scrollToSection = (id: string) => {
@@ -593,7 +599,7 @@ export default function Header({ onBookClick = () => { }, disableNav = false }: 
           </Dialog>
           {!effectiveDisable && (
             <Button
-              onClick={onBookClick}
+              onClick={handleBookNow}
               className="bg-gradient-to-r text-sm md:text-base from-blue-500 to-purple-500 hover:from-blue-600 hover:to-purple-600 text-white font-semibold px-3 py-2 md:px-6 md:py-2 rounded-lg shadow-lg transition-all duration-300 hover:scale-105"
             >
               <Ticket className="h-4 w-4 md:mr-2" />

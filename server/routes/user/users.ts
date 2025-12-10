@@ -84,6 +84,7 @@ export const listUserTransactions: RequestHandler = async (req, res) => {
 
     const mapped = items.map((b: any) => {
       try {
+        const movie = b?.showtime?.movie;
         const start = (() => {
           const v = b?.showtime?.start_time;
           if (!v) return null;
@@ -98,11 +99,12 @@ export const listUserTransactions: RequestHandler = async (req, res) => {
         const amount = (() => {
           try { return Number(b?.total_price ?? 0); } catch { return 0; }
         })();
+        const coverImage = movie?.cover_image || movie?.coverImage || movie?.poster || null;
         return {
           booking_id: b.id,
           booking_code: b.booking_code || null,
           user_id: b.user_id,
-          movie: b?.showtime?.movie?.title || "",
+          movie: movie?.title || "",
           dateDisplay,
           showtime: showtimeStr,
           quantity: Number(b?.ticket_count ?? 0),
@@ -112,6 +114,7 @@ export const listUserTransactions: RequestHandler = async (req, res) => {
           name: b?.name || "",
           phone: b?.phone || "",
           email: b?.email || email,
+          poster_url: coverImage,
         };
       } catch {
         return {
@@ -128,6 +131,7 @@ export const listUserTransactions: RequestHandler = async (req, res) => {
           name: b?.name || "",
           phone: b?.phone || "",
           email: b?.email || email,
+          poster_url: null,
         };
       }
     });
