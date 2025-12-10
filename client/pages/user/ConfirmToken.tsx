@@ -3,7 +3,7 @@ import { useNavigate, useParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { toast } from "@/components/ui/use-toast";
-import { resetPasswordApi } from "@/lib/api";
+import { resetPasswordApi } from "@/lib/api/auth";
 
 export default function ConfirmToken() {
   const [newPassword, setNewPassword] = useState("");
@@ -50,7 +50,7 @@ export default function ConfirmToken() {
             value={newPassword}
             onChange={(e) => setNewPassword(e.target.value)}
             required
-            pattern="^(?=.*[A-Za-z])(?=.*\d)[A-Za-z\d]{6,}$"
+            pattern="^(?=.*[A-Za-z])(?=.*\\d)[A-Za-z\\d]{6,}$"
             title="Mật khẩu phải có ít nhất 6 ký tự, bao gồm cả chữ cái và số"
           />
         </div>
@@ -64,7 +64,7 @@ export default function ConfirmToken() {
             value={confirmPassword}
             onChange={(e) => setConfirmPassword(e.target.value)}
             required
-            pattern="^(?=.*[A-Za-z])(?=.*\d)[A-Za-z\d]{6,}$"
+            pattern="^(?=.*[A-Za-z])(?=.*\\d)[A-Za-z\\d]{6,}$"
             title="Mật khẩu phải có ít nhất 6 ký tự, bao gồm cả chữ cái và số"
           />
         </div>
@@ -78,3 +78,4 @@ export default function ConfirmToken() {
     </div>
   );
 }
+

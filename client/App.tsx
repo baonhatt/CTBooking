@@ -10,12 +10,12 @@ import {
   Routes,
   Route,
 } from "react-router-dom";
-import Index from "./pages/Index";
+import Index from "./pages/user/Index";
 import NotFound from "./pages/NotFound";
-import ConfirmToken from "./components/ConfirmToken";
-import Checkout from "./pages/Checkout";
-import Booking from "./pages/Booking";
-import Account from "./pages/Account";
+import ConfirmToken from "./pages/user/ConfirmToken";
+import Checkout from "./pages/user/Checkout";
+import Booking from "./pages/user/Booking";
+import Account from "./pages/user/Account";
 import { AdminGate } from "@/admin/auth/AdminGate";
 
 const queryClient = new QueryClient({

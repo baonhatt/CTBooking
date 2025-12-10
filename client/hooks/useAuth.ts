@@ -11,7 +11,7 @@ export function useAuth() {
   }
 
   async function register(email: string, password: string, name?: string) {
-    return registerApi({ email, password });
+    return registerApi({ email, password, name });
   }
 
   async function forgetPass(email: string) {

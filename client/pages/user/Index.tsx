@@ -1,8 +1,8 @@
 import { useEffect, useState } from "react";
-import HeroSection from "@/components/HeroSection";
-import TechnologyBanner from "@/components/TechnologyBanner";
-import BookingSection from "@/components/BookingSection";
-import ProductSection from "@/components/ProductSection";
+import HeroSection from "@/components/user/HeroSection";
+import TechnologyBanner from "@/components/user/TechnologyBanner";
+import BookingSection from "@/components/user/BookingSection";
+import ProductSection from "@/components/user/ProductSection";
 import UserLayout from "@/user/layouts/UserLayout";
 import { ConfigProvider } from "antd";
 import { motion } from "framer-motion";
