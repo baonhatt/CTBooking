@@ -3,16 +3,17 @@ import nodemailer from "nodemailer";
 
 const transporter = nodemailer.createTransport({
   host: "smtp.gmail.com",
-  port: 587, // <-- Thay đổi sang cổng STARTTLS
-  secure: false, // <-- Phải là false khi dùng cổng 587
+  port: 465,
+  secure: true,
   auth: {
     user: process.env.GMAIL_USER,
-    pass: process.env.GMAIL_PASS, // Đã xác nhận là App Password
+    pass: process.env.GMAIL_PASS,
   },
-  requireTLS: true, // Yêu cầu sử dụng STARTTLS
-  // Tăng timeout để tránh lỗi ETIMEDOUT trong môi trường đám mây
-  timeout: 30000,
-  socketTimeout: 60000,
+  timeout: 180000,
+  socketTimeout: 180000,
+  tls: {
+    rejectUnauthorized: false
+  }
 });
 
 export async function sendMail(toEmail, subject, text) {
