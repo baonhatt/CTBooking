@@ -1,0 +1,7 @@
+name = "cinema-pages"
+pages_build_output_dir = "dist/spa"
+
+[[d1_databases]]
+binding = "cinema_db"
+database_name = "cinema-db"
+database_id = "9bae4fb3-570a-4ded-9a75-922ce4d6ef81"
