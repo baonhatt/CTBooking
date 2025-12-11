@@ -1,4 +1,5 @@
 import { prisma } from "./prisma";
+import "dotenv/config";
 
 /**
  * Generate unique booking code (8 random alphanumeric characters)
@@ -194,20 +195,20 @@ export function getBookingEmailTemplate(data: {
                 </div>
             </div>
 
-            ${data.movieImage ? `<img src="${data.movieImage}" alt="${data.movieTitle}" class="movie-poster">` : ""}
+            ${data.movieImage ? `<img src="${process.env.VITE_SERVER_BASE_URL}${data.movieImage}" alt="${data.movieTitle}" class="movie-poster">` : ""}
 
             <div class="details-section">
                 <div class="section-title">Thông tin phim</div>
                 <div class="detail-row">
-                    <span class="detail-label">Tên phim</span>
+                    <span class="detail-label">Tên phim: </span>
                     <span class="detail-value">${data.movieTitle}</span>
                 </div>
                 <div class="detail-row">
-                    <span class="detail-label">Ngày chiếu</span>
+                    <span class="detail-label">Ngày chiếu: </span>
                     <span class="detail-value">${data.showtimeDate}</span>
                 </div>
                 <div class="detail-row">
-                    <span class="detail-label">Giờ chiếu</span>
+                    <span class="detail-label">Giờ chiếu: </span>
                     <span class="detail-value">${data.showtimeTime}</span>
                 </div>
             </div>
@@ -215,11 +216,11 @@ export function getBookingEmailTemplate(data: {
             <div class="details-section">
                 <div class="section-title">Chi tiết đơn hàng</div>
                 <div class="detail-row">
-                    <span class="detail-label">Số lượng vé</span>
+                    <span class="detail-label">Số lượng vé: </span>
                     <span class="detail-value">${data.ticketCount} vé</span>
                 </div>
                 <div class="detail-row">
-                    <span class="detail-label">Tổng tiền</span>
+                    <span class="detail-label">Tổng tiền: </span>
                     <span class="detail-value price-highlight">${data.totalPrice}₫</span>
                 </div>
             </div>
