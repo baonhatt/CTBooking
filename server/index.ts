@@ -33,7 +33,7 @@ export function createServer() {
   try {
     fs.mkdirSync(uploadDir, { recursive: true });
     fs.mkdirSync(uploadMoviesDir, { recursive: true });
-  } catch { }
+  } catch { };
   app.use("/uploads", express.static(uploadDir));
 
   // Example API routes
@@ -73,7 +73,7 @@ export function createServer() {
         res.set("X-RateLimit-Remaining", "0");
         res.set("X-RateLimit-WindowMS", String(windowMs));
         return res.status(429).json({ message: `Quá nhiều yêu cầu, vui lòng thử lại sau ${retrySec}s` });
-      }
+      };
       const remaining = Math.max(0, max - (filtered.length + 1));
       res.locals.rateLimitRemaining = remaining;
       res.locals.rateLimitMax = max;
