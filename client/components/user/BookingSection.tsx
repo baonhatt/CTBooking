@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Check, Flame } from "lucide-react";
@@ -12,6 +12,7 @@ interface BookingSectionProps {
 
 export default function BookingSection({ onBookClick }: BookingSectionProps) {
   const navigate = useNavigate();
+  const sliderRef = useRef<HTMLDivElement | null>(null);
 
   const { data: ticketsData } = useQuery({
     queryKey: ["activeTickets"],
@@ -58,10 +59,14 @@ export default function BookingSection({ onBookClick }: BookingSectionProps) {
   }, [txData]);
 
   return (
-    <> 
-      <section className="py-20 bg-gradient-section relative overflow-hidden">
+    <>
+      <section className="py-24 bg-gradient-section relative overflow-hidden">
         <div className="container mx-auto px-4 relative z-10">
           <div className="max-w-7xl mx-auto">
+            <div className="text-center mb-8">
+              <h2 className="text-3xl md:text-4xl font-bold text-white">Bảng Giá Vé</h2>
+              <p className="text-gray-300 mt-2">Chọn gói phù hợp và đặt vé nhanh chóng</p>
+            </div>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-10 mb-8">
               {[...ticketPackages].sort((a, b) => a.display_order - b.display_order).map((pkg, i) => (
                 <motion.div

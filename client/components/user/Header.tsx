@@ -217,7 +217,7 @@ export default function Header({ onBookClick = () => { }, disableNav = false }: 
     >
       <div className="container mx-auto px-4 py-4 flex items-center justify-between ">
         <div className="flex items-center gap-3 animate-fade-in">
-          <img onClick={() => navigator('/')} src={icon} className="cursor-pointer w-[19rem] h-12 md:w-20 sm:w-20 md:h-16" alt="CINESPHERE logo" />
+          <img onClick={() => navigator('/')} src={icon} className="cursor-pointer  h-12 md:w-20 sm:w-20 md:h-16" alt="CINESPHERE logo" />
         </div>
 
         <nav className="hidden md:flex items-center gap-8 animate-fade-in delay-200">
