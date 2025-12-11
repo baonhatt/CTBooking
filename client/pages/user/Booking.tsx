@@ -21,6 +21,7 @@ export default function BookingPage() {
   const [selectedPackage, setSelectedPackage] = useState<any | null>(null);
   const [name, setName] = useState<string>("");
   const [phone, setPhone] = useState<string>("");
+  const [phoneError, setPhoneError] = useState<string>("");
   const [email, setEmail] = useState<string>("");
   const [paymentMethod, setPaymentMethod] = useState<"momo" | "vnpay">("momo");
   const [isProcessing, setIsProcessing] = useState(false);
@@ -45,6 +46,8 @@ export default function BookingPage() {
   const defaultTicket = ticketPackages.sort((a, b) => a.display_order - b.display_order)[0];
   const unitPrice = Number((selectedPackage?.price ?? defaultTicket?.price) || 0);
   const totalPrice = unitPrice * ticketCount;
+  const MIN_TICKETS = 1;
+  const MAX_TICKETS = 10;
 
   useEffect(() => {
     return () => { if (countdownRef.current) clearInterval(countdownRef.current); };
@@ -196,10 +199,14 @@ export default function BookingPage() {
       if (paymentMethod === "momo") {
         const extraDataEncoded = btoa(unescape(encodeURIComponent(JSON.stringify({ ...summary, booking_id: booking?.id, user_id: booking?.user_id }))));
         const partnerCode = (import.meta as any).env?.VITE_MOMO_PARTNER_CODE || "";
-        const partnerName = (import.meta as any).env?.VITE_MOMO_PARTNER_NAME || "";
-        const storeId = (import.meta as any).env?.VITE_MOMO_STORE_ID || "";
-        const redirectUrl = `${(import.meta as any).env?.VITE_CLIENT_BASE_URL}${(import.meta as any).env?.VITE_MOMO_REDIRECT_URL}` || "";
-        const ipnUrl = `${(import.meta as any).env?.VITE_CLIENT_BASE_URL}${(import.meta as any).env?.VITE_MOMO_IPN_URL}` || "";
+        const partnerName = (import.meta as any).env?.VITE_MOMO_PARTNER_NAME || "CineSphere";
+        const storeId = (import.meta as any).env?.VITE_MOMO_STORE_ID || "devstore";
+        const clientBase = (import.meta as any).env?.VITE_CLIENT_BASE_URL || window.location.origin;
+        const serverBase = (import.meta as any).env?.VITE_SERVER_BASE_URL || clientBase;
+        const redirectPath = (import.meta as any).env?.VITE_MOMO_REDIRECT_URL || "/checkout";
+        const ipnPath = (import.meta as any).env?.VITE_MOMO_IPN_URL || "/api/momo/ipn";
+        const redirectUrl = `${clientBase}${redirectPath}`;
+        const ipnUrl = `${serverBase}${ipnPath}`;
         const accessKey = (import.meta as any).env?.VITE_MOMO_ACCESS_KEY || "";
         const secretKey = (import.meta as any).env?.VITE_MOMO_SECRET_KEY || "";
         const requestId = Date.now().toString();
@@ -285,7 +292,7 @@ export default function BookingPage() {
               {selectedMovie && (
                 <div>
                   <div className="text-sm text-orange-400 mb-2">Chọn lịch chiếu</div>
-                  <div className="flex gap-2 bg-black/40 text-white rounded px-3 py-2 mb-4 border border-white/20">
+                  <div className="flex gap-2 bg-black/40 text-white rounded px-3 py-2 mb-4">
                     {availableDates.length === 0 ? (
                       <span className="text-orange-400">Hiện chưa có lịch chiếu</span>
                     ) : (
@@ -297,8 +304,8 @@ export default function BookingPage() {
                             variant={active ? "default" : "ghost"}
                             className={
                               active
-                                ? "bg-blue-600 text-white border border-white/30"
-                                : "bg-transparent text-white hover:bg-white/10 border border-white/20"
+                                ? "bg-blue-600 text-white"
+                                : "bg-transparent text-white hover:bg-white border"
                             }
                             onClick={() => setSelectedDate(new Date(d))}
                           >
@@ -311,7 +318,7 @@ export default function BookingPage() {
                   {selectedDate && (
                     <div className="space-y-3">
                       <div className="text-sm text-orange-400">Giờ chiếu</div>
-                      <div className="flex flex-wrap gap-2 border border-white/20 rounded px-2 py-2">
+                      <div className="flex flex-wrap  bg-black/40 gap-2 rounded px-2 py-2">
                         {(selectedMovie.showtimes || [])
                           .filter((st: any) => new Date(st.start_time).toDateString() === selectedDate.toDateString())
                           .map((st: any) => {
@@ -321,11 +328,11 @@ export default function BookingPage() {
                             return (
                               <Button
                                 key={st.id}
-                                variant={active ? "default" : "outline"}
+                                variant={active ? "default" : "ghost"}
                                 className={
                                   active
-                                    ? "bg-blue-600 text-white border border-white/30"
-                                    : "bg-transparent border-white/30 text-white hover:bg-white/10"
+                                    ? "bg-blue-600 text-white"
+                                    : "bg-transparent text-white hover:bg-white border"
                                 }
                                 onClick={() => { setSelectedShowtimeId(st.id); setSelectedShowtimeLabel(label); }}
                               >
@@ -348,7 +355,32 @@ export default function BookingPage() {
                   </div>
                   <div>
                     <Label className="text-white">Số điện thoại</Label>
-                    <Input className="bg-black/40 text-white border-white/10 focus-visible:ring-cyan-400" value={phone} onChange={(e) => setPhone(e.target.value)} type="tel" inputMode="numeric" pattern="^[0-9]{9,11}$" title="Số điện thoại 9-11 chữ số" placeholder="VD: 0912345678" />
+                    <Input
+                      className="bg-black/40 text-white border-white/10 focus-visible:ring-cyan-400"
+                      value={phone}
+                      inputMode="numeric"
+                      placeholder="VD: 0912345678"
+                      onChange={(e) => {
+                        const digits = e.target.value.replace(/\D+/g, "");
+                        if (digits !== e.target.value) {
+                          setPhoneError("Chỉ cho phép nhập số 0-9");
+                        } else {
+                          setPhoneError("");
+                        }
+                        setPhone(digits);
+                      }}
+                      onKeyDown={(e) => {
+                        const allow = ["Backspace", "Delete", "Tab", "ArrowLeft", "ArrowRight", "Home", "End"];
+                        if (allow.includes(e.key)) return;
+                        if (!/^[0-9]$/.test(e.key)) {
+                          e.preventDefault();
+                          setPhoneError("Chỉ cho phép nhập số 0-9");
+                        } else {
+                          setPhoneError("");
+                        }
+                      }}
+                    />
+                    {phoneError && <div className="text-red-400 text-xs mt-1">{phoneError}</div>}
                   </div>
                   <div>
                     <Label className="text-white">Email nhận vé</Label>
@@ -356,7 +388,27 @@ export default function BookingPage() {
                   </div>
                   <div>
                     <Label className="text-white">Số lượng vé</Label>
-                    <Input className="bg-black/40 text-white border-white/10 focus-visible:ring-cyan-400" type="number" min={1} max={10} value={ticketCount} onChange={(e) => setTicketCount(Number(e.target.value))} />
+                    <div className="flex items-center gap-2">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        className="bg-white/10 border-white/20 text-white hover:bg-white/20"
+                        onClick={() => setTicketCount((c) => Math.max(MIN_TICKETS, c - 1))}
+                      >
+                        -
+                      </Button>
+                      <div className="min-w-[3rem] text-center py-2 bg-black/40 border border-white/10 rounded text-white">
+                        {ticketCount}
+                      </div>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        className="bg-white/10 border-white/20 text-white hover:bg-white/20"
+                        onClick={() => setTicketCount((c) => Math.min(MAX_TICKETS, c + 1))}
+                      >
+                        +
+                      </Button>
+                    </div>
                   </div>
                 </div>
               </div>

@@ -73,11 +73,11 @@ export default function Index() {
       >
         <main>
           <HeroSection />
-          <TechnologyBanner />
           <div id="booking-section">
             <BookingSection onBookClick={handleBookClick} />
           </div>
           <ProductSection />
+          <TechnologyBanner />
         </main>
         {showBackToTop && (
           <motion.button

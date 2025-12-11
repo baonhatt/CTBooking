@@ -1,9 +1,12 @@
 import { useEffect, useState, useRef } from "react";
-import { Star, ChevronLeft, ChevronRight } from "lucide-react";
+import { Star, Play, CalendarDays, ChevronLeft, ChevronRight } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { getAllActiveMoviesToday } from "@/lib/api";
+import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
+import { motion } from "framer-motion";
 
-export default function HeroSection() {
+export default function HeroSection({ transitionSpeedMs = 1800 }: { transitionSpeedMs?: number }) {
   const [currentIndex, setCurrentIndex] = useState(0);
   const { data } = useQuery({
     queryKey: ["activeMovies", "today"],
@@ -28,34 +31,21 @@ export default function HeroSection() {
       duration: `${m.duration_min}`,
       genres,
       posterUrl: m.cover_image,
+      description: m.description,
     };
   });
 
   const displayMovies = movies.length > 0 ? movies : [
-    {
+    { 
       id: "sample-1",
       title: "Sample Movie 1",
       year: 2024,
       duration: "120",
+      description: 'description',
       genres: ["Action", "Adventure"],
       posterUrl: "https://images.unsplash.com/photo-1536440136628-849c177e76a1?w=400&h=600&fit=crop",
     },
-    {
-      id: "sample-2",
-      title: "Sample Movie 2",
-      year: 2024,
-      duration: "110",
-      genres: ["Drama", "Thriller"],
-      posterUrl: "https://images.unsplash.com/photo-1594908900066-3f47337549d8?w=400&h=600&fit=crop",
-    },
-    {
-      id: "sample-3",
-      title: "Sample Movie 3",
-      year: 2024,
-      duration: "95",
-      genres: ["Comedy", "Romance"],
-      posterUrl: "https://images.unsplash.com/photo-1598899134739-24c46f58b8c0?w=400&h=600&fit=crop",
-    },
+   
   ];
 
   useEffect(() => {
@@ -118,6 +108,7 @@ export default function HeroSection() {
   };
 
   const currentMovie = displayMovies[currentIndex];
+  const fewMovies = displayMovies.length <= 3;
   const dragStartX = useRef<number | null>(null);
   const dragDelta = useRef<number>(0);
   const isDragging = useRef<boolean>(false);
@@ -141,83 +132,92 @@ export default function HeroSection() {
       else handlePrev();
     }
   };
-
   return (
     <section className="relative min-h-screen bg-gradient-dark overflow-hidden">
-      {/* Background blur effect */}
-      <div className="absolute inset-0 bg-black/40" />
-      
-      <div className="container mx-auto px-4 relative z-10 min-h-screen flex flex-col justify-center py-16">
+      <div className="absolute inset-0">
+        <motion.img
+          key={currentMovie.posterUrl}
+          src={currentMovie.posterUrl}
+          alt="bg"
+          className="w-full h-full object-cover"
+          initial={{ opacity: 0, x: -12 }}
+          animate={{ opacity: 1, x: 0 }}
+          transition={{ duration: Math.max(1.5, Math.min(2.5, transitionSpeedMs / 1000)), ease: "easeInOut" }}
+          style={{ filter: "url(#bg-sharpen) contrast(1.06) brightness(1.03) saturate(1.06)", willChange: "opacity, transform" }}
+        />
+        <div className="absolute inset-0 bg-gradient-to-r from-black/70 via-black/50 to-transparent" />
+      </div>
 
-        {/* 3D Carousel */}
-        <div className="relative h-[420px] sm:h-[460px] md:h-[500px] flex items-center justify-center perspective-[1000px]"
-             onPointerDown={onPointerDown}
-             onPointerMove={onPointerMove}
-             onPointerUp={endDrag}
-             onPointerLeave={endDrag}
-        >
-          <div className="relative w-full max-w-5xl h-full flex items-center justify-center touch-pan-y select-none">
-            {displayMovies.map((movie, index) => {
-              const style = getCardStyle(index);
-              const diff = (index - currentIndex + displayMovies.length) % displayMovies.length;
-              const isCenter = diff === 0;
-              
-              return (
-                <div
+      <div className="container mx-auto px-4 relative z-10 min-h-screen flex flex-col justify-center py-20">
+
+        <div className="mb-3 mt-[4rem] max-w-5xl">
+          <h1 className="text-4xl md:text-6xl text-white">
+            {currentMovie.title}
+          </h1>
+          <div className="mt-3 flex items-center gap-3 text-gray-200">
+            <div className="flex items-center gap-1"><Star className="h-4 w-4 text-yellow-400" /><span>4.8</span></div>
+            <span>•</span>
+            <span>{currentMovie.year}</span>
+            <span>•</span>
+            <span>{currentMovie.duration} min</span>
+            <span>•</span>
+            <span className="text-purple-300">{currentMovie.genres.join(" / ")}</span>
+          </div>
+          <p className="mt-3 text-gray-300 text-lg md:text-xl">
+           {currentMovie.description}
+          </p>
+          <div className="mt-6 flex items-center gap-3">
+           
+          </div>
+          <div className="mt-4 flex items-center gap-3">
+            <button
+              onClick={handlePrev}
+              className="w-10 h-10 rounded-md bg-white/10 border border-white/20 text-white backdrop-blur-sm hover:bg-white/20 transition-all"
+            >
+              <ChevronLeft className="h-5 w-5 mx-auto" />
+            </button>
+            <button
+              onClick={handleNext}
+              className="w-10 h-10 rounded-md bg-white/10 border border-white/20 text-white backdrop-blur-sm hover:bg-white/20 transition-all"
+            >
+              <ChevronRight className="h-5 w-5 mx-auto" />
+            </button>
+          </div>
+        </div>
+
+        <div className="relative">
+          <div className="absolute -inset-x-16 -inset-y-8 bg-gradient-to-br from-cyan-500/15 via-purple-500/15 to-fuchsia-500/15 blur-3xl rounded-[3rem] pointer-events-none" />
+          <div className="relative z-10 w-full max-w-6xl mx-auto">
+            <div
+              className={cn(
+                "px-1 py-2 overflow-x-auto md:overflow-visible",
+                fewMovies
+                  ? "flex justify-end gap-3 md:flex"
+                  : "flex justify-center gap-4 md:grid md:grid-cols-5 lg:grid-cols-6 md:justify-center md:gap-6 md:place-items-center",
+              )}
+            >
+              {displayMovies.map((movie, index) => (
+                <button
                   key={movie.id}
-                  className="absolute transition-all duration-700 ease-out cursor-pointer"
-                  style={{
-                    ...style,
-                    pointerEvents: isCenter ? 'auto' : 'none',
-                  }}
-                  onClick={() => !isCenter && setCurrentIndex(index)}
+                  onClick={() => setCurrentIndex(index)}
+                  className="group"
                 >
-                  <div className="relative w-64 h-[24rem] sm:w-72 sm:h-[26rem] md:w-80 md:h-[30rem] lg:w-96 lg:h-[32rem] rounded-2xl overflow-hidden shadow-2xl bg-white transform-gpu">
-                    <img
-                      src={movie.posterUrl}
-                      alt={movie.title}
-                      className="w-full h-full object-cover"
-                    />
-                    
-                    {/* Price tag (optional) */}
-                    {/* {isCenter && (
-                      <div className="absolute top-4 right-4 bg-black text-white px-4 py-2 rounded-lg font-bold text-lg">
-                        $12
-                      </div>
-                    )} */}
-                    
-                    {/* Overlayed info inside image */}
-                    <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/90 via-black/60 to-transparent p-4 sm:p-5 md:p-6">
-                      <h3 className="text-white font-bold text-xl sm:text-2xl md:text-3xl mb-2">{movie.title}</h3>
-                      <div className="flex items-center gap-2 sm:gap-3 text-xs sm:text-sm md:text-base text-gray-200">
-                        <div className="flex items-center gap-1"><Star className="h-4 w-4 text-yellow-400 fill-yellow-400" /><span>4.8</span></div>
-                        <span>•</span>
-                        <span>{movie.duration} min</span>
-                        <span>•</span>
-                        <span className="text-purple-300">{movie.genres.join(" / ")}</span>
-                      </div>
-                      <p className="text-gray-400 text-[10px] sm:text-xs mt-2">{movie.year}</p>
+                  <div
+                    id={`movie-card-${index}`}
+                    className="w-40 md:w-44 shrink-0 rounded-xl overflow-hidden border border-white/10 bg-black/20 shadow-lg hover:shadow-2xl transition-all duration-200 hover:-translate-y-1"
+                  >
+                    <div style={{ aspectRatio: "2 / 3" }}>
+                      <img
+                        src={movie.posterUrl}
+                        alt={movie.title}
+                        className="w-full h-full object-cover"
+                      />
                     </div>
                   </div>
-                </div>
-              );
-            })}
+                </button>
+              ))}
+            </div>
           </div>
-
-          {/* Navigation Buttons */}
-          <button
-            onClick={handlePrev}
-            className="absolute left-2 sm:left-4 top-1/2 -translate-y-1/2 z-40 bg-white/10 hover:bg-white/20 backdrop-blur-sm text-white p-2 md:p-3 rounded-full transition-all"
-          >
-            <ChevronLeft className="h-5 w-5 md:h-6 md:w-6" />
-          </button>
-          
-          <button
-            onClick={handleNext}
-            className="absolute right-2 sm:right-4 top-1/2 -translate-y-1/2 z-40 bg-white/10 hover:bg-white/20 backdrop-blur-sm text-white p-2 md:p-3 rounded-full transition-all"
-          >
-            <ChevronRight className="h-5 w-5 md:h-6 md:w-6" />
-          </button>
         </div>
 
         {/* Dots Indicator */}
