@@ -196,10 +196,10 @@ export default function BookingPage() {
       if (paymentMethod === "momo") {
         const extraDataEncoded = btoa(unescape(encodeURIComponent(JSON.stringify({ ...summary, booking_id: booking?.id, user_id: booking?.user_id }))));
         const partnerCode = (import.meta as any).env?.VITE_MOMO_PARTNER_CODE || "";
-        const partnerName = (import.meta as any).env?.VITE_MOMO_PARTNER_NAME || "CineSphere";
-        const storeId = (import.meta as any).env?.VITE_MOMO_STORE_ID || "devstore";
-        const redirectUrl = (import.meta as any).env?.VITE_MOMO_REDIRECT_URL || window.location.origin + "/checkout";
-        const ipnUrl = (import.meta as any).env?.VITE_MOMO_IPN_URL || (API_BASE_URL ? API_BASE_URL + "/api/momo/ipn" : window.location.origin + "/api/momo/ipn");
+        const partnerName = (import.meta as any).env?.VITE_MOMO_PARTNER_NAME || "";
+        const storeId = (import.meta as any).env?.VITE_MOMO_STORE_ID || "";
+        const redirectUrl = `${(import.meta as any).env?.VITE_CLIENT_BASE_URL}${(import.meta as any).env?.VITE_MOMO_REDIRECT_URL}` || "";
+        const ipnUrl = `${(import.meta as any).env?.VITE_CLIENT_BASE_URL}${(import.meta as any).env?.VITE_MOMO_IPN_URL}` || "";
         const accessKey = (import.meta as any).env?.VITE_MOMO_ACCESS_KEY || "";
         const secretKey = (import.meta as any).env?.VITE_MOMO_SECRET_KEY || "";
         const requestId = Date.now().toString();
@@ -209,7 +209,7 @@ export default function BookingPage() {
         throw new Error("Không nhận được liên kết thanh toán MoMo");
       } else {
         orderInfoText = booking?.id;
-        const returnUrl = (import.meta as any).env?.VITE_VNPAY_RETURN_URL || window.location.origin + "/checkout";
+        const returnUrl = `${(import.meta as any).env?.VITE_SERVER_BASE_URL}${(import.meta as any).env?.VITE_VNPAY_RETURN_URL}` || "";
         const locale = "vn";
         const res = await createVnpayPaymentApi({ amount: canonicalTotal, orderId, orderInfo: orderInfoText, locale, returnUrl });
         if (res?.payUrl) { window.location.href = res.payUrl; return; }

@@ -49,12 +49,12 @@ export function createServer() {
   };
   const attempts = new Map<string, number[]>();
   const RL_MAX = (() => {
-    const raw = process.env.RATE_LIMIT_BOOKING_CHECK_MAX;
+    const raw = process.env.VITE_RATE_LIMIT_BOOKING_CHECK_MAX;
     const n = Number(raw);
     return Number.isFinite(n) && n > 0 ? n : 5;
   })();
   const RL_WINDOW_MS = (() => {
-    const raw = process.env.RATE_LIMIT_BOOKING_CHECK_WINDOWMS;
+    const raw = process.env.VITE_RATE_LIMIT_BOOKING_CHECK_WINDOWMS;
     const n = Number(raw);
     return Number.isFinite(n) && n >= 1000 ? n : 60_000;
   })();

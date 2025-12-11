@@ -8,12 +8,10 @@ function sortObject(obj: Record<string, any>) {
   return sorted;
 }
 
-const VNP_TMNCODE = process.env.VNPAY_TMN_CODE || "";
-const VNP_HASH_SECRET = process.env.VNPAY_HASH_SECRET || "";
-const VNP_GATEWAY =
-  process.env.VNPAY_GATEWAY ||
-  "https://sandbox.vnpayment.vn/paymentv2/vpcpay.html";
-const VNP_RETURN_URL = process.env.VNPAY_RETURN_URL || "http://localhost:8080/";
+const VNP_TMNCODE = process.env.VITE_VNPAY_TMN_CODE || "";
+const VNP_HASH_SECRET = process.env.VITE_VNPAY_HASH_SECRET || "";
+const VNP_GATEWAY = process.env.VITE_VNPAY_GATEWAY || ""
+const VNP_RETURN_URL = `${(import.meta as any).env?.VITE_SERVER_BASE_URL}${(import.meta as any).env?.VITE_VNPAY_RETURN_URL}`;
 
 export const createVnpayPayment: RequestHandler = async (req, res) => {
   try {
