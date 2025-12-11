@@ -311,10 +311,12 @@ export default function Checkout() {
         (import.meta as any).env?.VITE_MOMO_PARTNER_NAME || "CineSphere";
       const storeId =
         (import.meta as any).env?.VITE_MOMO_STORE_ID || "devstore";
-      const redirectUrl =
-        `${(import.meta as any).env?.VITE_CLIENT_BASE_URL}${(import.meta as any).env?.VITE_MOMO_REDIRECT_URL}` || "";
-      const ipnUrl =
-        `${(import.meta as any).env?.VITE_CLIENT_BASE_URL}${(import.meta as any).env?.VITE_MOMO_IPN_URL}` || "";
+      const clientBase = (import.meta as any).env?.VITE_CLIENT_BASE_URL || window.location.origin;
+      const serverBase = (import.meta as any).env?.VITE_SERVER_BASE_URL || clientBase;
+      const redirectPath = (import.meta as any).env?.VITE_MOMO_REDIRECT_URL || "/checkout";
+      const ipnPath = (import.meta as any).env?.VITE_MOMO_IPN_URL || "/api/momo/ipn";
+      const redirectUrl = `${clientBase}${redirectPath}`;
+      const ipnUrl = `${serverBase}${ipnPath}`;
       const accessKey = (import.meta as any).env?.VITE_MOMO_ACCESS_KEY || "";
       const secretKey = (import.meta as any).env?.VITE_MOMO_SECRET_KEY || "";
       const requestId = Date.now().toString();
