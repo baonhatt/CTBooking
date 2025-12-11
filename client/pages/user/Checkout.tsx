@@ -312,13 +312,9 @@ export default function Checkout() {
       const storeId =
         (import.meta as any).env?.VITE_MOMO_STORE_ID || "devstore";
       const redirectUrl =
-        (import.meta as any).env?.VITE_MOMO_REDIRECT_URL ||
-        window.location.origin + "/checkout";
+        `${(import.meta as any).env?.VITE_CLIENT_BASE_URL}${(import.meta as any).env?.VITE_MOMO_REDIRECT_URL}` || "";
       const ipnUrl =
-        (import.meta as any).env?.VITE_MOMO_IPN_URL ||
-        (API_BASE_URL
-          ? API_BASE_URL + "/api/momo/ipn"
-          : window.location.origin + "/api/momo/ipn");
+        `${(import.meta as any).env?.VITE_CLIENT_BASE_URL}${(import.meta as any).env?.VITE_MOMO_IPN_URL}` || "";
       const accessKey = (import.meta as any).env?.VITE_MOMO_ACCESS_KEY || "";
       const secretKey = (import.meta as any).env?.VITE_MOMO_SECRET_KEY || "";
       const requestId = Date.now().toString();

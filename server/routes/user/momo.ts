@@ -13,11 +13,11 @@ type CreatePaymentBody = {
 };
 
 const MOMO_ENDPOINT =
-  process.env.MOMO_ENDPOINT ||
+  process.env.VITE_MOMO_ENDPOINT ||
   "https://test-payment.momo.vn/v2/gateway/api/create";
-const ENV_PARTNER_CODE = process.env.MOMO_PARTNER_CODE || "";
-const ENV_ACCESS_KEY = process.env.MOMO_ACCESS_KEY || "";
-const ENV_SECRET_KEY = process.env.MOMO_SECRET_KEY || "";
+const ENV_PARTNER_CODE = process.env.VITE_MOMO_PARTNER_CODE || "";
+const ENV_ACCESS_KEY = process.env.VITE_MOMO_ACCESS_KEY || "";
+const ENV_SECRET_KEY = process.env.VITE_MOMO_SECRET_KEY || "";
 
 export const createMomoPayment: RequestHandler = async (req, res) => {
   try {

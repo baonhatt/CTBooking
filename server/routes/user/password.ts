@@ -3,6 +3,7 @@ import { prisma } from "../../lib/prisma";
 import crypto from "crypto";
 import bcrypt from "bcryptjs";
 import { sendMail } from "../mail-service";
+import "dotenv/config";
 
 export const handleForgetPass: RequestHandler = async (req, res) => {
   const email = (req.body as any).email;
@@ -25,7 +26,7 @@ export const handleForgetPass: RequestHandler = async (req, res) => {
       expired_at: new Date(Date.now() + 3600 * 1000),
     },
   });
-  const resetLink = `http://localhost:8080/reset-password?token=${token}`;
+  const resetLink = `${process.env.SERVER_BASE_URL}/reset-password?token=${token}`;
   const contentMail = `
     <p>Chào bạn,</p>
     <p>Bạn đã yêu cầu đặt lại mật khẩu.</p>
