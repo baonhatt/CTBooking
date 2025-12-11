@@ -26,16 +26,29 @@ export const handleForgetPass: RequestHandler = async (req, res) => {
       expired_at: new Date(Date.now() + 3600 * 1000),
     },
   });
-  const resetLink = `${process.env.SERVER_BASE_URL}/reset-password?token=${token}`;
-  const contentMail = `
-    <p>Chào bạn,</p>
-    <p>Bạn đã yêu cầu đặt lại mật khẩu.</p>
-    <p>Vui lòng nhấn vào liên kết để đổi mật khẩu: <b>${resetLink}</b></p>
-    <p>Xin cảm ơn!</p>
-    <br>
-    <p>Đội ngũ hỗ trợ!!!</p>
-    <p>&nbsp;&nbsp;Rạp Film</p>
-  `;
+  const resetLink = `${process.env.VITE_SERVER_BASE_URL}/reset-password?token=${token}`;
+  const contentMail = `<!DOCTYPE html >
+    <html>
+    <head>
+    <title>Đặt lại Mật khẩu </title>
+      </head>
+      <body style = "font-family: Arial, sans-serif; line-height: 1.6; color: #333;" >
+        <div style="max-width: 600px; margin: 20px auto; padding: 20px; border: 1px solid #ddd; border-radius: 8px;" >
+          <h2 style="color: #007bff;" > Yêu cầu Đặt lại Mật khẩu </h2>
+          <p> Chào bạn, </p>
+          <p> Chúng tôi nhận được yêu cầu đặt lại mật khẩu cho tài khoản của bạn.Vui lòng nhấp vào nút dưới đây để tạo mật khẩu mới.Liên kết này sẽ hết hạn sau ** [THỜI GIAN HẾT HẠN] ** (ví dụ: 1 giờ).</p>
+            <p style = "text-align: center; margin: 30px 0;">
+              <a href="${resetLink}" style = "display: inline-block; padding: 10px 20px; background-color: #dc3545; color: #ffffff !important; text-decoration: none; border-radius: 5px; font-weight: bold;">
+                Đặt lại Mật khẩu
+              </a>
+            </p>
+            <p> Nếu bạn không yêu cầu thay đổi mật khẩu, vui lòng bỏ qua email này hoặc liên hệ với bộ phận hỗ trợ của chúng tôi.</p>
+            <p> Trân trọng, <br>Đội ngũ Cinema App </p>
+            <hr style = "border: 0; border-top: 1px solid #eee;">
+            <p style="font-size: 0.8em; color: #777;" >Liên kết trực tiếp: <a href="#" >Ctbooing-support</a></p >
+        </div>
+      </body>
+    </html>`
   await sendMail(email, "Đặt lại mật khẩu - Film", contentMail);
   return res
     .status(200)
