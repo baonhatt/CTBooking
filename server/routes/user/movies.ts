@@ -5,63 +5,37 @@ import { prisma } from "../../lib/prisma";
 export const handleMovies2025: RequestHandler = (_req, res) => { };
 
 export const getAllActiveMoviesToday: RequestHandler = async (_req, res) => {
-  let activeMovies: ActiveMoviesTodayResponse[] = [];
-  // Use UTC date to avoid timezone issues
-  const now = new Date();
-  const todayStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), 0, 0, 0, 0));
   try {
-    // Get all active movies with their showtimes (from today onwards)
-    const active_movies = await (prisma as any).movies.findMany({
+    // Get all active movies only (no showtimes)
+    const active_movies = await prisma.movies.findMany({
       where: {
         is_active: true,
-      },
-      include: {
-        showtimes: {
-          where: {
-            start_time: {
-              gte: todayStart,
-            },
-          },
-          orderBy: {
-            start_time: "asc",
-          },
-          select: {
-            id: true,
-            start_time: true,
-            total_sold: true,
-          },
-        },
       },
       orderBy: {
         release_date: "desc",
       },
     });
 
-    // Filter to only include movies that have showtimes from today onwards
-    const moviesWithShowtimes = active_movies.filter(m => m.showtimes.length > 0);
+    const activeMovies: ActiveMoviesTodayResponse[] = active_movies.map((m) => ({
+      title: m.title,
+      description: m.description ?? "",
+      cover_image: m.cover_image ?? "",
+      detail_images: JSON.stringify(m.detail_images ?? []),
+      genres: JSON.stringify(m.genres ?? []),
+      rating: m.rating?.toString() ?? "0",
+      duration_min: m.duration_min ?? 0,
+      release_date: m.release_date,
+      price: 0, // Not used anymore but kept for backward compatibility
+      showtimes: [], // Empty array - no showtimes returned
+    }));
 
-    if (moviesWithShowtimes.length !== 0) {
-      activeMovies = moviesWithShowtimes.map((m) => ({
-        title: m.title,
-        description: m.description ?? "",
-        cover_image: m.cover_image ?? "",
-        detail_images: JSON.stringify(m.detail_images ?? []),
-        genres: JSON.stringify(m.genres ?? []),
-        rating: m.rating?.toString() ?? "0",
-        duration_min: m.duration_min ?? 0,
-        release_date: m.release_date,
-        showtimes: m.showtimes.map((s) => ({
-          id: s.id,
-          start_time: s.start_time,
-          total_sold: s.total_sold,
-        })),
-      }));
-      return res.status(200).json({ activeMovies });
-    } else {
-      return res.status(200).json({ activeMovies: [] });
-    }
-  } catch (error) {
-    return res.status(500).json({ message: "Lỗi máy chủ nội bộ" });
+    return res.status(200).json({ activeMovies });
+  } catch (error: any) {
+    console.error("Error in getAllActiveMoviesToday:", error);
+    return res.status(500).json({ 
+      message: "Lỗi máy chủ nội bộ",
+      error: process.env.NODE_ENV === "development" ? error.message : undefined
+    });
   }
 };
 

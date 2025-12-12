@@ -2,13 +2,65 @@ export default {
   async fetch(request: Request, env: any) {
     const origin = request.headers.get("Origin") || "*";
     const cors = {
-      "Access-Control-Allow-Origin": origin,
+      "Access-Control-Allow-Origin": origin || "https://main.cinema-pages.pages.dev",
       "Access-Control-Allow-Credentials": "true",
       "Access-Control-Allow-Methods": "GET,POST,PUT,DELETE,OPTIONS",
       "Access-Control-Allow-Headers": request.headers.get("Access-Control-Request-Headers") || "Content-Type,Authorization",
-    };
+      "Access-Control-Expose-Headers": "Content-Type,Authorization",
+      Vary: "Origin",
+      "Referrer-Policy": "strict-origin-when-cross-origin",
+      "Cross-Origin-Opener-Policy": "same-origin",
+      "Cross-Origin-Embedder-Policy": "unsafe-none",
+    } as Record<string, string>;
     if (request.method === "OPTIONS") return new Response(null, { status: 204, headers: cors });
     const url = new URL(request.url);
+    if (url.pathname === "/api/active" && request.method === "GET") {
+      return new Response(JSON.stringify({ items: [] }), { headers: { "Content-Type": "application/json", ...cors } });
+    }
+    if (url.pathname === "/api/seed" && request.method === "POST") {
+      await env.cinema_db.prepare(
+        "CREATE TABLE IF NOT EXISTS movies (id INTEGER PRIMARY KEY, title TEXT NOT NULL, description TEXT, cover_image TEXT, detail_images TEXT, genres TEXT, rating REAL)"
+      ).run();
+      await env.cinema_db.prepare(
+        "CREATE TABLE IF NOT EXISTS showtimes (id INTEGER PRIMARY KEY, movie_id INTEGER NOT NULL, start_time TEXT NOT NULL, total_sold INTEGER DEFAULT 0, created_at TEXT DEFAULT CURRENT_TIMESTAMP)"
+      ).run();
+      await env.cinema_db.prepare(
+        "CREATE TABLE IF NOT EXISTS toys (id INTEGER PRIMARY KEY, name TEXT NOT NULL, category TEXT, price REAL, stock INTEGER, status TEXT, image_url TEXT, created_at TEXT DEFAULT CURRENT_TIMESTAMP)"
+      ).run();
+
+      const title = "Sample Movie 1";
+      const { results: exists } = await env.cinema_db.prepare("SELECT id FROM movies WHERE title = ?").bind(title).all();
+      let movieId: number;
+      if (exists && exists.length) {
+        movieId = Number((exists[0] as any).id);
+      } else {
+        const resRun = await env.cinema_db
+          .prepare("INSERT INTO movies (title, description, cover_image, genres, rating) VALUES (?, ?, ?, ?, ?) ")
+          .bind(title, "description", "https://images.unsplash.com/photo-1536440136628-849c177e76a1?w=400&h=600&fit=crop", "[\"Action\",\"Adventure\"]", 4.8)
+          .run();
+        movieId = Number(((resRun as any)?.meta?.last_row_id) || ((resRun as any)?.lastRowId));
+      }
+
+      const baseDate = new Date();
+      baseDate.setHours(10, 0, 0, 0);
+      const times = [0, 180, 360].map((offset) => new Date(baseDate.getTime() + offset * 60 * 1000).toISOString());
+      for (const t of times) {
+        await env.cinema_db
+          .prepare("INSERT INTO showtimes (movie_id, start_time, total_sold) VALUES (?, ?, 0)")
+          .bind(movieId, t)
+          .run();
+      }
+
+      const { results: toyExists } = await env.cinema_db.prepare("SELECT id FROM toys WHERE name = ?").bind("Popcorn Combo").all();
+      if (!toyExists || !toyExists.length) {
+        await env.cinema_db
+          .prepare("INSERT INTO toys (name, category, price, stock, status, image_url) VALUES (?, ?, ?, ?, ?, ?)")
+          .bind("Popcorn Combo", "snack", 50000, 100, "active", null)
+          .run();
+      }
+
+      return new Response(JSON.stringify({ ok: true }), { headers: { "Content-Type": "application/json", ...cors } });
+    }
     if (url.pathname === "/api/getActiveMovies") {
       await env.cinema_db.prepare(
         "CREATE TABLE IF NOT EXISTS movies (id INTEGER PRIMARY KEY, title TEXT NOT NULL, description TEXT, cover_image TEXT, detail_images TEXT, genres TEXT, rating REAL)"
@@ -16,9 +68,11 @@ export default {
       await env.cinema_db.prepare(
         "CREATE TABLE IF NOT EXISTS showtimes (id INTEGER PRIMARY KEY, movie_id INTEGER NOT NULL, start_time TEXT NOT NULL, total_sold INTEGER DEFAULT 0, created_at TEXT DEFAULT CURRENT_TIMESTAMP)"
       ).run();
+      const today = new Date();
+      const yyyyMMdd = today.toISOString().slice(0, 10);
       const { results } = await env.cinema_db.prepare(
-        "SELECT m.id as movie_id, m.title, m.description, m.cover_image, m.genres, m.rating, s.id as showtime_id, s.start_time, s.total_sold FROM movies m JOIN showtimes s ON s.movie_id = m.id WHERE date(s.start_time) = date('now') ORDER BY s.start_time ASC"
-      ).all();
+        "SELECT m.id as movie_id, m.title, m.description, m.cover_image, m.genres, m.rating, s.id as showtime_id, s.start_time, s.total_sold FROM movies m JOIN showtimes s ON s.movie_id = m.id WHERE substr(s.start_time,1,10) = ? ORDER BY s.start_time ASC"
+      ).bind(yyyyMMdd).all();
       const map = new Map<number, any>();
       for (const r of results || []) {
         const mid = Number((r as any).movie_id);
@@ -30,7 +84,7 @@ export default {
             cover_image: (r as any).cover_image ?? null,
             genres: (r as any).genres ?? "[]",
             rating: (r as any).rating ?? null,
-            duration_min: 0,
+            duration_min: 120,
             release_date: new Date().toISOString(),
             showtimes: [],
           });
@@ -95,14 +149,36 @@ export default {
       }
       return new Response(JSON.stringify({ message: "Not found" }), { status: 404, headers: { "Content-Type": "application/json", ...cors } });
     }
-    if (url.pathname.startsWith("/api/admin/transactions")) {
+    if (url.pathname.startsWith("/api/showtimes") && request.method === "GET") {
+      await env.cinema_db.prepare(
+        "CREATE TABLE IF NOT EXISTS showtimes (id INTEGER PRIMARY KEY, movie_id INTEGER NOT NULL, start_time TEXT NOT NULL, total_sold INTEGER DEFAULT 0, created_at TEXT DEFAULT CURRENT_TIMESTAMP)"
+      ).run();
+      await env.cinema_db.prepare(
+        "CREATE TABLE IF NOT EXISTS movies (id INTEGER PRIMARY KEY, title TEXT NOT NULL)"
+      ).run();
+      const page = Number(url.searchParams.get("page") || 1);
+      const pageSize = Number(url.searchParams.get("pageSize") || 10);
+      const today = url.searchParams.get("today") === "1";
+      const from = url.searchParams.get("from");
+      const to = url.searchParams.get("to");
+      const id = url.searchParams.get("id");
+      const offset = (page - 1) * pageSize;
+      const whereParts: string[] = [];
+      const binds: any[] = [];
+      if (today) { whereParts.push("substr(s.start_time,1,10) = ?"); binds.push(new Date().toISOString().slice(0, 10)); }
+      if (from) { whereParts.push("s.start_time >= ?"); binds.push(from); }
+      if (to) { whereParts.push("s.start_time <= ?"); binds.push(to); }
+      if (id) { whereParts.push("s.movie_id = ?"); binds.push(Number(id)); }
+      const where = whereParts.length ? `WHERE ${whereParts.join(" AND ")}` : "";
+      const { results } = await env.cinema_db.prepare(`SELECT s.id, s.movie_id, s.start_time, s.total_sold, m.title as movie_title FROM showtimes s JOIN movies m ON m.id = s.movie_id ${where} ORDER BY s.start_time ASC LIMIT ? OFFSET ?`).bind(...binds, pageSize, offset).all();
+      const { results: countRes } = await env.cinema_db.prepare(`SELECT COUNT(1) as total FROM showtimes s ${where}`).bind(...binds).all();
+      const total = (countRes?.[0]?.total as number) || 0;
+      return new Response(JSON.stringify({ items: results || [], page, pageSize, total }), { headers: { "Content-Type": "application/json", ...cors } });
+    }
+    if (url.pathname.startsWith("/api/admin/transactions") && request.method === "GET") {
       const page = Number(url.searchParams.get("page") || 1);
       const pageSize = Number(url.searchParams.get("pageSize") || 10);
       return new Response(JSON.stringify({ items: [], page, pageSize, total: 0 }), { headers: { "Content-Type": "application/json", ...cors } });
-    }
-    if (url.pathname === "/api/admin/dashboard/metrics") {
-      const payload = { totalMovies: 0, totalShowtimes: 0, totalToys: 0, totalUsers: 0, totalTransactions: 0, revenueTotal: 0, revenueByMethod: { cash: 0, momo: 0, vnpay: 0 }, totalShowtimesToday: 0, totalShowtimesFuture: 0, occupancyTodayPercent: 0, topMoviesWeek: [] };
-      return new Response(JSON.stringify(payload), { headers: { "Content-Type": "application/json", ...cors } });
     }
     if (url.pathname.startsWith("/api/movies")) {
       await env.cinema_db.prepare(

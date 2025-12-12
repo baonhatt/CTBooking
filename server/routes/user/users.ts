@@ -74,9 +74,12 @@ export const listUserTransactions: RequestHandler = async (req, res) => {
 
     const total = await prisma.bookings.count({ where });
     const orderBy: any = sortKey === "paid_at" ? { paid_at: dir } : { created_at: dir };
-    const items = await prisma.bookings.findMany({
+    const items = await (prisma as any).bookings.findMany({
       where,
-      include: { showtime: { include: { movie: true } } },
+      include: { 
+        movies: true,
+        ticket_packages: true,
+      },
       orderBy,
       skip,
       take: pageSize,
@@ -84,29 +87,17 @@ export const listUserTransactions: RequestHandler = async (req, res) => {
 
     const mapped = items.map((b: any) => {
       try {
-        const movie = b?.showtime?.movie;
-        const start = (() => {
-          const v = b?.showtime?.start_time;
-          if (!v) return null;
-          return v instanceof Date ? v : new Date(v);
-        })();
-        const dateDisplay = (() => {
-          try { return start ? start.toLocaleDateString("vi-VN") : ""; } catch { return ""; }
-        })();
-        const showtimeStr = (() => {
-          try { return start ? start.toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit" }) : ""; } catch { return ""; }
-        })();
+        const movie = b?.movies;
         const amount = (() => {
           try { return Number(b?.total_price ?? 0); } catch { return 0; }
         })();
-        const coverImage = movie?.cover_image || movie?.coverImage || movie?.poster || null;
+        const coverImage = movie?.cover_image || null;
         return {
           booking_id: b.id,
           booking_code: b.booking_code || null,
           user_id: b.user_id,
           movie: movie?.title || "",
-          dateDisplay,
-          showtime: showtimeStr,
+          ticket_package: b?.ticket_packages?.name || "",
           quantity: Number(b?.ticket_count ?? 0),
           amount,
           method: b?.payment_method || "",
@@ -121,9 +112,8 @@ export const listUserTransactions: RequestHandler = async (req, res) => {
           booking_id: Number(b?.id ?? 0),
           booking_code: b?.booking_code || null,
           user_id: Number(b?.user_id ?? 0),
-          movie: b?.showtime?.movie?.title || "",
-          dateDisplay: "",
-          showtime: "",
+          movie: b?.movies?.title || "",
+          ticket_package: b?.ticket_packages?.name || "",
           quantity: Number(b?.ticket_count ?? 0),
           amount: 0,
           method: b?.payment_method || "",

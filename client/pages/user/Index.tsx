@@ -1,8 +1,9 @@
 import { useEffect, useState } from "react";
 import HeroSection from "@/components/user/HeroSection";
-import TechnologyBanner from "@/components/user/TechnologyBanner";
-import BookingSection from "@/components/user/BookingSection";
+import FilmCarousel from "@/components/user/FilmCarousel";
+import PromotionShowcase from "@/components/user/PromotionShowcase";
 import ProductSection from "@/components/user/ProductSection";
+import TechnologyBanner from "@/components/user/TechnologyBanner";
 import UserLayout from "@/user/layouts/UserLayout";
 import { ConfigProvider } from "antd";
 import { motion } from "framer-motion";
@@ -73,11 +74,10 @@ export default function Index() {
       >
         <main>
           <HeroSection />
-          <div id="booking-section">
-            <BookingSection onBookClick={handleBookClick} />
-          </div>
-          <ProductSection />
+          <FilmCarousel onSelectFilm={handleBookClick} />
+          <PromotionShowcase />
           <TechnologyBanner />
+          <ProductSection />
         </main>
         {showBackToTop && (
           <motion.button

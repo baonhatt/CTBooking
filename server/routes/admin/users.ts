@@ -77,12 +77,11 @@ export const getUserById: RequestHandler = async (req, res) => {
         },
         bookings: {
           include: {
-            showtime: {
-              include: {
-                movie: {
-                  select: { id: true, title: true },
-                },
-              },
+            movies: {
+              select: { id: true, title: true },
+            },
+            ticket_packages: {
+              select: { id: true, name: true },
             },
           },
           orderBy: { created_at: "desc" },
@@ -108,7 +107,8 @@ export const getUserById: RequestHandler = async (req, res) => {
       user_updated_at: user.updated_at,
       recent_bookings: user.bookings.map((b: any) => ({
         id: b.id,
-        movie_title: b.showtime?.movie?.title || "N/A",
+        movie_title: b.movies?.title || "N/A",
+        ticket_package_name: b.ticket_packages?.name || "N/A",
         ticket_count: b.ticket_count,
         total_price: Number(b.total_price),
         payment_method: b.payment_method,

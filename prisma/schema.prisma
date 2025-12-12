@@ -41,52 +41,42 @@ model tokens {
 }
 
 model movies {
-  id            Int         @id @default(autoincrement())
-  title         String      @db.VarChar(255)
+  id            Int        @id @default(autoincrement())
+  title         String     @db.VarChar(255)
   description   String?
   cover_image   String?
   detail_images Json?
   genres        Json?
-  rating        Decimal?    @db.Decimal(3, 1)
+  rating        Decimal?   @db.Decimal(3, 1)
   duration_min  Int?
-  created_at    DateTime    @default(now())
-  updated_at    DateTime    @default(now())
-  is_active     Boolean?    @default(true)
+  created_at    DateTime   @default(now())
+  updated_at    DateTime   @default(now())
+  is_active     Boolean?   @default(true)
   release_date  DateTime?
-  showtimes     showtimes[]
-}
-
-model showtimes {
-  id         Int        @id @default(autoincrement())
-  movie_id   Int
-  start_time DateTime
-  created_at DateTime   @default(now())
-  updated_at DateTime   @default(now())
-  total_sold Int        @default(0)
-  end_time   DateTime?
-  is_active  Boolean?   @default(true)
-  bookings   bookings[]
-  movie      movies     @relation(fields: [movie_id], references: [id], onDelete: Cascade)
+  bookings      bookings[]
 }
 
 model bookings {
-  id             Int       @id @default(autoincrement())
-  user_id        Int
-  showtime_id    Int
-  ticket_count   Int       @default(1)
-  total_price    Decimal   @db.Decimal(10, 2)
-  created_at     DateTime  @default(now())
-  paid_at        DateTime?
-  payment_method String?   @default("cash") @db.VarChar(50)
-  payment_status String?   @default("pending") @db.VarChar(50)
-  transaction_id String?   @db.VarChar(255)
-  updated_at     DateTime  @default(now())
-  name           String    @default("") @db.VarChar(200)
-  phone          String    @default("") @db.VarChar(20)
-  email          String    @default("") @db.VarChar(100)
-  booking_code   String?   @unique @db.VarChar(50)
-  showtime       showtimes @relation(fields: [showtime_id], references: [id], onDelete: Cascade)
-  user           users     @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  id                Int              @id @default(autoincrement())
+  user_id           Int
+  ticket_count      Int              @default(1)
+  total_price       Decimal          @db.Decimal(10, 2)
+  created_at        DateTime         @default(now())
+  paid_at           DateTime?
+  payment_method    String?          @default("cash") @db.VarChar(50)
+  payment_status    String?          @default("pending") @db.VarChar(50)
+  transaction_id    String?          @db.VarChar(255)
+  updated_at        DateTime         @default(now())
+  name              String           @default("") @db.VarChar(200)
+  phone             String           @default("") @db.VarChar(20)
+  email             String           @default("") @db.VarChar(100)
+  booking_code      String?          @unique @db.VarChar(50)
+  is_used           Boolean?         @default(false)
+  movie_id          Int?
+  ticket_package_id Int?
+  movies            movies?          @relation(fields: [movie_id], references: [id], onDelete: Cascade)
+  ticket_packages   ticket_packages? @relation(fields: [ticket_package_id], references: [id])
+  user              users            @relation(fields: [user_id], references: [id], onDelete: Cascade)
 }
 
 model toys {
@@ -102,18 +92,19 @@ model toys {
 }
 
 model ticket_packages {
-  id             Int      @id @default(autoincrement())
-  name           String   @db.VarChar(255)
-  code           String?  @unique @db.VarChar(50)
+  id             Int        @id @default(autoincrement())
+  name           String     @db.VarChar(255)
+  code           String?    @unique @db.VarChar(50)
   description    String?
-  price          Decimal  @db.Decimal(10, 2)
+  price          Decimal    @db.Decimal(10, 2)
   features       Json?
-  type           String?  @db.VarChar(50)
+  type           String?    @db.VarChar(50)
   min_group_size Int?
   max_group_size Int?
-  is_member_only Boolean? @default(false)
-  is_active      Boolean? @default(true)
-  display_order  Int?     @default(0)
-  created_at     DateTime @default(now())
-  updated_at     DateTime @default(now())
+  is_member_only Boolean?   @default(false)
+  is_active      Boolean?   @default(true)
+  display_order  Int?       @default(0)
+  created_at     DateTime   @default(now())
+  updated_at     DateTime   @default(now())
+  bookings       bookings[]
 }

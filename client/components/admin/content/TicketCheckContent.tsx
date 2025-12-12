@@ -4,7 +4,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { getBookingByCodeApi } from "@/lib/api";
+import { getBookingByCodeApi, useTicketApi } from "@/lib/api";
 import { AlertCircle, CheckCircle, Clock, MapPin, Users, DollarSign, Mail, Phone, User } from "lucide-react";
 
 interface TicketInfo {
@@ -17,23 +17,15 @@ interface TicketInfo {
   email: string;
   ticket_count: number;
   total_price: number;
-  showtime_id: number;
+  showtime_id: number | null;
   created_at: string;
   paid_at: string | null;
   payment_method: string | null;
   userName: string;
-  showtime?: {
-    id: number;
-    start_time: string;
-    end_time: string | null;
-    movie?: {
-      id: number;
-      title: string;
-      genres: any;
-      duration_min: number | null;
-      cover_image: string | null;
-    };
-  };
+  is_used: boolean;
+  valid: boolean;
+  can_use: boolean;
+  validity_days: number | null;
 }
 
 export default function TicketCheckContent() {
@@ -41,6 +33,7 @@ export default function TicketCheckContent() {
   const [ticketInfo, setTicketInfo] = useState<TicketInfo | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [useLoading, setUseLoading] = useState(false);
 
   const handleSearch = async () => {
     if (!code.trim()) {
@@ -62,6 +55,21 @@ export default function TicketCheckContent() {
       setTicketInfo(null);
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const handleConfirmUse = async () => {
+    if (!ticketInfo?.booking_code || !ticketInfo.can_use) return;
+    try {
+      setUseLoading(true);
+      const res = await useTicketApi(ticketInfo.booking_code);
+      if (res?.ok) {
+        setTicketInfo({ ...(ticketInfo as any), is_used: true, can_use: false, valid: false });
+      }
+    } catch (err: any) {
+      setError(err?.message || "Không thể xác nhận sử dụng vé");
+    } finally {
+      setUseLoading(false);
     }
   };
 
@@ -120,11 +128,11 @@ export default function TicketCheckContent() {
     });
   };
 
-  const genres = Array.isArray(ticketInfo?.showtime?.movie?.genres)
-    ? ticketInfo.showtime.movie.genres
-    : typeof ticketInfo?.showtime?.movie?.genres === "string"
-      ? ticketInfo.showtime.movie.genres.split(",")
-      : [];
+  const validityLabel = ticketInfo?.valid
+    ? "Vé còn hiệu lực"
+    : ticketInfo?.is_used
+      ? "Vé đã sử dụng"
+      : "Vé vô hiệu";
 
   return (
     <div className="space-y-6">
@@ -194,67 +202,42 @@ export default function TicketCheckContent() {
             </CardContent>
           </Card>
 
-          {/* Movie Information */}
-          {ticketInfo.showtime?.movie && (
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-2xl">
-                  {ticketInfo.showtime.movie.title}
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                  <div className="flex items-center gap-2">
-                    <Clock className="w-5 h-5 text-blue-600" />
-                    <div>
-                      <p className="text-xs text-gray-600">Thời Lượng</p>
-                      <p className="font-semibold">
-                        {ticketInfo.showtime.movie.duration_min || "N/A"} phút
-                      </p>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <MapPin className="w-5 h-5 text-blue-600" />
-                    <div>
-                      <p className="text-xs text-gray-600">Suất Chiếu</p>
-                      <p className="font-semibold">
-                        {formatTime(ticketInfo.showtime.start_time)}
-                      </p>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Users className="w-5 h-5 text-blue-600" />
-                    <div>
-                      <p className="text-xs text-gray-600">Số Vé</p>
-                      <p className="font-semibold">{ticketInfo.ticket_count}</p>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <DollarSign className="w-5 h-5 text-blue-600" />
-                    <div>
-                      <p className="text-xs text-gray-600">Tổng Tiền</p>
-                      <p className="font-semibold text-green-600">
-                        {Number(ticketInfo.total_price).toLocaleString("vi-VN")} ₫
-                      </p>
-                    </div>
+          {/* Ticket Summary */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-2xl">Thông tin vé</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <div className="flex items-center gap-2">
+                  <Users className="w-5 h-5 text-blue-600" />
+                  <div>
+                    <p className="text-xs text-gray-600">Số Vé</p>
+                    <p className="font-semibold">{ticketInfo.ticket_count}</p>
                   </div>
                 </div>
-
-                {genres.length > 0 && (
-                  <div className="pt-2">
-                    <p className="text-xs text-gray-600 mb-2">Thể Loại</p>
-                    <div className="flex flex-wrap gap-2">
-                      {genres.map((genre: string, idx: number) => (
-                        <Badge key={idx} variant="secondary">
-                          {genre}
-                        </Badge>
-                      ))}
-                    </div>
+                <div className="flex items-center gap-2">
+                  <DollarSign className="w-5 h-5 text-blue-600" />
+                  <div>
+                    <p className="text-xs text-gray-600">Tổng Tiền</p>
+                    <p className="font-semibold text-green-600">
+                      {Number(ticketInfo.total_price).toLocaleString("vi-VN")} ₫
+                    </p>
                   </div>
-                )}
-              </CardContent>
-            </Card>
-          )}
+                </div>
+                <div className="flex items-center gap-2">
+                  <Clock className="w-5 h-5 text-blue-600" />
+                  <div>
+                    <p className="text-xs text-gray-600">Ngày Thanh Toán</p>
+                    <p className="font-semibold">{ticketInfo.paid_at ? formatDate(ticketInfo.paid_at) : "N/A"}</p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Badge className={ticketInfo.valid ? "bg-green-600" : ticketInfo.is_used ? "bg-gray-600" : "bg-red-600"}>{validityLabel}</Badge>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
 
           {/* Customer Information */}
           <Card>
@@ -322,16 +305,19 @@ export default function TicketCheckContent() {
           {/* Confirmation Section */}
           <Card className="border-l-4 border-l-green-600 bg-green-50">
             <CardContent className="pt-6">
-              <div className="flex items-center gap-3">
-                <CheckCircle className="w-6 h-6 text-green-600" />
-                <div>
-                  <p className="font-semibold text-green-800">
-                    Thông tin vé đã được xác minh
-                  </p>
-                  <p className="text-sm text-green-700">
-                    Nhân viên có thể xác nhận vé này
-                  </p>
+              <div className="flex items-center gap-3 justify-between">
+                <div className="flex items-center gap-3">
+                  <CheckCircle className="w-6 h-6 text-green-600" />
+                  <div>
+                    <p className="font-semibold text-green-800">Trạng thái vé</p>
+                    <p className="text-sm text-green-700">{validityLabel}</p>
+                  </div>
                 </div>
+                {ticketInfo.can_use && (
+                  <Button onClick={handleConfirmUse} disabled={useLoading} className="bg-green-600 hover:bg-green-700 text-white">
+                    {useLoading ? "Đang xác nhận..." : "Xác nhận sử dụng vé"}
+                  </Button>
+                )}
               </div>
             </CardContent>
           </Card>

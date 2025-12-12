@@ -65,6 +65,35 @@ export default function Header({ onBookClick = () => { }, disableNav = false }: 
   const navigator = useNavigate();
   const location = useLocation();
   const effectiveDisable = disableNav || location.pathname !== "/";
+  const [activeSection, setActiveSection] = useState<string>("hero");
+  const navItems = [
+    { label: "Phim", target: "films" },
+    { label: "Công nghệ", target: "technology" },
+    { label: "Cửa hàng", target: "store" },
+  ];
+
+  useEffect(() => {
+    if (effectiveDisable) return;
+    const ids = ["hero", "films", "technology", "promotions", "store"];
+    const observers: IntersectionObserver[] = [];
+    ids.forEach((id) => {
+      const el = document.getElementById(id);
+      if (!el) return;
+      const observer = new IntersectionObserver(
+        (entries) => {
+          entries.forEach((entry) => {
+            if (entry.isIntersecting) {
+              setActiveSection(id);
+            }
+          });
+        },
+        { threshold: 0.4 }
+      );
+      observer.observe(el);
+      observers.push(observer);
+    });
+    return () => observers.forEach((ob) => ob.disconnect());
+  }, [effectiveDisable]);
   useEffect(() => {
     const readAuth = () => {
       const raw = localStorage.getItem("authUser");
@@ -211,41 +240,61 @@ export default function Header({ onBookClick = () => { }, disableNav = false }: 
       className={cn(
         "fixed top-0 left-0 right-0 z-50 transition-all duration-300",
         isScrolled
-          ? "bg-black/5 backdrop-blur-md border-b border-white/10"
-          : "bg-transparent border-b border-white/10",
+          ? "bg-black/50 backdrop-blur-lg border-b border-white/10 shadow-[0_10px_40px_rgba(67,97,238,0.15)]"
+          : "bg-gradient-to-b from-black/50 via-black/30 to-transparent border-b border-white/10",
       )}
     >
-      <div className="container mx-auto px-4 py-4 flex items-center justify-between ">
-        <div className="flex items-center gap-3 animate-fade-in">
-          <img onClick={() => navigator('/')} src={icon} className="cursor-pointer  h-12 md:w-20 sm:w-20 md:h-16" alt="CINESPHERE logo" />
+      <div className="container mx-auto px-4 py-4 flex items-center gap-6 md:gap-10">
+        <div className="flex items-center gap-4 animate-fade-in">
+          <img
+            onClick={() => navigator('/')}
+            src={icon}
+            className="cursor-pointer h-16 w-16 md:h-20 md:w-20 lg:h-24 lg:w-24 drop-shadow-[0_0_30px_rgba(59,130,246,0.6)] transition-transform duration-300 hover:scale-110"
+            alt="CINESPHERE logo"
+          />
+          <div className="hidden sm:flex flex-col leading-tight">
+       
+          </div>
         </div>
 
-        <nav className="hidden md:flex items-center gap-8 animate-fade-in delay-200">
-          <button
-            onClick={effectiveDisable ? undefined : () => scrollToSection("hero")}
-            className={cn("text-white transition-colors duration-300 font-medium", effectiveDisable ? "opacity-50 cursor-not-allowed" : "hover:text-blue-400")}
-          >
-            Phim Hot
-          </button>
-          <button
-            onClick={effectiveDisable ? undefined : () => scrollToSection("technology")}
-            className={cn("text-white transition-colors duration-300 font-medium", effectiveDisable ? "opacity-50 cursor-not-allowed" : "hover:text-blue-400")}
-          >
-            Công Nghệ
-          </button>
-          <button
-            onClick={effectiveDisable ? undefined : () => scrollToSection("products")}
-            className={cn("text-white transition-colors duration-300 font-medium", effectiveDisable ? "opacity-50 cursor-not-allowed" : "hover:text-blue-400")}
-          >
-            Cửa Hàng
-          </button>
+        <nav className="hidden md:flex items-center gap-8 lg:gap-10 animate-fade-in delay-200 ml-auto">
+          {navItems.map((item) => (
+            <button
+              key={item.target}
+              onClick={effectiveDisable ? undefined : () => scrollToSection(item.target)}
+              className={cn(
+                "relative group text-white font-bold uppercase tracking-[0.2em] text-base lg:text-lg transition-all duration-300",
+                effectiveDisable
+                  ? "opacity-40 cursor-not-allowed"
+                  : "hover:scale-[1.05] hover:text-cyan-300"
+              )}
+            >
+              <span
+                className={cn(
+                  "pb-2 inline-block font-extrabold",
+                  activeSection === item.target 
+                    ? "text-transparent bg-clip-text bg-gradient-to-r from-cyan-300 via-blue-400 to-purple-400" 
+                    : "text-white"
+                )}
+              >
+                {item.label}
+              </span>
+              <span
+                className={cn(
+                  "absolute left-0 right-0 -bottom-1 h-0.5 bg-gradient-to-r from-cyan-400 via-blue-500 to-fuchsia-500 origin-left transition-transform duration-300",
+                  activeSection === item.target ? "scale-x-100" : "scale-x-0 group-hover:scale-x-100"
+                )}
+              />
+            </button>
+          ))}
         </nav>
-        <div className="flex items-center gap-4 animate-fade-in delay-250">
+
+        <div className="flex items-center gap-4 animate-fade-in delay-250 ml-auto md:ml-0">
           <div className="md:hidden">
             <Sheet>
               <SheetTrigger asChild>
-                <Button variant="default" className="bg-opacity-20 border-white/20 text-white">
-                  <Menu className="h-4 w-4" />
+                <Button variant="default" className="bg-opacity-20 border-white/20 text-white w-10 h-10">
+                  <Menu className="h-6 w-6" />
                 </Button>
               </SheetTrigger>
 
@@ -255,55 +304,32 @@ export default function Header({ onBookClick = () => { }, disableNav = false }: 
                   <img
                     src={icon}
                     alt="CINESPHERE"
-                    className="h-8 cursor-pointer"
+                    className="h-12 w-12 cursor-pointer drop-shadow-[0_0_20px_rgba(59,130,246,0.5)]"
                     onClick={() => navigator("/")}
                   />
                 </div>
 
                 {/* Danh mục */}
-                <nav className="flex flex-col gap-6 text-lg">
-                  <button
-                    className={cn(
-                      "text-left font-medium",
-                      effectiveDisable ? "opacity-50 cursor-not-allowed" : ""
-                    )}
-                    disabled={effectiveDisable}
-                    onClick={() => {
-                      if (!effectiveDisable) {
-                        scrollToSection("hero");
-                      }
-                    }}
-                  >
-                    Phim Hot
-                  </button>
-                  <button
-                    className={cn(
-                      "text-left font-medium",
-                      effectiveDisable ? "opacity-50 cursor-not-allowed" : ""
-                    )}
-                    disabled={effectiveDisable}
-                    onClick={() => {
-                      if (!effectiveDisable) {
-                        scrollToSection("technology");
-                      }
-                    }}
-                  >
-                    Công Nghệ
-                  </button>
-                  <button
-                    className={cn(
-                      "text-left font-medium",
-                      effectiveDisable ? "opacity-50 cursor-not-allowed" : ""
-                    )}
-                    disabled={effectiveDisable}
-                    onClick={() => {
-                      if (!effectiveDisable) {
-                        scrollToSection("products");
-                      }
-                    }}
-                  >
-                    Cửa Hàng
-                  </button>
+                <nav className="flex flex-col gap-6">
+                  {navItems.map((item) => (
+                    <button
+                      key={item.target}
+                      className={cn(
+                        "text-left font-bold text-xl tracking-[0.15em] uppercase transition-colors duration-300",
+                        effectiveDisable 
+                          ? "opacity-50 cursor-not-allowed text-gray-400" 
+                          : "text-white hover:text-cyan-300"
+                      )}
+                      disabled={effectiveDisable}
+                      onClick={() => {
+                        if (!effectiveDisable) {
+                          scrollToSection(item.target);
+                        }
+                      }}
+                    >
+                      {item.label}
+                    </button>
+                  ))}
                 </nav>
 
                 {/* Khối account bên dưới */}
@@ -354,11 +380,11 @@ export default function Header({ onBookClick = () => { }, disableNav = false }: 
             <div className="hidden md:flex items-center">
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <button className="flex items-center gap-2 text-white font-medium hover:text-blue-400">
-                    <div className="w-8 h-8 rounded-full bg-white/10 border border-white/20 flex items-center justify-center">
-                      <User className="h-4 w-4" />
+                  <button className="flex items-center gap-3 text-white font-semibold hover:text-cyan-300 transition-colors duration-300">
+                    <div className="w-10 h-10 rounded-full bg-white/10 border border-white/20 flex items-center justify-center hover:border-cyan-400 hover:bg-cyan-500/20 transition-all duration-300">
+                      <User className="h-5 w-5" />
                     </div>
-                    <span>{userName}</span>
+                    <span className="text-base font-bold">{userName}</span>
                   </button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent className="bg-black/90 border border-white/20 text-white">
@@ -375,7 +401,7 @@ export default function Header({ onBookClick = () => { }, disableNav = false }: 
             <Dialog open={isLoginOpen} onOpenChange={setIsLoginOpen}>
               <DialogTrigger asChild>
                 <button
-                  className="hidden md:inline-block text-white hover:text-blue-400 transition-colors duration-300 font-medium"
+                  className="hidden md:inline-block text-white hover:text-cyan-300 transition-colors duration-300 font-bold text-base px-4 py-2 rounded-lg hover:bg-white/5"
                   onClick={openLogin}
                 >
                   Đăng nhập
@@ -666,10 +692,10 @@ export default function Header({ onBookClick = () => { }, disableNav = false }: 
           {!effectiveDisable && (
             <Button
               onClick={handleBookNow}
-              className="hidden md:inline-flex bg-gradient-to-r text-sm md:text-base from-blue-500 to-purple-500 hover:from-blue-600 hover:to-purple-600 text-white font-semibold px-3 py-2 md:px-6 md:py-2 rounded-lg shadow-lg transition-all duration-300 hover:scale-105"
+              className="hidden md:inline-flex bg-gradient-to-r from-cyan-500 via-blue-500 to-purple-500 hover:from-cyan-600 hover:via-blue-600 hover:to-purple-600 text-white font-extrabold text-base px-6 py-3 rounded-xl shadow-lg shadow-purple-500/30 transition-all duration-300 hover:scale-105 hover:shadow-purple-500/50 uppercase tracking-wider"
             >
-              <Ticket className="h-4 w-4 md:mr-2" />
-              <span className="hidden md:inline">ĐẶT VÉ NGAY</span>
+              <Ticket className="h-5 w-5 mr-2" />
+              <span>ĐẶT VÉ NGAY</span>
             </Button>
           )}
         </div>

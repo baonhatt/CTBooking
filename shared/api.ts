@@ -65,7 +65,7 @@ export interface PaymentRequest {
   emailBook: string;
   phone: string;
   name: string;
-  showtimeId: number;
+  movieId?: number;
   ticketCount: number;
   paymentMethod: 'cash' | 'momo' | 'vnpay';
   totalPrice?: number;
