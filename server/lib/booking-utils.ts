@@ -203,6 +203,7 @@ export function getBookingEmailTemplate(data: {
                     <span class="detail-label">Tên phim: </span>
                     <span class="detail-value">${data.movieTitle}</span>
                 </div>
+                ${data.showtimeDate && data.showtimeTime ? `
                 <div class="detail-row">
                     <span class="detail-label">Ngày chiếu: </span>
                     <span class="detail-value">${data.showtimeDate}</span>
@@ -211,6 +212,7 @@ export function getBookingEmailTemplate(data: {
                     <span class="detail-label">Giờ chiếu: </span>
                     <span class="detail-value">${data.showtimeTime}</span>
                 </div>
+                ` : ''}
             </div>
 
             <div class="details-section">
@@ -226,7 +228,7 @@ export function getBookingEmailTemplate(data: {
             </div>
 
             <div class="warning">
-                ⏰ <strong>Lưu ý:</strong> Vui lòng đến rạp trước 10 phút so với giờ chiếu. 
+                ⏰ <strong>Lưu ý:</strong> ${data.showtimeDate && data.showtimeTime ? 'Vui lòng đến rạp trước 10 phút so với giờ chiếu. ' : ''}
                 Mang theo mã đặt vé hoặc số điện thoại để nhân viên xác nhận.
             </div>
         </div>

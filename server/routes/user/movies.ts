@@ -17,6 +17,7 @@ export const getAllActiveMoviesToday: RequestHandler = async (_req, res) => {
     });
 
     const activeMovies: ActiveMoviesTodayResponse[] = active_movies.map((m) => ({
+      id: m.id,
       title: m.title,
       description: m.description ?? "",
       cover_image: m.cover_image ?? "",

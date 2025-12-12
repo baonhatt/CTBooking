@@ -14,9 +14,6 @@ export default function BookingPage() {
   const navigate = useNavigate();
   const [step, setStep] = useState<0 | 1>(0);
   const [movie, setMovie] = useState<string>("");
-  const [selectedDate, setSelectedDate] = useState<Date | null>(null);
-  const [selectedShowtimeId, setSelectedShowtimeId] = useState<number | null>(null);
-  const [selectedShowtimeLabel, setSelectedShowtimeLabel] = useState<string>("");
   const [ticketCount, setTicketCount] = useState<number>(1);
   const [selectedPackage, setSelectedPackage] = useState<any | null>(null);
   const [name, setName] = useState<string>("");
@@ -103,42 +100,12 @@ export default function BookingPage() {
     } catch { }
   }, [email, name, phone]);
 
-  const next7Days = useMemo(() => {
-    const arr: Date[] = [];
-    const start = new Date();
-    start.setHours(0, 0, 0, 0);
-    for (let i = 0; i < 7; i++) {
-      const d = new Date(start);
-      d.setDate(start.getDate() + i);
-      arr.push(d);
-    }
-    return arr;
-  }, []);
-  const availableDates = useMemo(() => {
-    const set = new Set<string>();
-    for (const st of (selectedMovie?.showtimes || [])) {
-      const d = new Date(st.start_time);
-      d.setHours(0, 0, 0, 0);
-      set.add(d.toDateString());
-    }
-    return next7Days.filter((d) => set.has(d.toDateString()));
-  }, [selectedMovie, next7Days]);
-  const hasShowtimeOn = (d: Date) => availableDates.some((x) => x.toDateString() === d.toDateString());
-  const handleSelectDate = (d: Date) => {
-    setSelectedDate(new Date(d));
-    if (!hasShowtimeOn(d)) {
-      toast({ title: "Không có suất chiếu", description: `Ngày ${formatDateLong(d)} chưa có lịch chiếu` });
-    }
-  };
-
   const resolveImageUrl = (u: string | undefined | null) => {
     if (!u) return "";
     if (u.startsWith("http")) return u;
     const path = u.startsWith("/") ? u : `/${u}`;
     return `${API_BASE_URL}${path}`;
   };
-  const formatDateShort = (date: Date) => date.toLocaleDateString("vi-VN", { weekday: "short", day: "2-digit", month: "2-digit" });
-  const formatDateLong = (date: Date) => date.toLocaleDateString("vi-VN", { weekday: "long", day: "2-digit", month: "2-digit" });
 
   const handleCreateAndPay = async () => {
     if (isProcessing) return;
@@ -154,10 +121,6 @@ export default function BookingPage() {
     }
     if (!name || !phone || !email) {
       toast({ title: "Thiếu thông tin", description: "Vui lòng nhập họ tên, số điện thoại và email" });
-      return;
-    }
-    if (selectedDate && !hasShowtimeOn(selectedDate)) {
-      toast({ title: "Không có suất chiếu", description: "Ngày đã chọn không có suất chiếu khả dụng" });
       return;
     }
     const confirmed = window.confirm("Xác nhận đặt vé và chuyển sang thanh toán?");
@@ -189,9 +152,6 @@ export default function BookingPage() {
       const summary = {
         orderId,
         movie: selectedMovie?.title,
-        dateDisplay: "",
-        showtime: "",
-        showtimeId: null,
         name,
         phone,
         email: authEmail,
@@ -287,7 +247,7 @@ export default function BookingPage() {
             <CardContent className="space-y-6">
               <div className="space-y-4">
                 <div className="text-sm text-orange-400">Chọn phim</div>
-                <Select value={movie} onValueChange={(v) => { setMovie(v); setSelectedDate(null); setSelectedShowtimeId(null); setSelectedShowtimeLabel(""); try { refetchActive(); } catch { } }}>
+                <Select value={movie} onValueChange={(v) => { setMovie(v); try { refetchActive(); } catch { } }}>
                   <SelectTrigger className="w-full bg-black/40 text-white border-white/10">
                     <span className="truncate">{selectedMovie?.title || "Chọn phim"}</span>
                   </SelectTrigger>
@@ -306,34 +266,18 @@ export default function BookingPage() {
                   </SelectContent>
                 </Select>
                 {selectedMovie && (
-                  <div className="mt-3 overflow-hidden rounded-lg border border-white/10">
-                    <img src={resolveImageUrl(selectedMovie.cover_image)} alt={selectedMovie.title} className="w-full h-40 object-cover" />
-                    <div className="px-3 py-2 text-sm text-orange-400">Thời lượng: {selectedMovie.duration_min ? `${selectedMovie.duration_min} phút` : "--"}</div>
+                  <div className="mt-3 flex items-center gap-4 p-3 rounded-lg border border-white/10 bg-black/30">
+                    <img src={resolveImageUrl(selectedMovie.cover_image)} alt={selectedMovie.title} className="w-20 h-28 object-cover rounded" />
+                    <div className="flex-1">
+                      <div className="text-white font-semibold mb-1">{selectedMovie.title}</div>
+                      <div className="text-sm text-orange-400">Thời lượng: {selectedMovie.duration_min ? `${selectedMovie.duration_min} phút` : "--"}</div>
+                      {selectedMovie.genres && (
+                        <div className="text-xs text-gray-400 mt-1">{Array.isArray(selectedMovie.genres) ? selectedMovie.genres.join(" / ") : selectedMovie.genres}</div>
+                      )}
+                    </div>
                   </div>
                 )}
               </div>
-
-              {selectedMovie && (
-                <div>
-                  <div className="text-sm text-orange-400 mb-2">Chọn ngày chiếu (7 ngày tới)</div>
-                  <div className="flex flex-wrap gap-2 bg-black/40 text-white rounded px-3 py-2 mb-2">
-                    {next7Days.map((d, idx) => {
-                      const selected = selectedDate && d.toDateString() === selectedDate.toDateString();
-                      const available = hasShowtimeOn(d);
-                      const cls = selected
-                        ? "bg-blue-600 text-white"
-                        : available
-                          ? "bg-transparent text-white hover:bg-white border"
-                          : "bg-black/60 text-white/50 border border-white/10";
-                      return (
-                        <Button key={idx} variant={selected ? "default" : "ghost"} className={cls} onClick={() => handleSelectDate(d)}>
-                          {formatDateShort(d)}
-                        </Button>
-                      );
-                    })}
-                  </div>
-                </div>
-              )}
 
               <div>
                 <div className="text-sm text-orange-400 mb-2">Thông tin khách hàng</div>
@@ -430,7 +374,6 @@ export default function BookingPage() {
                 <div className="space-y-3">
                   <div className="grid grid-cols-2 gap-2 text-sm">
                     <span className="text-orange-400">Phim</span><span className="font-medium text-white">{selectedMovie?.title}</span>
-                    <span className="text-orange-400">Ngày</span><span className="font-medium text-white">{selectedDate ? formatDateLong(selectedDate) : ""}</span>
                     <span className="text-orange-400">Thời lượng</span><span className="font-medium text-white">{selectedMovie?.duration_min ? `${selectedMovie.duration_min} phút` : "--"}</span>
                     <span className="text-orange-400">Họ tên</span><span className="font-medium text-white">{name}</span>
                     <span className="text-orange-400">Email</span><span className="font-medium text-white">{email}</span>
@@ -438,8 +381,12 @@ export default function BookingPage() {
                   </div>
                   <div className="text-xs sm:text-sm text-yellow-300 mt-1">Vui lòng kiểm tra kỹ email, mã đặt vé sẽ gửi tới email này.</div>
                   {selectedMovie?.cover_image && (
-                    <div className="mt-2 overflow-hidden rounded-lg border border-white/10">
-                      <img src={resolveImageUrl(selectedMovie.cover_image)} alt={selectedMovie.title} className="w-full h-40 object-cover" />
+                    <div className="mt-2 flex items-center gap-3 p-3 rounded-lg border border-white/10 bg-black/30">
+                      <img src={resolveImageUrl(selectedMovie.cover_image)} alt={selectedMovie.title} className="w-16 h-24 object-cover rounded" />
+                      <div className="flex-1">
+                        <div className="text-white font-semibold text-sm mb-1">{selectedMovie.title}</div>
+                        <div className="text-xs text-orange-400">{selectedMovie.duration_min ? `${selectedMovie.duration_min} phút` : "--"}</div>
+                      </div>
                     </div>
                   )}
                   

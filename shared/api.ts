@@ -48,6 +48,7 @@ export interface ShowtimeResponse {
 }
 
 export interface ActiveMoviesTodayResponse {
+  id: number;
   title: string;
   description: string;
   cover_image: string;

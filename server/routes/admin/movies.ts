@@ -262,46 +262,35 @@ export const getMovieById: RequestHandler = async (req, res) => {
 
     const movie = await (prisma as any).movies.findUnique({
       where: { id: movieId },
-      include: {
-        showtimes: {
-          select: {
-            id: true,
-            start_time: true,
-            total_sold: true,
-          },
-        },
-      },
     });
 
     if (!movie) {
       return res.status(404).json({ message: "Không tìm thấy phim" });
     }
 
-    // Calculate stats (only count showtimes that have PAID bookings)
-    const paidShowtimes = movie.showtimes.filter((st: any) => (st.total_sold || 0) > 0);
-    const totalShowtimes = paidShowtimes.length;
-    const totalTicketsSold = paidShowtimes.reduce(
-      (sum, st) => sum + (st.total_sold || 0),
-      0
-    );
-    const totalRevenue = await (prisma as any).bookings.aggregate({
+    // Calculate stats from bookings only (no showtimes needed)
+    const paidBookings = await (prisma as any).bookings.findMany({
       where: {
-        showtime: {
-          movie_id: movieId,
-        },
+        movie_id: movieId,
         payment_status: { in: ["paid"] },
       },
-      _sum: { total_price: true },
+      select: {
+        ticket_count: true,
+        total_price: true,
+      },
     });
 
-    const successfulBookings = await (prisma as any).bookings.count({
-      where: {
-        showtime: {
-          movie_id: movieId,
-        },
-        payment_status: { in: ["paid"] },
-      },
-    });
+    const totalTicketsSold = paidBookings.reduce(
+      (sum: number, booking: any) => sum + (Number(booking.ticket_count) || 0),
+      0
+    );
+
+    const totalRevenue = paidBookings.reduce(
+      (sum: number, booking: any) => sum + Number(booking.total_price || 0),
+      0
+    );
+
+    const successfulBookings = paidBookings.length;
 
     const mapped = {
       id: movie.id,
@@ -315,18 +304,23 @@ export const getMovieById: RequestHandler = async (req, res) => {
       release_date: movie.release_date,
       created_at: movie.created_at,
       updated_at: movie.updated_at,
-      hasShowtimes: movie.showtimes.length > 0,
+      hasShowtimes: false, // No showtimes in current logic
       stats: {
-        totalShowtimes,
+        totalShowtimes: 0, // Not applicable anymore
         totalTicketsSold,
-        totalRevenue: Number(totalRevenue._sum?.total_price || 0),
+        totalRevenue,
         successfulBookings,
       },
     };
 
     res.status(200).json(mapped);
   } catch (err: any) {
-    res.status(500).json({ message: "Lỗi máy chủ nội bộ" });
+    console.error("Error in getMovieById:", err);
+    res.status(500).json({ 
+      message: "Lỗi máy chủ nội bộ",
+      error: process.env.NODE_ENV === "development" ? err.message : undefined
+    });
   }
 };
+
 

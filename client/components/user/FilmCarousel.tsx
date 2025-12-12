@@ -1,10 +1,18 @@
-import { useMemo, useRef } from "react";
+import { useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { motion } from "framer-motion";
-import { ChevronLeft, ChevronRight, Play } from "lucide-react";
-import { getAllActiveMoviesToday } from "@/lib/api";
+import { ChevronLeft, ChevronRight, Play, Clock, Star, Calendar, Ticket } from "lucide-react";
+import { getAllActiveMoviesToday, getMovieById } from "@/lib/api";
 import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { movieStore } from "@/store/movieStore";
 
 interface FilmCarouselProps {
   onSelectFilm?: () => void;
@@ -13,6 +21,13 @@ interface FilmCarouselProps {
 export default function FilmCarousel({ onSelectFilm }: FilmCarouselProps) {
   const scrollRef = useRef<HTMLDivElement | null>(null);
   const navigate = useNavigate();
+  const [isDragging, setIsDragging] = useState(false);
+  const [startX, setStartX] = useState(0);
+  const [scrollLeft, setScrollLeft] = useState(0);
+  const [selectedMovieId, setSelectedMovieId] = useState<number | null>(null);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isLoadingDetails, setIsLoadingDetails] = useState(false);
+  const [storeUpdateTrigger, setStoreUpdateTrigger] = useState(0);
 
   const { data } = useQuery({
     queryKey: ["activeMovies", "carousel"],
@@ -21,21 +36,23 @@ export default function FilmCarousel({ onSelectFilm }: FilmCarouselProps) {
 
   const films = useMemo(() => {
     const fetched =
-      data?.activeMovies?.map((m: any) => ({
-        id: m.id,
-        title: m.title,
-        genre: (() => {
-          try {
-            const parsed = JSON.parse(m.genres);
-            return Array.isArray(parsed) ? parsed.join(" • ") : "Sci‑Fi";
-          } catch {
-            return "Sci‑Fi";
-          }
-        })(),
-        poster:
-          m.cover_image ||
-          "https://images.unsplash.com/photo-1464375117522-1311d6a5b81f?auto=format&fit=crop&w=900&q=80",
-      })) || [];
+      data?.activeMovies
+        ?.filter((m: any) => m.id != null && typeof m.id === "number")
+        ?.map((m: any) => ({
+          id: m.id,
+          title: m.title,
+          genre: (() => {
+            try {
+              const parsed = JSON.parse(m.genres);
+              return Array.isArray(parsed) ? parsed.join(" • ") : "Sci‑Fi";
+            } catch {
+              return "Sci‑Fi";
+            }
+          })(),
+          poster:
+            m.cover_image ||
+            "https://images.unsplash.com/photo-1464375117522-1311d6a5b81f?auto=format&fit=crop&w=900&q=80",
+        })) || [];
 
     if (fetched.length > 0) return fetched;
 
@@ -71,11 +88,103 @@ export default function FilmCarousel({ onSelectFilm }: FilmCarouselProps) {
     el.scrollBy({ left: dir === "left" ? -amount : amount, behavior: "smooth" });
   };
 
-  const handleOpen = (film: any) => {
+  // Drag handlers for swipe functionality
+  const handleMouseDown = (e: React.MouseEvent) => {
+    const el = scrollRef.current;
+    if (!el) return;
+    setIsDragging(true);
+    setStartX(e.pageX - el.offsetLeft);
+    setScrollLeft(el.scrollLeft);
+  };
+
+  const handleMouseMove = (e: React.MouseEvent) => {
+    if (!isDragging) return;
+    e.preventDefault();
+    const el = scrollRef.current;
+    if (!el) return;
+    const x = e.pageX - el.offsetLeft;
+    const walk = (x - startX) * 2;
+    el.scrollLeft = scrollLeft - walk;
+  };
+
+  const handleMouseUp = () => {
+    setIsDragging(false);
+  };
+
+  const handleMouseLeave = () => {
+    setIsDragging(false);
+  };
+
+  // Touch handlers for mobile swipe
+  const handleTouchStart = (e: React.TouchEvent) => {
+    const el = scrollRef.current;
+    if (!el) return;
+    setIsDragging(true);
+    setStartX(e.touches[0].pageX - el.offsetLeft);
+    setScrollLeft(el.scrollLeft);
+  };
+
+  const handleTouchMove = (e: React.TouchEvent) => {
+    if (!isDragging) return;
+    const el = scrollRef.current;
+    if (!el) return;
+    const x = e.touches[0].pageX - el.offsetLeft;
+    const walk = (x - startX) * 2;
+    el.scrollLeft = scrollLeft - walk;
+  };
+
+  const handleTouchEnd = () => {
+    setIsDragging(false);
+  };
+
+  const handleOpen = async (film: any) => {
+    if (typeof film.id === "string" && film.id.startsWith("placeholder")) {
+      return;
+    }
+    if (!film.id || typeof film.id !== "number") {
+      console.error("Invalid film ID:", film);
+      return;
+    }
     onSelectFilm?.();
+    setSelectedMovieId(film.id);
+    setIsModalOpen(true);
+
+    // Check if movie is in store, if not fetch and store it
+    const cachedMovie = movieStore.getMovie(film.id);
+    if (!cachedMovie) {
+      setIsLoadingDetails(true);
+      try {
+        const details = await getMovieById(film.id);
+        if (details) {
+          movieStore.setMovie(details);
+          setStoreUpdateTrigger((prev) => prev + 1);
+        }
+      } catch (error) {
+        console.error(`Failed to fetch details for movie ${film.id}:`, error);
+      } finally {
+        setIsLoadingDetails(false);
+      }
+    } else {
+      // Movie is already in store, trigger update to show it
+      setStoreUpdateTrigger((prev) => prev + 1);
+    }
+  };
+
+  // Get movie details from store
+  const movieDetails = useMemo(() => {
+    if (!selectedMovieId) return null;
+    return movieStore.getMovie(selectedMovieId);
+  }, [selectedMovieId, storeUpdateTrigger]);
+
+  const handleBookTicket = () => {
+    if (!movieDetails) return;
     try {
-      localStorage.setItem("selectedFilm", JSON.stringify(film));
-    } catch { }
+      const film = films.find((f) => f.id === movieDetails.id);
+      if (film) {
+        localStorage.setItem("selectedFilm", JSON.stringify(film));
+      }
+    } catch {}
+    setIsModalOpen(false);
     navigate("/booking");
   };
 
@@ -119,7 +228,15 @@ export default function FilmCarousel({ onSelectFilm }: FilmCarouselProps) {
 
         <div
           ref={scrollRef}
-          className="flex gap-6 overflow-x-auto pb-4 snap-x snap-mandatory scrollbar-neon"
+          onMouseDown={handleMouseDown}
+          onMouseMove={handleMouseMove}
+          onMouseUp={handleMouseUp}
+          onMouseLeave={handleMouseLeave}
+          onTouchStart={handleTouchStart}
+          onTouchMove={handleTouchMove}
+          onTouchEnd={handleTouchEnd}
+          className={`flex gap-6 overflow-x-auto pb-4 snap-x snap-mandatory scrollbar-hide ${isDragging ? "cursor-grabbing select-none" : "cursor-grab"}`}
+          style={{ userSelect: isDragging ? "none" : "auto" }}
         >
           {films.map((film, index) => (
             <motion.button
@@ -155,6 +272,138 @@ export default function FilmCarousel({ onSelectFilm }: FilmCarouselProps) {
           ))}
         </div>
       </div>
+
+      {/* Movie Details Modal */}
+      <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
+        <DialogContent className="max-w-3xl max-h-[90vh] flex flex-col bg-gradient-to-br from-[#0b1226] via-[#0e1b3d] to-[#050915] border border-cyan-500/30 text-white p-0 shadow-[0_0_50px_rgba(59,130,246,0.3)]">
+          <div className="overflow-y-auto scrollbar-neon flex-1 px-6 pt-6 pb-4">
+            {isLoadingDetails || !movieDetails ? (
+              <div className="flex items-center justify-center py-12">
+                <div className="text-center">
+                  <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-cyan-400 mx-auto mb-4"></div>
+                  <p className="text-gray-400">Đang tải thông tin phim...</p>
+                </div>
+              </div>
+            ) : (
+              <>
+                <DialogHeader className="mb-4">
+                  <DialogTitle className="text-3xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-cyan-300 via-blue-400 to-fuchsia-400 mb-2">
+                    {movieDetails.title}
+                  </DialogTitle>
+                  <DialogDescription className="text-gray-300 text-sm">
+                    {(() => {
+                      try {
+                        const genres = Array.isArray(movieDetails.genres)
+                          ? movieDetails.genres
+                          : typeof movieDetails.genres === "string"
+                          ? JSON.parse(movieDetails.genres)
+                          : [];
+                        return Array.isArray(genres) && genres.length > 0 ? genres.join(" • ") : "Chưa phân loại";
+                      } catch {
+                        return "Chưa phân loại";
+                      }
+                    })()}
+                  </DialogDescription>
+                </DialogHeader>
+
+                <div className="grid md:grid-cols-2 gap-6">
+                  {/* Movie Poster */}
+                  <div className="relative rounded-xl overflow-hidden border border-cyan-500/30 aspect-[2/3] shadow-[0_0_30px_rgba(59,130,246,0.2)]">
+                    <img
+                      src={
+                        movieDetails.cover_image ||
+                        "https://images.unsplash.com/photo-1464375117522-1311d6a5b81f?auto=format&fit=crop&w=900&q=80"
+                      }
+                      alt={movieDetails.title}
+                      className="w-full h-full object-cover"
+                    />
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/40 to-transparent pointer-events-none" />
+                  </div>
+
+                  {/* Movie Info */}
+                  <div className="space-y-4">
+                    <div>
+                      <h3 className="text-base font-semibold text-cyan-300 mb-2 flex items-center gap-2">
+                        <span className="w-1 h-4 bg-gradient-to-b from-cyan-400 to-blue-500 rounded-full"></span>
+                        Mô tả
+                      </h3>
+                      <p className="text-gray-300 leading-relaxed text-sm">
+                        {movieDetails.description || "Chưa có mô tả cho bộ phim này."}
+                      </p>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-4 pt-4 border-t border-white/10">
+                      {movieDetails.rating !== null && movieDetails.rating !== undefined && (
+                        <div className="flex items-center gap-2 p-2 rounded-lg bg-white/5 border border-white/10">
+                          <Star className="h-4 w-4 text-yellow-400 fill-yellow-400" />
+                          <span className="text-white font-medium text-sm">
+                            {movieDetails.rating.toFixed(1)} / 10
+                          </span>
+                        </div>
+                      )}
+                      {movieDetails.duration_min && (
+                        <div className="flex items-center gap-2 p-2 rounded-lg bg-white/5 border border-white/10">
+                          <Clock className="h-4 w-4 text-cyan-400" />
+                          <span className="text-white font-medium text-sm">
+                            {movieDetails.duration_min} phút
+                          </span>
+                        </div>
+                      )}
+                      {movieDetails.release_date && (
+                        <div className="flex items-center gap-2 p-2 rounded-lg bg-white/5 border border-white/10">
+                          <Calendar className="h-4 w-4 text-fuchsia-400" />
+                          <span className="text-white font-medium text-sm">
+                            {new Date(movieDetails.release_date).toLocaleDateString("vi-VN")}
+                          </span>
+                        </div>
+                      )}
+                    </div>
+
+                    {movieDetails.stats && (
+                      <div className="pt-4 border-t border-white/10">
+                        <h4 className="text-sm font-semibold text-cyan-300 mb-3 flex items-center gap-2">
+                          <span className="w-1 h-4 bg-gradient-to-b from-cyan-400 to-blue-500 rounded-full"></span>
+                          Thống kê
+                        </h4>
+                        <div className="grid grid-cols-2 gap-3">
+                          <div className="p-3 rounded-lg bg-white/5 border border-white/10">
+                            <div className="text-xs text-gray-400 mb-1">Suất chiếu</div>
+                            <div className="text-lg font-bold text-white">{movieDetails.stats.totalShowtimes}</div>
+                          </div>
+                          <div className="p-3 rounded-lg bg-white/5 border border-white/10">
+                            <div className="text-xs text-gray-400 mb-1">Vé đã bán</div>
+                            <div className="text-lg font-bold text-cyan-300">{movieDetails.stats.totalTicketsSold}</div>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </>
+            )}
+          </div>
+
+          {/* Fixed Footer with Buttons */}
+          {movieDetails && (
+            <div className="flex justify-end gap-3 px-6 py-4 border-t border-white/10 bg-gradient-to-br from-[#0b1226] via-[#0e1b3d] to-[#050915] shrink-0">
+              <Button
+                variant="outline"
+                onClick={() => setIsModalOpen(false)}
+                className="border-white/20 text-black hover:bg-white/10 hover:text-white hover:border-cyan-400/50 transition-all"
+              >
+                Đóng
+              </Button>
+              <Button
+                onClick={handleBookTicket}
+                className="bg-gradient-to-r from-cyan-400 via-blue-600 to-fuchsia-500 hover:from-fuchsia-500 hover:via-cyan-400 hover:to-blue-600 text-white font-semibold shadow-[0_0_30px_rgba(59,130,246,0.4)] hover:shadow-[0_0_40px_rgba(236,72,153,0.6)] transition-all duration-300 hover:scale-105"
+              >
+                <Ticket className="h-4 w-4 mr-2" />
+                Đặt vé ngay
+              </Button>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </section>
   );
 }

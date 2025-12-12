@@ -79,22 +79,44 @@ export default function Header({ onBookClick = () => { }, disableNav = false, to
     if (effectiveDisable) return;
     const ids = ["hero", "films", "technology", "promotions", "store"];
     const observers: IntersectionObserver[] = [];
+    const visibleSections = new Set<string>();
+    
     ids.forEach((id) => {
       const el = document.getElementById(id);
       if (!el) return;
+      
       const observer = new IntersectionObserver(
         (entries) => {
           entries.forEach((entry) => {
-            if (entry.isIntersecting) {
-              setActiveSection(id);
+            if (entry.isIntersecting && entry.intersectionRatio > 0.1) {
+              visibleSections.add(id);
+            } else {
+              visibleSections.delete(id);
             }
+            
+            // Tìm section đầu tiên trong danh sách ids mà đang visible
+            // (ưu tiên section ở trên)
+            let activeId = "hero";
+            for (const sectionId of ids) {
+              if (visibleSections.has(sectionId)) {
+                activeId = sectionId;
+                break; // Lấy section đầu tiên (ở trên cùng)
+              }
+            }
+            
+            setActiveSection(activeId);
           });
         },
-        { threshold: 0.4 }
+        { 
+          threshold: [0, 0.1, 0.2, 0.3, 0.4, 0.5],
+          rootMargin: "-15% 0px -60% 0px" // Trigger khi section vào viewport từ trên
+        }
       );
+      
       observer.observe(el);
       observers.push(observer);
     });
+    
     return () => observers.forEach((ob) => ob.disconnect());
   }, [effectiveDisable]);
   useEffect(() => {
@@ -247,42 +269,48 @@ export default function Header({ onBookClick = () => { }, disableNav = false, to
           : "bg-gradient-to-b from-black/50 via-black/30 to-transparent border-b border-white/10",
       )}
     >
-      <div className="container mx-auto px-4 py-4 flex items-center gap-6 md:gap-10">
-        <div className="flex items-center gap-4 animate-fade-in">
+      <div className="container mx-auto px-4 md:px-6 lg:px-8 py-3 md:py-4 flex items-center gap-4 md:gap-8">
+        {/* Logo Section */}
+        <div className="flex items-center gap-3 md:gap-4 animate-fade-in">
           <img
             onClick={() => navigator('/')}
             src={icon}
             className="cursor-pointer h-16 w-16 md:h-20 md:w-20 lg:h-24 lg:w-24 drop-shadow-[0_0_30px_rgba(59,130,246,0.6)] transition-transform duration-300 hover:scale-110"
             alt="CINESPHERE logo"
           />
-         
+          <div 
+            onClick={() => navigator('/')}
+            className="cursor-pointer hidden sm:block"
+          >
+          </div>
         </div>
 
-        <nav className="hidden md:flex items-center gap-8 lg:gap-10 animate-fade-in delay-200 ml-auto">
+        {/* Navigation */}
+        <nav className="hidden md:flex items-center gap-6 lg:gap-8 xl:gap-10 animate-fade-in delay-200 ml-auto">
           {navItems.map((item) => (
             <button
               key={item.target}
               onClick={effectiveDisable ? undefined : () => scrollToSection(item.target)}
               className={cn(
-                "relative group inline-flex h-10 items-center text-white font-normal uppercase text-sm md:text-base lg:text-base whitespace-nowrap tracking-[0.06em] md:tracking-[0.12em] transition-all duration-300",
+                "relative group inline-flex h-10 items-center text-white font-medium uppercase text-sm lg:text-[15px] whitespace-nowrap tracking-[0.08em] transition-all duration-300",
                 effectiveDisable
-                  ? "opacity-40 cursor-not-allowed"
-                  : "hover:scale-[1.05] hover:text-cyan-300"
+                  ? "opacity-50 cursor-not-allowed"
+                  : "hover:text-cyan-300 hover:scale-[1.02]"
               )}
             >
               <span
                 className={cn(
-                  "pb-0 inline-block leading-none font-normal",
+                  "pb-0.5 inline-block leading-tight font-medium transition-colors duration-300",
                   activeSection === item.target 
-                    ? "text-transparent bg-clip-text bg-gradient-to-r from-cyan-300 via-blue-400 to-purple-400" 
-                    : "text-white"
+                    ? "text-transparent bg-clip-text bg-gradient-to-r from-cyan-300 via-blue-400 to-purple-400 font-semibold" 
+                    : "text-white/90"
                 )}
               >
                 {item.label}
               </span>
               <span
                 className={cn(
-                  "absolute left-0 right-0 -bottom-1 h-0.5 bg-gradient-to-r from-cyan-400 via-blue-500 to-fuchsia-500 origin-left transition-transform duration-300",
+                  "absolute left-0 right-0 -bottom-0.5 h-[2px] bg-gradient-to-r from-cyan-400 via-blue-500 to-fuchsia-500 origin-left transition-transform duration-300 rounded-full",
                   activeSection === item.target ? "scale-x-100" : "scale-x-0 group-hover:scale-x-100"
                 )}
               />
@@ -311,15 +339,15 @@ export default function Header({ onBookClick = () => { }, disableNav = false, to
                 </div>
 
                 {/* Danh mục */}
-                <nav className="flex flex-col gap-6">
+                <nav className="flex flex-col gap-5">
                   {navItems.map((item) => (
                     <button
                       key={item.target}
                       className={cn(
-                        "text-left font-normal text-sm md:text-base tracking-[0.06em] md:tracking-[0.12em] uppercase transition-colors duration-300 whitespace-nowrap",
+                        "text-left font-medium text-base tracking-[0.08em] uppercase transition-colors duration-300 whitespace-nowrap py-2",
                         effectiveDisable 
                           ? "opacity-50 cursor-not-allowed text-gray-400" 
-                          : "text-white hover:text-cyan-300"
+                          : "text-white/90 hover:text-cyan-300"
                       )}
                       disabled={effectiveDisable}
                       onClick={() => {
@@ -383,8 +411,8 @@ export default function Header({ onBookClick = () => { }, disableNav = false, to
                 <Tooltip>
                   <TooltipTrigger asChild>
                     <DropdownMenuTrigger asChild>
-                      <button className="flex items-center gap-3 text-white font-normal hover:text-cyan-300 transition-colors duration-300">
-                        <div className="w-10 h-10 rounded-full bg-white/10 border border-white/20 flex items-center justify-center hover:border-cyan-400 hover:bg-cyan-500/20 transition-all duration-300">
+                      <button className="flex items-center gap-2.5 text-white font-medium hover:text-cyan-300 transition-colors duration-300">
+                        <div className="w-10 h-10 rounded-full bg-white/10 backdrop-blur-sm border border-white/20 flex items-center justify-center hover:border-cyan-400 hover:bg-cyan-500/20 transition-all duration-300 shadow-lg">
                           <User className="h-5 w-5" />
                         </div>
                       </button>
@@ -413,7 +441,7 @@ export default function Header({ onBookClick = () => { }, disableNav = false, to
             <Dialog open={isLoginOpen} onOpenChange={setIsLoginOpen}>
               <DialogTrigger asChild>
                 <button
-                  className="hidden md:inline-flex h-10 items-center text-white hover:text-cyan-300 transition-colors duration-300 font-normal text-base px-4 rounded-lg hover:bg-white/5 whitespace-nowrap"
+                  className="hidden md:inline-flex h-10 items-center text-white/90 hover:text-white transition-colors duration-300 font-medium text-[15px] px-5 rounded-lg hover:bg-white/10 backdrop-blur-sm whitespace-nowrap border border-white/10 hover:border-white/20"
                   onClick={openLogin}
                 >
                   Đăng nhập
