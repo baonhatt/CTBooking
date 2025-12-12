@@ -19,6 +19,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import iconCine from "@/assets/images/iconCine.svg";
 import icon from "@/assets/images/icon.svg";
 import brand from "@/assets/images/brand.svg";
@@ -32,9 +33,11 @@ import {
 interface HeaderProps {
   onBookClick?: () => void;
   disableNav?: boolean;
+  tooltipPrefix?: string;
+  extraMenuOptions?: Array<{ label: string; action: () => void }>;
 }
 
-export default function Header({ onBookClick = () => { }, disableNav = false }: HeaderProps) {
+export default function Header({ onBookClick = () => { }, disableNav = false, tooltipPrefix, extraMenuOptions = [] }: HeaderProps) {
   const auth = useAuth();
   const [isScrolled, setIsScrolled] = useState(false);
   const [userName, setUserName] = useState<string | null>(null);
@@ -252,9 +255,7 @@ export default function Header({ onBookClick = () => { }, disableNav = false }: 
             className="cursor-pointer h-16 w-16 md:h-20 md:w-20 lg:h-24 lg:w-24 drop-shadow-[0_0_30px_rgba(59,130,246,0.6)] transition-transform duration-300 hover:scale-110"
             alt="CINESPHERE logo"
           />
-          <div className="hidden sm:flex flex-col leading-tight">
-       
-          </div>
+         
         </div>
 
         <nav className="hidden md:flex items-center gap-8 lg:gap-10 animate-fade-in delay-200 ml-auto">
@@ -263,7 +264,7 @@ export default function Header({ onBookClick = () => { }, disableNav = false }: 
               key={item.target}
               onClick={effectiveDisable ? undefined : () => scrollToSection(item.target)}
               className={cn(
-                "relative group text-white font-bold uppercase tracking-[0.2em] text-base lg:text-lg transition-all duration-300",
+                "relative group inline-flex h-10 items-center text-white font-normal uppercase text-sm md:text-base lg:text-base whitespace-nowrap tracking-[0.06em] md:tracking-[0.12em] transition-all duration-300",
                 effectiveDisable
                   ? "opacity-40 cursor-not-allowed"
                   : "hover:scale-[1.05] hover:text-cyan-300"
@@ -271,7 +272,7 @@ export default function Header({ onBookClick = () => { }, disableNav = false }: 
             >
               <span
                 className={cn(
-                  "pb-2 inline-block font-extrabold",
+                  "pb-0 inline-block leading-none font-normal",
                   activeSection === item.target 
                     ? "text-transparent bg-clip-text bg-gradient-to-r from-cyan-300 via-blue-400 to-purple-400" 
                     : "text-white"
@@ -315,7 +316,7 @@ export default function Header({ onBookClick = () => { }, disableNav = false }: 
                     <button
                       key={item.target}
                       className={cn(
-                        "text-left font-bold text-xl tracking-[0.15em] uppercase transition-colors duration-300",
+                        "text-left font-normal text-sm md:text-base tracking-[0.06em] md:tracking-[0.12em] uppercase transition-colors duration-300 whitespace-nowrap",
                         effectiveDisable 
                           ? "opacity-50 cursor-not-allowed text-gray-400" 
                           : "text-white hover:text-cyan-300"
@@ -379,18 +380,29 @@ export default function Header({ onBookClick = () => { }, disableNav = false }: 
           {userName ? (
             <div className="hidden md:flex items-center">
               <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <button className="flex items-center gap-3 text-white font-semibold hover:text-cyan-300 transition-colors duration-300">
-                    <div className="w-10 h-10 rounded-full bg-white/10 border border-white/20 flex items-center justify-center hover:border-cyan-400 hover:bg-cyan-500/20 transition-all duration-300">
-                      <User className="h-5 w-5" />
-                    </div>
-                    <span className="text-base font-bold">{userName}</span>
-                  </button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent className="bg-black/90 border border-white/20 text-white">
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <DropdownMenuTrigger asChild>
+                      <button className="flex items-center gap-3 text-white font-normal hover:text-cyan-300 transition-colors duration-300">
+                        <div className="w-10 h-10 rounded-full bg-white/10 border border-white/20 flex items-center justify-center hover:border-cyan-400 hover:bg-cyan-500/20 transition-all duration-300">
+                          <User className="h-5 w-5" />
+                        </div>
+                      </button>
+                    </DropdownMenuTrigger>
+                  </TooltipTrigger>
+                  <TooltipContent side="bottom" align="center" className="bg-black/90 border border-white/20 text-white">
+                    {(tooltipPrefix || "Chào") + ", " + (userName || "bạn")}
+                  </TooltipContent>
+                </Tooltip>
+                <DropdownMenuContent side="bottom" align="end" className="bg-black/90 border border-white/20 text-white">
                   <DropdownMenuItem onClick={() => navigator("/account")}>
                     Tài khoản
                   </DropdownMenuItem>
+                  {extraMenuOptions.map((opt, idx) => (
+                    <DropdownMenuItem key={`extra-${idx}`} onClick={opt.action}>
+                      {opt.label}
+                    </DropdownMenuItem>
+                  ))}
                   <DropdownMenuItem onClick={handleLogout}>
                     Đăng xuất
                   </DropdownMenuItem>
@@ -401,7 +413,7 @@ export default function Header({ onBookClick = () => { }, disableNav = false }: 
             <Dialog open={isLoginOpen} onOpenChange={setIsLoginOpen}>
               <DialogTrigger asChild>
                 <button
-                  className="hidden md:inline-block text-white hover:text-cyan-300 transition-colors duration-300 font-bold text-base px-4 py-2 rounded-lg hover:bg-white/5"
+                  className="hidden md:inline-flex h-10 items-center text-white hover:text-cyan-300 transition-colors duration-300 font-normal text-base px-4 rounded-lg hover:bg-white/5 whitespace-nowrap"
                   onClick={openLogin}
                 >
                   Đăng nhập
@@ -418,7 +430,6 @@ export default function Header({ onBookClick = () => { }, disableNav = false }: 
                     </label>
                     <Input
                       type="email"
-                      placeholder="you@email.com"
                       value={loginEmail}
                       onChange={(e) => setLoginEmail(e.target.value)}
                       maxLength={50}
@@ -433,7 +444,6 @@ export default function Header({ onBookClick = () => { }, disableNav = false }: 
                     <div className="relative">
                       <Input
                         type={showLoginPass ? "text" : "password"}
-                        placeholder="••••••••"
                         value={loginPassword}
                         onChange={(e) => setLoginPassword(e.target.value)}
                         required
@@ -546,7 +556,6 @@ export default function Header({ onBookClick = () => { }, disableNav = false }: 
                   <div className="relative">
                     <Input
                       type={showRegisterPass ? "text" : "password"}
-                      placeholder="••••••••"
                       value={registerPassword}
                       maxLength={50}
                       onChange={(e) => setRegisterPassword(e.target.value)}
@@ -692,7 +701,7 @@ export default function Header({ onBookClick = () => { }, disableNav = false }: 
           {!effectiveDisable && (
             <Button
               onClick={handleBookNow}
-              className="hidden md:inline-flex bg-gradient-to-r from-cyan-500 via-blue-500 to-purple-500 hover:from-cyan-600 hover:via-blue-600 hover:to-purple-600 text-white font-extrabold text-base px-6 py-3 rounded-xl shadow-lg shadow-purple-500/30 transition-all duration-300 hover:scale-105 hover:shadow-purple-500/50 uppercase tracking-wider"
+              className="hidden md:inline-flex bg-gradient-to-r from-cyan-500 via-blue-500 to-purple-500 hover:from-cyan-600 hover:via-blue-600 hover:to-purple-600 text-white font-normal text-sm md:text-base px-5 md:px-6 py-2.5 md:py-3 rounded-xl shadow-lg shadow-purple-500/30 transition-all duration-300 hover:scale-105 hover:shadow-purple-500/50 uppercase tracking-wider"
             >
               <Ticket className="h-5 w-5 mr-2" />
               <span>ĐẶT VÉ NGAY</span>

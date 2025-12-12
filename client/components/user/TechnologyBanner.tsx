@@ -101,11 +101,8 @@ export default function TechnologyBanner() {
               cùng Vũ Trụ Đa Chiều 8K
             </span>
           </h2>
-          <p className="text-lg md:text-xl text-gray-200 leading-relaxed">
-            Bước vào Huyễn Cảnh Không Gian, bạn đứng giữa những khung hình sống
-            động: đại dương phát sáng, rừng khủng long, hành lang tàu điện ngầm hay
-            thành phố tương lai. Đây không chỉ là phòng chiếu, mà là "cánh cửa đa
-            chiều" mở ra thế giới mà mắt thường chưa từng thấy.
+          <p className="text-lg md:text-xl whitespace-break-spaces text-gray-200 leading-relaxed">
+            Chào mừng bạn đến với Huyễn Cảnh Không Gian, nơi những giới hạn về vật lý bị xóa nhòa để nhường chỗ cho những trải nghiệm thị giác đỉnh cao. Không đơn thuần là một phòng chiếu phim, đây là "cánh cửa thần kỳ" đưa bạn bước vào những chiều không gian mà thực tại chưa bao giờ chạm tới.
           </p>
         </motion.div>
 
@@ -156,19 +153,19 @@ export default function TechnologyBanner() {
           <div className="space-y-6">
             <div>
               <h3 className="text-3xl md:text-4xl font-bold text-white mb-4">
-                Giải mã Huyễn Cảnh Không Gian?
+                ✨ Tại sao bạn không nên bỏ lỡ?
               </h3>
               <p className="text-lg text-gray-300 leading-relaxed mb-4">
-                Trong tương lai 2050, nhân loại đã đạt đến đỉnh cao công nghệ với
-                máy tính lượng tử, AI và công nghệ sinh học. Tại căn cứ nghiên cứu
-                mặt trăng khổng lồ "Cung Trăng số 2", các nhà khoa học đã phát minh
-                ra "Hóa Thiên Hiệu" – thiết bị dịch chuyển không-thời gian độc nhất vô nhị.
+                Trải Nghiệm Đắm Chìm Không Giới Hạn: Với hệ thống màn hình đa diện bao quanh, chúng tôi tái tạo những khung cảnh vĩ đại, từ sự tĩnh lặng của vũ trụ bao la đến nhịp sống sôi động của những thành phố tương lai, tất cả gói gọn trong một không gian tinh tế.
               </p>
               <p className="text-lg text-gray-300 leading-relaxed">
-                Nhưng một sự kiện bất ngờ xảy ra: "Element 305", hợp chất bí ẩn quan
-                trọng cho sự sống còn của nhân loại, biến mất trong quá trình vận chuyển.
-                Bạn được gọi đến để thực hiện một nhiệm vụ bất khả thi: tìm lại Element
-                305 trước khi lịch sử bị vỡ vụn và tương lai sụp đổ.
+               Siêu Định Dạng 8K+8K: Hãy chuẩn bị để ngỡ ngàng trước những thước phim CG siêu phân giải 8K. Mọi chi tiết đều chân thực đến mức khó tin, cho phép bạn đắm mình vào cảnh vật mà không cần đeo bất kỳ thiết bị hỗ trợ nào.
+              </p>
+              <p className="text-lg text-gray-300 leading-relaxed">
+                Xuyên Không Trong Chớp Mắt: Chỉ một cái chạm, bối cảnh sẽ thay đổi tức thì. Bạn có thể đang dạo bước giữa rừng nguyên sinh rồi ngay lập tức lao vút qua những thiên hà xa xôi với tốc độ và cảm giác chân thực tuyệt đối.
+              </p>
+              <p className="text-lg text-gray-300 leading-relaxed">
+                Thánh Địa "Check-in" Nghệ Thuật: Không chỉ để xem, Huyễn Cảnh Không Gian còn là studio hoàn hảo để bạn sở hữu những thước phim TikTok "triệu view" hay những bức ảnh nghệ thuật đầy ảo diệu, khẳng định phong cách riêng trên mạng xã hội.
               </p>
             </div>
 

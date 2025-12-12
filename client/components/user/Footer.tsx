@@ -21,7 +21,7 @@ export default function Footer() {
       <div className="absolute right-0 bottom-0 w-96 h-96 bg-cyan-500/10 blur-[120px]" />
 
       <div className="container mx-auto px-4 relative z-10">
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-12 mb-12">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8 mb-12">
           <motion.div
             initial={{ opacity: 0, y: 30 }}
             whileInView={{ opacity: 1, y: 0 }}
@@ -33,8 +33,8 @@ export default function Footer() {
                 CINESPHERE
               </span>
             </h3>
-            <p className="text-gray-300 mb-6 leading-relaxed">
-              Phòng chiếu phim 6D công nghệ cao, mang đến trải nghiệm giải trí
+            <p className="text-gray-300 mb-6 leading-relaxed text-sm">
+              Phòng chiếu phim 8K công nghệ cao, mang đến trải nghiệm giải trí
               đa giác quan chân thực nhất.
             </p>
             <div className="flex gap-4">
@@ -73,7 +73,7 @@ export default function Footer() {
           >
             <h4 className="text-xl font-bold text-white mb-6 flex items-center gap-2">
               <span className="bg-gradient-to-r from-cyan-400 to-blue-400 bg-clip-text text-transparent">
-                ĐỊA CHỈ
+                LIÊN HỆ
               </span>
             </h4>
             <div className="space-y-4">
@@ -81,11 +81,13 @@ export default function Footer() {
                 <div className="w-10 h-10 rounded-full bg-red-500/20 border border-red-500/30 flex items-center justify-center flex-shrink-0 group-hover:bg-red-500/30 transition-colors">
                   <MapPin className="h-5 w-5 text-red-400" />
                 </div>
-                <div className="text-gray-300">
+                <div className="text-gray-300 text-sm">
                   <p className="font-semibold text-white mb-1">
-                    Gian hàng CINESPHERE
+                    Công ty TNHH CÔNG NGHỆ VR VIỆT NAM
                   </p>
-                  <p className="text-sm">Tầng 4, TTMT Vạn Hạnh Mall</p>
+                  <p className="text-xs leading-relaxed">
+                    Số 14/13/58 Thân Nhân Trung, Phường Tân Bình, Thành phố Hồ Chí Minh, Việt Nam
+                  </p>
                 </div>
               </div>
               <div className="flex items-center gap-4 group">
@@ -93,10 +95,10 @@ export default function Footer() {
                   <Phone className="h-5 w-5 text-cyan-400" />
                 </div>
                 <a
-                  href="tel:+84123456789"
-                  className="text-gray-300 hover:text-cyan-400 transition-colors font-medium"
+                  href="tel:0366431179"
+                  className="text-gray-300 hover:text-cyan-400 transition-colors font-medium text-sm"
                 >
-                  +84 123 456 789
+                  036.6431.179
                 </a>
               </div>
               <div className="flex items-center gap-4 group">
@@ -104,10 +106,10 @@ export default function Footer() {
                   <Mail className="h-5 w-5 text-purple-400" />
                 </div>
                 <a
-                  href="mailto:info@cinesphere.vn"
-                  className="text-gray-300 hover:text-purple-400 transition-colors font-medium"
+                  href="mailto:cinesphere0629@gmail.com"
+                  className="text-gray-300 hover:text-purple-400 transition-colors font-medium text-sm break-all"
                 >
-                  info@cinesphere.vn
+                  cinesphere0629@gmail.com
                 </a>
               </div>
             </div>
@@ -146,6 +148,41 @@ export default function Footer() {
               >
                 YT
               </motion.button>
+            </div>
+          </motion.div>
+
+          <motion.div
+            initial={{ opacity: 0, y: 30 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            transition={{ duration: 0.6, delay: 0.3 }}
+          >
+            <h4 className="text-xl font-bold text-white mb-6 flex items-center gap-2">
+              <span className="bg-gradient-to-r from-green-400 to-emerald-400 bg-clip-text text-transparent">
+                THÔNG TIN CÔNG TY
+              </span>
+            </h4>
+            <div className="space-y-3 text-gray-300 text-sm">
+              <div>
+                <p className="font-semibold text-white mb-1">Tên đại diện:</p>
+                <p className="text-xs">TRẦN THỊ THUỲ DƯƠNG</p>
+              </div>
+              <div>
+                <p className="font-semibold text-white mb-1">Số ĐKKD:</p>
+                <p className="text-xs">0319157654</p>
+              </div>
+              <div>
+                <p className="font-semibold text-white mb-1">Cấp tại:</p>
+                <p className="text-xs">Phòng ĐKKD Sở KH&ĐT Tp. HCM (Thuế cơ sở 16 Thành phố Hồ Chí Minh)</p>
+              </div>
+              <div>
+                <p className="font-semibold text-white mb-1">Đăng ký lần đầu:</p>
+                <p className="text-xs">16 tháng 09 năm 2025</p>
+              </div>
+              <div>
+                <p className="font-semibold text-white mb-1">Đăng ký thay đổi lần thứ 1:</p>
+                <p className="text-xs">10 tháng 12 năm 2025</p>
+              </div>
             </div>
           </motion.div>
         </div>
