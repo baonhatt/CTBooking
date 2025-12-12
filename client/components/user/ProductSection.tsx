@@ -7,6 +7,7 @@ import { getActiveToys } from "@/lib/api";
 
 export default function ProductSection() {
   const [products, setProducts] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
   useEffect(() => {
     (async () => {
       try {
@@ -20,9 +21,14 @@ export default function ProductSection() {
             image: t.image_url,
           })),
         );
-      } catch {}
+      } catch {
+        setProducts([]);
+      } finally {
+        setLoading(false);
+      }
     })();
   }, []);
+  if (loading || products.length === 0) return null;
   return (
     <section
       id="store"
