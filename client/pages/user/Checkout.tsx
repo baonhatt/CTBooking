@@ -75,16 +75,11 @@ export default function Checkout() {
         try {
           const bookingData = await getBookingByIdApi(Number(bookingId_vnpay));
           if (bookingData) {
-            // Tạo pending object từ booking data - đầy đủ như MoMo extraData
             const pendingFromApi = {
               orderId: `ORDER_${bookingData.id}`,
-              movie: bookingData.showtime?.movie?.title || "",
-              dateDisplay: bookingData.showtime?.start_time
-                ? new Date(bookingData.showtime.start_time).toLocaleDateString("vi-VN")
-                : "",
-              showtime: bookingData.showtime?.start_time
-                ? new Date(bookingData.showtime.start_time).toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit" })
-                : "",
+              movie: "",
+              dateDisplay: "",
+              showtime: "",
               showtimeId: bookingData.showtime_id,
               name: bookingData.name,
               phone: bookingData.phone,
@@ -142,13 +137,9 @@ export default function Checkout() {
             if (bookingData) {
               const pendingFromApi = {
                 orderId: `ORDER_${bookingData.id}`,
-                movie: bookingData.showtime?.movie?.title || "",
-                dateDisplay: bookingData.showtime?.start_time
-                  ? new Date(bookingData.showtime.start_time).toLocaleDateString("vi-VN")
-                  : "",
-                showtime: bookingData.showtime?.start_time
-                  ? new Date(bookingData.showtime.start_time).toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit" })
-                  : "",
+                movie: "",
+                dateDisplay: "",
+                showtime: "",
                 showtimeId: bookingData.showtime_id,
                 name: bookingData.name,
                 phone: bookingData.phone,
@@ -250,13 +241,6 @@ export default function Checkout() {
             name: bookingData.name ?? order.name,
             phone: bookingData.phone ?? order.phone,
             email: bookingData.email ?? order.email,
-            movie: bookingData.showtime?.movie?.title ?? order.movie,
-            dateDisplay: bookingData.showtime?.start_time
-              ? new Date(bookingData.showtime.start_time).toLocaleDateString("vi-VN")
-              : order.dateDisplay,
-            showtime: bookingData.showtime?.start_time
-              ? new Date(bookingData.showtime.start_time).toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit" })
-              : order.showtime,
           } as any;
           setOrder(merged);
           try { localStorage.setItem("lastCheckoutOrder", JSON.stringify(merged)); } catch { }

@@ -3,8 +3,7 @@ import { prisma } from "../../lib/prisma";
 
 export const getDashboardMetrics: RequestHandler = async (_req, res) => {
   try {
-    const totalMovies = await (prisma as any).movies.count();
-    const totalShowtimes = await (prisma as any).showtimes.count({ where: { is_active: true } });
+    const totalMovies = await (prisma as any).movies.count({ where: { is_active: true } });
     const totalToys = await (prisma as any).toys.count();
     const totalUsers = await (prisma as any).users.count();
 
@@ -75,32 +74,22 @@ export const getDashboardMetrics: RequestHandler = async (_req, res) => {
       vnpay: Number(revenueVnpayTodayAgg._sum?.total_price || 0),
     };
 
-    // Showtimes today and future (active only)
-    const showtimesToday = await (prisma as any).showtimes.count({
+    // Bookings today
+    const bookingsToday = await (prisma as any).bookings.count({
       where: {
-        is_active: true,
-        start_time: { gte: todayStart, lte: todayEnd },
+        payment_status: { in: ["paid"] },
+        OR: [
+          { created_at: { gte: todayStart, lte: todayEnd } },
+          { paid_at: { gte: todayStart, lte: todayEnd } },
+        ],
       },
     });
-    const showtimesFuture = await (prisma as any).showtimes.count({
+    const bookingsFuture = await (prisma as any).bookings.count({
       where: {
-        is_active: true,
-        start_time: { gt: todayEnd },
+        payment_status: { in: ["paid"] },
+        created_at: { gt: todayEnd },
       },
     });
-
-    // Occupancy today: average occupancy across active showtimes today
-    const capacityEnv = Number(process.env.SHOWTIME_FULL_CAPACITY);
-    const CAPACITY = Number.isFinite(capacityEnv) && capacityEnv > 0 ? capacityEnv : 50;
-    const todayShowtimesList = await (prisma as any).showtimes.findMany({
-      where: { is_active: true, start_time: { gte: todayStart, lte: todayEnd } },
-      select: { id: true, total_sold: true },
-    });
-    let occupancyTodayPercent = 0;
-    if (todayShowtimesList.length > 0) {
-      const totalSold = todayShowtimesList.reduce((sum: number, s: any) => sum + Number(s.total_sold || 0), 0);
-      occupancyTodayPercent = Math.round((totalSold / (todayShowtimesList.length * CAPACITY)) * 100);
-    }
 
     // Top 3 movies by revenue in the last 7 days (paid only)
     const weekStart = new Date(todayStart);
@@ -113,12 +102,12 @@ export const getDashboardMetrics: RequestHandler = async (_req, res) => {
           { paid_at: { gte: weekStart, lte: todayEnd } },
         ],
       },
-      include: { showtime: { include: { movie: true } } },
+      include: { movies: true },
     });
     const movieRevenueMap = new Map<number, { title: string; revenue: number }>();
     for (const b of weekBookings) {
-      const movieId = b.showtime?.movie_id;
-      const title = b.showtime?.movie?.title || "";
+      const movieId = b.movie_id;
+      const title = b.movies?.title || "";
       const price = Number(b.total_price || 0);
       if (movieId) {
         const prev = movieRevenueMap.get(movieId) || { title, revenue: 0 };
@@ -134,15 +123,13 @@ export const getDashboardMetrics: RequestHandler = async (_req, res) => {
 
     res.status(200).json({
       totalMovies,
-      totalShowtimes,
       totalToys,
       totalUsers,
       totalTransactions,
       revenueTotal,
       revenueByMethod,
-      totalShowtimesToday: showtimesToday,
-      totalShowtimesFuture: showtimesFuture,
-      occupancyTodayPercent,
+      totalBookingsToday: bookingsToday,
+      totalBookingsFuture: bookingsFuture,
       topMoviesWeek,
     });
   } catch (err: any) {

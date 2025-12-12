@@ -16,17 +16,16 @@ const MAX_TICKET_PER_ORDER = 10;
 
 type BookingValidationResult = {
   user: { id: number; email: string; fullname?: string | null; phone?: string | null };
-  showtime: any;
-  movie: any;
+  movie?: any;
   ticketPackage: any;
   unitPrice: number;
   totalPrice: number;
 };
 
 async function validateBookingInput(body: PaymentRequest): Promise<BookingValidationResult> {
-  const { email, emailBook, phone, name, showtimeId, ticketCount, ticketPackageId } = body;
+  const { email, emailBook, phone, name, movieId, ticketCount, ticketPackageId } = body;
 
-  if (!email || !phone || !emailBook || !name || !showtimeId || !ticketCount || ticketCount <= 0) {
+  if (!email || !phone || !emailBook || !name || !ticketCount || ticketCount <= 0) {
     throw new HttpError(400, "Vui lòng nhập đầy đủ thông tin hợp lệ.");
   }
   if (ticketCount > MAX_TICKET_PER_ORDER) {
@@ -45,19 +44,12 @@ async function validateBookingInput(body: PaymentRequest): Promise<BookingValida
     throw new HttpError(400, "Email người dùng không trùng khớp.");
   }
 
-  const showtime = await prisma.showtimes.findUnique({
-    where: { id: showtimeId },
-    include: { movie: true },
-  });
-  if (!showtime || showtime.is_active === false) {
-    throw new HttpError(404, "Không thể tìm thấy suất chiếu.");
-  }
-  if (!showtime.movie || showtime.movie.is_active === false) {
-    throw new HttpError(400, "Phim không hợp lệ hoặc đã ngừng hoạt động.");
-  }
-  const now = Date.now();
-  if (new Date(showtime.start_time).getTime() < now) {
-    throw new HttpError(400, "Suất chiếu đã bắt đầu hoặc đã kết thúc.");
+  let movie: any = null;
+  if (movieId) {
+    movie = await (prisma as any).movies.findUnique({ where: { id: Number(movieId) } });
+    if (!movie || movie.is_active === false) {
+      throw new HttpError(404, "Phim không hợp lệ hoặc đã ngừng hoạt động.");
+    }
   }
 
   let ticketPackage: any = null;
@@ -84,8 +76,7 @@ async function validateBookingInput(body: PaymentRequest): Promise<BookingValida
 
   return {
     user: { id: user.id, email: userEmail, fullname: user.fullname, phone: user.phone },
-    showtime,
-    movie: showtime.movie,
+    movie,
     ticketPackage,
     unitPrice,
     totalPrice,
@@ -98,18 +89,12 @@ export const validateBooking: RequestHandler = async (req, res) => {
     return res.status(200).json({
       ok: true,
       user: result.user,
-      showtime: {
-        id: result.showtime.id,
-        start_time: result.showtime.start_time,
-        end_time: result.showtime.end_time,
-        is_active: result.showtime.is_active,
-      },
-      movie: {
+      movie: result.movie ? {
         id: result.movie.id,
         title: result.movie.title,
         is_active: result.movie.is_active,
         duration_min: result.movie.duration_min,
-      },
+      } : undefined,
       ticketPackage: {
         id: result.ticketPackage.id,
         name: result.ticketPackage.name,
@@ -128,14 +113,15 @@ export const validateBooking: RequestHandler = async (req, res) => {
 export const createPayment: RequestHandler = async (req, res) => {
   try {
     const validation = await validateBookingInput(req.body as PaymentRequest);
-    const { user, showtime, totalPrice } = validation;
+    const { user, totalPrice } = validation;
     const { emailBook, phone, name, ticketCount, paymentMethod } = req.body as PaymentRequest;
 
     // ====== TẠO BOOKING ======
-    const booking = await prisma.bookings.create({
+    const booking = await (prisma as any).bookings.create({
       data: {
         user_id: user.id,
-        showtime_id: showtime.id,
+        movie_id: validation.movie?.id ? Number(validation.movie.id) : null,
+        ticket_package_id: validation.ticketPackage?.id ? Number(validation.ticketPackage.id) : null,
         ticket_count: ticketCount,
         total_price: totalPrice,
         payment_method: (paymentMethod || "cash").toLowerCase(),
@@ -150,7 +136,8 @@ export const createPayment: RequestHandler = async (req, res) => {
       booking: {
         id: booking.id,
         user_id: booking.user_id,
-        showtime_id: booking.showtime_id,
+        movie_id: booking.movie_id,
+        ticket_package_id: booking.ticket_package_id,
         ticket_count: booking.ticket_count,
         total_price: booking.total_price,
         payment_method: booking.payment_method,
@@ -182,17 +169,14 @@ export const updatePayment: RequestHandler = async (req, res) => {
     }
 
     // Tìm booking tương ứng
-    const booking = await prisma.bookings.findFirst({
+    const booking = await (prisma as any).bookings.findFirst({
       where: {
         id: Number(payment_id),
         user_id: Number(user_id),
       },
       include: {
-        showtime: {
-          include: {
-            movie: true,
-          },
-        },
+        movies: true,
+        ticket_packages: true,
       },
     });
 
@@ -222,41 +206,27 @@ export const updatePayment: RequestHandler = async (req, res) => {
       },
     });
 
-    // Nếu thanh toán thành công, update total_sold và gửi email
+    // Nếu thanh toán thành công, gửi email xác nhận
     if (
       payment_status &&
       payment_status.toLowerCase() === "paid"
     ) {
       console.log(`[Payment Success] Booking ID: ${booking.id}, Status: ${payment_status}`);
 
-      // Update total_sold
-      await prisma.showtimes.update({
-        where: { id: booking.showtime_id },
-        data: {
-          total_sold: {
-            increment: booking.ticket_count,
-          },
-        },
-      });
-
       // Gửi email xác nhận
       try {
-        const showtimeDate = new Date(booking.showtime.start_time).toLocaleDateString("vi-VN");
-        const showtimeTime = new Date(booking.showtime.start_time).toLocaleTimeString("vi-VN", {
-          hour: "2-digit",
-          minute: "2-digit",
-        });
         const totalPrice = Number(booking.total_price).toLocaleString("vi-VN");
 
+        const movieTitle = booking.movies?.title || "";
         const emailTemplate = getBookingEmailTemplate({
           bookingCode: bookingCode || "",
           customerName: booking.name || "Khách hàng",
-          movieTitle: booking.showtime.movie.title,
-          showtimeDate,
-          showtimeTime,
+          movieTitle: movieTitle,
+          showtimeDate: "",
+          showtimeTime: "",
           ticketCount: booking.ticket_count,
           totalPrice,
-          movieImage: booking.showtime.movie.cover_image || undefined,
+          movieImage: booking.movies?.cover_image || undefined,
         });
 
         console.log(`[Email] Sending to: ${booking.email}`);
@@ -274,12 +244,14 @@ export const updatePayment: RequestHandler = async (req, res) => {
       }
     }
 
+    const updatedBookingAny = updatedBooking as any;
     return res.status(200).json({
       message: "Thanh toán thành công",
       booking: {
         id: updatedBooking.id,
         user_id: updatedBooking.user_id,
-        showtime_id: updatedBooking.showtime_id,
+        movie_id: updatedBookingAny.movie_id,
+        ticket_package_id: updatedBookingAny.ticket_package_id,
         ticket_count: updatedBooking.ticket_count,
         total_price: updatedBooking.total_price,
         payment_method: updatedBooking.payment_method,
@@ -298,7 +270,7 @@ export const getBooking: RequestHandler = async (req, res) => {
   try {
     const bookingId = Number(req.params.id);
 
-    const booking = await prisma.bookings.findUnique({
+    const booking = await (prisma as any).bookings.findUnique({
       where: { id: bookingId },
       select: {
         id: true,
@@ -310,7 +282,8 @@ export const getBooking: RequestHandler = async (req, res) => {
         email: true,
         phone: true,
         user_id: true,
-        showtime_id: true,
+        movie_id: true,
+        ticket_package_id: true,
       },
     });
 
@@ -324,6 +297,8 @@ export const getBooking: RequestHandler = async (req, res) => {
       total_price: booking.total_price,
       ticket_count: booking.ticket_count,
       created_at: booking.created_at,
+      movie_id: booking.movie_id,
+      ticket_package_id: booking.ticket_package_id,
     });
   } catch (err: any) {
     res.status(500).json({ message: "Lỗi máy chủ nội bộ" });
@@ -335,20 +310,8 @@ export const getBookingById: RequestHandler = async (req, res) => {
   try {
     const { id } = req.params;
 
-    const booking = await prisma.bookings.findUnique({
+    const booking = await (prisma as any).bookings.findUnique({
       where: { id: Number(id) },
-      include: {
-        showtime: {
-          include: {
-            movie: {
-              select: {
-                id: true,
-                title: true,
-              },
-            },
-          },
-        },
-      },
     });
 
     if (!booking) {
@@ -364,12 +327,8 @@ export const getBookingById: RequestHandler = async (req, res) => {
       email: booking.email,
       ticket_count: booking.ticket_count,
       total_price: booking.total_price,
-      showtime_id: booking.showtime_id,
-      showtime: booking.showtime ? {
-        id: booking.showtime.id,
-        start_time: booking.showtime.start_time,
-        movie: booking.showtime.movie,
-      } : null,
+      movie_id: booking.movie_id,
+      ticket_package_id: booking.ticket_package_id,
     });
   } catch (err: any) {
     console.error("Error getting booking:", err);
@@ -389,26 +348,11 @@ export const getBookingByCode: RequestHandler = async (req, res) => {
     // Normalize code: uppercase and trim
     const normalizedCode = code.trim().toUpperCase();
 
-    const booking = await prisma.bookings.findUnique({
+    const booking = await (prisma as any).bookings.findUnique({
       where: { booking_code: normalizedCode },
       include: {
-        showtime: {
-          include: {
-            movie: {
-              select: {
-                id: true,
-                title: true,
-                genres: true,
-                duration_min: true,
-                cover_image: true,
-              },
-            },
-          },
-        },
         user: {
-          select: {
-            fullname: true,
-          },
+          select: { fullname: true },
         },
       },
     });
@@ -426,6 +370,13 @@ export const getBookingByCode: RequestHandler = async (req, res) => {
       return res.status(404).json({ message: `Không tìm thấy vé với mã này.${suffix}` });
     }
 
+    const now = new Date();
+    const paidAt = booking.paid_at ? new Date(booking.paid_at) : null;
+    const days = paidAt ? Math.floor((now.getTime() - paidAt.getTime()) / (1000 * 60 * 60 * 24)) : null;
+    const isPaid = (booking.payment_status || '').toLowerCase() === 'paid';
+    const valid = Boolean(isPaid && paidAt && days !== null && days <= 10 && !booking.is_used);
+    const can_use = Boolean(valid);
+
     res.status(200).json({
       id: booking.id,
       booking_code: booking.booking_code,
@@ -436,27 +387,44 @@ export const getBookingByCode: RequestHandler = async (req, res) => {
       email: booking.email,
       ticket_count: booking.ticket_count,
       total_price: booking.total_price,
-      showtime_id: booking.showtime_id,
+      movie_id: booking.movie_id,
+      ticket_package_id: booking.ticket_package_id,
       created_at: booking.created_at,
       paid_at: booking.paid_at,
       payment_method: booking.payment_method,
-      showtime: booking.showtime ? {
-        id: booking.showtime.id,
-        start_time: booking.showtime.start_time,
-        end_time: booking.showtime.end_time,
-        movie: {
-          id: booking.showtime.movie.id,
-          title: booking.showtime.movie.title,
-          genres: booking.showtime.movie.genres,
-          duration_min: booking.showtime.movie.duration_min,
-          cover_image: booking.showtime.movie.cover_image,
-        },
-      } : null,
-      userName: booking.user?.fullname || "N/A",
+      userName: booking.user?.fullname || 'N/A',
+      is_used: Boolean(booking.is_used),
+      valid,
+      can_use,
+      validity_days: days,
     });
   } catch (err: any) {
     console.error("Error getting booking by code:", err);
     res.status(500).json({ message: "Lỗi máy chủ nội bộ" });
+  }
+};
+
+// ===== CONFIRM TICKET USE BY CODE =====
+export const confirmUseTicket: RequestHandler = async (req, res) => {
+  try {
+    const { code } = req.body as { code?: string };
+    if (!code || !code.trim()) {
+      return res.status(400).json({ message: 'Vui lòng nhập mã vé' });
+    }
+    const normalizedCode = code.trim().toUpperCase();
+    const booking = await prisma.bookings.findUnique({ where: { booking_code: normalizedCode } });
+    if (!booking) return res.status(404).json({ message: 'Không tìm thấy vé' });
+    const isPaid = (booking.payment_status || '').toLowerCase() === 'paid';
+    const paidAt = booking.paid_at ? new Date(booking.paid_at) : null;
+    const days = paidAt ? Math.floor((Date.now() - paidAt.getTime()) / (1000 * 60 * 60 * 24)) : null;
+    const valid = Boolean(isPaid && paidAt && days !== null && days <= 10 && !booking.is_used);
+    if (!valid) {
+      return res.status(400).json({ message: 'Vé không còn hiệu lực hoặc đã sử dụng' });
+    }
+    const updated = await prisma.bookings.update({ where: { id: booking.id }, data: { is_used: true } });
+    return res.status(200).json({ ok: true, message: 'Xác nhận sử dụng vé thành công', booking: { id: updated.id, is_used: updated.is_used } });
+  } catch (err: any) {
+    return res.status(500).json({ message: 'Lỗi máy chủ nội bộ' });
   }
 };
 

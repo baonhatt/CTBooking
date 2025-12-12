@@ -39,8 +39,8 @@ export default function BookingPage() {
   });
   const isLoadingPage = isLoadingActive || isLoadingTickets;
 
-  const movies = (activeData?.activeMovies || []).map((m: any) => ({ id: m.title, title: m.title }));
   const activeMoviesFull = activeData?.activeMovies || [];
+  const movies = (activeMoviesFull || []).map((m: any) => ({ id: m.title, title: m.title }));
   const selectedMovie = activeMoviesFull.find((x: any) => x.title === movie);
   const ticketPackages = (ticketsData?.items || []).map((t: any) => ({ id: t.id, name: t.name, price: Number(t.price || 0), type: t.type || "", display_order: t.display_order || 0 }));
   const defaultTicket = ticketPackages.sort((a, b) => a.display_order - b.display_order)[0];
@@ -103,23 +103,33 @@ export default function BookingPage() {
     } catch { }
   }, [email, name, phone]);
 
-  const availableDates = useMemo(() => {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const list = (selectedMovie?.showtimes || [])
-      .map((st: any) => {
-        const d = new Date(st.start_time);
-        d.setHours(0, 0, 0, 0);
-        return d;
-      })
-      .filter((d: Date) => d.getTime() >= today.getTime())
-      .sort((a: Date, b: Date) => a.getTime() - b.getTime());
-    const uniq: Date[] = [];
-    for (const d of list) {
-      if (!uniq.find((x) => x.getTime() === d.getTime())) uniq.push(d);
+  const next7Days = useMemo(() => {
+    const arr: Date[] = [];
+    const start = new Date();
+    start.setHours(0, 0, 0, 0);
+    for (let i = 0; i < 7; i++) {
+      const d = new Date(start);
+      d.setDate(start.getDate() + i);
+      arr.push(d);
     }
-    return uniq;
-  }, [selectedMovie]);
+    return arr;
+  }, []);
+  const availableDates = useMemo(() => {
+    const set = new Set<string>();
+    for (const st of (selectedMovie?.showtimes || [])) {
+      const d = new Date(st.start_time);
+      d.setHours(0, 0, 0, 0);
+      set.add(d.toDateString());
+    }
+    return next7Days.filter((d) => set.has(d.toDateString()));
+  }, [selectedMovie, next7Days]);
+  const hasShowtimeOn = (d: Date) => availableDates.some((x) => x.toDateString() === d.toDateString());
+  const handleSelectDate = (d: Date) => {
+    setSelectedDate(new Date(d));
+    if (!hasShowtimeOn(d)) {
+      toast({ title: "Không có suất chiếu", description: `Ngày ${formatDateLong(d)} chưa có lịch chiếu` });
+    }
+  };
 
   const resolveImageUrl = (u: string | undefined | null) => {
     if (!u) return "";
@@ -131,13 +141,27 @@ export default function BookingPage() {
   const formatDateLong = (date: Date) => date.toLocaleDateString("vi-VN", { weekday: "long", day: "2-digit", month: "2-digit" });
 
   const handleCreateAndPay = async () => {
-    if (!selectedShowtimeId || !selectedDate || isProcessing) return;
+    if (isProcessing) return;
     const authRaw = localStorage.getItem("authUser");
     if (!authRaw) {
       toast({ title: "Vui lòng đăng nhập", description: "Bạn cần đăng nhập trước khi thanh toán" });
       window.dispatchEvent(new Event("open-login"));
       return;
     }
+    if (!selectedMovie) {
+      toast({ title: "Chưa chọn phim", description: "Vui lòng chọn một bộ phim" });
+      return;
+    }
+    if (!name || !phone || !email) {
+      toast({ title: "Thiếu thông tin", description: "Vui lòng nhập họ tên, số điện thoại và email" });
+      return;
+    }
+    if (selectedDate && !hasShowtimeOn(selectedDate)) {
+      toast({ title: "Không có suất chiếu", description: "Ngày đã chọn không có suất chiếu khả dụng" });
+      return;
+    }
+    const confirmed = window.confirm("Xác nhận đặt vé và chuyển sang thanh toán?");
+    if (!confirmed) return;
     try {
       setIsProcessing(true);
       const parsed = JSON.parse(authRaw);
@@ -151,7 +175,7 @@ export default function BookingPage() {
         emailBook: email,
         phone,
         name,
-        showtimeId: selectedShowtimeId,
+        movieId: undefined,
         ticketCount,
         ticketPackageId,
       });
@@ -165,9 +189,9 @@ export default function BookingPage() {
       const summary = {
         orderId,
         movie: selectedMovie?.title,
-        dateDisplay: selectedDate ? selectedDate.toLocaleDateString("vi-VN") : "",
-        showtime: selectedShowtimeLabel,
-        showtimeId: selectedShowtimeId,
+        dateDisplay: "",
+        showtime: "",
+        showtimeId: null,
         name,
         phone,
         email: authEmail,
@@ -188,14 +212,14 @@ export default function BookingPage() {
         emailBook: email,
         phone,
         name,
-        showtimeId: selectedShowtimeId,
+        movieId: undefined,
         ticketCount,
         paymentMethod,
         totalPrice: canonicalTotal,
         ticketPackageId,
       });
       localStorage.setItem("pendingOrder", JSON.stringify({ ...summary, booking_id: booking?.id, user_id: booking?.user_id }));
-      let orderInfoText = `${selectedMovie?.title || "Movie"} | ${ticketCount} vé | ${selectedShowtimeLabel || "--:--"}`;
+      let orderInfoText = `${selectedMovie?.title || "Movie"} | ${ticketCount} vé`;
       if (paymentMethod === "momo") {
         const extraDataEncoded = btoa(unescape(encodeURIComponent(JSON.stringify({ ...summary, booking_id: booking?.id, user_id: booking?.user_id }))));
         const partnerCode = (import.meta as any).env?.VITE_MOMO_PARTNER_CODE || "";
@@ -291,58 +315,23 @@ export default function BookingPage() {
 
               {selectedMovie && (
                 <div>
-                  <div className="text-sm text-orange-400 mb-2">Chọn lịch chiếu</div>
-                  <div className="flex gap-2 bg-black/40 text-white rounded px-3 py-2 mb-4">
-                    {availableDates.length === 0 ? (
-                      <span className="text-orange-400">Hiện chưa có lịch chiếu</span>
-                    ) : (
-                      availableDates.map((d, idx) => {
-                        const active = selectedDate && d.toDateString() === selectedDate.toDateString();
-                        return (
-                          <Button
-                            key={idx}
-                            variant={active ? "default" : "ghost"}
-                            className={
-                              active
-                                ? "bg-blue-600 text-white"
-                                : "bg-transparent text-white hover:bg-white border"
-                            }
-                            onClick={() => setSelectedDate(new Date(d))}
-                          >
-                            {formatDateShort(d)}
-                          </Button>
-                        );
-                      })
-                    )}
+                  <div className="text-sm text-orange-400 mb-2">Chọn ngày chiếu (7 ngày tới)</div>
+                  <div className="flex flex-wrap gap-2 bg-black/40 text-white rounded px-3 py-2 mb-2">
+                    {next7Days.map((d, idx) => {
+                      const selected = selectedDate && d.toDateString() === selectedDate.toDateString();
+                      const available = hasShowtimeOn(d);
+                      const cls = selected
+                        ? "bg-blue-600 text-white"
+                        : available
+                          ? "bg-transparent text-white hover:bg-white border"
+                          : "bg-black/60 text-white/50 border border-white/10";
+                      return (
+                        <Button key={idx} variant={selected ? "default" : "ghost"} className={cls} onClick={() => handleSelectDate(d)}>
+                          {formatDateShort(d)}
+                        </Button>
+                      );
+                    })}
                   </div>
-                  {selectedDate && (
-                    <div className="space-y-3">
-                      <div className="text-sm text-orange-400">Giờ chiếu</div>
-                      <div className="flex flex-wrap  bg-black/40 gap-2 rounded px-2 py-2">
-                        {(selectedMovie.showtimes || [])
-                          .filter((st: any) => new Date(st.start_time).toDateString() === selectedDate.toDateString())
-                          .map((st: any) => {
-                            const t = new Date(st.start_time);
-                            const label = `${t.getHours().toString().padStart(2, "0")}:${t.getMinutes().toString().padStart(2, "0")}`;
-                            const active = selectedShowtimeId === st.id;
-                            return (
-                              <Button
-                                key={st.id}
-                                variant={active ? "default" : "ghost"}
-                                className={
-                                  active
-                                    ? "bg-blue-600 text-white"
-                                    : "bg-transparent text-white hover:bg-white border"
-                                }
-                                onClick={() => { setSelectedShowtimeId(st.id); setSelectedShowtimeLabel(label); }}
-                              >
-                                {label}
-                              </Button>
-                            );
-                          })}
-                      </div>
-                    </div>
-                  )}
                 </div>
               )}
 
@@ -425,7 +414,7 @@ export default function BookingPage() {
 
               <div className="flex justify-end gap-3">
                 <Button variant="outline" className="bg-transparent border-white/30 text-white hover:bg-white/10" onClick={() => navigate("/")} disabled={isProcessing}>Hủy</Button>
-                <Button className="bg-gradient-to-r from-blue-500 to-purple-500 hover:from-blue-600 hover:to-purple-600 text-white font-semibold shadow-lg" onClick={() => setStep(1)} disabled={!movie || !selectedDate || !selectedShowtimeId || !name || !phone || !email || isProcessing}>Tiếp tục</Button>
+                <Button className="bg-gradient-to-r from-blue-500 to-purple-500 hover:from-blue-600 hover:to-purple-600 text-white font-semibold shadow-lg" onClick={() => setStep(1)} disabled={!movie || !name || !phone || !email || isProcessing}>Tiếp tục</Button>
               </div>
             </CardContent>
           </Card>
@@ -442,7 +431,6 @@ export default function BookingPage() {
                   <div className="grid grid-cols-2 gap-2 text-sm">
                     <span className="text-orange-400">Phim</span><span className="font-medium text-white">{selectedMovie?.title}</span>
                     <span className="text-orange-400">Ngày</span><span className="font-medium text-white">{selectedDate ? formatDateLong(selectedDate) : ""}</span>
-                    <span className="text-orange-400">Giờ</span><span className="font-medium text-white">{selectedShowtimeLabel}</span>
                     <span className="text-orange-400">Thời lượng</span><span className="font-medium text-white">{selectedMovie?.duration_min ? `${selectedMovie.duration_min} phút` : "--"}</span>
                     <span className="text-orange-400">Họ tên</span><span className="font-medium text-white">{name}</span>
                     <span className="text-orange-400">Email</span><span className="font-medium text-white">{email}</span>

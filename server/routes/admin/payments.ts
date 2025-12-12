@@ -122,12 +122,11 @@ export const listTransactions: RequestHandler = async (req, res) => {
             },
           },
         },
-        showtime: {
-          include: {
-            movie: {
-              select: { title: true },
-            },
-          },
+        movies: {
+          select: { title: true },
+        },
+        ticket_packages: {
+          select: { name: true },
         },
       },
       orderBy,
@@ -142,7 +141,8 @@ export const listTransactions: RequestHandler = async (req, res) => {
       phone: tx.phone || "",
       name: tx.name || tx.user.fullname || "",
       userName: tx.user.fullname || "",
-      movieTitle: tx.showtime?.movie?.title || "",
+      movieTitle: tx.movies?.title || "",
+      ticketPackageName: tx.ticket_packages?.name || "",
       ticketCount: tx.ticket_count,
       totalPrice: Number(tx.total_price),
       paymentMethod: tx.payment_method,
@@ -179,18 +179,21 @@ export const getTransactionById: RequestHandler = async (req, res) => {
             },
           },
         },
-        showtime: {
-          include: {
-            movie: {
-              select: {
-                id: true,
-                title: true,
-                cover_image: true,
-                genres: true,
-                rating: true,
-                duration_min: true,
-              },
-            },
+        movies: {
+          select: {
+            id: true,
+            title: true,
+            cover_image: true,
+            genres: true,
+            rating: true,
+            duration_min: true,
+          },
+        },
+        ticket_packages: {
+          select: {
+            id: true,
+            name: true,
+            price: true,
           },
         },
       },
@@ -211,17 +214,12 @@ export const getTransactionById: RequestHandler = async (req, res) => {
         is_active: booking.user.accounts[0]?.is_active ?? true,
         account_created_at: booking.user.accounts[0]?.created_at,
       },
-      showtime: {
-        id: booking.showtime.id,
-        start_time: booking.showtime.start_time,
-        end_time: booking.showtime.end_time,
-        price: Number(booking.showtime.price),
-        movie: booking.showtime.movie,
-      },
+      movie: booking.movies || null,
+      ticket_package: booking.ticket_packages || null,
       booking_details: {
         ticket_count: booking.ticket_count,
         total_price: Number(booking.total_price),
-        price_per_ticket: Number(booking.total_price) / booking.ticket_count,
+        price_per_ticket: booking.ticket_count > 0 ? Number(booking.total_price) / booking.ticket_count : 0,
       },
       payment_info: {
         payment_method: booking.payment_method || "N/A",

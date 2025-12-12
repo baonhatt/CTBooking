@@ -5,7 +5,7 @@ export async function createBookingApi(body: {
   emailBook: string;
   phone: string;
   name: string;
-  showtimeId: number;
+  movieId?: number;
   ticketCount: number;
   paymentMethod: "cash" | "momo" | "vnpay";
   totalPrice?: number;
@@ -22,7 +22,7 @@ export async function validateBookingApi(body: {
   emailBook: string;
   phone: string;
   name: string;
-  showtimeId: number;
+  movieId?: number;
   ticketCount: number;
   ticketPackageId?: number;
 }) {
@@ -30,7 +30,6 @@ export async function validateBookingApi(body: {
     ok: boolean;
     message?: string;
     user?: { id: number; email: string; fullname?: string; phone?: string };
-    showtime?: { id: number; start_time: string; end_time?: string | null; is_active?: boolean | null };
     movie?: { id: number; title: string; is_active?: boolean | null; duration_min?: number | null };
     ticketPackage?: { id: number; name: string; price: number };
     unitPrice?: number;
@@ -64,15 +63,7 @@ export async function getBookingByIdApi(bookingId: number) {
     email: string;
     ticket_count: number;
     total_price: number;
-    showtime_id: number;
-    showtime?: {
-      id: number;
-      start_time: string;
-      movie?: {
-        id: number;
-        title: string;
-      };
-    };
+    showtime_id: number | null;
   }>(`/api/bookings/${bookingId}`);
 }
 
@@ -87,23 +78,22 @@ export async function getBookingByCodeApi(code: string) {
     email: string;
     ticket_count: number;
     total_price: number;
-    showtime_id: number;
+    showtime_id: number | null;
     created_at: string;
     paid_at: string | null;
     payment_method: string | null;
     userName: string;
-    showtime?: {
-      id: number;
-      start_time: string;
-      end_time: string | null;
-      movie?: {
-        id: number;
-        title: string;
-        genres: any;
-        duration_min: number | null;
-        cover_image: string | null;
-      };
-    };
+    is_used: boolean;
+    valid: boolean;
+    can_use: boolean;
+    validity_days: number | null;
   }>(`/api/bookings/code/${code}`);
+}
+
+export async function useTicketApi(code: string) {
+  return request<{ ok: boolean; message: string; booking: { id: number; is_used: boolean } }>(`/api/bookings/use`, {
+    method: "POST",
+    body: JSON.stringify({ code }),
+  });
 }
 
