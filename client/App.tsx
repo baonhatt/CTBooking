@@ -16,6 +16,7 @@ import ConfirmToken from "./pages/user/ConfirmToken";
 import Checkout from "./pages/user/Checkout";
 import Booking from "./pages/user/Booking";
 import Account from "./pages/user/Account";
+import SuccessPayment from "./pages/user/SuccessPayment";
 import { AdminGate } from "@/admin/auth/AdminGate";
 
 const queryClient = new QueryClient({
@@ -37,6 +38,7 @@ const App = () => (
         <Routes>
           <Route path="/" element={<Index />} />
           <Route path="/checkout" element={<Checkout />} />
+          <Route path="/successPayment" element={<SuccessPayment />} />
           <Route path="/booking" element={<Booking />} />
           <Route path="/account" element={<Account />} />
           <Route path="/reset-password" element={<ConfirmToken />} />

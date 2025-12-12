@@ -7,9 +7,25 @@ import {
   Youtube,
   ArrowUp,
 } from "lucide-react";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
+import { useState, useEffect } from "react";
 
 export default function Footer() {
+  const [isVisible, setIsVisible] = useState(false);
+
+  useEffect(() => {
+    const toggleVisibility = () => {
+      if (window.scrollY > 0) {
+        setIsVisible(true);
+      } else {
+        setIsVisible(false);
+      }
+    };
+
+    window.addEventListener("scroll", toggleVisibility);
+    return () => window.removeEventListener("scroll", toggleVisibility);
+  }, []);
+
   const scrollToTop = () => {
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
@@ -123,31 +139,24 @@ export default function Footer() {
           >
             <h4 className="text-xl font-bold text-white mb-6 flex items-center gap-2">
               <span className="bg-gradient-to-r from-purple-400 to-pink-400 bg-clip-text text-transparent">
-                KẾT NỐI
+                VỊ TRÍ RẠP
               </span>
             </h4>
-            <div className="flex gap-4">
-              <motion.button
-                whileHover={{ scale: 1.1, y: -3 }}
-                whileTap={{ scale: 0.95 }}
-                className="w-14 h-14 rounded-full bg-white/5 backdrop-blur-md border border-white/20 flex items-center justify-center text-white font-bold hover:border-blue-400 hover:bg-blue-500/20 transition-all duration-300 shadow-lg hover:shadow-blue-500/50"
-              >
-                FB
-              </motion.button>
-              <motion.button
-                whileHover={{ scale: 1.1, y: -3 }}
-                whileTap={{ scale: 0.95 }}
-                className="w-14 h-14 rounded-full bg-white/5 backdrop-blur-md border border-white/20 flex items-center justify-center text-white font-bold hover:border-pink-400 hover:bg-pink-500/20 transition-all duration-300 shadow-lg hover:shadow-pink-500/50"
-              >
-                IG
-              </motion.button>
-              <motion.button
-                whileHover={{ scale: 1.1, y: -3 }}
-                whileTap={{ scale: 0.95 }}
-                className="w-14 h-14 rounded-full bg-white/5 backdrop-blur-md border border-white/20 flex items-center justify-center text-white font-bold hover:border-red-400 hover:bg-red-500/20 transition-all duration-300 shadow-lg hover:shadow-red-500/50"
-              >
-                YT
-              </motion.button>
+            <div className="relative w-full h-64 rounded-lg overflow-hidden border border-white/20 shadow-lg">
+              <iframe
+                src={`https://www.google.com/maps?q=${encodeURIComponent(
+                  "Số 14/13/58 Thân Nhân Trung, Phường Tân Bình, Thành phố Hồ Chí Minh, Việt Nam"
+                )}&output=embed`}
+                width="100%"
+                height="100%"
+                style={{ border: 0 }}
+                allowFullScreen
+                loading="lazy"
+                referrerPolicy="no-referrer-when-downgrade"
+                className="w-full h-full"
+                title="Vị trí CINESPHERE"
+              />
+              <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent pointer-events-none" />
             </div>
           </motion.div>
 
@@ -195,15 +204,23 @@ export default function Footer() {
       </div>
 
       {/* Scroll to Top Button */}
-      <motion.button
-        onClick={scrollToTop}
-        whileHover={{ scale: 1.1, y: -5 }}
-        whileTap={{ scale: 0.95 }}
-        className="fixed bottom-8 right-8 w-12 h-12 rounded-full bg-black/80 backdrop-blur-md border border-white/20 flex items-center justify-center hover:border-cyan-400 transition-colors z-50 shadow-lg"
-        aria-label="Scroll to top"
-      >
-        <ArrowUp className="h-5 w-5 text-cyan-400" />
-      </motion.button>
+      <AnimatePresence>
+        {isVisible && (
+          <motion.button
+            onClick={scrollToTop}
+            initial={{ opacity: 0, scale: 0.5 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.5 }}
+            whileHover={{ scale: 1.1, y: -5 }}
+            whileTap={{ scale: 0.95 }}
+            transition={{ duration: 0.2 }}
+            className="fixed bottom-8 right-8 w-12 h-12 rounded-full bg-black/80 backdrop-blur-md border border-white/20 flex items-center justify-center hover:border-cyan-400 transition-colors z-50 shadow-lg"
+            aria-label="Scroll to top"
+          >
+            <ArrowUp className="h-5 w-5 text-cyan-400" />
+          </motion.button>
+        )}
+      </AnimatePresence>
     </footer>
   );
 }

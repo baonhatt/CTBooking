@@ -113,6 +113,7 @@ export default function BookingSection({ onBookClick }: BookingSectionProps) {
 
                   <Button
                     onClick={() => {
+                      onBookClick(); // Thông báo cho component cha
                       const authRaw = localStorage.getItem("authUser");
                       if (!authRaw) {
                         toast({ title: "Vui lòng đăng nhập trước!" });

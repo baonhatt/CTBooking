@@ -9,6 +9,8 @@ import {
   CardFooter,
 } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
+import { motion } from "framer-motion";
+import { CheckCircle2, XCircle, Mail, Ticket, User, Film, ShoppingCart, ArrowLeft, Sparkles } from "lucide-react";
 import UserLayout from "@/user/layouts/UserLayout";
 import {
   createMomoPaymentApi,
@@ -22,6 +24,7 @@ export default function Checkout() {
   const [order, setOrder] = useState<any>(null);
   const [status, setStatus] = useState<string>("");
   const [loading, setLoading] = useState(false);
+  const [bookingCode, setBookingCode] = useState<string | null>(null);
   const [isLoggedIn, setIsLoggedIn] = useState<boolean>(
     !!localStorage.getItem("authUser"),
   );
@@ -234,6 +237,9 @@ export default function Checkout() {
                 ? "failed"
                 : "";
           if (newStatus) setStatus(newStatus);
+          if ((bookingData as any).booking_code) {
+            setBookingCode((bookingData as any).booking_code);
+          }
           const merged = {
             ...order,
             amount: bookingData.total_price ?? order.amount,
@@ -343,92 +349,201 @@ export default function Checkout() {
     }
   }
 
+  const resolveImageUrl = (u: string | undefined | null) => {
+    if (!u) return "";
+    if (u.startsWith("http")) return u;
+    const path = u.startsWith("/") ? u : `/${u}`;
+    return `${API_BASE_URL}${path}`;
+  };
+
   return (
     <UserLayout
       className="bg-gradient-dark"
       headerProps={{ onBookClick: () => { } }}
       hideFooter
     >
-      <div className="max-w-3xl mx-auto p-4 pt-44">
-        <Card className="w-full bg-black/40 border border-white/10 text-white">
-          <CardHeader>
-            <CardTitle className="text-blue-400">Thanh toán</CardTitle>
-          </CardHeader>
-          <CardContent>
-            {order ? (
-              <div className="space-y-3 text-sm">
+      <section className="relative min-h-screen bg-gradient-to-br from-purple-50 via-blue-50 to-cyan-50 overflow-hidden">
+        {/* Background Effects */}
+        <div className="absolute inset-0">
+          <div className="absolute top-0 left-1/4 w-96 h-96 bg-purple-200/30 rounded-full blur-3xl" />
+          <div className="absolute bottom-0 right-1/4 w-96 h-96 bg-blue-200/30 rounded-full blur-3xl" />
+        </div>
+
+        <div className="container mx-auto px-4 relative z-10 pt-32 md:pt-40 pb-8">
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.6 }}
+            className="max-w-xl mx-auto"
+          >
+            {/* Ticket Card */}
+            {order && (
+              <motion.div
+                initial={{ opacity: 0, scale: 0.95 }}
+                animate={{ opacity: 1, scale: 1 }}
+                transition={{ delay: 0.2, duration: 0.5 }}
+                className="bg-white rounded-2xl shadow-2xl overflow-hidden"
+              >
+                {/* Status Badge */}
                 {status === "success" && (
-                  <div className="bg-green-600/20 border border-green-500/50 rounded-lg p-4 mb-4">
-                    <h3 className="font-semibold text-green-300 mb-2">✓ Vé đã thanh toán thành công!</h3>
-                    <p className="text-green-200">Vui lòng kiểm tra email để nhận mã vé.</p>
+                  <div className="bg-gradient-to-r from-emerald-500 to-green-500 text-white px-6 py-3 flex items-center justify-center gap-2">
+                    <CheckCircle2 className="h-5 w-5" />
+                    <span className="font-semibold">Thanh toán thành công</span>
                   </div>
                 )}
                 {status === "failed" && (
-                  <div className="bg-red-600/20 border border-red-500/50 rounded-lg p-4 mb-4">
-                    <h3 className="font-semibold text-red-300 mb-2">✗ Thanh toán thất bại</h3>
-                    <p className="text-red-200">Vui lòng thử lại hoặc liên hệ hỗ trợ.</p>
+                  <div className="bg-gradient-to-r from-red-500 to-rose-500 text-white px-6 py-3 flex items-center justify-center gap-2">
+                    <XCircle className="h-5 w-5" />
+                    <span className="font-semibold">Thanh toán thất bại</span>
                   </div>
                 )}
-                <div className="grid grid-cols-2 gap-2">
-                  <span className="text-orange-400">Phim</span>
-                  <span className="font-medium text-white">{order.movie}</span>
-                  <span className="text-orange-400">Ngày</span>
-                  <span className="font-medium text-white">{order.dateDisplay}</span>
-                  <span className="text-orange-400">Giờ chiếu</span>
-                  <span className="font-medium text-white">{order.showtime}</span>
-                  <span className="text-orange-400">Họ tên</span>
-                  <span className="font-medium text-white">{order.name}</span>
-                  <span className="text-orange-400">Email</span>
-                  <span className="font-medium text-white">{order.email}</span>
-                  <span className="text-orange-400">Số lượng</span>
-                  <span className="font-medium text-white">{order.quantity}</span>
-                  <span className="text-white">Tổng tiền</span>
-                  <span className="font-semibold text-blue-400">
-                    {formatMoney(order.amount)}₫
-                  </span>
-                </div>
-                {status === "success" && (
-                  <div className="text-xs sm:text-sm text-yellow-300 mt-1">
-                    Vui lòng kiểm tra kỹ email, mã đặt vé sẽ gửi tới email này.
+
+                {/* Movie Poster */}
+                {order.poster && (
+                  <div className="relative h-48 md:h-56 overflow-hidden">
+                    <img 
+                      src={resolveImageUrl(order.poster)} 
+                      alt={order.movie} 
+                      className="w-full h-full object-cover"
+                    />
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent" />
+                    <div className="absolute bottom-3 left-4 right-4">
+                      <h2 className="text-xl md:text-2xl font-bold text-white mb-1">{order.movie}</h2>
+                      {order.duration && (
+                        <p className="text-white/90 text-xs md:text-sm">Thời lượng: {order.duration} phút</p>
+                      )}
+                    </div>
                   </div>
                 )}
-              </div>
-            ) : (
-              <div className="space-y-3">
-                <div className="h-6 bg-white/10 rounded animate-pulse"></div>
-                <div className="space-y-2">
-                  <div className="h-4 bg-white/10 rounded animate-pulse w-3/4"></div>
-                  <div className="h-4 bg-white/10 rounded animate-pulse w-1/2"></div>
+
+                {/* Booking Details */}
+                <div className="p-5 md:p-6 space-y-4">
+                  {/* Ticket Info */}
+                  <div className="flex items-center justify-between pb-3 border-b-2 border-dashed border-gray-200">
+                    <div>
+                      <p className="text-xs text-gray-500 mb-1">Số lượng vé</p>
+                      <p className="text-lg font-bold text-gray-900">{order.quantity} vé</p>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-xs text-gray-500 mb-1">Tổng tiền</p>
+                      <p className="text-xl font-extrabold bg-gradient-to-r from-purple-600 to-blue-600 bg-clip-text text-transparent">
+                        {formatMoney(order.amount)}₫
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Customer Info */}
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between py-1.5">
+                      <span className="text-xs text-gray-600">Họ tên</span>
+                      <span className="font-semibold text-sm text-gray-900">{order.name}</span>
+                    </div>
+                    <div className="flex items-center justify-between py-1.5">
+                      <span className="text-xs text-gray-600">Email</span>
+                      <span className="font-semibold text-xs text-gray-900 text-right">{order.email}</span>
+                    </div>
+                    {order.phone && (
+                      <div className="flex items-center justify-between py-1.5">
+                        <span className="text-xs text-gray-600">Số điện thoại</span>
+                        <span className="font-semibold text-sm text-gray-900">{order.phone}</span>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Booking Code (if success) */}
+                  {status === "success" && bookingCode && (
+                    <div className="pt-4 border-t-2 border-dashed border-gray-200">
+                      <p className="text-xs text-gray-500 mb-2 text-center">Mã đặt vé</p>
+                      <div className="bg-gray-50 rounded-lg p-4 text-center">
+                        <p className="text-2xl font-mono font-bold text-gray-900 tracking-wider mb-3">
+                          {bookingCode}
+                        </p>
+                        {/* Simple Barcode Representation */}
+                        <div className="flex items-center justify-center gap-0.5 mb-2">
+                          {bookingCode.split('').map((char, i) => (
+                            <div 
+                              key={i}
+                              className="w-0.5 bg-gray-800"
+                              style={{ height: `${16 + (char.charCodeAt(0) % 25)}px` }}
+                            />
+                          ))}
+                        </div>
+                        <p className="text-xs text-gray-500">Vui lòng lưu mã này để check-in tại rạp</p>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Success Message */}
+                  {status === "success" && (
+                    <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 flex items-start gap-2">
+                      <Mail className="h-4 w-4 text-blue-500 flex-shrink-0 mt-0.5" />
+                      <p className="text-xs text-blue-700">
+                        <strong>Lưu ý:</strong> Mã đặt vé đã được gửi tới email của bạn. Vui lòng kiểm tra hộp thư.
+                      </p>
+                    </div>
+                  )}
+
+                  {/* Failed Message */}
+                  {status === "failed" && (
+                    <div className="bg-red-50 border border-red-200 rounded-lg p-3">
+                      <p className="text-xs text-red-700">
+                        <strong>Thanh toán không thành công.</strong> Vui lòng thử lại hoặc liên hệ hỗ trợ nếu vấn đề vẫn tiếp tục.
+                      </p>
+                    </div>
+                  )}
                 </div>
-                <div className="grid grid-cols-2 gap-2">
-                  {[...Array(6)].map((_, i) => (
-                    <div key={i} className="h-4 bg-white/10 rounded animate-pulse"></div>
-                  ))}
+
+                {/* Footer Button */}
+                <div className="px-5 md:px-6 pb-5">
+                  <Button 
+                    className="w-full bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white font-semibold py-4 rounded-xl shadow-lg"
+                    onClick={() => { 
+                      try { 
+                        localStorage.removeItem("pendingOrder"); 
+                        localStorage.removeItem("lastCheckoutOrder"); 
+                        localStorage.removeItem("lastVnpayBookingId"); 
+                      } catch { } 
+                      navigate("/"); 
+                    }}
+                  >
+                    Về trang chủ
+                  </Button>
+                </div>
+              </motion.div>
+            )}
+
+            {/* Loading State */}
+            {!order && (
+              <div className="bg-white rounded-2xl shadow-2xl p-8">
+                <div className="space-y-4">
+                  <div className="h-64 bg-gray-200 rounded-lg animate-pulse"></div>
+                  <div className="space-y-3">
+                    <div className="h-4 bg-gray-200 rounded animate-pulse w-3/4"></div>
+                    <div className="h-4 bg-gray-200 rounded animate-pulse w-1/2"></div>
+                  </div>
                 </div>
               </div>
             )}
-          </CardContent>
-          <CardFooter className="flex justify-between">
-            <Button variant="outline" className="bg-transparent border-white/30 text-white hover:bg-white/10" onClick={() => { try { localStorage.removeItem("pendingOrder"); localStorage.removeItem("lastCheckoutOrder"); localStorage.removeItem("lastVnpayBookingId"); } catch { }; navigate("/"); }}>
-              Quay lại
-            </Button>
-          </CardFooter>
-          {!isLoggedIn && (
-            <div className="px-6 pb-6 text-sm text-red-300">
-              Vui lòng đăng nhập trước khi thanh toán.
-              <button
-                className="ml-2 text-blue-300 underline"
-                onClick={() => {
-                  window.dispatchEvent(new Event("open-login"));
-                  navigate("/");
-                }}
-              >
-                Đăng nhập
-              </button>
-            </div>
-          )}
-        </Card>
-      </div>
+
+            {!isLoggedIn && (
+              <div className="mt-4 bg-yellow-50 border border-yellow-200 rounded-lg p-4 text-center">
+                <p className="text-sm text-yellow-700">
+                  Vui lòng đăng nhập trước khi thanh toán.{" "}
+                  <button
+                    className="font-semibold text-yellow-800 underline hover:text-yellow-900"
+                    onClick={() => {
+                      window.dispatchEvent(new Event("open-login"));
+                      navigate("/");
+                    }}
+                  >
+                    Đăng nhập
+                  </button>
+                </p>
+              </div>
+            )}
+          </motion.div>
+        </div>
+      </section>
     </UserLayout>
   );
 }

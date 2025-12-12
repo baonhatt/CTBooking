@@ -1,7 +1,18 @@
 import { useMemo, useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Play, Pause, Sparkles, Waves } from "lucide-react";
+import { Play, Pause, Sparkles, Waves, Clock, Star, Calendar, Ticket } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { useQuery } from "@tanstack/react-query";
+import { useNavigate } from "react-router-dom";
+import { getAllActiveMoviesToday, getMovieById } from "@/lib/api";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { movieStore } from "@/store/movieStore";
 import heroVideo from "@/assets/videos/video.mp4";
 // @ts-ignore
 import heroImage1 from "@/assets/images/1.PNG";
@@ -13,11 +24,26 @@ export default function HeroSection() {
   const [currentPosterIndex, setCurrentPosterIndex] = useState(0);
   const videoRef = useRef<HTMLVideoElement>(null);
   const [isVideoPlaying, setIsVideoPlaying] = useState(false);
+  const navigate = useNavigate();
+  const [selectedMovieId, setSelectedMovieId] = useState<number | null>(null);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isLoadingDetails, setIsLoadingDetails] = useState(false);
+  const [storeUpdateTrigger, setStoreUpdateTrigger] = useState(0);
 
-  // Use static images instead of API
+  const { data } = useQuery({
+    queryKey: ["activeMovies", "hero"],
+    queryFn: ({ signal }) => getAllActiveMoviesToday({ signal }),
+  });
+
+  // Use static images and map to movies from API
   const moviePosters = useMemo(() => {
     return [heroImage1, heroImage9];
   }, []);
+
+  // Get movies from API
+  const movies = useMemo(() => {
+    return (data?.activeMovies || []) as any[];
+  }, [data]);
 
   // Auto-rotate posters every 5 seconds
   useEffect(() => {
@@ -59,6 +85,7 @@ export default function HeroSection() {
   };
 
   const currentPoster = moviePosters[currentPosterIndex];
+  const currentMovie = movies[currentPosterIndex] || null;
 
   const onMove = (e: React.MouseEvent<HTMLDivElement, MouseEvent>) => {
     const { clientX, clientY, currentTarget } = e;
@@ -66,6 +93,53 @@ export default function HeroSection() {
     const x = ((clientX - rect.left) / rect.width - 0.5) * 20;
     const y = ((clientY - rect.top) / rect.height - 0.5) * 20;
     setPointer({ x, y });
+  };
+
+  const handlePosterClick = async (index: number) => {
+    const movie = movies[index];
+    if (!movie || !movie.id) return;
+
+    setSelectedMovieId(movie.id);
+    setIsModalOpen(true);
+
+    // Check if movie is in store, if not fetch and store it
+    const cachedMovie = movieStore.getMovie(movie.id);
+    if (!cachedMovie) {
+      setIsLoadingDetails(true);
+      try {
+        const details = await getMovieById(movie.id);
+        if (details) {
+          movieStore.setMovie(details);
+          setStoreUpdateTrigger((prev) => prev + 1);
+        }
+      } catch (error) {
+        console.error(`Failed to fetch details for movie ${movie.id}:`, error);
+      } finally {
+        setIsLoadingDetails(false);
+      }
+    }
+  };
+
+  // Get movie details from store
+  const movieDetails = useMemo(() => {
+    if (!selectedMovieId) return null;
+    return movieStore.getMovie(selectedMovieId);
+  }, [selectedMovieId, storeUpdateTrigger]);
+
+  const handleBookTicket = () => {
+    if (!movieDetails) return;
+    try {
+      const movie = movies.find((m: any) => m.id === movieDetails.id);
+      if (movie) {
+        localStorage.setItem("selectedFilm", JSON.stringify({
+          id: movie.id,
+          title: movie.title,
+          poster: movie.cover_image,
+        }));
+      }
+    } catch {}
+    setIsModalOpen(false);
+    navigate("/booking");
   };
 
   return (
@@ -119,17 +193,7 @@ export default function HeroSection() {
             transition={{ duration: 0.8, ease: "easeOut" }}
             className="max-w-3xl space-y-6"
           >
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.2 }}
-              className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-white/10 border border-white/20 backdrop-blur-md shadow-lg"
-            >
-              <Sparkles className="h-4 w-4 text-cyan-300 animate-pulse" />
-              <span className="uppercase tracking-[0.32em] text-xs text-gray-100 font-medium">
-                CINESPHERE
-              </span>
-            </motion.div>
+           
 
             <motion.h1
               initial={{ opacity: 0, y: 20 }}
@@ -290,8 +354,11 @@ export default function HeroSection() {
                 {moviePosters.map((_, index) => (
                   <button
                     key={index}
-                    onClick={() => setCurrentPosterIndex(index)}
-                    className={`h-2 rounded-full transition-all duration-300 ${
+                    onClick={() => {
+                      setCurrentPosterIndex(index);
+                      handlePosterClick(index);
+                    }}
+                    className={`h-2 rounded-full transition-all duration-300 cursor-pointer ${
                       index === currentPosterIndex
                         ? "w-8 bg-cyan-400 shadow-[0_0_10px_rgba(34,211,238,0.8)]"
                         : "w-2 bg-white/30 hover:bg-white/50"
@@ -304,6 +371,138 @@ export default function HeroSection() {
           </motion.div>
         </div>
       </div>
+
+      {/* Movie Details Modal */}
+      <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
+        <DialogContent className="max-w-3xl max-h-[90vh] flex flex-col bg-gradient-to-br from-[#0b1226] via-[#0e1b3d] to-[#050915] border border-cyan-500/30 text-white p-0 shadow-[0_0_50px_rgba(59,130,246,0.3)]">
+          <div className="overflow-y-auto scrollbar-neon flex-1 px-6 pt-6 pb-4">
+            {!movieDetails ? (
+              <div className="flex items-center justify-center py-12">
+                <div className="text-center">
+                  <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-cyan-400 mx-auto mb-4"></div>
+                  <p className="text-gray-400">Đang tải thông tin phim...</p>
+                </div>
+              </div>
+            ) : (
+              <>
+                <DialogHeader className="mb-4">
+                  <DialogTitle className="text-3xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-cyan-300 via-blue-400 to-fuchsia-400 mb-2">
+                    {movieDetails.title}
+                  </DialogTitle>
+                  <DialogDescription className="text-gray-300 text-sm">
+                    {(() => {
+                      try {
+                        const genres = Array.isArray(movieDetails.genres)
+                          ? movieDetails.genres
+                          : typeof movieDetails.genres === "string"
+                          ? JSON.parse(movieDetails.genres)
+                          : [];
+                        return Array.isArray(genres) && genres.length > 0 ? genres.join(" • ") : "Chưa phân loại";
+                      } catch {
+                        return "Chưa phân loại";
+                      }
+                    })()}
+                  </DialogDescription>
+                </DialogHeader>
+
+                <div className="grid md:grid-cols-2 gap-6">
+                  {/* Movie Poster */}
+                  <div className="relative rounded-xl overflow-hidden border border-cyan-500/30 aspect-[2/3] shadow-[0_0_30px_rgba(59,130,246,0.2)]">
+                    <img
+                      src={
+                        movieDetails.cover_image ||
+                        "https://images.unsplash.com/photo-1464375117522-1311d6a5b81f?auto=format&fit=crop&w=900&q=80"
+                      }
+                      alt={movieDetails.title}
+                      className="w-full h-full object-cover"
+                    />
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/40 to-transparent pointer-events-none" />
+                  </div>
+
+                  {/* Movie Info */}
+                  <div className="space-y-4">
+                    <div>
+                      <h3 className="text-base font-semibold text-cyan-300 mb-2 flex items-center gap-2">
+                        <span className="w-1 h-4 bg-gradient-to-b from-cyan-400 to-blue-500 rounded-full"></span>
+                        Mô tả
+                      </h3>
+                      <p className="text-gray-300 leading-relaxed text-sm">
+                        {movieDetails.description || "Chưa có mô tả cho bộ phim này."}
+                      </p>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-4 pt-4 border-t border-white/10">
+                      {movieDetails.rating !== null && movieDetails.rating !== undefined && (
+                        <div className="flex items-center gap-2 p-2 rounded-lg bg-white/5 border border-white/10">
+                          <Star className="h-4 w-4 text-yellow-400 fill-yellow-400" />
+                          <span className="text-white font-medium text-sm">
+                            {movieDetails.rating.toFixed(1)} / 10
+                          </span>
+                        </div>
+                      )}
+                      {movieDetails.duration_min && (
+                        <div className="flex items-center gap-2 p-2 rounded-lg bg-white/5 border border-white/10">
+                          <Clock className="h-4 w-4 text-cyan-400" />
+                          <span className="text-white font-medium text-sm">
+                            {movieDetails.duration_min} phút
+                          </span>
+                        </div>
+                      )}
+                      {movieDetails.release_date && (
+                        <div className="flex items-center gap-2 p-2 rounded-lg bg-white/5 border border-white/10">
+                          <Calendar className="h-4 w-4 text-fuchsia-400" />
+                          <span className="text-white font-medium text-sm">
+                            {new Date(movieDetails.release_date).toLocaleDateString("vi-VN")}
+                          </span>
+                        </div>
+                      )}
+                    </div>
+
+                    {movieDetails.stats && (
+                      <div className="pt-4 border-t border-white/10">
+                        <h4 className="text-sm font-semibold text-cyan-300 mb-3 flex items-center gap-2">
+                          <span className="w-1 h-4 bg-gradient-to-b from-cyan-400 to-blue-500 rounded-full"></span>
+                          Thống kê
+                        </h4>
+                        <div className="grid grid-cols-2 gap-3">
+                          <div className="p-3 rounded-lg bg-white/5 border border-white/10">
+                            <div className="text-xs text-gray-400 mb-1">Suất chiếu</div>
+                            <div className="text-lg font-bold text-white">{movieDetails.stats.totalShowtimes}</div>
+                          </div>
+                          <div className="p-3 rounded-lg bg-white/5 border border-white/10">
+                            <div className="text-xs text-gray-400 mb-1">Vé đã bán</div>
+                            <div className="text-lg font-bold text-cyan-300">{movieDetails.stats.totalTicketsSold}</div>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </>
+            )}
+          </div>
+
+          {/* Fixed Footer with Buttons */}
+          {movieDetails && (
+            <div className="flex justify-end gap-3 px-6 py-4 border-t border-white/10 bg-gradient-to-br from-[#0b1226] via-[#0e1b3d] to-[#050915] shrink-0">
+              <Button
+                variant="outline"
+                onClick={() => setIsModalOpen(false)}
+                className="border-white/20 text-white hover:bg-white/10 hover:text-white hover:border-cyan-400/50 transition-all"
+              >
+                Đóng
+              </Button>
+              <Button
+                onClick={handleBookTicket}
+                className="bg-gradient-to-r from-cyan-400 via-blue-600 to-fuchsia-500 hover:from-fuchsia-500 hover:via-cyan-400 hover:to-blue-600 text-white font-semibold shadow-[0_0_30px_rgba(59,130,246,0.4)] hover:shadow-[0_0_40px_rgba(236,72,153,0.6)] transition-all duration-300 hover:scale-105"
+              >
+                <Ticket className="h-4 w-4 mr-2" />
+                Đặt vé ngay
+              </Button>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </section>
   );
 }
