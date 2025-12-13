@@ -19,6 +19,7 @@ import { getUsers, getUserById } from "./routes/admin/users";
 import { updateUserProfile, listUserTransactions } from "./routes/user/users";
 import { listTicketPackages, getTicketPackage, createTicketPackage, updateTicketPackage, deleteTicketPackage } from "./routes/admin/tickets";
 import { listActiveTicketPackages } from "./routes/user/tickets";
+import { getMailConfig, verifyMailProvider } from "./routes/mail-service";
 
 export function createServer() {
   const app = express();
@@ -133,6 +134,16 @@ export function createServer() {
   app.post("/api/tickets", createTicketPackage);
   app.put("/api/tickets/:id", updateTicketPackage);
   app.delete("/api/tickets/:id", deleteTicketPackage);
+
+  app.get("/api/debug/mail", async (_req, res) => {
+    try {
+      const config = getMailConfig();
+      const verify = await verifyMailProvider();
+      res.status(200).json({ config, verify });
+    } catch (err: any) {
+      res.status(500).json({ message: err?.message || "Internal error" });
+    }
+  });
 
   return app;
 }

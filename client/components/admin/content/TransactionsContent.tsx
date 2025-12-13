@@ -473,6 +473,22 @@ export default function TransactionsContent({
                       </span>
                     </div>
                   )}
+                  {txDetails.payment_info?.expiry_date && (
+                    <div className="flex justify-between">
+                      <span className="text-gray-600">Ngày hết hạn:</span>
+                      <span className="font-medium">
+                        {new Date(txDetails.payment_info.expiry_date).toLocaleString("vi-VN")}
+                      </span>
+                    </div>
+                  )}
+                  {typeof txDetails.payment_info?.days_left === "number" && (
+                    <div className="flex justify-between">
+                      <span className="text-gray-600">Thời gian còn lại:</span>
+                      <span className="font-medium">
+                        {Math.max(0, Number(txDetails.payment_info.days_left))} ngày
+                      </span>
+                    </div>
+                  )}
                 </div>
               </div>
             </div>

@@ -10,8 +10,13 @@ export function useAuth() {
     return loginApi({ email, password });
   }
 
-  async function register(email: string, password: string, name?: string) {
-    return registerApi({ email, password, name });
+  async function register(
+    email: string,
+    password: string,
+    name?: string,
+    options?: { gender?: string; dob?: string; phone?: string }
+  ) {
+    return registerApi({ email, password, name, ...(options || {}) });
   }
 
   async function forgetPass(email: string) {

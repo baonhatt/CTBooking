@@ -12,6 +12,9 @@ export async function registerApi(body: {
   email: string;
   password: string;
   name?: string;
+  gender?: string;
+  dob?: string;
+  phone?: string;
 }) {
   return request<{ status: string; message: string; user: any }>(
     "/api/register",

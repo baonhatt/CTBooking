@@ -65,6 +65,19 @@ export default function BookingPage() {
   const MAX_TICKETS = 10;
 
   useEffect(() => {
+    try {
+      const authRaw = localStorage.getItem("authUser");
+      if (!authRaw) {
+        toast({ title: "Vui lòng đăng nhập", description: "Bạn cần đăng nhập trước khi đặt vé" });
+        window.dispatchEvent(new Event("open-login"));
+        navigate("/", { replace: true });
+      }
+    } catch {
+      navigate("/", { replace: true });
+    }
+  }, [navigate]);
+
+  useEffect(() => {
     return () => { if (countdownRef.current) clearInterval(countdownRef.current); };
   }, []);
 

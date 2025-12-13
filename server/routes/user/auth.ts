@@ -2,6 +2,8 @@ import { RequestHandler } from "express";
 import type { Login, Register } from "@shared/api";
 import { prisma } from "../../lib/prisma";
 import bcrypt from "bcryptjs";
+import { sendMail } from "../mail-service";
+import { getWelcomeEmailTemplate } from "../../lib/booking-utils";
 
 export const handleLogin: RequestHandler = async (req, res) => {
   const { email, password } = req.body as Partial<Login>;
@@ -38,6 +40,9 @@ export const handleLogin: RequestHandler = async (req, res) => {
 export const handleRegister: RequestHandler = async (req, res) => {
   try {
     const { email, password } = req.body as Partial<Register>;
+    const gender = (req.body as any).gender as string | undefined;
+    const dobStr = (req.body as any).dob as string | undefined;
+    const phone = (req.body as any).phone as string | undefined;
 
     if (!email || !password) {
       return res
@@ -61,10 +66,17 @@ export const handleRegister: RequestHandler = async (req, res) => {
     if (!fullname || fullname.trim() === "") {
       fullname = email.split("@")[0];
     }
+    const dob =
+      dobStr && typeof dobStr === "string" && dobStr.trim()
+        ? new Date(dobStr)
+        : undefined;
 
     const newUser = await prisma.users.create({
       data: {
         fullname: fullname,
+        phone: phone,
+        gender: gender,
+        dob: dob,
         accounts: {
           create: {
             email,
@@ -74,6 +86,16 @@ export const handleRegister: RequestHandler = async (req, res) => {
       },
       include: { accounts: true },
     });
+
+    try {
+      const html = getWelcomeEmailTemplate({
+        customerName: fullname || email.split("@")[0],
+        email,
+      });
+      await sendMail(email, "🎉 Chào mừng bạn đến CINESPHERE", html);
+    } catch (mailErr) {
+      console.error("Gửi email chào mừng thất bại:", mailErr);
+    }
 
     return res
       .status(201)

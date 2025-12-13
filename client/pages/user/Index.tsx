@@ -8,22 +8,14 @@ import UserLayout from "@/user/layouts/UserLayout";
 import { ConfigProvider } from "antd";
 import { motion } from "framer-motion";
 import { ArrowUp } from "lucide-react";
-import { useNavigate } from "react-router-dom";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Button } from "@/components/ui/button";
-import { Select, SelectTrigger, SelectContent, SelectItem } from "@/components/ui/select";
-import { Label } from "@/components/ui/label";
 import { useQuery } from "@tanstack/react-query";
 import { getAllActiveMoviesToday, getActiveTickets } from "@/lib/api";
-import { toast } from "@/components/ui/use-toast";
 
 export default function Index() {
-  const navigate = useNavigate();
   const [showBackToTop, setShowBackToTop] = useState(false);
   const [isBookingModalOpen, setIsBookingModalOpen] = useState(false);
   const [movie, setMovie] = useState<string>("");
   const [selectedPackage, setSelectedPackage] = useState<any | null>(null);
-  const [ticketCount, setTicketCount] = useState<number>(1);
 
   const { data: activeData } = useQuery({
     queryKey: ["activeMovies", "home-modal"],
@@ -36,7 +28,6 @@ export default function Index() {
   });
 
   const activeMoviesFull = activeData?.activeMovies || [];
-  const movies = useMemo(() => (activeMoviesFull || []).map((m: any) => ({ id: m.title, title: m.title })), [activeMoviesFull]);
   const ticketPackages = useMemo(() => (ticketsData?.items || []).map((t: any) => ({
     id: t.id,
     name: t.name,
@@ -80,31 +71,6 @@ export default function Index() {
   const scrollToTop = () => {
     setShowBackToTop(false);
     window.scrollTo({ top: 0, behavior: "smooth" });
-  };
-
-  const handleConfirmQuickBooking = () => {
-    const authRaw = localStorage.getItem("authUser");
-    if (!authRaw) {
-      toast({ title: "Vui lòng đăng nhập", description: "Bạn cần đăng nhập trước khi đặt vé" });
-      window.dispatchEvent(new Event("open-login"));
-      return;
-    }
-    try {
-      const found = activeMoviesFull.find((m: any) => m.title === movie);
-      if (found) {
-        localStorage.setItem("selectedFilm", JSON.stringify({
-          id: found.id,
-          title: found.title,
-          poster: found.cover_image,
-        }));
-      }
-      if (selectedPackage) {
-        localStorage.setItem("selectedTicketPackage", JSON.stringify(selectedPackage));
-      }
-      localStorage.setItem("preselectTicketCount", String(ticketCount));
-    } catch { }
-    setIsBookingModalOpen(false);
-    navigate("/booking");
   };
 
   return (

@@ -14,7 +14,7 @@ import heroImage1 from "@/assets/images/1.PNG";
 
 export default function Account() {
   const navigate = useNavigate();
-  const [profile, setProfile] = useState<{ name: string; phone: string; email: string }>({ name: "", phone: "", email: "" });
+  const [profile, setProfile] = useState<{ name: string; phone: string; email: string; gender?: string; dob?: string }>({ name: "", phone: "", email: "", gender: "", dob: "" });
   const [isPwdOpen, setIsPwdOpen] = useState(false);
   const [oldPwd, setOldPwd] = useState("");
   const [newPwd, setNewPwd] = useState("");
@@ -27,6 +27,7 @@ export default function Account() {
   const [currentPage, setCurrentPage] = useState(1);
   const [tab, setTab] = useState<"history" | "info">("history");
   const pageSize = 5;
+  const [detailCountdown, setDetailCountdown] = useState<string | null>(null);
 
   useEffect(() => {
     const authRaw = localStorage.getItem("authUser");
@@ -44,6 +45,8 @@ export default function Account() {
       let email = "";
       let name = "";
       let phone = "";
+      let gender = "";
+      let dob = "";
       if (authRaw) {
         try {
           const parsed = JSON.parse(authRaw);
@@ -58,9 +61,11 @@ export default function Account() {
           email = p?.email || email;
           name = p?.name || name;
           phone = p?.phone || phone;
+          gender = p?.gender || gender;
+          dob = p?.dob || dob;
         } catch { }
       }
-      setProfile({ name: name || "", phone: phone || "", email: email || "" });
+      setProfile({ name: name || "", phone: phone || "", email: email || "", gender: gender || "", dob: dob || "" });
     } catch { }
   }, []);
 
@@ -118,6 +123,43 @@ export default function Account() {
     window.addEventListener("hashchange", readHash);
     return () => window.removeEventListener("hashchange", readHash);
   }, []);
+
+  useEffect(() => {
+    if (!isDetailOpen) {
+      setDetailCountdown(null);
+      return;
+    }
+    const expirySrc = selectedTx?.expiry_date;
+    const expired = Boolean(selectedTx?.expired);
+    const isUsed = Boolean(selectedTx?.is_used);
+    if (!expirySrc || expired || isUsed) {
+      setDetailCountdown(null);
+      return;
+    }
+    let expiry = 0;
+    try {
+      expiry = new Date(expirySrc as any).getTime();
+    } catch {
+      expiry = 0;
+    }
+    if (!expiry) {
+      setDetailCountdown(null);
+      return;
+    }
+    const update = () => {
+      const now = Date.now();
+      const diff = Math.max(0, expiry - now);
+      const hours = Math.floor(diff / 3600000);
+      const minutes = Math.floor((diff % 3600000) / 60000);
+      const seconds = Math.floor((diff % 60000) / 1000);
+      setDetailCountdown(
+        `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`,
+      );
+    };
+    update();
+    const id = setInterval(update, 1000);
+    return () => clearInterval(id);
+  }, [isDetailOpen, selectedTx?.expiry_date, selectedTx?.expired, selectedTx?.is_used]);
 
   const handleTabChange = (val: string) => {
     const value = val === "info" ? "info" : "history";
@@ -182,8 +224,8 @@ export default function Account() {
 
   const handleSaveProfile = async () => {
     try {
-      await updateUserProfileApi({ email: profile.email, name: profile.name, phone: profile.phone });
-      const p = { email: profile.email, name: profile.name, phone: profile.phone };
+      await updateUserProfileApi({ email: profile.email, name: profile.name, phone: profile.phone, gender: profile.gender, dob: profile.dob });
+      const p = { email: profile.email, name: profile.name, phone: profile.phone, gender: profile.gender, dob: profile.dob };
       localStorage.setItem("userProfile", JSON.stringify(p));
       const authRaw = localStorage.getItem("authUser");
       if (authRaw) {
@@ -277,14 +319,31 @@ export default function Account() {
                         placeholder="Nhập họ và tên"
                       />
                     </div>
-                    {/* <div className="space-y-2">
-                      <Label className="text-gray-200">Ngày sinh</Label>
-                      <Input
-                        className="bg-white/5 border-white/10 text-gray-300"
-                        value="--/--/----"
-                        readOnly
-                      />
-                    </div> */}
+                    <div className="space-y-2">
+                      <Label className="text-gray-200">Giới tính</Label>
+                      <div className="flex items-center gap-6">
+                        <label className="flex items-center gap-2">
+                          <input
+                            type="radio"
+                            name="gender"
+                            value="male"
+                            checked={(profile.gender || "") === "male"}
+                            onChange={(e) => setProfile((p) => ({ ...p, gender: e.target.value }))}
+                          />
+                          <span>Nam</span>
+                        </label>
+                        <label className="flex items-center gap-2">
+                          <input
+                            type="radio"
+                            name="gender"
+                            value="female"
+                            checked={(profile.gender || "") === "female"}
+                            onChange={(e) => setProfile((p) => ({ ...p, gender: e.target.value }))}
+                          />
+                          <span>Nữ</span>
+                        </label>
+                      </div>
+                    </div>
                     <div className="space-y-2">
                       <Label className="text-gray-200">Email</Label>
                       <div className="relative">
@@ -305,6 +364,15 @@ export default function Account() {
                         value={profile.phone}
                         onChange={(e) => setProfile((p) => ({ ...p, phone: e.target.value }))}
                         placeholder="Nhập số điện thoại"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label className="text-gray-200">Ngày sinh</Label>
+                      <Input
+                        type="date"
+                        className="bg-white/10 border-white/10 text-white placeholder:text-gray-400"
+                        value={profile.dob || ""}
+                        onChange={(e) => setProfile((p) => ({ ...p, dob: e.target.value }))}
                       />
                     </div>
                     <div className="space-y-2">
@@ -379,7 +447,21 @@ export default function Account() {
                                       Số vé: <span className="text-white font-medium">{t.quantity}</span> •
                                       <span className="ml-2 text-blue-300 font-semibold">{formatMoney(t.amount)}₫</span>
                                     </div>
-                                    <div className="text-xs text-green-300">{t.payment_status === "paid" ? "Đã thanh toán" : "Chưa thanh toán"}</div>
+                                    <div className="text-xs">
+                                      {t.payment_status === "paid" ? (
+                                        t.expired ? (
+                                          <span className="text-red-300">Vé đã hết hạn</span>
+                                        ) : t.is_used ? (
+                                          <span className="text-yellow-300">Vé đã sử dụng</span>
+                                        ) : (
+                                          <span className="text-green-300">
+                                            Vé đang hoạt động {typeof t.days_left === "number" ? `(còn ${Math.max(0, Number(t.days_left))} ngày)` : ""}
+                                          </span>
+                                        )
+                                      ) : (
+                                        <span className="text-yellow-300">Chưa thanh toán</span>
+                                      )}
+                                    </div>
                                   </div>
 
                                   <div className="flex flex-col items-end gap-2">
@@ -496,6 +578,26 @@ export default function Account() {
                 <span className="font-medium text-white">{selectedTx.method === "momo" ? "MoMo" : "VNPay"}</span>
                 <span className="text-gray-400">Ngày thanh toán</span>
                 <span className="font-medium text-white">{selectedTx.dateDisplay || "--"}</span>
+                {selectedTx.expiry_date ? (
+                  <>
+                    <span className="text-gray-400">Ngày hết hạn</span>
+                    <span className="font-medium text-white">
+                      {(() => { try { const d = new Date(selectedTx.expiry_date); return d.toLocaleString("vi-VN"); } catch { return String(selectedTx.expiry_date); } })()}
+                    </span>
+                  </>
+                ) : null}
+                {typeof selectedTx.days_left === "number" ? (
+                  <>
+                    <span className="text-gray-400">Thời gian còn lại</span>
+                    <span className="font-medium text-white">{Math.max(0, Number(selectedTx.days_left))} ngày</span>
+                  </>
+                ) : null}
+                {detailCountdown ? (
+                  <>
+                    <span className="text-gray-400">Đếm ngược</span>
+                    <span className="font-medium text-white">{detailCountdown}</span>
+                  </>
+                ) : null}
                 <span className="text-gray-400">Tổng tiền</span>
                 <span className="font-semibold text-blue-300">{formatMoney(selectedTx.amount)}₫</span>
               </div>
