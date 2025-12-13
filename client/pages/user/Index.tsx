@@ -8,20 +8,14 @@ import UserLayout from "@/user/layouts/UserLayout";
 import { ConfigProvider } from "antd";
 import { motion } from "framer-motion";
 import { ArrowUp } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 
 export default function Index() {
-  const [isBookingModalOpen, setIsBookingModalOpen] = useState(false);
+  const navigate = useNavigate();
   const [showBackToTop, setShowBackToTop] = useState(false);
 
   const handleBookClick = () => {
-    setIsBookingModalOpen(true);
-    // Scroll to booking section
-    setTimeout(() => {
-      const bookingSection = document.getElementById("booking-section");
-      if (bookingSection) {
-        bookingSection.scrollIntoView({ behavior: "smooth" });
-      }
-    }, 100);
+    navigate("/booking");
   };
 
   useEffect(() => {

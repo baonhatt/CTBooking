@@ -18,6 +18,7 @@ import heroVideo from "@/assets/videos/video.mp4";
 import heroImage1 from "@/assets/images/1.PNG";
 // @ts-ignore
 import heroImage9 from "@/assets/images/9.PNG";
+import { toast } from "@/components/ui/use-toast";
 
 export default function HeroSection() {
   const [pointer, setPointer] = useState({ x: 0, y: 0 });
@@ -128,6 +129,12 @@ export default function HeroSection() {
 
   const handleBookTicket = () => {
     if (!movieDetails) return;
+    const authRaw = localStorage.getItem("authUser");
+    if (!authRaw) {
+      toast({ title: "Vui lòng đăng nhập", description: "Bạn cần đăng nhập trước khi đặt vé" });
+      window.dispatchEvent(new Event("open-login"));
+      return;
+    }
     try {
       const movie = movies.find((m: any) => m.id === movieDetails.id);
       if (movie) {

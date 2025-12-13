@@ -5,6 +5,7 @@ import { motion } from "framer-motion";
 import { ChevronLeft, ChevronRight, Play, Clock, Star, Calendar, Ticket } from "lucide-react";
 import { getAllActiveMoviesToday, getMovieById } from "@/lib/api";
 import { Button } from "@/components/ui/button";
+import { toast } from "@/components/ui/use-toast";
 import {
   Dialog,
   DialogContent,
@@ -178,6 +179,12 @@ export default function FilmCarousel({ onSelectFilm }: FilmCarouselProps) {
 
   const handleBookTicket = () => {
     if (!movieDetails) return;
+    const authRaw = localStorage.getItem("authUser");
+    if (!authRaw) {
+      toast({ title: "Vui lòng đăng nhập", description: "Bạn cần đăng nhập trước khi đặt vé" });
+      window.dispatchEvent(new Event("open-login"));
+      return;
+    }
     try {
       const film = films.find((f) => f.id === movieDetails.id);
       if (film) {

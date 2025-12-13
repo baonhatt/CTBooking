@@ -72,13 +72,14 @@ export default function Header({ onBookClick = () => { }, disableNav = false, to
   const [activeSection, setActiveSection] = useState<string>("hero");
   const navItems = [
     { label: "Phim", target: "films" },
+    { label: "Giá vé", target: "promotions" },
     { label: "Công nghệ", target: "technology" },
     { label: "Cửa hàng", target: "store" },
   ];
 
   useEffect(() => {
     if (effectiveDisable) return;
-    const ids = ["hero", "films", "technology", "promotions", "store"];
+    const ids = ["hero", "films", "pricing", "technology", "promotions", "store"];
     const observers: IntersectionObserver[] = [];
     const visibleSections = new Set<string>();
     
@@ -256,9 +257,11 @@ export default function Header({ onBookClick = () => { }, disableNav = false, to
 
   const scrollToSection = (id: string) => {
     const element = document.getElementById(id);
-    if (element) {
-      element.scrollIntoView({ behavior: "smooth" });
-    }
+    if (!element) return;
+    const headerOffset = 72;
+    const rect = element.getBoundingClientRect();
+    const absoluteTop = window.scrollY + rect.top;
+    window.scrollTo({ top: Math.max(0, absoluteTop - headerOffset), behavior: "smooth" });
   };
 
   return (
@@ -729,15 +732,7 @@ export default function Header({ onBookClick = () => { }, disableNav = false, to
               </form>
             </DialogContent>
           </Dialog>
-          {!effectiveDisable && (
-            <Button
-              onClick={handleBookNow}
-              className="hidden md:inline-flex bg-gradient-to-r from-cyan-500 via-blue-500 to-purple-500 hover:from-cyan-600 hover:via-blue-600 hover:to-purple-600 text-white font-normal text-sm md:text-base px-5 md:px-6 py-2.5 md:py-3 rounded-xl shadow-lg shadow-purple-500/30 transition-all duration-300 hover:scale-105 hover:shadow-purple-500/50 uppercase tracking-wider"
-            >
-              <Ticket className="h-5 w-5 mr-2" />
-              <span>ĐẶT VÉ NGAY</span>
-            </Button>
-          )}
+          
         </div>
       </div>
     </header>
