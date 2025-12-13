@@ -134,23 +134,32 @@ export const listTransactions: RequestHandler = async (req, res) => {
       take: pageSize,
     });
 
-    const items = transactions.map((tx) => ({
-      id: tx.id,
-      bookingId: tx.id,
-      email: tx.email || tx.user.accounts[0]?.email || "",
-      phone: tx.phone || "",
-      name: tx.name || tx.user.fullname || "",
-      userName: tx.user.fullname || "",
-      movieTitle: tx.movies?.title || "",
-      ticketPackageName: tx.ticket_packages?.name || "",
-      ticketCount: tx.ticket_count,
-      totalPrice: Number(tx.total_price),
-      paymentMethod: tx.payment_method,
-      paymentStatus: tx.payment_status,
-      transactionId: tx.transaction_id,
-      createdAt: tx.created_at,
-      paidAt: tx.paid_at,
-    }));
+    const items = transactions.map((tx) => {
+      const now = new Date();
+      const expiryAt = tx.expiry_date ? new Date(tx.expiry_date as any) : null;
+      const expired = Boolean(expiryAt && now.getTime() > expiryAt.getTime());
+      const daysLeft = expiryAt ? Math.ceil((expiryAt.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)) : null;
+      return {
+        id: tx.id,
+        bookingId: tx.id,
+        email: tx.email || tx.user.accounts[0]?.email || "",
+        phone: tx.phone || "",
+        name: tx.name || tx.user.fullname || "",
+        userName: tx.user.fullname || "",
+        movieTitle: tx.movies?.title || "",
+        ticketPackageName: tx.ticket_packages?.name || "",
+        ticketCount: tx.ticket_count,
+        totalPrice: Number(tx.total_price),
+        paymentMethod: tx.payment_method,
+        paymentStatus: tx.payment_status,
+        transactionId: tx.transaction_id,
+        createdAt: tx.created_at,
+        paidAt: tx.paid_at,
+        expiryDate: tx.expiry_date || null,
+        expired,
+        daysLeft,
+      };
+    });
 
     res.status(200).json({
       items,
@@ -203,6 +212,10 @@ export const getTransactionById: RequestHandler = async (req, res) => {
       return res.status(404).json({ message: "Không tìm thấy giao dịch" });
     }
 
+    const now = new Date();
+    const expiryAt = booking.expiry_date ? new Date(booking.expiry_date as any) : null;
+    const expired = Boolean(expiryAt && now.getTime() > expiryAt.getTime());
+    const daysLeft = expiryAt ? Math.ceil((expiryAt.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)) : null;
     const mapped = {
       id: booking.id,
       user: {
@@ -227,6 +240,9 @@ export const getTransactionById: RequestHandler = async (req, res) => {
         transaction_id: booking.transaction_id || "N/A",
         created_at: booking.created_at,
         paid_at: booking.paid_at,
+        expiry_date: booking.expiry_date || null,
+        expired,
+        days_left: daysLeft,
       },
     };
 

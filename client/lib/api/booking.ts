@@ -79,12 +79,14 @@ export async function getBookingByCodeApi(code: string) {
     total_price: number;
     created_at: string;
     paid_at: string | null;
+    expiry_date: string | null;
     payment_method: string | null;
     userName: string;
     is_used: boolean;
     valid: boolean;
     can_use: boolean;
     validity_days: number | null;
+    expired: boolean;
   }>(`/api/bookings/code/${code}`);
 }
 

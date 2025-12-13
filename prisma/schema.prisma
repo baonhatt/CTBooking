@@ -24,6 +24,8 @@ model users {
   fullname   String?    @db.VarChar(100)
   phone      String?    @db.VarChar(20)
   avatar     String?
+  gender     String?    @db.VarChar(10)
+  dob        DateTime?  @db.Timestamptz(6)
   created_at DateTime?  @default(now()) @db.Timestamptz(6)
   updated_at DateTime?  @default(now()) @db.Timestamptz(6)
   accounts   accounts[]
@@ -74,6 +76,7 @@ model bookings {
   is_used           Boolean?         @default(false)
   movie_id          Int?
   ticket_package_id Int?
+  expiry_date       DateTime?
   movies            movies?          @relation(fields: [movie_id], references: [id], onDelete: Cascade)
   ticket_packages   ticket_packages? @relation(fields: [ticket_package_id], references: [id])
   user              users            @relation(fields: [user_id], references: [id], onDelete: Cascade)

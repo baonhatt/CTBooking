@@ -54,6 +54,7 @@ export default function Header({ onBookClick = () => { }, disableNav = false, to
   const [registerName, setRegisterName] = useState("");
   const [registerPassword, setRegisterPassword] = useState("");
   const [registerConfirmPassword, setRegisterConfirmPassword] = useState("");
+  const [registerTerms, setRegisterTerms] = useState(false);
   const [forgetPassEmail, setForgetPassEmail] = useState("");
   const [showLoginPass, setShowLoginPass] = useState(false);
   const [showRegisterPass, setShowRegisterPass] = useState(false);
@@ -162,6 +163,16 @@ export default function Header({ onBookClick = () => { }, disableNav = false, to
 
   const handleLoginSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    const emailOk = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(loginEmail);
+    if (!emailOk) {
+      toast({ title: "Email không hợp lệ" });
+      return;
+    }
+    const passOk = /^(?=.*[A-Za-z])(?=.*\d)[A-Za-z\d]{6,}$/.test(loginPassword);
+    if (!passOk) {
+      toast({ title: "Mật khẩu không hợp lệ", description: "Ít nhất 6 ký tự, gồm chữ và số" });
+      return;
+    }
     try {
       setIsLoginLoading(true);
       const data = await auth.login(loginEmail, loginPassword);
@@ -204,12 +215,17 @@ export default function Header({ onBookClick = () => { }, disableNav = false, to
       toast({ title: "Mật khẩu không khớp" });
       return;
     }
+    const okFormat = /^(?=.*[A-Za-z])(?=.*\d)[A-Za-z\d]{6,}$/.test(registerPassword);
+    if (!okFormat) {
+      toast({ title: "Mật khẩu không hợp lệ", description: "Ít nhất 6 ký tự, gồm chữ và số" });
+      return;
+    }
     try {
       setIsRegisterLoading(true);
       const data = await auth.register(
         registerEmail,
         registerPassword,
-        registerName,
+        registerName
       );
       if (data?.status === "success") {
         localStorage.setItem("authUser", JSON.stringify({ user: data.user }));
@@ -225,6 +241,7 @@ export default function Header({ onBookClick = () => { }, disableNav = false, to
         setRegisterEmail("");
         setRegisterPassword("");
         setRegisterConfirmPassword("");
+        setRegisterTerms(false);
         setIsLoginOpen(true);
       }
     } catch (err: any) {
@@ -454,9 +471,16 @@ export default function Header({ onBookClick = () => { }, disableNav = false, to
                   Đăng nhập
                 </button>
               </DialogTrigger>
-              <DialogContent className="bg-gradient-dark border border-white/10">
+              <DialogContent className="bg-gradient-to-br from-[#0b1226] via-[#0e1b3d] to-[#050915] border border-cyan-500/30 text-white shadow-[0_0_50px_rgba(59,130,246,0.3)]">
                 <DialogHeader>
-                  <DialogTitle className="text-blue-400">Đăng nhập</DialogTitle>
+                  <div className="flex justify-center mb-4">
+                    <img
+                      src={icon}
+                      alt="CINESPHERE"
+                      className="h-20 w-20"
+                    />
+                  </div>
+                  <DialogTitle className="text-transparent bg-clip-text bg-gradient-to-r from-cyan-300 via-blue-400 to-fuchsia-400 text-center">Đăng Nhập Tài Khoản</DialogTitle>
                 </DialogHeader>
                 <form className="space-y-4" onSubmit={handleLoginSubmit}>
                   <div>
@@ -465,9 +489,13 @@ export default function Header({ onBookClick = () => { }, disableNav = false, to
                     </label>
                     <Input
                       type="email"
+                      className="bg-white/10 border-white/20 text-white placeholder:text-gray-400 focus-visible:ring-cyan-400 focus-visible:ring-offset-1 rounded-lg"
                       value={loginEmail}
                       onChange={(e) => setLoginEmail(e.target.value)}
+                      onInput={(e) => setLoginEmail((e.target as HTMLInputElement).value)}
                       maxLength={50}
+                      autoComplete="email"
+                      name="email"
                       disabled={isLoginLoading}
                       required
                     />
@@ -477,19 +505,21 @@ export default function Header({ onBookClick = () => { }, disableNav = false, to
                       Mật khẩu
                     </label>
                     <div className="relative">
-                      <Input
-                        type={showLoginPass ? "text" : "password"}
-                        value={loginPassword}
-                        onChange={(e) => setLoginPassword(e.target.value)}
-                        required
-                        maxLength={50}
-                        pattern="^(?=.*[A-Za-z])(?=.*\d)[A-Za-z\d]{6,}$"
-                        title="Mật khẩu phải có ít nhất 6 ký tự, bao gồm cả chữ cái và số"
-                        disabled={isLoginLoading}
-                      />
+                    <Input
+                      type={showLoginPass ? "text" : "password"}
+                      className="bg-white/10 border-white/20 text-white placeholder:text-gray-400 focus-visible:ring-cyan-400 focus-visible:ring-offset-1 rounded-lg pr-10"
+                      value={loginPassword}
+                      onChange={(e) => setLoginPassword(e.target.value)}
+                      onInput={(e) => setLoginPassword((e.target as HTMLInputElement).value)}
+                      required
+                      maxLength={50}
+                      autoComplete="current-password"
+                      name="password"
+                      disabled={isLoginLoading}
+                    />
                       <button
                         type="button"
-                        className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-500 hover:text-black"
+                        className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-white"
                         onClick={() => setShowLoginPass((v) => !v)}
                         aria-label={
                           showLoginPass ? "Ẩn mật khẩu" : "Hiển thị mật khẩu"
@@ -506,7 +536,7 @@ export default function Header({ onBookClick = () => { }, disableNav = false, to
                   <Button
                     type="submit"
                     disabled={isLoginLoading}
-                    className="w-full bg-gradient-to-r from-blue-500 to-purple-500 hover:from-blue-600 hover:to-purple-600"
+                    className="w-full bg-gradient-to-r from-cyan-400 via-blue-600 to-fuchsia-500 hover:from-fuchsia-500 hover:via-cyan-400 hover:to-blue-600 text-white font-semibold shadow-[0_0_30px_rgba(59,130,246,0.4)] hover:shadow-[0_0_40px_rgba(236,72,153,0.6)]"
                   >
                     {isLoginLoading ? (
                       <span className="flex items-center justify-center gap-2">
@@ -514,14 +544,14 @@ export default function Header({ onBookClick = () => { }, disableNav = false, to
                         Đang đăng nhập...
                       </span>
                     ) : (
-                      "Đăng nhập"
+                      "ĐĂNG NHẬP"
                     )}
                   </Button>
                   <div className="flex justify-between items-center">
                     <div></div>
                     <Button
                       variant="link"
-                      className="text-sm text-blue-400 hover:text-blue-300"
+                      className="text-sm text-cyan-300 hover:text-cyan-200"
                       type="button"
                       onClick={() => {
                         openForgetPass();
@@ -530,13 +560,10 @@ export default function Header({ onBookClick = () => { }, disableNav = false, to
                       Quên mật khẩu?
                     </Button>
                   </div>
-                  <div className="relative w-full">
-                    <span className="absolute inset-x-0 bottom-0 h-[1px] bg-gray-400"></span>
-                  </div>
                   <div className="flex justify-center mt-4">
                     <Button
                       variant="link"
-                      className="text-sm text-blue-400 hover:text-blue-300 pt-6"
+                      className="text-sm text-cyan-300 hover:text-cyan-200 pt-6"
                       type="button"
                       onClick={() => {
                         openRegister();
@@ -550,10 +577,17 @@ export default function Header({ onBookClick = () => { }, disableNav = false, to
             </Dialog>
           )}
           <Dialog open={isRegisterOpen} onOpenChange={setIsRegisterOpen}>
-            <DialogContent className="bg-gradient-dark border border-white/10">
+            <DialogContent className="bg-gradient-to-br from-[#0b1226] via-[#0e1b3d] to-[#050915] border border-cyan-500/30 text-white shadow-[0_0_50px_rgba(59,130,246,0.3)]">
               <DialogHeader>
-                <DialogTitle className="text-blue-400 text-center">
-                  ĐĂNG KÝ
+                <div className="flex justify-center mb-4">
+                  <img
+                    src={icon}
+                    alt="CINESPHERE"
+                    className="h-20 w-20"
+                  />
+                </div>
+                <DialogTitle className="text-transparent bg-clip-text bg-gradient-to-r from-cyan-300 via-blue-400 to-fuchsia-400 text-center">
+                  Đăng Ký Tài Khoản
                 </DialogTitle>
               </DialogHeader>
               <form className="space-y-4" onSubmit={handleRegisterSubmit}>
@@ -563,6 +597,7 @@ export default function Header({ onBookClick = () => { }, disableNav = false, to
                   </label>
                   <Input
                     type="email"
+                    className="bg-white/10 border-white/20 text-white placeholder:text-gray-400 focus-visible:ring-cyan-400 focus-visible:ring-offset-1 rounded-lg"
                     placeholder="you@email.com"
                     value={registerEmail}
                     onChange={(e) => setRegisterEmail(e.target.value)}
@@ -577,11 +612,13 @@ export default function Header({ onBookClick = () => { }, disableNav = false, to
                   </label>
                   <Input
                     type="text"
+                    className="bg-white/10 border-white/20 text-white placeholder:text-gray-400 focus-visible:ring-cyan-400 focus-visible:ring-offset-1 rounded-lg"
                     placeholder="Họ và tên"
                     value={registerName}
                     maxLength={50}
                     onChange={(e) => setRegisterName(e.target.value)}
                     disabled={isRegisterLoading}
+                    required
                   />
                 </div>
                 <div>
@@ -591,17 +628,19 @@ export default function Header({ onBookClick = () => { }, disableNav = false, to
                   <div className="relative">
                     <Input
                       type={showRegisterPass ? "text" : "password"}
+                      className="bg-white/10 border-white/20 text-white placeholder:text-gray-400 focus-visible:ring-cyan-400 focus-visible:ring-offset-1 rounded-lg pr-10"
                       value={registerPassword}
                       maxLength={50}
                       onChange={(e) => setRegisterPassword(e.target.value)}
                       required
-                      pattern="^(?=.*[A-Za-z])(?=.*\d)[A-Za-z\d]{6,}$"
-                      title="Mật khẩu phải có ít nhất 6 ký tự, bao gồm cả chữ cái và số"
+                      onInput={(e) => setRegisterPassword((e.target as HTMLInputElement).value)}
+                      autoComplete="new-password"
+                      name="new-password"
                       disabled={isRegisterLoading}
                     />
                     <button
                       type="button"
-                      className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-500 hover:text-black"
+                      className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-white"
                       onClick={() => setShowRegisterPass((v) => !v)}
                       aria-label={
                         showRegisterPass ? "Ẩn mật khẩu" : "Hiển thị mật khẩu"
@@ -622,6 +661,7 @@ export default function Header({ onBookClick = () => { }, disableNav = false, to
                   <div className="relative">
                     <Input
                       type={showRegisterConfirmPass ? "text" : "password"}
+                      className="bg-white/10 border-white/20 text-white placeholder:text-gray-400 focus-visible:ring-cyan-400 focus-visible:ring-offset-1 rounded-lg pr-10"
                       placeholder="••••••••"
                       value={registerConfirmPassword}
                       maxLength={50}
@@ -629,13 +669,14 @@ export default function Header({ onBookClick = () => { }, disableNav = false, to
                         setRegisterConfirmPassword(e.target.value)
                       }
                       required
-                      pattern="^(?=.*[A-Za-z])(?=.*\d)[A-Za-z\d]{6,}$"
-                      title="Mật khẩu phải có ít nhất 6 ký tự, bao gồm cả chữ cái và số"
+                      onInput={(e) => setRegisterConfirmPassword((e.target as HTMLInputElement).value)}
+                      autoComplete="new-password"
+                      name="confirm-password"
                       disabled={isRegisterLoading}
                     />
                     <button
                       type="button"
-                      className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-500 hover:text-black"
+                      className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-white"
                       onClick={() => setShowRegisterConfirmPass((v) => !v)}
                       aria-label={
                         showRegisterConfirmPass
@@ -651,10 +692,33 @@ export default function Header({ onBookClick = () => { }, disableNav = false, to
                     </button>
                   </div>
                 </div>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    checked={registerTerms}
+                    onChange={(e) => setRegisterTerms(e.target.checked)}
+                    disabled={isRegisterLoading}
+                    required
+                    className="h-4 w-4"
+                  />
+                  <span className="text-xs text-gray-300 leading-5">
+                    Bằng việc đăng ký tài khoản, tôi đồng ý với Điều khoản dịch vụ và Chính sách bảo vệ của CTBooking.
+                  </span>
+                </div>
                 <Button
                   type="submit"
-                  disabled={isRegisterLoading}
-                  className="w-full bg-gradient-to-r from-blue-500 to-purple-500 hover:from-blue-600 hover:to-purple-600"
+                  disabled={
+                    isRegisterLoading ||
+                    !(
+                      registerEmail &&
+                      registerName &&
+                      registerPassword &&
+                      registerConfirmPassword &&
+                      registerPassword === registerConfirmPassword &&
+                      registerTerms
+                    )
+                  }
+                  className="w-full bg-gradient-to-r from-cyan-400 via-blue-600 to-fuchsia-500 hover:from-fuchsia-500 hover:via-cyan-400 hover:to-blue-600 text-white font-semibold shadow-[0_0_30px_rgba(59,130,246,0.4)] hover:shadow-[0_0_40px_rgba(236,72,153,0.6)]"
                 >
                   {isRegisterLoading ? (
                     <span className="flex items-center justify-center gap-2">
@@ -668,7 +732,7 @@ export default function Header({ onBookClick = () => { }, disableNav = false, to
                 <div className="flex justify-center">
                   <Button
                     variant="link"
-                    className="text-sm text-blue-400 hover:text-blue-300"
+                    className="text-sm text-cyan-300 hover:text-cyan-200"
                     type="button"
                     onClick={() => {
                       openLogin();
@@ -681,9 +745,9 @@ export default function Header({ onBookClick = () => { }, disableNav = false, to
             </DialogContent>
           </Dialog>
           <Dialog open={isForgetPassOpen} onOpenChange={setIsForgetPassOpen}>
-            <DialogContent className="bg-gradient-dark border border-white/10">
+            <DialogContent className="bg-gradient-to-br from-[#0b1226] via-[#0e1b3d] to-[#050915] border border-cyan-500/30 text-white shadow-[0_0_50px_rgba(59,130,246,0.3)]">
               <DialogHeader>
-                <DialogTitle className="text-blue-400 text-center">
+                <DialogTitle className="text-transparent bg-clip-text bg-gradient-to-r from-cyan-300 via-blue-400 to-fuchsia-400 text-center">
                   QUÊN MẬT KHẨU
                 </DialogTitle>
               </DialogHeader>
@@ -694,6 +758,7 @@ export default function Header({ onBookClick = () => { }, disableNav = false, to
                   </label>
                   <Input
                     type="email"
+                    className="bg-white/10 border-white/20 text-white placeholder:text-gray-400 focus-visible:ring-cyan-400 focus-visible:ring-offset-1 rounded-lg"
                     placeholder="you@gmail.com"
                     value={forgetPassEmail}
                     onChange={(e) => setForgetPassEmail(e.target.value)}
@@ -706,7 +771,7 @@ export default function Header({ onBookClick = () => { }, disableNav = false, to
                 <Button
                   type="submit"
                   disabled={isForgetLoading}
-                  className="w-full bg-gradient-to-r from-blue-500 to-purple-500 hover:from-blue-600 hover:to-purple-600"
+                  className="w-full bg-gradient-to-r from-cyan-400 via-blue-600 to-fuchsia-500 hover:from-fuchsia-500 hover:via-cyan-400 hover:to-blue-600 text-white font-semibold shadow-[0_0_30px_rgba(59,130,246,0.4)] hover:shadow-[0_0_40px_rgba(236,72,153,0.6)]"
                 >
                   {isForgetLoading ? (
                     <span className="flex items-center justify-center gap-2">
@@ -720,7 +785,7 @@ export default function Header({ onBookClick = () => { }, disableNav = false, to
                 <div className="flex justify-center">
                   <Button
                     variant="link"
-                    className="text-sm text-blue-400 hover:text-blue-300"
+                    className="text-sm text-cyan-300 hover:text-cyan-200"
                     type="button"
                     onClick={() => {
                       setIsForgetPassOpen(false);

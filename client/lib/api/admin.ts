@@ -126,6 +126,9 @@ export async function getTransactionById(id: number) {
       transaction_id: string;
       created_at: string;
       paid_at: string | null;
+      expiry_date: string | null;
+      expired: boolean;
+      days_left: number | null;
     };
   }>(`/api/admin/transactions/${id}`);
 }

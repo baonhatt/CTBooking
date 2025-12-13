@@ -1,37 +1,57 @@
 import "dotenv/config";
-import { Resend } from 'resend'; // 1. Thay thế nodemailer bằng Resend
+import nodemailer from "nodemailer";
 
-// --- Cấu hình SMTP cũ đã được loại bỏ ---
-// const transporter = nodemailer.createTransport({...}); 
+const GMAIL_HOST = "smtp.gmail.com";
+const GMAIL_PORT = 587;
+const GMAIL_USER = process.env.GMAIL_USER || "";
+const GMAIL_PASS = process.env.GMAIL_PASS || "";
+const GMAIL_SENDER_EMAIL = process.env.GMAIL_SENDER_EMAIL || GMAIL_USER || "no-reply@example.com";
+const GMAIL_SENDER_NAME = process.env.GMAIL_SENDER_NAME || "CTBOOKING";
 
-// 2. Khởi tạo Resend SDK
-// Khóa API sẽ được đọc từ process.env.RESEND_API_KEY
-const resend = new Resend(process.env.RESEND_API_KEY);
+const transporter =
+  GMAIL_USER && GMAIL_PASS
+    ? nodemailer.createTransport({
+        host: GMAIL_HOST,
+        port: GMAIL_PORT,
+        secure: false,
+        auth: { user: GMAIL_USER, pass: GMAIL_PASS },
+      })
+    : null;
 
-// 3. Định nghĩa email người gửi đã được xác minh trên Resend
-// Bắt buộc phải là email đã được Resend chấp thuận
-const SENDER_EMAIL = process.env.RESEND_SENDER_EMAIL || "info@yourdomain.com"; // <-- Cần đặt biến này trong ENV!
+export async function sendMail(toEmail: string, subject: string, html: string) {
+  if (!transporter) {
+    throw new Error("Mail provider is not configured");
+  }
+  const info = await transporter.sendMail({
+    from: `${GMAIL_SENDER_NAME} <${GMAIL_SENDER_EMAIL}>`,
+    to: toEmail,
+    subject,
+    html,
+  });
+  return info;
+}
 
+export function getMailConfig() {
+  return {
+    provider: "gmail",
+    host: GMAIL_HOST,
+    port: GMAIL_PORT,
+    has_user: Boolean(GMAIL_USER),
+    has_pass: Boolean(GMAIL_PASS),
+    sender_email: GMAIL_SENDER_EMAIL,
+    sender_name: GMAIL_SENDER_NAME,
+    configured: Boolean(transporter),
+  };
+}
 
-export async function sendMail(toEmail, subject, text) {
-  // 4. Thay đổi logic gửi mail từ transporter.sendMail sang resend.emails.send
+export async function verifyMailProvider() {
+  if (!transporter) {
+    return { ok: false, message: "Mail provider is not configured" };
+  }
   try {
-    const { data, error } = await resend.emails.send({
-      from: `CTBOOKING <${SENDER_EMAIL}>`, // Sử dụng email đã xác minh
-      to: [toEmail], // Resend nhận mảng email
-      subject: subject,
-      html: text,
-    });
-
-    if (error) {
-      console.error("Resend API Error:", error);
-      throw new Error(error.message);
-    }
-
-    console.log("Email sent successfully via Resend. ID:", data.id);
-    return data;
-  } catch (error) {
-    console.error("Error sending mail (Resend):", error);
-    throw error;
+    await transporter.verify();
+    return { ok: true };
+  } catch (err: any) {
+    return { ok: false, message: err?.message || String(err) };
   }
 }

@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -19,12 +19,14 @@ interface TicketInfo {
   total_price: number;
   created_at: string;
   paid_at: string | null;
+  expiry_date: string | null;
   payment_method: string | null;
   userName: string;
   is_used: boolean;
   valid: boolean;
   can_use: boolean;
   validity_days: number | null;
+  expired: boolean;
 }
 
 export default function TicketCheckContent() {
@@ -33,6 +35,7 @@ export default function TicketCheckContent() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [useLoading, setUseLoading] = useState(false);
+  const [countdown, setCountdown] = useState<string | null>(null);
 
   const handleSearch = async () => {
     if (!code.trim()) {
@@ -77,6 +80,36 @@ export default function TicketCheckContent() {
       handleSearch();
     }
   };
+
+  useEffect(() => {
+    if (!ticketInfo?.expiry_date || !ticketInfo?.valid) {
+      setCountdown(null);
+      return;
+    }
+    let expiry = 0;
+    try {
+      expiry = new Date(ticketInfo.expiry_date as any).getTime();
+    } catch {
+      expiry = 0;
+    }
+    if (!expiry) {
+      setCountdown(null);
+      return;
+    }
+    const update = () => {
+      const now = Date.now();
+      const diff = Math.max(0, expiry - now);
+      const hours = Math.floor(diff / 3600000);
+      const minutes = Math.floor((diff % 3600000) / 60000);
+      const seconds = Math.floor((diff % 60000) / 1000);
+      setCountdown(
+        `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`,
+      );
+    };
+    update();
+    const id = setInterval(update, 1000);
+    return () => clearInterval(id);
+  }, [ticketInfo?.expiry_date, ticketInfo?.valid]);
 
   const getStatusBadge = (status: string) => {
     switch (status?.toLowerCase()) {
@@ -129,9 +162,11 @@ export default function TicketCheckContent() {
 
   const validityLabel = ticketInfo?.valid
     ? "Vé còn hiệu lực"
+    : ticketInfo?.expired
+    ? "Vé đã hết hạn"
     : ticketInfo?.is_used
-      ? "Vé đã sử dụng"
-      : "Vé vô hiệu";
+    ? "Vé đã sử dụng"
+    : "Vé vô hiệu";
 
   return (
     <div className="space-y-6">
@@ -178,19 +213,49 @@ export default function TicketCheckContent() {
       {ticketInfo && (
         <div className="space-y-4">
           {/* Status Banner - moved to top */}
-          <Card className={ticketInfo.is_used ? "border-l-4 border-l-red-600 bg-red-50" : ticketInfo.valid ? "border-l-4 border-l-green-600 bg-green-50" : "border-l-4 border-l-yellow-600 bg-yellow-50"}>
+          <Card
+            className={
+              ticketInfo.expired
+                ? "border-l-4 border-l-red-600 bg-red-50"
+                : ticketInfo.is_used
+                ? "border-l-4 border-l-yellow-600 bg-yellow-50"
+                : ticketInfo.valid
+                ? "border-l-4 border-l-green-600 bg-green-50"
+                : "border-l-4 border-l-yellow-600 bg-yellow-50"
+            }
+          >
             <CardContent className="pt-6">
               <div className="flex items-center gap-3 justify-between">
                 <div className="flex items-center gap-3">
-                  {ticketInfo.is_used ? (
+                  {ticketInfo.expired ? (
                     <AlertCircle className="w-6 h-6 text-red-600" />
+                  ) : ticketInfo.is_used ? (
+                    <Clock className="w-6 h-6 text-yellow-600" />
                   ) : (
                     <CheckCircle className="w-6 h-6 text-green-600" />
                   )}
                   <div>
-                    <p className={ticketInfo.is_used ? "font-semibold text-red-800" : "font-semibold text-green-800"}>Trạng thái vé</p>
-                    <p className={ticketInfo.is_used ? "text-sm text-red-700" : "text-sm text-green-700"}>{validityLabel}</p>
+                    <p className={ticketInfo.expired ? "font-semibold text-red-800" : ticketInfo.is_used ? "font-semibold text-yellow-800" : "font-semibold text-green-800"}>Trạng thái vé</p>
+                    <p className={ticketInfo.expired ? "text-sm text-red-700" : ticketInfo.is_used ? "text-sm text-yellow-700" : "text-sm text-green-700"}>{validityLabel}</p>
                   </div>
+                </div>
+                <div className="text-right">
+                  {ticketInfo.expiry_date ? (
+                    <div className="text-sm">
+                      <p className="text-gray-600">Hết hạn</p>
+                      <p className="font-semibold">{formatDate(ticketInfo.expiry_date)}</p>
+                    </div>
+                  ) : null}
+                  {ticketInfo.valid && ticketInfo.validity_days !== null ? (
+                    <div className="mt-1 text-xs text-gray-700">
+                      Còn {Math.max(0, Number(ticketInfo.validity_days))} ngày
+                    </div>
+                  ) : null}
+                  {ticketInfo.valid && countdown ? (
+                    <div className="mt-1 text-xs text-gray-700">
+                      Đếm ngược {countdown}
+                    </div>
+                  ) : null}
                 </div>
                 {ticketInfo.can_use && !ticketInfo.is_used && (
                   <Button onClick={handleConfirmUse} disabled={useLoading} className="bg-green-600 hover:bg-green-700 text-white">
@@ -256,7 +321,7 @@ export default function TicketCheckContent() {
                   </div>
                 </div>
                 <div className="flex items-center gap-2">
-                  <Badge className={ticketInfo.valid ? "bg-green-600" : ticketInfo.is_used ? "bg-red-600" : "bg-yellow-600"}>{validityLabel}</Badge>
+                  <Badge className={ticketInfo.valid ? "bg-green-600" : ticketInfo.expired ? "bg-red-600" : ticketInfo.is_used ? "bg-yellow-600" : "bg-yellow-600"}>{validityLabel}</Badge>
                 </div>
               </div>
             </CardContent>

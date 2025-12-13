@@ -44,7 +44,7 @@ export async function getUserById(id: number) {
   }>(`/api/users/${id}`);
 }
 
-export async function updateUserProfileApi(body: { email: string; name?: string; phone?: string }) {
+export async function updateUserProfileApi(body: { email: string; name?: string; phone?: string; gender?: string; dob?: string }) {
   return request<{ ok: boolean; user: any }>(`/api/users/profile`, {
     method: "POST",
     body: JSON.stringify(body),

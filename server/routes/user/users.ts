@@ -3,24 +3,25 @@ import { prisma } from "../../lib/prisma";
 
 export const updateUserProfile: RequestHandler = async (req, res) => {
   try {
-    const { email, name, phone } = req.body as { email?: string; name?: string; phone?: string };
+    const { email, name, phone, gender, dob } = req.body as { email?: string; name?: string; phone?: string; gender?: string; dob?: string };
     if (!email) return res.status(400).json({ message: "Thiếu email" });
     const account = await prisma.accounts.findUnique({ where: { email } });
     if (!account) return res.status(404).json({ message: "Không tìm thấy tài khoản" });
+    const dobDate = (() => { try { if (!dob) return undefined; const d = new Date(dob); return isNaN(d.getTime()) ? undefined : d; } catch { return undefined; } })();
+    const normalizedGender = (() => { try { const g = typeof gender === "string" ? gender.trim().toLowerCase() : ""; return g === "male" || g === "female" ? g : undefined; } catch { return undefined; } })();
     const user = await prisma.users.update({
       where: { id: account.user_id },
       data: {
         fullname: typeof name === "string" ? name : undefined,
         phone: typeof phone === "string" ? phone : undefined,
+        gender: normalizedGender,
+        dob: dobDate,
         updated_at: new Date(),
       },
     });
-    return res.status(200).json({ ok: true, user: { id: user.id, fullname: user.fullname, phone: user.phone, email } });
+    return res.status(200).json({ ok: true, user: { id: user.id, fullname: user.fullname, phone: user.phone, gender: user.gender ?? null, dob: user.dob ?? null, email } });
   } catch (err) {
-    try {
-      console.error("listUserTransactions error:", err);
-    } catch { }
-    return res.status(200).json({ items: [] });
+    return res.status(500).json({ message: "Lỗi máy chủ nội bộ" });
   }
 };
 
@@ -92,6 +93,10 @@ export const listUserTransactions: RequestHandler = async (req, res) => {
           try { return Number(b?.total_price ?? 0); } catch { return 0; }
         })();
         const coverImage = movie?.cover_image || null;
+        const now = new Date();
+        const expiryAt = b?.expiry_date ? new Date(b.expiry_date as any) : null;
+        const expired = Boolean(expiryAt && now.getTime() > expiryAt.getTime());
+        const daysLeft = expiryAt ? Math.ceil((expiryAt.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)) : null;
         return {
           booking_id: b.id,
           booking_code: b.booking_code || null,
@@ -104,6 +109,10 @@ export const listUserTransactions: RequestHandler = async (req, res) => {
           payment_status: b?.payment_status || "",
           created_at: b?.created_at || null,
           paid_at: b?.paid_at || null,
+          expiry_date: b?.expiry_date || null,
+          expired,
+          days_left: daysLeft,
+          is_used: !!b?.is_used,
           name: b?.name || "",
           phone: b?.phone || "",
           email: b?.email || email,

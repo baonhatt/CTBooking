@@ -202,6 +202,9 @@ export const updatePayment: RequestHandler = async (req, res) => {
         payment_status,
         transaction_id: transaction_id ?? undefined,
         paid_at: paid_at ? new Date(paid_at) : undefined,
+        expiry_date: paid_at
+          ? new Date(new Date(paid_at).getTime() + 10 * 24 * 60 * 60 * 1000)
+          : undefined,
         booking_code: bookingCode ?? undefined,
       },
     });
@@ -227,6 +230,7 @@ export const updatePayment: RequestHandler = async (req, res) => {
           movieImage: booking.movies?.cover_image || undefined,
           durationMin: booking.movies?.duration_min || undefined,
           ticketPackageName: booking.ticket_packages?.name || undefined,
+          expiryDate: (updatedBooking as any)?.expiry_date || undefined,
         });
 
         console.log(`[Email] Sending to: ${booking.email}`);
@@ -372,10 +376,12 @@ export const getBookingByCode: RequestHandler = async (req, res) => {
 
     const now = new Date();
     const paidAt = booking.paid_at ? new Date(booking.paid_at) : null;
-    const days = paidAt ? Math.floor((now.getTime() - paidAt.getTime()) / (1000 * 60 * 60 * 24)) : null;
+    const expiryAt = booking.expiry_date ? new Date(booking.expiry_date as any) : null;
     const isPaid = (booking.payment_status || '').toLowerCase() === 'paid';
-    const valid = Boolean(isPaid && paidAt && days !== null && days <= 10 && !booking.is_used);
+    const expired = Boolean(expiryAt && now.getTime() > expiryAt.getTime());
+    const valid = Boolean(isPaid && paidAt && expiryAt && !expired && !booking.is_used);
     const can_use = Boolean(valid);
+    const daysLeft = expiryAt ? Math.ceil((expiryAt.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)) : null;
 
     res.status(200).json({
       id: booking.id,
@@ -391,12 +397,14 @@ export const getBookingByCode: RequestHandler = async (req, res) => {
       ticket_package_id: booking.ticket_package_id,
       created_at: booking.created_at,
       paid_at: booking.paid_at,
+      expiry_date: booking.expiry_date,
       payment_method: booking.payment_method,
       userName: booking.user?.fullname || 'N/A',
       is_used: Boolean(booking.is_used),
       valid,
       can_use,
-      validity_days: days,
+      validity_days: daysLeft,
+      expired,
     });
   } catch (err: any) {
     console.error("Error getting booking by code:", err);
@@ -416,8 +424,9 @@ export const confirmUseTicket: RequestHandler = async (req, res) => {
     if (!booking) return res.status(404).json({ message: 'Không tìm thấy vé' });
     const isPaid = (booking.payment_status || '').toLowerCase() === 'paid';
     const paidAt = booking.paid_at ? new Date(booking.paid_at) : null;
-    const days = paidAt ? Math.floor((Date.now() - paidAt.getTime()) / (1000 * 60 * 60 * 24)) : null;
-    const valid = Boolean(isPaid && paidAt && days !== null && days <= 10 && !booking.is_used);
+    const expiryAt = booking.expiry_date ? new Date(booking.expiry_date as any) : null;
+    const expired = Boolean(expiryAt && Date.now() > expiryAt.getTime());
+    const valid = Boolean(isPaid && paidAt && expiryAt && !expired && !booking.is_used);
     if (!valid) {
       return res.status(400).json({ message: 'Vé không còn hiệu lực hoặc đã sử dụng' });
     }
