@@ -8,7 +8,6 @@ import AdminIndex from "@/pages/admin/AdminIndex";
 import DashboardPage from "@/pages/admin/Dashboard";
 import UsersPage from "@/pages/admin/Users";
 import MoviesPage from "@/pages/admin/Movies";
-import ShowtimesPage from "@/pages/admin/Showtimes";
 import ToysPage from "@/pages/admin/Toys";
 import TransactionsPage from "@/pages/admin/Transactions";
 import TicketsPage from "@/pages/admin/Tickets";
@@ -102,7 +101,6 @@ export const AdminGate = () => {
       <Route path="/dashboard" element={<DashboardPage />} />
       <Route path="/users" element={<UsersPage />} />
       <Route path="/movies" element={<MoviesPage />} />
-      <Route path="/showtimes" element={<ShowtimesPage />} />
       <Route path="/toys" element={<ToysPage />} />
       <Route path="/tickets" element={<TicketsPage />} />
       <Route path="/transactions" element={<TransactionsPage />} />

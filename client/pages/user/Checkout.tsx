@@ -82,8 +82,6 @@ export default function Checkout() {
               orderId: `ORDER_${bookingData.id}`,
               movie: "",
               dateDisplay: "",
-              showtime: "",
-              showtimeId: bookingData.showtime_id,
               name: bookingData.name,
               phone: bookingData.phone,
               email: bookingData.email,
@@ -142,8 +140,6 @@ export default function Checkout() {
                 orderId: `ORDER_${bookingData.id}`,
                 movie: "",
                 dateDisplay: "",
-                showtime: "",
-                showtimeId: bookingData.showtime_id,
                 name: bookingData.name,
                 phone: bookingData.phone,
                 email: bookingData.email,
@@ -311,7 +307,7 @@ export default function Checkout() {
       const secretKey = (import.meta as any).env?.VITE_MOMO_SECRET_KEY || "";
       const requestId = Date.now().toString();
       const orderId = order.orderId || `ORDER_${Date.now()}`;
-      const orderInfo = `${order.movie || "Movie"} | ${order.quantity} vé | ${order.showtime || "--:--"}`;
+      const orderInfo = `${order.movie || "Movie"} | ${order.quantity} vé`;
       const extraDataEncoded = btoa(
         unescape(encodeURIComponent(JSON.stringify(order))),
       );
@@ -355,18 +351,30 @@ export default function Checkout() {
     const path = u.startsWith("/") ? u : `/${u}`;
     return `${API_BASE_URL}${path}`;
   };
+  const getGenresText = (g: any) => {
+    try {
+      if (Array.isArray(g)) return g.join(" • ");
+      if (typeof g === "string") {
+        const parsed = JSON.parse(g);
+        if (Array.isArray(parsed)) return parsed.join(" • ");
+        return g;
+      }
+      return "";
+    } catch {
+      return typeof g === "string" ? g : "";
+    }
+  };
 
   return (
     <UserLayout
       className="bg-gradient-dark"
-      headerProps={{ onBookClick: () => { } }}
+      headerProps={{ onBookClick: () => { }, forceDark: true }}
       hideFooter
     >
-      <section className="relative min-h-screen bg-gradient-to-br from-purple-50 via-blue-50 to-cyan-50 overflow-hidden">
-        {/* Background Effects */}
-        <div className="absolute inset-0">
-          <div className="absolute top-0 left-1/4 w-96 h-96 bg-purple-200/30 rounded-full blur-3xl" />
-          <div className="absolute bottom-0 right-1/4 w-96 h-96 bg-blue-200/30 rounded-full blur-3xl" />
+      <section className="relative min-h-screen overflow-hidden">
+        <div className="absolute inset-0 pointer-events-none z-0">
+          <div className="absolute inset-0 bg-[radial-gradient(circle_at_20%_20%,rgba(59,130,246,0.4),transparent_30%),radial-gradient(circle_at_80%_30%,rgba(236,72,153,0.3),transparent_35%),radial-gradient(circle_at_50%_70%,rgba(34,211,238,0.35),transparent_30%)]" />
+          <div className="absolute inset-0 bg-gradient-to-b from-black/40 via-black/20 to-transparent" />
         </div>
 
         <div className="container mx-auto px-4 relative z-10 pt-32 md:pt-40 pb-8">
@@ -382,17 +390,21 @@ export default function Checkout() {
                 initial={{ opacity: 0, scale: 0.95 }}
                 animate={{ opacity: 1, scale: 1 }}
                 transition={{ delay: 0.2, duration: 0.5 }}
-                className="bg-white rounded-2xl shadow-2xl overflow-hidden"
+                className={`backdrop-blur-md text-white rounded-2xl overflow-hidden ${
+                  status === "success"
+                    ? "bg-gradient-to-b from-emerald-700/30 via-emerald-600/20 to-teal-700/20 border border-emerald-400/50 shadow-[0_0_40px_rgba(34,197,94,0.3)]"
+                    : "bg-white/5 border border-white/15 shadow-2xl"
+                }`}
               >
                 {/* Status Badge */}
                 {status === "success" && (
-                  <div className="bg-gradient-to-r from-emerald-500 to-green-500 text-white px-6 py-3 flex items-center justify-center gap-2">
-                    <CheckCircle2 className="h-5 w-5" />
+                  <div className="bg-gradient-to-r from-emerald-500 to-green-600 text-white px-6 py-4 flex items-center justify-center gap-2 shadow-[0_0_24px_rgba(34,197,94,0.35)]">
+                    <CheckCircle2 className="h-6 w-6" />
                     <span className="font-semibold">Thanh toán thành công</span>
                   </div>
                 )}
                 {status === "failed" && (
-                  <div className="bg-gradient-to-r from-red-500 to-rose-500 text-white px-6 py-3 flex items-center justify-center gap-2">
+                  <div className="bg-gradient-to-r from-rose-500 to-red-600 text-white px-6 py-3 flex items-center justify-center gap-2 shadow-[0_0_20px_rgba(244,63,94,0.25)]">
                     <XCircle className="h-5 w-5" />
                     <span className="font-semibold">Thanh toán thất bại</span>
                   </div>
@@ -412,6 +424,9 @@ export default function Checkout() {
                       {order.duration && (
                         <p className="text-white/90 text-xs md:text-sm">Thời lượng: {order.duration} phút</p>
                       )}
+                      {order.genres && (
+                        <p className="text-white/80 text-xs md:text-sm mt-0.5">{getGenresText(order.genres)}</p>
+                      )}
                     </div>
                   </div>
                 )}
@@ -419,14 +434,14 @@ export default function Checkout() {
                 {/* Booking Details */}
                 <div className="p-5 md:p-6 space-y-4">
                   {/* Ticket Info */}
-                  <div className="flex items-center justify-between pb-3 border-b-2 border-dashed border-gray-200">
+                  <div className="flex items-center justify-between pb-3 border-b-2 border-dashed border-white/20">
                     <div>
-                      <p className="text-xs text-gray-500 mb-1">Số lượng vé</p>
-                      <p className="text-lg font-bold text-gray-900">{order.quantity} vé</p>
+                      <p className="text-xs text-white/80 mb-1">Số lượng vé</p>
+                      <p className="text-lg font-bold text-white">{order.quantity} vé</p>
                     </div>
                     <div className="text-right">
-                      <p className="text-xs text-gray-500 mb-1">Tổng tiền</p>
-                      <p className="text-xl font-extrabold bg-gradient-to-r from-purple-600 to-blue-600 bg-clip-text text-transparent">
+                      <p className="text-xs text-white/80 mb-1">Tổng tiền</p>
+                      <p className="text-xl font-extrabold bg-gradient-to-r from-blue-500 to-purple-500 bg-clip-text text-transparent">
                         {formatMoney(order.amount)}₫
                       </p>
                     </div>
@@ -435,27 +450,27 @@ export default function Checkout() {
                   {/* Customer Info */}
                   <div className="space-y-2">
                     <div className="flex items-center justify-between py-1.5">
-                      <span className="text-xs text-gray-600">Họ tên</span>
-                      <span className="font-semibold text-sm text-gray-900">{order.name}</span>
+                      <span className="text-xs text-white/80">Họ tên</span>
+                      <span className="font-semibold text-sm text-white">{order.name}</span>
                     </div>
                     <div className="flex items-center justify-between py-1.5">
-                      <span className="text-xs text-gray-600">Email</span>
-                      <span className="font-semibold text-xs text-gray-900 text-right">{order.email}</span>
+                      <span className="text-xs text-white/80">Email</span>
+                      <span className="font-semibold text-xs text-white text-right">{order.email}</span>
                     </div>
                     {order.phone && (
                       <div className="flex items-center justify-between py-1.5">
-                        <span className="text-xs text-gray-600">Số điện thoại</span>
-                        <span className="font-semibold text-sm text-gray-900">{order.phone}</span>
+                        <span className="text-xs text-white/80">Số điện thoại</span>
+                        <span className="font-semibold text-sm text-white">{order.phone}</span>
                       </div>
                     )}
                   </div>
 
                   {/* Booking Code (if success) */}
                   {status === "success" && bookingCode && (
-                    <div className="pt-4 border-t-2 border-dashed border-gray-200">
-                      <p className="text-xs text-gray-500 mb-2 text-center">Mã đặt vé</p>
-                      <div className="bg-gray-50 rounded-lg p-4 text-center">
-                        <p className="text-2xl font-mono font-bold text-gray-900 tracking-wider mb-3">
+                    <div className="pt-4 border-t-2 border-dashed border-white/20">
+                      <p className="text-xs text-white/80 mb-2 text-center">Mã đặt vé</p>
+                      <div className="bg-black/20 border border-white/20 rounded-lg p-4 text-center">
+                        <p className="text-2xl font-mono font-bold text-white tracking-wider mb-3">
                           {bookingCode}
                         </p>
                         {/* Simple Barcode Representation */}
@@ -463,21 +478,21 @@ export default function Checkout() {
                           {bookingCode.split('').map((char, i) => (
                             <div 
                               key={i}
-                              className="w-0.5 bg-gray-800"
+                              className="w-0.5 bg-white"
                               style={{ height: `${16 + (char.charCodeAt(0) % 25)}px` }}
                             />
                           ))}
                         </div>
-                        <p className="text-xs text-gray-500">Vui lòng lưu mã này để check-in tại rạp</p>
+                        <p className="text-xs text-white/80">Vui lòng lưu mã này để check-in tại rạp</p>
                       </div>
                     </div>
                   )}
 
                   {/* Success Message */}
                   {status === "success" && (
-                    <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 flex items-start gap-2">
-                      <Mail className="h-4 w-4 text-blue-500 flex-shrink-0 mt-0.5" />
-                      <p className="text-xs text-blue-700">
+                    <div className="bg-cyan-500/10 border border-cyan-400/30 rounded-lg p-3 flex items-start gap-2">
+                      <Mail className="h-4 w-4 text-cyan-300 flex-shrink-0 mt-0.5" />
+                      <p className="text-xs text-white/90">
                         <strong>Lưu ý:</strong> Mã đặt vé đã được gửi tới email của bạn. Vui lòng kiểm tra hộp thư.
                       </p>
                     </div>
@@ -485,8 +500,8 @@ export default function Checkout() {
 
                   {/* Failed Message */}
                   {status === "failed" && (
-                    <div className="bg-red-50 border border-red-200 rounded-lg p-3">
-                      <p className="text-xs text-red-700">
+                    <div className="bg-red-500/20 border border-red-500/40 rounded-lg p-3">
+                      <p className="text-xs text-red-200">
                         <strong>Thanh toán không thành công.</strong> Vui lòng thử lại hoặc liên hệ hỗ trợ nếu vấn đề vẫn tiếp tục.
                       </p>
                     </div>
@@ -514,23 +529,23 @@ export default function Checkout() {
 
             {/* Loading State */}
             {!order && (
-              <div className="bg-white rounded-2xl shadow-2xl p-8">
+              <div className="bg-white/5 border border-white/10 text-white rounded-2xl shadow-2xl p-8">
                 <div className="space-y-4">
-                  <div className="h-64 bg-gray-200 rounded-lg animate-pulse"></div>
+                  <div className="h-64 bg-white/10 rounded-lg animate-pulse"></div>
                   <div className="space-y-3">
-                    <div className="h-4 bg-gray-200 rounded animate-pulse w-3/4"></div>
-                    <div className="h-4 bg-gray-200 rounded animate-pulse w-1/2"></div>
+                    <div className="h-4 bg-white/10 rounded animate-pulse w-3/4"></div>
+                    <div className="h-4 bg-white/10 rounded animate-pulse w-1/2"></div>
                   </div>
                 </div>
               </div>
             )}
 
             {!isLoggedIn && (
-              <div className="mt-4 bg-yellow-50 border border-yellow-200 rounded-lg p-4 text-center">
-                <p className="text-sm text-yellow-700">
+              <div className="mt-4 bg-yellow-500/20 border border-yellow-500/40 rounded-lg p-4 text-center">
+                <p className="text-sm text-yellow-200">
                   Vui lòng đăng nhập trước khi thanh toán.{" "}
                   <button
-                    className="font-semibold text-yellow-800 underline hover:text-yellow-900"
+                    className="font-semibold text-yellow-200 underline hover:text-yellow-100"
                     onClick={() => {
                       window.dispatchEvent(new Event("open-login"));
                       navigate("/");

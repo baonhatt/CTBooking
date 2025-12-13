@@ -35,9 +35,10 @@ interface HeaderProps {
   disableNav?: boolean;
   tooltipPrefix?: string;
   extraMenuOptions?: Array<{ label: string; action: () => void }>;
+  forceDark?: boolean;
 }
 
-export default function Header({ onBookClick = () => { }, disableNav = false, tooltipPrefix, extraMenuOptions = [] }: HeaderProps) {
+export default function Header({ onBookClick = () => { }, disableNav = false, tooltipPrefix, extraMenuOptions = [], forceDark = false }: HeaderProps) {
   const auth = useAuth();
   const [isScrolled, setIsScrolled] = useState(false);
   const [userName, setUserName] = useState<string | null>(null);
@@ -264,9 +265,11 @@ export default function Header({ onBookClick = () => { }, disableNav = false, to
     <header
       className={cn(
         "fixed top-0 left-0 right-0 z-50 transition-all duration-300",
-        isScrolled
-          ? "bg-black/50 backdrop-blur-lg border-b border-white/10 shadow-[0_10px_40px_rgba(67,97,238,0.15)]"
-          : "bg-gradient-to-b from-black/50 via-black/30 to-transparent border-b border-white/10",
+        forceDark
+          ? "bg-black/70 backdrop-blur-lg border-b border-white/10 shadow-[0_10px_40px_rgba(67,97,238,0.15)]"
+          : isScrolled
+            ? "bg-black/50 backdrop-blur-lg border-b border-white/10 shadow-[0_10px_40px_rgba(67,97,238,0.15)]"
+            : "bg-gradient-to-b from-black/50 via-black/30 to-transparent border-b border-white/10",
       )}
     >
       <div className="container mx-auto px-4 md:px-6 lg:px-8 py-3 md:py-4 flex items-center gap-4 md:gap-8">

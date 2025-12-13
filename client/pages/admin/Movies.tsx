@@ -194,7 +194,6 @@ export default function MoviesPage() {
         setMoviesLocal={setMoviesLocal}
         setMovieStatus={setMovieStatus}
         setToys={() => { }}
-        setShowtimes={() => { }}
       />
     </AdminLayout>
   );

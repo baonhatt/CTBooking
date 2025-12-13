@@ -26,7 +26,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { getTransactionById } from "@/lib/api";
+import { getTransactionById, getTickets } from "@/lib/api";
 
 interface Tx {
   id: string;
@@ -46,7 +46,6 @@ interface Metrics {
   revenueTotal: number;
   revenueCount: number;
   avgRevenuePerUser: number;
-  totalShowtimes: number;
   totalToys: number;
   totalTransactions: number;
 }
@@ -101,9 +100,11 @@ export default function TransactionsContent({
 }: Props) {
   const [isDetailsOpen, setIsDetailsOpen] = useState(false);
   const [selectedTxId, setSelectedTxId] = useState<number | null>(null);
+  const [selectedTxSummary, setSelectedTxSummary] = useState<Tx | null>(null);
   const [txDetails, setTxDetails] = useState<any>(null);
   const [isLoadingDetails, setIsLoadingDetails] = useState(false);
   const [detailsError, setDetailsError] = useState<string | null>(null);
+  const [allTickets, setAllTickets] = useState<any[]>([]);
   console.log(data);
   useEffect(() => {
     if (isDetailsOpen && selectedTxId) {
@@ -111,6 +112,12 @@ export default function TransactionsContent({
         try {
           setIsLoadingDetails(true);
           setDetailsError(null);
+          if (!allTickets.length) {
+            try {
+              const { items } = await getTickets({ page: 1, pageSize: 200 });
+              setAllTickets(items || []);
+            } catch {}
+          }
           const details = await getTransactionById(selectedTxId);
           setTxDetails(details);
         } catch (err) {
@@ -123,21 +130,33 @@ export default function TransactionsContent({
     }
   }, [isDetailsOpen, selectedTxId]);
 
-  const handleViewDetails = (txId: number) => {
-    setSelectedTxId(txId);
+  const handleViewDetails = (tx: Tx) => {
+    setSelectedTxId(Number(tx.id));
+    setSelectedTxSummary(tx);
     setIsDetailsOpen(true);
   };
+  const unitPrice = (() => {
+    const per = txDetails?.booking_details?.price_per_ticket;
+    if (per !== undefined && per !== null) return Number(per);
+    const total = Number(txDetails?.booking_details?.total_price || 0);
+    const count = Math.max(1, Number(txDetails?.booking_details?.ticket_count || 1));
+    return total && count ? Math.round(total / count) : 0;
+  })();
+  const matchedTicket = allTickets.find((t: any) => {
+    const p = Number(t?.price || 0);
+    return Number.isFinite(p) && Math.round(p) === Math.round(unitPrice || 0);
+  });
   return (
     <div className="space-y-6">
       <Card>
         <CardHeader>
           <div className="flex justify-between items-center">
-            <CardTitle>Lịch sử giao dịch ({transactionsLength})</CardTitle>
+            <CardTitle>Lịch Sử Giao Dịch ({transactionsLength})</CardTitle>
             <button
               onClick={onRefresh}
               className="px-3 py-1 border border-gray-300 rounded text-sm hover:bg-gray-100 transition"
             >
-              ↻ Làm mới
+              ↻ Làm Mới
             </button>
           </div>
         </CardHeader>
@@ -197,7 +216,7 @@ export default function TransactionsContent({
                 setPage(1);
               }}
             >
-              Xóa bộ lọc
+              Xóa Bộ Lọc
             </Button>
           </div>
           <div className="flex items-center gap-3 mb-4">
@@ -209,22 +228,22 @@ export default function TransactionsContent({
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead className="font-bold uppercase">Mã giao dịch</TableHead>
-                <TableHead className="font-bold uppercase">Email</TableHead>
-                <TableHead className="font-bold uppercase">Tên</TableHead>
-                <TableHead className="font-bold uppercase">Phim</TableHead>
-                <TableHead className="font-bold uppercase">Số vé</TableHead>
-                <TableHead className="font-bold uppercase">Số tiền</TableHead>
-                <TableHead className="font-bold uppercase">
-                  Phương thức
+                <TableHead className="font-bold">Mã Giao Dịch</TableHead>
+                <TableHead className="font-bold">Email</TableHead>
+                <TableHead className="font-bold">Tên</TableHead>
+                <TableHead className="font-bold">Phim</TableHead>
+                <TableHead className="font-bold">Số Vé</TableHead>
+                <TableHead className="font-bold">Số Tiền</TableHead>
+                <TableHead className="font-bold">
+                  Phương Thức
                 </TableHead>
-                <TableHead className="font-bold uppercase">
-                  Trạng thái
+                <TableHead className="font-bold">
+                  Trạng Thái
                 </TableHead>
-                <TableHead className="font-bold uppercase">
-                  Ngày giao dịch
+                <TableHead className="font-bold">
+                  Ngày Giao Dịch
                 </TableHead>
-                <TableHead className="font-bold uppercase">Hành động</TableHead>
+                <TableHead className="font-bold">Hành Động</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -276,16 +295,16 @@ export default function TransactionsContent({
                       </Badge>
                     </TableCell>
                     <TableCell>{t.createdAt.toLocaleString("vi-VN")}</TableCell>
-                    <TableCell>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => handleViewDetails(Number(t.id))}
-                      >
-                        Xem
-                      </Button>
-                    </TableCell>
-                  </TableRow>
+                  <TableCell>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleViewDetails(t)}
+                    >
+                      Xem
+                    </Button>
+                  </TableCell>
+                </TableRow>
               ))}
             </TableBody>
           </Table>
@@ -377,61 +396,26 @@ export default function TransactionsContent({
                 </div>
               </div>
 
-              {/* Movie & Showtime Section */}
-              <div className="rounded-lg bg-purple-50 p-4 space-y-3">
-                <h3 className="font-semibold text-purple-900">Thông tin suất chiếu</h3>
-                <div className="flex gap-4">
-                  {txDetails.showtime?.movie?.cover_image && (
-                    <img
-                      src={txDetails.showtime.movie.cover_image}
-                      alt={txDetails.showtime.movie.title || "Movie"}
-                      className="w-20 h-28 object-cover rounded"
-                    />
-                  )}
-                  <div className="flex-1 space-y-2">
-                    <div>
-                      <p className="text-sm text-gray-600">Phim</p>
-                      <p className="font-semibold">{txDetails.showtime?.movie?.title || "N/A"}</p>
-                      {txDetails.showtime?.movie?.genres && (
-                        <p className="text-xs text-gray-500">
-                          {txDetails.showtime?.movie?.genres}
-                        </p>
-                      )}
-                    </div>
-                    <div className="flex gap-2">
-                      {txDetails.showtime?.movie?.rating !== null && txDetails.showtime?.movie?.rating !== undefined ? (
-                        <Badge variant="outline">
-                          ⭐ {Number(txDetails.showtime?.movie?.rating).toFixed(1)}
-                        </Badge>
-                      ) : (
-                        <Badge variant="outline">⭐ N/A</Badge>
-                      )}
-                      <Badge variant="outline">
-                        {txDetails.showtime?.movie?.duration_min || "N/A"}
-                      </Badge>
-                    </div>
-                    <div className="pt-2 border-t space-y-1 text-sm">
-                      <p>
-                        <span className="text-gray-600">Suất chiếu:</span>{" "}
-                        <span className="font-medium">
-                          {txDetails.showtime?.start_time ? new Date(txDetails.showtime.start_time).toLocaleString("vi-VN") : "N/A"}
-                        </span>
-                      </p>
-                      <p>
-                        <span className="text-gray-600">Kết thúc:</span>{" "}
-                        <span className="font-medium">
-                          {txDetails.showtime?.end_time ? new Date(txDetails.showtime.end_time).toLocaleString("vi-VN") : "N/A"}
-                        </span>
-                      </p>
-
-                    </div>
-                  </div>
-                </div>
-              </div>
 
               {/* Booking Details Section */}
               <div className="rounded-lg bg-amber-50 p-4 space-y-3">
                 <h3 className="font-semibold text-amber-900">Chi tiết đặt vé</h3>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <p className="text-sm text-gray-600">Phim đã đặt</p>
+                    <p className="font-medium">{selectedTxSummary?.movieTitle || "N/A"}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-gray-600">Loại vé</p>
+                    <p className="font-medium">
+                      {matchedTicket?.name
+                        ? matchedTicket.name
+                        : unitPrice
+                          ? `${unitPrice.toLocaleString("vi-VN")} đ / vé`
+                          : "N/A"}
+                    </p>
+                  </div>
+                </div>
                 <div className="grid grid-cols-3 gap-3">
                   <div>
                     <p className="text-sm text-gray-600">Số lượng vé</p>

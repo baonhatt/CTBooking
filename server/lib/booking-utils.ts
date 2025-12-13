@@ -38,11 +38,11 @@ export function getBookingEmailTemplate(data: {
   bookingCode: string;
   customerName: string;
   movieTitle: string;
-  showtimeDate: string;
-  showtimeTime: string;
   ticketCount: number;
   totalPrice: string;
   movieImage?: string;
+  durationMin?: number | string;
+  ticketPackageName?: string;
 }): string {
   return `
 <!DOCTYPE html>
@@ -184,7 +184,7 @@ export function getBookingEmailTemplate(data: {
         <div class="content">
             <div class="greeting">
                 Xin chào <strong>${data.customerName}</strong>,<br>
-                Cảm ơn bạn đã đặt vé tại CINESPHERE. Đơn hàng của bạn đã được xác nhận.
+                Cảm ơn bạn đã đặt vé tại CINESPHERE. Vui lòng sử dụng mã đặt vé sau để check-in tại rạp.
             </div>
 
             <div class="booking-code-box">
@@ -200,36 +200,35 @@ export function getBookingEmailTemplate(data: {
             <div class="details-section">
                 <div class="section-title">Thông tin phim</div>
                 <div class="detail-row">
-                    <span class="detail-label">Tên phim: </span>
+                    <span class="detail-label">Tên phim:&nbsp;</span>
                     <span class="detail-value">${data.movieTitle}</span>
                 </div>
-                ${data.showtimeDate && data.showtimeTime ? `
+                ${data.durationMin !== undefined && data.durationMin !== null ? `
                 <div class="detail-row">
-                    <span class="detail-label">Ngày chiếu: </span>
-                    <span class="detail-value">${data.showtimeDate}</span>
-                </div>
-                <div class="detail-row">
-                    <span class="detail-label">Giờ chiếu: </span>
-                    <span class="detail-value">${data.showtimeTime}</span>
-                </div>
-                ` : ''}
+                    <span class="detail-label">Thời lượng:&nbsp;</span>
+                    <span class="detail-value">${data.durationMin} phút</span>
+                </div>` : ``}
             </div>
 
             <div class="details-section">
                 <div class="section-title">Chi tiết đơn hàng</div>
                 <div class="detail-row">
-                    <span class="detail-label">Số lượng vé: </span>
+                    <span class="detail-label">Số lượng vé:&nbsp;</span>
                     <span class="detail-value">${data.ticketCount} vé</span>
                 </div>
+                ${data.ticketPackageName ? `
                 <div class="detail-row">
-                    <span class="detail-label">Tổng tiền: </span>
-                    <span class="detail-value price-highlight">${data.totalPrice}₫</span>
+                    <span class="detail-label">Loại vé:&nbsp;</span>
+                    <span class="detail-value">${data.ticketPackageName}</span>
+                </div>` : ``}
+                <div class="detail-row">
+                    <span class="detail-label">Tổng tiền:&nbsp;</span>
+                    <span class="detail-value">${data.totalPrice}đ</span>
                 </div>
             </div>
 
             <div class="warning">
-                ⏰ <strong>Lưu ý:</strong> ${data.showtimeDate && data.showtimeTime ? 'Vui lòng đến rạp trước 10 phút so với giờ chiếu. ' : ''}
-                Mang theo mã đặt vé hoặc số điện thoại để nhân viên xác nhận.
+                ⏰ <strong>Lưu ý:</strong> Mang theo mã đặt vé để nhân viên xác nhận.
             </div>
         </div>
 

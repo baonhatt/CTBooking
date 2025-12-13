@@ -107,9 +107,9 @@ export default function UsersContent({
                 <TableHead>Tên</TableHead>
                 <TableHead>Email</TableHead>
                 <TableHead>SĐT</TableHead>
-                <TableHead>Trạng thái</TableHead>
-                <TableHead>Ngày tạo</TableHead>
-                <TableHead className="text-right">Hành động</TableHead>
+                <TableHead>Trạng Thái</TableHead>
+                <TableHead>Ngày Tạo</TableHead>
+                <TableHead className="text-right">Hành Động</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -308,8 +308,9 @@ export default function UsersContent({
                             <div className="flex justify-between items-start mb-2">
                               <div>
                                 <p className="font-medium">
-                                  {booking.showtime?.movie?.title ||
-                                    "Phim không xác định"}
+                                  {booking.movies?.title ||
+                                    booking.ticket_packages?.name ||
+                                    "Không xác định"}
                                 </p>
                                 <p className="text-sm text-gray-600">
                                   Số vé: {booking.ticket_count}

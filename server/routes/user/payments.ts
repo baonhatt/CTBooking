@@ -222,11 +222,11 @@ export const updatePayment: RequestHandler = async (req, res) => {
           bookingCode: bookingCode || "",
           customerName: booking.name || "Khách hàng",
           movieTitle: movieTitle,
-          showtimeDate: "",
-          showtimeTime: "",
           ticketCount: booking.ticket_count,
           totalPrice,
           movieImage: booking.movies?.cover_image || undefined,
+          durationMin: booking.movies?.duration_min || undefined,
+          ticketPackageName: booking.ticket_packages?.name || undefined,
         });
 
         console.log(`[Email] Sending to: ${booking.email}`);

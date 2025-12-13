@@ -6,7 +6,6 @@ import {
   LayoutDashboard,
   Users as UsersIcon,
   Clapperboard,
-  CalendarDays,
   Package,
   Ticket as TicketIcon,
   CreditCard,
@@ -20,7 +19,6 @@ interface Props {
   | "users"
   | "movies"
   | "toys"
-  | "showtimes"
   | "transactions"
   | "tickets"
   | "ticket-check";
@@ -53,7 +51,6 @@ export default function AdminLayout({
     { key: "dashboard" as const, label: "Bảng điều khiển", icon: <LayoutDashboard className="h-4 w-4" /> },
     { key: "users" as const, label: "Người dùng", icon: <UsersIcon className="h-4 w-4" /> },
     { key: "movies" as const, label: "Phim", icon: <Clapperboard className="h-4 w-4" /> },
-    { key: "showtimes" as const, label: "Lịch chiếu", icon: <CalendarDays className="h-4 w-4" /> },
     { key: "toys" as const, label: "Đồ chơi", icon: <Package className="h-4 w-4" /> },
     { key: "tickets" as const, label: "Gói vé", icon: <TicketIcon className="h-4 w-4" /> },
     { key: "transactions" as const, label: "Giao dịch", icon: <CreditCard className="h-4 w-4" /> },

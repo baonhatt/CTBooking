@@ -169,41 +169,13 @@ export const updateMovie: RequestHandler = async (req, res) => {
         where: { id },
       });
 
-      if (movie && movie.is_active === true) {
-        // Phim đang hoạt động, check xem có suất chiếu từ hôm nay trở đi không
-        const now = new Date();
-        const todayStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), 0, 0, 0, 0));
-
-        const futureShowtimes = await (prisma as any).showtimes.findFirst({
-          where: {
-            movie_id: id,
-            start_time: {
-              gte: todayStart,
-            },
-          },
-        });
-
-        if (futureShowtimes) {
-          return res.status(400).json({
-            message: "Không thể tạm ẩn phim có suất chiếu từ hôm nay trở đi",
-          });
-        }
-      }
       data.is_active = false;
     } else if (is_active !== undefined) {
       data.is_active = Boolean(is_active);
     }
 
-    // Cho phép sửa release_date khi phim CHƯA có suất chiếu
+    // Cho phép sửa release_date
     if (release_date !== undefined) {
-      const showtimeCount = await (prisma as any).showtimes.count({
-        where: { movie_id: id },
-      });
-      if (showtimeCount > 0) {
-        return res.status(400).json({
-          message: "Không thể sửa đổi ngày phát hành vì phim đã có suất chiếu",
-        });
-      }
       if (release_date === null || release_date === "") {
         data.release_date = null;
       } else {
@@ -220,21 +192,6 @@ export const updateMovie: RequestHandler = async (req, res) => {
     data.updated_at = new Date();
     const movie = await (prisma as any).movies.update({ where: { id }, data });
 
-    // Update end_time for all showtimes of this movie if duration_min changed
-    if (duration_min !== undefined) {
-      const durationMinutes = Number(duration_min);
-      const showtimes = await (prisma as any).showtimes.findMany({
-        where: { movie_id: id },
-      });
-      for (const st of showtimes) {
-        const startDate = new Date(st.start_time);
-        const endDate = new Date(startDate.getTime() + durationMinutes * 60 * 1000);
-        await (prisma as any).showtimes.update({
-          where: { id: st.id },
-          data: { end_time: endDate },
-        });
-      }
-    }
 
     res.status(200).json({ message: "Cập nhật phim thành công", movie });
   } catch (err: any) {
@@ -304,9 +261,7 @@ export const getMovieById: RequestHandler = async (req, res) => {
       release_date: movie.release_date,
       created_at: movie.created_at,
       updated_at: movie.updated_at,
-      hasShowtimes: false, // No showtimes in current logic
       stats: {
-        totalShowtimes: 0, // Not applicable anymore
         totalTicketsSold,
         totalRevenue,
         successfulBookings,

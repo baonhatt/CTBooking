@@ -334,7 +334,7 @@ export default function Account() {
                                       {t.format || t.language || "2D"} • {t.rating || "T"}{t.ageLabel || ""}
                                     </div> */}
                                     <div className="text-sm text-gray-200">
-                                      {t.showtime || "--:--"} - <span className="font-medium">{t.dateDisplay || ""}</span>
+                                      <span className="font-medium">{t.dateDisplay || ""}</span>
                                     </div>
                                     <div className="text-sm text-gray-300">
                                       Số vé: <span className="text-white font-medium">{t.quantity}</span> •
@@ -441,7 +441,7 @@ export default function Account() {
                 <div className="space-y-1">
                   <div className="text-base font-semibold text-white">{selectedTx.movie}</div>
                   {/* <div className="text-sm text-gray-300">{selectedTx.format || selectedTx.language || "2D Phụ Đề"}</div> */}
-                  <div className="text-sm text-gray-300">{selectedTx.showtime} - {selectedTx.dateDisplay}</div>
+                  <div className="text-sm text-gray-300">{selectedTx.dateDisplay}</div>
                 </div>
               </div>
 

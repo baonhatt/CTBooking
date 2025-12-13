@@ -17,7 +17,6 @@ interface TicketInfo {
   email: string;
   ticket_count: number;
   total_price: number;
-  showtime_id: number | null;
   created_at: string;
   paid_at: string | null;
   payment_method: string | null;
@@ -178,6 +177,30 @@ export default function TicketCheckContent() {
       {/* Ticket Details Section */}
       {ticketInfo && (
         <div className="space-y-4">
+          {/* Status Banner - moved to top */}
+          <Card className={ticketInfo.is_used ? "border-l-4 border-l-red-600 bg-red-50" : ticketInfo.valid ? "border-l-4 border-l-green-600 bg-green-50" : "border-l-4 border-l-yellow-600 bg-yellow-50"}>
+            <CardContent className="pt-6">
+              <div className="flex items-center gap-3 justify-between">
+                <div className="flex items-center gap-3">
+                  {ticketInfo.is_used ? (
+                    <AlertCircle className="w-6 h-6 text-red-600" />
+                  ) : (
+                    <CheckCircle className="w-6 h-6 text-green-600" />
+                  )}
+                  <div>
+                    <p className={ticketInfo.is_used ? "font-semibold text-red-800" : "font-semibold text-green-800"}>Trạng thái vé</p>
+                    <p className={ticketInfo.is_used ? "text-sm text-red-700" : "text-sm text-green-700"}>{validityLabel}</p>
+                  </div>
+                </div>
+                {ticketInfo.can_use && !ticketInfo.is_used && (
+                  <Button onClick={handleConfirmUse} disabled={useLoading} className="bg-green-600 hover:bg-green-700 text-white">
+                    {useLoading ? "Đang xác nhận..." : "Xác nhận sử dụng vé"}
+                  </Button>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+
           {/* Booking Code & Status */}
           <Card className="border-l-4 border-l-blue-600">
             <CardContent className="pt-6">
@@ -233,7 +256,7 @@ export default function TicketCheckContent() {
                   </div>
                 </div>
                 <div className="flex items-center gap-2">
-                  <Badge className={ticketInfo.valid ? "bg-green-600" : ticketInfo.is_used ? "bg-gray-600" : "bg-red-600"}>{validityLabel}</Badge>
+                  <Badge className={ticketInfo.valid ? "bg-green-600" : ticketInfo.is_used ? "bg-red-600" : "bg-yellow-600"}>{validityLabel}</Badge>
                 </div>
               </div>
             </CardContent>
@@ -302,25 +325,6 @@ export default function TicketCheckContent() {
             </CardContent>
           </Card>
 
-          {/* Confirmation Section */}
-          <Card className="border-l-4 border-l-green-600 bg-green-50">
-            <CardContent className="pt-6">
-              <div className="flex items-center gap-3 justify-between">
-                <div className="flex items-center gap-3">
-                  <CheckCircle className="w-6 h-6 text-green-600" />
-                  <div>
-                    <p className="font-semibold text-green-800">Trạng thái vé</p>
-                    <p className="text-sm text-green-700">{validityLabel}</p>
-                  </div>
-                </div>
-                {ticketInfo.can_use && (
-                  <Button onClick={handleConfirmUse} disabled={useLoading} className="bg-green-600 hover:bg-green-700 text-white">
-                    {useLoading ? "Đang xác nhận..." : "Xác nhận sử dụng vé"}
-                  </Button>
-                )}
-              </div>
-            </CardContent>
-          </Card>
         </div>
       )}
 

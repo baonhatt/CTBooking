@@ -12,9 +12,7 @@ interface MovieDetail {
   release_date: string | null;
   created_at: string;
   updated_at: string;
-  hasShowtimes: boolean;
   stats: {
-    totalShowtimes: number;
     totalTicketsSold: number;
     totalRevenue: number;
     successfulBookings: number;

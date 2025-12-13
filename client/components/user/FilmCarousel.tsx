@@ -367,10 +367,6 @@ export default function FilmCarousel({ onSelectFilm }: FilmCarouselProps) {
                         </h4>
                         <div className="grid grid-cols-2 gap-3">
                           <div className="p-3 rounded-lg bg-white/5 border border-white/10">
-                            <div className="text-xs text-gray-400 mb-1">Suất chiếu</div>
-                            <div className="text-lg font-bold text-white">{movieDetails.stats.totalShowtimes}</div>
-                          </div>
-                          <div className="p-3 rounded-lg bg-white/5 border border-white/10">
                             <div className="text-xs text-gray-400 mb-1">Vé đã bán</div>
                             <div className="text-lg font-bold text-cyan-300">{movieDetails.stats.totalTicketsSold}</div>
                           </div>

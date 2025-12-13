@@ -166,13 +166,13 @@ export default function MoviesContent({
             <TableHeader>
               <TableRow>
                 <TableHead>ID</TableHead>
-                <TableHead>Tên phim</TableHead>
-                <TableHead>Thể loại</TableHead>
-                <TableHead>Thời lượng(phút)</TableHead>
-                <TableHead>Rating</TableHead>
-                <TableHead>Ngày ra mắt</TableHead>
-                <TableHead>Trạng thái</TableHead>
-                <TableHead className="text-right">Hành động</TableHead>
+                <TableHead>Tên Phim</TableHead>
+                <TableHead>Thể Loại</TableHead>
+                <TableHead>Thời Lượng (Phút)</TableHead>
+                <TableHead>Đánh Giá</TableHead>
+                <TableHead>Ngày Phát Hành</TableHead>
+                <TableHead>Trạng Thái</TableHead>
+                <TableHead className="text-right">Hành Động</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -339,7 +339,7 @@ export default function MoviesContent({
                       </span>
                     </p>
                     <p>
-                      <span className="text-gray-600">Rating:</span>{" "}
+                      <span className="text-gray-600">Đánh giá:</span>{" "}
                       <span className="font-medium">
                         {movieDetails.rating}/10
                       </span>
@@ -348,6 +348,14 @@ export default function MoviesContent({
                       <span className="text-gray-600">Thời lượng(phút):</span>{" "}
                       <span className="font-medium">
                         {movieDetails.duration_min}
+                      </span>
+                    </p>
+                    <p>
+                      <span className="text-gray-600">Ngày phát hành:</span>{" "}
+                      <span className="font-medium">
+                        {movieDetails.release_date
+                          ? formatLocalDateTime(new Date(movieDetails.release_date))
+                          : "N/A"}
                       </span>
                     </p>
                   </div>
@@ -365,23 +373,11 @@ export default function MoviesContent({
               )}
 
               {/* Statistics */}
-              <div className="grid grid-cols-2 gap-4">
-                <div className="bg-blue-50 p-4 rounded-lg border border-blue-200">
-                  <p className="text-sm text-gray-600">Tổng suất chiếu</p>
-                  <p className="text-2xl font-bold text-blue-600">
-                    {movieDetails.stats.totalShowtimes}
-                  </p>
-                </div>
+              <div className="grid grid-cols-1 gap-4">
                 <div className="bg-green-50 p-4 rounded-lg border border-green-200">
                   <p className="text-sm text-gray-600">Tổng vé đã bán</p>
                   <p className="text-2xl font-bold text-green-600">
                     {movieDetails.stats.totalTicketsSold}
-                  </p>
-                </div>
-                <div className="bg-purple-50 p-4 rounded-lg border border-purple-200">
-                  <p className="text-sm text-gray-600">Đơn thanh toán thành công</p>
-                  <p className="text-2xl font-bold text-purple-600">
-                    {movieDetails.stats.successfulBookings}
                   </p>
                 </div>
                 <div className="bg-yellow-50 p-4 rounded-lg border border-yellow-200">

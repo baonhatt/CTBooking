@@ -63,7 +63,6 @@ export async function getBookingByIdApi(bookingId: number) {
     email: string;
     ticket_count: number;
     total_price: number;
-    showtime_id: number | null;
   }>(`/api/bookings/${bookingId}`);
 }
 
@@ -78,7 +77,6 @@ export async function getBookingByCodeApi(code: string) {
     email: string;
     ticket_count: number;
     total_price: number;
-    showtime_id: number | null;
     created_at: string;
     paid_at: string | null;
     payment_method: string | null;

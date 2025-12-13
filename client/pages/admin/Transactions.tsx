@@ -119,7 +119,6 @@ export default function TransactionsPage() {
       revenueTotal,
       revenueCount,
       avgRevenuePerUser: 0,
-      totalShowtimes: 0,
       totalToys: 0,
       totalTransactions,
     }),

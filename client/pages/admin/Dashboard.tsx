@@ -11,15 +11,11 @@ import {
 export default function DashboardPage() {
   const [metrics, setMetrics] = useState({
     totalMovies: 0,
-    totalShowtimes: 0,
     totalToys: 0,
     totalUsers: 0,
     totalTransactions: 0,
     revenueTotal: 0,
     revenueByMethod: { cash: 0, momo: 0, vnpay: 0 },
-    totalShowtimesToday: 0,
-    totalShowtimesFuture: 0,
-    occupancyTodayPercent: 0,
     topMoviesWeek: [],
   });
 
