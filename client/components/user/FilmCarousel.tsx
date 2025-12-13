@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from "react";
+import { useMemo, useState, useCallback, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { motion } from "framer-motion";
@@ -14,21 +14,35 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { movieStore } from "@/store/movieStore";
+import useEmblaCarousel from "embla-carousel-react";
+import type { EmblaCarouselType } from "embla-carousel";
 
 interface FilmCarouselProps {
   onSelectFilm?: () => void;
 }
 
 export default function FilmCarousel({ onSelectFilm }: FilmCarouselProps) {
-  const scrollRef = useRef<HTMLDivElement | null>(null);
   const navigate = useNavigate();
-  const [isDragging, setIsDragging] = useState(false);
-  const [startX, setStartX] = useState(0);
-  const [scrollLeft, setScrollLeft] = useState(0);
   const [selectedMovieId, setSelectedMovieId] = useState<number | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isLoadingDetails, setIsLoadingDetails] = useState(false);
   const [storeUpdateTrigger, setStoreUpdateTrigger] = useState(0);
+  const [canScrollPrev, setCanScrollPrev] = useState(false);
+  const [canScrollNext, setCanScrollNext] = useState(false);
+  
+  // Embla Carousel setup with optimized options for mobile
+  const [emblaRef, emblaApi] = useEmblaCarousel(
+    {
+      align: "start",
+      dragFree: false,
+      containScroll: "trimSnaps",
+      slidesToScroll: 1,
+      breakpoints: {
+        "(min-width: 768px)": { slidesToScroll: 2 },
+      },
+    },
+    []
+  );
 
   const { data } = useQuery({
     queryKey: ["activeMovies", "carousel"],
@@ -82,61 +96,34 @@ export default function FilmCarousel({ onSelectFilm }: FilmCarouselProps) {
     ];
   }, [data]);
 
-  const scroll = (dir: "left" | "right") => {
-    const el = scrollRef.current;
-    if (!el) return;
-    const amount = el.clientWidth * 0.6;
-    el.scrollBy({ left: dir === "left" ? -amount : amount, behavior: "smooth" });
-  };
+  // Update scroll buttons state
+  const onSelect = useCallback((emblaApi: EmblaCarouselType) => {
+    if (!emblaApi) return;
+    setCanScrollPrev(emblaApi.canScrollPrev());
+    setCanScrollNext(emblaApi.canScrollNext());
+  }, []);
 
-  // Drag handlers for swipe functionality
-  const handleMouseDown = (e: React.MouseEvent) => {
-    const el = scrollRef.current;
-    if (!el) return;
-    setIsDragging(true);
-    setStartX(e.pageX - el.offsetLeft);
-    setScrollLeft(el.scrollLeft);
-  };
+  // Setup Embla event listeners
+  useEffect(() => {
+    if (!emblaApi) return;
+    
+    onSelect(emblaApi);
+    emblaApi.on("reInit", onSelect);
+    emblaApi.on("select", onSelect);
+    
+    return () => {
+      emblaApi.off("select", onSelect);
+    };
+  }, [emblaApi, onSelect]);
 
-  const handleMouseMove = (e: React.MouseEvent) => {
-    if (!isDragging) return;
-    e.preventDefault();
-    const el = scrollRef.current;
-    if (!el) return;
-    const x = e.pageX - el.offsetLeft;
-    const walk = (x - startX) * 2;
-    el.scrollLeft = scrollLeft - walk;
-  };
+  // Navigation handlers
+  const scrollPrev = useCallback(() => {
+    emblaApi?.scrollPrev();
+  }, [emblaApi]);
 
-  const handleMouseUp = () => {
-    setIsDragging(false);
-  };
-
-  const handleMouseLeave = () => {
-    setIsDragging(false);
-  };
-
-  // Touch handlers for mobile swipe
-  const handleTouchStart = (e: React.TouchEvent) => {
-    const el = scrollRef.current;
-    if (!el) return;
-    setIsDragging(true);
-    setStartX(e.touches[0].pageX - el.offsetLeft);
-    setScrollLeft(el.scrollLeft);
-  };
-
-  const handleTouchMove = (e: React.TouchEvent) => {
-    if (!isDragging) return;
-    const el = scrollRef.current;
-    if (!el) return;
-    const x = e.touches[0].pageX - el.offsetLeft;
-    const walk = (x - startX) * 2;
-    el.scrollLeft = scrollLeft - walk;
-  };
-
-  const handleTouchEnd = () => {
-    setIsDragging(false);
-  };
+  const scrollNext = useCallback(() => {
+    emblaApi?.scrollNext();
+  }, [emblaApi]);
 
   const handleOpen = async (film: any) => {
     if (typeof film.id === "string" && film.id.startsWith("placeholder")) {
@@ -218,43 +205,38 @@ export default function FilmCarousel({ onSelectFilm }: FilmCarouselProps) {
           <div className="flex items-center gap-3">
             <Button
               variant="ghost"
-              className="rounded-full border border-white/15 text-white hover:border-cyan-300"
-              onClick={() => scroll("left")}
+              className="rounded-full border border-white/15 text-white hover:border-cyan-300 disabled:opacity-50 disabled:cursor-not-allowed"
+              onClick={scrollPrev}
+              disabled={!canScrollPrev}
             >
               <ChevronLeft className="h-5 w-5" />
             </Button>
             <Button
               variant="ghost"
-              className="rounded-full border border-white/15 text-white hover:border-cyan-300"
-              onClick={() => scroll("right")}
+              className="rounded-full border border-white/15 text-white hover:border-cyan-300 disabled:opacity-50 disabled:cursor-not-allowed"
+              onClick={scrollNext}
+              disabled={!canScrollNext}
             >
               <ChevronRight className="h-5 w-5" />
             </Button>
           </div>
         </div>
 
-        <div
-          ref={scrollRef}
-          onMouseDown={handleMouseDown}
-          onMouseMove={handleMouseMove}
-          onMouseUp={handleMouseUp}
-          onMouseLeave={handleMouseLeave}
-          onTouchStart={handleTouchStart}
-          onTouchMove={handleTouchMove}
-          onTouchEnd={handleTouchEnd}
-          className={`flex gap-6 overflow-x-auto pb-4 snap-x snap-mandatory scrollbar-hide ${isDragging ? "cursor-grabbing select-none" : "cursor-grab"}`}
-          style={{ userSelect: isDragging ? "none" : "auto" }}
-        >
+        <div ref={emblaRef} className="overflow-hidden pb-4">
+          <div className="flex gap-6">
           {films.map((film, index) => (
-            <motion.button
+            <motion.div
               key={film.id}
-              onClick={() => handleOpen(film)}
               initial={{ opacity: 0, y: 30 }}
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true }}
               transition={{ delay: index * 0.05, duration: 0.45 }}
-              className="group relative min-w-[240px] md:min-w-[280px] snap-start rounded-3xl overflow-hidden border border-white/10 bg-white/5 backdrop-blur-lg shadow-[0_0_30px_rgba(59,130,246,0.2)] hover:shadow-[0_0_40px_rgba(236,72,153,0.25)] transition-all duration-300 hover:-translate-y-2"
+              className="flex-[0_0_auto] min-w-[240px] md:min-w-[280px]"
             >
+              <motion.button
+                onClick={() => handleOpen(film)}
+                className="group relative w-full rounded-3xl overflow-hidden border border-white/10 bg-white/5 backdrop-blur-lg shadow-[0_0_30px_rgba(59,130,246,0.2)] hover:shadow-[0_0_40px_rgba(236,72,153,0.25)] transition-all duration-300 hover:-translate-y-2"
+              >
               <div className="relative h-80 w-full overflow-hidden">
                 <img
                   src={film.poster}
@@ -276,7 +258,9 @@ export default function FilmCarousel({ onSelectFilm }: FilmCarouselProps) {
                 </div>
               </div>
             </motion.button>
+            </motion.div>
           ))}
+          </div>
         </div>
       </div>
 

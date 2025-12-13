@@ -1,5 +1,5 @@
-import { motion, AnimatePresence } from "framer-motion";
-import { Film, Sparkles, Smartphone, FastForward, Play, ChevronLeft, ChevronRight } from "lucide-react";
+import { motion } from "framer-motion";
+import { Play, ChevronLeft, ChevronRight } from "lucide-react";
 import { useState, useEffect } from "react";
 import { cn } from "@/lib/utils";
 
@@ -13,33 +13,6 @@ const spaceElements = [
   { id: 6, size: "w-24 h-24", position: "top-40 right-8", delay: 2.5, duration: 13 },
   { id: 7, size: "w-20 h-20", position: "top-60 right-12", delay: 0.8, duration: 10 },
   { id: 8, size: "w-32 h-32", position: "top-80 right-6", delay: 1.2, duration: 9 },
-];
-
-const highlights = [
-  {
-    icon: Sparkles,
-    title: "Đắm chìm 360° không giới hạn",
-    description:
-      "Màn hình bao quanh, ánh sáng và chiều sâu tái hiện vũ trụ, đại dương, thành phố tương lai ngay trước mắt.",
-  },
-  {
-    icon: Film,
-    title: "Siêu định dạng 8K + 8K",
-    description:
-      "Khung hình siêu phân giải nổi khối, màu sắc chuẩn điện ảnh – hoàn toàn không cần đeo kính hỗ trợ.",
-  },
-  {
-    icon: FastForward,
-    title: "Xuyên không trong chớp mắt",
-    description:
-      "Chạm nhẹ để đổi bối cảnh tức thì, mượt mà từ rừng nguyên sinh sang dải ngân hà với cảm giác chân thực.",
-  },
-  {
-    icon: Smartphone,
-    title: "Thánh địa check-in nghệ thuật",
-    description:
-      "Mỗi góc đều là khung phim điện ảnh, sẵn sàng cho vlog, TikTok triệu view và bộ ảnh ảo diệu của bạn.",
-  },
 ];
 
 // Video previews - có thể thay đổi URL video tại đây
@@ -347,36 +320,6 @@ export default function TechnologyBanner() {
               </div>
             </div>
 
-            {/* Feature Cards */}
-            <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
-              {highlights.map((item, index) => {
-                const Icon = item.icon;
-                return (
-                  <motion.div
-                    key={item.title}
-                    initial={{ opacity: 0, y: 20 }}
-                    whileInView={{ opacity: 1, y: 0 }}
-                    viewport={{ once: true }}
-                    transition={{ duration: 0.3, delay: index * 0.05 }}
-                    className="p-5 rounded-xl border border-white/10 bg-white/5 backdrop-blur-md hover:border-cyan-300/50 transition-all duration-300 hover:shadow-lg hover:shadow-cyan-500/20"
-                  >
-                    <div className="flex flex-col items-center text-center gap-3">
-                      <div className="w-12 h-12 rounded-full bg-cyan-500/15 flex items-center justify-center border border-cyan-300/30">
-                        <Icon className="h-6 w-6 text-cyan-200" />
-                      </div>
-                      <div>
-                        <p className="text-white font-semibold text-sm mb-2">
-                          {item.title}
-                        </p>
-                        <p className="text-xs text-gray-300 leading-relaxed">
-                          {item.description}
-                        </p>
-                      </div>
-                    </div>
-                  </motion.div>
-                );
-              })}
-            </div>
           </div>
         </motion.div>
 
@@ -421,7 +364,7 @@ export default function TechnologyBanner() {
                       initial={{ opacity: 0, scale: 0.9 }}
                       animate={{ opacity: 1, scale: 1 }}
                       transition={{ duration: 0.3 }}
-                      className="relative aspect-[3/4] min-h-[400px] rounded-2xl overflow-hidden border border-white/10 bg-white/5 group cursor-pointer"
+                      className="relative w-full aspect-[3/4] max-h-[500px] sm:max-h-[600px] rounded-2xl overflow-hidden border border-white/10 bg-white/5 group cursor-pointer"
                     >
                       {playingVideo === `preview-${index}` ? (
                         <iframe
