@@ -97,9 +97,9 @@ export default function TicketsContent(props: Props) {
                 <TableHead>Tên</TableHead>
                 <TableHead>Loại</TableHead>
                 <TableHead>Giá</TableHead>
-                <TableHead>Thứ tự</TableHead>
-                <TableHead>Trạng thái</TableHead>
-                <TableHead className="text-right">Hành động</TableHead>
+                <TableHead>Thứ Tự</TableHead>
+                <TableHead>Trạng Thái</TableHead>
+                <TableHead className="text-right">Hành Động</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>

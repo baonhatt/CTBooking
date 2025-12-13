@@ -27,7 +27,6 @@ export const getAllActiveMoviesToday: RequestHandler = async (_req, res) => {
       duration_min: m.duration_min ?? 0,
       release_date: m.release_date,
       price: 0, // Not used anymore but kept for backward compatibility
-      showtimes: [], // Empty array - no showtimes returned
     }));
 
     return res.status(200).json({ activeMovies });

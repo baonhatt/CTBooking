@@ -40,13 +40,6 @@ export interface MoviesResponse {
   items: Movie[];
 }
 
-export interface ShowtimeResponse {
-  id: number;
-  start_time: Date;
-  total_sold: number;
-  price: number;
-}
-
 export interface ActiveMoviesTodayResponse {
   id: number;
   title: string;
@@ -58,7 +51,6 @@ export interface ActiveMoviesTodayResponse {
   duration_min: number;
   price: number;
   release_date: Date;
-  showtimes: ShowtimeResponse[];
 }
 
 export interface PaymentRequest {

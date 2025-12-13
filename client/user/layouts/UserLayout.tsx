@@ -21,7 +21,7 @@ export default function UserLayout({
   contentClassName,
 }: UserLayoutProps) {
   return (
-    <div className={cn("min-h-screen bg-background", className)}>
+    <div className={cn("min-h-screen bg-gradient-dark", className)}>
       <Header {...headerProps} />
       <div className={contentClassName}>{children}</div>
       {!hideFooter && <Footer />}

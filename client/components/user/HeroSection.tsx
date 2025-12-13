@@ -48,7 +48,7 @@ export default function HeroSection() {
   // Auto-rotate posters every 5 seconds
   useEffect(() => {
     if (moviePosters.length <= 1) return;
-    
+
     const interval = setInterval(() => {
       setCurrentPosterIndex((prev) => (prev + 1) % moviePosters.length);
     }, 5000);
@@ -137,7 +137,7 @@ export default function HeroSection() {
           poster: movie.cover_image,
         }));
       }
-    } catch {}
+    } catch { }
     setIsModalOpen(false);
     navigate("/booking");
   };
@@ -166,7 +166,7 @@ export default function HeroSection() {
             />
           </motion.div>
         </AnimatePresence>
-        
+
         {/* Gradient overlays */}
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_20%_20%,rgba(59,130,246,0.4),transparent_30%),radial-gradient(circle_at_80%_30%,rgba(236,72,153,0.3),transparent_35%),radial-gradient(circle_at_50%_70%,rgba(34,211,238,0.35),transparent_30%)]" />
         <div className="absolute inset-0 bg-gradient-to-b from-black/80 via-black/50 to-[#050915]/95" />
@@ -193,7 +193,7 @@ export default function HeroSection() {
             transition={{ duration: 0.8, ease: "easeOut" }}
             className="max-w-3xl space-y-6"
           >
-           
+
 
             <motion.h1
               initial={{ opacity: 0, y: 20 }}
@@ -300,7 +300,7 @@ export default function HeroSection() {
                 {/* Video overlay gradient */}
                 <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-80" />
                 <div className="absolute inset-0 bg-gradient-to-b from-transparent via-transparent to-black/40" />
-                
+
                 {/* Play/Pause button overlay */}
                 <button
                   onClick={toggleVideoPlayback}
@@ -309,9 +309,9 @@ export default function HeroSection() {
                 >
                   <motion.div
                     initial={{ scale: 0.8, opacity: 0 }}
-                    animate={{ 
-                      scale: isVideoPlaying ? 0 : 1, 
-                      opacity: isVideoPlaying ? 0 : 1 
+                    animate={{
+                      scale: isVideoPlaying ? 0 : 1,
+                      opacity: isVideoPlaying ? 0 : 1
                     }}
                     transition={{ duration: 0.2 }}
                     className="w-20 h-20 rounded-full bg-white/20 backdrop-blur-md flex items-center justify-center border-2 border-white/30 shadow-xl group-hover/play:scale-110 transition-transform"
@@ -358,11 +358,10 @@ export default function HeroSection() {
                       setCurrentPosterIndex(index);
                       handlePosterClick(index);
                     }}
-                    className={`h-2 rounded-full transition-all duration-300 cursor-pointer ${
-                      index === currentPosterIndex
-                        ? "w-8 bg-cyan-400 shadow-[0_0_10px_rgba(34,211,238,0.8)]"
-                        : "w-2 bg-white/30 hover:bg-white/50"
-                    }`}
+                    className={`h-2 rounded-full transition-all duration-300 cursor-pointer ${index === currentPosterIndex
+                      ? "w-8 bg-cyan-400 shadow-[0_0_10px_rgba(34,211,238,0.8)]"
+                      : "w-2 bg-white/30 hover:bg-white/50"
+                      }`}
                     aria-label={`Go to poster ${index + 1}`}
                   />
                 ))}
@@ -395,8 +394,8 @@ export default function HeroSection() {
                         const genres = Array.isArray(movieDetails.genres)
                           ? movieDetails.genres
                           : typeof movieDetails.genres === "string"
-                          ? JSON.parse(movieDetails.genres)
-                          : [];
+                            ? JSON.parse(movieDetails.genres)
+                            : [];
                         return Array.isArray(genres) && genres.length > 0 ? genres.join(" • ") : "Chưa phân loại";
                       } catch {
                         return "Chưa phân loại";
@@ -465,10 +464,6 @@ export default function HeroSection() {
                           Thống kê
                         </h4>
                         <div className="grid grid-cols-2 gap-3">
-                          <div className="p-3 rounded-lg bg-white/5 border border-white/10">
-                            <div className="text-xs text-gray-400 mb-1">Suất chiếu</div>
-                            <div className="text-lg font-bold text-white">{movieDetails.stats.totalShowtimes}</div>
-                          </div>
                           <div className="p-3 rounded-lg bg-white/5 border border-white/10">
                             <div className="text-xs text-gray-400 mb-1">Vé đã bán</div>
                             <div className="text-lg font-bold text-cyan-300">{movieDetails.stats.totalTicketsSold}</div>

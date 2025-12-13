@@ -96,11 +96,11 @@ export default function ToysContent({
               <TableRow>
                 <TableHead>ID</TableHead>
                 <TableHead>Tên</TableHead>
-                <TableHead>Danh mục</TableHead>
+                <TableHead>Danh Mục</TableHead>
                 <TableHead>Giá</TableHead>
-                <TableHead>Tồn kho</TableHead>
-                <TableHead>Trạng thái</TableHead>
-                <TableHead className="text-right">Hành động</TableHead>
+                <TableHead>Tồn Kho</TableHead>
+                <TableHead>Trạng Thái</TableHead>
+                <TableHead className="text-right">Hành Động</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>

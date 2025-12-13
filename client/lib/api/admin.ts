@@ -60,15 +60,11 @@ export async function getTransactions(options?: {
 export async function getDashboardMetrics() {
   return request<{
     totalMovies: number;
-    totalShowtimes: number;
     totalToys: number;
     totalUsers: number;
     totalTransactions: number;
     revenueTotal: number;
     revenueByMethod: { cash: number; momo: number; vnpay: number };
-    totalShowtimesToday: number;
-    totalShowtimesFuture: number;
-    occupancyTodayPercent: number;
     topMoviesWeek: Array<{ id: number; title: string; revenue: number }>;
   }>("/api/admin/dashboard/metrics");
 }
@@ -118,20 +114,6 @@ export async function getTransactionById(id: number) {
       phone: string | null;
       is_active: boolean;
       account_created_at: string;
-    };
-    showtime: {
-      id: number;
-      start_time: string;
-      end_time: string | null;
-      price: number;
-      movie: {
-        id: number;
-        title: string;
-        cover_image: string | null;
-        genres: any[];
-        rating: number;
-        duration_min: number;
-      };
     };
     booking_details: {
       ticket_count: number;

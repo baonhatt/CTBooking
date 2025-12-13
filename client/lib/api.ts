@@ -5,6 +5,5 @@ export * from "./api/booking";
 export * from "./api/payments";
 export * from "./api/tickets";
 export * from "./api/toys";
-export * from "./api/showtimes";
 export * from "./api/admin";
 export * from "./api/users";

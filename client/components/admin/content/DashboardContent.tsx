@@ -5,15 +5,11 @@ import { Skeleton } from "@/components/ui/skeleton";
 
 interface Metrics {
   totalMovies: number;
-  totalShowtimes: number;
   totalToys: number;
   totalUsers: number;
   totalTransactions: number;
   revenueTotal: number;
   revenueByMethod: { cash: number; momo: number; vnpay: number };
-  totalShowtimesToday: number;
-  totalShowtimesFuture: number;
-  occupancyTodayPercent: number;
   topMoviesWeek: Array<{ id: number; title: string; revenue: number }>;
 }
 
@@ -107,7 +103,7 @@ export default function DashboardContent({
   return (
     <div className="space-y-6">
       {/* Top Metrics */}
-      <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <Card>
           <CardHeader>
             <CardTitle className="text-sm">Phim</CardTitle>
@@ -115,18 +111,6 @@ export default function DashboardContent({
           <CardContent>
             {isLoading ? <Skeleton className="h-8 w-20" /> : (
               <div className="text-2xl font-semibold">{metrics.totalMovies}</div>
-            )}
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-sm">Lịch chiếu</CardTitle>
-          </CardHeader>
-          <CardContent>
-            {isLoading ? <Skeleton className="h-8 w-20" /> : (
-              <div className="text-2xl font-semibold">
-                {metrics.totalShowtimes}
-              </div>
             )}
           </CardContent>
         </Card>
@@ -159,40 +143,6 @@ export default function DashboardContent({
               <div className="text-2xl font-semibold">
                 {metrics.totalTransactions}
               </div>
-            )}
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Showtimes Breakdown */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-sm">Suất chiếu hôm nay (active)</CardTitle>
-          </CardHeader>
-          <CardContent>
-            {isLoading ? <Skeleton className="h-8 w-20" /> : (
-              <div className="text-2xl font-semibold">{metrics.totalShowtimesToday}</div>
-            )}
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-sm">Suất chiếu tương lai (active)</CardTitle>
-          </CardHeader>
-          <CardContent>
-            {isLoading ? <Skeleton className="h-8 w-20" /> : (
-              <div className="text-2xl font-semibold">{metrics.totalShowtimesFuture}</div>
-            )}
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-sm">Tỉ lệ lấp đầy hôm nay</CardTitle>
-          </CardHeader>
-          <CardContent>
-            {isLoading ? <Skeleton className="h-8 w-24" /> : (
-              <div className="text-2xl font-semibold">{metrics.occupancyTodayPercent}%</div>
             )}
           </CardContent>
         </Card>

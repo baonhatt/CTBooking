@@ -138,7 +138,7 @@ export default function BookingPage() {
         emailBook: email,
         phone,
         name,
-        movieId: undefined,
+        movieId: selectedMovie?.id,
         ticketCount,
         ticketPackageId,
       });
@@ -172,7 +172,7 @@ export default function BookingPage() {
         emailBook: email,
         phone,
         name,
-        movieId: undefined,
+        movieId: selectedMovie?.id,
         ticketCount,
         paymentMethod,
         totalPrice: canonicalTotal,
@@ -216,19 +216,25 @@ export default function BookingPage() {
 
   return (
     <UserLayout
-      className="bg-gradient-dark"
+      className="bg-gradient-to-br from-[#050915] via-[#0b1226] to-[#0e1b3d]"
       headerProps={{ onBookClick: () => { }, disableNav: true }}
       hideFooter
       contentClassName="text-white"
     >
-      <div className="max-w-5xl mx-auto p-4 pt-28">
+      <div className="relative min-h-screen">
+        {/* Gradient overlays similar to home page */}
+        <div className="absolute inset-0 pointer-events-none z-0">
+          <div className="absolute inset-0 bg-[radial-gradient(circle_at_20%_20%,rgba(59,130,246,0.4),transparent_30%),radial-gradient(circle_at_80%_30%,rgba(236,72,153,0.3),transparent_35%),radial-gradient(circle_at_50%_70%,rgba(34,211,238,0.35),transparent_30%)]" />
+          <div className="absolute inset-0 bg-gradient-to-b from-black/40 via-black/20 to-transparent" />
+        </div>
+        <div className="relative z-10 max-w-5xl mx-auto p-4 pt-28">
         <div className="mb-4 text-sm py-3">
           <button className="text-blue-300 hover:text-blue-400 underline" onClick={() => navigate("/")}>Home</button>
           <span className="mx-2 text-white/60">&gt;</span>
           <span className="text-white">Đặt vé</span>
         </div>
         {isLoadingPage && (
-          <Card className="bg-black/40 border border-white/10 text-white">
+          <Card className="bg-white/5 backdrop-blur-md border border-white/15 text-white shadow-xl">
             <CardHeader>
               <CardTitle>Đang tải dữ liệu đặt vé</CardTitle>
             </CardHeader>
@@ -240,7 +246,7 @@ export default function BookingPage() {
         )}
 
         {!isLoadingPage && step === 0 && (
-          <Card className="bg-black/40 border border-white/10 text-white">
+          <Card className="bg-white/5 backdrop-blur-md border border-white/15 text-white shadow-xl">
             <CardHeader>
               <CardTitle>Đặt vé</CardTitle>
             </CardHeader>
@@ -248,10 +254,10 @@ export default function BookingPage() {
               <div className="space-y-4">
                 <div className="text-sm text-orange-400">Chọn phim</div>
                 <Select value={movie} onValueChange={(v) => { setMovie(v); try { refetchActive(); } catch { } }}>
-                  <SelectTrigger className="w-full bg-black/40 text-white border-white/10">
+                  <SelectTrigger className="w-full bg-white/10 backdrop-blur-sm text-white border-white/20 hover:bg-white/15">
                     <span className="truncate">{selectedMovie?.title || "Chọn phim"}</span>
                   </SelectTrigger>
-                  <SelectContent className="bg-black/90 text-white border border-white/10">
+                  <SelectContent className="bg-[#0b1226]/95 backdrop-blur-md text-white border border-white/20">
                     {(activeMoviesFull || []).map((m: any) => (
                       <SelectItem className="text-white py-2" key={m.id ?? m.title} value={m.title}>
                         <div className="flex items-center gap-3">
@@ -266,7 +272,7 @@ export default function BookingPage() {
                   </SelectContent>
                 </Select>
                 {selectedMovie && (
-                  <div className="mt-3 flex items-center gap-4 p-3 rounded-lg border border-white/10 bg-black/30">
+                  <div className="mt-3 flex items-center gap-4 p-3 rounded-lg border border-white/15 bg-white/5 backdrop-blur-sm">
                     <img src={resolveImageUrl(selectedMovie.cover_image)} alt={selectedMovie.title} className="w-20 h-28 object-cover rounded" />
                     <div className="flex-1">
                       <div className="text-white font-semibold mb-1">{selectedMovie.title}</div>
@@ -284,12 +290,12 @@ export default function BookingPage() {
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                   <div>
                     <Label className="text-white">Họ và Tên</Label>
-                    <Input className="bg-black/40 text-white border-white/10 focus-visible:ring-cyan-400" value={name} onChange={(e) => setName(e.target.value)} placeholder="Nhập họ và tên" minLength={2} />
+                    <Input className="bg-white/10 backdrop-blur-sm text-white border-white/20 focus-visible:ring-cyan-400 hover:bg-white/15" value={name} onChange={(e) => setName(e.target.value)} placeholder="Nhập họ và tên" minLength={2} />
                   </div>
                   <div>
                     <Label className="text-white">Số điện thoại</Label>
                     <Input
-                      className="bg-black/40 text-white border-white/10 focus-visible:ring-cyan-400"
+                      className="bg-white/10 backdrop-blur-sm text-white border-white/20 focus-visible:ring-cyan-400 hover:bg-white/15"
                       value={phone}
                       inputMode="numeric"
                       placeholder="VD: 0912345678"
@@ -317,7 +323,7 @@ export default function BookingPage() {
                   </div>
                   <div>
                     <Label className="text-white">Email nhận vé</Label>
-                    <Input className="bg-black/40 text-white border-white/10 focus-visible:ring-cyan-400" value={email} onChange={(e) => setEmail(e.target.value)} type="email" placeholder="you@email.com" />
+                    <Input className="bg-white/10 backdrop-blur-sm text-white border-white/20 focus-visible:ring-cyan-400 hover:bg-white/15" value={email} onChange={(e) => setEmail(e.target.value)} type="email" placeholder="you@email.com" />
                   </div>
                   <div>
                     <Label className="text-white">Số lượng vé</Label>
@@ -330,7 +336,7 @@ export default function BookingPage() {
                       >
                         -
                       </Button>
-                      <div className="min-w-[3rem] text-center py-2 bg-black/40 border border-white/10 rounded text-white">
+                      <div className="min-w-[3rem] text-center py-2 bg-white/10 backdrop-blur-sm border border-white/20 rounded text-white">
                         {ticketCount}
                       </div>
                       <Button
@@ -347,7 +353,7 @@ export default function BookingPage() {
               </div>
 
               {(selectedPackage || defaultTicket) && (
-                <div className="bg-black/40 rounded-lg p-3 border border-white/10">
+                <div className="bg-white/5 backdrop-blur-sm rounded-lg p-3 border border-white/15">
                   <div className="text-sm text-orange-400">Loại vé đã chọn</div>
                   <div className="flex justify-between items-center">
                     <span className="text-white font-medium">{selectedPackage?.name || defaultTicket?.name || "Vé tiêu chuẩn"}</span>
@@ -366,7 +372,7 @@ export default function BookingPage() {
 
         {step === 1 && (
           <>
-            <Card className="bg-black/40 border border-white/10 text-white">
+            <Card className="bg-white/5 backdrop-blur-md border border-white/15 text-white shadow-xl">
               <CardHeader>
                 <CardTitle>Thông tin đặt vé</CardTitle>
               </CardHeader>
@@ -381,7 +387,7 @@ export default function BookingPage() {
                   </div>
                   <div className="text-xs sm:text-sm text-yellow-300 mt-1">Vui lòng kiểm tra kỹ email, mã đặt vé sẽ gửi tới email này.</div>
                   {selectedMovie?.cover_image && (
-                    <div className="mt-2 flex items-center gap-3 p-3 rounded-lg border border-white/10 bg-black/30">
+                    <div className="mt-2 flex items-center gap-3 p-3 rounded-lg border border-white/15 bg-white/5 backdrop-blur-sm">
                       <img src={resolveImageUrl(selectedMovie.cover_image)} alt={selectedMovie.title} className="w-16 h-24 object-cover rounded" />
                       <div className="flex-1">
                         <div className="text-white font-semibold text-sm mb-1">{selectedMovie.title}</div>
@@ -397,7 +403,7 @@ export default function BookingPage() {
                     <button
                       type="button"
                       onClick={() => setPaymentMethod("momo")}
-                      className={`${paymentMethod === 'momo' ? 'border-pink-500 bg-pink-600/20' : 'border-white/10 bg-black/20'} cursor-pointer rounded-lg border p-3 flex items-center gap-3 focus:outline-none focus:ring-2 focus:ring-pink-500`}
+                      className={`${paymentMethod === 'momo' ? 'border-pink-500 bg-pink-600/20' : 'border-white/20 bg-white/10 backdrop-blur-sm'} cursor-pointer rounded-lg border p-3 flex items-center gap-3 focus:outline-none focus:ring-2 focus:ring-pink-500 hover:bg-white/15`}
                       aria-pressed={paymentMethod === 'momo'}
                     >
                       <span className="inline-flex items-center gap-2 text-white">
@@ -408,7 +414,7 @@ export default function BookingPage() {
                     <button
                       type="button"
                       onClick={() => setPaymentMethod("vnpay")}
-                      className={`${paymentMethod === 'vnpay' ? 'border-blue-500 bg-blue-600/20' : 'border-white/10 bg-black/20'} cursor-pointer rounded-lg border p-3 flex items-center gap-3 focus:outline-none focus:ring-2 focus:ring-blue-500`}
+                      className={`${paymentMethod === 'vnpay' ? 'border-blue-500 bg-blue-600/20' : 'border-white/20 bg-white/10 backdrop-blur-sm'} cursor-pointer rounded-lg border p-3 flex items-center gap-3 focus:outline-none focus:ring-2 focus:ring-blue-500 hover:bg-white/15`}
                       aria-pressed={paymentMethod === 'vnpay'}
                     >
                       <span className="inline-flex items-center gap-2 text-white">
@@ -417,7 +423,7 @@ export default function BookingPage() {
                       </span>
                     </button>
                   </div>
-                  <div className="bg-black/40 rounded-lg p-4 border border-white/10">
+                  <div className="bg-white/5 backdrop-blur-sm rounded-lg p-4 border border-white/15">
                     <div className="text-white font-semibold mb-2">Booking Summary</div>
                     <div className="space-y-2 text-sm">
                       <div className="flex justify-between"><span className="text-orange-400">Loại vé</span><span className="text-white font-medium">{selectedPackage?.name || defaultTicket?.name || 'Vé tiêu chuẩn'}</span></div>
@@ -437,6 +443,7 @@ export default function BookingPage() {
             </div>
           </>
         )}
+        </div>
       </div>
       {isProcessing && (
         <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex flex-col items-center justify-center text-white">
