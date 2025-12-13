@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import HeroSection from "@/components/user/HeroSection";
 import FilmCarousel from "@/components/user/FilmCarousel";
 import PromotionShowcase from "@/components/user/PromotionShowcase";
@@ -9,13 +9,45 @@ import { ConfigProvider } from "antd";
 import { motion } from "framer-motion";
 import { ArrowUp } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import { Select, SelectTrigger, SelectContent, SelectItem } from "@/components/ui/select";
+import { Label } from "@/components/ui/label";
+import { useQuery } from "@tanstack/react-query";
+import { getAllActiveMoviesToday, getActiveTickets } from "@/lib/api";
+import { toast } from "@/components/ui/use-toast";
 
 export default function Index() {
   const navigate = useNavigate();
   const [showBackToTop, setShowBackToTop] = useState(false);
+  const [isBookingModalOpen, setIsBookingModalOpen] = useState(false);
+  const [movie, setMovie] = useState<string>("");
+  const [selectedPackage, setSelectedPackage] = useState<any | null>(null);
+  const [ticketCount, setTicketCount] = useState<number>(1);
+
+  const { data: activeData } = useQuery({
+    queryKey: ["activeMovies", "home-modal"],
+    queryFn: () => getAllActiveMoviesToday(),
+    staleTime: 60000,
+  });
+  const { data: ticketsData } = useQuery({
+    queryKey: ["activeTickets", "home-modal"],
+    queryFn: ({ signal }) => getActiveTickets({ signal }),
+  });
+
+  const activeMoviesFull = activeData?.activeMovies || [];
+  const movies = useMemo(() => (activeMoviesFull || []).map((m: any) => ({ id: m.title, title: m.title })), [activeMoviesFull]);
+  const ticketPackages = useMemo(() => (ticketsData?.items || []).map((t: any) => ({
+    id: t.id,
+    name: t.name,
+    description: t.description || "",
+    price: Number(t.price || 0),
+    type: t.type || "",
+    display_order: t.display_order || 0,
+  })), [ticketsData]);
 
   const handleBookClick = () => {
-    navigate("/booking");
+    setIsBookingModalOpen(true);
   };
 
   useEffect(() => {
@@ -24,6 +56,18 @@ export default function Index() {
     onScroll();
     return () => window.removeEventListener("scroll", onScroll);
   }, []);
+
+  useEffect(() => {
+    try {
+      if (!movie && Array.isArray(activeMoviesFull) && activeMoviesFull.length > 0) {
+        setMovie(activeMoviesFull[0].title);
+      }
+      if (!selectedPackage && Array.isArray(ticketPackages) && ticketPackages.length > 0) {
+        const sorted = [...ticketPackages].sort((a, b) => (a.display_order ?? 0) - (b.display_order ?? 0));
+        setSelectedPackage(sorted[0] || null);
+      }
+    } catch { }
+  }, [activeMoviesFull, ticketPackages]);
 
   useEffect(() => {
     try {
@@ -36,6 +80,31 @@ export default function Index() {
   const scrollToTop = () => {
     setShowBackToTop(false);
     window.scrollTo({ top: 0, behavior: "smooth" });
+  };
+
+  const handleConfirmQuickBooking = () => {
+    const authRaw = localStorage.getItem("authUser");
+    if (!authRaw) {
+      toast({ title: "Vui lòng đăng nhập", description: "Bạn cần đăng nhập trước khi đặt vé" });
+      window.dispatchEvent(new Event("open-login"));
+      return;
+    }
+    try {
+      const found = activeMoviesFull.find((m: any) => m.title === movie);
+      if (found) {
+        localStorage.setItem("selectedFilm", JSON.stringify({
+          id: found.id,
+          title: found.title,
+          poster: found.cover_image,
+        }));
+      }
+      if (selectedPackage) {
+        localStorage.setItem("selectedTicketPackage", JSON.stringify(selectedPackage));
+      }
+      localStorage.setItem("preselectTicketCount", String(ticketCount));
+    } catch { }
+    setIsBookingModalOpen(false);
+    navigate("/booking");
   };
 
   return (
