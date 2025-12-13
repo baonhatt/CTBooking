@@ -258,7 +258,8 @@ export default function Header({ onBookClick = () => { }, disableNav = false, to
   const scrollToSection = (id: string) => {
     const element = document.getElementById(id);
     if (!element) return;
-    const headerOffset = 72;
+    const headerEl = document.querySelector("header") as HTMLElement | null;
+    const headerOffset = headerEl?.offsetHeight || 72;
     const rect = element.getBoundingClientRect();
     const absoluteTop = window.scrollY + rect.top;
     window.scrollTo({ top: Math.max(0, absoluteTop - headerOffset), behavior: "smooth" });

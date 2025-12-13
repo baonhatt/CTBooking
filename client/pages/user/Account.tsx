@@ -9,6 +9,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Link, useNavigate } from "react-router-dom";
 import { toast } from "@/components/ui/use-toast";
 import { updateUserProfileApi, changePasswordApi, getUserTransactionsApi } from "@/lib/api";
+// @ts-ignore
+import heroImage1 from "@/assets/images/1.PNG";
 
 export default function Account() {
   const navigate = useNavigate();
@@ -201,11 +203,29 @@ export default function Account() {
 
   return (
     <UserLayout
-      className="bg-gradient-dark"
+      className="bg-gradient-to-br from-[#050915] via-[#0b1226] to-[#0e1b3d]"
       headerProps={{ onBookClick: () => { } }}
       hideFooter
     >
-      <div className="max-w-5xl mx-auto px-4 pb-16 pt-32">
+      <div className="relative min-h-screen">
+        <div className="absolute inset-0 pointer-events-none z-0">
+          <img
+            src={heroImage1}
+            alt=""
+            className="w-full h-full object-cover opacity-40"
+            style={{
+              filter: `brightness(${Number((import.meta as any).env?.VITE_BACKDROP_BRIGHTNESS ?? 0.85)}) blur(${Number((import.meta as any).env?.VITE_BACKDROP_BLUR ?? 2)}px)`,
+            }}
+          />
+          <div className="absolute inset-0 bg-[radial-gradient(circle_at_20%_20%,rgba(59,130,246,0.35),transparent_30%),radial-gradient(circle_at_80%_30%,rgba(236,72,153,0.25),transparent_35%),radial-gradient(circle_at_50%_70%,rgba(34,211,238,0.3),transparent_30%)]" />
+          <div
+            className="absolute inset-0"
+            style={{ backgroundColor: `rgba(0,0,0,${Number((import.meta as any).env?.VITE_BACKDROP_DARK_BASE ?? 0.5)})` }}
+          />
+          <div className="absolute inset-0 bg-gradient-to-b from-black/50 via-black/25 to-transparent" />
+          <div className="absolute inset-0 neon-noise opacity-25" />
+        </div>
+        <div className="relative z-10 max-w-5xl mx-auto px-4 pb-16 pt-32">
         <div className="flex items-center gap-2 text-sm text-gray-300 mb-4">
           <Link to="/" className="text-blue-300 hover:text-blue-200">Home</Link>
           <span className="text-gray-400">›</span>
@@ -396,6 +416,7 @@ export default function Account() {
             </Tabs>
           </CardContent>
         </Card>
+        </div>
       </div>
 
       <Dialog open={isPwdOpen} onOpenChange={setIsPwdOpen}>
