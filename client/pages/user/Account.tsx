@@ -75,6 +75,25 @@ export default function Account() {
           (items || []).map((t: any) => ({
             ...t,
             poster: t?.poster || t?.cover_image || t?.coverImage || t?.poster_url,
+            date: (() => {
+              try {
+                const src = t?.paid_at || t?.created_at;
+                return src ? new Date(src) : null;
+              } catch { return null; }
+            })(),
+            dateDisplay: (() => {
+              try {
+                const dsrc = t?.paid_at || t?.created_at;
+                if (!dsrc) return "";
+                const d = new Date(dsrc);
+                const dd = String(d.getDate()).padStart(2, "0");
+                const mm = String(d.getMonth() + 1).padStart(2, "0");
+                const yyyy = d.getFullYear();
+                const hh = String(d.getHours()).padStart(2, "0");
+                const min = String(d.getMinutes()).padStart(2, "0");
+                return `${dd}/${mm}/${yyyy} ${hh}:${min}`;
+              } catch { return ""; }
+            })(),
           })) || [];
         setTransactions(mapped);
       } catch (e: any) {
@@ -124,22 +143,22 @@ export default function Account() {
   }, [limitedTransactions]);
 
   const groups = useMemo(() => {
-    const monthLabel = (dateStr: string | undefined) => {
-      if (!dateStr) return "Khác";
+    const toMonthKey = (t: any) => {
       try {
-        const [day, month, year] = dateStr.split("/");
-        if (month && year) return `Tháng ${month}/${year}`;
-      } catch { }
-      return "Khác";
+        const src = t?.paid_at || t?.created_at;
+        if (!src) return "Khác";
+        const d = new Date(src);
+        const mm = String(d.getMonth() + 1).padStart(2, "0");
+        const yyyy = d.getFullYear();
+        return `Tháng ${mm}/${yyyy}`;
+      } catch { return "Khác"; }
     };
-
     const map = new Map<string, any[]>();
     pagedTransactions?.forEach((t) => {
-      const key = monthLabel(t?.dateDisplay);
+      const key = toMonthKey(t);
       if (!map.has(key)) map.set(key, []);
       map.get(key)!.push(t);
     });
-
     const arr = Array.from(map.entries()).map(([month, items]) => ({ month, items }));
     return arr.sort((a, b) => b.month.localeCompare(a.month));
   }, [pagedTransactions]);
@@ -350,9 +369,9 @@ export default function Account() {
 
                                   <div className="space-y-1">
                                     <div className="text-lg font-semibold text-white leading-tight line-clamp-2">{t.movie || "Phim"}</div>
-                                    {/* <div className="text-sm text-gray-300">
-                                      {t.format || t.language || "2D"} • {t.rating || "T"}{t.ageLabel || ""}
-                                    </div> */}
+                                    <div className="text-sm text-gray-300">
+                                      {t.ticket_package ? `Gói: ${t.ticket_package}` : "Gói: --"}
+                                    </div>
                                     <div className="text-sm text-gray-200">
                                       <span className="font-medium">{t.dateDisplay || ""}</span>
                                     </div>
@@ -461,7 +480,7 @@ export default function Account() {
                 </div>
                 <div className="space-y-1">
                   <div className="text-base font-semibold text-white">{selectedTx.movie}</div>
-                  {/* <div className="text-sm text-gray-300">{selectedTx.format || selectedTx.language || "2D Phụ Đề"}</div> */}
+                  <div className="text-sm text-gray-300">{selectedTx.ticket_package ? `Gói: ${selectedTx.ticket_package}` : ""}</div>
                   <div className="text-sm text-gray-300">{selectedTx.dateDisplay}</div>
                 </div>
               </div>
@@ -475,6 +494,8 @@ export default function Account() {
                 <span className="font-medium text-white">{selectedTx.quantity}</span>
                 <span className="text-gray-400">Thanh toán</span>
                 <span className="font-medium text-white">{selectedTx.method === "momo" ? "MoMo" : "VNPay"}</span>
+                <span className="text-gray-400">Ngày thanh toán</span>
+                <span className="font-medium text-white">{selectedTx.dateDisplay || "--"}</span>
                 <span className="text-gray-400">Tổng tiền</span>
                 <span className="font-semibold text-blue-300">{formatMoney(selectedTx.amount)}₫</span>
               </div>
