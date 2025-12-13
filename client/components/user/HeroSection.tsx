@@ -155,26 +155,8 @@ export default function HeroSection() {
       className="relative min-h-screen overflow-hidden bg-gradient-to-br from-[#050915] via-[#0b1226] to-[#0e1b3d] text-white pt-24"
       onMouseMove={onMove}
     >
-      {/* Dynamic Background Images */}
+      {/* Gradient overlays */}
       <div className="absolute inset-0">
-        <AnimatePresence mode="wait">
-          <motion.div
-            key={currentPosterIndex}
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 1.5, ease: "easeInOut" }}
-            className="absolute inset-0"
-          >
-            <img
-              src={currentPoster}
-              alt="Cinematic backdrop"
-              className="w-full h-full object-cover"
-            />
-          </motion.div>
-        </AnimatePresence>
-
-        {/* Gradient overlays */}
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_20%_20%,rgba(59,130,246,0.4),transparent_30%),radial-gradient(circle_at_80%_30%,rgba(236,72,153,0.3),transparent_35%),radial-gradient(circle_at_50%_70%,rgba(34,211,238,0.35),transparent_30%)]" />
         <div className="absolute inset-0 bg-gradient-to-b from-black/80 via-black/50 to-[#050915]/95" />
         <div className="absolute inset-0 neon-noise opacity-30" />
@@ -212,7 +194,7 @@ export default function HeroSection() {
                 CINESPHERE
               </span>
               <br />
-              <span className="text-white">Viễn cảnh không gian</span>
+              <span className="text-white">Huyễn cảnh không gian</span>
             </motion.h1>
 
             <motion.p
@@ -221,9 +203,8 @@ export default function HeroSection() {
               transition={{ delay: 0.4 }}
               className="text-lg md:text-xl text-gray-200 leading-relaxed max-w-2xl"
             >
-              Chạm vào vũ trụ riêng của bạn. Mỗi suất chiếu là một hành trình nhập vai
-              với độ phân giải 8K và âm thanh đa tầng bao quanh, mở ra thế giới vô biên ngay
-              trong không gian nhỏ.
+              Dùng không gian nhỏ mô phỏng thế giới vô biên
+              Mỗi suất chiếu là một hành trình nhập vai với độ phân giải 8K và âm thanh đa tầng bao quanh
             </motion.p>
 
             <motion.div
