@@ -31,6 +31,9 @@ export default function Footer() {
   };
 
   return (
+
+
+    
     <footer className="relative bg-gradient-to-b from-[#060915] to-black border-t border-white/10 py-16 overflow-hidden">
       <div className="absolute inset-0 neon-noise opacity-30 pointer-events-none" />
       <div className="absolute left-0 top-0 w-96 h-96 bg-purple-500/10 blur-[120px]" />
