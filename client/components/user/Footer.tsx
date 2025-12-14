@@ -105,7 +105,7 @@ export default function Footer() {
                     Công ty TNHH CÔNG NGHỆ VR VIỆT NAM
                   </p>
                   <p className="text-xs leading-relaxed">
-                    Số 14/13/58 Thân Nhân Trung, Phường Tân Bình, Thành phố Hồ Chí Minh, Việt Nam
+                    Vạn Hạnh Mall, số 11 đường Sư Vạn Hạnh, Quận 10, Thành phố Hồ Chí Minh
                   </p>
                 </div>
               </div>
@@ -148,7 +148,7 @@ export default function Footer() {
             <div className="relative w-full h-64 rounded-lg overflow-hidden border border-white/20 shadow-lg">
               <iframe
                 src={`https://www.google.com/maps?q=${encodeURIComponent(
-                  "Số 14/13/58 Thân Nhân Trung, Phường Tân Bình, Thành phố Hồ Chí Minh, Việt Nam"
+                  "Vạn Hạnh Mall, số 11 đường Sư Vạn Hạnh, Quận 10, Thành phố Hồ Chí Minh"
                 )}&output=embed`}
                 width="100%"
                 height="100%"
