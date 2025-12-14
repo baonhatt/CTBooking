@@ -81,46 +81,31 @@ export default function Header({ onBookClick = () => { }, disableNav = false, to
   useEffect(() => {
     if (effectiveDisable) return;
     const ids = ["hero", "films", "pricing", "technology", "promotions", "store"];
-    const observers: IntersectionObserver[] = [];
-    const visibleSections = new Set<string>();
-    
-    ids.forEach((id) => {
-      const el = document.getElementById(id);
-      if (!el) return;
-      
-      const observer = new IntersectionObserver(
-        (entries) => {
-          entries.forEach((entry) => {
-            if (entry.isIntersecting && entry.intersectionRatio > 0.1) {
-              visibleSections.add(id);
-            } else {
-              visibleSections.delete(id);
-            }
-            
-            // Tìm section đầu tiên trong danh sách ids mà đang visible
-            // (ưu tiên section ở trên)
-            let activeId = "hero";
-            for (const sectionId of ids) {
-              if (visibleSections.has(sectionId)) {
-                activeId = sectionId;
-                break; // Lấy section đầu tiên (ở trên cùng)
-              }
-            }
-            
-            setActiveSection(activeId);
-          });
-        },
-        { 
-          threshold: [0, 0.1, 0.2, 0.3, 0.4, 0.5],
-          rootMargin: "-15% 0px -60% 0px" // Trigger khi section vào viewport từ trên
-        }
-      );
-      
-      observer.observe(el);
-      observers.push(observer);
-    });
-    
-    return () => observers.forEach((ob) => ob.disconnect());
+    const updateActive = () => {
+      const headerEl = document.querySelector("header") as HTMLElement | null;
+      const headerOffset = headerEl?.offsetHeight || 72;
+      const sections = ids
+        .map((id) => {
+          const el = document.getElementById(id);
+          if (!el) return null;
+          const rect = el.getBoundingClientRect();
+          return { id, top: rect.top };
+        })
+        .filter(Boolean) as Array<{ id: string; top: number }>;
+      if (!sections.length) return;
+      const above = sections.filter((s) => s.top <= headerOffset + 10);
+      const activeId = above.length
+        ? above.sort((a, b) => b.top - a.top)[0].id
+        : sections.sort((a, b) => a.top - b.top)[0].id;
+      setActiveSection(activeId);
+    };
+    updateActive();
+    window.addEventListener("scroll", updateActive);
+    window.addEventListener("resize", updateActive);
+    return () => {
+      window.removeEventListener("scroll", updateActive);
+      window.removeEventListener("resize", updateActive);
+    };
   }, [effectiveDisable]);
   useEffect(() => {
     const readAuth = () => {
@@ -641,6 +626,7 @@ export default function Header({ onBookClick = () => { }, disableNav = false, to
                     <button
                       type="button"
                       className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-white"
+                      tabIndex={-1}
                       onClick={() => setShowRegisterPass((v) => !v)}
                       aria-label={
                         showRegisterPass ? "Ẩn mật khẩu" : "Hiển thị mật khẩu"
@@ -662,7 +648,6 @@ export default function Header({ onBookClick = () => { }, disableNav = false, to
                     <Input
                       type={showRegisterConfirmPass ? "text" : "password"}
                       className="bg-white/10 border-white/20 text-white placeholder:text-gray-400 focus-visible:ring-cyan-400 focus-visible:ring-offset-1 rounded-lg pr-10"
-                      placeholder="••••••••"
                       value={registerConfirmPassword}
                       maxLength={50}
                       onChange={(e) =>
@@ -677,6 +662,7 @@ export default function Header({ onBookClick = () => { }, disableNav = false, to
                     <button
                       type="button"
                       className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-white"
+                      tabIndex={-1}
                       onClick={() => setShowRegisterConfirmPass((v) => !v)}
                       aria-label={
                         showRegisterConfirmPass

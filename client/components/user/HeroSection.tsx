@@ -337,7 +337,7 @@ export default function HeroSection() {
             </div>
 
             {/* Poster indicators */}
-            {moviePosters.length > 1 && (
+            {/* {moviePosters.length > 1 && (
               <div className="flex justify-center gap-2 mt-6">
                 {moviePosters.map((_, index) => (
                   <button
@@ -354,7 +354,7 @@ export default function HeroSection() {
                   />
                 ))}
               </div>
-            )}
+            )} */}
           </motion.div>
         </div>
       </div>

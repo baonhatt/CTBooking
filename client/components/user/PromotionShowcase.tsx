@@ -60,7 +60,7 @@ export default function PromotionShowcase() {
             Chọn gói phù hợp – ưu đãi kèm quà tặng
           </h2>
           <p className="text-gray-300 mt-3">
-            “Quà tặng hộp đèn kèm hình ảnh” • “Cúp ngàn quang cáo”
+            “Quà tặng hộp đèn kèm hình ảnh” - “Cúp ngàn quang cáo”
           </p>
         </div>
 

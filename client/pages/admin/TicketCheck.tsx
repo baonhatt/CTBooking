@@ -6,11 +6,13 @@ export default function TicketCheckPage() {
   const [active, setActive] = useState<"dashboard" | "users" | "movies" | "toys" | "transactions" | "tickets" | "ticket-check">("ticket-check");
 
   const handleLogout = () => {
-    localStorage.removeItem("admin-token");
+    localStorage.removeItem("adminToken");
+    localStorage.removeItem("adminEmail");
+    window.dispatchEvent(new Event("admin-auth-changed"));
     window.location.href = "/admin";
   };
 
-  const adminEmail = localStorage.getItem("admin-email") || "";
+  const adminEmail = localStorage.getItem("adminEmail") || "";
 
   return (
     <AdminLayout
