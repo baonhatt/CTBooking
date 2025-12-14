@@ -255,7 +255,7 @@ export function getWelcomeEmailTemplate(data: {
   customerName: string;
   email: string;
 }): string {
-  const baseUrl = process.env.VITE_SERVER_BASE_URL || "";
+  const baseUrl = process.env.VITE_SERVER_BASE_URL || "https://cinesphere.com.vn";
   const accountUrl = `${baseUrl}/account`;
   const bookingUrl = `${baseUrl}/booking`;
   const homeUrl = `${baseUrl}/`;
