@@ -1,12 +1,21 @@
 export default {
   async fetch(request: Request, env: any) {
-    const origin = request.headers.get("Origin") || "*";
+    const origin = request.headers.get("Origin") || "";
+    const allowed = new Set([
+      "https://cinesphere.com.vn",
+      "https://www.cinesphere.com.vn",
+      "https://cinema-pages.pages.dev",
+    ]);
+    const allowOrigin = origin && allowed.has(origin) ? origin : "https://cinesphere.com.vn";
     const cors = {
-      "Access-Control-Allow-Origin": origin || "https://main.cinema-pages.pages.dev",
+      "Access-Control-Allow-Origin": allowOrigin,
       "Access-Control-Allow-Credentials": "true",
       "Access-Control-Allow-Methods": "GET,POST,PUT,DELETE,OPTIONS",
-      "Access-Control-Allow-Headers": request.headers.get("Access-Control-Request-Headers") || "Content-Type,Authorization",
+      "Access-Control-Allow-Headers":
+        request.headers.get("Access-Control-Request-Headers") ||
+        "Content-Type,Authorization,Accept,Origin,Referer",
       "Access-Control-Expose-Headers": "Content-Type,Authorization",
+      "Access-Control-Max-Age": "86400",
       Vary: "Origin",
       "Referrer-Policy": "strict-origin-when-cross-origin",
       "Cross-Origin-Opener-Policy": "same-origin",
