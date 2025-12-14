@@ -2,6 +2,9 @@ export const API_BASE_URL = (() => {
   const env = (import.meta as any).env || {};
   const base = env?.VITE_API_BASE_URL || env?.VITE_API_URL || "";
   if (typeof window !== "undefined") {
+    const h = window.location.hostname || "";
+    if (h === "localhost" || h === "127.0.0.1") return "";
+    if (h.endsWith("pages.dev")) return base;
     return "";
   }
   return base;
