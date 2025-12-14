@@ -194,7 +194,7 @@ export default function HeroSection() {
                 CINESPHERE
               </span>
               <br />
-              <span className="text-white">Huyễn cảnh không gian</span>
+              <span className="text-white text-2xl md:text-3xl lg:text-5xl">Huyễn cảnh không gian</span>
             </motion.h1>
 
             <motion.p
