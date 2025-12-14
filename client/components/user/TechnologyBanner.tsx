@@ -15,35 +15,35 @@ const spaceElements = [
   { id: 8, size: "w-32 h-32", position: "top-80 right-6", delay: 1.2, duration: 9 },
 ];
 
-import post3 from "@/assets/videos/post 3.mp4";
-import post2 from "@/assets/videos/Post 2.mp4";
-import post4 from "@/assets/videos/post 4.mp4";
-import post5 from "@/assets/videos/POST 5.mp4";
-import post6 from "@/assets/videos/POST 6.mp4";
+const preview1 = "https://sample-videos.com/video321/mp4/720/big_buck_bunny_720p_1mb.mp4";
+const preview2 = "https://sample-videos.com/video321/mp4/720/big_buck_bunny_720p_1mb.mp4";
+const preview3 = "https://sample-videos.com/video321/mp4/720/big_buck_bunny_720p_1mb.mp4";
+const preview4 = "https://sample-videos.com/video321/mp4/720/big_buck_bunny_720p_1mb.mp4";
+const preview5 = "https://sample-videos.com/video321/mp4/720/big_buck_bunny_720p_1mb.mp4";
 
 const videoPreviews = [
   {
-    src: post3,
+    src: preview1,
     title: "Không gian sci-fi CineSphere",
     description: "Hành lang ánh sáng và màn hình tương tác đa chiều.",
   },
   {
-    src: post2,
+    src: preview2,
     title: "Khán giả giữa đại dương ánh sáng",
     description: "Đắm chìm trong bối cảnh biển sâu và sinh vật ảo diệu.",
   },
   {
-    src: post4,
+    src: preview3,
     title: "Khủng long sát cạnh",
     description: "Cảnh rừng nguyên sinh, quy mô lớn như chạm tay tới.",
   },
   {
-    src: post5,
+    src: preview4,
     title: "Phòng chiếu toàn cảnh",
     description: "Khán giả ngồi giữa khung hình 8K bao phủ trọn không gian.",
   },
   {
-    src: post6,
+    src: preview5,
     title: "Hành trình xuyên không",
     description: "Tăng tốc qua vũ trụ đa chiều với hiệu ứng mượt mà.",
   },
@@ -52,7 +52,7 @@ const videoPreviews = [
 // Video/Hình ảnh chính bên trái
 const mainVisual = {
   type: "video" as const,
-  src: post6,
+  src: preview5,
 };
 
 export default function TechnologyBanner() {
