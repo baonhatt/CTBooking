@@ -29,6 +29,15 @@ export default function FilmCarousel({ onSelectFilm }: FilmCarouselProps) {
   const [storeUpdateTrigger, setStoreUpdateTrigger] = useState(0);
   const [canScrollPrev, setCanScrollPrev] = useState(false);
   const [canScrollNext, setCanScrollNext] = useState(false);
+  const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
+  const [lastTapTime, setLastTapTime] = useState(0);
+  const isTouchDevice = useMemo(
+    () =>
+      typeof window !== "undefined" &&
+      (("ontouchstart" in window) ||
+        (window.matchMedia && window.matchMedia("(pointer: coarse)").matches)),
+    [],
+  );
   
   // Embla Carousel setup with optimized options for mobile
   const [emblaRef, emblaApi] = useEmblaCarousel(
@@ -234,17 +243,41 @@ export default function FilmCarousel({ onSelectFilm }: FilmCarouselProps) {
               className="flex-[0_0_auto] min-w-[240px] md:min-w-[280px]"
             >
               <motion.button
-                onClick={() => handleOpen(film)}
+                onMouseEnter={() => setHoveredIndex(index)}
+                onMouseLeave={() => setHoveredIndex((prev) => (prev === index ? null : prev))}
+                onTouchStart={() => {
+                  setHoveredIndex(index);
+                  setLastTapTime(Date.now());
+                }}
+                onClick={() => {
+                  if (isTouchDevice) {
+                    const now = Date.now();
+                    if (!hoveredIndex || hoveredIndex !== index || now - lastTapTime > 350) {
+                      setHoveredIndex(index);
+                      setLastTapTime(now);
+                      return;
+                    }
+                  }
+                  handleOpen(film);
+                }}
                 className="group relative w-full rounded-3xl overflow-hidden border border-white/10 bg-white/5 backdrop-blur-lg shadow-[0_0_30px_rgba(59,130,246,0.2)] hover:shadow-[0_0_40px_rgba(236,72,153,0.25)] transition-all duration-300 hover:-translate-y-2"
               >
               <div className="relative h-80 w-full overflow-hidden">
+                <div
+                  className="absolute inset-0 bg-center bg-cover blur-md scale-110"
+                  style={{ backgroundImage: `url(${film.poster})` }}
+                />
                 <img
                   src={film.poster}
                   alt={film.title}
-                  className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
+                  className="absolute inset-0 w-full h-full object-contain"
                 />
                 <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/30 to-transparent" />
-                <div className="absolute bottom-4 left-4 right-4 space-y-2 text-left">
+                <div
+                  className={`absolute bottom-4 left-4 right-4 space-y-2 text-left opacity-0 transition-opacity duration-300 ${
+                    hoveredIndex === index ? "opacity-100" : "group-hover:opacity-100"
+                  }`}
+                >
                   <p className="text-xs uppercase tracking-[0.18em] text-cyan-200">
                     {film.genre}
                   </p>

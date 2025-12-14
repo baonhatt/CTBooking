@@ -345,7 +345,7 @@ export default function BookingPage() {
           <div className="absolute inset-0 neon-noise opacity-25" />
         </div>
         <div className="relative z-10 max-w-5xl mx-auto p-4 pt-28">
-        <div className="mb-4 text-sm py-3">
+        <div className="text-sm py-9">
           <button className="text-blue-300 hover:text-blue-400 underline" onClick={() => navigate("/")}>Home</button>
           <span className="mx-2 text-white/60">&gt;</span>
           <span className="text-white">Đặt vé</span>

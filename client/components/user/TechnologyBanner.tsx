@@ -1,6 +1,6 @@
 import { motion } from "framer-motion";
-import { Play, ChevronLeft, ChevronRight } from "lucide-react";
-import { useState, useEffect } from "react";
+import { Play, Pause, ChevronLeft, ChevronRight } from "lucide-react";
+import { useState, useEffect, useRef } from "react";
 import { cn } from "@/lib/utils";
 
 // Decorative space elements
@@ -15,50 +15,70 @@ const spaceElements = [
   { id: 8, size: "w-32 h-32", position: "top-80 right-6", delay: 1.2, duration: 9 },
 ];
 
-// Video previews - có thể thay đổi URL video tại đây
+import post3 from "@/assets/videos/post 3.mp4";
+import post2 from "@/assets/videos/Post 2.mp4";
+import post4 from "@/assets/videos/post 4.mp4";
+import post5 from "@/assets/videos/POST 5.mp4";
+import post6 from "@/assets/videos/POST 6.mp4";
+
 const videoPreviews = [
   {
-    videoUrl: "https://www.youtube.com/embed/dQw4w9WgXcQ", // Video mẫu - thay bằng video thực tế
-    thumbnail: "https://images.unsplash.com/photo-1521737604893-d14cc237f11d?auto=format&fit=crop&w=800&q=80",
+    src: post3,
     title: "Không gian sci-fi CineSphere",
     description: "Hành lang ánh sáng và màn hình tương tác đa chiều.",
-    duration: "2:15",
   },
   {
-    videoUrl: "https://www.youtube.com/embed/dQw4w9WgXcQ",
-    thumbnail: "https://images.unsplash.com/photo-1505685296765-3a2736de412f?auto=format&fit=crop&w=800&q=80",
+    src: post2,
     title: "Khán giả giữa đại dương ánh sáng",
     description: "Đắm chìm trong bối cảnh biển sâu và sinh vật ảo diệu.",
-    duration: "1:45",
   },
   {
-    videoUrl: "https://www.youtube.com/embed/dQw4w9WgXcQ",
-    thumbnail: "https://images.unsplash.com/photo-1489515217757-5fd1be406fef?auto=format&fit=crop&w=800&q=80",
+    src: post4,
     title: "Khủng long sát cạnh",
     description: "Cảnh rừng nguyên sinh, quy mô lớn như chạm tay tới.",
-    duration: "3:20",
   },
   {
-    videoUrl: "https://www.youtube.com/embed/dQw4w9WgXcQ",
-    thumbnail: "https://images.unsplash.com/photo-1509228627152-72ae9ae6848d?auto=format&fit=crop&w=800&q=80",
+    src: post5,
     title: "Phòng chiếu toàn cảnh",
     description: "Khán giả ngồi giữa khung hình 8K bao phủ trọn không gian.",
-    duration: "2:50",
+  },
+  {
+    src: post6,
+    title: "Hành trình xuyên không",
+    description: "Tăng tốc qua vũ trụ đa chiều với hiệu ứng mượt mà.",
   },
 ];
 
 // Video/Hình ảnh chính bên trái
 const mainVisual = {
-  type: "video" as const, // "video" hoặc "image"
-  videoUrl: "https://www.youtube.com/embed/dQw4w9WgXcQ", // Thêm URL video YouTube/Vimeo tại đây
-  thumbnail: "https://images.unsplash.com/photo-1536440136628-849c177e76a1?auto=format&fit=crop&w=1600&q=80",
-  imageUrl: "https://images.unsplash.com/photo-1536440136628-849c177e76a1?auto=format&fit=crop&w=1600&q=80",
+  type: "video" as const,
+  src: post6,
 };
 
 export default function TechnologyBanner() {
   const [playingVideo, setPlayingVideo] = useState<string | null>(null);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [slidesToShow, setSlidesToShow] = useState(4);
+  const videoRefs = useRef<HTMLVideoElement[]>([]);
+  const mainVideoRef = useRef<HTMLVideoElement | null>(null);
+  const [mainAspect, setMainAspect] = useState<number | null>(null);
+  const [durations, setDurations] = useState<number[]>(
+    Array(videoPreviews.length).fill(0),
+  );
+  const [progresses, setProgresses] = useState<number[]>(
+    Array(videoPreviews.length).fill(0),
+  );
+  const [playingArr, setPlayingArr] = useState<boolean[]>(
+    Array(videoPreviews.length).fill(false),
+  );
+  const isVisible = (i: number) =>
+    i >= currentIndex && i < currentIndex + slidesToShow;
+  const formatTime = (s: number) => {
+    if (!isFinite(s) || s <= 0) return "0:00";
+    const m = Math.floor(s / 60);
+    const sec = Math.floor(s % 60);
+    return `${m}:${sec < 10 ? "0" : ""}${sec}`;
+  };
   
   // Responsive slides to show
   useEffect(() => {
@@ -85,6 +105,83 @@ export default function TechnologyBanner() {
   
   const prevSlide = () => {
     setCurrentIndex((prev) => Math.max(prev - 1, 0));
+  };
+
+  useEffect(() => {
+    const nextPlaying: boolean[] = Array(videoPreviews.length).fill(false);
+    videoRefs.current.forEach((el, i) => {
+      if (!el) return;
+      const visible = isVisible(i);
+      if (!visible) {
+        el.pause();
+      }
+      nextPlaying[i] = false;
+    });
+    setPlayingArr(nextPlaying);
+  }, [currentIndex, slidesToShow]);
+
+  useEffect(() => {
+    if (playingVideo === "main") {
+      mainVideoRef.current?.play().catch(() => {});
+    }
+  }, [playingVideo]);
+  const onMainLoadedMetadata = () => {
+    const el = mainVideoRef.current;
+    if (!el) return;
+    const w = (el as any).videoWidth || 0;
+    const h = (el as any).videoHeight || 0;
+    if (w > 0 && h > 0) setMainAspect(w / h);
+  };
+
+  const togglePlay = (i: number) => {
+    const el = videoRefs.current[i];
+    if (!el) return;
+    if (el.paused) {
+      videoRefs.current.forEach((v, k) => {
+        if (v && k !== i) v.pause();
+      });
+      el.muted = false;
+      el.play().catch(() => {});
+      setPlayingArr(Array(videoPreviews.length).fill(false).map((_, idx) => idx === i));
+    } else {
+      el.pause();
+      setPlayingArr((prev) => {
+        const arr = [...prev];
+        arr[i] = false;
+        return arr;
+      });
+    }
+  };
+
+  const onLoadedMetadata = (i: number) => {
+    const el = videoRefs.current[i];
+    if (!el) return;
+    setDurations((prev) => {
+      const arr = [...prev];
+      arr[i] = el.duration || 0;
+      return arr;
+    });
+  };
+
+  const onTimeUpdate = (i: number) => {
+    const el = videoRefs.current[i];
+    if (!el) return;
+    setProgresses((prev) => {
+      const arr = [...prev];
+      arr[i] = el.currentTime || 0;
+      return arr;
+    });
+  };
+
+  const onSeek = (i: number, value: number) => {
+    const el = videoRefs.current[i];
+    if (!el) return;
+    el.currentTime = value;
+    setProgresses((prev) => {
+      const arr = [...prev];
+      arr[i] = value;
+      return arr;
+    });
   };
 
   return (
@@ -242,7 +339,7 @@ export default function TechnologyBanner() {
           <p className="text-sm uppercase tracking-[0.28em] text-cyan-200 mb-4">
             CINESPHERE EXPERIENCE
           </p>
-          <h2 className="text-4xl md:text-5xl lg:text-6xl font-extrabold mb-6">
+          <h2 className="text-4xl md:text-5xl lg:text-6xl font-extrabold mb-6 lg:leading-[1.25]">
             <span className="bg-gradient-to-r from-cyan-300 to-blue-400 bg-clip-text text-transparent">
               Chạm tới Vô Cực
             </span>{" "}
@@ -255,71 +352,47 @@ export default function TechnologyBanner() {
           </p>
         </motion.div>
 
-        {/* Main Content Section: Video on top, Text below */}
         <motion.div
           initial={{ opacity: 0, y: 30 }}
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true }}
           transition={{ duration: 0.5 }}
-          className="max-w-5xl mx-auto mb-16"
+          className="max-w-6xl mx-auto mb-16"
         >
-          {/* Main Video/Image */}
-          <div className="relative aspect-[16/9] rounded-3xl overflow-hidden border border-white/10 bg-white/5 group shadow-2xl mb-10">
-            {mainVisual.type === "video" && playingVideo === "main" ? (
-              <iframe
-                src={`${mainVisual.videoUrl}?autoplay=1&rel=0`}
-                className="w-full h-full"
-                allow="autoplay; encrypted-media; fullscreen"
-                allowFullScreen
-                title="CineSphere Experience"
-              />
-            ) : (
-              <>
-                <img
-                  src={mainVisual.type === "video" ? mainVisual.thumbnail : mainVisual.imageUrl}
-                  alt="CineSphere Experience"
+          <div className="flex flex-col md:flex-row items-start md:items-center gap-8">
+            <div className="w-full md:basis-1/2 lg:basis-5/12 md:max-w-[520px] lg:max-w-[560px]">
+              <div
+                className="relative w-full rounded-2xl overflow-hidden border border-white/10 bg-white/5 shadow-xl"
+                style={{ aspectRatio: mainAspect ? String(mainAspect) : "16/9", maxHeight: "85vh" }}
+              >
+                <video
+                  ref={mainVideoRef}
+                  src={mainVisual.src as any}
                   className="w-full h-full object-cover"
+                  controls
+                  playsInline
+                  preload="metadata"
+                  onLoadedMetadata={onMainLoadedMetadata}
                 />
-                {mainVisual.type === "video" && (
-                  <>
-                    <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/30 to-transparent" />
-                    <button
-                      onClick={() => setPlayingVideo("main")}
-                      className="absolute inset-0 flex items-center justify-center group-hover:scale-110 transition-transform cursor-pointer"
-                      aria-label="Play video"
-                    >
-                      <div className="w-20 h-20 rounded-full bg-white/20 backdrop-blur-md flex items-center justify-center border-2 border-white/30 shadow-xl">
-                        <Play className="h-10 w-10 text-white ml-1" fill="white" />
-                      </div>
-                    </button>
-                  </>
-                )}
-              </>
-            )}
-          </div>
-
-          {/* Text Content Below Video */}
-          <div className="space-y-8">
-            <div>
-              <h3 className="text-3xl md:text-4xl font-bold text-white mb-6 text-center">
-                ✨ Tại sao bạn không nên bỏ lỡ?
-              </h3>
-              <div className="space-y-4 max-w-4xl mx-auto">
-                <p className="text-lg text-gray-300 leading-relaxed">
-                  <strong className="text-white">Trải Nghiệm Đắm Chìm Không Giới Hạn:</strong> Với hệ thống màn hình đa diện bao quanh, chúng tôi tái tạo những khung cảnh vĩ đại, từ sự tĩnh lặng của vũ trụ bao la đến nhịp sống sôi động của những thành phố tương lai, tất cả gói gọn trong một không gian tinh tế.
-                </p>
-                <p className="text-lg text-gray-300 leading-relaxed">
-                  <strong className="text-white">Siêu Định Dạng 8K+8K:</strong> Hãy chuẩn bị để ngỡ ngàng trước những thước phim CG siêu phân giải 8K. Mọi chi tiết đều chân thực đến mức khó tin, cho phép bạn đắm mình vào cảnh vật mà không cần đeo bất kỳ thiết bị hỗ trợ nào.
-                </p>
-                <p className="text-lg text-gray-300 leading-relaxed">
-                  <strong className="text-white">Xuyên Không Trong Chớp Mắt:</strong> Chỉ một cái chạm, bối cảnh sẽ thay đổi tức thì. Bạn có thể đang dạo bước giữa rừng nguyên sinh rồi ngay lập tức lao vút qua những thiên hà xa xôi với tốc độ và cảm giác chân thực tuyệt đối.
-                </p>
-                <p className="text-lg text-gray-300 leading-relaxed">
-                  <strong className="text-white">Thánh Địa "Check-in" Nghệ Thuật:</strong> Không chỉ để xem, Huyễn Cảnh Không Gian còn là studio hoàn hảo để bạn sở hữu những thước phim TikTok "triệu view" hay những bức ảnh nghệ thuật đầy ảo diệu, khẳng định phong cách riêng trên mạng xã hội.
-                </p>
               </div>
             </div>
-
+            <div className="w-full md:basis-1/2 lg:basis-7/12 space-y-4">
+              <h3 className="text-3xl md:text-4xl font-bold text-white">
+                ✨ Tại sao bạn không nên bỏ lỡ?
+              </h3>
+              <p className="text-lg text-gray-300 leading-relaxed">
+                <span className="text-white font-semibold">Trải Nghiệm Đắm Chìm Không Giới Hạn:</span> Với hệ thống màn hình đa diện bao quanh, chúng tôi tái tạo những khung cảnh vĩ đại, từ sự tĩnh lặng của vũ trụ bao la đến nhịp sống sôi động của những thành phố tương lai, tất cả gói gọn trong một không gian tinh tế.
+              </p>
+              <p className="text-lg text-gray-300 leading-relaxed">
+                <span className="text-white font-semibold">Siêu Định Dạng 8K+8K:</span> Hãy chuẩn bị để ngỡ ngàng trước những thước phim CG siêu phân giải 8K. Mọi chi tiết đều chân thực đến mức khó tin, cho phép bạn đắm mình vào cảnh vật mà không cần đeo bất kỳ thiết bị hỗ trợ nào.
+              </p>
+              <p className="text-lg text-gray-300 leading-relaxed">
+                <span className="text-white font-semibold">Xuyên Không Trong Chớp Mắt:</span> Chỉ một cái chạm, bối cảnh sẽ thay đổi tức thì. Bạn có thể đang dạo bước giữa rừng nguyên sinh rồi ngay lập tức lao vút qua những thiên hà xa xôi với tốc độ và cảm giác chân thực tuyệt đối.
+              </p>
+              <p className="text-lg text-gray-300 leading-relaxed">
+                <span className="text-white font-semibold">Thánh Địa "Check-in" Nghệ Thuật:</span> Không chỉ để xem, Huyễn Cảnh Không Gian còn là studio hoàn hảo để bạn sở hữu những thước phim TikTok "triệu view" hay những bức ảnh nghệ thuật đầy ảo diệu, khẳng định phong cách riêng trên mạng xã hội.
+              </p>
+            </div>
           </div>
         </motion.div>
 
@@ -361,48 +434,55 @@ export default function TechnologyBanner() {
                     }}
                   >
                     <motion.div
-                      initial={{ opacity: 0, scale: 0.9 }}
+                      initial={{ opacity: 0, scale: 0.95 }}
                       animate={{ opacity: 1, scale: 1 }}
                       transition={{ duration: 0.3 }}
-                      className="relative w-full aspect-[3/4] max-h-[500px] sm:max-h-[600px] rounded-2xl overflow-hidden border border-white/10 bg-white/5 group cursor-pointer"
+                      className="relative w-full aspect-[3/4] max-h-[500px] sm:max-h-[600px] rounded-2xl overflow-hidden border border-white/10 bg-black/20"
                     >
-                      {playingVideo === `preview-${index}` ? (
-                        <iframe
-                          src={`${item.videoUrl}?autoplay=1&rel=0`}
-                          className="w-full h-full"
-                          allow="autoplay; encrypted-media; fullscreen"
-                          allowFullScreen
-                          title={item.title}
-                        />
-                      ) : (
-                        <>
-                          <img
-                            src={item.thumbnail}
-                            alt={item.title}
-                            className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
-                            loading="lazy"
-                          />
-                          <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/40 to-transparent" />
+                      <video
+                        ref={(el) => {
+                          if (el) videoRefs.current[index] = el;
+                        }}
+                        src={item.src as any}
+                        className="w-full h-full object-cover"
+                        playsInline
+                        preload="metadata"
+                        onLoadedMetadata={() => onLoadedMetadata(index)}
+                        onTimeUpdate={() => onTimeUpdate(index)}
+                      />
+                      <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/30 to-transparent pointer-events-none" />
+                      <div className="absolute bottom-0 left-0 right-0 p-4 space-y-2">
+                        <div className="flex items-center justify-between">
+                          <p className="text-white font-semibold text-sm">{item.title}</p>
+                          <span className="text-xs text-gray-300 bg-black/50 px-2 py-1 rounded">
+                            {formatTime(progresses[index])}/{formatTime(durations[index])}
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-3">
                           <button
-                            onClick={() => setPlayingVideo(`preview-${index}`)}
-                            className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
-                            aria-label={`Play ${item.title}`}
+                            onClick={() => togglePlay(index)}
+                            className="w-10 h-10 rounded-full bg-white/15 backdrop-blur-md border border-white/25 flex items-center justify-center hover:bg-white/25 transition"
+                            aria-label={playingArr[index] ? "Pause" : "Play"}
                           >
-                            <div className="w-16 h-16 rounded-full bg-white/20 backdrop-blur-md flex items-center justify-center border-2 border-white/30">
-                              <Play className="h-8 w-8 text-white ml-1" fill="white" />
-                            </div>
+                            {playingArr[index] ? (
+                              <Pause className="h-5 w-5 text-white" />
+                            ) : (
+                              <Play className="h-5 w-5 text-white ml-0.5" />
+                            )}
                           </button>
-                          <div className="absolute bottom-0 left-0 right-0 p-4 space-y-1">
-                            <div className="flex items-center justify-between mb-1">
-                              <p className="text-white font-semibold text-sm">{item.title}</p>
-                              <span className="text-xs text-gray-300 bg-black/50 px-2 py-1 rounded">
-                                {item.duration}
-                              </span>
-                            </div>
-                            <p className="text-xs text-gray-200">{item.description}</p>
-                          </div>
-                        </>
-                      )}
+                          <input
+                            type="range"
+                            min={0}
+                            max={Math.max(1, durations[index] || 0)}
+                            step={0.1}
+                            value={Math.min(progresses[index] || 0, durations[index] || 0)}
+                            onChange={(e) => onSeek(index, Number(e.target.value))}
+                            className="flex-1 h-2 accent-cyan-400"
+                            aria-label="Tiến trình video"
+                          />
+                        </div>
+                        <p className="text-xs text-gray-200">{item.description}</p>
+                      </div>
                     </motion.div>
                   </div>
                 ))}

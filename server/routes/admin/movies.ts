@@ -2,6 +2,7 @@ import { RequestHandler } from "express";
 import { prisma } from "../../lib/prisma";
 import fs from "fs";
 import path from "path";
+import sharp from "sharp";
 
 export const createMovie: RequestHandler = async (req, res) => {
   let baseData: any;
@@ -52,19 +53,16 @@ export const createMovie: RequestHandler = async (req, res) => {
     if (cover_image_base64 && typeof cover_image_base64 === "string") {
       try {
         const match = cover_image_base64.match(/^data:(.+);base64,(.+)$/);
-        const ext = match ? match[1].split("/")[1] || "png" : "png";
-        const buf = Buffer.from(
-          match ? match[2] : cover_image_base64,
-          "base64",
-        );
+        const raw = match ? match[2] : cover_image_base64;
+        const inputBuf = Buffer.from(raw, "base64");
         const dir = path.resolve(process.cwd(), "uploads", "movies");
         try {
           fs.mkdirSync(dir, { recursive: true });
         } catch { }
-        const filename = `movie_${Date.now()}.${ext}`;
-        const filepath = path.join(dir, filename);
-        fs.writeFileSync(filepath, buf);
-        savedCover = `/uploads/movies/${filename}`;
+        const filenameBase = `movie_${Date.now()}`;
+        const outPath = path.join(dir, `${filenameBase}.webp`);
+        await sharp(inputBuf).webp({ quality: 75 }).toFile(outPath);
+        savedCover = `/uploads/movies/${path.basename(outPath)}`;
       } catch { }
     }
     baseData = {
@@ -127,19 +125,16 @@ export const updateMovie: RequestHandler = async (req, res) => {
     if (cover_image_base64 && typeof cover_image_base64 === "string") {
       try {
         const match = cover_image_base64.match(/^data:(.+);base64,(.+)$/);
-        const ext = match ? match[1].split("/")[1] || "png" : "png";
-        const buf = Buffer.from(
-          match ? match[2] : cover_image_base64,
-          "base64",
-        );
+        const raw = match ? match[2] : cover_image_base64;
+        const inputBuf = Buffer.from(raw, "base64");
         const dir = path.resolve(process.cwd(), "uploads", "movies");
         try {
           fs.mkdirSync(dir, { recursive: true });
         } catch { }
-        const filename = `movie_${Date.now()}.${ext}`;
-        const filepath = path.join(dir, filename);
-        fs.writeFileSync(filepath, buf);
-        data.cover_image = `/uploads/movies/${filename}`;
+        const filenameBase = `movie_${Date.now()}`;
+        const outPath = path.join(dir, `${filenameBase}.webp`);
+        await sharp(inputBuf).webp({ quality: 75 }).toFile(outPath);
+        data.cover_image = `/uploads/movies/${path.basename(outPath)}`;
       } catch { }
     }
     if (detail_images !== undefined) data.detail_images = detail_images;

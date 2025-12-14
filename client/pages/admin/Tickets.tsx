@@ -71,7 +71,12 @@ export default function TicketsPage() {
       active="tickets"
       setActive={() => { }}
       adminEmailState={localStorage.getItem("adminEmail") || "admin@email.com"}
-      handleLogout={() => { }}
+      handleLogout={() => {
+        localStorage.removeItem("adminToken");
+        localStorage.removeItem("adminEmail");
+        window.dispatchEvent(new Event("admin-auth-changed"));
+        window.location.href = "/admin";
+      }}
     >
       <TicketsContent
         data={tickets}
