@@ -3,7 +3,7 @@ main = "worker/src/index.ts"
 compatibility_date = "2025-12-01"
 
 [vars]
-UPSTREAM_BASE = "https://cinema-worker.baonhat20.workers.dev"
+UPSTREAM_BASE = "https://cinesphere.com.vn"
 
 [[d1_databases]]
 binding = "cinema_db"
