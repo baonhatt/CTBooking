@@ -4,6 +4,8 @@ compatibility_date = "2025-12-01"
 
 [vars]
 UPSTREAM_BASE = "https://cinesphere.com.vn"
+GMAIL_SENDER_EMAIL = "no-reply@cinesphere.com.vn"
+GMAIL_SENDER_NAME = "CTBOOKING"
 
 [[d1_databases]]
 binding = "cinema_db"
