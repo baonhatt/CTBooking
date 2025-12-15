@@ -4,7 +4,7 @@ compatibility_date = "2024-12-01"
 send_metrics = false
 
 [vars]
-UPSTREAM_BASE = "https://cinema-worker.baonhat20.workers.dev"
+UPSTREAM_BASE = "https://cinesphere.com.vn"
 
 [[d1_databases]]
 binding = "cinema_db"
