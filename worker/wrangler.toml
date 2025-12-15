@@ -12,7 +12,11 @@ VITE_MOMO_ENDPOINT = "https://test-payment.momo.vn/v2/gateway/api/create"
 GMAIL_SENDER_EMAIL = "no-reply@cinesphere.com.vn"
 GMAIL_SENDER_NAME = "CTBOOKING"
 
-[[d1_databases]]
-binding = "cinema_db"
-database_name = "cinema-db"
-database_id = "9bae4fb3-570a-4ded-9a75-922ce4d6ef81"
+  [[d1_databases]]
+  binding = "cinema_db"
+  database_name = "cinema-db"
+  database_id = "9bae4fb3-570a-4ded-9a75-922ce4d6ef81"
+  
+  [[r2_buckets]]
+  binding = "r2_cinemastore"
+  bucket_name = "cinemastore"
