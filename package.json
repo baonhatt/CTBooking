@@ -21,7 +21,9 @@
     "start": "node dist/server/node-build.mjs",
     "test": "vitest --run",
     "format.fix": "prettier --write .",
-    "typecheck": "tsc"
+    "typecheck": "tsc",
+    "deploy:preview": "npx wrangler deploy --env preview --config worker/wrangler.toml",
+    "deploy:prod": "npx wrangler deploy --env production --config worker/wrangler.toml"
   },
   "rollup": {
     "forceJs": true
