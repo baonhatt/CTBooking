@@ -3,8 +3,10 @@ main = "src/index.ts"
 compatibility_date = "2024-12-01"
 send_metrics = false
 
+[vars]
+UPSTREAM_BASE = "https://cinema-worker.baonhat20.workers.dev"
+
 [[d1_databases]]
 binding = "cinema_db"
 database_name = "cinema-db"
 database_id = "9bae4fb3-570a-4ded-9a75-922ce4d6ef81"
-
