@@ -712,7 +712,7 @@ export default {
       const hashSecret = String(env.VITE_VNPAY_HASH_SECRET || body.hashSecret || "");
       const base = String(env.VITE_SERVER_BASE_URL || env.UPSTREAM_BASE || "https://cinesphere.com.vn");
       const returnPath = String(env.VITE_VNPAY_RETURN_URL || "/checkout");
-      const returnUrl = String(body.returnUrl || `${base}${returnPath}`);
+      const returnUrl = `${base}${returnPath}`;
       if (!tmnCode || !hashSecret || !returnUrl) return json({ message: "VNPay configuration missing" }, 400);
       const vnp_TxnRef = orderId;
       const vnp_Version = "2.1.0";
