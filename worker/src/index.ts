@@ -467,29 +467,49 @@ export default {
     if (url.pathname === "/api/create-booking" && request.method === "POST") {
       const body = await request.json().catch(() => null);
       if (!body) return badRequest();
-      const ticketCount = Number(body.ticketCount);
-      const totalPrice = Number(body.totalPrice ?? 0);
+      const email = String(body.email || "");
+      const emailBook = String(body.emailBook || body.email || "");
+      const phone = String(body.phone || "");
+      const name = String(body.name || "");
+      const movieId = body.movieId ? Number(body.movieId) : null;
+      const ticketPackageId = body.ticketPackageId ? Number(body.ticketPackageId) : null;
+      const ticketCount = Number(body.ticketCount || 0);
       const paymentMethod = String((body.paymentMethod || "cash")).toLowerCase();
-      const resRun = await env.cinema_db
-        .prepare(
-          `INSERT INTO bookings (user_id, movie_id, ticket_package_id, ticket_count, total_price, payment_method, phone, name, email, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-        )
-        .bind(
-          Number(body.user_id || 0),
-          body.movieId ? Number(body.movieId) : null,
-          body.ticketPackageId ? Number(body.ticketPackageId) : null,
-          ticketCount,
-          totalPrice,
-          paymentMethod,
-          body.phone,
-          body.name,
-          body.emailBook,
-          new Date().toISOString(),
-        )
-        .run();
-      const bookingId = Number((resRun.meta as any).last_row_id ?? 0);
-      const booking = await env.cinema_db.prepare(`SELECT * FROM bookings WHERE id = ?`).bind(bookingId).first();
-      return json({ message: "Khởi tạo đặt vé thành công", booking }, 201);
+      if (!email || !emailBook || !phone || !name || !ticketCount || ticketCount <= 0) return badRequest("Vui lòng nhập đầy đủ thông tin hợp lệ.");
+      const acc = await env.cinema_db.prepare(`SELECT * FROM accounts WHERE email = ?`).bind(email).first();
+      if (!acc) return json({ message: "Không tìm thấy người dùng" }, 404);
+      let unitPrice = 0;
+      if (ticketPackageId) {
+        const pkg = await env.cinema_db.prepare(`SELECT * FROM ticket_packages WHERE id = ?`).bind(ticketPackageId).first();
+        if (!pkg || Number((pkg as any).is_active ?? 0) === 0) return json({ message: "Gói vé không hợp lệ" }, 404);
+        unitPrice = Number((pkg as any).price || 0);
+      }
+      const totalPrice = Number(body.totalPrice ?? unitPrice * ticketCount);
+      if (!Number.isFinite(totalPrice) || totalPrice <= 0) return badRequest("Giá trị tổng tiền không hợp lệ.");
+      try {
+        const resRun = await env.cinema_db
+          .prepare(
+            `INSERT INTO bookings (user_id, movie_id, ticket_package_id, ticket_count, total_price, payment_method, phone, name, email, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          )
+          .bind(
+            Number((acc as any).user_id || 0),
+            movieId,
+            ticketPackageId,
+            ticketCount,
+            totalPrice,
+            paymentMethod,
+            phone,
+            name,
+            emailBook,
+            new Date().toISOString(),
+          )
+          .run();
+        const bookingId = Number((resRun.meta as any).last_row_id ?? 0);
+        const booking = await env.cinema_db.prepare(`SELECT * FROM bookings WHERE id = ?`).bind(bookingId).first();
+        return json({ message: "Khởi tạo đặt vé thành công", booking }, 201);
+      } catch (e: any) {
+        return json({ message: "Không thể tạo đặt vé", error: String(e?.message || e) }, 500);
+      }
     }
     if (url.pathname === "/api/confirm-booking" && request.method === "POST") {
       const body = await request.json().catch(() => null);
