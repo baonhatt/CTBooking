@@ -23,8 +23,16 @@ export default {
     } as Record<string, string>;
     if (request.method === "OPTIONS") return new Response(null, { status: 204, headers: cors });
     const url = new URL(request.url);
-    if (url.pathname.startsWith("/api/")) {
-      const target = `cinema-worker.baonhat20.workers.dev${url.pathname}${url.search}`;
+    if (url.pathname === "/") {
+      return new Response(JSON.stringify({ ok: true, service: "cinema-worker" }), { headers: { "Content-Type": "application/json", ...cors } });
+    }
+    if (url.pathname === "/api/ping") {
+      return new Response(JSON.stringify({ message: "pong" }), { headers: { "Content-Type": "application/json", ...cors } });
+    }
+    const upstreamBase = (env && env.UPSTREAM_BASE) || "https://cinema-worker.baonhat20.workers.dev";
+    const upstreamHost = (() => { try { return new URL(upstreamBase).host; } catch { return ""; } })();
+    if (url.pathname.startsWith("/api/") && url.host !== upstreamHost) {
+      const target = `${upstreamBase}${url.pathname}${url.search}`;
       const isBodyAllowed = !["GET", "HEAD"].includes(request.method.toUpperCase());
       const body = isBodyAllowed ? await request.clone().arrayBuffer() : undefined;
       const proxied = await fetch(target, {
