@@ -5,6 +5,10 @@ send_metrics = false
 
 [vars]
 UPSTREAM_BASE = "https://cinesphere.com.vn"
+VITE_SERVER_BASE_URL = "https://cinesphere.com.vn"
+VITE_VNPAY_RETURN_URL = "/checkout"
+VITE_VNPAY_GATEWAY = "https://sandbox.vnpayment.vn/paymentv2/vpcpay.html"
+VITE_MOMO_ENDPOINT = "https://test-payment.momo.vn/v2/gateway/api/create"
 
 [[d1_databases]]
 binding = "cinema_db"

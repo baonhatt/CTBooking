@@ -710,7 +710,7 @@ export default {
       if (!amount || !orderId || !orderInfo) return json({ message: "Invalid payload" }, 400);
       const tmnCode = String(env.VITE_VNPAY_TMN_CODE || body.tmnCode || "");
       const hashSecret = String(env.VITE_VNPAY_HASH_SECRET || body.hashSecret || "");
-      const base = String(env.VITE_SERVER_BASE_URL || "https://cinesphere.com.vn");
+      const base = String(env.VITE_SERVER_BASE_URL || env.UPSTREAM_BASE || "https://cinesphere.com.vn");
       const returnPath = String(env.VITE_VNPAY_RETURN_URL || "/checkout");
       const returnUrl = String(body.returnUrl || `${base}${returnPath}`);
       if (!tmnCode || !hashSecret || !returnUrl) return json({ message: "VNPay configuration missing" }, 400);
