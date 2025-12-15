@@ -104,20 +104,59 @@ export default {
       return json({ activeMovies });
     }
     if (url.pathname === "/api/movies" && request.method === "GET") {
-      const result = await env.cinema_db.prepare(`SELECT id, title, description, cover_image, genres, rating, duration_min, is_active, release_date, created_at, updated_at FROM movies ORDER BY updated_at DESC, id DESC;`).all();
-      const items = Array.isArray(result.results) ? result.results : [];
-      return json({ items });
+      const page = Number(url.searchParams.get("page") || 1);
+      const pageSize = Number(url.searchParams.get("pageSize") || 10);
+      const q = String(url.searchParams.get("q") || "");
+      const sortKeyRaw = String(url.searchParams.get("sort") || "updated_at").toLowerCase();
+      const dir = String(url.searchParams.get("dir") || "desc").toLowerCase() === "asc" ? "ASC" : "DESC";
+      const offset = (page - 1) * pageSize;
+      const allowedSort = new Set(["updated_at", "release_date", "title", "rating"]);
+      const sortKey = allowedSort.has(sortKeyRaw) ? sortKeyRaw : "updated_at";
+      const whereParts: string[] = [];
+      const bind: any[] = [];
+      if (q) {
+        whereParts.push(`(title LIKE ? OR description LIKE ?)`);
+        const like = `%${q}%`;
+        bind.push(like, like);
+      }
+      const where = whereParts.length ? `WHERE ${whereParts.join(" AND ")}` : "";
+      const totalRow = await env.cinema_db.prepare(`SELECT COUNT(*) as c FROM movies ${where}`).bind(...bind).first();
+      const total = Number((totalRow as any)?.c || 0);
+      const rows = await env.cinema_db
+        .prepare(`SELECT id, title, description, cover_image, genres, rating, duration_min, is_active, release_date, created_at, updated_at FROM movies ${where} ORDER BY ${sortKey} ${dir} LIMIT ? OFFSET ?`)
+        .bind(...bind, pageSize, offset)
+        .all();
+      const items = Array.isArray(rows.results) ? rows.results : [];
+      return json({ items, page, pageSize, total });
     }
     if (url.pathname === "/api/movies" && request.method === "POST") {
       const body = await request.json().catch(() => null);
       if (!body || !body.title) return badRequest("Thiếu tiêu đề phim");
       const now = new Date().toISOString();
+      const savedCover = await (async () => {
+        try {
+          if (env.r2_cinemastore && typeof body.cover_image_base64 === "string" && body.cover_image_base64.startsWith("data:")) {
+            const m = body.cover_image_base64.match(/^data:(.+);base64,(.+)$/);
+            if (!m) return body.cover_image ?? null;
+            const mime = String(m[1] || "application/octet-stream").toLowerCase();
+            const raw = String(m[2] || "");
+            const bstr = atob(raw);
+            const bytes = new Uint8Array(bstr.length);
+            for (let i = 0; i < bstr.length; i++) bytes[i] = bstr.charCodeAt(i);
+            const ext = mime.includes("webp") ? "webp" : mime.includes("png") ? "png" : mime.includes("jpeg") ? "jpeg" : mime.includes("jpg") ? "jpg" : "bin";
+            const key = `uploads/movies/movie_${Date.now()}.${ext}`;
+            await env.r2_cinemastore.put(key, bytes, { httpMetadata: { contentType: mime } });
+            return `/${key}`;
+          }
+          return body.cover_image ?? null;
+        } catch { return body.cover_image ?? null; }
+      })();
       const stmt = env.cinema_db.prepare(
         `INSERT INTO movies (title, description, cover_image, detail_images, genres, rating, duration_min, is_active, release_date, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       ).bind(
         String(body.title),
         body.description ?? null,
-        body.cover_image ?? null,
+        savedCover,
         typeof body.detail_images === "string" ? body.detail_images : JSON.stringify(body.detail_images ?? []),
         typeof body.genres === "string" ? body.genres : JSON.stringify(body.genres ?? []),
         body.rating ?? null,
@@ -143,12 +182,33 @@ export default {
       const body = await request.json().catch(() => null);
       if (!body) return badRequest();
       const now = new Date().toISOString();
+      const oldRow = await env.cinema_db.prepare(`SELECT cover_image FROM movies WHERE id = ?`).bind(id).first();
+      const oldCover = String((oldRow as any)?.cover_image || "");
+      const coverUpdate = await (async () => {
+        try {
+          if (env.r2_cinemastore && typeof body.cover_image_base64 === "string" && body.cover_image_base64.startsWith("data:")) {
+            const m = body.cover_image_base64.match(/^data:(.+);base64,(.+)$/);
+            if (!m) return body.cover_image ?? null;
+            const mime = String(m[1] || "application/octet-stream").toLowerCase();
+            const raw = String(m[2] || "");
+            const bstr = atob(raw);
+            const bytes = new Uint8Array(bstr.length);
+            for (let i = 0; i < bstr.length; i++) bytes[i] = bstr.charCodeAt(i);
+            const ext = mime.includes("webp") ? "webp" : mime.includes("png") ? "png" : mime.includes("jpeg") ? "jpeg" : mime.includes("jpg") ? "jpg" : "bin";
+            const key = `uploads/movies/movie_${Date.now()}.${ext}`;
+            await env.r2_cinemastore.put(key, bytes, { httpMetadata: { contentType: mime } });
+            return `/${key}`;
+          }
+          if (body.cover_image !== undefined) return body.cover_image ?? null;
+          return undefined;
+        } catch { return undefined; }
+      })();
       await env.cinema_db.prepare(
         `UPDATE movies SET title = COALESCE(?, title), description = COALESCE(?, description), cover_image = COALESCE(?, cover_image), detail_images = COALESCE(?, detail_images), genres = COALESCE(?, genres), rating = COALESCE(?, rating), duration_min = COALESCE(?, duration_min), is_active = COALESCE(?, is_active), release_date = COALESCE(?, release_date), updated_at = ? WHERE id = ?`,
       ).bind(
         body.title ?? null,
         body.description ?? null,
-        body.cover_image ?? null,
+        coverUpdate === undefined ? null : coverUpdate,
         typeof body.detail_images === "string" ? body.detail_images : JSON.stringify(body.detail_images ?? null),
         typeof body.genres === "string" ? body.genres : JSON.stringify(body.genres ?? null),
         body.rating ?? null,
@@ -158,8 +218,23 @@ export default {
         now,
         id,
       ).run();
+      if (env.r2_cinemastore && typeof coverUpdate === "string" && coverUpdate !== oldCover && oldCover.startsWith("/uploads/")) {
+        const oldKey = oldCover.replace(/^\//, "");
+        try { await env.r2_cinemastore.delete(oldKey); } catch {}
+      }
       const movie = await env.cinema_db.prepare(`SELECT * FROM movies WHERE id = ?`).bind(id).first();
       return json({ movie });
+    }
+    if (url.pathname.startsWith("/uploads/") && request.method === "GET") {
+      const key = url.pathname.slice(1);
+      try {
+        const obj = await env.r2_cinemastore.get(key);
+        if (!obj) return notFound();
+        const ct = (obj as any).httpMetadata?.contentType || "application/octet-stream";
+        return new Response((obj as any).body, { headers: { "content-type": ct, "cache-control": "public, max-age=31536000, immutable" } });
+      } catch {
+        return notFound();
+      }
     }
     if (/^\/api\/movies\/\d+$/.test(url.pathname) && request.method === "DELETE") {
       const id = Number(url.pathname.split("/").pop());
@@ -170,7 +245,36 @@ export default {
       const id = Number(url.pathname.split("/").pop());
       const movie = await env.cinema_db.prepare(`SELECT * FROM movies WHERE id = ?`).bind(id).first();
       if (!movie) return notFound();
-      return json(movie);
+      const statsRow = await env.cinema_db
+        .prepare(`SELECT SUM(ticket_count) as total_tickets, SUM(total_price) as total_revenue, COUNT(*) as successful_bookings FROM bookings WHERE movie_id = ? AND payment_status IN ('paid')`)
+        .bind(id)
+        .first();
+      const totalTicketsSold = Number((statsRow as any)?.total_tickets || 0);
+      const totalRevenue = Number((statsRow as any)?.total_revenue || 0);
+      const successfulBookings = Number((statsRow as any)?.successful_bookings || 0);
+      const mapped = {
+        id: (movie as any).id,
+        title: (movie as any).title,
+        description: (movie as any).description || "Không có mô tả",
+        cover_image: (movie as any).cover_image || null,
+        genres: (() => {
+          const v = (movie as any).genres;
+          try { return typeof v === "string" ? JSON.parse(v) : Array.isArray(v) ? v : []; } catch { return []; }
+        })(),
+        rating: Number((movie as any).rating ?? 0),
+        duration_min: Number((movie as any).duration_min ?? 0),
+        price: 0,
+        is_active: Boolean((movie as any).is_active !== 0),
+        release_date: (movie as any).release_date || null,
+        created_at: (movie as any).created_at,
+        updated_at: (movie as any).updated_at,
+        stats: {
+          totalTicketsSold,
+          totalRevenue,
+          successfulBookings,
+        },
+      };
+      return json(mapped);
     }
     if (url.pathname === "/api/tickets" && request.method === "GET") {
       const res = await env.cinema_db.prepare(`SELECT * FROM ticket_packages ORDER BY display_order ASC, price ASC`).all();
@@ -329,8 +433,8 @@ export default {
       const offset = (page - 1) * pageSize;
       const where = q ? `%${q}%` : null;
       const base = q
-        ? `SELECT u.*, (SELECT COUNT(*) FROM bookings b WHERE b.user_id = u.id) as total_bookings, (SELECT email FROM accounts a WHERE a.user_id = u.id LIMIT 1) as email FROM users u WHERE u.fullname LIKE ? OR u.phone LIKE ? ORDER BY u.created_at DESC LIMIT ? OFFSET ?`
-        : `SELECT u.*, (SELECT COUNT(*) FROM bookings b WHERE b.user_id = u.id) as total_bookings, (SELECT email FROM accounts a WHERE a.user_id = u.id LIMIT 1) as email FROM users u ORDER BY u.created_at DESC LIMIT ? OFFSET ?`;
+        ? `SELECT u.*, (SELECT COUNT(*) FROM bookings b WHERE b.user_id = u.id) as total_bookings, (SELECT email FROM accounts a WHERE a.user_id = u.id LIMIT 1) as email, (SELECT is_active FROM accounts a WHERE a.user_id = u.id LIMIT 1) as is_active FROM users u WHERE u.fullname LIKE ? OR u.phone LIKE ? ORDER BY u.created_at DESC LIMIT ? OFFSET ?`
+        : `SELECT u.*, (SELECT COUNT(*) FROM bookings b WHERE b.user_id = u.id) as total_bookings, (SELECT email FROM accounts a WHERE a.user_id = u.id LIMIT 1) as email, (SELECT is_active FROM accounts a WHERE a.user_id = u.id LIMIT 1) as is_active FROM users u ORDER BY u.created_at DESC LIMIT ? OFFSET ?`;
       const stmt = q
         ? env.cinema_db.prepare(base).bind(where, where, pageSize, offset)
         : env.cinema_db.prepare(base).bind(pageSize, offset);

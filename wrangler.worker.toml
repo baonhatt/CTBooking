@@ -11,7 +11,11 @@ VITE_VNPAY_RETURN_URL = "/checkout"
 VITE_VNPAY_GATEWAY = "https://sandbox.vnpayment.vn/paymentv2/vpcpay.html"
 VITE_MOMO_ENDPOINT = "https://test-payment.momo.vn/v2/gateway/api/create"
 
-[[d1_databases]]
-binding = "cinema_db"
-database_name = "cinema-db"
-database_id = "9bae4fb3-570a-4ded-9a75-922ce4d6ef81"
+  [[d1_databases]]
+  binding = "cinema_db"
+  database_name = "cinema-db"
+  database_id = "9bae4fb3-570a-4ded-9a75-922ce4d6ef81"
+  
+  [[r2_buckets]]
+  binding = "r2_cinemastore"
+  bucket_name = "cinemastore"

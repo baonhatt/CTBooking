@@ -97,6 +97,31 @@ const AdminEditModal: React.FC<AdminEditModalProps> = (props) => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isEditOpen, editType, editData?.id]);
 
+  async function fileToCompressedDataURL(file: File, opts?: { maxW?: number; maxH?: number; quality?: number; type?: string }) {
+    const maxW = opts?.maxW ?? 1280;
+    const maxH = opts?.maxH ?? 1280;
+    const quality = opts?.quality ?? 0.75;
+    const type = opts?.type ?? "image/webp";
+    const blobUrl = URL.createObjectURL(file);
+    const img = await new Promise<HTMLImageElement>((resolve, reject) => {
+      const i = new Image();
+      i.onload = () => resolve(i);
+      i.onerror = reject;
+      i.src = blobUrl;
+    });
+    const ratio = Math.min(maxW / img.width, maxH / img.height, 1);
+    const w = Math.max(1, Math.round(img.width * ratio));
+    const h = Math.max(1, Math.round(img.height * ratio));
+    const canvas = document.createElement("canvas");
+    canvas.width = w;
+    canvas.height = h;
+    const ctx = canvas.getContext("2d")!;
+    ctx.drawImage(img, 0, 0, w, h);
+    const dataUrl = canvas.toDataURL(type, quality);
+    URL.revokeObjectURL(blobUrl);
+    return dataUrl;
+  }
+
 
   async function refetch(type: "movie" | "toy") {
     if (type === "movie") {
@@ -411,12 +436,7 @@ const AdminEditModal: React.FC<AdminEditModalProps> = (props) => {
                     if (!editData.id) {
                       let coverBase64: string | undefined = undefined;
                       if (editData.posterFile) {
-                        const file = editData.posterFile as File;
-                        coverBase64 = await new Promise<string>((resolve) => {
-                          const r = new FileReader();
-                          r.onload = () => resolve(String(r.result));
-                          r.readAsDataURL(file);
-                        });
+                        coverBase64 = await fileToCompressedDataURL(editData.posterFile as File, { maxW: 1280, maxH: 1280, quality: 0.75, type: "image/webp" });
                       }
                       const payload = {
                         title: editData.title,
@@ -438,12 +458,7 @@ const AdminEditModal: React.FC<AdminEditModalProps> = (props) => {
                     } else {
                       let coverBase64: string | undefined = undefined;
                       if (editData.posterFile) {
-                        const file = editData.posterFile as File;
-                        coverBase64 = await new Promise<string>((resolve) => {
-                          const r = new FileReader();
-                          r.onload = () => resolve(String(r.result));
-                          r.readAsDataURL(file);
-                        });
+                        coverBase64 = await fileToCompressedDataURL(editData.posterFile as File, { maxW: 1280, maxH: 1280, quality: 0.75, type: "image/webp" });
                       }
                       await updateMovieApi(Number(editData.id), {
                         title: editData.title,
