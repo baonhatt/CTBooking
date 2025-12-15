@@ -1,0 +1,11 @@
+PRAGMA foreign_keys=off;
+DROP TABLE IF EXISTS bookings;
+DROP TABLE IF EXISTS tokens;
+DROP TABLE IF EXISTS accounts;
+DROP TABLE IF EXISTS movies;
+DROP TABLE IF EXISTS ticket_packages;
+DROP TABLE IF EXISTS toys;
+DROP TABLE IF EXISTS users;
+DROP TABLE IF EXISTS showtimes;
+DELETE FROM sqlite_sequence;
+PRAGMA foreign_keys=on;
