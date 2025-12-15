@@ -9,6 +9,8 @@ VITE_SERVER_BASE_URL = "https://cinesphere.com.vn"
 VITE_VNPAY_RETURN_URL = "/checkout"
 VITE_VNPAY_GATEWAY = "https://sandbox.vnpayment.vn/paymentv2/vpcpay.html"
 VITE_MOMO_ENDPOINT = "https://test-payment.momo.vn/v2/gateway/api/create"
+GMAIL_SENDER_EMAIL = "no-reply@cinesphere.com.vn"
+GMAIL_SENDER_NAME = "CTBOOKING"
 
 [[d1_databases]]
 binding = "cinema_db"
