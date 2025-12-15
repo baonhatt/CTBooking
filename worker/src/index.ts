@@ -319,7 +319,8 @@ export default {
         const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>Chào mừng</title></head><body style="font-family:Arial,sans-serif;line-height:1.6;color:#333;"><div style="max-width:600px;margin:20px auto;padding:20px;border:1px solid #ddd;border-radius:8px;"><h2 style="color:#28a745;">Chào mừng bạn đến CINESPHERE</h2><p>Xin chào ${displayName},</p><p>Tài khoản của bạn đã được tạo thành công.</p><p>Chúc bạn có trải nghiệm đặt vé tuyệt vời!</p><p>Trân trọng,<br>Đội ngũ CTBOOKING</p></div></body></html>`;
         await sendMail(env, String(body.email), "🎉 Chào mừng bạn đến CINESPHERE", html);
       } catch {}
-      return json({ status: "success", message: "Đăng ký thành công!" }, 201);
+      const username = typeof body.name === "string" && body.name.trim() ? String(body.name).trim() : String(body.email).split("@")[0];
+      return json({ status: "success", message: "Đăng ký thành công!", user: { id: userId, email: String(body.email), username } }, 201);
     }
     if (url.pathname === "/api/users" && request.method === "GET") {
       const page = Number(url.searchParams.get("page") ?? 1);
@@ -343,9 +344,54 @@ export default {
     }
     if (/^\/api\/users\/\d+$/.test(url.pathname) && request.method === "GET") {
       const id = Number(url.pathname.split("/").pop());
-      const user = await env.cinema_db.prepare(`SELECT * FROM users WHERE id = ?`).bind(id).first();
-      if (!user) return notFound();
-      return json(user);
+      const base = await env.cinema_db
+        .prepare(
+          `SELECT u.*, 
+            (SELECT email FROM accounts a WHERE a.user_id = u.id LIMIT 1) as email,
+            (SELECT is_active FROM accounts a WHERE a.user_id = u.id LIMIT 1) as is_active,
+            (SELECT login_type FROM accounts a WHERE a.user_id = u.id LIMIT 1) as login_type,
+            (SELECT created_at FROM accounts a WHERE a.user_id = u.id LIMIT 1) as account_created_at
+          FROM users u WHERE u.id = ?`,
+        )
+        .bind(id)
+        .first();
+      if (!base) return notFound();
+      const totalRow = await env.cinema_db.prepare(`SELECT COUNT(*) as c FROM bookings WHERE user_id = ?`).bind(id).first();
+      const bookings = await env.cinema_db
+        .prepare(
+          `SELECT b.id, b.ticket_count, b.total_price, b.payment_method, b.payment_status, b.created_at, m.title as movie_title, t.name as ticket_package_name
+           FROM bookings b 
+           LEFT JOIN movies m ON m.id = b.movie_id 
+           LEFT JOIN ticket_packages t ON t.id = b.ticket_package_id 
+           WHERE b.user_id = ? 
+           ORDER BY b.created_at DESC 
+           LIMIT 10`,
+        )
+        .bind(id)
+        .all();
+      const recent_bookings = (bookings.results || []).map((b: any) => ({
+        id: b.id,
+        movie_title: b.movie_title || "N/A",
+        ticket_count: Number(b.ticket_count || 0),
+        total_price: Number(b.total_price || 0),
+        payment_method: b.payment_method || "",
+        payment_status: b.payment_status || "",
+        created_at: b.created_at,
+      }));
+      return json({
+        id: (base as any).id,
+        fullname: (base as any).fullname || "N/A",
+        phone: (base as any).phone || "N/A",
+        email: (base as any).email || "N/A",
+        avatar: (base as any).avatar || null,
+        is_active: Boolean((base as any).is_active ?? true),
+        login_type: (base as any).login_type || "email",
+        account_created_at: (base as any).account_created_at,
+        user_created_at: (base as any).created_at,
+        user_updated_at: (base as any).updated_at,
+        recent_bookings,
+        total_bookings: Number((totalRow as any)?.c || 0),
+      });
     }
     if (url.pathname === "/api/users/profile" && request.method === "POST") {
       const body = await request.json().catch(() => null);
@@ -522,6 +568,10 @@ export default {
         total_price: (booking as any).total_price,
         ticket_count: (booking as any).ticket_count,
         created_at: (booking as any).created_at,
+        name: (booking as any).name,
+        phone: (booking as any).phone,
+        email: (booking as any).email,
+        user_id: (booking as any).user_id,
         movie_id: (booking as any).movie_id,
         ticket_package_id: (booking as any).ticket_package_id,
       });
@@ -1033,16 +1083,15 @@ export default {
     }
     if (url.pathname === "/api/debug/mail" && request.method === "GET") {
       const config = {
-        provider: "gmail",
-        host: "smtp.gmail.com",
-        port: 587,
-        has_user: Boolean(env.GMAIL_USER),
-        has_pass: Boolean(env.GMAIL_PASS),
-        sender_email: String(env.GMAIL_SENDER_EMAIL || env.GMAIL_USER || "no-reply@example.com"),
+        provider: "mailchannels",
+        endpoint: "https://api.mailchannels.net/tx/v1/send",
+        sender_email: String(env.GMAIL_SENDER_EMAIL || "no-reply@example.com"),
         sender_name: String(env.GMAIL_SENDER_NAME || "CTBOOKING"),
-        configured: Boolean(env.GMAIL_USER && env.GMAIL_PASS),
+        has_sender_email: Boolean(env.GMAIL_SENDER_EMAIL),
+        has_sender_name: Boolean(env.GMAIL_SENDER_NAME),
+        configured: Boolean(env.GMAIL_SENDER_EMAIL),
       };
-      const verify = config.configured ? { ok: true } : { ok: false, message: "Mail provider is not configured" };
+      const verify = config.configured ? { ok: true } : { ok: false, message: "Missing GMAIL_SENDER_EMAIL" };
       return json({ config, verify });
     }
     return notFound();
