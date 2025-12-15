@@ -20,3 +20,38 @@ GMAIL_SENDER_NAME = "CTBOOKING"
   [[r2_buckets]]
   binding = "r2_cinemastore"
   bucket_name = "cinemastore"
+
+[env.preview]
+[env.preview.vars]
+UPSTREAM_BASE = "https://cinesphere.com.vn"
+VITE_SERVER_BASE_URL = "https://cinesphere.com.vn"
+VITE_VNPAY_RETURN_URL = "/checkout"
+VITE_VNPAY_GATEWAY = "https://sandbox.vnpayment.vn/paymentv2/vpcpay.html"
+VITE_MOMO_ENDPOINT = "https://test-payment.momo.vn/v2/gateway/api/create"
+GMAIL_SENDER_EMAIL = "no-reply@cinesphere.com.vn"
+GMAIL_SENDER_NAME = "CTBOOKING"
+
+[env.production]
+[env.production.vars]
+UPSTREAM_BASE = "https://cinesphere.com.vn"
+VITE_SERVER_BASE_URL = "https://cinesphere.com.vn"
+VITE_VNPAY_RETURN_URL = "/checkout"
+VITE_VNPAY_GATEWAY = "https://sandbox.vnpayment.vn/paymentv2/vpcpay.html"
+VITE_MOMO_ENDPOINT = "https://test-payment.momo.vn/v2/gateway/api/create"
+GMAIL_SENDER_EMAIL = "no-reply@cinesphere.com.vn"
+GMAIL_SENDER_NAME = "CTBOOKING"
+[observability]
+enabled = false
+head_sampling_rate = 1
+
+[observability]
+[observability.logs]
+enabled = true
+head_sampling_rate = 1
+persist = true
+invocation_logs = true
+
+[observability.traces]
+enabled = true
+head_sampling_rate = 1
+persist = false
