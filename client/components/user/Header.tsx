@@ -842,7 +842,7 @@ export default function Header({ onBookClick = () => { }, disableNav = false, to
                     className="h-4 w-4"
                   />
                   <span className="text-xs text-gray-300 leading-5">
-                    Bằng việc đăng ký tài khoản, tôi đồng ý với Điều khoản dịch vụ và Chính sách bảo vệ của CTBooking.
+                    Bằng việc đăng ký tài khoản, tôi đồng ý với Điều khoản dịch vụ và Chính sách bảo vệ của Cinesphere.
                   </span>
                 </div>
                 {registerTermsError && (

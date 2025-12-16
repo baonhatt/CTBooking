@@ -539,23 +539,6 @@ export default function Checkout() {
                 </div>
               </div>
             )}
-
-            {!isLoggedIn && (
-              <div className="mt-4 bg-yellow-500/20 border border-yellow-500/40 rounded-lg p-4 text-center">
-                <p className="text-sm text-yellow-200">
-                  Vui lòng đăng nhập trước khi thanh toán.{" "}
-                  <button
-                    className="font-semibold text-yellow-200 underline hover:text-yellow-100"
-                    onClick={() => {
-                      window.dispatchEvent(new Event("open-login"));
-                      navigate("/");
-                    }}
-                  >
-                    Đăng nhập
-                  </button>
-                </p>
-              </div>
-            )}
           </motion.div>
         </div>
       </section>

@@ -196,8 +196,6 @@ export function getBookingEmailTemplate(data: {
                 </div>
             </div>
 
-            ${data.movieImage ? `<img src="${process.env.VITE_SERVER_BASE_URL}${data.movieImage}" alt="${data.movieTitle}" class="movie-poster">` : ""}
-
             <div class="details-section">
                 <div class="section-title">Thông tin phim</div>
                 <div class="detail-row">
@@ -235,6 +233,122 @@ export function getBookingEmailTemplate(data: {
 
             <div class="warning">
                 ⏰ <strong>Lưu ý:</strong> Mang theo mã đặt vé để nhân viên xác nhận.
+            </div>
+        </div>
+
+        <div class="footer">
+            <p><strong>CINESPHERE - Rạp chiếu phim hiện đại</strong></p>
+            <p>Email: support@cinesphere.com | Hotline: 1900-xxxx</p>
+            <p style="margin-top: 15px; color: #999;">
+                Đây là email tự động, vui lòng không trả lời email này.
+            </p>
+        </div>
+    </div>
+</body>
+</html>
+  `;
+}
+
+export function getResetPasswordEmailTemplate(link: string): string {
+  return `
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Đặt lại Mật khẩu - CINESPHERE</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f5f5f5;
+            margin: 0;
+            padding: 0;
+        }
+        .container {
+            max-width: 600px;
+            margin: 0 auto;
+            background-color: #ffffff;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 30px 20px;
+            text-align: center;
+        }
+        .header h1 {
+            margin: 0;
+            font-size: 28px;
+            font-weight: 600;
+        }
+        .header p {
+            margin: 8px 0 0 0;
+            font-size: 14px;
+            opacity: 0.9;
+        }
+        .content {
+            padding: 30px;
+            color: #333;
+        }
+        .greeting {
+            font-size: 16px;
+            margin-bottom: 20px;
+        }
+        .btn-container {
+            text-align: center;
+            margin: 30px 0;
+        }
+        .btn {
+            display: inline-block;
+            padding: 12px 24px;
+            background-color: #dc3545;
+            color: white;
+            text-decoration: none;
+            border-radius: 4px;
+            font-weight: 600;
+            font-size: 16px;
+        }
+        .footer {
+            background-color: #f8f9fa;
+            padding: 20px;
+            text-align: center;
+            font-size: 12px;
+            color: #666;
+            border-top: 1px solid #eee;
+        }
+        .footer p {
+            margin: 5px 0;
+        }
+        .note {
+            font-size: 14px;
+            color: #666;
+            margin-top: 20px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🎬 CINESPHERE</h1>
+            <p>Yêu cầu Đặt lại Mật khẩu</p>
+        </div>
+
+        <div class="content">
+            <div class="greeting">
+                <h2 style="color: #007bff; margin-top: 0;">Yêu cầu Đặt lại Mật khẩu</h2>
+                <p>Chào bạn,</p>
+                <p>Chúng tôi nhận được yêu cầu đặt lại mật khẩu cho tài khoản của bạn. Vui lòng nhấp vào nút dưới đây để tạo mật khẩu mới. Liên kết này sẽ hết hạn sau <strong>60 phút</strong>.</p>
+            </div>
+
+            <div class="btn-container">
+                <a href="${link}" class="btn">Đặt lại Mật khẩu</a>
+            </div>
+
+            <div class="note">
+                <p>Nếu bạn không yêu cầu thay đổi mật khẩu, vui lòng bỏ qua email này hoặc liên hệ với bộ phận hỗ trợ của chúng tôi.</p>
+                <p>Trân trọng,<br>Đội ngũ Cinema App</p>
             </div>
         </div>
 
