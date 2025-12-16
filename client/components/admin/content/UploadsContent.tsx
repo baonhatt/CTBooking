@@ -5,12 +5,14 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Progress } from "@/components/ui/progress";
-import { uploadAdminVideo, uploadDirectToCloudinary, createSiteMediaApi } from "@/lib/api/uploads";
- 
+import { uploadAdminVideo, uploadDirectToCloudinary, createSiteMediaApi, getSiteMediaApi, updateSiteMediaApi } from "@/lib/api/uploads";
+
 export default function UploadsContent() {
   const fileRef = useRef<HTMLInputElement | null>(null);
   const [files, setFiles] = useState<File[]>([]);
   const [openConfirm, setOpenConfirm] = useState(false);
+  const [confirmMessage, setConfirmMessage] = useState("");
+  const [pendingTargetId, setPendingTargetId] = useState<number | null>(null);
   const [uploads, setUploads] = useState<
     {
       id: string;
@@ -25,6 +27,7 @@ export default function UploadsContent() {
       uploadProgress: number;
       status: "pending" | "uploading" | "done" | "error";
       error?: string;
+      targetId?: number;
     }[]
   >([]);
   const runningRef = useRef(0);
@@ -121,10 +124,6 @@ export default function UploadsContent() {
                 return cp;
               });
               
-              // We need to define compressImage outside or here. 
-              // Since it uses URL.createObjectURL, it's fine.
-              // We'll move compressImage to be stable or just use the existing one if it's in scope.
-              // But compressImage is defined in component body, so it's available.
               finalFile = await compressImage(nextItem.file);
               
               setUploads((arr) => {
@@ -156,18 +155,35 @@ export default function UploadsContent() {
                   })
                 ));
 
-            await createSiteMediaApi({
-              section: nextItem.section,
-              type: nextItem.isVideo ? "video" : "image",
-              url: result.url,
-              public_id: result.public_id,
-              format: result.format,
-              width: result.width,
-              height: result.height,
-              duration: result.duration,
-              display_order: 0,
-              is_active: true,
-            });
+            if (nextItem.targetId) {
+              await updateSiteMediaApi({
+                id: nextItem.targetId,
+                section: nextItem.section,
+                type: nextItem.isVideo ? "video" : "image",
+                url: result.url,
+                public_id: result.public_id,
+                format: result.format,
+                width: result.width,
+                height: result.height,
+                duration: result.duration,
+                is_active: true,
+              });
+              setStatusLines((prev) => [...prev, `Đã cập nhật [${nextItem.name}] vào ${nextItem.section} (ID: ${nextItem.targetId})`]);
+            } else {
+              await createSiteMediaApi({
+                section: nextItem.section,
+                type: nextItem.isVideo ? "video" : "image",
+                url: result.url,
+                public_id: result.public_id,
+                format: result.format,
+                width: result.width,
+                height: result.height,
+                duration: result.duration,
+                display_order: 0,
+                is_active: true,
+              });
+              setStatusLines((prev) => [...prev, `Đã tạo mới [${nextItem.name}] vào ${nextItem.section}`]);
+            }
 
             setUploads((arr) => {
               const cp = [...arr];
@@ -175,7 +191,6 @@ export default function UploadsContent() {
               if (i !== -1) cp[i] = { ...cp[i], status: "done", uploadProgress: 100 };
               return cp;
             });
-            setStatusLines((prev) => [...prev, `Đã upload [${nextItem.name}] lên ${nextItem.section} xong`]);
           } catch (err: any) {
             setUploads((arr) => {
               const cp = [...arr];
@@ -190,6 +205,53 @@ export default function UploadsContent() {
       }
     }
   }, [uploads]);
+
+  const checkAndPrepareUpload = async () => {
+    if (!files.length) return;
+    setConfirmMessage("");
+    setPendingTargetId(null);
+
+    try {
+      // Fetch existing items to check constraints
+      const res = await getSiteMediaApi({ section });
+      const items = res.items || [];
+      
+      if (section === "technology_section2") {
+        if (items.length >= 6) {
+          // Sort by display_order to find the 6th one
+          const sorted = [...items].sort((a, b) => (a.display_order || 0) - (b.display_order || 0));
+          // Target the 6th item (index 5) or the last one if fewer than 6 but logic says >=6
+          const target = sorted[5] || sorted[items.length - 1];
+          
+          if (target) {
+            setPendingTargetId(target.id);
+            setConfirmMessage(`Mục ${section} đã đạt giới hạn 6 video. Hành động này sẽ GHI ĐÈ lên video thứ 6 (ID: ${target.id}).`);
+            setOpenConfirm(true);
+            return;
+          }
+        }
+      } else {
+        // hero_section or technology_section1 -> single item
+        if (items.length > 0) {
+          const target = items[0];
+          setPendingTargetId(target.id);
+          setConfirmMessage(`Mục ${section} đã có dữ liệu. Hành động này sẽ CẬP NHẬT thay thế nội dung cũ.`);
+          setOpenConfirm(true);
+          return;
+        }
+      }
+
+      // Default: Insert new
+      setConfirmMessage(files.length === 1 && /^image\//.test(files[0].type)
+        ? "Bạn có chắc muốn tải lên ảnh này?"
+        : "Bạn có chắc muốn tải lên các tệp đã chọn?");
+      setOpenConfirm(true);
+    } catch (err) {
+      console.error("Check failed", err);
+      setConfirmMessage("Không thể kiểm tra dữ liệu cũ. Bạn có muốn tiếp tục tải lên?");
+      setOpenConfirm(true);
+    }
+  };
 
   const startUpload = async () => {
     if (!files.length) return;
@@ -208,9 +270,11 @@ export default function UploadsContent() {
       compressProgress: /^image\//.test(f.type) ? 0 : null,
       uploadProgress: 0,
       status: "pending" as const,
+      targetId: pendingTargetId || undefined,
     }));
     setUploads((arr) => [...arr, ...toAdd]);
     setFiles([]);
+    setPendingTargetId(null); // Reset
     if (fileRef.current) fileRef.current.value = "";
   };
  
@@ -237,7 +301,7 @@ export default function UploadsContent() {
         <div className="flex gap-2">
           <Button
             disabled={!files.length}
-            onClick={() => setOpenConfirm(true)}
+            onClick={checkAndPrepareUpload}
           >
             Upload
           </Button>
@@ -338,9 +402,9 @@ export default function UploadsContent() {
             </DialogHeader>
             <div className="space-y-3">
               <div className="text-sm text-white/80">
-                {files.length === 1 && /^image\//.test(files[0].type)
+                {confirmMessage || (files.length === 1 && /^image\//.test(files[0].type)
                   ? "Bạn có chắc muốn tải lên ảnh này?"
-                  : "Bạn có chắc muốn tải lên các tệp đã chọn?"}
+                  : "Bạn có chắc muốn tải lên các tệp đã chọn?")}
               </div>
               <div className="flex gap-2">
                 <Button onClick={startUpload}>Xác nhận</Button>

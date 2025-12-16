@@ -145,6 +145,33 @@ export async function createSiteMediaApi(body: {
   return (await res.json()) as { item: any };
 }
 
+export async function updateSiteMediaApi(body: {
+  id: number;
+  section?: "hero_section" | "technology_section1" | "technology_section2";
+  type?: "image" | "video";
+  title?: string;
+  description?: string;
+  public_id?: string;
+  url?: string;
+  format?: string;
+  width?: number;
+  height?: number;
+  duration?: number;
+  display_order?: number;
+  is_active?: boolean;
+}) {
+  const res = await fetch("/api/admin/site-media", {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    throw new Error(data?.message || `HTTP ${res.status}`);
+  }
+  return (await res.json()) as { item: any; success: boolean };
+}
+
 export async function getSiteMediaApi(options?: {
   section?: "hero_section" | "technology_section1" | "technology_section2";
   type?: "image" | "video";
