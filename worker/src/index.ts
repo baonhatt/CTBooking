@@ -1210,9 +1210,8 @@ export default {
       const ticketPackageId = body.ticketPackageId ? Number(body.ticketPackageId) : null;
       if (!email || !emailBook || !phone || !name || !ticketCount || ticketCount <= 0) return badRequest("Vui lòng nhập đầy đủ thông tin hợp lệ.");
       if (ticketCount > 10) return badRequest("Mỗi lượt chỉ đặt tối đa 10 vé.");
-      const acc = await env.cinema_db.prepare(`SELECT * FROM accounts WHERE email = ?`).bind(email).first();
-      if (!acc) return json({ ok: false, message: "Người dùng không tồn tại." }, 404);
-      const user = await env.cinema_db.prepare(`SELECT * FROM users WHERE id = ?`).bind(Number((acc as any).user_id)).first();
+      const acc = null;
+      const user = null;
       let movie: any = null;
       if (movieId) {
         movie = await env.cinema_db.prepare(`SELECT * FROM movies WHERE id = ?`).bind(movieId).first();
@@ -1232,7 +1231,7 @@ export default {
       const totalPrice = unitPrice * ticketCount;
       return json({
         ok: true,
-        user: { id: Number((user as any)?.id), email: String(email), fullname: (user as any)?.fullname ?? null, phone: (user as any)?.phone ?? null },
+        user: { id: 0, email: String(email), fullname: null, phone: null },
         movie: movie
           ? { id: Number(movie.id), title: String(movie.title || ""), is_active: Number(movie.is_active) ? true : false, duration_min: Number(movie.duration_min ?? 0) }
           : undefined,
@@ -1253,8 +1252,7 @@ export default {
       const ticketCount = Number(body.ticketCount || 0);
       const paymentMethod = String((body.paymentMethod || "cash")).toLowerCase();
       if (!email || !emailBook || !phone || !name || !ticketCount || ticketCount <= 0) return badRequest("Vui lòng nhập đầy đủ thông tin hợp lệ.");
-      const acc = await env.cinema_db.prepare(`SELECT * FROM accounts WHERE email = ?`).bind(email).first();
-      if (!acc) return json({ message: "Không tìm thấy người dùng" }, 404);
+      const acc = null;
       let unitPrice = 0;
       if (ticketPackageId) {
         const pkg = await env.cinema_db.prepare(`SELECT * FROM ticket_packages WHERE id = ?`).bind(ticketPackageId).first();
@@ -1264,12 +1262,17 @@ export default {
       const totalPrice = Number(body.totalPrice ?? unitPrice * ticketCount);
       if (!Number.isFinite(totalPrice) || totalPrice <= 0) return badRequest("Giá trị tổng tiền không hợp lệ.");
       try {
+        const resUser = await env.cinema_db
+          .prepare(`INSERT INTO users (fullname, phone, created_at, updated_at) VALUES (?, ?, ?, ?)`)
+          .bind(String(name || "Khách vãng lai"), String(phone || ""), new Date().toISOString(), new Date().toISOString())
+          .run();
+        const userId = Number((resUser.meta as any).last_row_id ?? 0);
         const resRun = await env.cinema_db
           .prepare(
             `INSERT INTO bookings (user_id, movie_id, ticket_package_id, ticket_count, total_price, payment_method, phone, name, email, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
           )
           .bind(
-            Number((acc as any).user_id || 0),
+            userId,
             movieId,
             ticketPackageId,
             ticketCount,
@@ -1291,17 +1294,22 @@ export default {
     if (url.pathname === "/api/confirm-booking" && request.method === "POST") {
       const body = await request.json().catch(() => null);
       if (!body) return badRequest();
-      const user_id = Number(body.user_id);
+      const user_id = Number(body.user_id || 0);
       const payment_id = Number(body.payment_id);
       const payment_status = String(body.payment_status || "");
       const transaction_id = body.transaction_id ?? null;
       const paid_at = body.paid_at ? new Date(body.paid_at).toISOString() : null;
-      if (!user_id || !payment_id || !payment_status) return badRequest("Vui lòng nhập đầy đủ thông tin hợp lệ.");
+      if (!payment_id || !payment_status) return badRequest("Vui lòng nhập đầy đủ thông tin hợp lệ.");
+      const acc = await env.cinema_db.prepare(`SELECT * FROM accounts WHERE user_id = ?`).bind(user_id).first();
+      if (!acc) return json({ message: "Không tìm thấy tài khoản" }, 404);
       const booking = await env.cinema_db
-        .prepare(`SELECT * FROM bookings WHERE id = ? AND user_id = ?`)
-        .bind(payment_id, user_id)
+        .prepare(`SELECT * FROM bookings WHERE id = ?`)
+        .bind(payment_id)
         .first();
       if (!booking) return json({ message: "Không tìm thấy đặt vé." }, 404);
+      if (Number((booking as any).user_id || 0) !== user_id) {
+        return json({ message: "Đặt vé không thuộc người dùng này" }, 403);
+      }
       let bookingCode = (booking as any).booking_code as string | null;
       if (payment_status.toLowerCase() === "paid" && !bookingCode) {
         let isUnique = false;

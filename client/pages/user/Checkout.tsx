@@ -191,9 +191,9 @@ export default function Checkout() {
       const payment_status = resultCode === "0" ? "paid" : "failed";
 
       // Chỉ gọi confirmBookingApi nếu là lần đầu callback
-      if (isFirstMomoCallback && pending && pending.booking_id && pending.user_id) {
+      if (isFirstMomoCallback && pending && pending.booking_id) {
         confirmBookingApi({
-          user_id: Number(pending.user_id),
+          user_id: Number(pending.user_id || 0),
           payment_id: Number(pending.booking_id),
           payment_status,
           transaction_id: transId as any,
@@ -255,10 +255,10 @@ export default function Checkout() {
     const isSuccess = vnpResponseCode === "00";
     setStatus(isSuccess ? "success" : "failed");
 
-    if (isSuccess && pendingData && pendingData.booking_id && pendingData.user_id) {
+    if (isSuccess && pendingData && pendingData.booking_id) {
       console.log("Confirming VNPay booking...");
       confirmBookingApi({
-        user_id: Number(pendingData.user_id),
+        user_id: Number(pendingData.user_id || 0),
         payment_id: Number(pendingData.booking_id),
         payment_status: "paid",
         transaction_id: vnpTransactionNo || vnpTxnRef,
@@ -269,10 +269,10 @@ export default function Checkout() {
       }).catch((err) => {
         console.error("Error confirming booking:", err);
       });
-    } else if (!isSuccess && pendingData && pendingData.booking_id && pendingData.user_id) {
+    } else if (!isSuccess && pendingData && pendingData.booking_id) {
       console.log("VNPay payment failed, updating status to failed...");
       confirmBookingApi({
-        user_id: Number(pendingData.user_id),
+        user_id: Number(pendingData.user_id || 0),
         payment_id: Number(pendingData.booking_id),
         payment_status: "failed",
         transaction_id: vnpTransactionNo || vnpTxnRef,

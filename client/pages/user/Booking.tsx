@@ -64,18 +64,7 @@ export default function BookingPage() {
   const MIN_TICKETS = 1;
   const MAX_TICKETS = 10;
 
-  useEffect(() => {
-    try {
-      const authRaw = localStorage.getItem("authUser");
-      if (!authRaw) {
-        toast({ title: "Vui lòng đăng nhập", description: "Bạn cần đăng nhập trước khi đặt vé" });
-        window.dispatchEvent(new Event("open-login"));
-        navigate("/", { replace: true });
-      }
-    } catch {
-      navigate("/", { replace: true });
-    }
-  }, [navigate]);
+  
 
   useEffect(() => {
     return () => { if (countdownRef.current) clearInterval(countdownRef.current); };
@@ -212,12 +201,6 @@ export default function BookingPage() {
       toast({ title: "Vui lòng xác nhận thông tin", description: "Hãy tick vào ô xác nhận trước khi thanh toán" });
       return;
     }
-    const authRaw = localStorage.getItem("authUser");
-    if (!authRaw) {
-      toast({ title: "Vui lòng đăng nhập", description: "Bạn cần đăng nhập trước khi thanh toán" });
-      window.dispatchEvent(new Event("open-login"));
-      return;
-    }
     if (!selectedMovie) {
       toast({ title: "Chưa chọn phim", description: "Vui lòng chọn một bộ phim" });
       return;
@@ -234,14 +217,12 @@ export default function BookingPage() {
     if (!confirmed) return;
     try {
       setIsProcessing(true);
-      const parsed = JSON.parse(authRaw);
-      const authEmail = parsed?.user?.email || parsed?.email || "";
       const orderId = `ORDER_${Date.now()}`;
       const movieDetail = selectedMovie;
       const ticketPackageId = selectedPackage?.id || defaultTicket?.id;
       // Validate booking data on server to prevent tampering
       const validation = await validateBookingApi({
-        email: authEmail,
+        email,
         emailBook: email,
         phone,
         name,
@@ -261,7 +242,7 @@ export default function BookingPage() {
         movie: selectedMovie?.title,
         name,
         phone,
-        email: authEmail,
+        email,
         emailBook: email,
         quantity: ticketCount,
         amount: canonicalTotal,
@@ -275,7 +256,7 @@ export default function BookingPage() {
       countdownRef.current = setInterval(() => setCountdown((c) => c - 1), 1000);
 
       const { booking } = await createBookingApi({
-        email: authEmail,
+        email,
         emailBook: email,
         phone,
         name,
@@ -524,7 +505,16 @@ export default function BookingPage() {
 
               <div className="flex justify-end gap-3">
                 <Button variant="outline" className="bg-transparent border-white/30 text-white hover:bg-white/10" onClick={() => navigate("/")} disabled={isProcessing}>Hủy</Button>
-                <Button className="bg-gradient-to-r from-blue-500 to-purple-500 hover:from-blue-600 hover:to-purple-600 text-white font-semibold shadow-lg disabled:opacity-50" onClick={() => setStep(1)} disabled={!movie || !selectedPackage || !name || !phone || !email || isProcessing}>Tiếp tục</Button>
+                <Button
+                  className="bg-gradient-to-r from-blue-500 to-purple-500 hover:from-blue-600 hover:to-purple-600 text-white font-semibold shadow-lg disabled:opacity-50"
+                  onClick={() => {
+                    const ok = window.confirm("Lưu ý thông tin vé của bạn sẽ được gửi đến email này");
+                    if (ok) setStep(1);
+                  }}
+                  disabled={!movie || !selectedPackage || !name || !phone || !email || isProcessing}
+                >
+                  Tiếp tục
+                </Button>
               </div>
             </CardContent>
           </Card>

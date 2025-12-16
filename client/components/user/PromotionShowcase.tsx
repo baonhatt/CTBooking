@@ -21,12 +21,6 @@ export default function PromotionShowcase() {
   })).sort((a, b) => a.display_order - b.display_order);
 
   const handleBookCombo = (combo: typeof combos[0]) => {
-    const authRaw = localStorage.getItem("authUser");
-    if (!authRaw) {
-      toast({ title: "Vui lòng đăng nhập trước!" });
-      window.dispatchEvent(new Event("open-login"));
-      return;
-    }
     try {
       // Lưu combo được chọn vào localStorage dưới dạng package để tương thích với hệ thống booking
       const comboPackage = {

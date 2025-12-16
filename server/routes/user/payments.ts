@@ -36,13 +36,7 @@ async function validateBookingInput(body: PaymentRequest): Promise<BookingValida
     where: { accounts: { some: { email } } },
     select: { id: true, fullname: true, phone: true, accounts: { select: { email: true }, take: 1 } },
   });
-  if (!user) {
-    throw new HttpError(404, "Người dùng không tồn tại.");
-  }
-  const userEmail = user.accounts?.[0]?.email;
-  if (!userEmail || userEmail.toLowerCase() !== email.toLowerCase()) {
-    throw new HttpError(400, "Email người dùng không trùng khớp.");
-  }
+  const userEmail = user?.accounts?.[0]?.email || email;
 
   let movie: any = null;
   if (movieId) {
@@ -75,7 +69,7 @@ async function validateBookingInput(body: PaymentRequest): Promise<BookingValida
   const totalPrice = unitPrice * ticketCount;
 
   return {
-    user: { id: user.id, email: userEmail, fullname: user.fullname, phone: user.phone },
+    user: { id: user?.id ?? 0, email: userEmail, fullname: user?.fullname ?? name, phone: user?.phone ?? phone },
     movie,
     ticketPackage,
     unitPrice,
@@ -116,10 +110,24 @@ export const createPayment: RequestHandler = async (req, res) => {
     const { user, totalPrice } = validation;
     const { emailBook, phone, name, ticketCount, paymentMethod } = req.body as PaymentRequest;
 
+    let userId = Number(user?.id ?? 0);
+    if (!userId || userId <= 0) {
+      let guest = await (prisma as any).users.findFirst({ where: { phone } });
+      if (!guest) {
+        guest = await (prisma as any).users.create({
+          data: {
+            fullname: name || "Khách vãng lai",
+            phone,
+          },
+        });
+      }
+      userId = Number(guest.id);
+    }
+
     // ====== TẠO BOOKING ======
     const booking = await (prisma as any).bookings.create({
       data: {
-        user_id: user.id,
+        user_id: userId,
         movie_id: validation.movie?.id ? Number(validation.movie.id) : null,
         ticket_package_id: validation.ticketPackage?.id ? Number(validation.ticketPackage.id) : null,
         ticket_count: ticketCount,
