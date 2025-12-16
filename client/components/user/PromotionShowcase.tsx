@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { getActiveTickets } from "@/lib/api";
 import { toast } from "@/components/ui/use-toast";
+import { Carousel, CarouselContent, CarouselItem, CarouselNext, CarouselPrevious } from "../ui/carousel";
 
 export default function PromotionShowcase() {
   const navigate = useNavigate();
@@ -68,38 +69,80 @@ export default function PromotionShowcase() {
             Chưa có gói vé nào
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-            {combos.map((combo, index) => (
-              <motion.div
-                key={combo.id}
-                initial={{ opacity: 0, y: 24 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true }}
-                transition={{ delay: index * 0.08, duration: 0.45 }}
-                className="relative overflow-hidden rounded-3xl p-6 bg-white/5 border border-cyan-400/20 shadow-[0_10px_50px_rgba(59,130,246,0.15)] hover:shadow-[0_10px_60px_rgba(236,72,153,0.22)] transition-all duration-300"
-              >
-                <div className="absolute inset-0 bg-gradient-to-br from-cyan-500/15 via-blue-600/10 to-fuchsia-500/12" />
-                <div className="absolute -top-10 -right-10 w-28 h-28 bg-white/10 rounded-full blur-3xl" />
-                <div className="relative z-10 space-y-3">
-                  <p className="text-sm uppercase tracking-[0.16em] text-cyan-200">
-                    Combo
-                  </p>
-                  <h3 className="text-xl font-semibold text-white">{combo.name}</h3>
-                  <p className="text-3xl font-extrabold text-cyan-300 drop-shadow">
-                    {combo.price.toLocaleString("vi-VN")}₫
-                  </p>
-                  <p className="text-sm text-gray-200">
-                    Vé trải nghiệm CINESPHERE kèm quà tặng ánh sáng lưu niệm.
-                  </p>
-                  <button 
-                    onClick={() => handleBookCombo(combo)}
-                    className="mt-2 inline-flex items-center justify-center px-4 py-2 rounded-xl bg-gradient-to-r from-cyan-400 to-purple-500 text-black font-semibold hover:from-fuchsia-500 hover:to-cyan-400 transition-all duration-300 shadow-[0_0_25px_rgba(59,130,246,0.35)]"
-                  >
-                    Đặt ngay
-                  </button>
-                </div>
-              </motion.div>
-            ))}
+          <div className="mx-auto max-w-7xl">
+            <Carousel
+              opts={{
+                align: "start",
+                loop: true,
+              }}
+              className="w-full"
+            >
+              <CarouselContent>
+                {combos.map((combo, index) => (
+                  <CarouselItem key={combo.id} className="md:basis-1/2 lg:basis-1/4 pl-6">
+                    <motion.div
+                      initial={{ opacity: 0, y: 50 }}
+                      whileInView={{ opacity: 1, y: 0 }}
+                      whileHover={{
+                        scale: 1.05,
+                        boxShadow: "0 20px 60px rgba(6, 182, 212, 0.2)",
+                      }}
+                      viewport={{ once: true }}
+                      transition={{
+                        delay: index * 0.1,
+                        duration: 0.5,
+                        type: "spring",
+                        stiffness: 100,
+                      }}
+                      className="h-full relative overflow-hidden rounded-3xl p-6 bg-white/5 border border-cyan-400/20 shadow-[0_10px_50px_rgba(59,130,246,0.15)] group transition-colors duration-300 flex flex-col justify-between"
+                    >
+                      <div className="absolute inset-0 bg-gradient-to-br from-cyan-500/15 via-blue-600/10 to-fuchsia-500/12 opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
+                      <div className="absolute -top-10 -right-10 w-28 h-28 bg-white/10 rounded-full blur-3xl group-hover:bg-cyan-400/20 transition-colors duration-500" />
+
+                      {/* Shine effect */}
+                      <div className="absolute inset-0 -translate-x-full group-hover:animate-[shimmer_2s_infinite] bg-gradient-to-r from-transparent via-white/10 to-transparent" />
+
+                      <div className="relative z-10 space-y-3">
+                        <p className="text-sm uppercase tracking-[0.16em] text-cyan-200 group-hover:text-cyan-100 transition-colors">
+                          Combo
+                        </p>
+                        <h3 className="text-xl font-semibold text-white group-hover:text-cyan-50 transition-colors">
+                          {combo.name}
+                        </h3>
+                        <motion.p
+                          whileHover={{ scale: 1.1, originX: 0 }}
+                          className="text-3xl font-extrabold text-cyan-300 drop-shadow group-hover:text-cyan-200 transition-colors"
+                        >
+                          {combo.price.toLocaleString("vi-VN")}₫
+                        </motion.p>
+                        <p className="text-sm text-gray-200 group-hover:text-white transition-colors">
+                          Vé trải nghiệm CINESPHERE kèm quà tặng ánh sáng lưu
+                          niệm.
+                        </p>
+                        <motion.button
+                          whileHover={{ scale: 1.05 }}
+                          whileTap={{ scale: 0.95 }}
+                          onClick={() => handleBookCombo(combo)}
+                          className="mt-2 w-full inline-flex items-center justify-center px-4 py-3 rounded-xl bg-gradient-to-r from-cyan-400 to-purple-500 text-black font-bold hover:from-cyan-300 hover:to-purple-400 transition-all duration-300 shadow-[0_0_25px_rgba(59,130,246,0.35)] group-hover:shadow-[0_0_35px_rgba(6,182,212,0.5)]"
+                        >
+                          Đặt ngay
+                        </motion.button>
+                      </div>
+                    </motion.div>
+                  </CarouselItem>
+                ))}
+              </CarouselContent>
+              <div className="hidden md:block">
+                <CarouselPrevious className="bg-white/10 hover:bg-cyan-500 hover:text-white border-none text-white -left-12" />
+                <CarouselNext className="bg-white/10 hover:bg-cyan-500 hover:text-white border-none text-white -right-12" />
+              </div>
+
+              {/* Mobile Navigation */}
+              <div className="flex justify-center gap-4 mt-6 md:hidden">
+                <CarouselPrevious className="static translate-y-0 bg-white/10 hover:bg-cyan-500 hover:text-white border-none text-white" />
+                <CarouselNext className="static translate-y-0 bg-white/10 hover:bg-cyan-500 hover:text-white border-none text-white" />
+              </div>
+            </Carousel>
           </div>
         )}
       </div>

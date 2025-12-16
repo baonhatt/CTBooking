@@ -233,13 +233,12 @@ export default function HeroSection() {
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.3 }}
-              className="text-4xl md:text-6xl lg:text-7xl font-extrabold leading-tight tracking-tight"
+              className="text-6xl md:text-6xl lg:text-7xl font-extrabold leading-none tracking-tight flex flex-col gap-2"
             >
-              <span className="bg-gradient-to-r from-cyan-300 via-blue-400 to-fuchsia-400 bg-clip-text text-transparent drop-shadow-[0_10px_40px_rgba(56,189,248,0.5)]">
+              <span className="bg-gradient-to-r from-cyan-300 via-blue-400 to-fuchsia-400 bg-clip-text text-transparent drop-shadow-[0_10px_40px_rgba(56,189,248,0.5)] py-2">
                 CINESPHERE
               </span>
-              <br />
-              <span className="text-white text-2xl md:text-3xl lg:text-5xl">Huyễn cảnh không gian</span>
+              <span className="text-white text-3xl md:text-3xl lg:text-5xl">Huyễn cảnh không gian</span>
             </motion.h1>
 
             <motion.p
