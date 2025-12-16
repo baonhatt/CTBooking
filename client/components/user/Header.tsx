@@ -30,6 +30,8 @@ import {
   SheetTrigger,
 } from "@/components/ui/sheet";
 
+export const PASSWORD_PATTERN = /^(?=.*[A-Za-z])(?=.*\d)[A-Za-z\d!@#$%^&*()_+\-\=\[\]{};':"\\|,.<>\/?]{6,}$/;
+
 interface HeaderProps {
   onBookClick?: () => void;
   disableNav?: boolean;
@@ -50,12 +52,23 @@ export default function Header({ onBookClick = () => { }, disableNav = false, to
   const [isForgetLoading, setIsForgetLoading] = useState(false);
   const [loginEmail, setLoginEmail] = useState("");
   const [loginPassword, setLoginPassword] = useState("");
+  const [loginEmailError, setLoginEmailError] = useState<string>("");
+  const [loginPasswordError, setLoginPasswordError] = useState<string>("");
+  const [loginSubmitError, setLoginSubmitError] = useState<string>("");
   const [registerEmail, setRegisterEmail] = useState("");
   const [registerName, setRegisterName] = useState("");
   const [registerPassword, setRegisterPassword] = useState("");
   const [registerConfirmPassword, setRegisterConfirmPassword] = useState("");
   const [registerTerms, setRegisterTerms] = useState(false);
+  const [registerEmailError, setRegisterEmailError] = useState<string>("");
+  const [registerNameError, setRegisterNameError] = useState<string>("");
+  const [registerPasswordError, setRegisterPasswordError] = useState<string>("");
+  const [registerConfirmError, setRegisterConfirmError] = useState<string>("");
+  const [registerTermsError, setRegisterTermsError] = useState<string>("");
+  const [registerSubmitError, setRegisterSubmitError] = useState<string>("");
   const [forgetPassEmail, setForgetPassEmail] = useState("");
+  const [forgetPassEmailError, setForgetPassEmailError] = useState<string>("");
+  const [forgetSubmitError, setForgetSubmitError] = useState<string>("");
   const [showLoginPass, setShowLoginPass] = useState(false);
   const [showRegisterPass, setShowRegisterPass] = useState(false);
   const [showRegisterConfirmPass, setShowRegisterConfirmPass] = useState(false);
@@ -148,14 +161,17 @@ export default function Header({ onBookClick = () => { }, disableNav = false, to
 
   const handleLoginSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setLoginEmailError("");
+    setLoginPasswordError("");
+    setLoginSubmitError("");
     const emailOk = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(loginEmail);
     if (!emailOk) {
-      toast({ title: "Email không hợp lệ" });
+      setLoginEmailError("Vui lòng nhập email hợp lệ");
       return;
     }
-    const passOk = /^(?=.*[A-Za-z])(?=.*\d)[A-Za-z\d]{6,}$/.test(loginPassword);
+    const passOk = PASSWORD_PATTERN.test(loginPassword);
     if (!passOk) {
-      toast({ title: "Mật khẩu không hợp lệ", description: "Ít nhất 6 ký tự, gồm chữ và số" });
+      setLoginPasswordError("Mật khẩu ít nhất 6 ký tự gồm chữ và số");
       return;
     }
     try {
@@ -176,7 +192,14 @@ export default function Header({ onBookClick = () => { }, disableNav = false, to
         setLoginPassword("");
       }
     } catch (err: any) {
-      toast({ title: "Đăng nhập thất bại", description: err.message });
+      const msg = String(err?.message || "");
+      if (msg.toLowerCase().includes("email")) {
+        setLoginEmailError(msg);
+      } else if (msg.toLowerCase().includes("mật khẩu") || msg.toLowerCase().includes("password")) {
+        setLoginPasswordError(msg);
+      } else {
+        setLoginSubmitError(msg || "Đăng nhập thất bại");
+      }
     } finally {
       setIsLoginLoading(false);
     }
@@ -196,13 +219,33 @@ export default function Header({ onBookClick = () => { }, disableNav = false, to
 
   const handleRegisterSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (registerPassword !== registerConfirmPassword) {
-      toast({ title: "Mật khẩu không khớp" });
+    setRegisterEmailError("");
+    setRegisterNameError("");
+    setRegisterPasswordError("");
+    setRegisterConfirmError("");
+    setRegisterTermsError("");
+    setRegisterSubmitError("");
+    const emailOk = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(registerEmail);
+    if (!emailOk) {
+      setRegisterEmailError("Vui lòng nhập email hợp lệ");
       return;
     }
-    const okFormat = /^(?=.*[A-Za-z])(?=.*\d)[A-Za-z\d]{6,}$/.test(registerPassword);
-    if (!okFormat) {
-      toast({ title: "Mật khẩu không hợp lệ", description: "Ít nhất 6 ký tự, gồm chữ và số" });
+    const nameOk = !!registerName.trim();
+    if (!nameOk) {
+      setRegisterNameError("Vui lòng nhập họ và tên");
+      return;
+    }
+    const passOk = PASSWORD_PATTERN.test(registerPassword);
+    if (!passOk) {
+      setRegisterPasswordError("Mật khẩu ít nhất 6 ký tự, gồm chữ và số");
+      return;
+    }
+    if (registerPassword !== registerConfirmPassword) {
+      setRegisterConfirmError("Mật khẩu nhập lại không khớp");
+      return;
+    }
+    if (!registerTerms) {
+      setRegisterTermsError("Vui lòng đồng ý điều khoản để tiếp tục");
       return;
     }
     try {
@@ -230,23 +273,34 @@ export default function Header({ onBookClick = () => { }, disableNav = false, to
         setIsLoginOpen(true);
       }
     } catch (err: any) {
-      toast({ title: "Đăng ký thất bại", description: err.message });
+      const msg = String(err?.message || "");
+      if (msg.toLowerCase().includes("email")) {
+        setRegisterEmailError(msg);
+      } else {
+        setRegisterSubmitError(msg || "Đăng ký thất bại");
+      }
     } finally {
       setIsRegisterLoading(false);
     }
   };
   const handleForgetPassSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setForgetPassEmailError("");
+    setForgetSubmitError("");
+    const emailOk = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(forgetPassEmail);
+    if (!emailOk) {
+      setForgetPassEmailError("Vui lòng nhập email hợp lệ");
+      return;
+    }
     try {
       setIsForgetLoading(true);
       const data = await auth.forgetPass(forgetPassEmail);
       if (data?.status === "success") {
-        toast({ title: "Thông báo hệ thống!", description: data.message });
         setIsForgetPassOpen(false);
         setForgetPassEmail("");
       }
     } catch (err: any) {
-      toast({ title: "Thông báo hệ thống!", description: err.message });
+      setForgetSubmitError(String(err?.message || "Yêu cầu thất bại"));
     } finally {
       setIsForgetLoading(false);
     }
@@ -272,10 +326,10 @@ export default function Header({ onBookClick = () => { }, disableNav = false, to
       className={cn(
         "fixed top-0 left-0 right-0 z-50 transition-all duration-300",
         forceDark
-          ? "bg-black/70 backdrop-blur-lg border-b border-white/10 shadow-[0_10px_40px_rgba(67,97,238,0.15)]"
+          ? "bg-black/80 backdrop-blur-lg border-b border-white/10 shadow-[0_10px_40px_rgba(67,97,238,0.15)]"
           : isScrolled
-            ? "bg-black/50 backdrop-blur-lg border-b border-white/10 shadow-[0_10px_40px_rgba(67,97,238,0.15)]"
-            : "bg-gradient-to-b from-black/50 via-black/30 to-transparent border-b border-white/10",
+            ? "bg-black/60 backdrop-blur-lg border-b border-white/10 shadow-[0_10px_40px_rgba(67,97,238,0.15)]"
+            : "bg-gradient-to-b from-black/60 via-black/40 to-transparent border-b border-white/10",
       )}
     >
       <div className="container mx-auto px-4 md:px-6 lg:px-8 py-3 md:py-4 flex items-center gap-4 md:gap-8">
@@ -468,15 +522,30 @@ export default function Header({ onBookClick = () => { }, disableNav = false, to
                   <DialogTitle className="text-transparent bg-clip-text bg-gradient-to-r from-cyan-300 via-blue-400 to-fuchsia-400 text-center">Đăng Nhập Tài Khoản</DialogTitle>
                 </DialogHeader>
                 <form className="space-y-4" onSubmit={handleLoginSubmit}>
+                  {loginSubmitError && (
+                    <div className="rounded-md border border-yellow-500/70 bg-yellow-500/10 px-3 py-2 text-sm text-yellow-300">
+                      {loginSubmitError}
+                    </div>
+                  )}
                   <div>
                     <label className="text-sm text-gray-300 mb-1 block">
                       Email
                     </label>
                     <Input
                       type="email"
-                      className="bg-white/10 border-white/20 text-white placeholder:text-gray-400 focus-visible:ring-cyan-400 focus-visible:ring-offset-1 rounded-lg"
+                      className={cn(
+                        "bg-white/10 border-white/20 text-white placeholder:text-gray-400 focus-visible:ring-cyan-400 focus-visible:ring-offset-1 rounded-lg",
+                        loginEmailError && "border-yellow-500 focus-visible:ring-yellow-500"
+                      )}
                       value={loginEmail}
-                      onChange={(e) => setLoginEmail(e.target.value)}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        setLoginEmail(val);
+                        const ok = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(val);
+                        if (ok) setLoginEmailError("");
+                        else if (val.length > 0) setLoginEmailError("Vui lòng nhập email hợp lệ");
+                        if (loginSubmitError) setLoginSubmitError("");
+                      }}
                       onInput={(e) => setLoginEmail((e.target as HTMLInputElement).value)}
                       maxLength={50}
                       autoComplete="email"
@@ -484,6 +553,11 @@ export default function Header({ onBookClick = () => { }, disableNav = false, to
                       disabled={isLoginLoading}
                       required
                     />
+                    {loginEmailError && (
+                      <div className="mt-1 rounded-md bg-yellow-500/10 px-3 py-2 text-xs text-yellow-300">
+                        {loginEmailError}
+                      </div>
+                    )}
                   </div>
                   <div>
                     <label className="text-sm text-gray-300 mb-1 block">
@@ -492,9 +566,19 @@ export default function Header({ onBookClick = () => { }, disableNav = false, to
                     <div className="relative">
                     <Input
                       type={showLoginPass ? "text" : "password"}
-                      className="bg-white/10 border-white/20 text-white placeholder:text-gray-400 focus-visible:ring-cyan-400 focus-visible:ring-offset-1 rounded-lg pr-10"
+                      className={cn(
+                        "bg-white/10 border-white/20 text-white placeholder:text-gray-400 focus-visible:ring-cyan-400 focus-visible:ring-offset-1 rounded-lg pr-10",
+                        loginPasswordError && "border-yellow-500 focus-visible:ring-yellow-500"
+                      )}
                       value={loginPassword}
-                      onChange={(e) => setLoginPassword(e.target.value)}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        setLoginPassword(val);
+                        const ok = PASSWORD_PATTERN.test(val);
+                        if (ok) setLoginPasswordError("");
+                        else if (val.length > 0) setLoginPasswordError("Mật khẩu ít nhất 6 ký tự gồm chữ và số");
+                        if (loginSubmitError) setLoginSubmitError("");
+                      }}
                       onInput={(e) => setLoginPassword((e.target as HTMLInputElement).value)}
                       required
                       maxLength={50}
@@ -517,6 +601,11 @@ export default function Header({ onBookClick = () => { }, disableNav = false, to
                         )}
                       </button>
                     </div>
+                    {loginPasswordError && (
+                      <div className="mt-1 rounded-md bg-yellow-500/10 px-3 py-2 text-xs text-yellow-300">
+                        {loginPasswordError}
+                      </div>
+                    )}
                   </div>
                   <Button
                     type="submit"
@@ -576,20 +665,40 @@ export default function Header({ onBookClick = () => { }, disableNav = false, to
                 </DialogTitle>
               </DialogHeader>
               <form className="space-y-4" onSubmit={handleRegisterSubmit}>
+                {registerSubmitError && (
+                  <div className="rounded-md border border-yellow-500/70 bg-yellow-500/10 px-3 py-2 text-sm text-yellow-300">
+                    {registerSubmitError}
+                  </div>
+                )}
                 <div>
                   <label className="text-sm text-gray-300 mb-1 block">
                     Email
                   </label>
                   <Input
                     type="email"
-                    className="bg-white/10 border-white/20 text-white placeholder:text-gray-400 focus-visible:ring-cyan-400 focus-visible:ring-offset-1 rounded-lg"
+                    className={cn(
+                      "bg-white/10 border-white/20 text-white placeholder:text-gray-400 focus-visible:ring-cyan-400 focus-visible:ring-offset-1 rounded-lg",
+                      registerEmailError && "border-yellow-500 focus-visible:ring-yellow-500"
+                    )}
                     placeholder="you@email.com"
                     value={registerEmail}
-                    onChange={(e) => setRegisterEmail(e.target.value)}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      setRegisterEmail(val);
+                      const ok = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(val);
+                      if (ok) setRegisterEmailError("");
+                      else if (val.length > 0) setRegisterEmailError("Vui lòng nhập email hợp lệ");
+                      if (registerSubmitError) setRegisterSubmitError("");
+                    }}
                     maxLength={50}
                     disabled={isRegisterLoading}
                     required
                   />
+                  {registerEmailError && (
+                    <div className="mt-1 rounded-md bg-yellow-500/10 px-3 py-2 text-xs text-yellow-300">
+                      {registerEmailError}
+                    </div>
+                  )}
                 </div>
                 <div>
                   <label className="text-sm text-gray-300 mb-1 block">
@@ -597,14 +706,28 @@ export default function Header({ onBookClick = () => { }, disableNav = false, to
                   </label>
                   <Input
                     type="text"
-                    className="bg-white/10 border-white/20 text-white placeholder:text-gray-400 focus-visible:ring-cyan-400 focus-visible:ring-offset-1 rounded-lg"
+                    className={cn(
+                      "bg-white/10 border-white/20 text-white placeholder:text-gray-400 focus-visible:ring-cyan-400 focus-visible:ring-offset-1 rounded-lg",
+                      registerNameError && "border-yellow-500 focus-visible:ring-yellow-500"
+                    )}
                     placeholder="Họ và tên"
                     value={registerName}
                     maxLength={50}
-                    onChange={(e) => setRegisterName(e.target.value)}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      setRegisterName(val);
+                      if (val.trim()) setRegisterNameError("");
+                      else setRegisterNameError("Vui lòng nhập họ và tên");
+                      if (registerSubmitError) setRegisterSubmitError("");
+                    }}
                     disabled={isRegisterLoading}
                     required
                   />
+                  {registerNameError && (
+                    <div className="mt-1 rounded-md bg-yellow-500/10 px-3 py-2 text-xs text-yellow-300">
+                      {registerNameError}
+                    </div>
+                  )}
                 </div>
                 <div>
                   <label className="text-sm text-gray-300 mb-1 block">
@@ -613,10 +736,21 @@ export default function Header({ onBookClick = () => { }, disableNav = false, to
                   <div className="relative">
                     <Input
                       type={showRegisterPass ? "text" : "password"}
-                      className="bg-white/10 border-white/20 text-white placeholder:text-gray-400 focus-visible:ring-cyan-400 focus-visible:ring-offset-1 rounded-lg pr-10"
+                      className={cn(
+                        "bg-white/10 border-white/20 text-white placeholder:text-gray-400 focus-visible:ring-cyan-400 focus-visible:ring-offset-1 rounded-lg pr-10",
+                        registerPasswordError && "border-yellow-500 focus-visible:ring-yellow-500"
+                      )}
                       value={registerPassword}
                       maxLength={50}
-                      onChange={(e) => setRegisterPassword(e.target.value)}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      setRegisterPassword(val);
+                      const ok = PASSWORD_PATTERN.test(val);
+                      if (ok) setRegisterPasswordError("");
+                      else if (val.length > 0) setRegisterPasswordError("Mật khẩu ít nhất 6 ký tự, gồm chữ và số");
+                      if (registerSubmitError) setRegisterSubmitError("");
+                      if (registerConfirmPassword && val === registerConfirmPassword) setRegisterConfirmError("");
+                    }}
                       required
                       onInput={(e) => setRegisterPassword((e.target as HTMLInputElement).value)}
                       autoComplete="new-password"
@@ -639,6 +773,11 @@ export default function Header({ onBookClick = () => { }, disableNav = false, to
                       )}
                     </button>
                   </div>
+                  {registerPasswordError && (
+                    <div className="mt-1 rounded-md bg-yellow-500/10 px-3 py-2 text-xs text-yellow-300">
+                      {registerPasswordError}
+                    </div>
+                  )}
                 </div>
                 <div>
                   <label className="text-sm text-gray-300 mb-1 block">
@@ -647,12 +786,18 @@ export default function Header({ onBookClick = () => { }, disableNav = false, to
                   <div className="relative">
                     <Input
                       type={showRegisterConfirmPass ? "text" : "password"}
-                      className="bg-white/10 border-white/20 text-white placeholder:text-gray-400 focus-visible:ring-cyan-400 focus-visible:ring-offset-1 rounded-lg pr-10"
+                      className={cn(
+                        "bg-white/10 border-white/20 text-white placeholder:text-gray-400 focus-visible:ring-cyan-400 focus-visible:ring-offset-1 rounded-lg pr-10",
+                        registerConfirmError && "border-yellow-500 focus-visible:ring-yellow-500"
+                      )}
                       value={registerConfirmPassword}
                       maxLength={50}
-                      onChange={(e) =>
-                        setRegisterConfirmPassword(e.target.value)
-                      }
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      setRegisterConfirmPassword(val);
+                      if (registerPassword && registerPassword === val) setRegisterConfirmError("");
+                      else if (val.length > 0) setRegisterConfirmError("Mật khẩu nhập lại không khớp");
+                    }}
                       required
                       onInput={(e) => setRegisterConfirmPassword((e.target as HTMLInputElement).value)}
                       autoComplete="new-password"
@@ -677,12 +822,21 @@ export default function Header({ onBookClick = () => { }, disableNav = false, to
                       )}
                     </button>
                   </div>
+                  {registerConfirmError && (
+                    <div className="mt-1 rounded-md bg-yellow-500/10 px-3 py-2 text-xs text-yellow-300">
+                      {registerConfirmError}
+                    </div>
+                  )}
                 </div>
                 <div className="flex items-center gap-2">
                   <input
                     type="checkbox"
                     checked={registerTerms}
-                    onChange={(e) => setRegisterTerms(e.target.checked)}
+                    onChange={(e) => {
+                      const checked = e.target.checked;
+                      setRegisterTerms(checked);
+                      if (checked) setRegisterTermsError("");
+                    }}
                     disabled={isRegisterLoading}
                     required
                     className="h-4 w-4"
@@ -691,6 +845,11 @@ export default function Header({ onBookClick = () => { }, disableNav = false, to
                     Bằng việc đăng ký tài khoản, tôi đồng ý với Điều khoản dịch vụ và Chính sách bảo vệ của CTBooking.
                   </span>
                 </div>
+                {registerTermsError && (
+                  <div className="mt-1 rounded-md bg-yellow-500/10 px-3 py-2 text-xs text-yellow-300">
+                    {registerTermsError}
+                  </div>
+                )}
                 <Button
                   type="submit"
                   disabled={
@@ -744,16 +903,36 @@ export default function Header({ onBookClick = () => { }, disableNav = false, to
                   </label>
                   <Input
                     type="email"
-                    className="bg-white/10 border-white/20 text-white placeholder:text-gray-400 focus-visible:ring-cyan-400 focus-visible:ring-offset-1 rounded-lg"
+                    className={cn(
+                      "bg-white/10 border-white/20 text-white placeholder:text-gray-400 focus-visible:ring-cyan-400 focus-visible:ring-offset-1 rounded-lg",
+                      forgetPassEmailError && "border-yellow-500 focus-visible:ring-yellow-500"
+                    )}
                     placeholder="you@gmail.com"
                     value={forgetPassEmail}
-                    onChange={(e) => setForgetPassEmail(e.target.value)}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      setForgetPassEmail(val);
+                      const ok = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(val);
+                      if (ok) setForgetPassEmailError("");
+                      else if (val.length > 0) setForgetPassEmailError("Vui lòng nhập email hợp lệ");
+                      if (forgetSubmitError) setForgetSubmitError("");
+                    }}
                     maxLength={50}
                     title="Vui lòng nhập email của bạn để thay đổi mật khẩu!"
                     disabled={isForgetLoading}
                     required
                   />
+                  {!!forgetPassEmailError && (
+                    <div className="mt-1 rounded-md bg-yellow-500/10 px-3 py-2 text-xs text-yellow-300">
+                      {forgetPassEmailError}
+                    </div>
+                  )}
                 </div>
+                {!!forgetSubmitError && (
+                  <div className="rounded-md border border-yellow-500/70 bg-yellow-500/10 px-3 py-2 text-sm text-yellow-300">
+                    {forgetSubmitError}
+                  </div>
+                )}
                 <Button
                   type="submit"
                   disabled={isForgetLoading}

@@ -175,12 +175,6 @@ export default function FilmCarousel({ onSelectFilm }: FilmCarouselProps) {
 
   const handleBookTicket = () => {
     if (!movieDetails) return;
-    const authRaw = localStorage.getItem("authUser");
-    if (!authRaw) {
-      toast({ title: "Vui lòng đăng nhập", description: "Bạn cần đăng nhập trước khi đặt vé" });
-      window.dispatchEvent(new Event("open-login"));
-      return;
-    }
     try {
       const film = films.find((f) => f.id === movieDetails.id);
       if (film) {
