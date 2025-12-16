@@ -254,7 +254,7 @@ export default function FilmCarousel({ onSelectFilm }: FilmCarouselProps) {
                   }
                   handleOpen(film);
                 }}
-                className="group relative w-full rounded-3xl overflow-hidden border border-white/10 bg-white/5 backdrop-blur-lg shadow-[0_0_30px_rgba(59,130,246,0.2)] hover:shadow-[0_0_40px_rgba(236,72,153,0.25)] transition-all duration-300 hover:-translate-y-2"
+                className="group relative w-full rounded-3xl overflow-hidden border border-white/10 bg-white/5 backdrop-blur-lg shadow-[0_0_30px_rgba(59,130,246,0.2)] hover:shadow-[0_0_40px_rgba(236,72,153,0.25)] transition-all duration-300"
               >
               <div className="relative h-80 w-full overflow-hidden">
                 <div
@@ -264,7 +264,7 @@ export default function FilmCarousel({ onSelectFilm }: FilmCarouselProps) {
                 <img
                   src={film.poster}
                   alt={film.title}
-                  className="absolute inset-0 w-full h-full object-contain"
+                  className="absolute inset-0 w-full h-full object-contain transition-transform duration-500 group-hover:scale-110"
                 />
                 <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/30 to-transparent" />
                 <div

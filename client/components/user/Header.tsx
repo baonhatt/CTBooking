@@ -9,7 +9,7 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { toast } from "@/components/ui/use-toast";
-import { Ticket, Loader2, Menu, User, Eye, EyeOff } from "lucide-react";
+import { Ticket, Loader2, Menu, User, Eye, EyeOff, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/useAuth";
 import {
@@ -28,6 +28,7 @@ import {
   Sheet,
   SheetContent,
   SheetTrigger,
+  SheetClose,
 } from "@/components/ui/sheet";
 
 export const PASSWORD_PATTERN = /^(?=.*[A-Za-z])(?=.*\d)[A-Za-z\d!@#$%^&*()_+\-\=\[\]{};':"\\|,.<>\/?]{6,}$/;
@@ -326,10 +327,10 @@ export default function Header({ onBookClick = () => { }, disableNav = false, to
       className={cn(
         "fixed top-0 left-0 right-0 z-50 transition-all duration-300",
         forceDark
-          ? "bg-black/80 backdrop-blur-lg border-b border-white/10 shadow-[0_10px_40px_rgba(67,97,238,0.15)]"
+          ? "bg-black/95 backdrop-blur-lg border-b border-white/10 shadow-[0_10px_40px_rgba(67,97,238,0.15)]"
           : isScrolled
-            ? "bg-black/60 backdrop-blur-lg border-b border-white/10 shadow-[0_10px_40px_rgba(67,97,238,0.15)]"
-            : "bg-gradient-to-b from-black/60 via-black/40 to-transparent border-b border-white/10",
+            ? "bg-black/80 backdrop-blur-lg border-b border-white/10 shadow-[0_10px_40px_rgba(67,97,238,0.15)]"
+            : "bg-gradient-to-b from-black/80 via-black/60 to-transparent border-b border-white/10",
       )}
     >
       <div className="container mx-auto px-4 md:px-6 lg:px-8 py-3 md:py-4 flex items-center gap-4 md:gap-8">
@@ -390,79 +391,92 @@ export default function Header({ onBookClick = () => { }, disableNav = false, to
                 </Button>
               </SheetTrigger>
 
-              <SheetContent side="right" className="bg-gradient-dark border border-white/10 text-white">
-                {/* Header panel */}
-                <div className="flex items-center justify-between mb-8">
-                  <img
-                    src={icon}
-                    alt="CINESPHERE"
-                    className="h-12 w-12 cursor-pointer drop-shadow-[0_0_20px_rgba(59,130,246,0.5)]"
-                    onClick={() => navigator("/")}
-                  />
-                </div>
+              <SheetContent side="top" className="w-full h-[100dvh] bg-[#050915] border-none text-white p-0 [&>button]:hidden z-[60]">
+                <div className="flex flex-col h-full p-6 sm:p-8">
+                  {/* Header panel */}
+                  <div className="flex items-center justify-between mb-6">
+                    <div className="flex items-center gap-3" onClick={() => navigator("/")}>
+                      <img
+                        src={icon}
+                        alt="CINESPHERE"
+                        className="h-16 w-16 cursor-pointer drop-shadow-[0_0_20px_rgba(59,130,246,0.5)]"
+                      />
+                    </div>
+                    
+                    <SheetClose className="rounded-full p-2 border border-white/20 hover:bg-white/10 hover:border-white transition-all duration-300">
+                      <X className="h-8 w-8 text-white" />
+                      <span className="sr-only">Close</span>
+                    </SheetClose>
+                  </div>
 
-                {/* Danh mục */}
-                <nav className="flex flex-col gap-5">
-                  {navItems.map((item) => (
-                    <button
-                      key={item.target}
-                      className={cn(
-                        "text-left font-medium text-base tracking-[0.08em] uppercase transition-colors duration-300 whitespace-nowrap py-2",
-                        effectiveDisable 
-                          ? "opacity-50 cursor-not-allowed text-gray-400" 
-                          : "text-white/90 hover:text-cyan-300"
-                      )}
-                      disabled={effectiveDisable}
-                      onClick={() => {
-                        if (!effectiveDisable) {
-                          scrollToSection(item.target);
-                        }
-                      }}
-                    >
-                      {item.label}
-                    </button>
-                  ))}
-                </nav>
+                  {/* Danh mục */}
+                  <nav className="flex flex-col gap-2 flex-1 overflow-y-auto">
+                    {navItems.map((item) => (
+                      <SheetClose key={item.target} asChild>
+                        <button
+                          className={cn(
+                            "text-left font-medium text-lg tracking-wide transition-colors duration-300 py-3 border-b border-white/5",
+                            effectiveDisable 
+                              ? "opacity-50 cursor-not-allowed text-gray-400" 
+                              : "text-white hover:text-cyan-300"
+                          )}
+                          disabled={effectiveDisable}
+                          onClick={() => {
+                            if (!effectiveDisable) {
+                              scrollToSection(item.target);
+                            }
+                          }}
+                        >
+                          {item.label}
+                        </button>
+                      </SheetClose>
+                    ))}
+                    
+                    {userName && (
+                        <SheetClose asChild>
+                          <button
+                              className="text-left font-medium text-lg tracking-wide transition-colors duration-300 py-3 border-b border-white/5 text-white hover:text-cyan-300"
+                              onClick={() => navigator("/account")}
+                          >
+                              Tài khoản ({userName})
+                          </button>
+                        </SheetClose>
+                    )}
+                  </nav>
 
-                {/* Khối account bên dưới */}
-                <div className="mt-10 border-t border-white/10 pt-4 space-y-2 text-sm">
-                  {userName ? (
-                    <>
-                      <button
-                        className="block w-full text-left"
-                        onClick={() => navigator("/account")}
-                      >
-                        Tài khoản ({userName})
-                      </button>
-                      <button
-                        className="block w-full text-left"
-                        onClick={handleLogout}
-                      >
-                        Đăng xuất
-                      </button>
-                    </>
-                  ) : (
-                    <>
-                      <button
-                        className="block w-full text-left"
-                        onClick={() => setIsLoginOpen(true)}
-                      >
-                        Đăng nhập
-                      </button>
-                      <button
-                        className="block w-full text-left"
-                        onClick={() => setIsRegisterOpen(true)}
-                      >
-                        Đăng ký
-                      </button>
-                      <button
-                        className="block w-full text-left"
-                        onClick={() => setIsForgetPassOpen(true)}
-                      >
-                        Quên mật khẩu
-                      </button>
-                    </>
-                  )}
+                  {/* Khối account bên dưới */}
+                  <div className="mt-auto pt-8">
+                    {userName ? (
+                      <SheetClose asChild>
+                        <Button
+                          className="w-full h-12 text-base font-semibold rounded-full bg-red-600 hover:bg-red-700 text-white shadow-lg"
+                          onClick={handleLogout}
+                        >
+                          Đăng xuất
+                        </Button>
+                      </SheetClose>
+                    ) : (
+                      <div className="grid gap-3">
+                         <SheetClose asChild>
+                            <Button
+                              className="w-full h-12 text-base font-semibold rounded-full bg-blue-600 hover:bg-blue-700 text-white shadow-lg"
+                              onClick={() => setIsLoginOpen(true)}
+                            >
+                              Đăng nhập
+                            </Button>
+                         </SheetClose>
+                         <SheetClose asChild>
+                            <Button
+                              variant="outline"
+                              className="w-full h-12 text-base font-semibold rounded-full bg-white border-white text-black hover:bg-gray-100 hover:text-black"
+                              onClick={() => setIsRegisterOpen(true)}
+                            >
+                              Đăng ký
+                            </Button>
+                         </SheetClose>
+                      </div>
+                    )}
+                  </div>
                 </div>
               </SheetContent>
             </Sheet>
@@ -842,7 +856,7 @@ export default function Header({ onBookClick = () => { }, disableNav = false, to
                     className="h-4 w-4"
                   />
                   <span className="text-xs text-gray-300 leading-5">
-                    Bằng việc đăng ký tài khoản, tôi đồng ý với Điều khoản dịch vụ và Chính sách bảo vệ của Cinesphere.
+                    Bằng việc đăng ký tài khoản, tôi đồng ý với Điều khoản dịch vụ và Chính sách bảo vệ của CTBooking.
                   </span>
                 </div>
                 {registerTermsError && (
