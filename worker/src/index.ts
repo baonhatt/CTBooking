@@ -81,7 +81,8 @@ function getBookingEmailTemplate(baseUrl: string, data: {
   ticketPackageName?: string;
   expiryDate?: string | Date | null;
 }): string {
-  const imgHtml = data.movieImage ? `<img src="${baseUrl}${data.movieImage}" alt="${data.movieTitle}" class="movie-poster">` : "";
+  const imgSrc = data.movieImage?.startsWith("http") ? data.movieImage : `${baseUrl}${data.movieImage}`;
+  const imgHtml = data.movieImage ? `<img src="${imgSrc}" alt="${data.movieTitle}" class="movie-poster">` : "";
   const durationHtml = data.durationMin !== undefined && data.durationMin !== null ? `
                 <div class="detail-row">
                     <span class="detail-label">Thời lượng:&nbsp;</span>

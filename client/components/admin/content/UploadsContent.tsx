@@ -1,4 +1,4 @@
-import React, { useRef, useState } from "react";
+import React, { useRef, useState, useEffect } from "react";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -11,9 +11,23 @@ export default function UploadsContent() {
   const fileRef = useRef<HTMLInputElement | null>(null);
   const [files, setFiles] = useState<File[]>([]);
   const [openConfirm, setOpenConfirm] = useState(false);
-  const [compressProgressList, setCompressProgressList] = useState<number[]>([]);
-  const [uploadProgressList, setUploadProgressList] = useState<number[]>([]);
-  const [isUploading, setIsUploading] = useState(false);
+  const [uploads, setUploads] = useState<
+    {
+      id: string;
+      file: File;
+      name: string;
+      size: number;
+      type: string;
+      section: "hero_section" | "technology_section1" | "technology_section2";
+      isVideo: boolean;
+      isImage: boolean;
+      compressProgress?: number | null;
+      uploadProgress: number;
+      status: "pending" | "uploading" | "done" | "error";
+      error?: string;
+    }[]
+  >([]);
+  const runningRef = useRef(0);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [section, setSection] = useState<"hero_section" | "technology_section1" | "technology_section2">("hero_section");
   const [statusLines, setStatusLines] = useState<string[]>([]);
@@ -46,103 +60,158 @@ export default function UploadsContent() {
     };
   }, [files]);
  
+  const compressImage = async (fi: File) => {
+    const url = URL.createObjectURL(fi);
+    try {
+      const img = await new Promise<HTMLImageElement>((resolve, reject) => {
+        const i = new Image();
+        i.onload = () => resolve(i);
+        i.onerror = reject as any;
+        i.src = url;
+      });
+      const maxDim = 2560;
+      const ratio = Math.min(1, maxDim / Math.max(img.width, img.height));
+      const w = Math.round(img.width * ratio);
+      const h = Math.round(img.height * ratio);
+      const canvas = document.createElement("canvas");
+      canvas.width = w;
+      canvas.height = h;
+      const ctx = canvas.getContext("2d");
+      if (!ctx) return fi;
+      ctx.drawImage(img, 0, 0, w, h);
+      let quality = 0.82;
+      let blob: Blob | null = await new Promise((resolve) => canvas.toBlob(resolve, "image/webp", quality));
+      for (let i = 0; i < 3 && blob && blob.size > 10_000_000; i++) {
+        quality = Math.max(0.5, quality - 0.12);
+        blob = await new Promise((resolve) => canvas.toBlob(resolve, "image/webp", quality));
+      }
+      if (blob && blob.size < fi.size) {
+        return new File([blob], fi.name.replace(/\.(png|jpg|jpeg|bmp|gif)$/i, ".webp"), { type: "image/webp" });
+      }
+      return fi;
+    } finally {
+      URL.revokeObjectURL(url);
+    }
+  };
+
+  // Effect to manage queue processing
+  useEffect(() => {
+    const maxConcurrent = 4;
+    const activeCount = uploads.filter((u) => u.status === "uploading").length;
+    
+    // If we have slots and pending items
+    if (activeCount < maxConcurrent) {
+      const nextItem = uploads.find((u) => u.status === "pending");
+      if (nextItem) {
+        // Mark as uploading immediately to prevent double processing in next render
+        setUploads((prev) =>
+          prev.map((u) => (u.id === nextItem.id ? { ...u, status: "uploading" } : u))
+        );
+
+        // Start async task
+        (async () => {
+          try {
+            let finalFile = nextItem.file;
+            // Compress image if needed
+            if (nextItem.isImage && nextItem.file.size > 10_000_000) {
+              setUploads((arr) => {
+                const cp = [...arr];
+                const i = cp.findIndex((x) => x.id === nextItem.id);
+                if (i !== -1) cp[i] = { ...cp[i], compressProgress: 0 };
+                return cp;
+              });
+              
+              // We need to define compressImage outside or here. 
+              // Since it uses URL.createObjectURL, it's fine.
+              // We'll move compressImage to be stable or just use the existing one if it's in scope.
+              // But compressImage is defined in component body, so it's available.
+              finalFile = await compressImage(nextItem.file);
+              
+              setUploads((arr) => {
+                const cp = [...arr];
+                const i = cp.findIndex((x) => x.id === nextItem.id);
+                if (i !== -1) cp[i] = { ...cp[i], compressProgress: 100 };
+                return cp;
+              });
+              setStatusLines((prev) => [...prev, `Đã nén ảnh [${nextItem.name}] (${formatSize(finalFile.size)} từ ${formatSize(nextItem.size)}), đang upload...`]);
+            }
+
+            setStage("uploading");
+            
+            const result = await (nextItem.isVideo
+              ? uploadAdminVideo(finalFile, (p) =>
+                  setUploads((arr) => {
+                    const cp = [...arr];
+                    const i = cp.findIndex((x) => x.id === nextItem.id);
+                    if (i !== -1) cp[i] = { ...cp[i], uploadProgress: p };
+                    return cp;
+                  })
+                )
+              : uploadDirectToCloudinary(finalFile, (p) =>
+                  setUploads((arr) => {
+                    const cp = [...arr];
+                    const i = cp.findIndex((x) => x.id === nextItem.id);
+                    if (i !== -1) cp[i] = { ...cp[i], uploadProgress: p };
+                    return cp;
+                  })
+                ));
+
+            await createSiteMediaApi({
+              section: nextItem.section,
+              type: nextItem.isVideo ? "video" : "image",
+              url: result.url,
+              public_id: result.public_id,
+              format: result.format,
+              width: result.width,
+              height: result.height,
+              duration: result.duration,
+              display_order: 0,
+              is_active: true,
+            });
+
+            setUploads((arr) => {
+              const cp = [...arr];
+              const i = cp.findIndex((x) => x.id === nextItem.id);
+              if (i !== -1) cp[i] = { ...cp[i], status: "done", uploadProgress: 100 };
+              return cp;
+            });
+            setStatusLines((prev) => [...prev, `Đã upload [${nextItem.name}] lên ${nextItem.section} xong`]);
+          } catch (err: any) {
+            setUploads((arr) => {
+              const cp = [...arr];
+              const i = cp.findIndex((x) => x.id === nextItem.id);
+              if (i !== -1) cp[i] = { ...cp[i], status: "error", error: err?.message || "Upload lỗi" };
+              return cp;
+            });
+            setStage("error");
+            setStatusLines((prev) => [...prev, `Upload thất bại [${nextItem.name}]: ${err?.message || "Có lỗi xảy ra"}`]);
+          }
+        })();
+      }
+    }
+  }, [uploads]);
+
   const startUpload = async () => {
     if (!files.length) return;
     setOpenConfirm(false);
-    setIsUploading(true);
     setStage("compressing");
-    const initCompress = Array(files.length).fill(0);
-    const initUpload = Array(files.length).fill(0);
-    setCompressProgressList(initCompress);
-    setUploadProgressList(initUpload);
-    setStatusLines((prev) => [...prev, "Bắt đầu tải lên nhiều tệp..."]);
-    try {
-      const tasks = files.map(async (f, idx) => {
-        const isVid = /^video\//.test(f.type);
-        const isImg = /^image\//.test(f.type);
-        if (!isVid && !isImg) throw new Error("Sai định dạng: chỉ chấp nhận video hoặc ảnh");
-        let uploadFile = f;
-        if (isVid) {
-          setCompressProgressList((arr) => {
-            const next = [...arr]; next[idx] = 100; return next;
-          });
-          setStatusLines((prev) => [...prev, `Bỏ qua nén video [${f.name}], đang upload trực tiếp...`]);
-        } else if (isImg && f.size > 10_000_000) {
-          const compressImage = async (fi: File) => {
-            const url = URL.createObjectURL(fi);
-            try {
-              const img = await new Promise<HTMLImageElement>((resolve, reject) => {
-                const i = new Image();
-                i.onload = () => resolve(i);
-                i.onerror = reject as any;
-                i.src = url;
-              });
-              const maxDim = 2560;
-              const ratio = Math.min(1, maxDim / Math.max(img.width, img.height));
-              const w = Math.round(img.width * ratio);
-              const h = Math.round(img.height * ratio);
-              const canvas = document.createElement("canvas");
-              canvas.width = w;
-              canvas.height = h;
-              const ctx = canvas.getContext("2d");
-              if (!ctx) return fi;
-              ctx.drawImage(img, 0, 0, w, h);
-              let quality = 0.82;
-              let blob: Blob | null = await new Promise((resolve) => canvas.toBlob(resolve, "image/webp", quality));
-              for (let i = 0; i < 3 && blob && blob.size > 10_000_000; i++) {
-                quality = Math.max(0.5, quality - 0.12);
-                blob = await new Promise((resolve) => canvas.toBlob(resolve, "image/webp", quality));
-              }
-              if (blob && blob.size < fi.size) {
-                return new File([blob], fi.name.replace(/\.(png|jpg|jpeg|bmp|gif)$/i, ".webp"), { type: "image/webp" });
-              }
-              return fi;
-            } finally {
-              URL.revokeObjectURL(url);
-            }
-          };
-          uploadFile = await compressImage(f);
-          setCompressProgressList((arr) => {
-            const next = [...arr]; next[idx] = 100; return next;
-          });
-          setStatusLines((prev) => [...prev, `Đã nén ảnh [${f.name}] (${formatSize(uploadFile.size)} từ ${formatSize(f.size)}), đang upload...`]);
-        } else {
-          setCompressProgressList((arr) => {
-            const next = [...arr]; next[idx] = 100; return next;
-          });
-        }
-        setStage("uploading");
-        const result = await (isVid
-          ? uploadAdminVideo(uploadFile, (p) =>
-              setUploadProgressList((arr) => { const next = [...arr]; next[idx] = p; return next; })
-            )
-          : uploadDirectToCloudinary(uploadFile, (p) =>
-              setUploadProgressList((arr) => { const next = [...arr]; next[idx] = p; return next; })
-            ));
-        await createSiteMediaApi({
-          section,
-          type: isVid ? "video" : "image",
-          url: result.url,
-          public_id: result.public_id,
-          format: result.format,
-          width: result.width,
-          height: result.height,
-          duration: result.duration,
-          display_order: 0,
-          is_active: true,
-        });
-        setStatusLines((prev) => [...prev, `Đã upload [${f.name}] lên ${section} xong`]);
-      });
-      await Promise.all(tasks);
-      setStage("done");
-      setFiles([]);
-      if (fileRef.current) fileRef.current.value = "";
-    } catch (err: any) {
-      setStage("error");
-      setStatusLines((prev) => [...prev, `Upload thất bại: ${err?.message || "Có lỗi xảy ra"}`]);
-    } finally {
-      setIsUploading(false);
-    }
+    setStatusLines((prev) => [...prev, "Đã thêm vào hàng đợi..."]);
+    const toAdd = files.map((f) => ({
+      id: crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}_${Math.random()}`,
+      file: f,
+      name: f.name,
+      size: f.size,
+      type: f.type,
+      section,
+      isVideo: /^video\//.test(f.type),
+      isImage: /^image\//.test(f.type),
+      compressProgress: /^image\//.test(f.type) ? 0 : null,
+      uploadProgress: 0,
+      status: "pending" as const,
+    }));
+    setUploads((arr) => [...arr, ...toAdd]);
+    setFiles([]);
+    if (fileRef.current) fileRef.current.value = "";
   };
  
   return (
@@ -167,7 +236,7 @@ export default function UploadsContent() {
  
         <div className="flex gap-2">
           <Button
-            disabled={!files.length || isUploading}
+            disabled={!files.length}
             onClick={() => setOpenConfirm(true)}
           >
             Upload
@@ -178,8 +247,6 @@ export default function UploadsContent() {
               setFiles([]);
               if (fileRef.current) fileRef.current.value = "";
               setPreviewUrl(null);
-              setCompressProgressList([]);
-              setUploadProgressList([]);
               setStatusLines([]);
               setStage("idle");
             }}
@@ -194,7 +261,6 @@ export default function UploadsContent() {
             className="w-full bg-[#0e1b3d] text-white border border-white/10 rounded-md px-3 py-2"
             value={section}
             onChange={(e) => setSection(e.target.value as any)}
-            disabled={isUploading}
           >
             <option value="hero_section">Hero Section</option>
             <option value="technology_section1">Technology Section 1 (banner)</option>
@@ -232,21 +298,25 @@ export default function UploadsContent() {
         )}
 
         <div className="space-y-4">
-          {!!files.length && (
+          {!!uploads.length && (
             <div className="space-y-3">
               <Label>Tiến trình</Label>
-              {files.map((f, idx) => (
-                <div key={idx} className="space-y-2">
-                  <div className="text-xs text-white/80">{f.name} • {formatSize(f.size)} • {/^video\//.test(f.type) ? "Video" : /^image\//.test(f.type) ? "Image" : "Unknown"}</div>
-                  <div className="space-y-1">
-                    <div className="text-xs text-white/60">Nén</div>
-                    <Progress value={compressProgressList[idx] || 0} />
-                    <div className="text-xs text-white/70">{compressProgressList[idx] || 0}%</div>
+              {uploads.map((u) => (
+                <div key={u.id} className="space-y-2">
+                  <div className="text-xs text-white/80">
+                    {u.name} • {formatSize(u.size)} • {u.isVideo ? "Video" : u.isImage ? "Image" : "Unknown"} • {u.section}
                   </div>
+                  {u.isImage && (
+                    <div className="space-y-1">
+                      <div className="text-xs text-white/60">Nén</div>
+                      <Progress value={u.compressProgress || 0} />
+                      <div className="text-xs text-white/70">{u.compressProgress || 0}%</div>
+                    </div>
+                  )}
                   <div className="space-y-1">
                     <div className="text-xs text-white/60">Upload</div>
-                    <Progress value={uploadProgressList[idx] || 0} />
-                    <div className="text-xs text-white/70">{uploadProgressList[idx] || 0}%</div>
+                    <Progress value={u.uploadProgress} />
+                    <div className="text-xs text-white/70">{u.uploadProgress}%</div>
                   </div>
                 </div>
               ))}
@@ -273,8 +343,8 @@ export default function UploadsContent() {
                   : "Bạn có chắc muốn tải lên các tệp đã chọn?"}
               </div>
               <div className="flex gap-2">
-                <Button onClick={startUpload} disabled={isUploading}>Xác nhận</Button>
-                <Button variant="secondary" onClick={() => setOpenConfirm(false)} disabled={isUploading}>
+                <Button onClick={startUpload}>Xác nhận</Button>
+                <Button variant="secondary" onClick={() => setOpenConfirm(false)}>
                   Hủy
                 </Button>
               </div>
