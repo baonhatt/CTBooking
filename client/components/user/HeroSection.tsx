@@ -25,6 +25,7 @@ export default function HeroSection() {
   const [pointer, setPointer] = useState({ x: 0, y: 0 });
   const [currentPosterIndex, setCurrentPosterIndex] = useState(0);
   const videoRef = useRef<HTMLVideoElement>(null);
+  const videoContainerRef = useRef<HTMLDivElement>(null);
   const [isVideoPlaying, setIsVideoPlaying] = useState(false);
   const navigate = useNavigate();
   const [selectedMovieId, setSelectedMovieId] = useState<number | null>(null);
@@ -70,6 +71,32 @@ export default function HeroSection() {
     // Pause video when component mounts
     video.pause();
     setIsVideoPlaying(false);
+  }, []);
+
+  // Intersection Observer for hero video - pause when scrolled out of viewport
+  useEffect(() => {
+    if (!videoRef.current || !videoContainerRef.current) return;
+    
+    const observer = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          if (!entry.isIntersecting) {
+            // Video is out of viewport, pause it
+            videoRef.current?.pause();
+            setIsVideoPlaying(false);
+          }
+        });
+      },
+      {
+        threshold: 0.1, // Trigger when less than 10% visible
+      }
+    );
+    
+    observer.observe(videoContainerRef.current);
+    
+    return () => {
+      observer.disconnect();
+    };
   }, []);
 
   // Toggle play/pause function
@@ -271,7 +298,10 @@ export default function HeroSection() {
             transition={{ duration: 0.8, delay: 0.3, ease: "easeOut" }}
             className="relative hidden lg:block z-40"
           >
-            <div className="relative w-full max-w-md mx-auto aspect-[9/16] rounded-3xl overflow-hidden border-2 border-white/20 bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-xl shadow-2xl group">
+            <div 
+              ref={videoContainerRef}
+              className="relative w-full max-w-md mx-auto aspect-[9/16] rounded-3xl overflow-hidden border-2 border-white/20 bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-xl shadow-2xl group"
+            >
               {/* Video Container */}
               <div className="absolute inset-0">
                 <video
