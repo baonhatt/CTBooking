@@ -257,7 +257,15 @@ export default function TechnologyBanner() {
     const w = (el as any).videoWidth || 0;
     const h = (el as any).videoHeight || 0;
     if (w > 0 && h > 0) setMainAspect(w / h);
+    el.currentTime = 1;
   };
+
+  useEffect(() => {
+    const el = mainVideoRef.current;
+    if (el && el.readyState >= 1) {
+      el.currentTime = 0.5;
+    }
+  }, [mainVisual.src]);
 
   const toggleMainVideo = () => {
     const el = mainVideoRef.current;
@@ -628,7 +636,6 @@ export default function TechnologyBanner() {
                           className="w-full h-full object-cover"
                           playsInline
                           preload={"metadata"}
-                          muted
                           loop
                           onPlay={() => {
                             setPlayingArr((prev) => {
@@ -677,10 +684,10 @@ export default function TechnologyBanner() {
                             <Pause className="h-4 w-4 sm:h-5 sm:w-5 text-white" fill="white" />
                           </button>
                         )}
-                        <div className="absolute bottom-0 left-0 right-0 p-2 sm:p-3 z-10">
+                        {/* <div className="absolute bottom-0 left-0 right-0 p-2 sm:p-3 z-10">
                           <p className="text-white font-semibold text-xs mb-0.5 line-clamp-1">{item.title}</p>
                           <p className="text-xs text-gray-300 line-clamp-2">{item.description}</p>
-                        </div>
+                        </div> */}
                       </motion.div>
                     </div>
                   );

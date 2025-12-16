@@ -238,7 +238,7 @@ export function getBookingEmailTemplate(data: {
 
         <div class="footer">
             <p><strong>CINESPHERE - Rạp chiếu phim hiện đại</strong></p>
-            <p>Email: support@cinesphere.com | Hotline: 1900-xxxx</p>
+            <p>Email: cinesphere0629@gmail.com | Hotline: 1900-xxxx</p>
             <p style="margin-top: 15px; color: #999;">
                 Đây là email tự động, vui lòng không trả lời email này.
             </p>
@@ -347,14 +347,14 @@ export function getResetPasswordEmailTemplate(link: string): string {
             </div>
 
             <div class="note">
-                <p>Nếu bạn không yêu cầu thay đổi mật khẩu, vui lòng bỏ qua email này hoặc liên hệ với bộ phận hỗ trợ của chúng tôi.</p>
+                <p>Nếu bạn không yêu cầu thay đổi mật khẩu, vui lòng bỏ qua email này hoặc liên hệ với bộ phận hỗ trợ qua email "cinesphere0629@gmail.com" để được giúp đỡ.</p>
                 <p>Trân trọng,<br>Đội ngũ Cinema App</p>
             </div>
         </div>
 
         <div class="footer">
             <p><strong>CINESPHERE - Rạp chiếu phim hiện đại</strong></p>
-            <p>Email: support@cinesphere.com | Hotline: 1900-xxxx</p>
+            <p>Email: cinesphere0629@gmail.com | Hotline: 1900-xxxx</p>
             <p style="margin-top: 15px; color: #999;">
                 Đây là email tự động, vui lòng không trả lời email này.
             </p>
@@ -431,11 +431,11 @@ export function getWelcomeEmailTemplate(data: {
         <a class="btn btn-primary" href="${homeUrl}" target="_blank">Đến Trang Chủ</a>
       </div>
       <div style="font-size: 13px; color: #6b7280; margin-top: 12px;">
-        Cần hỗ trợ? Vui lòng liên hệ đội ngũ chăm sóc khách hàng của chúng tôi.
+        Cần hỗ trợ? Vui lòng liên hệ đội ngũ chăm sóc khách hàng của chúng tôi qua email: cinesphere0629@gmail.com.
       </div>
     </div>
     <div class="footer">
-      CINESPHERE • Email: support@cinesphere.com • Hotline: 1900-xxxx
+      CINESPHERE • Email: cinesphere0629@gmail.com • Hotline: 1900-xxxx
     </div>
   </div>
 </body>

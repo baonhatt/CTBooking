@@ -170,7 +170,7 @@ function getBookingEmailTemplate(baseUrl: string, data: {
         </div>
         <div class="footer">
             <p><strong>CINESPHERE - Rạp chiếu phim hiện đại</strong></p>
-            <p>Email: support@cinesphere.com | Hotline: 1900-xxxx</p>
+            <p>Email: cinesphere0629@gmail.com | Hotline: 1900-xxxx</p>
             <p style="margin-top: 15px; color: #999;">Đây là email tự động, vui lòng không trả lời email này.</p>
         </div>
     </div>
@@ -232,10 +232,10 @@ function getWelcomeEmailTemplate(baseUrl: string, data: { customerName: string; 
         <a class="btn btn-primary" href="${homeUrl}" target="_blank">Đến Trang Chủ</a>
       </div>
       <div style="font-size: 13px; color: #6b7280; margin-top: 12px;">
-        Cần hỗ trợ? Vui lòng liên hệ đội ngũ chăm sóc khách hàng của chúng tôi.
+        Cần hỗ trợ? Vui lòng liên hệ đội ngũ chăm sóc khách hàng của chúng tôi qua email: cinesphere0629@gmail.com.
       </div>
     </div>
-    <div class="footer">CINESPHERE • Email: support@cinesphere.com • Hotline: 1900-xxxx</div>
+    <div class="footer">CINESPHERE • Email: cinesphere0629@gmail.com • Hotline: 1900-xxxx</div>
   </div>
 </body>
 </html>
@@ -340,14 +340,14 @@ function getResetPasswordEmailTemplate(baseUrl: string, link: string): string {
             </div>
 
             <div class="note">
-                <p>Nếu bạn không yêu cầu thay đổi mật khẩu, vui lòng bỏ qua email này hoặc liên hệ với bộ phận hỗ trợ của chúng tôi.</p>
+                <p>Nếu bạn không yêu cầu thay đổi mật khẩu, vui lòng bỏ qua email này hoặc liên hệ với bộ phận hỗ trợ qua email "cinesphere0629@gmail.com" để được giúp đỡ.</p>
                 <p>Trân trọng,<br>Đội ngũ Cinema App</p>
             </div>
         </div>
 
         <div class="footer">
             <p><strong>CINESPHERE - Rạp chiếu phim hiện đại</strong></p>
-            <p>Email: support@cinesphere.com | Hotline: 1900-xxxx</p>
+            <p>Email: cinesphere0629@gmail.com | Hotline: 1900-xxxx</p>
             <p style="margin-top: 15px; color: #999;">
                 Đây là email tự động, vui lòng không trả lời email này.
             </p>
@@ -845,6 +845,43 @@ export default {
         const id = res.success ? Number((res.meta as any).last_row_id ?? 0) : 0;
         const item = await env.cinema_db.prepare(`SELECT * FROM site_media WHERE id = ?`).bind(id).first();
         return json({ item });
+      } catch (err: any) {
+        return json({ message: String(err?.message || "Internal error") }, 500);
+      }
+    }
+    if (url.pathname === "/api/admin/site-media" && request.method === "PUT") {
+      try {
+        const body = await request.json().catch(() => null);
+        if (!body || !body.id) return json({ message: "Thiếu id" }, 400);
+        
+        const updates: string[] = [];
+        const bind: any[] = [];
+        
+        if (body.section !== undefined) { updates.push("section = ?"); bind.push(String(body.section)); }
+        if (body.type !== undefined) { updates.push("type = ?"); bind.push(String(body.type)); }
+        if (body.title !== undefined) { updates.push("title = ?"); bind.push(String(body.title)); }
+        if (body.description !== undefined) { updates.push("description = ?"); bind.push(String(body.description)); }
+        if (body.public_id !== undefined) { updates.push("public_id = ?"); bind.push(String(body.public_id)); }
+        if (body.url !== undefined) { updates.push("url = ?"); bind.push(String(body.url)); }
+        if (body.format !== undefined) { updates.push("format = ?"); bind.push(String(body.format)); }
+        if (body.width !== undefined) { updates.push("width = ?"); bind.push(Number(body.width)); }
+        if (body.height !== undefined) { updates.push("height = ?"); bind.push(Number(body.height)); }
+        if (body.duration !== undefined) { updates.push("duration = ?"); bind.push(Number(body.duration)); }
+        if (body.display_order !== undefined) { updates.push("display_order = ?"); bind.push(Number(body.display_order)); }
+        if (body.is_active !== undefined) { updates.push("is_active = ?"); bind.push(Boolean(body.is_active) ? 1 : 0); }
+        
+        updates.push("updated_at = ?");
+        bind.push(new Date().toISOString());
+        
+        bind.push(Number(body.id));
+        
+        const stmt = env.cinema_db.prepare(
+          `UPDATE site_media SET ${updates.join(", ")} WHERE id = ?`
+        ).bind(...bind);
+        
+        const res = await stmt.run();
+        const item = await env.cinema_db.prepare(`SELECT * FROM site_media WHERE id = ?`).bind(Number(body.id)).first();
+        return json({ item, success: res.success });
       } catch (err: any) {
         return json({ message: String(err?.message || "Internal error") }, 500);
       }

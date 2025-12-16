@@ -41,6 +41,8 @@ export default function HeroSection() {
     queryKey: ["siteMedia", "hero_section"],
     queryFn: ({ signal }) => getSiteMediaApi({ section: "hero_section", type: "video", active: true, signal }),
   });
+  const heroVideoSrc = (heroMedia?.items?.[0]?.url as string) || heroVideoDefault;
+
 
   // Use static images and map to movies from API
   const moviePosters = useMemo(() => {
@@ -63,15 +65,32 @@ export default function HeroSection() {
     return () => clearInterval(interval);
   }, [moviePosters.length]);
 
-  // Pause video on mount
+  // Pause video on mount and set preview frame
   useEffect(() => {
     const video = videoRef.current;
     if (!video) return;
 
+    const PREVIEW_TIME = 1; // Giây thứ 2 làm ảnh preview
+
+    const handleLoadedMetadata = () => {
+      video.currentTime = PREVIEW_TIME;
+    };
+
+    video.addEventListener('loadedmetadata', handleLoadedMetadata);
+
     // Pause video when component mounts
     video.pause();
     setIsVideoPlaying(false);
-  }, []);
+
+    // If metadata is already loaded, seek immediately
+    if (video.readyState >= 1) {
+      video.currentTime = PREVIEW_TIME;
+    }
+
+    return () => {
+      video.removeEventListener('loadedmetadata', handleLoadedMetadata);
+    };
+  }, [heroVideoSrc]);
 
   // Intersection Observer for hero video - pause when scrolled out of viewport
   useEffect(() => {
@@ -119,7 +138,6 @@ export default function HeroSection() {
 
   const currentPoster = moviePosters[currentPosterIndex];
   const currentMovie = movies[currentPosterIndex] || null;
-  const heroVideoSrc = (heroMedia?.items?.[0]?.url as string) || heroVideoDefault;
 
   const onMove = (e: React.MouseEvent<HTMLDivElement, MouseEvent>) => {
     const { clientX, clientY, currentTarget } = e;
@@ -230,7 +248,7 @@ export default function HeroSection() {
               transition={{ delay: 0.4 }}
               className="text-lg md:text-xl text-gray-200 leading-relaxed max-w-2xl"
             >
-              Dùng không gian nhỏ mô phỏng thế giới vô biên
+              Dùng không gian nhỏ mô phỏng thế giới vô biên. 
               Mỗi suất chiếu là một hành trình nhập vai với độ phân giải 8K và âm thanh đa tầng bao quanh
             </motion.p>
 

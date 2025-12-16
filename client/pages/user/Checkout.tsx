@@ -502,7 +502,7 @@ export default function Checkout() {
                   {status === "failed" && (
                     <div className="bg-red-500/20 border border-red-500/40 rounded-lg p-3">
                       <p className="text-xs text-red-200">
-                        <strong>Thanh toán không thành công.</strong> Vui lòng thử lại hoặc liên hệ hỗ trợ nếu vấn đề vẫn tiếp tục.
+                        <strong>Thanh toán không thành công.</strong> Vui lòng thử lại hoặc liên hệ hỗ trợ "cinesphere0629@gmail.com" nếu vấn đề vẫn tiếp tục.
                       </p>
                     </div>
                   )}
