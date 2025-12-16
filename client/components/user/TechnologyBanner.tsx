@@ -1,7 +1,7 @@
 import { motion } from "framer-motion";
 import { Play, Pause, ChevronLeft, ChevronRight } from "lucide-react";
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
-import { cn } from "@/lib/utils";
+import { cn, optimizeCloudinaryUrl } from "@/lib/utils";
 import { useQuery } from "@tanstack/react-query";
 import { getSiteMediaApi } from "@/lib/api/uploads";
 import useEmblaCarousel from "embla-carousel-react";
@@ -82,11 +82,11 @@ export default function TechnologyBanner() {
   });
   const mainVisual = {
     type: "video" as const,
-    src: (techMain?.items?.[0]?.url as string) || mainVisualDefault.src,
+    src: optimizeCloudinaryUrl((techMain?.items?.[0]?.url as string) || mainVisualDefault.src, 1280),
   };
   const videoPreviewsDb = Array.isArray(techList?.items)
     ? techList!.items.map((it: any) => ({
-        src: it.url as string,
+        src: optimizeCloudinaryUrl(it.url as string, 640),
         title: it.title || "Video",
         description: it.description || "",
       }))

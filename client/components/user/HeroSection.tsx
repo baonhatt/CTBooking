@@ -13,13 +13,13 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { movieStore } from "@/store/movieStore";
-let heroVideoDefault = "https://sample-videos.com/video321/mp4/720/big_buck_bunny_720p_1mb.mp4";
 // @ts-ignore
 import heroImage1 from "@/assets/images/1.PNG";
 // @ts-ignore
 import heroImage9 from "@/assets/images/9.PNG";
 import { toast } from "@/components/ui/use-toast";
 import { getSiteMediaApi } from "@/lib/api/uploads";
+import { optimizeCloudinaryUrl } from "@/lib/utils";
 
 export default function HeroSection() {
   const [pointer, setPointer] = useState({ x: 0, y: 0 });
@@ -41,7 +41,7 @@ export default function HeroSection() {
     queryKey: ["siteMedia", "hero_section"],
     queryFn: ({ signal }) => getSiteMediaApi({ section: "hero_section", type: "video", active: true, signal }),
   });
-  const heroVideoSrc = (heroMedia?.items?.[0]?.url as string) || heroVideoDefault;
+  const heroVideoSrc = optimizeCloudinaryUrl((heroMedia?.items?.[0]?.url as string), 1280);
 
 
   // Use static images and map to movies from API
