@@ -66,3 +66,21 @@ export async function getUserTransactionsApi(options: { email: string; status?: 
   return request<{ items: any[] }>(path, { signal: options.signal });
 }
 
+export async function getUserProfileByEmailApi(email: string) {
+  const params = new URLSearchParams();
+  params.set("email", email);
+  return request<{
+    id?: number;
+    fullname?: string;
+    phone?: string;
+    gender?: string | null;
+    dob?: string | null;
+    email: string;
+    is_active?: boolean;
+    login_type?: string;
+    user_created_at?: string | null;
+    user_updated_at?: string | null;
+    account_created_at?: string | null;
+  }>(`/api/users/profile?${params.toString()}`);
+}
+

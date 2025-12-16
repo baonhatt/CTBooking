@@ -2,6 +2,8 @@ name = "cinema-worker"
 main = "src/index.ts"
 compatibility_date = "2024-12-01"
 send_metrics = false
+workers_dev = true
+preview_urls = true
 
 [vars]
 UPSTREAM_BASE = "https://cinesphere.com.vn"
@@ -9,42 +11,83 @@ VITE_SERVER_BASE_URL = "https://cinesphere.com.vn"
 VITE_VNPAY_RETURN_URL = "/checkout"
 VITE_VNPAY_GATEWAY = "https://sandbox.vnpayment.vn/paymentv2/vpcpay.html"
 VITE_MOMO_ENDPOINT = "https://test-payment.momo.vn/v2/gateway/api/create"
+VITE_MOMO_REDIRECT_URL = "/checkout"
+VITE_MOMO_IPN_URL = "/api/momo/ipn"
+R2_PUBLIC_BASE = "https://cinesphere.com.vn"
+R2_PUBLIC_ENABLED = "false"
 GMAIL_SENDER_EMAIL = "no-reply@cinesphere.com.vn"
 GMAIL_SENDER_NAME = "CTBOOKING"
+BREVO_SENDER_EMAIL = "no-reply@cinesphere.com.vn"
+BREVO_SENDER_NAME = "CTBOOKING"
 
-  [[d1_databases]]
-  binding = "cinema_db"
-  database_name = "cinema-db"
-  database_id = "9bae4fb3-570a-4ded-9a75-922ce4d6ef81"
-  
-  [[r2_buckets]]
-  binding = "r2_cinemastore"
-  bucket_name = "cinemastore"
+[[d1_databases]]
+binding = "cinema_db"
+database_name = "cinema-db"
+database_id = "9bae4fb3-570a-4ded-9a75-922ce4d6ef81"
+
+[[r2_buckets]]
+binding = "r2_cinemastore"
+bucket_name = "cinemastore"
 
 [env.preview]
 [env.preview.vars]
 UPSTREAM_BASE = "https://cinesphere.com.vn"
 VITE_SERVER_BASE_URL = "https://cinesphere.com.vn"
+VITE_MOMO_RETURN_URL = "/checkout"
+VITE_MOMO_REDIRECT_URL = "/checkout"
+VITE_MOMO_IPN_URL = "/api/momo/ipn"
 VITE_VNPAY_RETURN_URL = "/checkout"
 VITE_VNPAY_GATEWAY = "https://sandbox.vnpayment.vn/paymentv2/vpcpay.html"
 VITE_MOMO_ENDPOINT = "https://test-payment.momo.vn/v2/gateway/api/create"
+R2_PUBLIC_BASE = "https://cinesphere.com.vn"
+R2_PUBLIC_ENABLED = "false"
 GMAIL_SENDER_EMAIL = "no-reply@cinesphere.com.vn"
 GMAIL_SENDER_NAME = "CTBOOKING"
+BREVO_SENDER_EMAIL = "no-reply@cinesphere.com.vn"
+BREVO_SENDER_NAME = "CTBOOKING"
+
+[[env.preview.d1_databases]]
+binding = "cinema_db"
+database_name = "cinema-db"
+database_id = "9bae4fb3-570a-4ded-9a75-922ce4d6ef81"
+
+[[env.preview.r2_buckets]]
+binding = "r2_cinemastore"
+bucket_name = "cinemastore"
 
 [env.production]
 [env.production.vars]
 UPSTREAM_BASE = "https://cinesphere.com.vn"
 VITE_SERVER_BASE_URL = "https://cinesphere.com.vn"
+VITE_MOMO_RETURN_URL = "/checkout"
+VITE_MOMO_REDIRECT_URL = "/checkout"
+VITE_MOMO_IPN_URL = "/api/momo/ipn"
 VITE_VNPAY_RETURN_URL = "/checkout"
 VITE_VNPAY_GATEWAY = "https://sandbox.vnpayment.vn/paymentv2/vpcpay.html"
 VITE_MOMO_ENDPOINT = "https://test-payment.momo.vn/v2/gateway/api/create"
+R2_PUBLIC_BASE = "https://cinesphere.com.vn"
+R2_PUBLIC_ENABLED = "false"
 GMAIL_SENDER_EMAIL = "no-reply@cinesphere.com.vn"
 GMAIL_SENDER_NAME = "CTBOOKING"
+BREVO_SENDER_EMAIL = "no-reply@cinesphere.com.vn"
+BREVO_SENDER_NAME = "CTBOOKING"
+
+[[env.production.d1_databases]]
+binding = "cinema_db"
+database_name = "cinema-db"
+database_id = "9bae4fb3-570a-4ded-9a75-922ce4d6ef81"
+
+[[env.production.r2_buckets]]
+binding = "r2_cinemastore"
+bucket_name = "cinemastore"
+
+routes = [
+  { pattern = "cinesphere.com.vn/api/*", zone_name = "cinesphere.com.vn" },
+  { pattern = "cinesphere.com.vn/uploads/*", zone_name = "cinesphere.com.vn" }
+]
 [observability]
 enabled = false
 head_sampling_rate = 1
-
-[observability]
 [observability.logs]
 enabled = true
 head_sampling_rate = 1

@@ -16,10 +16,13 @@ import { listActiveToys } from "./routes/user/toys";
 import { listToys, createToy, getToy, updateToy, deleteToy } from "./routes/admin/toys";
 import { getDashboardMetrics, getRevenueByDate, getRevenue7Days, getRevenueByMonth } from "./routes/admin/dashboard";
 import { getUsers, getUserById } from "./routes/admin/users";
-import { updateUserProfile, listUserTransactions } from "./routes/user/users";
+import { updateUserProfile, listUserTransactions, getUserProfileByEmail } from "./routes/user/users";
 import { listTicketPackages, getTicketPackage, createTicketPackage, updateTicketPackage, deleteTicketPackage } from "./routes/admin/tickets";
+import { uploadAdminVideo } from "./routes/admin/uploads";
 import { listActiveTicketPackages } from "./routes/user/tickets";
 import { getMailConfig, verifyMailProvider } from "./routes/mail-service";
+import { generateCloudinarySignature } from "./routes/admin/cloudinary-sign";
+import { createSiteMedia, listSiteMedia } from "./routes/admin/site-media";
 
 export function createServer() {
   const app = express();
@@ -124,6 +127,7 @@ export function createServer() {
   app.get("/api/admin/dashboard/revenue-7days", getRevenue7Days);
   app.get("/api/admin/dashboard/revenue-month", getRevenueByMonth);
   app.get("/api/users", getUsers);
+  app.get("/api/users/profile", getUserProfileByEmail);
   app.get("/api/users/:id", getUserById);
   app.post("/api/users/profile", updateUserProfile);
   app.post("/api/users/password", changePassword);
@@ -134,6 +138,10 @@ export function createServer() {
   app.post("/api/tickets", createTicketPackage);
   app.put("/api/tickets/:id", updateTicketPackage);
   app.delete("/api/tickets/:id", deleteTicketPackage);
+  app.post("/api/admin/uploads/video", uploadAdminVideo);
+  app.post("/api/admin/cloudinary/sign", generateCloudinarySignature);
+  app.post("/api/admin/site-media", createSiteMedia);
+  app.get("/api/site-media", listSiteMedia);
 
   app.get("/api/debug/mail", async (_req, res) => {
     try {

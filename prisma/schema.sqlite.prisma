@@ -112,3 +112,21 @@ model ticket_packages {
   bookings       bookings[]
 }
 
+model site_media {
+  id            Int       @id @default(autoincrement())
+  section       String
+  type          String
+  title         String?
+  description   String?
+  public_id     String?
+  url           String
+  format        String?
+  width         Int?
+  height        Int?
+  duration      Float?
+  display_order Int?      @default(0)
+  is_active     Boolean?  @default(true)
+  created_at    DateTime  @default(now())
+  updated_at    DateTime  @default(now())
+}
+

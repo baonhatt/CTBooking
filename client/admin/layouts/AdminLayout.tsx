@@ -21,7 +21,8 @@ interface Props {
   | "toys"
   | "transactions"
   | "tickets"
-  | "ticket-check";
+  | "ticket-check"
+  | "uploads";
   setActive: (x: Props["active"]) => void;
   adminEmailState: string;
   handleLogout: () => void;
@@ -55,6 +56,7 @@ export default function AdminLayout({
     { key: "tickets" as const, label: "Gói vé", icon: <TicketIcon className="h-4 w-4" /> },
     { key: "transactions" as const, label: "Giao dịch", icon: <CreditCard className="h-4 w-4" /> },
     { key: "ticket-check" as const, label: "Kiểm Tra Vé", icon: <ScanLine className="h-4 w-4" /> },
+    { key: "uploads" as const, label: "Uploads", icon: <Clapperboard className="h-4 w-4" /> },
   ];
 
   return (

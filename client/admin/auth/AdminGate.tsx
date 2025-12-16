@@ -12,6 +12,7 @@ import ToysPage from "@/pages/admin/Toys";
 import TransactionsPage from "@/pages/admin/Transactions";
 import TicketsPage from "@/pages/admin/Tickets";
 import TicketCheckPage from "@/pages/admin/TicketCheck";
+import UploadsPage from "@/pages/admin/Uploads";
 // import { adminLoginApi } from "@/lib/api";
 
 const AdminLoginView = () => {
@@ -105,6 +106,7 @@ export const AdminGate = () => {
       <Route path="/tickets" element={<TicketsPage />} />
       <Route path="/transactions" element={<TransactionsPage />} />
       <Route path="/ticket-check" element={<TicketCheckPage />} />
+      <Route path="/uploads" element={<UploadsPage />} />
       <Route path="*" element={<Navigate to="/admin/dashboard" replace />} />
     </Routes>
   );

@@ -1,8 +1,6 @@
 import { RequestHandler } from "express";
 import { prisma } from "../../lib/prisma";
-import fs from "fs";
-import path from "path";
-import sharp from "sharp";
+import { cloudinary } from "../../cloudinary";
 
 export const createMovie: RequestHandler = async (req, res) => {
   let baseData: any;
@@ -55,21 +53,74 @@ export const createMovie: RequestHandler = async (req, res) => {
         const match = cover_image_base64.match(/^data:(.+);base64,(.+)$/);
         const raw = match ? match[2] : cover_image_base64;
         const inputBuf = Buffer.from(raw, "base64");
-        const dir = path.resolve(process.cwd(), "uploads", "movies");
-        try {
-          fs.mkdirSync(dir, { recursive: true });
-        } catch { }
-        const filenameBase = `movie_${Date.now()}`;
-        const outPath = path.join(dir, `${filenameBase}.webp`);
-        await sharp(inputBuf).webp({ quality: 75 }).toFile(outPath);
-        savedCover = `/uploads/movies/${path.basename(outPath)}`;
+        const uploadRes = await cloudinary.uploader.upload_stream(
+          {
+            resource_type: "image",
+            folder: "ctbooking/images/movies",
+            use_filename: true,
+            unique_filename: false,
+            overwrite: true,
+            transformation: [
+              { quality: "auto" },
+              { fetch_format: "webp" },
+              { width: 1280, crop: "limit" },
+            ],
+          },
+          (error: any, result: any) => {
+            if (error) throw error;
+            return result;
+          }
+        );
+        // upload_stream requires piping; fallback to upload with buffer as data URI
       } catch { }
+      try {
+        const dataUri = cover_image_base64.startsWith("data:")
+          ? cover_image_base64
+          : `data:image/jpeg;base64,${cover_image_base64}`;
+        const result = await cloudinary.uploader.upload(dataUri, {
+          resource_type: "image",
+          folder: "ctbooking/images/movies",
+          use_filename: true,
+          unique_filename: false,
+          overwrite: true,
+          transformation: [
+            { quality: "auto" },
+            { fetch_format: "webp" },
+            { width: 1280, crop: "limit" },
+          ],
+        } as any);
+        savedCover = (result as any).secure_url || (result as any).url;
+      } catch { }
+    }
+    let processedDetailImages: any = detail_images;
+    if (Array.isArray(detail_images)) {
+      const out: string[] = [];
+      for (const img of detail_images as any[]) {
+        if (typeof img === "string" && /^data:.*;base64,/.test(img)) {
+          try {
+            const r = await cloudinary.uploader.upload(img, {
+              resource_type: "image",
+              folder: "ctbooking/images/movies/details",
+              use_filename: true,
+              unique_filename: false,
+              overwrite: true,
+              transformation: [{ quality: "auto" }, { fetch_format: "webp" }],
+            } as any);
+            out.push((r as any).secure_url || (r as any).url);
+          } catch {
+            out.push(img);
+          }
+        } else {
+          out.push(String(img));
+        }
+      }
+      processedDetailImages = out;
     }
     baseData = {
       title,
       description,
       cover_image: savedCover,
-      detail_images,
+      detail_images: processedDetailImages,
       genres,
       rating: ratingNum,
       duration_min: durationNum,
@@ -124,20 +175,51 @@ export const updateMovie: RequestHandler = async (req, res) => {
     if (cover_image !== undefined) data.cover_image = cover_image;
     if (cover_image_base64 && typeof cover_image_base64 === "string") {
       try {
-        const match = cover_image_base64.match(/^data:(.+);base64,(.+)$/);
-        const raw = match ? match[2] : cover_image_base64;
-        const inputBuf = Buffer.from(raw, "base64");
-        const dir = path.resolve(process.cwd(), "uploads", "movies");
-        try {
-          fs.mkdirSync(dir, { recursive: true });
-        } catch { }
-        const filenameBase = `movie_${Date.now()}`;
-        const outPath = path.join(dir, `${filenameBase}.webp`);
-        await sharp(inputBuf).webp({ quality: 75 }).toFile(outPath);
-        data.cover_image = `/uploads/movies/${path.basename(outPath)}`;
+        const dataUri = cover_image_base64.startsWith("data:")
+          ? cover_image_base64
+          : `data:image/jpeg;base64,${cover_image_base64}`;
+        const result = await cloudinary.uploader.upload(dataUri, {
+          resource_type: "image",
+          folder: "ctbooking/images/movies",
+          use_filename: true,
+          unique_filename: false,
+          overwrite: true,
+          transformation: [
+            { quality: "auto" },
+            { fetch_format: "webp" },
+            { width: 1280, crop: "limit" },
+          ],
+        } as any);
+        data.cover_image = (result as any).secure_url || (result as any).url;
       } catch { }
     }
-    if (detail_images !== undefined) data.detail_images = detail_images;
+    if (detail_images !== undefined) {
+      if (Array.isArray(detail_images)) {
+        const out: string[] = [];
+        for (const img of detail_images as any[]) {
+          if (typeof img === "string" && /^data:.*;base64,/.test(img)) {
+            try {
+              const r = await cloudinary.uploader.upload(img, {
+                resource_type: "image",
+                folder: "ctbooking/images/movies/details",
+                use_filename: true,
+                unique_filename: false,
+                overwrite: true,
+                transformation: [{ quality: "auto" }, { fetch_format: "webp" }],
+              } as any);
+              out.push((r as any).secure_url || (r as any).url);
+            } catch {
+              out.push(img);
+            }
+          } else {
+            out.push(String(img));
+          }
+        }
+        data.detail_images = out;
+      } else {
+        data.detail_images = detail_images;
+      }
+    }
     if (genres !== undefined) data.genres = genres;
 
     // Validate rating
