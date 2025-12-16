@@ -245,7 +245,7 @@ export const updatePayment: RequestHandler = async (req, res) => {
 
         await sendMail(
           booking.email,
-          `🎬 Xác nhận đặt vé - Mã: ${bookingCode}`,
+          `🎬 Xác nhận đặt vé - CINESPHERE`,
           emailTemplate
         );
 

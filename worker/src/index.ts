@@ -145,7 +145,6 @@ function getBookingEmailTemplate(baseUrl: string, data: {
                 <div class="booking-code">${data.bookingCode}</div>
                 <div style="font-size: 12px; color: #999; margin-top: 10px;">Vui lòng lưu lại mã này để check-in tại rạp</div>
             </div>
-            ${imgHtml}
             <div class="details-section">
                 <div class="section-title">Thông tin phim</div>
                 <div class="detail-row">
@@ -248,33 +247,112 @@ function getResetPasswordEmailTemplate(baseUrl: string, link: string): string {
 <!DOCTYPE html>
 <html lang="vi">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Đặt lại mật khẩu - CINESPHERE</title>
-  <style>
-    body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f5f7fb; margin:0; padding:0; }
-    .container { max-width: 600px; margin: 0 auto; background-color: #ffffff; border-radius: 10px; box-shadow: 0 4px 12px rgba(0,0,0,0.06); overflow: hidden; }
-    .header { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 30px 20px; text-align: center; }
-    .header h1 { margin: 0; font-size: 28px; font-weight: 700; }
-    .content { padding: 26px; color: #1f2937; }
-    .greeting { font-size: 16px; margin-bottom: 14px; }
-    .card { background: #fff3cd; border-left: 4px solid #ffc107; border-radius: 8px; padding: 16px; margin: 14px 0; color: #856404; }
-    .btn { display: inline-block; padding: 10px 16px; border-radius: 8px; text-decoration: none; font-weight: 600; }
-    .btn-primary { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; }
-    .footer { background-color: #f9fafb; padding: 18px; text-align: center; font-size: 12px; color: #6b7280; border-top: 1px solid #e5e7eb; }
-  </style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Đặt lại Mật khẩu - CINESPHERE</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f5f5f5;
+            margin: 0;
+            padding: 0;
+        }
+        .container {
+            max-width: 600px;
+            margin: 0 auto;
+            background-color: #ffffff;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 30px 20px;
+            text-align: center;
+        }
+        .header h1 {
+            margin: 0;
+            font-size: 28px;
+            font-weight: 600;
+        }
+        .header p {
+            margin: 8px 0 0 0;
+            font-size: 14px;
+            opacity: 0.9;
+        }
+        .content {
+            padding: 30px;
+            color: #333;
+        }
+        .greeting {
+            font-size: 16px;
+            margin-bottom: 20px;
+        }
+        .btn-container {
+            text-align: center;
+            margin: 30px 0;
+        }
+        .btn {
+            display: inline-block;
+            padding: 12px 24px;
+            background-color: #dc3545;
+            color: white;
+            text-decoration: none;
+            border-radius: 4px;
+            font-weight: 600;
+            font-size: 16px;
+        }
+        .footer {
+            background-color: #f8f9fa;
+            padding: 20px;
+            text-align: center;
+            font-size: 12px;
+            color: #666;
+            border-top: 1px solid #eee;
+        }
+        .footer p {
+            margin: 5px 0;
+        }
+        .note {
+            font-size: 14px;
+            color: #666;
+            margin-top: 20px;
+        }
+    </style>
 </head>
 <body>
-  <div class="container">
-    <div class="header"><h1>CINESPHERE</h1></div>
-    <div class="content">
-      <div class="greeting">Chúng tôi nhận được yêu cầu đặt lại mật khẩu cho tài khoản của bạn.</div>
-      <div class="card">Liên kết sẽ hết hạn sau 1 giờ.</div>
-      <div style="text-align:center;margin:20px 0;"><a class="btn btn-primary" href="${link}" target="_blank">Đặt lại Mật khẩu</a></div>
-      <div style="font-size: 13px; color: #6b7280; margin-top: 12px;">Nếu bạn không yêu cầu thay đổi mật khẩu, vui lòng bỏ qua email này.</div>
+    <div class="container">
+        <div class="header">
+            <h1>🎬 CINESPHERE</h1>
+            <p>Yêu cầu Đặt lại Mật khẩu</p>
+        </div>
+
+        <div class="content">
+            <div class="greeting">
+                <h2 style="color: #007bff; margin-top: 0;">Yêu cầu Đặt lại Mật khẩu</h2>
+                <p>Chào bạn,</p>
+                <p>Chúng tôi nhận được yêu cầu đặt lại mật khẩu cho tài khoản của bạn. Vui lòng nhấp vào nút dưới đây để tạo mật khẩu mới. Liên kết này sẽ hết hạn sau <strong>60 phút</strong>.</p>
+            </div>
+
+            <div class="btn-container">
+                <a href="${link}" class="btn">Đặt lại Mật khẩu</a>
+            </div>
+
+            <div class="note">
+                <p>Nếu bạn không yêu cầu thay đổi mật khẩu, vui lòng bỏ qua email này hoặc liên hệ với bộ phận hỗ trợ của chúng tôi.</p>
+                <p>Trân trọng,<br>Đội ngũ Cinema App</p>
+            </div>
+        </div>
+
+        <div class="footer">
+            <p><strong>CINESPHERE - Rạp chiếu phim hiện đại</strong></p>
+            <p>Email: support@cinesphere.com | Hotline: 1900-xxxx</p>
+            <p style="margin-top: 15px; color: #999;">
+                Đây là email tự động, vui lòng không trả lời email này.
+            </p>
+        </div>
     </div>
-    <div class="footer">CINESPHERE • Email: support@cinesphere.com • Hotline: 1900-xxxx</div>
-  </div>
 </body>
 </html>
   `;
@@ -1024,7 +1102,7 @@ export default {
       const arr = new Uint8Array(32);
       crypto.getRandomValues(arr);
       const token = Array.from(arr).map((b) => b.toString(16).padStart(2, "0")).join("");
-      const expiredAt = new Date(Date.now() + 3600 * 1000).toISOString();
+      const expiredAt = new Date(Date.now() + 60 * 60 * 1000).toISOString(); // 60 minutes
       await env.cinema_db
         .prepare(`INSERT INTO tokens (account_id, type, token, expired_at, created_at) VALUES (?, 'reset_password', ?, ?, ?)`)
         .bind(Number((acc as any).id), token, expiredAt, new Date().toISOString())
@@ -1033,7 +1111,7 @@ export default {
       const link = `${base}/reset-password?token=${token}`;
       const html = getResetPasswordEmailTemplate(base, link);
       try {
-        const result = await sendMail(env, String(email), "Đặt lại mật khẩu - CTBOOKING", html);
+        const result = await sendMail(env, String(email), "Đặt lại mật khẩu - CINESPHERE", html);
         if (!result.ok) return json({ status: "error", message: "Gửi email thất bại", detail: { status: result.status, body: result.body, provider: result.provider, missing: result.missing } }, 502);
       } catch (e) {
         return json({ status: "error", message: "Gửi email thất bại" }, 502);
@@ -1354,7 +1432,7 @@ export default {
             ticketPackageName: packageName || undefined,
             expiryDate: (updated as any).expiry_date || null,
           });
-          await sendMail(env, emailTo, "✅ Thanh toán thành công - CTBOOKING", html);
+          await sendMail(env, emailTo, "✅ Thanh toán thành công - CINESPHERE", html);
         }
       } catch {}
       return json({
