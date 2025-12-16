@@ -23,7 +23,10 @@
     "format.fix": "prettier --write .",
     "typecheck": "tsc",
     "deploy:preview": "npx wrangler deploy --env preview --config worker/wrangler.toml",
-    "deploy:prod": "npx wrangler deploy --env production --config worker/wrangler.toml"
+    "deploy:prod": "npx wrangler deploy --config worker/wrangler.toml",
+    "pages:deploy": "npm run build:client && npx wrangler pages deploy dist/spa --project-name=cinema-pages",
+    "pages:deploy:prod": "npm run build:client && npx wrangler pages deploy dist/spa --project-name=cinema-pages --branch=main",
+    "pages:deploy:preview": "npm run build:client && npx wrangler pages deploy dist/spa --project-name=cinema-pages --branch=preview"
   },
   "rollup": {
     "forceJs": true
@@ -35,6 +38,7 @@
     "antd": "^6.0.0",
     "bcryptjs": "^3.0.3",
     "body-parser": "^2.2.1",
+    "cloudinary": "^2.8.0",
     "dotenv": "^17.2.3",
     "express": "^5.1.0",
     "multer": "^2.0.2",

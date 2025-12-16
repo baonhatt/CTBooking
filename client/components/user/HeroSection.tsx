@@ -13,12 +13,13 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { movieStore } from "@/store/movieStore";
-const heroVideo = "https://sample-videos.com/video321/mp4/720/big_buck_bunny_720p_1mb.mp4";
+let heroVideoDefault = "https://sample-videos.com/video321/mp4/720/big_buck_bunny_720p_1mb.mp4";
 // @ts-ignore
 import heroImage1 from "@/assets/images/1.PNG";
 // @ts-ignore
 import heroImage9 from "@/assets/images/9.PNG";
 import { toast } from "@/components/ui/use-toast";
+import { getSiteMediaApi } from "@/lib/api/uploads";
 
 export default function HeroSection() {
   const [pointer, setPointer] = useState({ x: 0, y: 0 });
@@ -34,6 +35,10 @@ export default function HeroSection() {
   const { data } = useQuery({
     queryKey: ["activeMovies", "hero"],
     queryFn: ({ signal }) => getAllActiveMoviesToday({ signal }),
+  });
+  const { data: heroMedia } = useQuery({
+    queryKey: ["siteMedia", "hero_section"],
+    queryFn: ({ signal }) => getSiteMediaApi({ section: "hero_section", type: "video", active: true, signal }),
   });
 
   // Use static images and map to movies from API
@@ -87,6 +92,7 @@ export default function HeroSection() {
 
   const currentPoster = moviePosters[currentPosterIndex];
   const currentMovie = movies[currentPosterIndex] || null;
+  const heroVideoSrc = (heroMedia?.items?.[0]?.url as string) || heroVideoDefault;
 
   const onMove = (e: React.MouseEvent<HTMLDivElement, MouseEvent>) => {
     const { clientX, clientY, currentTarget } = e;
@@ -276,7 +282,7 @@ export default function HeroSection() {
               <div className="absolute inset-0">
                 <video
                   ref={videoRef}
-                  src={heroVideo}
+                  src={heroVideoSrc}
                   className="w-full h-full object-cover"
                   loop
                   playsInline

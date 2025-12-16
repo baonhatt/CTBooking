@@ -25,6 +25,32 @@ export const updateUserProfile: RequestHandler = async (req, res) => {
   }
 };
 
+export const getUserProfileByEmail: RequestHandler = async (req, res) => {
+  try {
+    const emailRaw = String(req.query.email || "");
+    const email = (() => { try { return decodeURIComponent(emailRaw); } catch { return emailRaw; } })();
+    if (!email) return res.status(400).json({ message: "Thiếu email" });
+    const account = await prisma.accounts.findUnique({ where: { email } });
+    if (!account) return res.status(404).json({ message: "Không tìm thấy tài khoản" });
+    const user = await prisma.users.findUnique({ where: { id: account.user_id } });
+    return res.status(200).json({
+      id: user?.id ?? account.user_id,
+      fullname: user?.fullname || "N/A",
+      phone: user?.phone || "N/A",
+      gender: user?.gender ?? null,
+      dob: user?.dob ?? null,
+      email,
+      is_active: account.is_active ?? true,
+      login_type: account.login_type || "email",
+      user_created_at: user?.created_at ?? null,
+      user_updated_at: user?.updated_at ?? null,
+      account_created_at: account.created_at ?? null,
+    });
+  } catch {
+    return res.status(500).json({ message: "Lỗi máy chủ nội bộ" });
+  }
+};
+
 export const listUserTransactions: RequestHandler = async (req, res) => {
   try {
     const emailRaw = String(req.query.email || "");

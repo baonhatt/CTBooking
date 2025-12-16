@@ -436,7 +436,9 @@ const AdminEditModal: React.FC<AdminEditModalProps> = (props) => {
                     if (!editData.id) {
                       let coverBase64: string | undefined = undefined;
                       if (editData.posterFile) {
-                        coverBase64 = await fileToCompressedDataURL(editData.posterFile as File, { maxW: 1280, maxH: 1280, quality: 0.75, type: "image/webp" });
+                        const f = editData.posterFile as File;
+                        const q = f.size > 15_000_000 ? 0.5 : f.size > 8_000_000 ? 0.6 : 0.75;
+                        coverBase64 = await fileToCompressedDataURL(f, { maxW: 1280, maxH: 1280, quality: q, type: "image/webp" });
                       }
                       const payload = {
                         title: editData.title,
@@ -458,7 +460,9 @@ const AdminEditModal: React.FC<AdminEditModalProps> = (props) => {
                     } else {
                       let coverBase64: string | undefined = undefined;
                       if (editData.posterFile) {
-                        coverBase64 = await fileToCompressedDataURL(editData.posterFile as File, { maxW: 1280, maxH: 1280, quality: 0.75, type: "image/webp" });
+                        const f = editData.posterFile as File;
+                        const q = f.size > 15_000_000 ? 0.5 : f.size > 8_000_000 ? 0.6 : 0.75;
+                        coverBase64 = await fileToCompressedDataURL(f, { maxW: 1280, maxH: 1280, quality: q, type: "image/webp" });
                       }
                       await updateMovieApi(Number(editData.id), {
                         title: editData.title,

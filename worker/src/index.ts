@@ -12,21 +12,342 @@ async function hmacHex(algo: "SHA-256" | "SHA-512", key: string, message: string
   return Array.from(bytes).map((b) => b.toString(16).padStart(2, "0")).join("");
 }
 
-async function sendMail(env: any, toEmail: string, subject: string, html: string): Promise<boolean> {
-  const fromEmail = String(env.GMAIL_SENDER_EMAIL || env.GMAIL_USER || "no-reply@example.com");
-  const fromName = String(env.GMAIL_SENDER_NAME || "CTBOOKING");
-  const payload = {
-    personalizations: [{ to: [{ email: toEmail }] }],
-    from: { email: fromEmail, name: fromName },
-    subject,
-    content: [{ type: "text/html", value: html }],
+/**
+ * Gửi email qua Brevo hoặc MailChannels tùy theo biến môi trường
+ * - Ưu tiên Brevo nếu có `BREVO_API_KEY`
+ * - Fallback MailChannels khi không có Brevo
+ */
+async function sendMail(env: any, toEmail: string, subject: string, html: string): Promise<{ ok: boolean; status: number; body: string; provider: string; missing: string[] }> {
+  const brevoKey = String(env.BREVO_API_KEY || "");
+  const useBrevo = Boolean(brevoKey);
+  if (useBrevo) {
+    const senderEmailBrevo = String(env.BREVO_SENDER_EMAIL || "");
+    const senderNameBrevo = String(env.BREVO_SENDER_NAME || "");
+    const senderEmailFallback = String(env.GMAIL_SENDER_EMAIL || "no-reply@example.com");
+    const senderNameFallback = String(env.GMAIL_SENDER_NAME || "CTBOOKING");
+    const missing: string[] = [];
+    if (!brevoKey) missing.push("BREVO_API_KEY");
+    if (!senderEmailBrevo) missing.push("BREVO_SENDER_EMAIL");
+    if (!senderNameBrevo) missing.push("BREVO_SENDER_NAME");
+    const senderEmail = senderEmailBrevo || senderEmailFallback;
+    const senderName = senderNameBrevo || senderNameFallback;
+    const payload = {
+      sender: { email: senderEmail, name: senderName },
+      to: [{ email: toEmail }],
+      subject,
+      htmlContent: html,
+    };
+    const res = await fetch("https://api.brevo.com/v3/smtp/email", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "api-key": brevoKey },
+      body: JSON.stringify(payload),
+    });
+    const bodyText = await res.text().catch(() => "");
+    return { ok: res.ok, status: res.status, body: bodyText, provider: "brevo", missing };
+  } else {
+    const fromEmail = String(env.GMAIL_SENDER_EMAIL || env.GMAIL_USER || "no-reply@example.com");
+    const fromName = String(env.GMAIL_SENDER_NAME || "CTBOOKING");
+    const missing: string[] = [];
+    if (!String(env.GMAIL_SENDER_EMAIL || env.GMAIL_USER || "")) missing.push("GMAIL_SENDER_EMAIL");
+    if (!String(env.GMAIL_SENDER_NAME || "")) missing.push("GMAIL_SENDER_NAME");
+    const payload = {
+      personalizations: [{ to: [{ email: toEmail }] }],
+      from: { email: fromEmail, name: fromName },
+      subject,
+      content: [{ type: "text/html", value: html }],
+    };
+    const res = await fetch("https://api.mailchannels.net/tx/v1/send", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    const bodyText = await res.text().catch(() => "");
+    return { ok: res.ok, status: res.status, body: bodyText, provider: "mailchannels", missing };
+  }
+}
+
+function formatCurrencyVi(amount: number): string {
+  return `${Number(amount || 0).toLocaleString("vi-VN")}đ`;
+}
+
+function getBookingEmailTemplate(baseUrl: string, data: {
+  bookingCode: string;
+  customerName: string;
+  movieTitle: string;
+  ticketCount: number;
+  totalPrice: string;
+  movieImage?: string;
+  durationMin?: number | string;
+  ticketPackageName?: string;
+  expiryDate?: string | Date | null;
+}): string {
+  const imgHtml = data.movieImage ? `<img src="${baseUrl}${data.movieImage}" alt="${data.movieTitle}" class="movie-poster">` : "";
+  const durationHtml = data.durationMin !== undefined && data.durationMin !== null ? `
+                <div class="detail-row">
+                    <span class="detail-label">Thời lượng:&nbsp;</span>
+                    <span class="detail-value">${data.durationMin} phút</span>
+                </div>` : ``;
+  const pkgHtml = data.ticketPackageName ? `
+              <div class="detail-row">
+                  <span class="detail-label">Loại vé:&nbsp;</span>
+                  <span class="detail-value">${data.ticketPackageName}</span>
+              </div>` : ``;
+  const expiryHtml = data.expiryDate ? `
+              <div class="detail-row">
+                  <span class="detail-label">Ngày hết hạn:&nbsp;</span>
+                  <span class="detail-value">${(() => { try { const d = new Date(String(data.expiryDate)); const dd = String(d.getDate()).padStart(2,"0"); const mm = String(d.getMonth()+1).padStart(2,"0"); const yyyy = d.getFullYear(); const hh = String(d.getHours()).padStart(2,"0"); const mi = String(d.getMinutes()).padStart(2,"0"); return dd+"/"+mm+"/"+yyyy+" "+hh+":"+mi; } catch { return String(data.expiryDate); } })()}</span>
+              </div>` : ``;
+  return `
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Xác nhận đặt vé - CINESPHERE</title>
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f5f5f5; margin: 0; padding: 0; }
+        .container { max-width: 600px; margin: 0 auto; background-color: #ffffff; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); overflow: hidden; }
+        .header { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 30px 20px; text-align: center; }
+        .header h1 { margin: 0; font-size: 28px; font-weight: 600; }
+        .header p { margin: 8px 0 0 0; font-size: 14px; opacity: 0.9; }
+        .content { padding: 30px; }
+        .greeting { font-size: 16px; color: #333; margin-bottom: 20px; }
+        .booking-code-box { background-color: #f8f9fa; border-left: 4px solid #667eea; padding: 20px; margin: 20px 0; border-radius: 4px; }
+        .booking-code-label { font-size: 12px; color: #666; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px; }
+        .booking-code { font-size: 32px; font-weight: 700; color: #667eea; font-family: 'Courier New', monospace; letter-spacing: 2px; }
+        .details-section { margin: 25px 0; }
+        .section-title { font-size: 14px; font-weight: 600; color: #333; text-transform: uppercase; margin-bottom: 15px; border-bottom: 2px solid #667eea; padding-bottom: 8px; }
+        .detail-row { display: flex; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid #eee; font-size: 14px; }
+        .detail-row:last-child { border-bottom: none; }
+        .detail-label { color: #666; font-weight: 500; }
+        .detail-value { color: #333; font-weight: 600; }
+        .price-highlight { color: #27ae60; font-size: 18px; }
+        .movie-poster { width: 100%; max-width: 200px; margin: 15px auto; border-radius: 4px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .footer { background-color: #f8f9fa; padding: 20px; text-align: center; font-size: 12px; color: #666; border-top: 1px solid #eee; }
+        .footer p { margin: 5px 0; }
+        .warning { background-color: #fff3cd; border-left: 4px solid #ffc107; padding: 12px; margin: 15px 0; border-radius: 4px; font-size: 13px; color: #856404; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🎬 CINESPHERE</h1>
+            <p>Xác nhận đặt vé thành công</p>
+        </div>
+        <div class="content">
+            <div class="greeting">
+                Xin chào <strong>${data.customerName}</strong>,<br>
+                Cảm ơn bạn đã đặt vé tại CINESPHERE. Vui lòng sử dụng mã đặt vé sau để check-in tại rạp.
+            </div>
+            <div class="booking-code-box">
+                <div class="booking-code-label">Mã đặt vé của bạn</div>
+                <div class="booking-code">${data.bookingCode}</div>
+                <div style="font-size: 12px; color: #999; margin-top: 10px;">Vui lòng lưu lại mã này để check-in tại rạp</div>
+            </div>
+            ${imgHtml}
+            <div class="details-section">
+                <div class="section-title">Thông tin phim</div>
+                <div class="detail-row">
+                    <span class="detail-label">Tên phim:&nbsp;</span>
+                    <span class="detail-value">${data.movieTitle}</span>
+                </div>
+                ${durationHtml}
+            </div>
+            <div class="details-section">
+              <div class="section-title">Chi tiết đơn hàng</div>
+              <div class="detail-row">
+                  <span class="detail-label">Số lượng vé:&nbsp;</span>
+                  <span class="detail-value">${data.ticketCount} vé</span>
+              </div>
+              ${pkgHtml}
+              <div class="detail-row">
+                  <span class="detail-label">Tổng tiền:&nbsp;</span>
+                  <span class="detail-value">${data.totalPrice}</span>
+              </div>
+              ${expiryHtml}
+            </div>
+            <div class="warning">⏰ <strong>Lưu ý:</strong> Mang theo mã đặt vé để nhân viên xác nhận.</div>
+        </div>
+        <div class="footer">
+            <p><strong>CINESPHERE - Rạp chiếu phim hiện đại</strong></p>
+            <p>Email: support@cinesphere.com | Hotline: 1900-xxxx</p>
+            <p style="margin-top: 15px; color: #999;">Đây là email tự động, vui lòng không trả lời email này.</p>
+        </div>
+    </div>
+</body>
+</html>
+  `;
+}
+
+function getWelcomeEmailTemplate(baseUrl: string, data: { customerName: string; email: string }): string {
+  const accountUrl = `${baseUrl}/account`;
+  const bookingUrl = `${baseUrl}/booking`;
+  const homeUrl = `${baseUrl}/`;
+  return `
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Chào mừng - CINESPHERE</title>
+  <style>
+    body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f5f7fb; margin:0; padding:0; }
+    .container { max-width: 600px; margin: 0 auto; background-color: #ffffff; border-radius: 10px; box-shadow: 0 4px 12px rgba(0,0,0,0.06); overflow: hidden; }
+    .header { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 30px 20px; text-align: center; }
+    .header h1 { margin: 0; font-size: 28px; font-weight: 700; }
+    .header p { margin: 8px 0 0 0; font-size: 14px; opacity: 0.95; }
+    .content { padding: 26px; color: #1f2937; }
+    .greeting { font-size: 16px; margin-bottom: 14px; }
+    .card { background: #f8f9fa; border: 1px solid #e5e7eb; border-left: 4px solid #667eea; border-radius: 8px; padding: 16px; margin: 14px 0; }
+    .steps { margin: 10px 0; }
+    .step { display: flex; align-items: center; gap: 12px; padding: 10px 0; border-bottom: 1px dashed #e5e7eb; }
+    .step:last-child { border-bottom: none; }
+    .step-number { background: #667eea; color: white; width: 28px; height: 28px; border-radius: 8px; display: inline-flex; align-items: center; justify-content: center; font-size: 14px; font-weight: 700; line-height: 28px; flex-shrink: 0; }
+    .btn { display: inline-block; padding: 10px 16px; border-radius: 8px; text-decoration: none; font-weight: 600; }
+    .btn-primary { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; }
+    .btn-secondary { background: #f3f4f6; color: #111827; border: 1px solid #e5e7eb; }
+    .footer { background-color: #f9fafb; padding: 18px; text-align: center; font-size: 12px; color: #6b7280; border-top: 1px solid #e5e7eb; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <h1>CINESPHERE</h1>
+      <p>Chào mừng đến CINESPHERE</p>
+    </div>
+    <div class="content">
+      <div class="greeting">
+        Xin chào <strong>${data.customerName}</strong>,<br>
+        Tài khoản của bạn đã được tạo thành công với email <strong>${data.email}</strong>.<br>
+        Vui lòng truy cập trang web của chúng tôi để có thể trải nghiệm đầy đủ các chức năng sau khi đăng nhập.
+      </div>
+      <div class="card">
+        <div class="steps">
+          <div class="step"><div class="step-number">1</div><div>Đặt vé để trải nghiệm các bộ phim vũ trụ đa chiều</div></div>
+          <div class="step"><div class="step-number">2</div><div>Nhận những ưu đãi mới mỗi ngày</div></div>
+          <div class="step"><div class="step-number">3</div><div>Dễ dàng theo dõi các vé đã đặt của bạn</div></div>
+        </div>
+      </div>
+      <div style="text-align:center; margin-top: 10px;">
+        <a class="btn btn-primary" href="${homeUrl}" target="_blank">Đến Trang Chủ</a>
+      </div>
+      <div style="font-size: 13px; color: #6b7280; margin-top: 12px;">
+        Cần hỗ trợ? Vui lòng liên hệ đội ngũ chăm sóc khách hàng của chúng tôi.
+      </div>
+    </div>
+    <div class="footer">CINESPHERE • Email: support@cinesphere.com • Hotline: 1900-xxxx</div>
+  </div>
+</body>
+</html>
+  `;
+}
+
+function getResetPasswordEmailTemplate(baseUrl: string, link: string): string {
+  return `
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Đặt lại mật khẩu - CINESPHERE</title>
+  <style>
+    body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f5f7fb; margin:0; padding:0; }
+    .container { max-width: 600px; margin: 0 auto; background-color: #ffffff; border-radius: 10px; box-shadow: 0 4px 12px rgba(0,0,0,0.06); overflow: hidden; }
+    .header { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 30px 20px; text-align: center; }
+    .header h1 { margin: 0; font-size: 28px; font-weight: 700; }
+    .content { padding: 26px; color: #1f2937; }
+    .greeting { font-size: 16px; margin-bottom: 14px; }
+    .card { background: #fff3cd; border-left: 4px solid #ffc107; border-radius: 8px; padding: 16px; margin: 14px 0; color: #856404; }
+    .btn { display: inline-block; padding: 10px 16px; border-radius: 8px; text-decoration: none; font-weight: 600; }
+    .btn-primary { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; }
+    .footer { background-color: #f9fafb; padding: 18px; text-align: center; font-size: 12px; color: #6b7280; border-top: 1px solid #e5e7eb; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header"><h1>CINESPHERE</h1></div>
+    <div class="content">
+      <div class="greeting">Chúng tôi nhận được yêu cầu đặt lại mật khẩu cho tài khoản của bạn.</div>
+      <div class="card">Liên kết sẽ hết hạn sau 1 giờ.</div>
+      <div style="text-align:center;margin:20px 0;"><a class="btn btn-primary" href="${link}" target="_blank">Đặt lại Mật khẩu</a></div>
+      <div style="font-size: 13px; color: #6b7280; margin-top: 12px;">Nếu bạn không yêu cầu thay đổi mật khẩu, vui lòng bỏ qua email này.</div>
+    </div>
+    <div class="footer">CINESPHERE • Email: support@cinesphere.com • Hotline: 1900-xxxx</div>
+  </div>
+</body>
+</html>
+  `;
+}
+
+/**
+ * Tạo SHA-1 hex cho chuỗi đầu vào
+ * Dùng để ký request Cloudinary (legacy signature)
+ */
+async function sha1Hex(input: string): Promise<string> {
+  const enc = new TextEncoder();
+  const buf = await crypto.subtle.digest("SHA-1", enc.encode(input));
+  const bytes = new Uint8Array(buf as ArrayBuffer);
+  return Array.from(bytes).map((b) => b.toString(16).padStart(2, "0")).join("");
+}
+
+/**
+ * Kiểm tra cấu hình Cloudinary bắt buộc
+ */
+function hasCloudinary(env: any) {
+  const cloudName = String(env.CLOUDINARY_CLOUD_NAME || "");
+  const apiKey = String(env.CLOUDINARY_API_KEY || "");
+  const apiSecret = String(env.CLOUDINARY_API_SECRET || "");
+  return Boolean(cloudName && apiKey && apiSecret);
+}
+
+/**
+ * Ký tham số upload Cloudinary theo chuẩn `api_sign_request`
+ */
+async function cloudinarySignedParams(env: any, params: Record<string, string | number>) {
+  const apiKey = String(env.CLOUDINARY_API_KEY || "");
+  const apiSecret = String(env.CLOUDINARY_API_SECRET || "");
+  const keys = Object.keys(params).sort();
+  const toSign = keys.map((k) => `${k}=${params[k]}`).join("&") + apiSecret;
+  const signature = await sha1Hex(toSign);
+  return { signature, api_key: apiKey };
+}
+
+/**
+ * Upload ảnh base64 (data URI) lên Cloudinary với transform giống Express:
+ * - `q_auto`, `f_webp`, `w_1280`, `c_limit`
+ * Trả về URL an toàn (secure_url) và kích thước
+ */
+async function uploadCloudinaryImageDataURI(env: any, dataUri: string, folder: string) {
+  const cloudName = String(env.CLOUDINARY_CLOUD_NAME || "");
+  const timestamp = Math.floor(Date.now() / 1000);
+  const params = {
+    timestamp,
+    folder,
+    use_filename: "true",
+    unique_filename: "false",
+    overwrite: "true",
+    transformation: "q_auto,f_webp,w_1280,c_limit",
   };
-  const res = await fetch("https://api.mailchannels.net/tx/v1/send", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(payload),
-  });
-  return res.ok;
+  const signed = await cloudinarySignedParams(env, params);
+  const form = new FormData();
+  form.append("file", dataUri);
+  form.append("folder", folder);
+  form.append("use_filename", "true");
+  form.append("unique_filename", "false");
+  form.append("overwrite", "true");
+  form.append("timestamp", String(timestamp));
+  form.append("api_key", signed.api_key);
+  form.append("signature", signed.signature);
+  form.append("transformation", "q_auto,f_webp,w_1280,c_limit");
+  const endpoint = `https://api.cloudinary.com/v1_1/${cloudName}/image/upload`;
+  const res = await fetch(endpoint, { method: "POST", body: form });
+  const json = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(String(json?.error?.message || `Cloudinary ${res.status}`));
+  return {
+    url: String(json.secure_url || json.url || ""),
+    width: Number(json.width || 0),
+    height: Number(json.height || 0),
+  };
 }
 
 export default {
@@ -54,6 +375,8 @@ export default {
     } as Record<string, string>;
     if (request.method === "OPTIONS") return new Response(null, { status: 204, headers: cors });
     const url = new URL(request.url);
+    const r2Base = String(env.R2_PUBLIC_BASE || "");
+    const r2Enabled = String(env.R2_PUBLIC_ENABLED || "").toLowerCase() === "true";
     const json = (data: any, status = 200) =>
       new Response(JSON.stringify(data), { status, headers: { "Content-Type": "application/json", ...cors } });
     const notFound = () => new Response("Not found", { status: 404, headers: cors });
@@ -75,6 +398,115 @@ export default {
     };
     if (url.pathname === "/") return json({ ok: true, service: "cinema-worker", time: Date.now() });
     if (url.pathname === "/api/ping" && request.method === "GET") return json({ message: "ping" });
+    if (url.pathname === "/api/admin/cloudinary/sign" && request.method === "POST") {
+      try {
+        if (!hasCloudinary(env)) return json({ message: "Thiếu cấu hình Cloudinary" }, 400);
+        const body = await request.json().catch(() => null);
+        const folder = String(body?.folder || "");
+        const resourceType = String(body?.resource_type || "");
+        if (!folder || !resourceType) return json({ message: "Thiếu tham số cần thiết" }, 400);
+        const timestamp = Math.floor(Date.now() / 1000);
+        const params = {
+          timestamp,
+          folder,
+          use_filename: "true",
+          unique_filename: "false",
+          overwrite: "true",
+        } as Record<string, string | number>;
+        const signed = await cloudinarySignedParams(env, params);
+        return json({ timestamp, signature: signed.signature, api_key: signed.api_key });
+      } catch (err: any) {
+        return json({ message: String(err?.message || "Internal error") }, 500);
+      }
+    }
+    if (url.pathname === "/api/users/profile" && request.method === "GET") {
+      const email = url.searchParams.get("email");
+      if (!email) return badRequest("Thiếu email");
+      const acc = await env.cinema_db.prepare(`SELECT * FROM accounts WHERE email = ?`).bind(String(email)).first();
+      if (!acc) return json({ message: "Không tìm thấy tài khoản" }, 404);
+      const user = await env.cinema_db.prepare(`SELECT * FROM users WHERE id = ?`).bind(Number((acc as any).user_id)).first();
+      return json({
+        id: user?.id ?? Number((acc as any).user_id),
+        fullname: user?.fullname ?? "N/A",
+        phone: user?.phone ?? "N/A",
+        gender: user?.gender ?? null,
+        dob: user?.dob ?? null,
+        email: String(email),
+        is_active: Boolean((acc as any)?.is_active ?? true),
+        login_type: (acc as any)?.login_type || "email",
+        user_created_at: user?.created_at ?? null,
+        user_updated_at: user?.updated_at ?? null,
+        account_created_at: (acc as any)?.created_at ?? null,
+      });
+    }
+    if (url.pathname === "/api/admin/uploads/video" && request.method === "POST") {
+      try {
+        const form = await request.formData();
+        const file = form.get("file") as File | null;
+        if (!file) return json({ message: "Thiếu tệp video" }, 400);
+        const mime = String(file.type || "application/octet-stream").toLowerCase();
+        if (!mime.startsWith("video/")) return json({ message: "Chỉ chấp nhận tệp video" }, 400);
+        if (hasCloudinary(env)) {
+          const cloudName = String(env.CLOUDINARY_CLOUD_NAME || "");
+          const timestamp = Math.floor(Date.now() / 1000);
+          const folder = String(env.CLOUDINARY_UPLOAD_FOLDER || "ctbooking/videos");
+          const params = {
+            timestamp,
+            folder,
+            use_filename: "true",
+            unique_filename: "false",
+            overwrite: "true",
+            eager: "q_auto,w_1280,h_720,c_limit,f_mp4,vc_h264",
+            eager_async: "true",
+          };
+          const signed = await cloudinarySignedParams(env, params);
+          const cf = new FormData();
+          cf.append("file", file);
+          cf.append("folder", folder);
+          cf.append("use_filename", "true");
+          cf.append("unique_filename", "false");
+          cf.append("overwrite", "true");
+          cf.append("timestamp", String(timestamp));
+          cf.append("api_key", signed.api_key);
+          cf.append("signature", signed.signature);
+          cf.append("eager", "q_auto,w_1280,h_720,c_limit,f_mp4,vc_h264");
+          cf.append("eager_async", "true");
+          const endpoint = `https://api.cloudinary.com/v1_1/${cloudName}/video/upload`;
+          const resp = await fetch(endpoint, { method: "POST", body: cf });
+          const data = await resp.json().catch(() => ({}));
+          if (!resp.ok) return json({ message: String(data?.error?.message || `Cloudinary ${resp.status}`) }, 500);
+          return json({
+            public_id: String(data.public_id || ""),
+            url: String(data.secure_url || data.url || ""),
+            bytes: Number(data.bytes || file.size || 0),
+            duration: typeof data.duration === "number" ? data.duration : undefined,
+            format: String(data.format || ""),
+            width: typeof data.width === "number" ? data.width : undefined,
+            height: typeof data.height === "number" ? data.height : undefined,
+          });
+        }
+        if (!env.r2_cinemastore) return json({ message: "Thiếu R2 bucket hoặc Cloudinary" }, 500);
+        const ext = (() => {
+          const e = (file.name || "").split(".").pop()?.toLowerCase() || "";
+          if (e) return e;
+          if (mime.includes("mp4")) return "mp4";
+          if (mime.includes("webm")) return "webm";
+          if (mime.includes("mov")) return "mov";
+          return "bin";
+        })();
+        const key = `uploads/videos/video_${Date.now()}.${ext}`;
+        const arr = new Uint8Array(await file.arrayBuffer());
+        await env.r2_cinemastore.put(key, arr, { httpMetadata: { contentType: mime } });
+        return json({
+          public_id: key,
+          url: `/${key}`,
+          bytes: Number(file.size || arr.byteLength || 0),
+          format: ext,
+        });
+      } catch (err: any) {
+        return json({ message: String(err?.message || "Upload error") }, 500);
+      }
+    }
     if (url.pathname === "/api/getActiveMovies" && request.method === "POST") {
       const stmt = env.cinema_db.prepare(
         `SELECT id, title, description, cover_image, detail_images, genres, rating, duration_min, release_date, is_active FROM movies WHERE is_active = 1 ORDER BY release_date DESC;`,
@@ -126,15 +558,33 @@ export default {
         .prepare(`SELECT id, title, description, cover_image, genres, rating, duration_min, is_active, release_date, created_at, updated_at FROM movies ${where} ORDER BY ${sortKey} ${dir} LIMIT ? OFFSET ?`)
         .bind(...bind, pageSize, offset)
         .all();
-      const items = Array.isArray(rows.results) ? rows.results : [];
+      const items = Array.isArray(rows.results) ? (rows.results as any[]).map((m: any) => {
+        const ci = m?.cover_image;
+        return {
+          ...m,
+          cover_image: (() => {
+            if (typeof ci === "string" && ci.startsWith("/uploads/")) {
+              if (r2Enabled && r2Base) return `${r2Base}/${ci.replace(/^\//, "")}`;
+              return `${url.origin}${ci}`;
+            }
+            return ci;
+          })(),
+        };
+      }) : [];
       return json({ items, page, pageSize, total });
     }
     if (url.pathname === "/api/movies" && request.method === "POST") {
       const body = await request.json().catch(() => null);
       if (!body || !body.title) return badRequest("Thiếu tiêu đề phim");
       const now = new Date().toISOString();
+      const MAX_IMAGE_SIZE = 5 * 1024 * 1024;
       const savedCover = await (async () => {
         try {
+          if (hasCloudinary(env) && typeof body.cover_image_base64 === "string" && body.cover_image_base64.startsWith("data:")) {
+            const folder = "ctbooking/images/movies";
+            const r = await uploadCloudinaryImageDataURI(env, body.cover_image_base64, folder);
+            return r.url;
+          }
           if (env.r2_cinemastore && typeof body.cover_image_base64 === "string" && body.cover_image_base64.startsWith("data:")) {
             const m = body.cover_image_base64.match(/^data:(.+);base64,(.+)$/);
             if (!m) return body.cover_image ?? null;
@@ -143,6 +593,7 @@ export default {
             const bstr = atob(raw);
             const bytes = new Uint8Array(bstr.length);
             for (let i = 0; i < bstr.length; i++) bytes[i] = bstr.charCodeAt(i);
+            if (bytes.length > MAX_IMAGE_SIZE) return "__TOO_LARGE__";
             const ext = mime.includes("webp") ? "webp" : mime.includes("png") ? "png" : mime.includes("jpeg") ? "jpeg" : mime.includes("jpg") ? "jpg" : "bin";
             const key = `uploads/movies/movie_${Date.now()}.${ext}`;
             await env.r2_cinemastore.put(key, bytes, { httpMetadata: { contentType: mime } });
@@ -151,13 +602,34 @@ export default {
           return body.cover_image ?? null;
         } catch { return body.cover_image ?? null; }
       })();
+      if (savedCover === "__TOO_LARGE__") return json({ message: "Ảnh vượt quá 5MB, vui lòng chọn ảnh nhỏ hơn" }, 413);
+      const processedDetailImages = await (async () => {
+        const di = body.detail_images;
+        if (hasCloudinary(env) && Array.isArray(di)) {
+          const out: string[] = [];
+          for (const img of di as any[]) {
+            if (typeof img === "string" && /^data:.*;base64,/.test(img)) {
+              try {
+                const rr = await uploadCloudinaryImageDataURI(env, img, "ctbooking/images/movies/details");
+                out.push(rr.url);
+              } catch {
+                out.push(String(img));
+              }
+            } else {
+              out.push(String(img));
+            }
+          }
+          return out;
+        }
+        return di;
+      })();
       const stmt = env.cinema_db.prepare(
         `INSERT INTO movies (title, description, cover_image, detail_images, genres, rating, duration_min, is_active, release_date, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       ).bind(
         String(body.title),
         body.description ?? null,
         savedCover,
-        typeof body.detail_images === "string" ? body.detail_images : JSON.stringify(body.detail_images ?? []),
+        typeof processedDetailImages === "string" ? processedDetailImages : JSON.stringify(processedDetailImages ?? []),
         typeof body.genres === "string" ? body.genres : JSON.stringify(body.genres ?? []),
         body.rating ?? null,
         body.duration_min ?? null,
@@ -175,7 +647,18 @@ export default {
       const id = Number(url.pathname.split("/").pop());
       const movie = await env.cinema_db.prepare(`SELECT * FROM movies WHERE id = ?`).bind(id).first();
       if (!movie) return notFound();
-      return json(movie);
+      const ci = (movie as any)?.cover_image;
+      const mapped = {
+        ...(movie as any),
+        cover_image: (() => {
+          if (typeof ci === "string" && ci.startsWith("/uploads/")) {
+            if (r2Enabled && r2Base) return `${r2Base}/${ci.replace(/^\//, "")}`;
+            return `${url.origin}${ci}`;
+          }
+          return ci;
+        })(),
+      };
+      return json(mapped);
     }
     if (/^\/api\/movies\/\d+$/.test(url.pathname) && request.method === "PUT") {
       const id = Number(url.pathname.split("/").pop());
@@ -184,8 +667,14 @@ export default {
       const now = new Date().toISOString();
       const oldRow = await env.cinema_db.prepare(`SELECT cover_image FROM movies WHERE id = ?`).bind(id).first();
       const oldCover = String((oldRow as any)?.cover_image || "");
+      const MAX_IMAGE_SIZE = 5 * 1024 * 1024;
       const coverUpdate = await (async () => {
         try {
+          if (hasCloudinary(env) && typeof body.cover_image_base64 === "string" && body.cover_image_base64.startsWith("data:")) {
+            const folder = "ctbooking/images/movies";
+            const r = await uploadCloudinaryImageDataURI(env, body.cover_image_base64, folder);
+            return r.url;
+          }
           if (env.r2_cinemastore && typeof body.cover_image_base64 === "string" && body.cover_image_base64.startsWith("data:")) {
             const m = body.cover_image_base64.match(/^data:(.+);base64,(.+)$/);
             if (!m) return body.cover_image ?? null;
@@ -194,6 +683,7 @@ export default {
             const bstr = atob(raw);
             const bytes = new Uint8Array(bstr.length);
             for (let i = 0; i < bstr.length; i++) bytes[i] = bstr.charCodeAt(i);
+            if (bytes.length > MAX_IMAGE_SIZE) return "__TOO_LARGE__";
             const ext = mime.includes("webp") ? "webp" : mime.includes("png") ? "png" : mime.includes("jpeg") ? "jpeg" : mime.includes("jpg") ? "jpg" : "bin";
             const key = `uploads/movies/movie_${Date.now()}.${ext}`;
             await env.r2_cinemastore.put(key, bytes, { httpMetadata: { contentType: mime } });
@@ -203,13 +693,38 @@ export default {
           return undefined;
         } catch { return undefined; }
       })();
+      if (coverUpdate === "__TOO_LARGE__") return json({ message: "Ảnh vượt quá 5MB, vui lòng chọn ảnh nhỏ hơn" }, 413);
+      const detailImagesUpdate = await (async () => {
+        const di = body.detail_images;
+        if (hasCloudinary(env) && Array.isArray(di)) {
+          const out: string[] = [];
+          for (const img of di as any[]) {
+            if (typeof img === "string" && /^data:.*;base64,/.test(img)) {
+              try {
+                const rr = await uploadCloudinaryImageDataURI(env, img, "ctbooking/images/movies/details");
+                out.push(rr.url);
+              } catch {
+                out.push(String(img));
+              }
+            } else {
+              out.push(String(img));
+            }
+          }
+          return out;
+        }
+        return di === undefined ? undefined : di;
+      })();
       await env.cinema_db.prepare(
         `UPDATE movies SET title = COALESCE(?, title), description = COALESCE(?, description), cover_image = COALESCE(?, cover_image), detail_images = COALESCE(?, detail_images), genres = COALESCE(?, genres), rating = COALESCE(?, rating), duration_min = COALESCE(?, duration_min), is_active = COALESCE(?, is_active), release_date = COALESCE(?, release_date), updated_at = ? WHERE id = ?`,
       ).bind(
         body.title ?? null,
         body.description ?? null,
         coverUpdate === undefined ? null : coverUpdate,
-        typeof body.detail_images === "string" ? body.detail_images : JSON.stringify(body.detail_images ?? null),
+        detailImagesUpdate === undefined
+          ? null
+          : typeof detailImagesUpdate === "string"
+            ? detailImagesUpdate
+            : JSON.stringify(detailImagesUpdate ?? null),
         typeof body.genres === "string" ? body.genres : JSON.stringify(body.genres ?? null),
         body.rating ?? null,
         body.duration_min ?? null,
@@ -225,13 +740,143 @@ export default {
       const movie = await env.cinema_db.prepare(`SELECT * FROM movies WHERE id = ?`).bind(id).first();
       return json({ movie });
     }
+    if (url.pathname === "/api/admin/site-media" && request.method === "POST") {
+      try {
+        const body = await request.json().catch(() => null);
+        if (!body || !body.section || !body.type || !body.url) return json({ message: "Thiếu section/type/url" }, 400);
+        const stmt = env.cinema_db.prepare(
+          `INSERT INTO site_media (section, type, title, description, public_id, url, format, width, height, duration, display_order, is_active, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        ).bind(
+          String(body.section),
+          String(body.type),
+          body.title ? String(body.title) : null,
+          body.description ? String(body.description) : null,
+          body.public_id ? String(body.public_id) : null,
+          String(body.url),
+          body.format ? String(body.format) : null,
+          body.width !== undefined ? Number(body.width) : null,
+          body.height !== undefined ? Number(body.height) : null,
+          body.duration !== undefined ? Number(body.duration) : null,
+          body.display_order !== undefined ? Number(body.display_order) : 0,
+          typeof body.is_active === "boolean" ? body.is_active : true,
+          new Date().toISOString(),
+          new Date().toISOString(),
+        );
+        const res = await stmt.run();
+        const id = res.success ? Number((res.meta as any).last_row_id ?? 0) : 0;
+        const item = await env.cinema_db.prepare(`SELECT * FROM site_media WHERE id = ?`).bind(id).first();
+        return json({ item });
+      } catch (err: any) {
+        return json({ message: String(err?.message || "Internal error") }, 500);
+      }
+    }
+    if (url.pathname === "/api/site-media" && request.method === "GET") {
+      try {
+        const section = url.searchParams.get("section");
+        const type = url.searchParams.get("type");
+        const active = url.searchParams.get("active");
+        const whereParts: string[] = [];
+        const bind: any[] = [];
+        if (section) { whereParts.push("section = ?"); bind.push(String(section)); }
+        if (type) { whereParts.push("type = ?"); bind.push(String(type)); }
+        if (active !== null && active !== undefined) { whereParts.push("is_active = ?"); bind.push(String(active) === "true" ? 1 : 0); }
+        const where = whereParts.length ? `WHERE ${whereParts.join(" AND ")}` : "";
+        const rows = await env.cinema_db
+          .prepare(`SELECT * FROM site_media ${where} ORDER BY display_order ASC, created_at DESC`)
+          .bind(...bind)
+          .all();
+        const items = Array.isArray(rows.results) ? rows.results : [];
+        return json({ items });
+      } catch (err: any) {
+        return json({ message: String(err?.message || "Internal error") }, 500);
+      }
+    }
     if (url.pathname.startsWith("/uploads/") && request.method === "GET") {
       const key = url.pathname.slice(1);
       try {
-        const obj = await env.r2_cinemastore.get(key);
+        const range = request.headers.get("Range");
+        const obj = range
+          ? (() => {
+              const m = range.match(/bytes=(\d+)-(\d+)?/);
+              const start = m ? Number(m[1]) : 0;
+              const end = m && m[2] ? Number(m[2]) : undefined;
+              const length = end !== undefined && end >= start ? end - start + 1 : undefined;
+              return env.r2_cinemastore.get(key, { range: { offset: start, length } });
+            })()
+          : env.r2_cinemastore.get(key);
         if (!obj) return notFound();
-        const ct = (obj as any).httpMetadata?.contentType || "application/octet-stream";
-        return new Response((obj as any).body, { headers: { "content-type": ct, "cache-control": "public, max-age=31536000, immutable" } });
+        const ext = key.split(".").pop()?.toLowerCase() || "";
+        const ctMeta = (obj as any).httpMetadata?.contentType || "";
+        let ct = ctMeta || "";
+        if (!ct || ct === "application/octet-stream") {
+          const map: Record<string, string> = {
+            mp4: "video/mp4",
+            m4v: "video/mp4",
+            webm: "video/webm",
+            mov: "video/quicktime",
+            mkv: "video/x-matroska",
+            mp3: "audio/mpeg",
+            wav: "audio/wav",
+            jpg: "image/jpeg",
+            jpeg: "image/jpeg",
+            png: "image/png",
+            webp: "image/webp",
+          };
+          ct = map[ext] || "application/octet-stream";
+        }
+        const total = Number((obj as any).size || 0);
+        const headers = { "Content-Type": ct, "Cache-Control": "public, max-age=31536000, immutable", "Accept-Ranges": "bytes", ...cors } as Record<string, string>;
+        if (range && total > 0) {
+          const m = range.match(/bytes=(\d+)-(\d+)?/);
+          const start = m ? Number(m[1]) : 0;
+          const end = m && m[2] ? Number(m[2]) : total - 1;
+          headers["Content-Range"] = `bytes ${start}-${end}/${total}`;
+          headers["Content-Length"] = String(end - start + 1);
+          return new Response((obj as any).body, { status: 206, headers });
+        }
+        if (total > 0) headers["Content-Length"] = String(total);
+        return new Response((obj as any).body, { headers });
+      } catch {
+        return notFound();
+      }
+    }
+    if (url.pathname === "/api/debug/uploads/videos" && request.method === "GET") {
+      try {
+        const list = await env.r2_cinemastore.list({ prefix: "uploads/videos/" });
+        const keys = Array.isArray((list as any)?.objects) ? (list as any).objects.map((o: any) => o.key) : [];
+        return json({ keys });
+      } catch {
+        return json({ keys: [] });
+      }
+    }
+    if (url.pathname.startsWith("/uploads/") && request.method === "HEAD") {
+      const key = url.pathname.slice(1);
+      try {
+        const meta = await env.r2_cinemastore.head(key);
+        if (!meta) return notFound();
+        const ext = key.split(".").pop()?.toLowerCase() || "";
+        const ctMeta = (meta as any).httpMetadata?.contentType || "";
+        let ct = ctMeta || "";
+        if (!ct || ct === "application/octet-stream") {
+          const map: Record<string, string> = {
+            mp4: "video/mp4",
+            m4v: "video/mp4",
+            webm: "video/webm",
+            mov: "video/quicktime",
+            mkv: "video/x-matroska",
+            mp3: "audio/mpeg",
+            wav: "audio/wav",
+            jpg: "image/jpeg",
+            jpeg: "image/jpeg",
+            png: "image/png",
+            webp: "image/webp",
+          };
+          ct = map[ext] || "application/octet-stream";
+        }
+        const total = Number((meta as any).size || 0);
+        const headers = { "Content-Type": ct, "Cache-Control": "public, max-age=31536000, immutable", "Accept-Ranges": "bytes", ...cors } as Record<string, string>;
+        if (total > 0) headers["Content-Length"] = String(total);
+        return new Response(null, { status: 200, headers });
       } catch {
         return notFound();
       }
@@ -256,7 +901,14 @@ export default {
         id: (movie as any).id,
         title: (movie as any).title,
         description: (movie as any).description || "Không có mô tả",
-        cover_image: (movie as any).cover_image || null,
+        cover_image: (() => {
+          const ci = (movie as any).cover_image || null;
+          if (typeof ci === "string" && ci.startsWith("/uploads/")) {
+            if (r2Enabled && r2Base) return `${r2Base}/${ci.replace(/^\//, "")}`;
+            return `${url.origin}${ci}`;
+          }
+          return ci;
+        })(),
         genres: (() => {
           const v = (movie as any).genres;
           try { return typeof v === "string" ? JSON.parse(v) : Array.isArray(v) ? v : []; } catch { return []; }
@@ -376,10 +1028,15 @@ export default {
         .prepare(`INSERT INTO tokens (account_id, type, token, expired_at, created_at) VALUES (?, 'reset_password', ?, ?, ?)`)
         .bind(Number((acc as any).id), token, expiredAt, new Date().toISOString())
         .run();
-      const base = env.VITE_SERVER_BASE_URL || "https://cinesphere.com.vn";
+      const base = String(env.VITE_SERVER_BASE_URL || env.UPSTREAM_BASE || "https://cinesphere.com.vn");
       const link = `${base}/reset-password?token=${token}`;
-      const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>Đặt lại mật khẩu</title></head><body style="font-family:Arial,sans-serif;line-height:1.6;color:#333;"><div style="max-width:600px;margin:20px auto;padding:20px;border:1px solid #ddd;border-radius:8px;"><h2 style="color:#007bff;">Yêu cầu Đặt lại Mật khẩu</h2><p>Chúng tôi nhận được yêu cầu đặt lại mật khẩu cho tài khoản của bạn.</p><p>Vui lòng nhấp vào nút dưới đây để tạo mật khẩu mới. Liên kết này sẽ hết hạn sau 1 giờ.</p><p style="text-align:center;margin:30px 0;"><a href="${link}" style="display:inline-block;padding:10px 20px;background-color:#dc3545;color:#ffffff;text-decoration:none;border-radius:5px;font-weight:bold;">Đặt lại Mật khẩu</a></p><p>Nếu bạn không yêu cầu thay đổi mật khẩu, vui lòng bỏ qua email này.</p><p>Trân trọng,<br>Đội ngũ CTBOOKING</p></div></body></html>`;
-      try { await sendMail(env, String(email), "Đặt lại mật khẩu - CTBOOKING", html); } catch {}
+      const html = getResetPasswordEmailTemplate(base, link);
+      try {
+        const result = await sendMail(env, String(email), "Đặt lại mật khẩu - CTBOOKING", html);
+        if (!result.ok) return json({ status: "error", message: "Gửi email thất bại", detail: { status: result.status, body: result.body, provider: result.provider, missing: result.missing } }, 502);
+      } catch (e) {
+        return json({ status: "error", message: "Gửi email thất bại" }, 502);
+      }
       return json({ status: "success", message: "Đã gửi yêu cầu đặt lại mật khẩu", link });
     }
     if (url.pathname === "/api/reset-password" && request.method === "POST") {
@@ -420,7 +1077,8 @@ export default {
       await env.cinema_db.prepare(`INSERT INTO accounts (user_id, email, password, login_type, is_active, created_at, updated_at) VALUES (?, ?, ?, 'email', 1, ?, ?)`).bind(userId, body.email, hashed, now, now).run();
       try {
         const displayName = typeof body.name === "string" && body.name.trim() ? body.name : String(body.email).split("@")[0];
-        const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>Chào mừng</title></head><body style="font-family:Arial,sans-serif;line-height:1.6;color:#333;"><div style="max-width:600px;margin:20px auto;padding:20px;border:1px solid #ddd;border-radius:8px;"><h2 style="color:#28a745;">Chào mừng bạn đến CINESPHERE</h2><p>Xin chào ${displayName},</p><p>Tài khoản của bạn đã được tạo thành công.</p><p>Chúc bạn có trải nghiệm đặt vé tuyệt vời!</p><p>Trân trọng,<br>Đội ngũ CTBOOKING</p></div></body></html>`;
+        const base = String(env.VITE_SERVER_BASE_URL || env.UPSTREAM_BASE || "https://cinesphere.com.vn");
+        const html = getWelcomeEmailTemplate(base, { customerName: displayName, email: String(body.email) });
         await sendMail(env, String(body.email), "🎉 Chào mừng bạn đến CINESPHERE", html);
       } catch {}
       const username = typeof body.name === "string" && body.name.trim() ? String(body.name).trim() : String(body.email).split("@")[0];
@@ -518,12 +1176,26 @@ export default {
     }
     if (url.pathname === "/api/users/password" && request.method === "POST") {
       const body = await request.json().catch(() => null);
-      if (!body || !body.email || !body.password) return badRequest("Thiếu dữ liệu");
-      const acc = await env.cinema_db.prepare(`SELECT * FROM accounts WHERE email = ?`).bind(body.email).first();
+      if (!body || !body.email) return badRequest("Thiếu dữ liệu");
+      const email = String(body.email || "");
+      const oldPassword = body.oldPassword ? String(body.oldPassword) : null;
+      const newPassword = body.newPassword ? String(body.newPassword) : null;
+      const directPassword = body.password ? String(body.password) : null;
+      const acc = await env.cinema_db.prepare(`SELECT * FROM accounts WHERE email = ?`).bind(email).first();
       if (!acc) return json({ message: "Không tìm thấy tài khoản" }, 404);
-      const hashed = await bcrypt.hash(String(body.password), 10);
-      await env.cinema_db.prepare(`UPDATE accounts SET password = ? WHERE id = ?`).bind(hashed, Number(acc.id)).run();
-      return json({ ok: true });
+      if (oldPassword && newPassword) {
+        const ok = acc?.password ? await bcrypt.compare(oldPassword, String(acc.password)) : false;
+        if (!ok) return json({ message: "Mật khẩu hiện tại không đúng" }, 400);
+        const hashed = await bcrypt.hash(newPassword, 10);
+        await env.cinema_db.prepare(`UPDATE accounts SET password = ? WHERE id = ?`).bind(hashed, Number((acc as any).id)).run();
+        return json({ ok: true });
+      }
+      if (directPassword) {
+        const hashed = await bcrypt.hash(directPassword, 10);
+        await env.cinema_db.prepare(`UPDATE accounts SET password = ? WHERE id = ?`).bind(hashed, Number((acc as any).id)).run();
+        return json({ ok: true });
+      }
+      return badRequest("Thiếu dữ liệu");
     }
     if (url.pathname === "/api/validate-booking" && request.method === "POST") {
       const body = await request.json().catch(() => null);
@@ -651,17 +1323,28 @@ export default {
       const updated = await env.cinema_db.prepare(`SELECT * FROM bookings WHERE id = ?`).bind(Number((booking as any).id)).first();
       try {
         const emailTo = String((updated as any).email || "");
-        if (emailTo) {
+        const statusNow = String((updated as any).payment_status || "").toLowerCase();
+        if (emailTo && statusNow === "paid") {
           const movie = (updated as any).movie_id ? await env.cinema_db.prepare(`SELECT title FROM movies WHERE id = ?`).bind(Number((updated as any).movie_id)).first() : null;
+          const movieMore = (updated as any).movie_id ? await env.cinema_db.prepare(`SELECT cover_image, duration_min FROM movies WHERE id = ?`).bind(Number((updated as any).movie_id)).first() : null;
           const ticket = (updated as any).ticket_package_id ? await env.cinema_db.prepare(`SELECT name, price FROM ticket_packages WHERE id = ?`).bind(Number((updated as any).ticket_package_id)).first() : null;
           const code = (updated as any).booking_code || "";
           const qty = Number((updated as any).ticket_count || 0);
           const amount = Number((updated as any).total_price || 0);
           const title = (movie as any)?.title || "";
           const packageName = (ticket as any)?.name || "";
-          const paidAtStr = (updated as any).paid_at ? new Date((updated as any).paid_at).toLocaleString("vi-VN") : "";
-          const expiryStr = (updated as any).expiry_date ? new Date((updated as any).expiry_date as any).toLocaleDateString("vi-VN") : "";
-          const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>Xác nhận thanh toán</title></head><body style="font-family:Arial,sans-serif;line-height:1.6;color:#333;"><div style="max-width:600px;margin:20px auto;padding:20px;border:1px solid #ddd;border-radius:8px;"><h2 style="color:#007bff;">Xác nhận thanh toán thành công</h2><p>Mã vé của bạn: <strong>${code}</strong></p><ul><li>Phim: ${title}</li><li>Gói vé: ${packageName}</li><li>Số lượng: ${qty}</li><li>Tổng tiền: ${amount.toLocaleString("vi-VN")} đ</li><li>Thanh toán lúc: ${paidAtStr}</li><li>Hạn sử dụng: ${expiryStr}</li></ul><p>Vui lòng giữ mã vé để sử dụng khi vào rạp.</p><p>Trân trọng,<br>Đội ngũ CTBOOKING</p></div></body></html>`;
+          const base = String(env.VITE_SERVER_BASE_URL || env.UPSTREAM_BASE || "https://cinesphere.com.vn");
+          const html = getBookingEmailTemplate(base, {
+            bookingCode: code,
+            customerName: String((updated as any).name || ""),
+            movieTitle: title,
+            ticketCount: qty,
+            totalPrice: formatCurrencyVi(amount),
+            movieImage: (movieMore as any)?.cover_image || undefined,
+            durationMin: (movieMore as any)?.duration_min ?? undefined,
+            ticketPackageName: packageName || undefined,
+            expiryDate: (updated as any).expiry_date || null,
+          });
           await sendMail(env, emailTo, "✅ Thanh toán thành công - CTBOOKING", html);
         }
       } catch {}
@@ -774,8 +1457,11 @@ export default {
       const amount = Number(body.amount);
       const orderId = String(body.orderId || "");
       const orderInfo = String(body.orderInfo || "");
-      const redirectUrl = String(body.redirectUrl || "");
-      const ipnUrl = String(body.ipnUrl || "");
+      const base = String(env.VITE_SERVER_BASE_URL || env.UPSTREAM_BASE || "https://cinesphere.com.vn");
+      const redirectPath = String(env.VITE_MOMO_REDIRECT_URL || env.VITE_MOMO_RETURN_URL || env.VITE_VNPAY_RETURN_URL || "/checkout");
+      const redirectUrl = `${base}${redirectPath}`;
+      const ipnPath = String(env.VITE_MOMO_IPN_URL || "/api/momo/ipn");
+      const ipnUrl = `${base}${ipnPath}`;
       const requestType = String(body.requestType || "captureWallet");
       const extraData = String(body.extraData || "");
       const lang = String(body.lang || "vi");
@@ -1206,17 +1892,34 @@ export default {
       return json({ items, page, pageSize, total: Number((totalRow as any)?.c || 0) });
     }
     if (url.pathname === "/api/debug/mail" && request.method === "GET") {
-      const config = {
-        provider: "mailchannels",
-        endpoint: "https://api.mailchannels.net/tx/v1/send",
-        sender_email: String(env.GMAIL_SENDER_EMAIL || "no-reply@example.com"),
-        sender_name: String(env.GMAIL_SENDER_NAME || "CTBOOKING"),
-        has_sender_email: Boolean(env.GMAIL_SENDER_EMAIL),
-        has_sender_name: Boolean(env.GMAIL_SENDER_NAME),
-        configured: Boolean(env.GMAIL_SENDER_EMAIL),
-      };
-      const verify = config.configured ? { ok: true } : { ok: false, message: "Missing GMAIL_SENDER_EMAIL" };
+      const hasBrevo = Boolean(env.BREVO_API_KEY);
+      const config = hasBrevo
+        ? {
+            provider: "brevo",
+            endpoint: "https://api.brevo.com/v3/smtp/email",
+            sender_email: String(env.BREVO_SENDER_EMAIL || "no-reply@example.com"),
+            sender_name: String(env.BREVO_SENDER_NAME || "CTBOOKING"),
+            has_api_key: true,
+            configured: true,
+          }
+        : {
+            provider: "mailchannels",
+            endpoint: "https://api.mailchannels.net/tx/v1/send",
+            sender_email: String(env.GMAIL_SENDER_EMAIL || "no-reply@example.com"),
+            sender_name: String(env.GMAIL_SENDER_NAME || "CTBOOKING"),
+            has_sender_email: Boolean(env.GMAIL_SENDER_EMAIL),
+            configured: Boolean(env.GMAIL_SENDER_EMAIL),
+          };
+      const verify = config.configured ? { ok: true } : { ok: false, message: "Missing mail configuration" };
       return json({ config, verify });
+    }
+    if (url.pathname === "/api/debug/mail/send" && request.method === "POST") {
+      const body = await request.json().catch(() => null);
+      const to = String(body?.to || "");
+      if (!to) return badRequest("Thiếu email");
+      const html = `<html><body><h3>Test gửi mail</h3><p>Thời gian: ${new Date().toISOString()}</p></body></html>`;
+      const r = await sendMail(env, to, "Test gửi mail từ Worker", html);
+      return json({ ok: r.ok, status: r.status, body: r.body });
     }
     return notFound();
   },

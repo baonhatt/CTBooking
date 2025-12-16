@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Link, useNavigate } from "react-router-dom";
 import { toast } from "@/components/ui/use-toast";
-import { updateUserProfileApi, changePasswordApi, getUserTransactionsApi } from "@/lib/api";
+import { updateUserProfileApi, changePasswordApi, getUserTransactionsApi, getUserProfileByEmailApi } from "@/lib/api";
 // @ts-ignore
 import heroImage1 from "@/assets/images/1.PNG";
 
@@ -68,6 +68,36 @@ export default function Account() {
       setProfile({ name: name || "", phone: phone || "", email: email || "", gender: gender || "", dob: dob || "" });
     } catch { }
   }, []);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const email = profile.email;
+        if (!email) return;
+        const data = await getUserProfileByEmailApi(email);
+        const dobStr = (() => {
+          try {
+            if (!data?.dob) return "";
+            const d = new Date(data.dob as any);
+            if (isNaN(d.getTime())) return String(data.dob);
+            return d.toISOString().slice(0, 10);
+          } catch {
+            return "";
+          }
+        })();
+        setProfile((p) => ({
+          ...p,
+          name: data?.fullname || p.name || "",
+          phone: data?.phone || p.phone || "",
+          email: data?.email || p.email || "",
+          gender: (data?.gender as any) || p.gender || "",
+          dob: dobStr || p.dob || "",
+        }));
+      } catch (e: any) {
+        // silent
+      }
+    })();
+  }, [profile.email]);
 
   useEffect(() => {
     (async () => {
