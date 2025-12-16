@@ -1,7 +1,7 @@
 import "dotenv/config";
 import nodemailer from "nodemailer";
 
-const GMAIL_HOST = "smtp.gmail.com";
+const GMAIL_HOST = "sandbox.smtp.mailtrap.io";
 const GMAIL_PORT = 587;
 const GMAIL_USER = process.env.GMAIL_USER || "";
 const GMAIL_PASS = process.env.GMAIL_PASS || "";
