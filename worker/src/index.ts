@@ -396,6 +396,16 @@ async function cloudinarySignedParams(env: any, params: Record<string, string | 
  * - `q_auto`, `f_webp`, `w_1280`, `c_limit`
  * Trả về URL an toàn (secure_url) và kích thước
  */
+function optimizeCloudinaryUrl(url: string, width?: number) {
+  if (!url || typeof url !== "string" || !url.includes("cloudinary.com")) return url;
+  const parts = url.split("/upload/");
+  if (parts.length !== 2) return url;
+  const transformations = ["f_auto", "q_auto"];
+  if (width) transformations.push(`w_${width}`);
+  const transformString = transformations.join(",");
+  return `${parts[0]}/upload/${transformString}/${parts[1]}`;
+}
+
 async function uploadCloudinaryImageDataURI(env: any, dataUri: string, folder: string) {
   const cloudName = String(env.CLOUDINARY_CLOUD_NAME || "");
   const timestamp = Math.floor(Date.now() / 1000);
@@ -596,11 +606,18 @@ export default {
         id: Number(m.id),
         title: String(m.title || ""),
         description: m.description ?? "",
-        cover_image: m.cover_image ?? "",
+        cover_image: optimizeCloudinaryUrl(m.cover_image ?? ""),
         detail_images: (() => {
           const v = m.detail_images;
           if (v === null || v === undefined) return "[]";
-          try { return typeof v === "string" ? v : JSON.stringify(v); } catch { return "[]"; }
+          try {
+             const parsed = typeof v === "string" ? JSON.parse(v) : v;
+             if (Array.isArray(parsed)) {
+                 const opt = parsed.map((u: string) => optimizeCloudinaryUrl(u));
+                 return JSON.stringify(opt);
+             }
+             return typeof v === "string" ? v : JSON.stringify(v);
+          } catch { return "[]"; }
         })(),
         genres: (() => {
           const v = m.genres;
@@ -646,7 +663,7 @@ export default {
               if (r2Enabled && r2Base) return `${r2Base}/${ci.replace(/^\//, "")}`;
               return `${url.origin}${ci}`;
             }
-            return ci;
+            return optimizeCloudinaryUrl(ci);
           })(),
         };
       }) : [];
@@ -734,8 +751,20 @@ export default {
             if (r2Enabled && r2Base) return `${r2Base}/${ci.replace(/^\//, "")}`;
             return `${url.origin}${ci}`;
           }
-          return ci;
+          return optimizeCloudinaryUrl(ci);
         })(),
+        detail_images: (() => {
+             try {
+                 const di = (movie as any).detail_images;
+                 const isString = typeof di === "string";
+                 const parsed = isString ? JSON.parse(di) : di;
+                 if (Array.isArray(parsed)) {
+                     const optimized = parsed.map((url: string) => optimizeCloudinaryUrl(url));
+                     return isString ? JSON.stringify(optimized) : optimized;
+                 }
+                 return di;
+             } catch { return (movie as any).detail_images; }
+        })()
       };
       return json(mapped);
     }
@@ -901,7 +930,10 @@ export default {
           .prepare(`SELECT * FROM site_media ${where} ORDER BY display_order ASC, created_at DESC`)
           .bind(...bind)
           .all();
-        const items = Array.isArray(rows.results) ? rows.results : [];
+        const items = Array.isArray(rows.results) ? rows.results.map((item: any) => ({
+          ...item,
+          url: optimizeCloudinaryUrl(item.url)
+        })) : [];
         return json({ items });
       } catch (err: any) {
         return json({ message: String(err?.message || "Internal error") }, 500);
@@ -1023,7 +1055,7 @@ export default {
             if (r2Enabled && r2Base) return `${r2Base}/${ci.replace(/^\//, "")}`;
             return `${url.origin}${ci}`;
           }
-          return ci;
+          return optimizeCloudinaryUrl(ci);
         })(),
         genres: (() => {
           const v = (movie as any).genres;
