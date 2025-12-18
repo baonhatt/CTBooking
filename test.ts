@@ -1,4 +1,4 @@
-import { pgTable, serial, integer, varchar, text, boolean, timestamp, decimal, json, foreignKey, doublePrecision } from "drizzle-orm/pg-core";
+import { pgTable, serial, integer, varchar, text, boolean, timestamp, decimal, json, foreignKey } from "drizzle-orm/pg-core";
 import { relations, sql } from "drizzle-orm";
 
 export const users = pgTable("users", {
@@ -7,9 +7,9 @@ export const users = pgTable("users", {
   phone: varchar("phone", { length: 20 }),
   avatar: text("avatar"),
   gender: varchar("gender", { length: 10 }),
-  dob: timestamp("dob", { withTimezone: true, mode: 'string' }),
-  created_at: timestamp("created_at", { withTimezone: true, mode: 'string' }).defaultNow(),
-  updated_at: timestamp("updated_at", { withTimezone: true, mode: 'string' }).defaultNow(),
+  dob: timestamp("dob", { withTimezone: true, mode: 'date' }),
+  created_at: timestamp("created_at", { withTimezone: true, mode: 'date' }).defaultNow(),
+  updated_at: timestamp("updated_at", { withTimezone: true, mode: 'date' }).defaultNow(),
 });
 
 export const accounts = pgTable("accounts", {
@@ -19,8 +19,8 @@ export const accounts = pgTable("accounts", {
   password: varchar("password", { length: 255 }),
   login_type: varchar("login_type", { length: 50 }).default("email").notNull(),
   is_active: boolean("is_active").default(true),
-  created_at: timestamp("created_at", { withTimezone: true, mode: 'string' }).defaultNow(),
-  updated_at: timestamp("updated_at", { withTimezone: true, mode: 'string' }).defaultNow(),
+  created_at: timestamp("created_at", { withTimezone: true, mode: 'date' }).defaultNow(),
+  updated_at: timestamp("updated_at", { withTimezone: true, mode: 'date' }).defaultNow(),
 });
 
 export const tokens = pgTable("tokens", {
@@ -28,8 +28,8 @@ export const tokens = pgTable("tokens", {
   account_id: integer("account_id").notNull().references(() => accounts.id, { onDelete: "cascade" }),
   type: varchar("type", { length: 50 }).notNull(),
   token: text("token").notNull().unique(),
-  expired_at: timestamp("expired_at", { mode: 'string' }),
-  created_at: timestamp("created_at", { mode: 'string' }).defaultNow().notNull(),
+  expired_at: timestamp("expired_at", { mode: 'date' }),
+  created_at: timestamp("created_at", { mode: 'date' }).defaultNow().notNull(),
 });
 
 export const movies = pgTable("movies", {
@@ -41,8 +41,8 @@ export const movies = pgTable("movies", {
   genres: json("genres"),
   rating: decimal("rating", { precision: 3, scale: 1 }),
   duration_min: integer("duration_min"),
-  created_at: timestamp("created_at", { mode: 'string' }).defaultNow().notNull(),
-  updated_at: timestamp("updated_at", { mode: 'string' }).defaultNow().notNull(),
+  created_at: timestamp("created_at", { mode: 'date' }).defaultNow().notNull(),
+  updated_at: timestamp("updated_at", { mode: 'date' }).defaultNow().notNull(),
   is_active: boolean("is_active").default(true),
   release_date: timestamp("release_date", { mode: 'date' }),
 });
@@ -60,8 +60,8 @@ export const ticket_packages = pgTable("ticket_packages", {
   is_member_only: boolean("is_member_only").default(false),
   is_active: boolean("is_active").default(true),
   display_order: integer("display_order").default(0),
-  created_at: timestamp("created_at", { mode: 'string' }).defaultNow().notNull(),
-  updated_at: timestamp("updated_at", { mode: 'string' }).defaultNow().notNull(),
+  created_at: timestamp("created_at", { mode: 'date' }).defaultNow().notNull(),
+  updated_at: timestamp("updated_at", { mode: 'date' }).defaultNow().notNull(),
 });
 
 export const bookings = pgTable("bookings", {
@@ -70,12 +70,12 @@ export const bookings = pgTable("bookings", {
   user_id: integer("user_id").references(() => users.id, { onDelete: "cascade" }),
   ticket_count: integer("ticket_count").default(1).notNull(),
   total_price: decimal("total_price", { precision: 10, scale: 2 }).notNull(),
-  created_at: timestamp("created_at", { mode: 'string' }).defaultNow().notNull(),
-  paid_at: timestamp("paid_at", { mode: 'string' }),
+  created_at: timestamp("created_at", { mode: 'date' }).defaultNow().notNull(),
+  paid_at: timestamp("paid_at", { mode: 'date' }),
   payment_method: varchar("payment_method", { length: 50 }).default("cash"),
   payment_status: varchar("payment_status", { length: 50 }).default("pending"),
   transaction_id: varchar("transaction_id", { length: 255 }),
-  updated_at: timestamp("updated_at", { mode: 'string' }).defaultNow().notNull(),
+  updated_at: timestamp("updated_at", { mode: 'date' }).defaultNow().notNull(),
   name: varchar("name", { length: 200 }).default("").notNull(),
   phone: varchar("phone", { length: 20 }).default("").notNull(),
   email: varchar("email", { length: 100 }).default("").notNull(),
@@ -83,7 +83,7 @@ export const bookings = pgTable("bookings", {
   is_used: boolean("is_used").default(false),
   movie_id: integer("movie_id").references(() => movies.id, { onDelete: "cascade" }),
   ticket_package_id: integer("ticket_package_id").references(() => ticket_packages.id),
-  expiry_date: timestamp("expiry_date", { mode: 'string' }),
+  expiry_date: timestamp("expiry_date", { mode: 'date' }),
 });
 
 export const toys = pgTable("toys", {
@@ -94,8 +94,8 @@ export const toys = pgTable("toys", {
   stock: integer("stock").default(0).notNull(),
   status: varchar("status", { length: 20 }).default("active").notNull(),
   image_url: text("image_url"),
-  created_at: timestamp("created_at", { mode: 'string' }).defaultNow().notNull(),
-  updated_at: timestamp("updated_at", { mode: 'string' }).defaultNow().notNull(),
+  created_at: timestamp("created_at", { mode: 'date' }).defaultNow().notNull(),
+  updated_at: timestamp("updated_at", { mode: 'date' }).defaultNow().notNull(),
 });
 
 export const site_media = pgTable("site_media", {
@@ -109,11 +109,11 @@ export const site_media = pgTable("site_media", {
   format: varchar("format", { length: 50 }),
   width: integer("width"),
   height: integer("height"),
-  duration: doublePrecision("duration"),
+  duration: decimal("duration"), // Using decimal for Float as pg-core doesn't have float directly exposed easily usually, but doublePrecision exists. Let's check imports.
   display_order: integer("display_order").default(0),
   is_active: boolean("is_active").default(true),
-  created_at: timestamp("created_at", { mode: 'string' }).defaultNow().notNull(),
-  updated_at: timestamp("updated_at", { mode: 'string' }).defaultNow().notNull(),
+  created_at: timestamp("created_at", { mode: 'date' }).defaultNow().notNull(),
+  updated_at: timestamp("updated_at", { mode: 'date' }).defaultNow().notNull(),
 });
 
 // Relations

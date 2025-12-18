@@ -1,5 +1,3 @@
-import { db } from "../../db";
-import { toys } from "../../db/schema";
 import { eq, desc, or, ilike, count } from "drizzle-orm";
 
 export async function listToysImpl(anyDb: any, tables: { toys: any }, args: { page: number; pageSize: number; q: string }) {
@@ -34,6 +32,7 @@ export async function createToyImpl(anyDb: any, tables: { toys: any }, args: { n
   }
   */
 
+  const nowIso = new Date().toISOString();
   // Insert toy (tương thích với D1/SQLite không hỗ trợ .returning())
   await anyDb.insert(tables.toys).values({
     name,
@@ -42,8 +41,8 @@ export async function createToyImpl(anyDb: any, tables: { toys: any }, args: { n
     stock: Number(stock ?? 0),
     status: status ?? "active",
     image_url: savedImage,
-    created_at: new Date().toISOString(),
-    updated_at: new Date().toISOString(),
+    created_at: nowIso,
+    updated_at: nowIso,
   });
 
   // Query lại toy vừa tạo

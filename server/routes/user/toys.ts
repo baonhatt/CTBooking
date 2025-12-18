@@ -1,4 +1,3 @@
-import { toys } from "../../db/schema";
 import { inArray, desc } from "drizzle-orm";
 
 export async function listActiveToys(anyDb: any, tables: { toys: any }) {

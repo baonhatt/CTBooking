@@ -74,11 +74,11 @@ export default function MoviesContent({
   onSearchChange = () => { },
   sortKey = "updated_at",
   sortDir = "desc",
-  setSortKey = () => {},
-  setSortDir = () => {},
+  setSortKey = () => { },
+  setSortDir = () => { },
   isLoading = false,
   showActiveOnly = false,
-  setShowActiveOnly = () => {},
+  setShowActiveOnly = () => { },
 }: Props) {
   const [isDetailsOpen, setIsDetailsOpen] = useState(false);
   const [selectedMovieId, setSelectedMovieId] = useState<number | null>(null);
@@ -150,7 +150,7 @@ export default function MoviesContent({
             <option value="desc">Giảm dần</option>
             <option value="asc">Tăng dần</option>
           </select>
-          
+
         </div>
         <div className="flex gap-2">
           <Button onClick={onRefresh} variant="outline">
@@ -190,78 +190,78 @@ export default function MoviesContent({
             <TableBody>
               {isLoading
                 ? Array.from({ length: 5 }).map((_, idx) => (
-                    <TableRow key={`sk-${idx}`}>
-                      <TableCell><Skeleton className="h-4 w-16" /></TableCell>
-                      <TableCell className="flex items-center space-x-3">
-                        <Skeleton className="h-15 w-20" />
-                        <Skeleton className="h-4 w-32" />
-                      </TableCell>
-                      <TableCell><Skeleton className="h-4 w-28" /></TableCell>
-                      <TableCell><Skeleton className="h-4 w-20" /></TableCell>
-                      <TableCell><Skeleton className="h-4 w-12" /></TableCell>
-                      <TableCell><Skeleton className="h-4 w-28" /></TableCell>
-                      <TableCell><Skeleton className="h-5 w-20" /></TableCell>
-                      <TableCell className="text-right"><Skeleton className="h-8 w-32 ml-auto" /></TableCell>
-                    </TableRow>
-                  ))
+                  <TableRow key={`sk-${idx}`}>
+                    <TableCell><Skeleton className="h-4 w-16" /></TableCell>
+                    <TableCell className="flex items-center space-x-3">
+                      <Skeleton className="h-15 w-20" />
+                      <Skeleton className="h-4 w-32" />
+                    </TableCell>
+                    <TableCell><Skeleton className="h-4 w-28" /></TableCell>
+                    <TableCell><Skeleton className="h-4 w-20" /></TableCell>
+                    <TableCell><Skeleton className="h-4 w-12" /></TableCell>
+                    <TableCell><Skeleton className="h-4 w-28" /></TableCell>
+                    <TableCell><Skeleton className="h-5 w-20" /></TableCell>
+                    <TableCell className="text-right"><Skeleton className="h-8 w-32 ml-auto" /></TableCell>
+                  </TableRow>
+                ))
                 : data.map((movie) => (
-                <TableRow key={movie.id}>
-                  <TableCell className="font-medium w-16">{movie.id}</TableCell>
-                  <TableCell className="flex items-center space-x-3">
-                    {movie.posterUrl && (
-                      <img
-                        src={movie.posterUrl}
-                        alt={movie.title}
-                        className="w-20 h-15 object-cover rounded shadow-md"
-                        loading="lazy"
-                      />
-                    )}
-                    <span className="font-medium">{movie.title}</span>
-                  </TableCell>
-                  <TableCell>{movie.genres.join(", ")}</TableCell>
-                  <TableCell>{movie.duration}</TableCell>
-                  <TableCell>{movie.rating ?? ""}</TableCell>
-                  <TableCell>
-                    {movie.release_date
-                      ? formatLocalDateTime(new Date(movie.release_date))
-                      : "N/A"}
-                  </TableCell>
-                  <TableCell>
-                    <Badge
-                      className={
-                        movieStatus[movie.id] === "active"
-                          ? "bg-green-100 text-green-800 hover:bg-green-100"
-                          : "bg-gray-100 text-gray-800 hover:bg-gray-100"
-                      }
-                    >
-                      {movieStatus[movie.id] === "active"
-                        ? "Đang chiếu"
-                        : "Đã ẩn"}
-                    </Badge>
-                  </TableCell>
-                  <TableCell className="text-right space-x-2">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => handleViewDetails(Number(movie.id))}
-                    >
-                      Xem
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() =>
-                        onEdit("movie", {
-                          ...movie,
-                          status: movieStatus[movie.id] || "active",
-                        })
-                      }
-                    >
-                      Sửa
-                    </Button>
-                  </TableCell>
-                </TableRow>
-              ))}
+                  <TableRow key={movie.id}>
+                    <TableCell className="font-medium w-16">{movie.id}</TableCell>
+                    <TableCell className="flex items-center space-x-3">
+                      {movie.posterUrl && (
+                        <img
+                          src={movie.posterUrl}
+                          alt={movie.title}
+                          className="w-20 h-15 object-cover rounded shadow-md"
+                          loading="lazy"
+                        />
+                      )}
+                      <span className="font-medium">{movie.title}</span>
+                    </TableCell>
+                    <TableCell>{movie.genres.join(", ")}</TableCell>
+                    <TableCell>{movie.duration}</TableCell>
+                    <TableCell>{movie.rating ?? ""}</TableCell>
+                    <TableCell>
+                      {movie.release_date
+                        ? formatLocalDateTime(new Date(movie.release_date))
+                        : ""}
+                    </TableCell>
+                    <TableCell>
+                      <Badge
+                        className={
+                          movieStatus[movie.id] === "active"
+                            ? "bg-green-100 text-green-800 hover:bg-green-100"
+                            : "bg-gray-100 text-gray-800 hover:bg-gray-100"
+                        }
+                      >
+                        {movieStatus[movie.id] === "active"
+                          ? "Đang chiếu"
+                          : "Đã ẩn"}
+                      </Badge>
+                    </TableCell>
+                    <TableCell className="text-right space-x-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleViewDetails(Number(movie.id))}
+                      >
+                        Xem
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() =>
+                          onEdit("movie", {
+                            ...movie,
+                            status: movieStatus[movie.id] || "active",
+                          })
+                        }
+                      >
+                        Sửa
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                ))}
             </TableBody>
           </Table>
         </CardContent>
@@ -347,7 +347,7 @@ export default function MoviesContent({
                       <span className="font-medium">
                         {Array.isArray(movieDetails.genres)
                           ? movieDetails.genres.join(", ")
-                          : "N/A"}
+                          : ""}
                       </span>
                     </p>
                     <p>
@@ -367,7 +367,7 @@ export default function MoviesContent({
                       <span className="font-medium">
                         {movieDetails.release_date
                           ? formatLocalDateTime(new Date(movieDetails.release_date))
-                          : "N/A"}
+                          : ""}
                       </span>
                     </p>
                   </div>

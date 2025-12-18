@@ -1,5 +1,3 @@
-import { db } from "../../db";
-import { users, accounts, bookings } from "../../db/schema";
 import { eq, ilike, or, desc, count, sql, and } from "drizzle-orm";
 
 export async function getUsersImpl(anyDb: any, tables: { users: any; accounts: any; bookings: any }, args: { page: number; pageSize: number; q: string }) {
@@ -38,9 +36,9 @@ export async function getUsersImpl(anyDb: any, tables: { users: any; accounts: a
   const total = totalRes?.count || 0;
   const mapped = items.map((item: any) => ({
     id: item.user.id,
-    fullname: item.user.fullname || "N/A",
-    phone: item.user.phone || "N/A",
-    email: item.email || "N/A",
+    fullname: item.user.fullname || "",
+    phone: item.user.phone || "",
+    email: item.email || "",
     is_active: (item.is_active_agg ?? 1) > 0,
     total_bookings: Number(item.bookings_count || 0),
     created_at: item.user.created_at,
@@ -64,10 +62,10 @@ export async function getUserByIdImpl(anyDb: any, tables: { users: any }, id: nu
   if (!user) return null;
   const mapped = {
     id: user.id,
-    fullname: user.fullname || "N/A",
-    phone: user.phone || "N/A",
+    fullname: user.fullname || "",
+    phone: user.phone || "",
     avatar: user.avatar || null,
-    email: user.accounts[0]?.email || "N/A",
+    email: user.accounts[0]?.email || "",
     is_active: user.accounts[0]?.is_active ?? true,
     login_type: user.accounts[0]?.login_type || "email",
     account_created_at: user.accounts[0]?.created_at,
@@ -75,8 +73,8 @@ export async function getUserByIdImpl(anyDb: any, tables: { users: any }, id: nu
     user_updated_at: user.updated_at,
     recent_bookings: user.bookings.map((b: any) => ({
       id: b.id,
-      movie_title: b.movie?.title || "N/A",
-      ticket_package_name: b.ticket_package?.name || "N/A",
+      movie_title: b.movie?.title || "",
+      ticket_package_name: b.ticket_package?.name || "",
       ticket_count: b.ticket_count,
       total_price: Number(b.total_price),
       payment_method: b.payment_method,

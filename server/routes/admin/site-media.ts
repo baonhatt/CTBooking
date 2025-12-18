@@ -1,11 +1,10 @@
-import { db } from "../../db";
-import { site_media } from "../../db/schema";
 import { eq, and, asc, desc } from "drizzle-orm";
 import { cloudinary, cloudinaryEnvOk } from "../../cloudinary";
 
 export async function createSiteMediaImpl(anyDb: any, tables: { site_media: any }, args: { section: string; type: string; title?: string; description?: string; public_id?: string; url: string; format?: string; width?: number; height?: number; duration?: string | number; display_order?: number; is_active?: boolean }) {
   const { section, type, title, description, public_id, url, format, width, height, duration, display_order, is_active } = args;
   // Insert site media (tương thích với D1/SQLite không hỗ trợ .returning())
+  const nowIso = new Date().toISOString();
   await anyDb.insert(tables.site_media).values({
     section: String(section),
     type: String(type),
@@ -19,8 +18,8 @@ export async function createSiteMediaImpl(anyDb: any, tables: { site_media: any 
     duration: duration !== undefined ? String(duration) : null,
     display_order: display_order !== undefined ? Number(display_order) : 0,
     is_active: typeof is_active === "boolean" ? is_active : true,
-    created_at: new Date().toISOString(),
-    updated_at: new Date().toISOString(),
+    created_at: nowIso,
+    updated_at: nowIso,
   });
 
   // Query lại site media vừa tạo

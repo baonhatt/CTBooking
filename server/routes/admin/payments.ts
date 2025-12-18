@@ -1,5 +1,3 @@
-import { db } from "../../db";
-import { bookings, users, accounts, movies, ticket_packages } from "../../db/schema";
 import { eq, and, or, gte, lte, inArray, desc, asc, sum, count, ilike } from "drizzle-orm";
 
 export async function getRevenueImpl(anyDb: any, tables: { bookings: any }, args: { from?: string; to?: string; status?: string }) {
@@ -118,10 +116,10 @@ export async function getTransactionByIdImpl(anyDb: any, tables: { bookings: any
     id: booking.id,
     user: {
       id: booking.user.id,
-      fullname: booking.user.fullname,
-      email: booking.email || booking.user.accounts[0]?.email || "N/A",
-      phone: booking.phone || booking.user.phone || "N/A",
-      name: booking.name || booking.user.fullname || "N/A",
+      fullname: booking.user.fullname || "",
+      email: booking.email || booking.user.accounts[0]?.email || "",
+      phone: booking.phone || booking.user.phone || "",
+      name: booking.name || booking.user.fullname || "",
       is_active: booking.user.accounts[0]?.is_active ?? true,
       account_created_at: booking.user.accounts[0]?.created_at,
     },
@@ -144,9 +142,9 @@ export async function getTransactionByIdImpl(anyDb: any, tables: { bookings: any
       price_per_ticket: booking.ticket_count > 0 ? Number(booking.total_price) / booking.ticket_count : 0,
     },
     payment_info: {
-      payment_method: booking.payment_method || "N/A",
+      payment_method: booking.payment_method || "",
       payment_status: booking.payment_status || "pending",
-      transaction_id: booking.transaction_id || "N/A",
+      transaction_id: booking.transaction_id || "",
       created_at: booking.created_at,
       paid_at: booking.paid_at,
       expiry_date: booking.expiry_date || null,

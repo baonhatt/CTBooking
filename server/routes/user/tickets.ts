@@ -1,4 +1,3 @@
-import { ticket_packages } from "../../db/schema";
 import { eq, asc } from "drizzle-orm";
 
 export async function listActiveTicketPackages(anyDb: any, tables: { ticket_packages: any }) {

@@ -404,10 +404,20 @@ app.post("/api/getActiveMovies", async (c) => {
   return c.json({ activeMovies: optimized });
 });
 
+// Schema tables for D1
+const getD1Tables = (schema: any) => ({
+  bookings: schema.bookings,
+  users: schema.users,
+  accounts: schema.accounts,
+  movies: schema.movies,
+  ticket_packages: schema.ticket_packages,
+});
+
 app.post("/api/validate-booking", async (c) => {
   try {
     const db = drizzle(c.env.cinema_db, { schema });
-    const r = await validateBookingImpl(db, await c.req.json());
+    const tables = getD1Tables(schema);
+    const r = await validateBookingImpl(db, await c.req.json(), tables);
     return c.json(r, 200);
   } catch (err: any) {
     const status = err?.status || 500;
@@ -420,8 +430,10 @@ app.post("/api/create-booking", async (c) => {
   let body: any = {};
   try {
     const db = drizzle(c.env.cinema_db, { schema });
+    const tables = getD1Tables(schema);
     body = await c.req.json().catch(() => ({}));
-    const r = await createPaymentImpl(db, body as any);
+    // Pass schema tables to ensure correct schema is used (D1 schema instead of PostgreSQL)
+    const r = await createPaymentImpl(db, body as any, tables);
     return c.json(r, 201);
   } catch (err: any) {
     logSystemError("create-booking", err, body);
@@ -442,6 +454,7 @@ app.post("/api/confirm-booking", async (c) => {
   let body: any = {};
   try {
     const db = drizzle(c.env.cinema_db, { schema });
+    const tables = getD1Tables(schema);
     body = await c.req.json().catch(() => ({}));
     const mailer = async (to: string, sub: string, html: string) => {
       const res = await sendMail(c.env, to, sub, html);
@@ -449,7 +462,7 @@ app.post("/api/confirm-booking", async (c) => {
       return res;
     };
     const renderBooking = (data: any) => getBookingEmailTemplate("https://cinesphere.com.vn", data);
-    const r = await updatePaymentImpl(db, body as any, mailer, renderBooking);
+    const r = await updatePaymentImpl(db, body as any, mailer, renderBooking, tables);
     const status = (r as any)?.status === "error" ? 400 : 200;
     return c.json(r, status);
   } catch (err: any) {
@@ -460,8 +473,9 @@ app.post("/api/confirm-booking", async (c) => {
 
 app.get("/api/bookings/:id", async (c) => {
   const db = drizzle(c.env.cinema_db, { schema });
+  const tables = getD1Tables(schema);
   const id = Number(c.req.param("id"));
-  const r = await getBookingByIdImpl(db, id);
+  const r = await getBookingByIdImpl(db, id, tables);
   if (!r) return c.json({ message: "Không tìm thấy đặt vé" }, 404);
   return c.json(r, 200);
 });
@@ -496,8 +510,9 @@ app.get("/api/bookings/code/:code", async (c) => {
   c.header("X-RateLimit-WindowMS", String(windowMs));
 
   const db = drizzle(c.env.cinema_db, { schema });
+  const tables = getD1Tables(schema);
   const code = String(c.req.param("code") || "");
-  const r = await getBookingByCodeImpl(db, code);
+  const r = await getBookingByCodeImpl(db, code, tables);
   if (!r) {
     return c.json({ message: "Không tìm thấy vé với mã này." }, 404);
   }
@@ -506,9 +521,10 @@ app.get("/api/bookings/code/:code", async (c) => {
 
 app.post("/api/bookings/use", async (c) => {
   const db = drizzle(c.env.cinema_db, { schema });
+  const tables = getD1Tables(schema);
   const body = await c.req.json().catch(() => ({}));
   const code = String((body as any)?.code || "");
-  const r = await confirmUseTicketImpl(db, code);
+  const r = await confirmUseTicketImpl(db, code, tables);
   const status = (r as any)?.status === "error" ? 400 : 200;
   return c.json(r, status);
 });

@@ -76,6 +76,18 @@ export default function UsersContent({
     }
   }, [isDetailsOpen, selectedUserId]);
 
+  const formatDateTime = (d: Date | string) => {
+    const date = typeof d === "string" ? new Date(d) : d;
+    return date.toLocaleString("vi-VN", {
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
+      second: "2-digit",
+    });
+  };
+
   const handleViewDetails = (userId: number) => {
     setSelectedUserId(userId);
     setIsDetailsOpen(true);
@@ -132,7 +144,7 @@ export default function UsersContent({
                   <TableCell>{u.email}</TableCell>
                   <TableCell>{u.phone}</TableCell>
                   <TableCell>{u.is_active ? "Hoạt động" : "Tạm khóa"}</TableCell>
-                  <TableCell>{u.created_at.toLocaleDateString("vi-VN")}</TableCell>
+                  <TableCell>{formatDateTime(u.created_at)}</TableCell>
                   <TableCell className="text-right space-x-2">
                     <Button
                       variant="outline"
@@ -255,27 +267,17 @@ export default function UsersContent({
                     <p className="text-sm text-gray-600">Ngày tạo tài khoản</p>
                     <p className="font-medium">
                       {userDetails.account_created_at
-                        ? new Date(
-                          userDetails.account_created_at,
-                        ).toLocaleDateString("vi-VN")
-                        : "N/A"}
+                        ? formatDateTime(userDetails.account_created_at)
+                        : ""}
                     </p>
                   </div>
                   <div>
                     <p className="text-sm text-gray-600">Ngày tạo hồ sơ</p>
-                    <p className="font-medium">
-                      {new Date(userDetails.user_created_at).toLocaleDateString(
-                        "vi-VN",
-                      )}
-                    </p>
+                    <p className="font-medium">{formatDateTime(userDetails.user_created_at)}</p>
                   </div>
                   <div>
                     <p className="text-sm text-gray-600">Cập nhật lần cuối</p>
-                    <p className="font-medium">
-                      {new Date(userDetails.user_updated_at).toLocaleDateString(
-                        "vi-VN",
-                      )}
-                    </p>
+                    <p className="font-medium">{formatDateTime(userDetails.user_updated_at)}</p>
                   </div>
                 </div>
               </div>
@@ -335,8 +337,8 @@ export default function UsersContent({
                             <div className="grid grid-cols-2 gap-2 text-sm">
                               <p className="text-gray-600">
                                 Phương thức:{" "}
-                                <span className="font-medium">
-                                  {booking.payment_method || "N/A"}
+                                  <span className="font-medium">
+                                  {booking.payment_method || ""}
                                 </span>
                               </p>
                               <p className="text-gray-600">
@@ -349,11 +351,7 @@ export default function UsersContent({
                                 </span>
                               </p>
                             </div>
-                            <p className="text-xs text-gray-500 mt-2">
-                              {new Date(booking.created_at).toLocaleDateString(
-                                "vi-VN",
-                              )}
-                            </p>
+                            <p className="text-xs text-gray-500 mt-2">{formatDateTime(booking.created_at)}</p>
                           </div>
                         ),
                       )}

@@ -232,9 +232,18 @@ export function createServer() {
     const r = await vnpayIpnImpl();
     res.status(200).json(r);
   });
+  // Schema tables for PostgreSQL
+  const pgTables = {
+    bookings: pgBookings,
+    users: pgUsers,
+    accounts: pgAccounts,
+    movies: pgMovies,
+    ticket_packages: pgTicketPackages,
+  };
+
   app.post("/api/validate-booking", async (req, res) => {
     try {
-      const r = await validateBookingImpl(db, req.body as any);
+      const r = await validateBookingImpl(db, req.body as any, pgTables);
       res.status(200).json(r);
     } catch (error: any) {
       const status = error?.status || 500;
@@ -244,7 +253,7 @@ export function createServer() {
   });
   app.post("/api/create-booking", async (req, res) => {
     try {
-      const r = await createPaymentImpl(db, req.body as any);
+      const r = await createPaymentImpl(db, req.body as any, pgTables);
       res.status(201).json(r);
     } catch (error: any) {
       res.status(500).json({ message: "Lỗi máy chủ nội bộ", error: error?.message });
@@ -252,7 +261,7 @@ export function createServer() {
   });
   app.post("/api/confirm-booking", async (req, res) => {
     try {
-      const r = await updatePaymentImpl(db, req.body as any);
+      const r = await updatePaymentImpl(db, req.body as any, undefined, undefined, pgTables);
       const status = (r as any)?.status === "error" ? 400 : 200;
       res.status(status).json(r);
     } catch {
@@ -262,7 +271,7 @@ export function createServer() {
   app.get("/api/bookings/:id", async (req, res) => {
     try {
       const id = Number(req.params.id);
-      const r = await getBookingByIdImpl(db, id);
+      const r = await getBookingByIdImpl(db, id, pgTables);
       if (!r) return res.status(404).json({ message: "Không tìm thấy đặt vé" });
       res.status(200).json(r);
     } catch (err: any) {
@@ -272,7 +281,7 @@ export function createServer() {
   app.get("/api/bookings/code/:code", noStore, rateLimitCheckCode(), async (req, res) => {
     try {
       const code = String(req.params.code || "");
-      const r = await getBookingByCodeImpl(db, code);
+      const r = await getBookingByCodeImpl(db, code, pgTables);
       if (!r) {
         const remaining = typeof (res.locals as any).rateLimitRemaining === "number" ? (res.locals as any).rateLimitRemaining : undefined;
         const windowMs = typeof (res.locals as any).rateLimitWindowMs === "number" ? (res.locals as any).rateLimitWindowMs : undefined;
@@ -287,7 +296,7 @@ export function createServer() {
   app.post("/api/bookings/use", async (req, res) => {
     try {
       const code = String((req.body as any)?.code || "");
-      const r = await confirmUseTicketImpl(db, code);
+      const r = await confirmUseTicketImpl(db, code, pgTables);
       const status = (r as any)?.status === "error" ? 400 : 200;
       res.status(status).json(r);
     } catch {
@@ -483,7 +492,8 @@ export function createServer() {
       const r = await updateUserProfileImpl(db, { accounts: pgAccounts, users: pgUsers }, req.body as any);
       const status = (r as any)?.status === "error" ? 400 : 200;
       res.status(status).json(r);
-    } catch {
+    } catch (err: any) {
+      console.error("Error /api/users/profile:", err);
       res.status(500).json({ message: "Lỗi máy chủ nội bộ" });
     }
   });
