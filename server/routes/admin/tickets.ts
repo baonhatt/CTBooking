@@ -1,5 +1,3 @@
-import { db } from "../../db";
-import { ticket_packages } from "../../db/schema";
 import { eq, or, ilike, desc, asc, count, sql } from "drizzle-orm";
 
 export async function listTicketPackagesImpl(anyDb: any, tables: { ticket_packages: any }, args: { page: number; pageSize: number; q: string }) {
@@ -28,6 +26,7 @@ export async function createTicketPackageImpl(anyDb: any, tables: { ticket_packa
       featuresJson = (features as string).split(",").map((x: string) => x.trim()).filter(Boolean);
     }
   }
+  const nowIso = new Date().toISOString();
   // Insert ticket package (tương thích với D1/SQLite không hỗ trợ .returning())
   await anyDb.insert(tables.ticket_packages).values({
     name,
@@ -41,8 +40,8 @@ export async function createTicketPackageImpl(anyDb: any, tables: { ticket_packa
     is_member_only: is_member_only ? Boolean(is_member_only) : false,
     is_active: is_active === undefined ? true : Boolean(is_active),
     display_order: display_order !== undefined ? Number(display_order) : 0,
-    created_at: new Date().toISOString(),
-    updated_at: new Date().toISOString(),
+    created_at: nowIso,
+    updated_at: nowIso,
   });
 
   // Query lại ticket package vừa tạo

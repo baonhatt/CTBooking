@@ -40,21 +40,21 @@ export default function UploadsContent() {
   const [openMediaModal, setOpenMediaModal] = useState(false);
   const [mediaItems, setMediaItems] = useState<any[]>([]);
   const [mediaLoadingId, setMediaLoadingId] = useState<number | null>(null);
- 
+
   const onPickFile = (e: React.ChangeEvent<HTMLInputElement>) => {
     const arr = Array.from(e.target.files || []);
     setFiles(arr);
   };
- 
+
   const isValidVideo = (f: File | null) =>
     !!f && /^video\//.test(f.type);
-  
+
   const formatSize = (bytes: number) => {
     if (bytes < 1024) return `${bytes} B`;
     if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
     return `${(bytes / 1024 / 1024).toFixed(2)} MB`;
   };
-  
+
   React.useEffect(() => {
     if (!files.length) {
       setPreviewUrl(null);
@@ -67,7 +67,7 @@ export default function UploadsContent() {
       URL.revokeObjectURL(url);
     };
   }, [files]);
- 
+
   const compressImage = async (fi: File) => {
     const url = URL.createObjectURL(fi);
     try {
@@ -106,7 +106,7 @@ export default function UploadsContent() {
   useEffect(() => {
     const maxConcurrent = 4;
     const activeCount = uploads.filter((u) => u.status === "uploading").length;
-    
+
     // If we have slots and pending items
     if (activeCount < maxConcurrent) {
       const nextItem = uploads.find((u) => u.status === "pending");
@@ -128,9 +128,9 @@ export default function UploadsContent() {
                 if (i !== -1) cp[i] = { ...cp[i], compressProgress: 0 };
                 return cp;
               });
-              
+
               finalFile = await compressImage(nextItem.file);
-              
+
               setUploads((arr) => {
                 const cp = [...arr];
                 const i = cp.findIndex((x) => x.id === nextItem.id);
@@ -141,24 +141,24 @@ export default function UploadsContent() {
             }
 
             setStage("uploading");
-            
+
             const result = await (nextItem.isVideo
               ? uploadAdminVideo(finalFile, (p) =>
-                  setUploads((arr) => {
-                    const cp = [...arr];
-                    const i = cp.findIndex((x) => x.id === nextItem.id);
-                    if (i !== -1) cp[i] = { ...cp[i], uploadProgress: p };
-                    return cp;
-                  })
-                )
+                setUploads((arr) => {
+                  const cp = [...arr];
+                  const i = cp.findIndex((x) => x.id === nextItem.id);
+                  if (i !== -1) cp[i] = { ...cp[i], uploadProgress: p };
+                  return cp;
+                })
+              )
               : uploadDirectToCloudinary(finalFile, (p) =>
-                  setUploads((arr) => {
-                    const cp = [...arr];
-                    const i = cp.findIndex((x) => x.id === nextItem.id);
-                    if (i !== -1) cp[i] = { ...cp[i], uploadProgress: p };
-                    return cp;
-                  })
-                ));
+                setUploads((arr) => {
+                  const cp = [...arr];
+                  const i = cp.findIndex((x) => x.id === nextItem.id);
+                  if (i !== -1) cp[i] = { ...cp[i], uploadProgress: p };
+                  return cp;
+                })
+              ));
 
             if (nextItem.targetId) {
               await updateSiteMediaApi({
@@ -220,14 +220,14 @@ export default function UploadsContent() {
       // Fetch existing items to check constraints
       const res = await getSiteMediaApi({ section });
       const items = res.items || [];
-      
+
       if (section === "technology_section2") {
         if (items.length >= 6) {
           // Sort by display_order to find the 6th one
           const sorted = [...items].sort((a, b) => (a.display_order || 0) - (b.display_order || 0));
           // Target the 6th item (index 5) or the last one if fewer than 6 but logic says >=6
           const target = sorted[5] || sorted[items.length - 1];
-          
+
           if (target) {
             setPendingTargetId(target.id);
             setConfirmMessage(`Mục ${section} đã đạt giới hạn 6 video. Hành động này sẽ GHI ĐÈ lên video thứ 6 (ID: ${target.id}).`);
@@ -282,7 +282,7 @@ export default function UploadsContent() {
     setPendingTargetId(null); // Reset
     if (fileRef.current) fileRef.current.value = "";
   };
- 
+
   return (
     <Card className="bg-gradient-to-br from-[#0e1b3d] to-[#15325f] text-white border border-white/10">
       <CardHeader>
@@ -354,7 +354,7 @@ export default function UploadsContent() {
             Chọn nơi sẽ hiển thị media sau khi upload
           </div>
         </div>
- 
+
         {files.length === 1 && previewUrl && (
           <div className="mt-4 grid md:grid-cols-3 gap-4 items-start">
             <div className="md:col-span-2">
@@ -375,7 +375,7 @@ export default function UploadsContent() {
             <div className="space-y-2 text-sm text-white/80">
               <div className="font-medium text-white">Thông tin tệp</div>
               <div>Tên: {files[0].name}</div>
-              <div>Loại: {files[0].type || "N/A"}</div>
+              <div>Loại: {files[0].type || ""}</div>
               <div>Dung lượng: {formatSize(files[0].size || 0)}</div>
             </div>
           </div>
@@ -414,7 +414,7 @@ export default function UploadsContent() {
             </div>
           )}
         </div>
- 
+
         <Dialog open={openConfirm} onOpenChange={setOpenConfirm}>
           <DialogContent className="bg-white text-black border-gray-200">
             <DialogHeader>

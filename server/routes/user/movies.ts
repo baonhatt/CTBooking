@@ -1,7 +1,5 @@
 import type { RequestHandler } from "express";
 import type { ActiveMoviesTodayResponse } from "@shared/api";
-import { db } from "../../db";
-import { movies as pgMovies } from "../../db/schema";
 import { eq, desc, asc, count, sql, and } from "drizzle-orm";
 
 export async function getAllActiveMoviesToday(anyDb: any, tables: { movies: any }): Promise<{ activeMovies: ActiveMoviesTodayResponse[] }> {

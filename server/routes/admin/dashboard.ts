@@ -1,5 +1,3 @@
-import { db } from "../../db";
-import { movies, toys, users, bookings } from "../../db/schema";
 import { count, sum, eq, inArray, and, or, gte, lte, gt, sql } from "drizzle-orm";
 
 export async function getDashboardMetricsImpl(anyDb: any, tables: { movies: any; toys?: any; users: any; bookings: any }) {

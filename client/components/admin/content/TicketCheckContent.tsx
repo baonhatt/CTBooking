@@ -317,7 +317,7 @@ export default function TicketCheckContent() {
                   <Clock className="w-5 h-5 text-blue-600" />
                   <div>
                     <p className="text-xs text-gray-600">Ngày Thanh Toán</p>
-                    <p className="font-semibold">{ticketInfo.paid_at ? formatDate(ticketInfo.paid_at) : "N/A"}</p>
+                    <p className="font-semibold">{ticketInfo.paid_at ? formatDate(ticketInfo.paid_at) : ""}</p>
                   </div>
                 </div>
                 <div className="flex items-center gap-2">
@@ -366,7 +366,7 @@ export default function TicketCheckContent() {
                   <div>
                     <p className="text-sm text-gray-600 mb-1">Phương Thức Thanh Toán</p>
                     <Badge variant="outline" className="text-base py-2 px-3">
-                      {ticketInfo.payment_method?.toUpperCase() || "N/A"}
+                      {ticketInfo.payment_method?.toUpperCase() || ""}
                     </Badge>
                   </div>
 

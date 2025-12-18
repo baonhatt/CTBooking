@@ -1,4 +1,3 @@
-import { accounts, tokens } from "../../db/schema";
 import { eq, and, gte } from "drizzle-orm";
 // import crypto from "crypto";
 import bcrypt from "bcryptjs";

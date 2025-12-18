@@ -377,15 +377,15 @@ export default function TransactionsContent({
                 <div className="grid grid-cols-2 gap-3">
                   <div>
                     <p className="text-sm text-gray-600">Tên khách hàng</p>
-                    <p className="font-medium">{txDetails.user?.fullname || "N/A"}</p>
+                    <p className="font-medium">{txDetails.user?.fullname || ""}</p>
                   </div>
                   <div>
                     <p className="text-sm text-gray-600">Email</p>
-                    <p className="font-medium text-sm">{txDetails.user?.email || "N/A"}</p>
+                    <p className="font-medium text-sm">{txDetails.user?.email || ""}</p>
                   </div>
                   <div>
                     <p className="text-sm text-gray-600">Số điện thoại</p>
-                    <p className="font-medium">{txDetails.user?.phone || "N/A"}</p>
+                    <p className="font-medium">{txDetails.user?.phone || ""}</p>
                   </div>
                   <div>
                     <p className="text-sm text-gray-600">Trạng thái tài khoản</p>
@@ -403,7 +403,7 @@ export default function TransactionsContent({
                 <div className="grid grid-cols-2 gap-3">
                   <div>
                     <p className="text-sm text-gray-600">Phim đã đặt</p>
-                    <p className="font-medium">{selectedTxSummary?.movieTitle || "N/A"}</p>
+                    <p className="font-medium">{selectedTxSummary?.movieTitle || ""}</p>
                   </div>
                   <div>
                     <p className="text-sm text-gray-600">Loại vé</p>
@@ -412,7 +412,7 @@ export default function TransactionsContent({
                         ? matchedTicket.name
                         : unitPrice
                           ? `${unitPrice.toLocaleString("vi-VN")} đ / vé`
-                          : "N/A"}
+                          : ""}
                     </p>
                   </div>
                 </div>
@@ -420,14 +420,14 @@ export default function TransactionsContent({
                   <div>
                     <p className="text-sm text-gray-600">Số lượng vé</p>
                     <p className="text-2xl font-bold text-amber-600">
-                      {txDetails.booking_details?.ticket_count || "N/A"}
+                      {txDetails.booking_details?.ticket_count || ""}
                     </p>
                   </div>
 
                   <div>
                     <p className="text-sm text-gray-600">Tổng tiền</p>
                     <p className="text-xl font-bold text-green-600">
-                      {txDetails.booking_details?.total_price ? txDetails.booking_details.total_price.toLocaleString("vi-VN") : "N/A"} đ
+                      {txDetails.booking_details?.total_price ? txDetails.booking_details.total_price.toLocaleString("vi-VN") : ""} đ
                     </p>
                   </div>
                 </div>
@@ -439,7 +439,7 @@ export default function TransactionsContent({
                 <div className="space-y-2 text-sm">
                   <div className="flex justify-between">
                     <span className="text-gray-600">Phương thức:</span>
-                    <span className="font-medium capitalize">{txDetails.payment_info?.payment_method || "N/A"}</span>
+                    <span className="font-medium capitalize">{txDetails.payment_info?.payment_method || ""}</span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-gray-600">Trạng thái:</span>
@@ -452,17 +452,17 @@ export default function TransactionsContent({
                             : "bg-red-100 text-red-800 hover:bg-red-100"
                       }
                     >
-                      {txDetails.payment_info?.payment_status || "N/A"}
+                      {txDetails.payment_info?.payment_status || ""}
                     </Badge>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-gray-600">Mã giao dịch:</span>
-                    <span className="font-mono text-xs">{txDetails.payment_info?.transaction_id || "N/A"}</span>
+                    <span className="font-mono text-xs">{txDetails.payment_info?.transaction_id || ""}</span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-gray-600">Thời gian tạo:</span>
                     <span className="font-medium">
-                      {txDetails.payment_info?.created_at ? new Date(txDetails.payment_info.created_at).toLocaleString("vi-VN") : "N/A"}
+                      {txDetails.payment_info?.created_at ? new Date(txDetails.payment_info.created_at).toLocaleString("vi-VN") : ""}
                     </span>
                   </div>
                   {txDetails.payment_info?.paid_at && (

@@ -1,6 +1,7 @@
 import { eq, desc, and, inArray } from "drizzle-orm";
 
 export async function createMovieImpl(anyDb: any, tables: { movies: any }, data: { title: string; description?: string; cover_image?: string | null; detail_images?: any; genres?: any; rating?: string | null; duration_min: number; is_active?: boolean; release_date: string | Date }) {
+  const nowIso = new Date().toISOString();
   const baseData: any = {
     title: data.title,
     description: data.description,
@@ -11,8 +12,8 @@ export async function createMovieImpl(anyDb: any, tables: { movies: any }, data:
     duration_min: data.duration_min,
     is_active: data.is_active === undefined ? true : Boolean(data.is_active),
     release_date: data.release_date ? new Date(data.release_date).toISOString() : null,
-    created_at: new Date().toISOString(),
-    updated_at: new Date().toISOString(),
+    created_at: nowIso,
+    updated_at: nowIso,
   };
   try {
     // Insert movie (tương thích với D1/SQLite không hỗ trợ .returning())

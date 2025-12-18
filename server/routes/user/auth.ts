@@ -33,7 +33,6 @@ export async function registerImpl(anyDb: any, tables: { accounts: any; users: a
     const gender = payload.gender;
     const dobStr = payload.dob;
     const phone = payload.phone;
-    const now = new Date().toISOString();
 
     if (!email || !password) {
       return { status: "error", message: "Email và mật khẩu không được để trống!" };
@@ -62,14 +61,15 @@ export async function registerImpl(anyDb: any, tables: { accounts: any; users: a
     // D1/SQLite có thể không hỗ trợ transaction đầy đủ như Postgres
     // Nên tách ra thành các bước riêng, nhưng vẫn đảm bảo thứ tự: USER → ACCOUNT
 
+    const nowIso = new Date().toISOString();
     // Step 1: Tạo USER trước (vì account cần user_id - foreign key constraint)
     await anyDb.insert(tables.users).values({
       fullname: fullname,
       phone: phone,
       gender: gender,
       dob: dob,
-      created_at: now,
-      updated_at: now,
+      created_at: nowIso,
+      updated_at: nowIso,
     });
 
     // Query lại user vừa tạo (tương thích với D1/SQLite không hỗ trợ .returning())
@@ -106,8 +106,8 @@ export async function registerImpl(anyDb: any, tables: { accounts: any; users: a
       password: hashedPassword,
       login_type: "email",
       is_active: true,
-      created_at: now,
-      updated_at: now,
+      created_at: nowIso,
+      updated_at: nowIso,
     });
 
     const newUser = user;
