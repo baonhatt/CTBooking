@@ -43,14 +43,11 @@ type Bindings = {
   CLOUDINARY_API_KEY: string;
   CLOUDINARY_API_SECRET: string;
   CLOUDINARY_UPLOAD_FOLDER: string;
-  UPSTREAM_BASE:string;
-  R2_PUBLIC_BASE: string;
-  R2_PUBLIC_ENABLED: string;
   VITE_MOMO_PARTNER_CODE: string;
   VITE_MOMO_ACCESS_KEY: string;
   VITE_MOMO_SECRET_KEY: string;
   VITE_MOMO_ENDPOINT: string;
-  VITE_MOMO_IPN_URL:string;
+  VITE_MOMO_IPN_URL: string;
   VITE_MOMO_REDIRECT_URL: string;
   VITE_VNPAY_TMN_CODE: string;
   VITE_VNPAY_HASH_SECRET: string;
@@ -58,30 +55,59 @@ type Bindings = {
   VITE_VNPAY_RETURN_URL: string;
   VITE_SERVER_BASE_URL: string;
   VITE_CLIENT_BASE_URL: string;
-  BREVO_API_KEY:string;
-  BREVO_SENDER_EMAIL:string;
-  BREVO_SENDER_NAME:string;
+  BREVO_API_KEY: string;
+  BREVO_SENDER_EMAIL: string;
+  BREVO_SENDER_NAME: string;
   VITE_RATE_LIMIT_BOOKING_CHECK_MAX: string;
   VITE_RATE_LIMIT_BOOKING_CHECK_WINDOWMS: string;
 };
 
 const app = new Hono<{ Bindings: Bindings }>();
 
-app.use("*", cors({
-  origin: (origin) => {
-    const allowed = new Set([
-      "https://cinesphere.com.vn",
-      "https://www.cinesphere.com.vn",
-      "https://cinema-pages.pages.dev",
-    ]);
-    return allowed.has(origin) ? origin : "https://cinesphere.com.vn";
-  },
-  allowMethods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-  allowHeaders: ["Content-Type", "Authorization", "Accept", "Origin", "Referer", "Access-Control-Request-Headers"],
-  exposeHeaders: ["Content-Type", "Authorization"],
-  maxAge: 86400,
-  credentials: true,
-}));
+app.use(
+  "*",
+  cors({
+    origin: (origin) => {
+      if (!origin) return "https://cinesphere.com.vn";
+
+      const allowedExact = new Set([
+        "https://cinesphere.com.vn",
+        "https://www.cinesphere.com.vn",
+        "https://cinema-pages.pages.dev", // Pages production
+      ]);
+
+      if (allowedExact.has(origin)) return origin;
+
+      // Allow all preview subdomains for cinema-pages on pages.dev
+      try {
+        const url = new URL(origin);
+        if (
+          url.hostname === "cinema-pages.pages.dev" ||
+          url.hostname.endsWith(".cinema-pages.pages.dev")
+        ) {
+          return origin;
+        }
+      } catch {
+        // ignore parse error, fall back to default
+      }
+
+      // Fallback: default to prod domain
+      return "https://cinesphere.com.vn";
+    },
+    allowMethods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    allowHeaders: [
+      "Content-Type",
+      "Authorization",
+      "Accept",
+      "Origin",
+      "Referer",
+      "Access-Control-Request-Headers",
+    ],
+    exposeHeaders: ["Content-Type", "Authorization"],
+    maxAge: 86400,
+    credentials: true,
+  }),
+);
 
 app.use("*", async (c, next) => {
   await next();
@@ -119,7 +145,9 @@ app.post("/api/register", async (c) => {
       if (!res.ok) throw new Error(`Email failed: ${res.status} ${res.body}`);
       return res;
     };
-    const renderWelcome = (data: { customerName: string; email: string }) => getWelcomeEmailTemplate("https://cinesphere.com.vn", data);
+    const appBaseUrl = c.env.VITE_CLIENT_BASE_URL || "https://cinesphere.com.vn";
+    const renderWelcome = (data: { customerName: string; email: string }) =>
+      getWelcomeEmailTemplate(appBaseUrl, data);
     const r = await registerImpl(db, { accounts: schema.accounts, users: schema.users }, body as any, mailer, renderWelcome);
     const status = (r as any)?.status === "error" ? 400 : 200;
     return c.json(r, status);
@@ -149,7 +177,8 @@ app.post("/api/forget-password", async (c) => {
       if (!res.ok) throw new Error(`Email failed: ${res.status} ${res.body}`);
       return res;
     };
-    const renderReset = (link: string) => getResetPasswordEmailTemplate("https://cinesphere.com.vn", link);
+    const appBaseUrl = c.env.VITE_CLIENT_BASE_URL || "https://cinesphere.com.vn";
+    const renderReset = (link: string) => getResetPasswordEmailTemplate(appBaseUrl, link);
     const r = await forgetPassImpl(db, { accounts: schema.accounts, tokens: schema.tokens }, email, mailer, renderReset);
     return c.json(r, 200);
   } catch (err: any) {
@@ -461,7 +490,8 @@ app.post("/api/confirm-booking", async (c) => {
       if (!res.ok) throw new Error(`Email failed: ${res.status} ${res.body}`);
       return res;
     };
-    const renderBooking = (data: any) => getBookingEmailTemplate("https://cinesphere.com.vn", data);
+    const appBaseUrl = c.env.VITE_CLIENT_BASE_URL || "https://cinesphere.com.vn";
+    const renderBooking = (data: any) => getBookingEmailTemplate(appBaseUrl, data);
     const r = await updatePaymentImpl(db, body as any, mailer, renderBooking, tables);
     const status = (r as any)?.status === "error" ? 400 : 200;
     return c.json(r, status);
@@ -899,13 +929,38 @@ app.get("/api/debug/test-mail", async (c) => {
 app.post("/api/momo/create-payment", async (c) => {
   try {
     const body = await c.req.json().catch(() => ({}));
-    
-    // Construct URLs from Worker environment variables to ensure correctness
-    const clientBase = c.env.VITE_CLIENT_BASE_URL || "https://cinesphere.com.vn";
-    const redirectPath = c.env.VITE_MOMO_REDIRECT_URL || "/checkout";
-    const redirectUrl = redirectPath.startsWith("http") ? redirectPath : `${clientBase}${redirectPath}`;
-    const serverBase = c.env.VITE_SERVER_BASE_URL || clientBase;
-    const ipnUrl = `${serverBase}/api/momo/ipn`;
+
+    // 1) redirectUrl: ưu tiên lấy từ client (để support preview domain), nhưng phải kiểm tra hostname
+    const rawRedirectFromClient = String((body as any)?.redirectUrl || "");
+    let redirectUrl = "";
+    const allowHost = (host: string) =>
+      host === "cinesphere.com.vn" ||
+      host === "www.cinesphere.com.vn" ||
+      host === "cinema-pages.pages.dev" ||
+      host.endsWith(".cinema-pages.pages.dev");
+
+    if (rawRedirectFromClient) {
+      try {
+        const u = new URL(rawRedirectFromClient);
+        if (allowHost(u.hostname)) {
+          redirectUrl = u.toString();
+        }
+      } catch {
+        // ignore, sẽ fallback phía dưới
+      }
+    }
+
+    // Fallback: build từ env nếu client không gửi hoặc không hợp lệ
+    if (!redirectUrl) {
+      const clientBase = c.env.VITE_CLIENT_BASE_URL || "https://cinesphere.com.vn";
+      const redirectPath = c.env.VITE_MOMO_REDIRECT_URL || "/checkout";
+      redirectUrl = redirectPath.startsWith("http") ? redirectPath : `${clientBase}${redirectPath}`;
+    }
+
+    // 2) ipnUrl: luôn dùng server base (không tin client, tránh bị đổi IPN)
+    const serverBase = c.env.VITE_SERVER_BASE_URL || "https://cinesphere.com.vn";
+    const ipnPath = c.env.VITE_MOMO_IPN_URL || "/api/momo/ipn";
+    const ipnUrl = ipnPath.startsWith("http") ? ipnPath : `${serverBase}${ipnPath}`;
 
     const config = {
       partnerCode: c.env.VITE_MOMO_PARTNER_CODE,
@@ -934,11 +989,37 @@ app.post("/api/vnpay/create-payment", async (c) => {
   try {
     const body = await c.req.json().catch(() => ({}));
     const ip = c.req.header("CF-Connecting-IP") || "127.0.0.1";
+    // returnUrl phải là URL frontend (nơi user quay lại)
+    const rawReturnFromClient = String((body as any)?.returnUrl || "");
+    let returnUrl = "";
+    const allowHost = (host: string) =>
+      host === "cinesphere.com.vn" ||
+      host === "www.cinesphere.com.vn" ||
+      host === "cinema-pages.pages.dev" ||
+      host.endsWith(".cinema-pages.pages.dev");
+
+    if (rawReturnFromClient) {
+      try {
+        const u = new URL(rawReturnFromClient);
+        if (allowHost(u.hostname)) {
+          returnUrl = u.toString();
+        }
+      } catch {
+        // ignore, sẽ fallback
+      }
+    }
+
+    if (!returnUrl) {
+      const clientBase = c.env.VITE_CLIENT_BASE_URL || "https://cinesphere.com.vn";
+      const returnPath = c.env.VITE_VNPAY_RETURN_URL || "/checkout";
+      returnUrl = returnPath.startsWith("http") ? returnPath : `${clientBase}${returnPath}`;
+    }
+
     const config = {
       tmnCode: c.env.VITE_VNPAY_TMN_CODE,
       hashSecret: c.env.VITE_VNPAY_HASH_SECRET,
       gateway: c.env.VITE_VNPAY_GATEWAY,
-      returnUrl: `${c.env.VITE_SERVER_BASE_URL || ""}${c.env.VITE_VNPAY_RETURN_URL || ""}`,
+      returnUrl,
     };
     const r = await createVnpayPaymentImpl({ ...(body as any), ip, ...config });
     const status = (r as any)?.status === "error" ? 400 : 200;

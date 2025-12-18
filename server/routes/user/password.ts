@@ -26,23 +26,19 @@ export async function forgetPassImpl(anyDb: any, tables: { accounts: any; tokens
     token: token,
     expired_at: new Date(Date.now() + 60 * 60 * 1000).toISOString(),
   });
-  
+
   let contentMail = "";
   if (getResetPasswordEmailHtml) {
-    // If renderer provided, use it. We assume the renderer handles the full link construction or we pass the link.
-    // However, the signature I proposed is (link: string) => string.
-    // But how do we get the base URL? 
-    // If getResetPasswordEmailHtml is provided, the caller (Worker) should have already bound the base URL or we pass the relative token?
-    // Let's assume we pass the FULL link.
-    // But wait, the Worker knows the base URL.
-    // If we rely on process.env.VITE_SERVER_BASE_URL here, it might fail in Worker.
-    // So we should try to construct the link using a default if env is missing, OR let the renderer handle it if it takes a token?
-    // Let's stick to passing the link.
-    const baseUrl = (typeof process !== "undefined" && process.env?.VITE_SERVER_BASE_URL) ? process.env.VITE_SERVER_BASE_URL : "https://cinesphere.com.vn";
-    const resetLink = `${baseUrl}/reset-password?token=${token}`;
+    // Khi caller (Worker hoặc server khác) cung cấp renderer, ưu tiên để caller quyết định base URL.
+    // Ở môi trường Node (Express), vẫn có thể dùng env để tạo link đầy đủ.
+    let resetLink = `/reset-password?token=${token}`;
+    if (typeof process !== "undefined" && process.env?.VITE_SERVER_BASE_URL) {
+      resetLink = `${process.env.VITE_SERVER_BASE_URL}/reset-password?token=${token}`;
+    }
     contentMail = getResetPasswordEmailHtml(resetLink);
   } else {
-    const resetLink = `${process.env.VITE_SERVER_BASE_URL}/reset-password?token=${token}`;
+    const baseUrl = process.env.VITE_SERVER_BASE_URL || "https://cinesphere.com.vn";
+    const resetLink = `${baseUrl}/reset-password?token=${token}`;
     contentMail = getResetPasswordEmailTemplate(resetLink);
   }
 
