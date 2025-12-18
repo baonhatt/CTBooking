@@ -55,6 +55,8 @@ interface Props {
   setSortKey?: (k: "updated_at" | "release_date" | "title" | "rating") => void;
   setSortDir?: (d: "asc" | "desc") => void;
   isLoading?: boolean;
+  showActiveOnly?: boolean;
+  setShowActiveOnly?: (v: boolean) => void;
 }
 
 export default function MoviesContent({
@@ -75,6 +77,8 @@ export default function MoviesContent({
   setSortKey = () => {},
   setSortDir = () => {},
   isLoading = false,
+  showActiveOnly = false,
+  setShowActiveOnly = () => {},
 }: Props) {
   const [isDetailsOpen, setIsDetailsOpen] = useState(false);
   const [selectedMovieId, setSelectedMovieId] = useState<number | null>(null);
@@ -120,6 +124,14 @@ export default function MoviesContent({
           <h3 className="text-lg font-semibold whitespace-nowrap">
             Tổng: {moviesLength}
           </h3>
+          <label className="flex items-center gap-2 whitespace-nowrap">
+            <input
+              type="checkbox"
+              checked={showActiveOnly}
+              onChange={(e) => setShowActiveOnly(e.target.checked)}
+            />
+            Active
+          </label>
           <select
             value={sortKey}
             onChange={(e) => setSortKey(e.target.value as any)}

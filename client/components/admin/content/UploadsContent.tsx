@@ -5,9 +5,11 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Progress } from "@/components/ui/progress";
-import { uploadAdminVideo, uploadDirectToCloudinary, createSiteMediaApi, getSiteMediaApi, updateSiteMediaApi } from "@/lib/api/uploads";
+import { uploadAdminVideo, uploadDirectToCloudinary, createSiteMediaApi, getSiteMediaApi, updateSiteMediaApi, deleteSiteMediaApi } from "@/lib/api/uploads";
+import { useToast } from "@/hooks/use-toast";
 
 export default function UploadsContent() {
+  const { toast } = useToast();
   const fileRef = useRef<HTMLInputElement | null>(null);
   const [files, setFiles] = useState<File[]>([]);
   const [openConfirm, setOpenConfirm] = useState(false);
@@ -35,6 +37,9 @@ export default function UploadsContent() {
   const [section, setSection] = useState<"hero_section" | "technology_section1" | "technology_section2">("hero_section");
   const [statusLines, setStatusLines] = useState<string[]>([]);
   const [stage, setStage] = useState<"idle" | "compressing" | "uploading" | "done" | "error">("idle");
+  const [openMediaModal, setOpenMediaModal] = useState(false);
+  const [mediaItems, setMediaItems] = useState<any[]>([]);
+  const [mediaLoadingId, setMediaLoadingId] = useState<number | null>(null);
  
   const onPickFile = (e: React.ChangeEvent<HTMLInputElement>) => {
     const arr = Array.from(e.target.files || []);
@@ -297,7 +302,7 @@ export default function UploadsContent() {
             <div className="text-xs text-red-300">Tệp đã chọn không phải video/ảnh hợp lệ</div>
           )}
         </div>
- 
+
         <div className="flex gap-2">
           <Button
             disabled={!files.length}
@@ -317,8 +322,23 @@ export default function UploadsContent() {
           >
             Reset
           </Button>
+          <Button
+            variant="outline"
+            onClick={async () => {
+              try {
+                const { items } = await getSiteMediaApi({});
+                setMediaItems(items);
+                setOpenMediaModal(true);
+              } catch (err: any) {
+                toast({ title: "Lỗi tải danh sách", description: err?.message || "Không thể tải site media" });
+              }
+            }}
+            className="ml-auto text-black bg-white hover:bg-gray-200 border-transparent"
+          >
+            Xem media
+          </Button>
         </div>
- 
+
         <div className="space-y-2">
           <Label>Vị trí hiển thị</Label>
           <select
@@ -396,12 +416,12 @@ export default function UploadsContent() {
         </div>
  
         <Dialog open={openConfirm} onOpenChange={setOpenConfirm}>
-          <DialogContent className="bg-[#0e1b3d] text-white border border-white/10">
+          <DialogContent className="bg-white text-black border-gray-200">
             <DialogHeader>
               <DialogTitle>Xác nhận tải lên</DialogTitle>
             </DialogHeader>
             <div className="space-y-3">
-              <div className="text-sm text-white/80">
+              <div className="text-sm text-gray-700">
                 {confirmMessage || (files.length === 1 && /^image\//.test(files[0].type)
                   ? "Bạn có chắc muốn tải lên ảnh này?"
                   : "Bạn có chắc muốn tải lên các tệp đã chọn?")}
@@ -412,6 +432,74 @@ export default function UploadsContent() {
                   Hủy
                 </Button>
               </div>
+            </div>
+          </DialogContent>
+        </Dialog>
+
+        <Dialog open={openMediaModal} onOpenChange={setOpenMediaModal}>
+          <DialogContent className="bg-white text-black border-gray-200 max-w-4xl w-[95vw]">
+            <DialogHeader>
+              <DialogTitle>Thư viện Site Media</DialogTitle>
+            </DialogHeader>
+            <div className="overflow-x-auto">
+              <table className="min-w-full text-sm">
+                <thead>
+                  <tr className="text-left">
+                    <th className="p-2">ID</th>
+                    <th className="p-2">Section</th>
+                    <th className="p-2">Type</th>
+                    <th className="p-2">URL</th>
+                    <th className="p-2">Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {mediaItems.map((m) => (
+                    <tr key={m.id} className="border-t border-gray-200">
+                      <td className="p-2">{m.id}</td>
+                      <td className="p-2">{m.section}</td>
+                      <td className="p-2">{m.type}</td>
+                      <td className="p-2">
+                        <div className="max-w-[300px] truncate" title={m.url}>
+                          {m.url}
+                        </div>
+                      </td>
+                      <td className="p-2">
+                        <Button
+                          variant="destructive"
+                          size="sm"
+                          disabled={mediaLoadingId === m.id}
+                          onClick={async () => {
+                            const ok = window.confirm("Bạn có chắc chắn muốn xóa media này?");
+                            if (!ok) return;
+                            try {
+                              setMediaLoadingId(m.id);
+                              const r = await deleteSiteMediaApi(Number(m.id));
+                              if (r.ok) {
+                                toast({ title: "Đã xóa thành công", description: `Media #${m.id}` });
+                                const { items } = await getSiteMediaApi({});
+                                setMediaItems(items);
+                              } else {
+                                throw new Error("Xóa thất bại");
+                              }
+                            } catch (err: any) {
+                              toast({ title: "Xóa thất bại", description: err?.message || "Không thể xóa media", variant: "destructive" });
+                            } finally {
+                              setMediaLoadingId(null);
+                            }
+                          }}
+                        >
+                          {mediaLoadingId === m.id ? "Đang xóa..." : "Xóa"}
+                        </Button>
+                      </td>
+                    </tr>
+                  ))}
+                  {mediaItems.length === 0 && (
+                    <tr>
+                      <td className="p-4 text-center text-gray-500" colSpan={6}>Chưa có media</td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
             </div>
           </DialogContent>
         </Dialog>

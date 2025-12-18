@@ -1,5 +1,21 @@
-import type { RequestHandler } from "express";
-import crypto from "crypto";
+// import crypto from "crypto";
+
+async function hmacSHA512(key: string, data: string) {
+    const encoder = new TextEncoder();
+    const keyData = encoder.encode(key);
+    const msgData = encoder.encode(data);
+    const cryptoKey = await crypto.subtle.importKey(
+        "raw",
+        keyData,
+        { name: "HMAC", hash: "SHA-512" },
+        false,
+        ["sign"]
+    );
+    const signature = await crypto.subtle.sign("HMAC", cryptoKey, msgData);
+    return Array.from(new Uint8Array(signature))
+        .map(b => b.toString(16).padStart(2, "0"))
+        .join("");
+}
 
 function sortObject(obj: Record<string, any>) {
   const sorted: Record<string, any> = {};
@@ -10,68 +26,52 @@ function sortObject(obj: Record<string, any>) {
 
 const VNP_TMNCODE = process.env.VITE_VNPAY_TMN_CODE || "";
 const VNP_HASH_SECRET = process.env.VITE_VNPAY_HASH_SECRET || "";
-const VNP_GATEWAY = process.env.VITE_VNPAY_GATEWAY || ""
-const VNP_RETURN_URL = `${(import.meta as any).env?.VITE_SERVER_BASE_URL}${(import.meta as any).env?.VITE_VNPAY_RETURN_URL}`;
+const VNP_GATEWAY = process.env.VITE_VNPAY_GATEWAY || "";
+const VNP_RETURN_URL = "";
 
-export const createVnpayPayment: RequestHandler = async (req, res) => {
-  try {
-    const {
-      amount,
-      orderId,
-      orderInfo,
-      locale = "vn",
-    } = req.body as {
-      amount: number;
-      orderId: string;
-      orderInfo: string;
-      locale?: string;
-    };
-    if (!amount || !orderId || !orderInfo) {
-      return res.status(400).json({ message: "Invalid payload" });
-    }
-    const tmnCode = VNP_TMNCODE || (req.body as any).tmnCode || "";
-    const hashSecret = VNP_HASH_SECRET || (req.body as any).hashSecret || "";
-    const returnUrl = (req.body as any).returnUrl || VNP_RETURN_URL || "";
-    if (!tmnCode || !hashSecret || !returnUrl) {
-      return res.status(400).json({ message: "VNPay configuration missing" });
-    }
-    const vnp_TxnRef = orderId;
-    const vnp_Version = "2.1.0";
-    const vnp_Command = "pay";
-    const vnp_CreateDate = new Date()
-      .toISOString()
-      .replace(/[-:TZ.]/g, "")
-      .slice(0, 14);
-    const vnp_IpAddr =
-      req.headers["x-forwarded-for"] || req.socket.remoteAddress || "127.0.0.1";
-    const vnp_Amount = amount * 100;
-    const params: Record<string, any> = {
-      vnp_Version,
-      vnp_Command,
-      vnp_TmnCode: tmnCode,
-      vnp_Locale: locale,
-      vnp_CurrCode: "VND",
-      vnp_TxnRef,
-      vnp_OrderInfo: orderInfo,
-      vnp_OrderType: "other",
-      vnp_Amount,
-      vnp_ReturnUrl: returnUrl,
-      vnp_IpAddr,
-      vnp_CreateDate,
-    };
-    const sorted = sortObject(params);
-    const signData = new URLSearchParams(sorted).toString();
-    const hmac = crypto.createHmac("sha512", hashSecret);
-    const vnp_SecureHash = hmac.update(signData).digest("hex");
-    const query = new URLSearchParams({ ...sorted, vnp_SecureHash }).toString();
-    const payUrl = `${VNP_GATEWAY}?${query}`;
-    return res.json({ payUrl });
-  } catch (err) {
-    return res.status(500).json({ message: (err as Error).message });
+export async function createVnpayPaymentImpl(payload: { amount: number; orderId: string; orderInfo: string; locale?: string; tmnCode?: string; hashSecret?: string; returnUrl?: string; ip?: string; gateway?: string }) {
+  const { amount, orderId, orderInfo, locale = "vn" } = payload;
+  if (!amount || !orderId || !orderInfo) {
+    return { status: "error", message: "Invalid payload" };
   }
-};
+  const tmnCode = payload.tmnCode || VNP_TMNCODE || "";
+  const hashSecret = payload.hashSecret || VNP_HASH_SECRET || "";
+  const returnUrl = payload.returnUrl || VNP_RETURN_URL || "";
+  const gateway = payload.gateway || VNP_GATEWAY || "";
+  if (!tmnCode || !hashSecret || !returnUrl || !gateway) {
+    return { status: "error", message: "VNPay configuration missing" };
+  }
+  const vnp_TxnRef = orderId;
+  const vnp_Version = "2.1.0";
+  const vnp_Command = "pay";
+  const vnp_CreateDate = new Date().toISOString().replace(/[-:TZ.]/g, "").slice(0, 14);
+  const vnp_IpAddr = payload.ip || "127.0.0.1";
+  const vnp_Amount = amount * 100;
+  const params: Record<string, any> = {
+    vnp_Version,
+    vnp_Command,
+    vnp_TmnCode: tmnCode,
+    vnp_Locale: locale,
+    vnp_CurrCode: "VND",
+    vnp_TxnRef,
+    vnp_OrderInfo: orderInfo,
+    vnp_OrderType: "other",
+    vnp_Amount,
+    vnp_ReturnUrl: returnUrl,
+    vnp_IpAddr,
+    vnp_CreateDate,
+  };
+  const sorted = sortObject(params);
+  const signData = new URLSearchParams(sorted).toString();
+  // const hmac = crypto.createHmac("sha512", hashSecret);
+  // const vnp_SecureHash = hmac.update(signData).digest("hex");
+  const vnp_SecureHash = await hmacSHA512(hashSecret, signData);
+  const query = new URLSearchParams({ ...sorted, vnp_SecureHash }).toString();
+  const payUrl = `${gateway}?${query}`;
+  return { payUrl };
+}
 
-export const vnpayIpn: RequestHandler = async (_req, res) => {
-  res.status(200).json({ result: true });
-};
+export async function vnpayIpnImpl() {
+  return { result: true };
+}
 

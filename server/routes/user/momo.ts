@@ -1,5 +1,21 @@
-import type { RequestHandler } from "express";
-import crypto from "crypto";
+// import crypto from "crypto";
+
+async function hmacSHA256(key: string, data: string) {
+    const encoder = new TextEncoder();
+    const keyData = encoder.encode(key);
+    const msgData = encoder.encode(data);
+    const cryptoKey = await crypto.subtle.importKey(
+        "raw",
+        keyData,
+        { name: "HMAC", hash: "SHA-256" },
+        false,
+        ["sign"]
+    );
+    const signature = await crypto.subtle.sign("HMAC", cryptoKey, msgData);
+    return Array.from(new Uint8Array(signature))
+        .map(b => b.toString(16).padStart(2, "0"))
+        .join("");
+}
 
 type CreatePaymentBody = {
   amount: number;
@@ -19,92 +35,59 @@ const ENV_PARTNER_CODE = process.env.VITE_MOMO_PARTNER_CODE || "";
 const ENV_ACCESS_KEY = process.env.VITE_MOMO_ACCESS_KEY || "";
 const ENV_SECRET_KEY = process.env.VITE_MOMO_SECRET_KEY || "";
 
-export const createMomoPayment: RequestHandler = async (req, res) => {
-  try {
-    const {
-      amount,
-      orderId,
-      orderInfo,
-      redirectUrl,
-      ipnUrl,
-      requestType = "captureWallet",
-      extraData = "",
-      lang = "vi",
-      requestId: requestIdFromBody,
-      // optional dev-only credentials in body
-      partnerCode: partnerCodeBody,
-      accessKey: accessKeyBody,
-      secretKey: secretKeyBody,
-    } = req.body as CreatePaymentBody & {
-      requestId?: string;
-      partnerCode?: string;
-      accessKey?: string;
-      secretKey?: string;
-    };
-
-    const partnerCode = ENV_PARTNER_CODE || partnerCodeBody || "";
-    const accessKey = ENV_ACCESS_KEY || accessKeyBody || "";
-    const secretKey = ENV_SECRET_KEY || secretKeyBody || "";
-
-    if (!partnerCode || !accessKey || !secretKey) {
-      return res.status(400).json({ message: "MOMO configuration missing" });
-    }
-
-    if (!amount || !orderId || !orderInfo || !redirectUrl || !ipnUrl) {
-      return res.status(400).json({ message: "Invalid payload" });
-    }
-
-    const requestId = requestIdFromBody || Date.now().toString();
-
-    const rawSignature = `accessKey=${accessKey}&amount=${amount}&extraData=${extraData}&ipnUrl=${ipnUrl}&orderId=${orderId}&orderInfo=${orderInfo}&partnerCode=${partnerCode}&redirectUrl=${redirectUrl}&requestId=${requestId}&requestType=${requestType}`;
-    const signature = crypto
-      .createHmac("sha256", secretKey)
-      .update(rawSignature)
-      .digest("hex");
-
-    const payload = {
-      partnerCode,
-      accessKey,
-      requestId,
-      amount,
-      orderId,
-      orderInfo,
-      redirectUrl,
-      ipnUrl,
-      extraData,
-      requestType,
-      signature,
-      lang,
-    };
-
-    const momoRes = await fetch(MOMO_ENDPOINT, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
-    });
-
-    const data = await momoRes.json().catch(() => ({}));
-
-    if (!momoRes.ok) {
-      return res
-        .status(momoRes.status)
-        .json({ message: data?.message || "MOMO error", data });
-    }
-
-    return res.json({
-      payUrl: data?.payUrl || data?.deeplink || data?.deeplinkWeb || "",
-      data,
-    });
-  } catch (err) {
-    return res.status(500).json({ message: (err as Error).message });
+export async function createMomoPaymentImpl(payload: CreatePaymentBody & { requestId?: string; partnerCode?: string; accessKey?: string; secretKey?: string; endpoint?: string }) {
+  const {
+    amount,
+    orderId,
+    orderInfo,
+    redirectUrl,
+    ipnUrl,
+    requestType = "captureWallet",
+    extraData = "",
+    lang = "vi",
+    requestId: requestIdFromBody,
+    partnerCode: partnerCodeBody,
+    accessKey: accessKeyBody,
+    secretKey: secretKeyBody,
+    endpoint: endpointBody,
+  } = payload;
+  const partnerCode = partnerCodeBody || ENV_PARTNER_CODE || "";
+  const accessKey = accessKeyBody || ENV_ACCESS_KEY || "";
+  const secretKey = secretKeyBody || ENV_SECRET_KEY || "";
+  const endpoint = endpointBody || MOMO_ENDPOINT || "";
+  if (!partnerCode || !accessKey || !secretKey) {
+    return { status: "error", message: "MOMO configuration missing" };
   }
-};
-
-export const momoIpn: RequestHandler = async (_req, res) => {
-  try {
-    res.status(200).json({ result: true });
-  } catch {
-    res.status(500).json({ result: false });
+  if (!amount || !orderId || !orderInfo || !redirectUrl || !ipnUrl) {
+    return { status: "error", message: "Invalid payload" };
   }
-};
+  const requestId = requestIdFromBody || Date.now().toString();
+  const rawSignature = `accessKey=${accessKey}&amount=${amount}&extraData=${extraData}&ipnUrl=${ipnUrl}&orderId=${orderId}&orderInfo=${orderInfo}&partnerCode=${partnerCode}&redirectUrl=${redirectUrl}&requestId=${requestId}&requestType=${requestType}`;
+  // const signature = crypto.createHmac("sha256", secretKey).update(rawSignature).digest("hex");
+  const signature = await hmacSHA256(secretKey, rawSignature);
+  const body = {
+    partnerCode,
+    accessKey,
+    requestId,
+    amount,
+    orderId,
+    orderInfo,
+    redirectUrl,
+    ipnUrl,
+    extraData,
+    requestType,
+    signature,
+    lang,
+  };
+  const momoRes = await fetch(endpoint, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+  const data = await momoRes.json().catch(() => ({}));
+  if (!momoRes.ok) {
+    return { status: "error", message: data?.message || "MOMO error", data, httpStatus: momoRes.status };
+  }
+  return { payUrl: data?.payUrl || data?.deeplink || data?.deeplinkWeb || "", data };
+}
+
+export async function momoIpnImpl() {
+  return { result: true };
+}
 

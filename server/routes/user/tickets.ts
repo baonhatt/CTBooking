@@ -1,15 +1,11 @@
-import type { RequestHandler } from "express";
-import { prisma } from "../../lib/prisma";
+import { ticket_packages } from "../../db/schema";
+import { eq, asc } from "drizzle-orm";
 
-export const listActiveTicketPackages: RequestHandler = async (_req, res) => {
-  try {
-    const items = await (prisma as any).ticket_packages.findMany({
-      where: { is_active: true },
-      orderBy: [{ display_order: "asc" }, { price: "asc" }],
-    });
-    res.status(200).json({ items });
-  } catch {
-    res.status(500).json({ message: "Lỗi máy chủ nội bộ" });
-  }
-};
+export async function listActiveTicketPackages(anyDb: any, tables: { ticket_packages: any }) {
+  const items = await anyDb.query.ticket_packages.findMany({
+    where: eq(tables.ticket_packages.is_active, true),
+    orderBy: [asc(tables.ticket_packages.display_order), asc(tables.ticket_packages.price)],
+  });
+  return { items };
+}
 

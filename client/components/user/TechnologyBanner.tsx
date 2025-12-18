@@ -19,39 +19,13 @@ const spaceElements = [
   { id: 8, size: "w-32 h-32", position: "top-80 right-6", delay: 1.2, duration: 9 },
 ];
 
-const preview1 = "https://cinesphere.com.vn/uploads/videos/Post2.mp4";
-const preview2 = "https://cinesphere.com.vn/uploads/videos/post3.mp4";
-const preview3 = "https://cinesphere.com.vn/uploads/videos/post4.mp4";
-const preview4 = "https://cinesphere.com.vn/uploads/videos/POST5.mp4";
-const preview5 = "https://cinesphere.com.vn/uploads/videos/POST6.mp4";
+const preview1 = "";
+const preview2 = "";
+const preview3 = "";
+const preview4 = "";
+const preview5 = "";
 
-const videoPreviews = [
-  {
-    src: preview1,
-    title: "Không gian sci-fi CineSphere",
-    description: "Hành lang ánh sáng và màn hình tương tác đa chiều.",
-  },
-  {
-    src: preview2,
-    title: "Khán giả giữa đại dương ánh sáng",
-    description: "Đắm chìm trong bối cảnh biển sâu và sinh vật ảo diệu.",
-  },
-  {
-    src: preview3,
-    title: "Khủng long sát cạnh",
-    description: "Cảnh rừng nguyên sinh, quy mô lớn như chạm tay tới.",
-  },
-  {
-    src: preview4,
-    title: "Phòng chiếu toàn cảnh",
-    description: "Khán giả ngồi giữa khung hình 8K bao phủ trọn không gian.",
-  },
-  {
-    src: preview5,
-    title: "Hành trình xuyên không",
-    description: "Tăng tốc qua vũ trụ đa chiều với hiệu ứng mượt mà.",
-  },
-];
+const videoPreviews = [];
 
 // Video/Hình ảnh chính bên trái
 const mainVisualDefault = {

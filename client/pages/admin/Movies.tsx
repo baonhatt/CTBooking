@@ -19,6 +19,7 @@ export default function MoviesPage() {
   const [editType, setEditType] = useState<"movie" | null>(null);
   const [editData, setEditData] = useState<any>({});
   const [isLoading, setIsLoading] = useState(false);
+  const [showActiveOnly, setShowActiveOnly] = useState(false);
 
   useEffect(() => {
     try {
@@ -28,6 +29,7 @@ export default function MoviesPage() {
         if (typeof s.searchQuery === "string") setSearchQuery(s.searchQuery);
         if (typeof s.sortKey === "string") setSortKey(s.sortKey);
         if (typeof s.sortDir === "string") setSortDir(s.sortDir);
+        if (typeof s.showActiveOnly === "boolean") setShowActiveOnly(s.showActiveOnly);
       }
     } catch { }
   }, []);
@@ -41,6 +43,7 @@ export default function MoviesPage() {
         q: searchQuery,
         sort: sortKey,
         dir: sortDir,
+        status: showActiveOnly ? "active" : "all",
       });
       const mapped = items.map((m: any) => ({
         id: String(m.id),
@@ -59,19 +62,30 @@ export default function MoviesPage() {
       setTotalMovies(total);
       setMovieStatus((prev) => ({
         ...prev,
-        ...Object.fromEntries(mapped.map((x: any) => [x.id, "active"])),
+        ...Object.fromEntries(items.map((m: any) => [String(m.id), m.is_active ? "active" : "inactive"])),
       }));
       setIsLoading(false);
     })();
     try {
-      const state = { searchQuery, sortKey, sortDir };
+      const state = { searchQuery, sortKey, sortDir, showActiveOnly };
       localStorage.setItem("admin_movies_filters", JSON.stringify(state));
     } catch { }
-  }, [moviesPage, pageSize, searchQuery, sortKey, sortDir]);
+  }, [moviesPage, pageSize, searchQuery, sortKey, sortDir, showActiveOnly]);
 
   const moviesTotalPages = useMemo(
     () => Math.max(1, Math.ceil(totalMovies / pageSize)),
     [totalMovies],
+  );
+  const filteredMovies = useMemo(
+    () =>
+      showActiveOnly
+        ? moviesLocal.filter((m) => (movieStatus[m.id] || "active") === "active")
+        : moviesLocal,
+    [showActiveOnly, moviesLocal, movieStatus],
+  );
+  const displayTotal = useMemo(
+    () => (showActiveOnly ? filteredMovies.length : totalMovies),
+    [showActiveOnly, filteredMovies, totalMovies],
   );
 
   function toLocalDateTimeString(date: Date) {
@@ -128,6 +142,7 @@ export default function MoviesPage() {
       q: searchQuery,
       sort: sortKey,
       dir: sortDir,
+      status: showActiveOnly ? "active" : "all",
     });
     const mapped = items.map((m: any) => ({
       id: String(m.id),
@@ -145,9 +160,9 @@ export default function MoviesPage() {
     setMoviesLocal(mapped);
     setTotalMovies(total);
     setMovieStatus((prev) => ({
-      ...prev,
-      ...Object.fromEntries(mapped.map((x: any) => [x.id, "active"])),
-    }));
+        ...prev,
+        ...Object.fromEntries(items.map((m: any) => [String(m.id), m.is_active ? "active" : "inactive"])),
+      }));
     setIsLoading(false);
   };
 
@@ -164,14 +179,14 @@ export default function MoviesPage() {
       }}
     >
       <MoviesContent
-        data={moviesLocal}
+        data={filteredMovies}
         totalPages={moviesTotalPages}
         currentPage={moviesPage}
         setPage={setMoviesPage}
         movieStatus={movieStatus}
         onEdit={handleOpenEdit}
         onCreate={handleOpenCreate}
-        moviesLength={totalMovies}
+        moviesLength={displayTotal}
         formatLocalDateTime={formatLocalDateTime}
         onRefresh={handleRefresh}
         searchQuery={searchQuery}
@@ -184,6 +199,8 @@ export default function MoviesPage() {
         setSortKey={setSortKey}
         setSortDir={setSortDir}
         isLoading={isLoading}
+        showActiveOnly={showActiveOnly}
+        setShowActiveOnly={setShowActiveOnly}
       />
       <AdminEditModal
         isEditOpen={isEditOpen}

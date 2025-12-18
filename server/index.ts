@@ -4,25 +4,27 @@ import fs from "fs";
 import path from "path";
 import cors from "cors";
 import { handleDemo } from "./routes/user/demo";
-import { handleMovies2025, listMovies, getMovie, getAllActiveMoviesToday } from "./routes/user/movies";
-import { createMovie, updateMovie, deleteMovie, getMovieById } from "./routes/admin/movies";
-import { handleLogin, handleRegister } from "./routes/user/auth";
-import { handleForgetPass, handleResetPassword, changePassword } from "./routes/user/password";
-import { createMomoPayment, momoIpn } from "./routes/user/momo";
-import { createVnpayPayment, vnpayIpn } from "./routes/user/vnpay";
-import { createPayment, updatePayment, getBooking, getBookingById, getBookingByCode, validateBooking, confirmUseTicket } from "./routes/user/payments";
-import { getRevenue, listTransactions, getTransactionById } from "./routes/admin/payments";
+import { getAllActiveMoviesToday, listMovies, getMovie } from "./routes/user/movies";
+import { createMovieImpl, updateMovieImpl, deleteMovieImpl, getMovieByIdImpl } from "./routes/admin/movies";
+import { loginImpl, registerImpl } from "./routes/user/auth";
+import { forgetPassImpl, resetPasswordImpl, changePasswordImpl } from "./routes/user/password";
+import { createMomoPaymentImpl, momoIpnImpl } from "./routes/user/momo";
+import { createVnpayPaymentImpl, vnpayIpnImpl } from "./routes/user/vnpay";
+import { validateBookingImpl, createPaymentImpl, updatePaymentImpl, getBookingImpl, getBookingByIdImpl, getBookingByCodeImpl, confirmUseTicketImpl } from "./routes/user/payments";
+import { getRevenueImpl, listTransactionsImpl, getTransactionByIdImpl } from "./routes/admin/payments";
 import { listActiveToys } from "./routes/user/toys";
-import { listToys, createToy, getToy, updateToy, deleteToy } from "./routes/admin/toys";
-import { getDashboardMetrics, getRevenueByDate, getRevenue7Days, getRevenueByMonth } from "./routes/admin/dashboard";
-import { getUsers, getUserById } from "./routes/admin/users";
-import { updateUserProfile, listUserTransactions, getUserProfileByEmail } from "./routes/user/users";
-import { listTicketPackages, getTicketPackage, createTicketPackage, updateTicketPackage, deleteTicketPackage } from "./routes/admin/tickets";
+import { listToysImpl, createToyImpl, getToyImpl, updateToyImpl, deleteToyImpl } from "./routes/admin/toys";
+import { getDashboardMetricsImpl, getRevenueByDateImpl, getRevenue7DaysImpl, getRevenueByMonthImpl } from "./routes/admin/dashboard";
+import { getUsersImpl, getUserByIdImpl } from "./routes/admin/users";
+import { updateUserProfileImpl, listUserTransactionsImpl, getUserProfileByEmailImpl } from "./routes/user/users";
+import { listTicketPackagesImpl, getTicketPackageImpl, createTicketPackageImpl, updateTicketPackageImpl, deleteTicketPackageImpl } from "./routes/admin/tickets";
 import { uploadAdminVideo } from "./routes/admin/uploads";
 import { listActiveTicketPackages } from "./routes/user/tickets";
 import { getMailConfig, verifyMailProvider } from "./routes/mail-service";
 import { generateCloudinarySignature } from "./routes/admin/cloudinary-sign";
-import { createSiteMedia, listSiteMedia } from "./routes/admin/site-media";
+import { createSiteMediaImpl, listSiteMediaImpl, updateSiteMediaImpl } from "./routes/admin/site-media";
+import { db } from "./db";
+import { movies as pgMovies, bookings as pgBookings, users as pgUsers, accounts as pgAccounts, tokens as pgTokens, ticket_packages as pgTicketPackages, toys as pgToys, site_media as pgSiteMedia } from "./db/schema";
 
 export function createServer() {
   const app = express();
@@ -91,57 +93,524 @@ export function createServer() {
   };
 
   app.get("/api/demo", handleDemo);
-  app.get("/api/movies/2025", handleMovies2025);
-  app.get("/api/movies", listMovies);
-  app.get("/api/movies/:id", getMovie);
-  app.get("/api/movies/detail/:id", getMovieById);
-  app.post("/api/movies", createMovie);
-  app.put("/api/movies/:id", updateMovie);
-  app.delete("/api/movies/:id", deleteMovie);
-  app.post("/api/login", handleLogin);
-  app.post("/api/register", handleRegister);
-  app.post("/api/forget-password", handleForgetPass);
-  app.post("/api/reset-password", handleResetPassword);
-  app.post("/api/getActiveMovies", getAllActiveMoviesToday);
-  app.post("/api/momo/create-payment", createMomoPayment);
-  app.post("/api/momo/ipn", momoIpn);
-  app.post("/api/vnpay/create-payment", createVnpayPayment);
-  app.post("/api/vnpay/ipn", vnpayIpn);
-  app.post("/api/validate-booking", validateBooking); // kiểm tra dữ liệu trước khi tạo booking
-  app.post("/api/create-booking", createPayment); // sử dụng để tạo đặt vé sau khi ấn nút thanh toán
-  app.post("/api/confirm-booking", updatePayment); // sử dụng để xử lý data do momo trả về sau khi người dùng thanh toán thành công
-  app.get("/api/bookings/:id", getBookingById); // lấy booking info đầy đủ cho checkout page
-  app.get("/api/bookings/code/:code", noStore, rateLimitCheckCode(), getBookingByCode); // lấy booking info theo mã vé cho ticket check
-  app.post("/api/bookings/use", confirmUseTicket);
-  app.get("/api/admin/revenue", getRevenue);
-  app.get("/api/admin/transactions", listTransactions);
-  app.get("/api/admin/transactions/:id", getTransactionById);
-  app.get("/api/toys", listToys);
-  app.get("/api/toys/active", listActiveToys);
-  app.get("/api/toys/:id", getToy);
-  app.post("/api/toys", createToy);
-  app.put("/api/toys/:id", updateToy);
-  app.delete("/api/toys/:id", deleteToy);
-  app.get("/api/admin/dashboard/metrics", getDashboardMetrics);
-  app.get("/api/admin/dashboard/revenue-date", getRevenueByDate);
-  app.get("/api/admin/dashboard/revenue-7days", getRevenue7Days);
-  app.get("/api/admin/dashboard/revenue-month", getRevenueByMonth);
-  app.get("/api/users", getUsers);
-  app.get("/api/users/profile", getUserProfileByEmail);
-  app.get("/api/users/:id", getUserById);
-  app.post("/api/users/profile", updateUserProfile);
-  app.post("/api/users/password", changePassword);
-  app.get("/api/usersprofile/transactions", listUserTransactions);
-  app.get("/api/tickets", listTicketPackages);
-  app.get("/api/tickets/active", listActiveTicketPackages);
-  app.get("/api/tickets/:id", getTicketPackage);
-  app.post("/api/tickets", createTicketPackage);
-  app.put("/api/tickets/:id", updateTicketPackage);
-  app.delete("/api/tickets/:id", deleteTicketPackage);
+  app.get("/api/movies", async (req, res) => {
+    try {
+      const page = Number(req.query.page || 1);
+      const pageSize = Number(req.query.pageSize || 20);
+      const q = String(req.query.q || "").toLowerCase();
+      const sortKey = String(req.query.sort || "updated_at");
+      const dir = String(req.query.dir || "desc").toLowerCase() === "asc" ? "asc" : "desc";
+      const status = String(req.query.status || "all");
+      const { items, total } = await listMovies(db, { movies: pgMovies }, { page, pageSize, q, sort: sortKey, dir, status: status as any });
+      res.status(200).json({ items, page, pageSize, total });
+    } catch {
+      res.status(500).json({ message: "Lỗi máy chủ nội bộ" });
+    }
+  });
+  app.get("/api/movies/:id", async (req, res) => {
+    try {
+      const id = Number(req.params.id);
+      const movie = await getMovie(db, { movies: pgMovies }, id);
+      if (!movie) return res.status(404).json({ message: "Không tìm thấy" });
+      res.status(200).json({ movie });
+    } catch {
+      res.status(500).json({ message: "Lỗi máy chủ nội bộ" });
+    }
+  });
+  app.get("/api/movies/detail/:id", async (req, res) => {
+    try {
+      const id = Number(req.params.id);
+      const r = await getMovieByIdImpl(db, { movies: pgMovies, bookings: pgBookings }, id);
+      if (!r) return res.status(404).json({ message: "Không tìm thấy phim" });
+      res.status(200).json(r);
+    } catch {
+      res.status(500).json({ message: "Lỗi máy chủ nội bộ" });
+    }
+  });
+  app.post("/api/movies", async (req, res) => {
+    try {
+      const r = await createMovieImpl(db, { movies: pgMovies }, req.body as any);
+      res.status(201).json(r);
+    } catch {
+      res.status(500).json({ message: "Lỗi máy chủ nội bộ" });
+    }
+  });
+  app.put("/api/movies/:id", async (req, res) => {
+    try {
+      const id = Number(req.params.id);
+      const r = await updateMovieImpl(db, { movies: pgMovies }, id, req.body as any);
+      if (!r) return res.status(404).json({ message: "Không tìm thấy" });
+      res.status(200).json(r);
+    } catch {
+      res.status(500).json({ message: "Lỗi máy chủ nội bộ" });
+    }
+  });
+  app.delete("/api/movies/:id", async (req, res) => {
+    try {
+      const id = Number(req.params.id);
+      const r = await deleteMovieImpl(db, { movies: pgMovies }, id);
+      if (!r) return res.status(404).json({ message: "Không tìm thấy" });
+      res.status(200).json(r);
+    } catch {
+      res.status(500).json({ message: "Lỗi máy chủ nội bộ" });
+    }
+  });
+  app.post("/api/login", async (req, res) => {
+    try {
+      const r = await loginImpl(db, { accounts: pgAccounts, users: pgUsers }, req.body as any);
+      res.status(200).json(r);
+    } catch {
+      res.status(500).json({ message: "Lỗi máy chủ nội bộ" });
+    }
+  });
+  app.post("/api/register", async (req, res) => {
+    try {
+      const r = await registerImpl(db, { accounts: pgAccounts, users: pgUsers }, req.body as any);
+      res.status(200).json(r);
+    } catch {
+      res.status(500).json({ message: "Lỗi máy chủ nội bộ" });
+    }
+  });
+  app.post("/api/forget-password", async (req, res) => {
+    try {
+      const email = String((req.body as any)?.email || "");
+      const r = await forgetPassImpl(db, { accounts: pgAccounts, tokens: pgTokens }, email);
+      res.status(200).json(r);
+    } catch {
+      res.status(500).json({ message: "Lỗi máy chủ nội bộ" });
+    }
+  });
+  app.post("/api/reset-password", async (req, res) => {
+    try {
+      const r = await resetPasswordImpl(db, { accounts: pgAccounts, tokens: pgTokens }, req.body as any);
+      res.status(200).json(r);
+    } catch {
+      res.status(500).json({ message: "Lỗi máy chủ nội bộ" });
+    }
+  });
+  app.post("/api/getActiveMovies", async (_req, res) => {
+    try {
+      const result = await getAllActiveMoviesToday(db, { movies: pgMovies });
+      return res.status(200).json(result);
+    } catch (error: any) {
+      console.error("Error in getActiveMovies:", error);
+      return res.status(500).json({
+        message: "Lỗi máy chủ nội bộ",
+        error: process.env.NODE_ENV === "development" ? error?.message : undefined,
+      });
+    }
+  });
+  app.post("/api/momo/create-payment", async (req, res) => {
+    try {
+      const r = await createMomoPaymentImpl(req.body as any);
+      const status = (r as any)?.status === "error" ? 400 : 200;
+      const httpStatus = (r as any)?.httpStatus ? Number((r as any).httpStatus) : status;
+      res.status(httpStatus).json(r);
+    } catch (err: any) {
+      res.status(500).json({ message: err?.message || "Internal error" });
+    }
+  });
+  app.post("/api/momo/ipn", async (_req, res) => {
+    try {
+      const r = await momoIpnImpl();
+      res.status(200).json(r);
+    } catch {
+      res.status(500).json({ result: false });
+    }
+  });
+  app.post("/api/vnpay/create-payment", async (req, res) => {
+    try {
+      const ip = (req.headers["x-forwarded-for"] as any) || req.socket.remoteAddress || "127.0.0.1";
+      const r = await createVnpayPaymentImpl({ ...(req.body as any), ip });
+      const status = (r as any)?.status === "error" ? 400 : 200;
+      res.status(status).json(r);
+    } catch (err: any) {
+      res.status(500).json({ message: err?.message || "Internal error" });
+    }
+  });
+  app.post("/api/vnpay/ipn", async (_req, res) => {
+    const r = await vnpayIpnImpl();
+    res.status(200).json(r);
+  });
+  app.post("/api/validate-booking", async (req, res) => {
+    try {
+      const r = await validateBookingImpl(db, req.body as any);
+      res.status(200).json(r);
+    } catch (error: any) {
+      const status = error?.status || 500;
+      const message = error?.message || "Lỗi máy chủ nội bộ";
+      res.status(status).json({ ok: false, message });
+    }
+  });
+  app.post("/api/create-booking", async (req, res) => {
+    try {
+      const r = await createPaymentImpl(db, req.body as any);
+      res.status(201).json(r);
+    } catch (error: any) {
+      res.status(500).json({ message: "Lỗi máy chủ nội bộ", error: error?.message });
+    }
+  });
+  app.post("/api/confirm-booking", async (req, res) => {
+    try {
+      const r = await updatePaymentImpl(db, req.body as any);
+      const status = (r as any)?.status === "error" ? 400 : 200;
+      res.status(status).json(r);
+    } catch {
+      res.status(500).json({ message: "Lỗi máy chủ nội bộ" });
+    }
+  });
+  app.get("/api/bookings/:id", async (req, res) => {
+    try {
+      const id = Number(req.params.id);
+      const r = await getBookingByIdImpl(db, id);
+      if (!r) return res.status(404).json({ message: "Không tìm thấy đặt vé" });
+      res.status(200).json(r);
+    } catch (err: any) {
+      res.status(500).json({ message: "Lỗi máy chủ nội bộ" });
+    }
+  });
+  app.get("/api/bookings/code/:code", noStore, rateLimitCheckCode(), async (req, res) => {
+    try {
+      const code = String(req.params.code || "");
+      const r = await getBookingByCodeImpl(db, code);
+      if (!r) {
+        const remaining = typeof (res.locals as any).rateLimitRemaining === "number" ? (res.locals as any).rateLimitRemaining : undefined;
+        const windowMs = typeof (res.locals as any).rateLimitWindowMs === "number" ? (res.locals as any).rateLimitWindowMs : undefined;
+        const suffix = remaining !== undefined && windowMs !== undefined ? ` Bạn còn ${remaining} lần thử trong ${Math.ceil(windowMs / 1000)}s` : "";
+        return res.status(404).json({ message: `Không tìm thấy vé với mã này.${suffix}` });
+      }
+      res.status(200).json(r);
+    } catch (err: any) {
+      res.status(500).json({ message: "Lỗi máy chủ nội bộ" });
+    }
+  });
+  app.post("/api/bookings/use", async (req, res) => {
+    try {
+      const code = String((req.body as any)?.code || "");
+      const r = await confirmUseTicketImpl(db, code);
+      const status = (r as any)?.status === "error" ? 400 : 200;
+      res.status(status).json(r);
+    } catch {
+      res.status(500).json({ message: "Lỗi máy chủ nội bộ" });
+    }
+  });
+  app.get("/api/admin/revenue", async (req, res) => {
+    try {
+      const from = String(req.query.from || "");
+      const to = String(req.query.to || "");
+      const status = String(req.query.status || "paid");
+      const r = await getRevenueImpl(db, { bookings: pgBookings }, { from, to, status });
+      res.status(200).json(r);
+    } catch {
+      res.status(500).json({ message: "Lỗi máy chủ nội bộ" });
+    }
+  });
+  app.get("/api/admin/transactions", async (req, res) => {
+    try {
+      const page = Number(req.query.page || 1);
+      const pageSize = Number(req.query.pageSize || 20);
+      const email = String(req.query.email || "");
+      const status = String(req.query.status || "all");
+      const sort = String(req.query.sort || "created_at");
+      const dir = String(req.query.dir || "desc").toLowerCase() === "asc" ? "asc" : "desc";
+      const payment_method = String(req.query.payment_method || "");
+      const from = String(req.query.from || "");
+      const to = String(req.query.to || "");
+      const r = await listTransactionsImpl(db, { bookings: pgBookings, users: pgUsers, accounts: pgAccounts, movies: pgMovies, ticket_packages: pgTicketPackages }, { page, pageSize, email, status, sort, dir, payment_method, from, to });
+      res.status(200).json(r);
+    } catch {
+      res.status(500).json({ message: "Lỗi máy chủ nội bộ" });
+    }
+  });
+  app.get("/api/admin/transactions/:id", async (req, res) => {
+    try {
+      const id = Number(req.params.id);
+      const r = await getTransactionByIdImpl(db, { bookings: pgBookings, users: pgUsers, accounts: pgAccounts, movies: pgMovies, ticket_packages: pgTicketPackages }, id);
+      if (!r) return res.status(404).json({ message: "Không tìm thấy" });
+      res.status(200).json(r);
+    } catch {
+      res.status(500).json({ message: "Lỗi máy chủ nội bộ" });
+    }
+  });
+  app.get("/api/toys", async (req, res) => {
+    try {
+      const page = Number(req.query.page || 1);
+      const pageSize = Number(req.query.pageSize || 20);
+      const q = String(req.query.q || "");
+      const r = await listToysImpl(db, { toys: pgToys }, { page, pageSize, q });
+      res.status(200).json(r);
+    } catch {
+      res.status(500).json({ message: "Lỗi máy chủ nội bộ" });
+    }
+  });
+  app.get("/api/toys/active", async (_req, res) => {
+    try {
+      const r = await listActiveToys(db, { toys: pgToys });
+      res.status(200).json(r);
+    } catch {
+      res.status(500).json({ message: "Lỗi máy chủ nội bộ" });
+    }
+  });
+  app.get("/api/toys/:id", async (req, res) => {
+    try {
+      const id = Number(req.params.id);
+      const r = await getToyImpl(db, { toys: pgToys }, id);
+      if (!r) return res.status(404).json({ message: "Không tìm thấy" });
+      res.status(200).json(r);
+    } catch {
+      res.status(500).json({ message: "Lỗi máy chủ nội bộ" });
+    }
+  });
+  app.post("/api/toys", async (req, res) => {
+    try {
+      const r = await createToyImpl(db, { toys: pgToys }, req.body as any);
+      res.status(201).json(r);
+    } catch {
+      res.status(500).json({ message: "Lỗi máy chủ nội bộ" });
+    }
+  });
+  app.put("/api/toys/:id", async (req, res) => {
+    try {
+      const id = Number(req.params.id);
+      const r = await updateToyImpl(db, { toys: pgToys }, id, req.body as any);
+      if (!r) return res.status(404).json({ message: "Không tìm thấy" });
+      res.status(200).json(r);
+    } catch {
+      res.status(500).json({ message: "Lỗi máy chủ nội bộ" });
+    }
+  });
+  app.delete("/api/toys/:id", async (req, res) => {
+    try {
+      const id = Number(req.params.id);
+      const r = await deleteToyImpl(db, { toys: pgToys }, id);
+      if (!r) return res.status(404).json({ message: "Không tìm thấy" });
+      res.status(200).json(r);
+    } catch {
+      res.status(500).json({ message: "Lỗi máy chủ nội bộ" });
+    }
+  });
+  app.get("/api/admin/dashboard/metrics", async (_req, res) => {
+    try {
+      const r = await getDashboardMetricsImpl(db, { movies: pgMovies, toys: pgToys, users: pgUsers, bookings: pgBookings });
+      res.status(200).json(r);
+    } catch {
+      res.status(500).json({ message: "Lỗi máy chủ nội bộ" });
+    }
+  });
+  app.get("/api/admin/dashboard/revenue-date", async (req, res) => {
+    try {
+      const date = String(req.query.date || "");
+      const status = String(req.query.status || "paid");
+      const r = await getRevenueByDateImpl(db, { bookings: pgBookings }, { date, status });
+      res.status(200).json(r);
+    } catch {
+      res.status(500).json({ message: "Lỗi máy chủ nội bộ" });
+    }
+  });
+  app.get("/api/admin/dashboard/revenue-7days", async (_req, res) => {
+    try {
+      const r = await getRevenue7DaysImpl(db, { bookings: pgBookings });
+      res.status(200).json(r);
+    } catch {
+      res.status(500).json({ message: "Lỗi máy chủ nội bộ" });
+    }
+  });
+  app.get("/api/admin/dashboard/revenue-month", async (req, res) => {
+    try {
+      const year = String(req.query.year || "");
+      const month = String(req.query.month || "");
+      const status = String(req.query.status || "paid");
+      const r = await getRevenueByMonthImpl(db, { bookings: pgBookings }, { year, month, status });
+      res.status(200).json(r);
+    } catch {
+      res.status(500).json({ message: "Lỗi máy chủ nội bộ" });
+    }
+  });
+  app.get("/api/admin/users", async (req, res) => {
+    try {
+      const page = Number(req.query.page || 1);
+      const pageSize = Number(req.query.pageSize || 20);
+      const q = String(req.query.q || "");
+      const r = await getUsersImpl(db, { users: pgUsers, accounts: pgAccounts, bookings: pgBookings }, { page, pageSize, q });
+      res.status(200).json(r);
+    } catch {
+      res.status(500).json({ message: "Lỗi máy chủ nội bộ" });
+    }
+  });
+  app.get("/api/admin/users/:id", async (req, res) => {
+    try {
+      const id = Number(req.params.id);
+      const r = await getUserByIdImpl(db, { users: pgUsers }, id);
+      if (!r) return res.status(404).json({ message: "Không tìm thấy" });
+      res.status(200).json(r);
+    } catch {
+      res.status(500).json({ message: "Lỗi máy chủ nội bộ" });
+    }
+  });
+  app.get("/api/users", async (req, res) => {
+    try {
+      const page = Number(req.query.page || 1);
+      const pageSize = Number(req.query.pageSize || 20);
+      const q = String(req.query.q || "");
+      const r = await getUsersImpl(db, { users: pgUsers, accounts: pgAccounts, bookings: pgBookings }, { page, pageSize, q });
+      res.status(200).json(r);
+    } catch {
+      res.status(500).json({ message: "Lỗi máy chủ nội bộ" });
+    }
+  });
+  app.get("/api/users/profile", async (req, res) => {
+    try {
+      const emailRaw = String(req.query.email || "");
+      const r = await getUserProfileByEmailImpl(db, { accounts: pgAccounts, users: pgUsers }, emailRaw);
+      const status = (r as any)?.status === "error" ? 400 : 200;
+      res.status(status).json(r);
+    } catch {
+      res.status(500).json({ message: "Lỗi máy chủ nội bộ" });
+    }
+  });
+  app.get("/api/users/:id", async (req, res) => {
+    try {
+      const id = Number(req.params.id);
+      const r = await getUserByIdImpl(db, { users: pgUsers }, id);
+      if (!r) return res.status(404).json({ message: "Không tìm thấy" });
+      res.status(200).json(r);
+    } catch {
+      res.status(500).json({ message: "Lỗi máy chủ nội bộ" });
+    }
+  });
+  app.post("/api/users/profile", async (req, res) => {
+    try {
+      const r = await updateUserProfileImpl(db, { accounts: pgAccounts, users: pgUsers }, req.body as any);
+      const status = (r as any)?.status === "error" ? 400 : 200;
+      res.status(status).json(r);
+    } catch {
+      res.status(500).json({ message: "Lỗi máy chủ nội bộ" });
+    }
+  });
+  app.post("/api/users/password", async (req, res) => {
+    try {
+      const r = await changePasswordImpl(db, { accounts: pgAccounts }, req.body as any);
+      const status = (r as any)?.status === "error" ? 400 : 200;
+      res.status(status).json(r);
+    } catch {
+      res.status(500).json({ message: "Lỗi máy chủ nội bộ" });
+    }
+  });
+  app.get("/api/usersprofile/transactions", async (req, res) => {
+    try {
+      const email = String(req.query.email || "");
+      const status = String(req.query.status || "paid");
+      const page = Number(req.query.page || 1);
+      const pageSize = Number(req.query.pageSize || 10);
+      const sort = String(req.query.sort || "created_at");
+      const dir = String(req.query.dir || "desc").toLowerCase() === "asc" ? "asc" : "desc";
+      const payment_method = String(req.query.payment_method || "");
+      const from = String(req.query.from || "");
+      const to = String(req.query.to || "");
+      const r = await listUserTransactionsImpl(db, { accounts: pgAccounts, bookings: pgBookings }, { email, status, page, pageSize, sort, dir, payment_method, from, to });
+      res.status(200).json(r);
+    } catch (err) {
+      res.status(500).json({ message: "Lỗi máy chủ nội bộ" });
+    }
+  });
+  app.get("/api/tickets", async (req, res) => {
+    try {
+      const page = Number(req.query.page || 1);
+      const pageSize = Number(req.query.pageSize || 20);
+      const q = String(req.query.q || "");
+      const r = await listTicketPackagesImpl(db, { ticket_packages: pgTicketPackages }, { page, pageSize, q });
+      res.status(200).json(r);
+    } catch {
+      res.status(500).json({ message: "Lỗi máy chủ nội bộ" });
+    }
+  });
+  app.get("/api/tickets/active", async (_req, res) => {
+    try {
+      const r = await listActiveTicketPackages(db, { ticket_packages: pgTicketPackages });
+      res.status(200).json(r);
+    } catch {
+      res.status(500).json({ message: "Lỗi máy chủ nội bộ" });
+    }
+  });
+  app.get("/api/tickets/:id", async (req, res) => {
+    try {
+      const id = Number(req.params.id);
+      const r = await getTicketPackageImpl(db, { ticket_packages: pgTicketPackages }, id);
+      if (!r) return res.status(404).json({ message: "Không tìm thấy" });
+      res.status(200).json(r);
+    } catch {
+      res.status(500).json({ message: "Lỗi máy chủ nội bộ" });
+    }
+  });
+  app.post("/api/tickets", async (req, res) => {
+    try {
+      const r = await createTicketPackageImpl(db, { ticket_packages: pgTicketPackages }, req.body as any);
+      res.status(201).json(r);
+    } catch {
+      res.status(500).json({ message: "Lỗi máy chủ nội bộ" });
+    }
+  });
+  app.put("/api/tickets/:id", async (req, res) => {
+    try {
+      const id = Number(req.params.id);
+      const r = await updateTicketPackageImpl(db, { ticket_packages: pgTicketPackages }, id, req.body as any);
+      if (!r) return res.status(404).json({ message: "Không tìm thấy" });
+      res.status(200).json(r);
+    } catch {
+      res.status(500).json({ message: "Lỗi máy chủ nội bộ" });
+    }
+  });
+  app.delete("/api/tickets/:id", async (req, res) => {
+    try {
+      const id = Number(req.params.id);
+      const r = await deleteTicketPackageImpl(db, { ticket_packages: pgTicketPackages }, id);
+      if (!r) return res.status(404).json({ message: "Không tìm thấy" });
+      res.status(200).json(r);
+    } catch {
+      res.status(500).json({ message: "Lỗi máy chủ nội bộ" });
+    }
+  });
   app.post("/api/admin/uploads/video", uploadAdminVideo);
   app.post("/api/admin/cloudinary/sign", generateCloudinarySignature);
-  app.post("/api/admin/site-media", createSiteMedia);
-  app.get("/api/site-media", listSiteMedia);
+  app.post("/api/admin/site-media", async (req, res) => {
+    try {
+      const r = await createSiteMediaImpl(db, { site_media: pgSiteMedia }, req.body as any);
+      res.status(201).json(r);
+    } catch {
+      res.status(500).json({ message: "Lỗi máy chủ nội bộ" });
+    }
+  });
+  app.put("/api/admin/site-media", async (req, res) => {
+    try {
+      const r = await updateSiteMediaImpl(db, { site_media: pgSiteMedia }, req.body as any);
+      const status = (r as any)?.item ? 200 : 404;
+      res.status(status).json({ ...r });
+    } catch {
+      res.status(500).json({ message: "Lỗi máy chủ nội bộ" });
+    }
+  });
+  app.delete("/api/admin/site-media/:id", async (req, res) => {
+    try {
+      const id = Number(req.params.id);
+      const { deleteSiteMediaImpl } = await import("./routes/admin/site-media");
+      const r = await deleteSiteMediaImpl(db, { site_media: pgSiteMedia }, id);
+      const status = r.ok ? 200 : 404;
+      res.status(status).json(r);
+    } catch (err: any) {
+      res.status(500).json({ message: err?.message || "Lỗi máy chủ nội bộ" });
+    }
+  });
+  app.get("/api/site-media", async (req, res) => {
+    try {
+      const section = String(req.query.section || "");
+      const type = String(req.query.type || "");
+      const active = String(req.query.active || "");
+      const r = await listSiteMediaImpl(db, { site_media: pgSiteMedia }, { section, type, active });
+      res.status(200).json(r);
+    } catch {
+      res.status(500).json({ message: "Lỗi máy chủ nội bộ" });
+    }
+  });
 
   app.get("/api/debug/mail", async (_req, res) => {
     try {
