@@ -15,6 +15,7 @@
     "dev:debug": "tsx --inspect=9229 --tsconfig tsconfig.json node_modules/vite/bin/vite.js",
     "build": "npm run build:client && npm run build:server",
     "build:client": "vite build",
+    "build:client:preview": "vite build --mode preview",
     "build:server": "vite build --config vite.config.server.ts",
     "start": "node dist/server/node-build.mjs",
     "test": "vitest --run",
@@ -24,7 +25,7 @@
     "deploy:prod": "npx wrangler deploy --config worker/wrangler.toml",
     "pages:deploy": "npm run build:client && npx wrangler pages deploy dist/spa --project-name=cinema-pages",
     "pages:deploy:prod": "npm run build:client && npx wrangler pages deploy dist/spa --project-name=cinema-pages --branch=main",
-    "pages:deploy:preview": "npm run build:client && npx wrangler pages deploy dist/spa --project-name=cinema-pages --branch=preview"
+    "pages:deploy:preview": "npm run build:client:preview && npx wrangler pages deploy dist/spa --project-name=cinema-pages --branch=preview"
   },
   "rollup": {
     "forceJs": true
