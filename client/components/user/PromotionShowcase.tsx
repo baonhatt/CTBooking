@@ -69,7 +69,7 @@ export default function PromotionShowcase() {
             Chưa có gói vé nào
           </div>
         ) : (
-          <div className="mx-auto max-w-7xl">
+          <div className="mx-auto max-w-7xl px-10 py-10">
             <Carousel
               opts={{
                 align: "start",
@@ -79,7 +79,7 @@ export default function PromotionShowcase() {
             >
               <CarouselContent>
                 {combos.map((combo, index) => (
-                  <CarouselItem key={combo.id} className="md:basis-1/2 lg:basis-1/4 pl-6">
+                  <CarouselItem key={combo.id} className="md:basis-1/2 lg:basis-1/4 py-10 pl-6">
                     <motion.div
                       initial={{ opacity: 0, y: 50 }}
                       whileInView={{ opacity: 1, y: 0 }}
