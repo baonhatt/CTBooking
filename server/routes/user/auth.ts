@@ -1,112 +1,156 @@
-import { RequestHandler } from "express";
 import type { Login, Register } from "@shared/api";
-import { prisma } from "../../lib/prisma";
+import { eq, desc, and, sql } from "drizzle-orm";
 import bcrypt from "bcryptjs";
 import { sendMail } from "../mail-service";
 import { getWelcomeEmailTemplate } from "../../lib/booking-utils";
 
-export const handleLogin: RequestHandler = async (req, res) => {
-  const { email, password } = req.body as Partial<Login>;
-  const useracc = await prisma.accounts.findFirst({
-    where: {
-      email: email,
-    },
+export async function loginImpl(anyDb: any, tables: { accounts: any; users: any }, payload: Partial<Login>) {
+  const email = payload.email || "";
+  const password = payload.password || "";
+  const useracc = await anyDb.query.accounts.findFirst({
+    where: eq(tables.accounts.email, email),
   });
   if (!useracc) {
-    return res
-      .status(400)
-      .json({ status: "error", message: "Email không tồn tại!" });
+    return { status: "error", message: "Email không tồn tại!" };
   }
-  const isPasswordValid = await bcrypt.compare(password, useracc.password);
+  const isPasswordValid = await bcrypt.compare(password, useracc.password || "");
   if (!isPasswordValid) {
-    return res
-      .status(400)
-      .json({ status: "error", message: "Mật khẩu không đúng!" });
+    return { status: "error", message: "Mật khẩu không đúng!" };
   }
-  const user = await prisma.users.findFirst({
-    where: {
-      id: useracc.user_id,
-    },
+  const user = await anyDb.query.users.findFirst({
+    where: eq(tables.users.id, useracc.user_id),
   });
-  return res
-    .status(200)
-    .json({
-      status: "success",
-      message: "Đăng nhập thành công!",
-      user: { username: user?.fullname, email: email },
-    });
-};
+  return {
+    status: "success",
+    message: "Đăng nhập thành công!",
+    user: { username: user?.fullname, email },
+  };
+}
 
-export const handleRegister: RequestHandler = async (req, res) => {
+export async function registerImpl(anyDb: any, tables: { accounts: any; users: any }, payload: Partial<Register> & { gender?: string; dob?: string; phone?: string; name?: string }, sendMailFn?: (to: string, subject: string, html: string) => Promise<any>, getWelcomeEmailHtml?: (data: { customerName: string; email: string }) => string) {
   try {
-    const { email, password } = req.body as Partial<Register>;
-    const gender = (req.body as any).gender as string | undefined;
-    const dobStr = (req.body as any).dob as string | undefined;
-    const phone = (req.body as any).phone as string | undefined;
+    const { email, password } = payload;
+    const gender = payload.gender;
+    const dobStr = payload.dob;
+    const phone = payload.phone;
+    const now = new Date().toISOString();
 
     if (!email || !password) {
-      return res
-        .status(400)
-        .json({
-          status: "error",
-          message: "Email và mật khẩu không được để trống!",
-        });
+      return { status: "error", message: "Email và mật khẩu không được để trống!" };
     }
 
-    const existing = await prisma.accounts.findUnique({ where: { email } });
+    const existing = await anyDb.query.accounts.findFirst({ where: eq(tables.accounts.email, email) });
     if (existing) {
-      return res
-        .status(400)
-        .json({ status: "error", message: "Email đã tồn tại" });
+      return { status: "error", message: "Email đã tồn tại" };
     }
 
     const hashedPassword = await bcrypt.hash(password, 10);
 
-    let fullname = (req.body as any).name as string | undefined;
+    let fullname = payload.name;
     if (!fullname || fullname.trim() === "") {
       fullname = email.split("@")[0];
     }
-    const dob =
-      dobStr && typeof dobStr === "string" && dobStr.trim()
-        ? new Date(dobStr)
-        : undefined;
 
-    const newUser = await prisma.users.create({
-      data: {
-        fullname: fullname,
-        phone: phone,
-        gender: gender,
-        dob: dob,
-        accounts: {
-          create: {
-            email,
-            password: hashedPassword,
-          },
-        },
-      },
-      include: { accounts: true },
-    });
-
-    try {
-      const html = getWelcomeEmailTemplate({
-        customerName: fullname || email.split("@")[0],
-        email,
-      });
-      await sendMail(email, "🎉 Chào mừng bạn đến CINESPHERE", html);
-    } catch (mailErr) {
-      console.error("Gửi email chào mừng thất bại:", mailErr);
+    let dob: string | undefined;
+    if (dobStr && typeof dobStr === "string" && dobStr.trim()) {
+      const d = new Date(dobStr);
+      if (!isNaN(d.getTime())) {
+        dob = d.toISOString();
+      }
     }
 
-    return res
-      .status(201)
-      .json({
+    // D1/SQLite có thể không hỗ trợ transaction đầy đủ như Postgres
+    // Nên tách ra thành các bước riêng, nhưng vẫn đảm bảo thứ tự: USER → ACCOUNT
+
+    // Step 1: Tạo USER trước (vì account cần user_id - foreign key constraint)
+    await anyDb.insert(tables.users).values({
+      fullname: fullname,
+      phone: phone,
+      gender: gender,
+      dob: dob,
+      created_at: now,
+      updated_at: now,
+    });
+
+    // Query lại user vừa tạo (tương thích với D1/SQLite không hỗ trợ .returning())
+    const whereConditions = [];
+    if (phone) {
+      whereConditions.push(eq(tables.users.phone, phone));
+    }
+    if (fullname) {
+      whereConditions.push(eq(tables.users.fullname, fullname));
+    }
+
+    // Lấy user mới nhất theo điều kiện hoặc lấy user mới nhất nếu không có điều kiện
+    let user;
+    if (whereConditions.length > 0) {
+      const users = await anyDb.select().from(tables.users)
+        .where(and(...whereConditions))
+        .orderBy(desc(tables.users.id))
+        .limit(1);
+      user = users[0];
+    } else {
+      // Fallback: lấy user mới nhất nếu không có phone/fullname
+      const users = await anyDb.select().from(tables.users)
+        .orderBy(desc(tables.users.id))
+        .limit(1);
+      user = users[0];
+    }
+
+    if (!user) throw new Error("Không thể tạo thông tin người dùng (Insert failed)");
+
+    // Step 2: Tạo ACCOUNT sau (với user_id từ user vừa tạo)
+    await anyDb.insert(tables.accounts).values({
+      user_id: user.id,
+      email,
+      password: hashedPassword,
+      login_type: "email",
+      is_active: true,
+      created_at: now,
+      updated_at: now,
+    });
+
+    const newUser = user;
+
+    try {
+      let html = "";
+      const templateData = {
+        customerName: fullname || email.split("@")[0],
+        email,
+      };
+
+      if (getWelcomeEmailHtml) {
+        html = getWelcomeEmailHtml(templateData);
+      } else {
+        html = getWelcomeEmailTemplate(templateData);
+      }
+
+      const mailer = sendMailFn || sendMail;
+      await mailer(email, "🎉 Chào mừng bạn đến CINESPHERE", html);
+    } catch (mailErr: any) {
+      console.error(`[${new Date().toISOString()}] ERROR in registerImpl email sending:`);
+      console.error(`Message: ${mailErr?.message || String(mailErr)}`);
+      // We do NOT rollback user creation on email failure to avoid "ghost accounts" in the sense of 
+      // "Error returned but Account Created". We return Success with a log.
+      // If we wanted to enforce "No Account if Email Fails", we would need to delete the user here 
+      // or move email inside transaction (bad for performance).
+      return {
         status: "success",
-        message: "Đăng ký thành công",
+        message: "Đăng ký thành công (nhưng gửi email thất bại)",
         user: { id: newUser.id, email },
-      });
-  } catch (err) {
+        emailError: mailErr?.message || String(mailErr),
+      };
+    }
+
+    return {
+      status: "success",
+      message: "Đăng ký thành công",
+      user: { id: newUser.id, email },
+      emailSent: true,
+    };
+  } catch (err: any) {
     console.error(err);
-    return res.status(500).json({ status: "error", message: "Server error" });
+    return { status: "error", message: `Server error: ${err?.message || String(err)}` };
   }
-};
+}
 

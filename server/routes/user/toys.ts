@@ -1,16 +1,12 @@
-import { RequestHandler } from "express";
-import { prisma } from "../../lib/prisma";
+import { toys } from "../../db/schema";
+import { inArray, desc } from "drizzle-orm";
 
-export const listActiveToys: RequestHandler = async (_req, res) => {
-  try {
-    const items = await (prisma as any).toys.findMany({
-      where: { status: { in: ["active", "ACTIVE"] } },
-      orderBy: { created_at: "desc" },
-      take: 24,
-    });
-    res.status(200).json({ items });
-  } catch {
-    res.status(500).json({ message: "Lỗi máy chủ nội bộ" });
-  }
-};
+export async function listActiveToys(anyDb: any, tables: { toys: any }) {
+  const items = await anyDb.query.toys.findMany({
+    where: inArray(tables.toys.status, ["active", "ACTIVE"]),
+    orderBy: [desc(tables.toys.created_at)],
+    limit: 24,
+  });
+  return { items };
+}
 

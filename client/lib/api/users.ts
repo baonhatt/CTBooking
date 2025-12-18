@@ -10,7 +10,7 @@ export async function getUsers(options?: {
   if (options?.page) params.set("page", String(options.page));
   if (options?.pageSize) params.set("pageSize", String(options.pageSize));
   if (options?.q) params.set("q", options.q);
-  const path = `/api/users${params.toString() ? `?${params.toString()}` : ""}`;
+  const path = `/api/admin/users${params.toString() ? `?${params.toString()}` : ""}`;
   return request<{
     items: any[];
     page: number;
@@ -41,7 +41,7 @@ export async function getUserById(id: number) {
       created_at: string;
     }>;
     total_bookings: number;
-  }>(`/api/users/${id}`);
+  }>(`/api/admin/users/${id}`);
 }
 
 export async function updateUserProfileApi(body: { email: string; name?: string; phone?: string; gender?: string; dob?: string }) {

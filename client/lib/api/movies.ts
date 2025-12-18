@@ -23,6 +23,7 @@ export async function getMoviesAdmin(options?: {
   q?: string;
   sort?: "updated_at" | "release_date" | "title" | "rating";
   dir?: "asc" | "desc";
+  status?: "all" | "active" | "inactive";
   signal?: AbortSignal;
 }) {
   const params = new URLSearchParams();
@@ -31,6 +32,7 @@ export async function getMoviesAdmin(options?: {
   if (options?.q) params.set("q", options.q);
   if (options?.sort) params.set("sort", options.sort);
   if (options?.dir) params.set("dir", options.dir);
+  if (options?.status) params.set("status", options.status);
   const path = `/api/movies${params.toString() ? `?${params.toString()}` : ""}`;
   return request<{
     items: any[];

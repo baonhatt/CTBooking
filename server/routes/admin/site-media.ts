@@ -1,61 +1,123 @@
-import type { RequestHandler } from "express";
-import { prisma } from "../../lib/prisma";
+import { db } from "../../db";
+import { site_media } from "../../db/schema";
+import { eq, and, asc, desc } from "drizzle-orm";
+import { cloudinary, cloudinaryEnvOk } from "../../cloudinary";
 
-export const createSiteMedia: RequestHandler = async (req, res) => {
+export async function createSiteMediaImpl(anyDb: any, tables: { site_media: any }, args: { section: string; type: string; title?: string; description?: string; public_id?: string; url: string; format?: string; width?: number; height?: number; duration?: string | number; display_order?: number; is_active?: boolean }) {
+  const { section, type, title, description, public_id, url, format, width, height, duration, display_order, is_active } = args;
+  // Insert site media (tương thích với D1/SQLite không hỗ trợ .returning())
+  await anyDb.insert(tables.site_media).values({
+    section: String(section),
+    type: String(type),
+    title: title ? String(title) : null,
+    description: description ? String(description) : null,
+    public_id: public_id ? String(public_id) : null,
+    url: String(url),
+    format: format ? String(format) : null,
+    width: width !== undefined ? Number(width) : null,
+    height: height !== undefined ? Number(height) : null,
+    duration: duration !== undefined ? String(duration) : null,
+    display_order: display_order !== undefined ? Number(display_order) : 0,
+    is_active: typeof is_active === "boolean" ? is_active : true,
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+  });
+
+  // Query lại site media vừa tạo
+  const item = await anyDb.query.site_media.findFirst({
+    orderBy: [desc(tables.site_media.id)],
+  });
+
+  if (!item) throw new Error("Không thể tạo site media");
+  return { item };
+}
+
+export async function listSiteMediaImpl(anyDb: any, tables: { site_media: any }, args: { section?: string; type?: string; active?: string }) {
+  const { section, type, active } = args;
+  const conditions: any[] = [];
+  if (section) conditions.push(eq(tables.site_media.section, String(section)));
+  if (type) conditions.push(eq(tables.site_media.type, String(type)));
+  if (active) conditions.push(eq(tables.site_media.is_active, String(active) === "true"));
+  const items = await anyDb.query.site_media.findMany({
+    where: and(...conditions),
+    orderBy: [asc(tables.site_media.display_order), desc(tables.site_media.created_at)],
+  });
+  return { items };
+}
+
+export async function updateSiteMediaImpl(
+  anyDb: any,
+  tables: { site_media: any },
+  args: {
+    id: number;
+    section?: string;
+    type?: string;
+    title?: string;
+    description?: string;
+    public_id?: string;
+    url?: string;
+    format?: string;
+    width?: number;
+    height?: number;
+    duration?: number;
+    display_order?: number;
+    is_active?: boolean;
+  },
+) {
+  const {
+    id,
+    section,
+    type,
+    title,
+    description,
+    public_id,
+    url,
+    format,
+    width,
+    height,
+    duration,
+    display_order,
+    is_active,
+  } = args;
+  const payload: any = { updated_at: new Date().toISOString() };
+  if (section !== undefined) payload.section = String(section);
+  if (type !== undefined) payload.type = String(type);
+  if (title !== undefined) payload.title = title ? String(title) : null;
+  if (description !== undefined) payload.description = description ? String(description) : null;
+  if (public_id !== undefined) payload.public_id = public_id ? String(public_id) : null;
+  if (url !== undefined) payload.url = url ? String(url) : null;
+  if (format !== undefined) payload.format = format ? String(format) : null;
+  if (width !== undefined) payload.width = width !== null && width !== undefined ? Number(width) : null;
+  if (height !== undefined) payload.height = height !== null && height !== undefined ? Number(height) : null;
+  if (duration !== undefined) payload.duration = duration !== null && duration !== undefined ? String(duration) : null;
+  if (display_order !== undefined) payload.display_order = display_order !== null && display_order !== undefined ? Number(display_order) : 0;
+  if (is_active !== undefined) payload.is_active = Boolean(is_active);
+  payload.updated_at = new Date().toISOString();
+  // Update site media (tương thích với D1/SQLite không hỗ trợ .returning())
+  await anyDb.update(tables.site_media).set(payload).where(eq(tables.site_media.id, Number(id)));
+
+  // Query lại site media vừa update
+  const item = await anyDb.query.site_media.findFirst({
+    where: eq(tables.site_media.id, Number(id)),
+  });
+
+  return { item, success: Boolean(item) };
+}
+
+export async function deleteSiteMediaImpl(anyDb: any, tables: { site_media: any }, id: number) {
+  const existing = await anyDb.query.site_media.findFirst({ where: eq(tables.site_media.id, Number(id)) });
+  if (!existing) return { ok: false, message: "Không tìm thấy media" };
   try {
-    const {
-      section,
-      type,
-      title,
-      description,
-      public_id,
-      url,
-      format,
-      width,
-      height,
-      duration,
-      display_order,
-      is_active,
-    } = req.body || {};
-    if (!section || !type || !url) {
-      return res.status(400).json({ message: "Thiếu section/type/url" });
+    if (cloudinaryEnvOk && existing.public_id) {
+      const resourceType = existing.type === "video" ? "video" : "image";
+      try {
+        await cloudinary.uploader.destroy(existing.public_id, { resource_type: resourceType });
+      } catch { }
     }
-    const item = await (prisma as any).site_media.create({
-      data: {
-        section: String(section),
-        type: String(type),
-        title: title ? String(title) : null,
-        description: description ? String(description) : null,
-        public_id: public_id ? String(public_id) : null,
-        url: String(url),
-        format: format ? String(format) : null,
-        width: width ? Number(width) : null,
-        height: height ? Number(height) : null,
-        duration: duration ? Number(duration) : null,
-        display_order: display_order ? Number(display_order) : 0,
-        is_active: typeof is_active === "boolean" ? is_active : true,
-      },
-    });
-    return res.status(200).json({ item });
+    // Delete site media (tương thích với D1/SQLite không hỗ trợ .returning())
+    await anyDb.delete(tables.site_media).where(eq(tables.site_media.id, Number(id)));
+    return { ok: true, item: existing };
   } catch (err: any) {
-    return res.status(500).json({ message: err?.message || "Internal error" });
+    return { ok: false, message: err?.message || "Xóa media thất bại" };
   }
-};
-
-export const listSiteMedia: RequestHandler = async (req, res) => {
-  try {
-    const { section, type, active } = req.query || {};
-    const where: any = {};
-    if (section) where.section = String(section);
-    if (type) where.type = String(type);
-    if (active) where.is_active = String(active) === "true";
-    const items = await (prisma as any).site_media.findMany({
-      where,
-      orderBy: [{ display_order: "asc" }, { created_at: "desc" }],
-    });
-    return res.status(200).json({ items });
-  } catch (err: any) {
-    return res.status(500).json({ message: err?.message || "Internal error" });
-  }
-};
-
+}

@@ -190,3 +190,12 @@ export async function getSiteMediaApi(options?: {
   }
   return (await res.json()) as { items: any[] };
 }
+
+export async function deleteSiteMediaApi(id: number) {
+  const res = await fetch(`/api/admin/site-media/${id}`, { method: "DELETE" });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    throw new Error(data?.message || `HTTP ${res.status}`);
+  }
+  return data as { ok: boolean; item?: any };
+}

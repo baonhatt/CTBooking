@@ -1,6 +1,7 @@
 name = "cinema-worker"
 main = "src/index.ts"
 compatibility_date = "2024-12-01"
+compatibility_flags = ["nodejs_compat"]
 send_metrics = false
 workers_dev = true
 preview_urls = true
@@ -8,6 +9,7 @@ preview_urls = true
 [vars]
 UPSTREAM_BASE = "https://cinesphere.com.vn"
 VITE_SERVER_BASE_URL = "https://cinesphere.com.vn"
+VITE_CLIENT_BASE_URL = "https://cinesphere.com.vn"
 VITE_VNPAY_RETURN_URL = "/checkout"
 VITE_VNPAY_GATEWAY = "https://sandbox.vnpayment.vn/paymentv2/vpcpay.html"
 VITE_MOMO_ENDPOINT = "https://test-payment.momo.vn/v2/gateway/api/create"
@@ -19,6 +21,8 @@ GMAIL_SENDER_EMAIL = "no-reply@cinesphere.com.vn"
 GMAIL_SENDER_NAME = "CINESPHERE"
 BREVO_SENDER_EMAIL = "no-reply@cinesphere.com.vn"
 BREVO_SENDER_NAME = "CINESPHERE"
+VITE_RATE_LIMIT_BOOKING_CHECK_MAX = "5"
+VITE_RATE_LIMIT_BOOKING_CHECK_WINDOWMS = "60000"
 
 [[d1_databases]]
 binding = "cinema_db"
@@ -33,6 +37,7 @@ bucket_name = "cinemastore"
 [env.preview.vars]
 UPSTREAM_BASE = "https://cinesphere.com.vn"
 VITE_SERVER_BASE_URL = "https://cinesphere.com.vn"
+VITE_CLIENT_BASE_URL = "https://cinesphere.com.vn"
 VITE_MOMO_RETURN_URL = "/checkout"
 VITE_MOMO_REDIRECT_URL = "/checkout"
 VITE_MOMO_IPN_URL = "/api/momo/ipn"
@@ -45,6 +50,8 @@ GMAIL_SENDER_EMAIL = "no-reply@cinesphere.com.vn"
 GMAIL_SENDER_NAME = "CINESPHERE"
 BREVO_SENDER_EMAIL = "no-reply@cinesphere.com.vn"
 BREVO_SENDER_NAME = "CINESPHERE"
+VITE_RATE_LIMIT_BOOKING_CHECK_MAX = "5"
+VITE_RATE_LIMIT_BOOKING_CHECK_WINDOWMS = "60000"
 
 [[env.preview.d1_databases]]
 binding = "cinema_db"
@@ -71,6 +78,8 @@ GMAIL_SENDER_EMAIL = "no-reply@cinesphere.com.vn"
 GMAIL_SENDER_NAME = "CINESPHERE"
 BREVO_SENDER_EMAIL = "no-reply@cinesphere.com.vn"
 BREVO_SENDER_NAME = "CINESPHERE"
+VITE_RATE_LIMIT_BOOKING_CHECK_MAX = "5"
+VITE_RATE_LIMIT_BOOKING_CHECK_WINDOWMS = "60000"
 
 [[env.production.d1_databases]]
 binding = "cinema_db"

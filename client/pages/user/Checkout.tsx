@@ -243,6 +243,12 @@ export default function Checkout() {
             name: bookingData.name ?? order.name,
             phone: bookingData.phone ?? order.phone,
             email: bookingData.email ?? order.email,
+            method: bookingData.payment_method ?? order.method,
+            movie: (bookingData as any).movie_title || order.movie,
+            poster: (bookingData as any).movie_image || order.poster,
+            duration: (bookingData as any).duration_min || order.duration,
+            ticketPackageName: (bookingData as any).ticket_package_name || order.ticketPackageName,
+            expiryDate: (bookingData as any).expiry_date || order.expiryDate,
           } as any;
           setOrder(merged);
           try { localStorage.setItem("lastCheckoutOrder", JSON.stringify(merged)); } catch { }
@@ -298,10 +304,15 @@ export default function Checkout() {
       const storeId =
         (import.meta as any).env?.VITE_MOMO_STORE_ID || "devstore";
       const clientBase = (import.meta as any).env?.VITE_CLIENT_BASE_URL || window.location.origin;
-      const serverBase = (import.meta as any).env?.VITE_SERVER_BASE_URL || clientBase;
       const redirectPath = (import.meta as any).env?.VITE_MOMO_REDIRECT_URL || "/checkout";
       const ipnPath = (import.meta as any).env?.VITE_MOMO_IPN_URL || "/api/momo/ipn";
       const redirectUrl = `${clientBase}${redirectPath}`;
+      // Nếu clientBase là localhost thì serverBase cũng phải là localhost khi dev
+      // Nhưng nếu đang chạy production thì serverBase phải là domain thật
+      // Tuy nhiên logic serverBase ở đây hơi rối, nên tách bạch:
+      // - redirectUrl: URL user sẽ được chuyển về (Client URL)
+      // - ipnUrl: URL MoMo gọi server (Server API URL)
+      const serverBase = (import.meta as any).env?.VITE_SERVER_BASE_URL || clientBase;
       const ipnUrl = `${serverBase}${ipnPath}`;
       const accessKey = (import.meta as any).env?.VITE_MOMO_ACCESS_KEY || "";
       const secretKey = (import.meta as any).env?.VITE_MOMO_SECRET_KEY || "";
@@ -410,115 +421,108 @@ export default function Checkout() {
                   </div>
                 )}
 
-                {/* Movie Poster */}
-                {order.poster && (
-                  <div className="relative h-48 md:h-56 overflow-hidden">
-                    <img 
-                      src={resolveImageUrl(order.poster)} 
-                      alt={order.movie} 
-                      className="w-full h-full object-cover"
-                    />
-                    <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent" />
-                    <div className="absolute bottom-3 left-4 right-4">
-                      <h2 className="text-xl md:text-2xl font-bold text-white mb-1">{order.movie}</h2>
-                      {order.duration && (
-                        <p className="text-white/90 text-xs md:text-sm">Thời lượng: {order.duration} phút</p>
-                      )}
-                      {order.genres && (
-                        <p className="text-white/80 text-xs md:text-sm mt-0.5">{getGenresText(order.genres)}</p>
-                      )}
-                    </div>
-                  </div>
-                )}
-
-                {/* Booking Details */}
-                <div className="p-5 md:p-6 space-y-4">
-                  {/* Ticket Info */}
-                  <div className="flex items-center justify-between pb-3 border-b-2 border-dashed border-white/20">
-                    <div>
-                      <p className="text-xs text-white/80 mb-1">Số lượng vé</p>
-                      <p className="text-lg font-bold text-white">{order.quantity} vé</p>
-                    </div>
-                    <div className="text-right">
-                      <p className="text-xs text-white/80 mb-1">Tổng tiền</p>
-                      <p className="text-xl font-extrabold bg-gradient-to-r from-blue-500 to-purple-500 bg-clip-text text-transparent">
-                        {formatMoney(order.amount)}₫
-                      </p>
-                    </div>
-                  </div>
-
-                  {/* Customer Info */}
-                  <div className="space-y-2">
-                    <div className="flex items-center justify-between py-1.5">
-                      <span className="text-xs text-white/80">Họ tên</span>
-                      <span className="font-semibold text-sm text-white">{order.name}</span>
-                    </div>
-                    <div className="flex items-center justify-between py-1.5">
-                      <span className="text-xs text-white/80">Email</span>
-                      <span className="font-semibold text-xs text-white text-right">{order.email}</span>
-                    </div>
-                    {order.phone && (
-                      <div className="flex items-center justify-between py-1.5">
-                        <span className="text-xs text-white/80">Số điện thoại</span>
-                        <span className="font-semibold text-sm text-white">{order.phone}</span>
+                <div className="flex flex-col md:flex-row">
+                  {/* Movie Poster - Left Side */}
+                  <div className="w-full md:w-1/3 relative bg-black/20">
+                    {order.poster ? (
+                      <img
+                        src={resolveImageUrl(order.poster)}
+                        alt={order.movie}
+                        className="w-full h-full object-cover aspect-[2/3]"
+                      />
+                    ) : (
+                      <div className="w-full aspect-[2/3] flex items-center justify-center text-white/20">
+                        <Film className="w-12 h-12" />
                       </div>
                     )}
                   </div>
 
-                  {/* Booking Code (if success) */}
-                  {status === "success" && bookingCode && (
-                    <div className="pt-4 border-t-2 border-dashed border-white/20">
-                      <p className="text-xs text-white/80 mb-2 text-center">Mã đặt vé</p>
-                      <div className="bg-black/20 border border-white/20 rounded-lg p-4 text-center">
-                        <p className="text-2xl font-mono font-bold text-white tracking-wider mb-3">
-                          {bookingCode}
-                        </p>
-                        {/* Simple Barcode Representation */}
-                        <div className="flex items-center justify-center gap-0.5 mb-2">
-                          {bookingCode.split('').map((char, i) => (
-                            <div 
-                              key={i}
-                              className="w-0.5 bg-white"
-                              style={{ height: `${16 + (char.charCodeAt(0) % 25)}px` }}
-                            />
-                          ))}
+                  {/* Booking Details - Right Side */}
+                  <div className="w-full md:w-2/3 p-5 md:p-6 flex flex-col justify-between bg-black/10">
+                    <div>
+                      <h2 className="text-2xl md:text-3xl font-bold text-white mb-3">{order.movie}</h2>
+                      <div className="space-y-2 text-base text-white/90">
+                        {order.duration && <p>Thời lượng: {order.duration} phút</p>}
+                        {order.genres && <p>{getGenresText(order.genres)}</p>}
+                        {order.ticketPackageName && <p className="text-emerald-400 font-semibold text-lg">Gói vé: {order.ticketPackageName}</p>}
+                        {order.expiryDate && (
+                            <p className="text-yellow-400 font-medium">
+                                Hạn sử dụng: {new Date(order.expiryDate).toLocaleDateString('vi-VN')}
+                            </p>
+                        )}
+                      </div>
+
+                      <div className="h-px bg-white/10 my-5" />
+
+                      {/* Ticket Info */}
+                      <div className="space-y-4">
+                        <div className="flex items-center justify-between">
+                          <span className="text-white/80 text-base">Số lượng vé</span>
+                          <span className="font-bold text-white text-xl">{order.quantity}</span>
                         </div>
-                        <p className="text-xs text-white/80">Vui lòng lưu mã này để check-in tại rạp</p>
+                        <div className="flex items-center justify-between">
+                          <span className="text-white/80 text-base">Tổng tiền</span>
+                          <span className="text-2xl font-extrabold bg-gradient-to-r from-blue-400 to-purple-400 bg-clip-text text-transparent">
+                            {formatMoney(order.amount)}₫
+                          </span>
+                        </div>
+                        <div className="flex items-center justify-between">
+                          <span className="text-white/80 text-base">Phương thức</span>
+                          <span className="font-medium text-white text-lg capitalize">
+                            {order.method === 'momo' ? 'Momo' : order.method === 'vnpay' ? 'VN Pay' : order.method}
+                          </span>
+                        </div>
+                      </div>
+
+                      <div className="h-px bg-white/10 my-5" />
+
+                      {/* Customer Info */}
+                      <div className="space-y-3 text-base">
+                        <div className="flex justify-between">
+                          <span className="text-white/70">Khách hàng</span>
+                          <span className="text-white font-medium">{order.name}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-white/70">Email</span>
+                          <span className="text-white font-medium">{order.email}</span>
+                        </div>
+                        {order.phone && (
+                          <div className="flex justify-between">
+                            <span className="text-white/70">SĐT</span>
+                            <span className="text-white font-medium">{order.phone}</span>
+                          </div>
+                        )}
                       </div>
                     </div>
-                  )}
 
-                  {/* Success Message */}
-                  {status === "success" && (
-                    <div className="bg-cyan-500/10 border border-cyan-400/30 rounded-lg p-3 flex items-start gap-2">
-                      <Mail className="h-4 w-4 text-cyan-300 flex-shrink-0 mt-0.5" />
-                      <p className="text-xs text-white/90">
-                        <strong>Lưu ý:</strong> Mã đặt vé đã được gửi tới email của bạn. Vui lòng kiểm tra hộp thư.
-                      </p>
+                    {/* Messages */}
+                    <div className="mt-8">
+                      {status === "success" && (
+                        <div className="flex items-start gap-3 text-emerald-300 bg-emerald-500/10 p-4 rounded-lg border border-emerald-500/20">
+                          <Mail className="h-5 w-5 flex-shrink-0 mt-0.5" />
+                          <span className="font-bold text-base">Lưu ý: Vé đã được gửi tới email của bạn. Vui lòng kiểm tra hộp thư.</span>
+                        </div>
+                      )}
+                      {status === "failed" && (
+                        <div className="text-base font-bold text-rose-300 bg-rose-500/10 p-4 rounded-lg border border-rose-500/20">
+                          Thanh toán thất bại. Vui lòng thử lại.
+                        </div>
+                      )}
                     </div>
-                  )}
-
-                  {/* Failed Message */}
-                  {status === "failed" && (
-                    <div className="bg-red-500/20 border border-red-500/40 rounded-lg p-3">
-                      <p className="text-xs text-red-200">
-                        <strong>Thanh toán không thành công.</strong> Vui lòng thử lại hoặc liên hệ hỗ trợ "cinesphere0629@gmail.com" nếu vấn đề vẫn tiếp tục.
-                      </p>
-                    </div>
-                  )}
+                  </div>
                 </div>
 
                 {/* Footer Button */}
-                <div className="px-5 md:px-6 pb-5">
-                  <Button 
-                    className="w-full bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white font-semibold py-4 rounded-xl shadow-lg"
-                    onClick={() => { 
-                      try { 
-                        localStorage.removeItem("pendingOrder"); 
-                        localStorage.removeItem("lastCheckoutOrder"); 
-                        localStorage.removeItem("lastVnpayBookingId"); 
-                      } catch { } 
-                      navigate("/"); 
+                <div className="p-4 bg-black/20 border-t border-white/10">
+                  <Button
+                    className="w-full bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white font-semibold py-6 rounded-xl shadow-lg transition-all hover:scale-[1.02]"
+                    onClick={() => {
+                      try {
+                        localStorage.removeItem("pendingOrder");
+                        localStorage.removeItem("lastCheckoutOrder");
+                        localStorage.removeItem("lastVnpayBookingId");
+                      } catch { }
+                      navigate("/");
                     }}
                   >
                     Về trang chủ

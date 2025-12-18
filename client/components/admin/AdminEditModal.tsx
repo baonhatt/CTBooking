@@ -89,6 +89,7 @@ const AdminEditModal: React.FC<AdminEditModalProps> = (props) => {
                 : m.duration_min ?? "",
             release_date:
               editData?.release_date ?? m.release_date ?? null,
+            is_active: editData?.is_active ?? m.is_active ?? true,
           });
         }
       } catch {}

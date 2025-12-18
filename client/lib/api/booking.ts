@@ -63,6 +63,7 @@ export async function getBookingByIdApi(bookingId: number) {
     email: string;
     ticket_count: number;
     total_price: number;
+    payment_method?: string;
   }>(`/api/bookings/${bookingId}`);
 }
 

@@ -1,88 +1,68 @@
-import { RequestHandler } from "express";
+import type { RequestHandler } from "express";
 import type { ActiveMoviesTodayResponse } from "@shared/api";
-import { prisma } from "../../lib/prisma";
+import { db } from "../../db";
+import { movies as pgMovies } from "../../db/schema";
+import { eq, desc, asc, count, sql, and } from "drizzle-orm";
 
-export const handleMovies2025: RequestHandler = (_req, res) => { };
+export async function getAllActiveMoviesToday(anyDb: any, tables: { movies: any }): Promise<{ activeMovies: ActiveMoviesTodayResponse[] }> {
+  const active_movies = await anyDb.query.movies.findMany({
+    where: eq(tables.movies.is_active, true),
+    orderBy: [desc(tables.movies.release_date)],
+  });
+  const activeMovies: ActiveMoviesTodayResponse[] = active_movies.map((m: any) => ({
+    id: m.id,
+    title: m.title,
+    description: m.description ?? "",
+    cover_image: m.cover_image ?? "",
+    detail_images: JSON.stringify(m.detail_images ?? []),
+    genres: JSON.stringify(m.genres ?? []),
+    rating: m.rating?.toString() ?? "0",
+    duration_min: m.duration_min ?? 0,
+    release_date: m.release_date ?? new Date().toISOString(),
+    price: 0,
+  }));
+  return { activeMovies };
+}
 
-export const getAllActiveMoviesToday: RequestHandler = async (_req, res) => {
-  try {
-    // Get all active movies only (no showtimes)
-    const active_movies = await prisma.movies.findMany({
-      where: {
-        is_active: true,
-      },
-      orderBy: {
-        release_date: "desc",
-      },
-    });
 
-    const activeMovies: ActiveMoviesTodayResponse[] = active_movies.map((m) => ({
-      id: m.id,
-      title: m.title,
-      description: m.description ?? "",
-      cover_image: m.cover_image ?? "",
-      detail_images: JSON.stringify(m.detail_images ?? []),
-      genres: JSON.stringify(m.genres ?? []),
-      rating: m.rating?.toString() ?? "0",
-      duration_min: m.duration_min ?? 0,
-      release_date: m.release_date,
-      price: 0, // Not used anymore but kept for backward compatibility
-    }));
-
-    return res.status(200).json({ activeMovies });
-  } catch (error: any) {
-    console.error("Error in getAllActiveMoviesToday:", error);
-    return res.status(500).json({ 
-      message: "Lỗi máy chủ nội bộ",
-      error: process.env.NODE_ENV === "development" ? error.message : undefined
-    });
+export async function listMovies(anyDb: any, tables: { movies: any }, args: { page: number; pageSize: number; q: string; sort: string; dir: "asc" | "desc"; status?: "all" | "active" | "inactive" }) {
+  const { page, pageSize, q, sort, dir, status = "all" } = args;
+  const conditions: any[] = [];
+  if (q) {
+    const term = `%${q.toLowerCase()}%`;
+    conditions.push(sql`lower(${tables.movies.title}) like ${term} or lower(${tables.movies.description}) like ${term}`);
   }
-};
-
-export const listMovies: RequestHandler = async (req, res) => {
-  try {
-    const page = Number(req.query.page || 1);
-    const pageSize = Number(req.query.pageSize || 20);
-    const q = String(req.query.q || "").toLowerCase();
-    const sortKey = String(req.query.sort || "updated_at");
-    const dir = String(req.query.dir || "desc").toLowerCase() === "asc" ? "asc" : "desc";
-    const where: any = q
-      ? {
-        OR: [
-          { title: { contains: q, mode: "insensitive" } },
-          { description: { contains: q, mode: "insensitive" } },
-        ],
+  if (status === "active") {
+    conditions.push(eq(tables.movies.is_active, true));
+  } else if (status === "inactive") {
+    conditions.push(eq(tables.movies.is_active, false));
+  }
+  const whereClause = conditions.length ? and(...conditions) : undefined;
+  const totalResult = await anyDb.select({ count: count() }).from(tables.movies).where(whereClause);
+  const total = totalResult[0]?.count || 0;
+  const items = await anyDb.query.movies.findMany({
+    where: whereClause,
+    orderBy: (tbl: any, fns: { asc: any; desc: any }) => {
+      const direction = dir === "asc" ? fns.asc : fns.desc;
+      switch (sort) {
+        case "release_date": return [direction(tbl.release_date)];
+        case "title": return [direction(tbl.title)];
+        case "rating": return [direction(tbl.rating)];
+        default: return [direction(tbl.updated_at)];
       }
-      : {};
-    const total = await (prisma as any).movies.count({ where });
-    const orderBy: any =
-      sortKey === "release_date"
-        ? { release_date: dir }
-        : sortKey === "title"
-          ? { title: dir }
-          : sortKey === "rating"
-            ? { rating: dir }
-            : { updated_at: dir };
-    const items = await (prisma as any).movies.findMany({
-      where,
-      orderBy,
-      skip: (page - 1) * pageSize,
-      take: pageSize,
-    });
-    res.status(200).json({ items, page, pageSize, total });
-  } catch {
-    res.status(500).json({ message: "Lỗi máy chủ nội bộ" });
-  }
-};
+    },
+    limit: pageSize,
+    offset: (page - 1) * pageSize,
+  });
+  return { items, page, pageSize, total };
+}
 
-export const getMovie: RequestHandler = async (req, res) => {
-  try {
-    const id = Number(req.params.id);
-    const movie = await (prisma as any).movies.findUnique({ where: { id } });
-    if (!movie) return res.status(404).json({ message: "Không tìm thấy" });
-    res.status(200).json({ movie });
-  } catch {
-    res.status(500).json({ message: "Lỗi máy chủ nội bộ" });
-  }
-};
+
+export async function getMovie(anyDb: any, tables: { movies: any }, id: number) {
+  const movie = await anyDb.query.movies.findFirst({
+    where: eq(tables.movies.id, id),
+  });
+  return movie;
+}
+
 

@@ -286,7 +286,7 @@ export default function BookingPage() {
         const res = await createMomoPaymentApi(payload);
         if (res?.payUrl) { window.location.href = res.payUrl; return; }
         throw new Error("Không nhận được liên kết thanh toán MoMo");
-      } else {
+      } else if (paymentMethod === "vnpay") {
         orderInfoText = booking?.id;
         const returnUrl = `${(import.meta as any).env?.VITE_SERVER_BASE_URL}${(import.meta as any).env?.VITE_VNPAY_RETURN_URL}` || "";
         const locale = "vn";
