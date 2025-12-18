@@ -7,6 +7,15 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Input } from "@/components/ui/input";
 import { toast } from "@/components/ui/use-toast";
 import { Ticket, Loader2, Menu, User, Eye, EyeOff, X } from "lucide-react";
@@ -23,7 +32,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip
 import iconCine from "@/assets/images/iconCine.svg";
 import icon from "@/assets/images/icon.svg";
 import brand from "@/assets/images/brand.svg";
-import { Navigate, useNavigate, useLocation } from "react-router-dom";
+import { Navigate, useNavigate, useLocation, Router } from "react-router-dom";
 import {
   Sheet,
   SheetContent,
@@ -73,6 +82,7 @@ export default function Header({ onBookClick = () => { }, disableNav = false, to
   const [showLoginPass, setShowLoginPass] = useState(false);
   const [showRegisterPass, setShowRegisterPass] = useState(false);
   const [showRegisterConfirmPass, setShowRegisterConfirmPass] = useState(false);
+  const [errorModal, setErrorModal] = useState<{ open: boolean; title: string; message: string }>({ open: false, title: "", message: "" });
   useEffect(() => {
     const handleScroll = () => {
       setIsScrolled(window.scrollY > 50);
@@ -157,6 +167,7 @@ export default function Header({ onBookClick = () => { }, disableNav = false, to
     localStorage.removeItem("userProfile");
     setUserName(null);
     window.dispatchEvent(new Event("user-auth-changed"));
+    navigator('/');
     toast({ title: "Đã đăng xuất" });
   };
 
@@ -191,18 +202,28 @@ export default function Header({ onBookClick = () => { }, disableNav = false, to
         setIsLoginOpen(false);
         setLoginEmail("");
         setLoginPassword("");
+      } else {
+        const msg = data?.message || "Đăng nhập thất bại";
+        if (msg.toLowerCase().includes("email")) {
+          setLoginEmailError(msg);
+        } else if (msg.toLowerCase().includes("mật khẩu") || msg.toLowerCase().includes("password")) {
+          setLoginPasswordError(msg);
+        }
+        setLoginSubmitError(msg);
       }
     } catch (err: any) {
-      const msg = String(err?.message || "");
+      const msg = String(err?.message || "Đăng nhập thất bại");
       if (msg.toLowerCase().includes("email")) {
         setLoginEmailError(msg);
       } else if (msg.toLowerCase().includes("mật khẩu") || msg.toLowerCase().includes("password")) {
         setLoginPasswordError(msg);
       } else {
-        setLoginSubmitError(msg || "Đăng nhập thất bại");
+        setLoginSubmitError(msg);
       }
+      setErrorModal({ open: true, title: "Đăng nhập thất bại", message: msg });
     } finally {
       setIsLoginLoading(false);
+      navigator('/');
     }
   };
   const openRegister = () => {
@@ -274,12 +295,13 @@ export default function Header({ onBookClick = () => { }, disableNav = false, to
         setIsLoginOpen(true);
       }
     } catch (err: any) {
-      const msg = String(err?.message || "");
+      const msg = String(err?.message || "Đăng ký thất bại");
       if (msg.toLowerCase().includes("email")) {
         setRegisterEmailError(msg);
       } else {
-        setRegisterSubmitError(msg || "Đăng ký thất bại");
+        setRegisterSubmitError(msg);
       }
+      setErrorModal({ open: true, title: "Đăng ký thất bại", message: msg });
     } finally {
       setIsRegisterLoading(false);
     }
@@ -342,7 +364,7 @@ export default function Header({ onBookClick = () => { }, disableNav = false, to
             className="cursor-pointer h-16 w-16 md:h-20 md:w-20 lg:h-24 lg:w-24 drop-shadow-[0_0_30px_rgba(59,130,246,0.6)] transition-transform duration-300 hover:scale-110"
             alt="CINESPHERE logo"
           />
-          <div 
+          <div
             onClick={() => navigator('/')}
             className="cursor-pointer hidden sm:block"
           >
@@ -365,8 +387,8 @@ export default function Header({ onBookClick = () => { }, disableNav = false, to
               <span
                 className={cn(
                   "pb-0.5 inline-block leading-tight font-medium transition-colors duration-300",
-                  activeSection === item.target 
-                    ? "text-transparent bg-clip-text bg-gradient-to-r from-cyan-300 via-blue-400 to-purple-400 font-semibold" 
+                  activeSection === item.target
+                    ? "text-transparent bg-clip-text bg-gradient-to-r from-cyan-300 via-blue-400 to-purple-400 font-semibold"
                     : "text-white/90"
                 )}
               >
@@ -402,7 +424,7 @@ export default function Header({ onBookClick = () => { }, disableNav = false, to
                         className="h-16 w-16 cursor-pointer drop-shadow-[0_0_20px_rgba(59,130,246,0.5)]"
                       />
                     </div>
-                    
+
                     <SheetClose className="rounded-full p-2 border border-white/20 hover:bg-white/10 hover:border-white transition-all duration-300">
                       <X className="h-8 w-8 text-white" />
                       <span className="sr-only">Close</span>
@@ -416,8 +438,8 @@ export default function Header({ onBookClick = () => { }, disableNav = false, to
                         <button
                           className={cn(
                             "text-left font-medium text-lg tracking-wide transition-colors duration-300 py-3 border-b border-white/5",
-                            effectiveDisable 
-                              ? "opacity-50 cursor-not-allowed text-gray-400" 
+                            effectiveDisable
+                              ? "opacity-50 cursor-not-allowed text-gray-400"
                               : "text-white hover:text-cyan-300"
                           )}
                           disabled={effectiveDisable}
@@ -431,16 +453,16 @@ export default function Header({ onBookClick = () => { }, disableNav = false, to
                         </button>
                       </SheetClose>
                     ))}
-                    
+
                     {userName && (
-                        <SheetClose asChild>
-                          <button
-                              className="text-left font-medium text-lg tracking-wide transition-colors duration-300 py-3 border-b border-white/5 text-white hover:text-cyan-300"
-                              onClick={() => navigator("/account")}
-                          >
-                              Tài khoản ({userName})
-                          </button>
-                        </SheetClose>
+                      <SheetClose asChild>
+                        <button
+                          className="text-left font-medium text-lg tracking-wide transition-colors duration-300 py-3 border-b border-white/5 text-white hover:text-cyan-300"
+                          onClick={() => navigator("/account")}
+                        >
+                          Tài khoản ({userName})
+                        </button>
+                      </SheetClose>
                     )}
                   </nav>
 
@@ -457,23 +479,23 @@ export default function Header({ onBookClick = () => { }, disableNav = false, to
                       </SheetClose>
                     ) : (
                       <div className="grid gap-3">
-                         <SheetClose asChild>
-                            <Button
-                              className="w-full h-12 text-base font-semibold rounded-full bg-blue-600 hover:bg-blue-700 text-white shadow-lg"
-                              onClick={() => setIsLoginOpen(true)}
-                            >
-                              Đăng nhập
-                            </Button>
-                         </SheetClose>
-                         <SheetClose asChild>
-                            <Button
-                              variant="outline"
-                              className="w-full h-12 text-base font-semibold rounded-full bg-white border-white text-black hover:bg-gray-100 hover:text-black"
-                              onClick={() => setIsRegisterOpen(true)}
-                            >
-                              Đăng ký
-                            </Button>
-                         </SheetClose>
+                        <SheetClose asChild>
+                          <Button
+                            className="w-full h-12 text-base font-semibold rounded-full bg-blue-600 hover:bg-blue-700 text-white shadow-lg"
+                            onClick={() => setIsLoginOpen(true)}
+                          >
+                            Đăng nhập
+                          </Button>
+                        </SheetClose>
+                        <SheetClose asChild>
+                          <Button
+                            variant="outline"
+                            className="w-full h-12 text-base font-semibold rounded-full bg-white border-white text-black hover:bg-gray-100 hover:text-black"
+                            onClick={() => setIsRegisterOpen(true)}
+                          >
+                            Đăng ký
+                          </Button>
+                        </SheetClose>
                       </div>
                     )}
                   </div>
@@ -536,11 +558,7 @@ export default function Header({ onBookClick = () => { }, disableNav = false, to
                   <DialogTitle className="text-transparent bg-clip-text bg-gradient-to-r from-cyan-300 via-blue-400 to-fuchsia-400 text-center">Đăng Nhập Tài Khoản</DialogTitle>
                 </DialogHeader>
                 <form className="space-y-4" onSubmit={handleLoginSubmit}>
-                  {loginSubmitError && (
-                    <div className="rounded-md border border-yellow-500/70 bg-yellow-500/10 px-3 py-2 text-sm text-yellow-300">
-                      {loginSubmitError}
-                    </div>
-                  )}
+                
                   <div>
                     <label className="text-sm text-gray-300 mb-1 block">
                       Email
@@ -578,28 +596,28 @@ export default function Header({ onBookClick = () => { }, disableNav = false, to
                       Mật khẩu
                     </label>
                     <div className="relative">
-                    <Input
-                      type={showLoginPass ? "text" : "password"}
-                      className={cn(
-                        "bg-white/10 border-white/20 text-white placeholder:text-gray-400 focus-visible:ring-cyan-400 focus-visible:ring-offset-1 rounded-lg pr-10",
-                        loginPasswordError && "border-yellow-500 focus-visible:ring-yellow-500"
-                      )}
-                      value={loginPassword}
-                      onChange={(e) => {
-                        const val = e.target.value;
-                        setLoginPassword(val);
-                        const ok = PASSWORD_PATTERN.test(val);
-                        if (ok) setLoginPasswordError("");
-                        else if (val.length > 0) setLoginPasswordError("Mật khẩu ít nhất 6 ký tự gồm chữ và số");
-                        if (loginSubmitError) setLoginSubmitError("");
-                      }}
-                      onInput={(e) => setLoginPassword((e.target as HTMLInputElement).value)}
-                      required
-                      maxLength={50}
-                      autoComplete="current-password"
-                      name="password"
-                      disabled={isLoginLoading}
-                    />
+                      <Input
+                        type={showLoginPass ? "text" : "password"}
+                        className={cn(
+                          "bg-white/10 border-white/20 text-white placeholder:text-gray-400 focus-visible:ring-cyan-400 focus-visible:ring-offset-1 rounded-lg pr-10",
+                          loginPasswordError && "border-yellow-500 focus-visible:ring-yellow-500"
+                        )}
+                        value={loginPassword}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          setLoginPassword(val);
+                          const ok = PASSWORD_PATTERN.test(val);
+                          if (ok) setLoginPasswordError("");
+                          else if (val.length > 0) setLoginPasswordError("Mật khẩu ít nhất 6 ký tự gồm chữ và số");
+                          if (loginSubmitError) setLoginSubmitError("");
+                        }}
+                        onInput={(e) => setLoginPassword((e.target as HTMLInputElement).value)}
+                        required
+                        maxLength={50}
+                        autoComplete="current-password"
+                        name="password"
+                        disabled={isLoginLoading}
+                      />
                       <button
                         type="button"
                         className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-white"
@@ -756,15 +774,15 @@ export default function Header({ onBookClick = () => { }, disableNav = false, to
                       )}
                       value={registerPassword}
                       maxLength={50}
-                    onChange={(e) => {
-                      const val = e.target.value;
-                      setRegisterPassword(val);
-                      const ok = PASSWORD_PATTERN.test(val);
-                      if (ok) setRegisterPasswordError("");
-                      else if (val.length > 0) setRegisterPasswordError("Mật khẩu ít nhất 6 ký tự, gồm chữ và số");
-                      if (registerSubmitError) setRegisterSubmitError("");
-                      if (registerConfirmPassword && val === registerConfirmPassword) setRegisterConfirmError("");
-                    }}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        setRegisterPassword(val);
+                        const ok = PASSWORD_PATTERN.test(val);
+                        if (ok) setRegisterPasswordError("");
+                        else if (val.length > 0) setRegisterPasswordError("Mật khẩu ít nhất 6 ký tự, gồm chữ và số");
+                        if (registerSubmitError) setRegisterSubmitError("");
+                        if (registerConfirmPassword && val === registerConfirmPassword) setRegisterConfirmError("");
+                      }}
                       required
                       onInput={(e) => setRegisterPassword((e.target as HTMLInputElement).value)}
                       autoComplete="new-password"
@@ -806,12 +824,12 @@ export default function Header({ onBookClick = () => { }, disableNav = false, to
                       )}
                       value={registerConfirmPassword}
                       maxLength={50}
-                    onChange={(e) => {
-                      const val = e.target.value;
-                      setRegisterConfirmPassword(val);
-                      if (registerPassword && registerPassword === val) setRegisterConfirmError("");
-                      else if (val.length > 0) setRegisterConfirmError("Mật khẩu nhập lại không khớp");
-                    }}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        setRegisterConfirmPassword(val);
+                        if (registerPassword && registerPassword === val) setRegisterConfirmError("");
+                        else if (val.length > 0) setRegisterConfirmError("Mật khẩu nhập lại không khớp");
+                      }}
                       required
                       onInput={(e) => setRegisterConfirmPassword((e.target as HTMLInputElement).value)}
                       autoComplete="new-password"
@@ -977,7 +995,24 @@ export default function Header({ onBookClick = () => { }, disableNav = false, to
               </form>
             </DialogContent>
           </Dialog>
-          
+
+          {/* Error Modal */}
+          <AlertDialog open={errorModal.open} onOpenChange={(open) => setErrorModal((prev) => ({ ...prev, open }))}>
+            <AlertDialogContent className="bg-gradient-to-br from-[#0b1226] via-[#0e1b3d] to-[#050915] border border-red-500/30 text-white shadow-[0_0_50px_rgba(239,68,68,0.3)]">
+              <AlertDialogHeader>
+                <AlertDialogTitle className="text-red-400">{errorModal.title}</AlertDialogTitle>
+                <AlertDialogDescription className="text-gray-300">
+                  {errorModal.message}
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogAction className="bg-gradient-to-r from-cyan-400 via-blue-600 to-fuchsia-500 hover:from-fuchsia-500 hover:via-cyan-400 hover:to-blue-600 text-white font-semibold">
+                  Đóng
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
+
         </div>
       </div>
     </header>

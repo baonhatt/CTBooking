@@ -18,13 +18,14 @@ export default function Index() {
   const [selectedPackage, setSelectedPackage] = useState<any | null>(null);
 
   const { data: activeData } = useQuery({
-    queryKey: ["activeMovies", "home-modal"],
-    queryFn: () => getAllActiveMoviesToday(),
+    queryKey: ["activeMovies"],
+    queryFn: ({ signal }) => getAllActiveMoviesToday({ signal }),
     staleTime: 60000,
   });
   const { data: ticketsData } = useQuery({
-    queryKey: ["activeTickets", "home-modal"],
+    queryKey: ["activeTickets"],
     queryFn: ({ signal }) => getActiveTickets({ signal }),
+    staleTime: 60000,
   });
 
   const activeMoviesFull = activeData?.activeMovies || [];

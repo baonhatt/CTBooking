@@ -54,8 +54,9 @@ export default function FilmCarousel({ onSelectFilm }: FilmCarouselProps) {
   );
 
   const { data } = useQuery({
-    queryKey: ["activeMovies", "carousel"],
+    queryKey: ["activeMovies"],
     queryFn: ({ signal }) => getAllActiveMoviesToday({ signal }),
+    staleTime: 60000,
   });
 
   const films = useMemo(() => {
@@ -258,13 +259,13 @@ export default function FilmCarousel({ onSelectFilm }: FilmCarouselProps) {
               >
               <div className="relative h-80 w-full overflow-hidden">
                 <div
-                  className="absolute inset-0 bg-center bg-cover blur-md scale-110"
+                  className="absolute inset-0 bg-center bg-cover blur-md object-cover scale-110"
                   style={{ backgroundImage: `url(${film.poster})` }}
                 />
                 <img
                   src={film.poster}
                   alt={film.title}
-                  className="absolute inset-0 w-full h-full object-contain transition-transform duration-500 group-hover:scale-110"
+                  className="absolute object-cover inset-0 w-full h-full object-contain transition-transform duration-500 group-hover:scale-110"
                 />
                 <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/30 to-transparent" />
                 <div

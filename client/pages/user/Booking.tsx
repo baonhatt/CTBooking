@@ -351,14 +351,14 @@ export default function BookingPage() {
 
           {!isLoadingPage && step === 0 && (
             <Card className="bg-white/5 backdrop-blur-md border border-white/15 text-white shadow-xl">
-              <CardHeader>
-                <CardTitle>Đặt Vé</CardTitle>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-2xl font-bold text-white">Đặt Vé</CardTitle>
               </CardHeader>
               <CardContent className="space-y-6">
-                <div className="space-y-4">
-                  <div className="text-sm text-orange-400">Chọn Phim</div>
+                <div className="space-y-3">
+                  <div className="text-sm font-medium text-gray-400">Chọn Phim</div>
                   <Select value={movie} onValueChange={(v) => { setMovie(v); try { refetchActive(); } catch { } }}>
-                    <SelectTrigger className="w-full bg-white/10 backdrop-blur-sm text-white border-white/20 hover:bg-white/15">
+                    <SelectTrigger className="w-full bg-white/10 backdrop-blur-sm text-white border-white/20 hover:bg-white/15 h-11">
                       <span className="truncate">{selectedMovie?.title || "Chọn phim"}</span>
                     </SelectTrigger>
                     <SelectContent className="bg-[#0b1226]/95 backdrop-blur-md text-white border border-white/20">
@@ -368,7 +368,7 @@ export default function BookingPage() {
                             <img src={resolveImageUrl(m.cover_image)} alt={m.title} className="w-10 h-14 object-cover rounded border border-white/10" />
                             <div className="flex flex-col">
                               <span className="font-medium">{m.title}</span>
-                              <span className="text-xs text-orange-400">{m.duration_min ? `${m.duration_min} phút` : "--"}</span>
+                              <span className="text-xs text-gray-400">{m.duration_min ? `${m.duration_min} phút` : "--"}</span>
                             </div>
                           </div>
                         </SelectItem>
@@ -380,26 +380,26 @@ export default function BookingPage() {
                       <img src={resolveImageUrl(selectedMovie.cover_image)} alt={selectedMovie.title} className="w-20 h-28 object-cover rounded" />
                       <div className="flex-1">
                         <div className="text-white font-semibold mb-1">{selectedMovie.title}</div>
-                        <div className="text-sm text-orange-400">Thời lượng: {selectedMovie.duration_min ? `${selectedMovie.duration_min} phút` : "--"}</div>
+                        <div className="text-sm text-gray-400">Thời lượng: {selectedMovie.duration_min ? `${selectedMovie.duration_min} phút` : "--"}</div>
                         {selectedMovie.genres && (
-                          <div className="text-xs text-gray-400 mt-1">{Array.isArray(selectedMovie.genres) ? selectedMovie.genres.join(" / ") : selectedMovie.genres}</div>
+                          <div className="text-xs text-gray-500 mt-1">{Array.isArray(selectedMovie.genres) ? selectedMovie.genres.join(" / ") : selectedMovie.genres}</div>
                         )}
                       </div>
                     </div>
                   )}
                 </div>
 
-                <div>
-                  <div className="text-sm text-orange-400 mb-2">Thông Tin khách Hàng</div>
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                    <div>
-                      <Label className="text-white">Họ Và Tên</Label>
-                      <Input className="bg-white/10 backdrop-blur-sm text-white border-white/20 focus-visible:ring-cyan-400 hover:bg-white/15" value={name} onChange={(e) => setName(e.target.value)} placeholder="Nhập họ và tên" minLength={2} />
+                <div className="space-y-3">
+                  <div className="text-sm font-medium text-gray-400">Thông Tin Khách Hàng</div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="space-y-1.5">
+                      <Label className="text-sm font-normal text-gray-300">Họ Và Tên</Label>
+                      <Input className="bg-white/10 backdrop-blur-sm text-white border-white/20 focus-visible:ring-blue-400 hover:bg-white/15 h-11 placeholder:text-gray-500" value={name} onChange={(e) => setName(e.target.value)} placeholder="Nhập họ và tên" minLength={2} />
                     </div>
-                    <div>
-                      <Label className="text-white">Số Điện Thoại</Label>
+                    <div className="space-y-1.5">
+                      <Label className="text-sm font-normal text-gray-300">Số Điện Thoại</Label>
                       <Input
-                        className="bg-white/10 backdrop-blur-sm text-white border-white/20 focus-visible:ring-cyan-400 hover:bg-white/15"
+                        className="bg-white/10 backdrop-blur-sm text-white border-white/20 focus-visible:ring-blue-400 hover:bg-white/15 h-11 placeholder:text-gray-500"
                         value={phone}
                         inputMode="numeric"
                         placeholder="VD: 0912345678"
@@ -427,12 +427,12 @@ export default function BookingPage() {
                           }
                         }}
                       />
-                      {phoneError && <div className="text-red-400 text-xs mt-1">{phoneError}</div>}
+                      {phoneError && <div className="text-orange-400 text-xs mt-1">{phoneError}</div>}
                     </div>
-                    <div>
-                      <Label className="text-white">Email Nhận Vé</Label>
+                    <div className="space-y-1.5">
+                      <Label className="text-sm font-normal text-gray-300">Email Nhận Vé</Label>
                       <Input
-                        className="bg-white/10 backdrop-blur-sm text-white border-white/20 focus-visible:ring-cyan-400 hover:bg-white/15"
+                        className="bg-white/10 backdrop-blur-sm text-white border-white/20 focus-visible:ring-blue-400 hover:bg-white/15 h-11 placeholder:text-gray-500"
                         value={email}
                         onChange={(e) => {
                           const val = e.target.value;
@@ -446,26 +446,26 @@ export default function BookingPage() {
                         type="email"
                         placeholder="you@email.com"
                       />
-                      {emailError && <div className="text-red-400 text-xs mt-1">{emailError}</div>}
+                      {emailError && <div className="text-orange-400 text-xs mt-1">{emailError}</div>}
                     </div>
-                    <div>
-                      <Label className="text-white">Số Lượng Vé</Label>
+                    <div className="space-y-1.5">
+                      <Label className="text-sm font-normal text-gray-300">Số Lượng Vé</Label>
                       <div className="flex items-center gap-2">
                         <Button
                           type="button"
                           variant="outline"
-                          className="bg-white/10 border-white/20 text-white hover:bg-white/20"
+                          className="bg-white/10 border-white/20 text-white hover:bg-white/20 h-11 w-11"
                           onClick={() => setTicketCount((c) => Math.max(MIN_TICKETS, c - 1))}
                         >
                           -
                         </Button>
-                        <div className="min-w-[3rem] text-center py-2 bg-white/10 backdrop-blur-sm border border-white/20 rounded text-white">
+                        <div className="min-w-[3rem] text-center py-2.5 bg-white/10 backdrop-blur-sm border border-white/20 rounded text-white h-11 flex items-center justify-center">
                           {ticketCount}
                         </div>
                         <Button
                           type="button"
                           variant="outline"
-                          className="bg-white/10 border-white/20 text-white hover:bg-white/20"
+                          className="bg-white/10 border-white/20 text-white hover:bg-white/20 h-11 w-11"
                           onClick={() => setTicketCount((c) => Math.min(MAX_TICKETS, c + 1))}
                         >
                           +
@@ -475,8 +475,8 @@ export default function BookingPage() {
                   </div>
                 </div>
 
-                <div className="space-y-4">
-                  <div className="text-sm text-orange-400">Chọn Loại Vé</div>
+                <div className="space-y-3">
+                  <div className="text-sm font-medium text-gray-400">Chọn Loại Vé</div>
                   <Select
                     value={selectedPackage?.id ? String(selectedPackage.id) : ""}
                     onValueChange={(v) => {
@@ -484,7 +484,7 @@ export default function BookingPage() {
                       setSelectedPackage(pkg || null);
                     }}
                   >
-                    <SelectTrigger className="w-full bg-white/10 backdrop-blur-sm text-white border-white/20 hover:bg-white/15">
+                    <SelectTrigger className="w-full bg-white/10 backdrop-blur-sm text-white border-white/20 hover:bg-white/15 h-11">
                       <span className="truncate">{selectedPackage?.name || "Chọn loại vé"}</span>
                     </SelectTrigger>
                     <SelectContent className="bg-[#0b1226]/95 backdrop-blur-md text-white border border-white/20">
@@ -492,34 +492,34 @@ export default function BookingPage() {
                         <SelectItem key={t.id} value={String(t.id)} className="text-white py-2">
                           <div className="flex items-center justify-between gap-3 w-full">
                             <span className="font-medium">{t.name}</span>
-                            <span className="text-sm text-cyan-300">{Number(t.price || 0).toLocaleString("vi-VN")}₫</span>
+                            <span className="text-sm text-blue-300">{Number(t.price || 0).toLocaleString("vi-VN")}₫</span>
                           </div>
                         </SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
                   {selectedPackage && (
-                    <div className="rounded-lg p-4 border border-white/15 bg-white/5 backdrop-blur-sm space-y-2">
+                    <div className="rounded-lg p-4 border border-white/15 bg-white/5 backdrop-blur-sm space-y-3">
                       <div className="flex items-center justify-between">
                         <span className="text-white font-semibold">{selectedPackage.name}</span>
                         <div className="text-right text-md font-bold text-white">
                           {unitPrice.toLocaleString("vi-VN")}₫
-                          <span className="text-xs font-medium text-white/80"> / vé</span>
+                          <span className="text-xs font-normal text-gray-400"> / vé</span>
                         </div>
                       </div>
                       {(selectedPackage.description || selectedPackage.type) && (
-                        <p className="text-sm text-gray-300">
+                        <p className="text-sm text-gray-400">
                           {selectedPackage.description || `Gói vé ${selectedPackage.type}`}
                         </p>
                       )}
                       {Array.isArray(selectedPackage.features) && selectedPackage.features.length > 0 && (
-                        <ul className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                        <ul className="space-y-1">
                           {selectedPackage.features.map((f: string, idx: number) => (
-                            <li key={idx} className="text-sm text-gray-100">• {f}</li>
+                            <li key={idx} className="text-sm text-gray-300">• {f}</li>
                           ))}
                         </ul>
                       )}
-                      <div className="pt-2 mt-1 border-t border-white/10 text-right">
+                      <div className="pt-3 mt-2 border-t border-white/10 text-right">
                         <span className="text-lg font-bold text-white">
                           Tạm tính: {totalPrice.toLocaleString("vi-VN")}₫
                         </span>
@@ -528,10 +528,10 @@ export default function BookingPage() {
                   )}
                 </div>
 
-                <div className="flex justify-end gap-3">
-                  <Button variant="outline" className="bg-transparent border-white/30 text-white hover:bg-white/10" onClick={() => navigate("/")} disabled={isProcessing}>Hủy</Button>
+                <div className="flex justify-end gap-3 pt-2">
+                  <Button variant="outline" className="bg-transparent border-white/30 text-white hover:bg-white/10 h-11 px-6" onClick={() => navigate("/")} disabled={isProcessing}>Hủy</Button>
                   <Button
-                    className="bg-gradient-to-r from-blue-500 to-purple-500 hover:from-blue-600 hover:to-purple-600 text-white font-semibold shadow-lg disabled:opacity-50"
+                    className="bg-blue-600 hover:bg-blue-700 text-white font-semibold shadow-lg disabled:opacity-50 h-11 px-6"
                     onClick={() => {
                       const ok = window.confirm("Lưu ý thông tin vé của bạn sẽ được gửi đến email này");
                       if (ok) setStep(1);
@@ -548,31 +548,31 @@ export default function BookingPage() {
           {step === 1 && (
             <>
               <Card className="bg-white/5 backdrop-blur-md border border-white/15 text-white shadow-xl">
-                <CardHeader>
-                  <CardTitle>Thông tin đặt vé</CardTitle>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-2xl font-bold text-white">Thông tin đặt vé</CardTitle>
                 </CardHeader>
                 <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="space-y-3">
                     <div className="rounded-lg p-4 border border-white/15 bg-white/5 backdrop-blur-sm">
-                      <div className="text-white font-semibold mb-2">Thông tin người đặt</div>
+                      <div className="text-sm font-medium text-gray-400 mb-3">Thông tin người đặt</div>
                       <div className="grid grid-cols-[100px_1fr] gap-x-4 gap-y-2 text-sm">
-                        <span className="text-orange-400">Họ tên</span><span className="font-medium text-white">{name}</span>
-                        <span className="text-orange-400">Email</span><span className="font-medium text-white">{email}</span>
-                        <span className="text-orange-400">Số lượng</span><span className="font-medium text-white">{ticketCount}</span>
+                        <span className="text-gray-400">Họ tên</span><span className="font-medium text-white">{name}</span>
+                        <span className="text-gray-400">Email</span><span className="font-medium text-white">{email}</span>
+                        <span className="text-gray-400">Số lượng</span><span className="font-medium text-white">{ticketCount}</span>
                       </div>
                     </div>
                     {selectedMovie?.cover_image && (
-                      <div className="mt-2 p-3 rounded-lg border border-white/15 bg-white/5 backdrop-blur-sm">
+                      <div className="p-3 rounded-lg border border-white/15 bg-white/5 backdrop-blur-sm">
                         <div className="flex items-center gap-3">
                           <img src={resolveImageUrl(selectedMovie.cover_image)} alt={selectedMovie.title} className="w-16 h-24 object-cover rounded" />
                           <div className="flex-1 grid grid-cols-[100px_1fr] gap-x-4 gap-y-1 text-sm">
-                            <span className="text-orange-400">Phim</span>
+                            <span className="text-gray-400">Phim</span>
                             <span className="font-medium text-white">{selectedMovie.title}</span>
-                            <span className="text-orange-400">Thời lượng</span>
+                            <span className="text-gray-400">Thời lượng</span>
                             <span className="font-medium text-white">{selectedMovie.duration_min ? `${selectedMovie.duration_min} phút` : "--"}</span>
-                            <span className="text-orange-400">Thể loại</span>
+                            <span className="text-gray-400">Thể loại</span>
                             <span className="font-medium text-white">{selectedMovie.genres ? (Array.isArray(selectedMovie.genres) ? selectedMovie.genres.join(" / ") : selectedMovie.genres) : "--"}</span>
-                            <span className="text-orange-400">Khởi chiếu</span>
+                            <span className="text-gray-400">Khởi chiếu</span>
                             <span className="font-medium text-white">{selectedMovie.release_date ? new Date(selectedMovie.release_date).toLocaleDateString("vi-VN") : "--"}</span>
                           </div>
                         </div>
@@ -580,12 +580,12 @@ export default function BookingPage() {
                     )}
                   </div>
                   <div className="space-y-3">
-                    <div className="text-sm text-orange-400">Phương thức thanh toán</div>
+                    <div className="text-sm font-medium text-gray-400">Phương thức thanh toán</div>
                     <div className="grid grid-cols-2 gap-3">
                       <button
                         type="button"
                         onClick={() => setPaymentMethod("momo")}
-                        className={`${paymentMethod === 'momo' ? 'border-pink-500 bg-pink-600/20' : 'border-white/20 bg-white/10 backdrop-blur-sm'} cursor-pointer rounded-lg border p-3 flex items-center gap-3 focus:outline-none focus:ring-2 focus:ring-pink-500 hover:bg-white/15`}
+                        className={`${paymentMethod === 'momo' ? 'border-pink-500 bg-pink-600/20' : 'border-white/20 bg-white/10 backdrop-blur-sm'} cursor-pointer rounded-lg border p-3 flex items-center gap-3 focus:outline-none focus:ring-2 focus:ring-pink-500 hover:bg-white/15 h-11`}
                         aria-pressed={paymentMethod === 'momo'}
                       >
                         <span className="inline-flex items-center gap-2 text-white">
@@ -596,7 +596,7 @@ export default function BookingPage() {
                       <button
                         type="button"
                         onClick={() => setPaymentMethod("vnpay")}
-                        className={`${paymentMethod === 'vnpay' ? 'border-blue-500 bg-blue-600/20' : 'border-white/20 bg-white/10 backdrop-blur-sm'} cursor-pointer rounded-lg border p-3 flex items-center gap-3 focus:outline-none focus:ring-2 focus:ring-blue-500 hover:bg-white/15`}
+                        className={`${paymentMethod === 'vnpay' ? 'border-blue-500 bg-blue-600/20' : 'border-white/20 bg-white/10 backdrop-blur-sm'} cursor-pointer rounded-lg border p-3 flex items-center gap-3 focus:outline-none focus:ring-2 focus:ring-blue-500 hover:bg-white/15 h-11`}
                         aria-pressed={paymentMethod === 'vnpay'}
                       >
                         <span className="inline-flex items-center gap-2 text-white">
@@ -606,12 +606,12 @@ export default function BookingPage() {
                       </button>
                     </div>
                     <div className="bg-white/5 backdrop-blur-sm rounded-lg p-4 border border-white/15">
-                      <div className="text-white font-semibold mb-2">Booking Summary</div>
+                      <div className="text-sm font-medium text-gray-400 mb-3">Booking Summary</div>
                       <div className="space-y-2 text-sm">
-                        <div className="flex justify-between"><span className="text-orange-400">Loại vé</span><span className="text-white font-medium">{selectedPackage?.name || defaultTicket?.name || 'Vé tiêu chuẩn'}</span></div>
-                        <div className="flex justify-between"><span className="text-orange-400">Đơn giá</span><span className="text-white">{unitPrice.toLocaleString('vi-VN')}₫</span></div>
-                        <div className="flex justify-between"><span className="text-orange-400">Số lượng</span><span className="text-white">{ticketCount}</span></div>
-                        <div className="flex justify-between border-t border-white/10 pt-2"><span className="text-white font-semibold">Tổng Tiền</span><span className="text-white-400 font-bold">{totalPrice.toLocaleString('vi-VN')}₫</span></div>
+                        <div className="flex justify-between"><span className="text-gray-400">Loại vé</span><span className="text-white font-medium">{selectedPackage?.name || defaultTicket?.name || 'Vé tiêu chuẩn'}</span></div>
+                        <div className="flex justify-between"><span className="text-gray-400">Đơn giá</span><span className="text-white">{unitPrice.toLocaleString('vi-VN')}₫</span></div>
+                        <div className="flex justify-between"><span className="text-gray-400">Số lượng</span><span className="text-white">{ticketCount}</span></div>
+                        <div className="flex justify-between border-t border-white/10 pt-2 mt-2"><span className="text-white font-semibold">Tổng Tiền</span><span className="text-white font-bold">{totalPrice.toLocaleString('vi-VN')}₫</span></div>
                       </div>
                     </div>
                   </div>
@@ -623,15 +623,15 @@ export default function BookingPage() {
                       aria-label="Xác nhận thông tin đặt vé"
                       id="confirm-checkbox"
                     />
-                    <label htmlFor="confirm-checkbox" className="text-xs sm:text-sm text-yellow-300">
+                    <label htmlFor="confirm-checkbox" className="text-xs sm:text-sm text-gray-300">
                       Vui lòng xác nhận lại thông tin, bao gồm: loại vé, số lượng vé và email. Mã đặt vé sẽ gửi tới email này nếu thanh toán thành công.
                     </label>
                   </div>
                 </CardContent>
               </Card>
-              <div className="flex justify-between">
-                <Button variant="outline" className="bg-transparent mt-2 border-white/30 text-white hover:bg-white/10" onClick={() => setStep(0)} disabled={isProcessing}>Quay lại</Button>
-                <Button className="bg-gradient-to-r mt-2 from-blue-500 to-purple-500 hover:from-blue-600 hover:to-purple-600 text-white font-semibold shadow-lg disabled:opacity-50" disabled={!confirmChecked || isProcessing} onClick={handleCreateAndPay}>
+              <div className="flex justify-between pt-4">
+                <Button variant="outline" className="bg-transparent border-white/30 text-white hover:bg-white/10 h-11 px-6" onClick={() => setStep(0)} disabled={isProcessing}>Quay lại</Button>
+                <Button className="bg-blue-600 hover:bg-blue-700 text-white font-semibold shadow-lg disabled:opacity-50 h-11 px-6" disabled={!confirmChecked || isProcessing} onClick={handleCreateAndPay}>
                   {isProcessing ? "Đang xử lý..." : "Thanh toán"}
                 </Button>
               </div>

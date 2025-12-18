@@ -34,8 +34,9 @@ export default function HeroSection() {
   const [storeUpdateTrigger, setStoreUpdateTrigger] = useState(0);
 
   const { data } = useQuery({
-    queryKey: ["activeMovies", "hero"],
+    queryKey: ["activeMovies"],
     queryFn: ({ signal }) => getAllActiveMoviesToday({ signal }),
+    staleTime: 60000,
   });
   const { data: heroMedia } = useQuery({
     queryKey: ["siteMedia", "hero_section"],

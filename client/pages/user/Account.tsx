@@ -9,8 +9,9 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Link, useNavigate } from "react-router-dom";
 import { toast } from "@/components/ui/use-toast";
 import { updateUserProfileApi, changePasswordApi, getUserTransactionsApi, getUserProfileByEmailApi } from "@/lib/api";
-// @ts-ignore
 import heroImage1 from "@/assets/images/1.PNG";
+import { DatePicker } from "antd";
+import dayjs from "dayjs";
 
 export default function Account() {
   const navigate = useNavigate();
@@ -317,7 +318,7 @@ export default function Account() {
           <div className="absolute inset-0 neon-noise opacity-25" />
         </div>
         <div className="relative z-10 max-w-5xl mx-auto px-4 pb-16 pt-32">
-        <div className="flex items-center gap-2 text-sm text-gray-300 mb-4">
+        <div className="flex items-center my-5 gap-2 text-sm text-gray-300 mb-4">
           <Link to="/" className="text-blue-300 hover:text-blue-200">Home</Link>
           <span className="text-gray-400">›</span>
           <span className="text-white font-medium">Tài Khoản</span>
@@ -339,7 +340,7 @@ export default function Account() {
 
               <TabsContent value="info" className="mt-6">
                 <div className="space-y-5">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                     <div className="space-y-2">
                       <Label className="text-gray-200">Họ và tên</Label>
                       <Input
@@ -350,43 +351,13 @@ export default function Account() {
                       />
                     </div>
                     <div className="space-y-2">
-                      <Label className="text-gray-200">Giới tính</Label>
-                      <div className="flex items-center gap-6">
-                        <label className="flex items-center gap-2">
-                          <input
-                            type="radio"
-                            name="gender"
-                            value="male"
-                            checked={(profile.gender || "") === "male"}
-                            onChange={(e) => setProfile((p) => ({ ...p, gender: e.target.value }))}
-                          />
-                          <span>Nam</span>
-                        </label>
-                        <label className="flex items-center gap-2">
-                          <input
-                            type="radio"
-                            name="gender"
-                            value="female"
-                            checked={(profile.gender || "") === "female"}
-                            onChange={(e) => setProfile((p) => ({ ...p, gender: e.target.value }))}
-                          />
-                          <span>Nữ</span>
-                        </label>
-                      </div>
-                    </div>
-                    <div className="space-y-2">
                       <Label className="text-gray-200">Email</Label>
-                      <div className="relative">
-                        <Input
-                          className="bg-white/5 border-white/10 text-gray-200 pr-24"
-                          value={profile.email}
-                          readOnly
-                        />
-                      </div>
+                      <Input
+                        className="bg-white/5 border-white/10 text-gray-200"
+                        value={profile.email}
+                        readOnly
+                      />
                     </div>
-                  </div>
-
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                     <div className="space-y-2">
                       <Label className="text-gray-200">Số điện thoại</Label>
                       <Input
@@ -398,19 +369,51 @@ export default function Account() {
                     </div>
                     <div className="space-y-2">
                       <Label className="text-gray-200">Ngày sinh</Label>
-                      <Input
-                        type="date"
-                        className="bg-white/10 border-white/10 text-white placeholder:text-gray-400"
-                        value={profile.dob || ""}
-                        onChange={(e) => setProfile((p) => ({ ...p, dob: e.target.value }))}
+                      <DatePicker
+                        value={profile.dob ? dayjs(profile.dob) : null}
+                        onChange={(date) => setProfile((p) => ({ ...p, dob: date ? date.format("YYYY-MM-DD") : "" }))}
+                        format="DD/MM/YYYY"
+                        placeholder="Chọn ngày sinh"
+                        className="w-full h-10 bg-white/10 border-white/10 hover:bg-white/10 hover:border-white/10 [&_.ant-picker-input>input]:!text-white [&_.ant-picker-input>input::placeholder]:!text-gray-400 [&_.ant-picker-suffix]:!text-gray-400"
+                        style={{
+                          backgroundColor: "rgba(255, 255, 255, 0.1)",
+                          borderColor: "rgba(255, 255, 255, 0.1)",
+                        }}
                       />
+                    </div>
+                    <div className="space-y-2">
+                      <Label className="text-gray-200">Giới tính</Label>
+                      <div className="flex items-center gap-6 h-10">
+                        <label className="flex items-center gap-2 cursor-pointer">
+                          <input
+                            type="radio"
+                            name="gender"
+                            value="male"
+                            checked={(profile.gender || "") === "male"}
+                            onChange={(e) => setProfile((p) => ({ ...p, gender: e.target.value }))}
+                            className="accent-blue-500"
+                          />
+                          <span>Nam</span>
+                        </label>
+                        <label className="flex items-center gap-2 cursor-pointer">
+                          <input
+                            type="radio"
+                            name="gender"
+                            value="female"
+                            checked={(profile.gender || "") === "female"}
+                            onChange={(e) => setProfile((p) => ({ ...p, gender: e.target.value }))}
+                            className="accent-blue-500"
+                          />
+                          <span>Nữ</span>
+                        </label>
+                      </div>
                     </div>
                     <div className="space-y-2">
                       <Label className="text-gray-200">Mật khẩu</Label>
                       <div className="relative">
                         <Input
-                          className="bg-white/5 border-white/10 text-gray-200 pr-24"
-                          value="••••••••••"
+                          className="bg-white/5 border-white/10 text-gray-200 pr-20"
+                          value="••••••••"
                           readOnly
                         />
                         <button
@@ -423,13 +426,10 @@ export default function Account() {
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-5 items-end">
-                    <div className="space-y-2"></div>
-                    <div className="flex justify-end">
-                      <Button onClick={handleSaveProfile} className="bg-blue-600 hover:bg-blue-700 px-8">
-                        Cập nhật
-                      </Button>
-                    </div>
+                  <div className="flex justify-end pt-2">
+                    <Button onClick={handleSaveProfile} className="bg-blue-600 hover:bg-blue-700 px-8">
+                      Cập nhật
+                    </Button>
                   </div>
                 </div>
               </TabsContent>
@@ -612,7 +612,20 @@ export default function Account() {
                   <>
                     <span className="text-gray-400">Ngày hết hạn</span>
                     <span className="font-medium text-white">
-                      {(() => { try { const d = new Date(selectedTx.expiry_date); return d.toLocaleString("vi-VN"); } catch { return String(selectedTx.expiry_date); } })()}
+                      {(() => {
+                        try {
+                          const d = new Date(selectedTx.expiry_date);
+                          if (isNaN(d.getTime())) return String(selectedTx.expiry_date);
+                          const day = String(d.getDate()).padStart(2, '0');
+                          const month = String(d.getMonth() + 1).padStart(2, '0');
+                          const year = d.getFullYear();
+                          const hour = String(d.getHours()).padStart(2, '0');
+                          const min = String(d.getMinutes()).padStart(2, '0');
+                          return `${day}/${month}/${year} ${hour}:${min}`;
+                        } catch {
+                          return String(selectedTx.expiry_date);
+                        }
+                      })()}
                     </span>
                   </>
                 ) : null}
