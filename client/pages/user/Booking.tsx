@@ -21,6 +21,7 @@ export default function BookingPage() {
   const [phone, setPhone] = useState<string>("");
   const [phoneError, setPhoneError] = useState<string>("");
   const [email, setEmail] = useState<string>("");
+  const [emailError, setEmailError] = useState<string>("");
   const [paymentMethod, setPaymentMethod] = useState<"momo" | "vnpay">("momo");
   const [isProcessing, setIsProcessing] = useState(false);
   const countdownRef = useRef<NodeJS.Timeout | null>(null);
@@ -296,7 +297,7 @@ export default function BookingPage() {
       }
     } catch (err: any) {
       setIsProcessing(false);
-      toast({ title: "Không thể tạo đặt vé", description: err?.message || "Vui lòng thử lại" });
+      toast({ title: "Không thể tạo đặt vé", description: "Đã xảy ra lỗi, vui lòng thử lại sau" });
     } finally {
       setIsProcessing(false);
     }
@@ -399,12 +400,16 @@ export default function BookingPage() {
                       placeholder="VD: 0912345678"
                       onChange={(e) => {
                         const digits = e.target.value.replace(/\D+/g, "");
+                        setPhone(digits);
                         if (digits !== e.target.value) {
                           setPhoneError("Chỉ cho phép nhập số 0-9");
+                        } else if (digits && !digits.startsWith("0")) {
+                          setPhoneError("Số điện thoại phải bắt đầu bằng số 0");
+                        } else if (digits && digits.length !== 10) {
+                          setPhoneError("Số điện thoại phải có đúng 10 chữ số");
                         } else {
                           setPhoneError("");
                         }
-                        setPhone(digits);
                       }}
                       onKeyDown={(e) => {
                         const allow = ["Backspace", "Delete", "Tab", "ArrowLeft", "ArrowRight", "Home", "End"];
@@ -421,7 +426,22 @@ export default function BookingPage() {
                   </div>
                   <div>
                     <Label className="text-white">Email Nhận Vé</Label>
-                    <Input className="bg-white/10 backdrop-blur-sm text-white border-white/20 focus-visible:ring-cyan-400 hover:bg-white/15" value={email} onChange={(e) => setEmail(e.target.value)} type="email" placeholder="you@email.com" />
+                    <Input
+                      className="bg-white/10 backdrop-blur-sm text-white border-white/20 focus-visible:ring-cyan-400 hover:bg-white/15"
+                      value={email}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        setEmail(val);
+                        if (val && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(val)) {
+                          setEmailError("Email không hợp lệ");
+                        } else {
+                          setEmailError("");
+                        }
+                      }}
+                      type="email"
+                      placeholder="you@email.com"
+                    />
+                    {emailError && <div className="text-red-400 text-xs mt-1">{emailError}</div>}
                   </div>
                   <div>
                     <Label className="text-white">Số Lượng Vé</Label>
@@ -511,7 +531,7 @@ export default function BookingPage() {
                     const ok = window.confirm("Lưu ý thông tin vé của bạn sẽ được gửi đến email này");
                     if (ok) setStep(1);
                   }}
-                  disabled={!movie || !selectedPackage || !name || !phone || !email || isProcessing}
+                  disabled={!movie || !selectedPackage || !name || !phone || !email || isProcessing || !!phoneError || !!emailError || phone.length !== 10}
                 >
                   Tiếp tục
                 </Button>
@@ -596,10 +616,11 @@ export default function BookingPage() {
                     onCheckedChange={(v) => setConfirmChecked(Boolean(v))}
                     className="border-white/40 data-[state=checked]:bg-blue-500"
                     aria-label="Xác nhận thông tin đặt vé"
+                    id="confirm-checkbox"
                   />
-                  <span className="text-xs sm:text-sm text-yellow-300">
+                  <label htmlFor="confirm-checkbox" className="text-xs sm:text-sm text-yellow-300">
                     Vui lòng xác nhận lại thông tin, bao gồm: loại vé, số lượng vé và email. Mã đặt vé sẽ gửi tới email này nếu thanh toán thành công.
-                  </span>
+                  </label>
                 </div>
               </CardContent>
             </Card>
