@@ -177,8 +177,46 @@ app.post("/api/forget-password", async (c) => {
       if (!res.ok) throw new Error(`Email failed: ${res.status} ${res.body}`);
       return res;
     };
-    const appBaseUrl = c.env.VITE_CLIENT_BASE_URL || "https://cinesphere.com.vn";
-    const renderReset = (link: string) => getResetPasswordEmailTemplate(appBaseUrl, link);
+    // Xử lý Dynamic URL cho Reset Password link
+    // 1. Ưu tiên lấy từ Origin header của request (Preview domain)
+    let appBaseUrl = "";
+    const origin = c.req.header("Origin");
+    
+    const allowHost = (host: string) =>
+      host === "cinesphere.com.vn" ||
+      host === "www.cinesphere.com.vn" ||
+      host === "cinema-pages.pages.dev" ||
+      host.endsWith(".cinema-pages.pages.dev");
+
+    if (origin) {
+      try {
+        const u = new URL(origin);
+        if (allowHost(u.hostname)) {
+          appBaseUrl = origin;
+        }
+      } catch { }
+    }
+
+    // 2. Fallback về env
+    if (!appBaseUrl) {
+      appBaseUrl = c.env.VITE_CLIENT_BASE_URL || "https://cinesphere.com.vn";
+    }
+
+    const renderReset = (link: string) => {
+       // link ở đây là relative "/reset-password?token=..." do logic bên trong forgetPassImpl xử lý
+       // Tuy nhiên, forgetPassImpl mặc định nối với process.env.VITE_SERVER_BASE_URL nếu không truyền callback
+       // Nhưng ở đây ta truyền callback renderReset, nên ta tự build full link
+       // Lưu ý: forgetPassImpl gọi callback này với tham số là link relative nếu ta custom?
+       // Check lại server/routes/user/password.ts: 
+       // if (getResetPasswordEmailHtml) { ... resetLink = `/reset-password?token=${token}`; ... contentMail = getResetPasswordEmailHtml(resetLink); }
+       // Vậy tham số link truyền vào đây chỉ là path relative. Ta cần nối với appBaseUrl.
+       
+       // Đảm bảo link không bị double slash
+       const path = link.startsWith("/") ? link : `/${link}`;
+       const fullLink = `${appBaseUrl}${path}`;
+       return getResetPasswordEmailTemplate(appBaseUrl, fullLink);
+    };
+
     const r = await forgetPassImpl(db, { accounts: schema.accounts, tokens: schema.tokens }, email, mailer, renderReset);
     return c.json(r, 200);
   } catch (err: any) {
@@ -950,6 +988,20 @@ app.post("/api/momo/create-payment", async (c) => {
       }
     }
 
+    // Fallback: Thử lấy từ Origin header của request (Dynamic cho Preview)
+    if (!redirectUrl) {
+      const origin = c.req.header("Origin");
+      if (origin) {
+        try {
+          const u = new URL(origin);
+          if (allowHost(u.hostname)) {
+            const redirectPath = c.env.VITE_MOMO_REDIRECT_URL || "/checkout";
+            redirectUrl = `${origin}${redirectPath}`;
+          }
+        } catch { }
+      }
+    }
+
     // Fallback: build từ env nếu client không gửi hoặc không hợp lệ
     if (!redirectUrl) {
       const clientBase = c.env.VITE_CLIENT_BASE_URL || "https://cinesphere.com.vn";
@@ -1005,7 +1057,21 @@ app.post("/api/vnpay/create-payment", async (c) => {
           returnUrl = u.toString();
         }
       } catch {
-        // ignore, sẽ fallback
+        // ignore
+      }
+    }
+
+    // Fallback: Thử lấy từ Origin header
+    if (!returnUrl) {
+      const origin = c.req.header("Origin");
+      if (origin) {
+        try {
+          const u = new URL(origin);
+          if (allowHost(u.hostname)) {
+            const returnPath = c.env.VITE_VNPAY_RETURN_URL || "/checkout";
+            returnUrl = `${origin}${returnPath}`;
+          }
+        } catch { }
       }
     }
 
