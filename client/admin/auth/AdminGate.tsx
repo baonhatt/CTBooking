@@ -55,6 +55,7 @@ const AdminLoginView = () => {
               <div>
                 <Label>Email</Label>
                 <Input
+                  className="text-black"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                 />

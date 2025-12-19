@@ -11,6 +11,7 @@ export default function PromotionShowcase() {
   const { data: ticketsData, isLoading } = useQuery({
     queryKey: ["activeTickets"],
     queryFn: ({ signal }) => getActiveTickets({ signal }),
+    staleTime: 60000,
   });
 
   const combos = (ticketsData?.items || []).map((t: any) => ({

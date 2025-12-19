@@ -561,11 +561,11 @@ export default function TechnologyBanner() {
           viewport={{ once: true }}
           transition={{ duration: 0.5 }}
         >
-          <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-4 mb-11">
-            <h3 className="text-2xl md:text-3xl font-bold text-white text-center md:text-left">
+          <div className="flex flex-col items-center md:flex-row md:items-end md:justify-between gap-4 mb-6 md:mb-11">
+            <h3 className="text-3xl md:text-3xl font-bold text-white text-center md:text-left">
               Khám phá không gian CineSphere
             </h3>
-            <div className="flex items-center justify-center gap-3">
+            <div className="hidden md:flex items-center justify-center gap-3">
               <button
                 onClick={scrollPrev}
                 disabled={!canScrollPrev}
@@ -658,15 +658,31 @@ export default function TechnologyBanner() {
                             <Pause className="h-4 w-4 sm:h-5 sm:w-5 text-white" fill="white" />
                           </button>
                         )}
-                        {/* <div className="absolute bottom-0 left-0 right-0 p-2 sm:p-3 z-10">
-                          <p className="text-white font-semibold text-xs mb-0.5 line-clamp-1">{item.title}</p>
-                          <p className="text-xs text-gray-300 line-clamp-2">{item.description}</p>
-                        </div> */}
                       </motion.div>
                     </div>
                   );
                 })}
               </div>
+            </div>
+            
+            {/* Mobile navigation buttons - shown below carousel on small screens */}
+            <div className="flex md:hidden items-center justify-center gap-3 mt-12">
+              <button
+                onClick={scrollPrev}
+                disabled={!canScrollPrev}
+                className="rounded-full w-10 h-10 bg-black/60 backdrop-blur-md border border-white/20 flex items-center justify-center hover:bg-black/80 hover:border-cyan-400 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-300 shadow-lg"
+                aria-label="Previous slide"
+              >
+                <ChevronLeft className="h-5 w-5 text-white" />
+              </button>
+              <button
+                onClick={scrollNext}
+                disabled={!canScrollNext}
+                className="rounded-full w-10 h-10 bg-black/60 backdrop-blur-md border border-white/20 flex items-center justify-center hover:bg-black/80 hover:border-cyan-400 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-300 shadow-lg"
+                aria-label="Next slide"
+              >
+                <ChevronRight className="h-5 w-5 text-white" />
+              </button>
             </div>
           </div>
         </motion.div>
