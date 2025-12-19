@@ -69,6 +69,7 @@ export default function TransactionsPage() {
         setTransactions(
           items.map((t: any) => ({
             id: String(t.id),
+            userId: t.user_id,
             email: t.email,
             userName: t.userName,
             movieTitle: t.movieTitle,
@@ -141,8 +142,9 @@ export default function TransactionsPage() {
       });
       setTransactions(
         items.map((t: any) => ({
-          id: String(t.id),
-          email: t.email,
+            id: String(t.id),
+            userId: t.user_id,
+            email: t.email,
           userName: t.userName,
           movieTitle: t.movieTitle,
           ticketCount: t.ticketCount,

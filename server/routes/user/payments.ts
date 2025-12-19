@@ -1,5 +1,5 @@
 import { PaymentRequest } from "@shared/api";
-import { eq, and, asc, desc } from "drizzle-orm";
+import { eq, and, asc, desc, isNull } from "drizzle-orm";
 import { generateBookingCode, getBookingEmailTemplate } from "../../lib/booking-utils";
 import { sendMail } from "../mail-service";
 
@@ -185,13 +185,21 @@ export async function updatePaymentImpl(
   tables?: { bookings: any; users: any; accounts: any; movies: any; ticket_packages: any }
 ) {
   const { user_id, payment_id, payment_status, transaction_id, paid_at } = payload as any;
-  if (!user_id || !payment_id || !payment_status) {
+  if (!payment_id || !payment_status) {
     return { status: "error", message: "Vui lòng nhập đầy đủ thông tin hợp lệ." };
   }
   const bookingsTable = tables?.bookings;
   if (!bookingsTable) throw new Error("Missing bookings table");
+  
+  let whereClause;
+  if (user_id && Number(user_id) !== 0) {
+    whereClause = and(eq(bookingsTable.id, Number(payment_id)), eq(bookingsTable.user_id, Number(user_id)));
+  } else {
+    whereClause = and(eq(bookingsTable.id, Number(payment_id)), isNull(bookingsTable.user_id));
+  }
+
   const booking = await anyDb.query.bookings.findFirst({
-    where: and(eq(bookingsTable.id, Number(payment_id)), eq(bookingsTable.user_id, Number(user_id))),
+    where: whereClause,
     with: { movie: true, ticket_package: true },
   });
   if (!booking) return { status: "error", message: "Không tìm thấy đặt vé." };

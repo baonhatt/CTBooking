@@ -77,10 +77,11 @@ export async function listTransactionsImpl(anyDb: any, tables: { bookings: any; 
     return {
       id: tx.id,
       bookingId: tx.id,
+      user_id: tx.user_id,
       email: tx.email || row.account_email || "",
       phone: tx.phone || "",
       name: tx.name || row.user?.fullname || "",
-      userName: row.user?.fullname || "",
+      userName: row.user?.fullname || tx.name || "Khách vãng lai",
       movieTitle: row.movie_title || "",
       ticketPackageName: row.ticket_package_name || "",
       ticketCount: tx.ticket_count,
@@ -115,13 +116,13 @@ export async function getTransactionByIdImpl(anyDb: any, tables: { bookings: any
   const mapped = {
     id: booking.id,
     user: {
-      id: booking.user.id,
-      fullname: booking.user.fullname || "",
-      email: booking.email || booking.user.accounts[0]?.email || "",
-      phone: booking.phone || booking.user.phone || "",
-      name: booking.name || booking.user.fullname || "",
-      is_active: booking.user.accounts[0]?.is_active ?? true,
-      account_created_at: booking.user.accounts[0]?.created_at,
+      id: booking.user?.id || 0,
+      fullname: booking.user?.fullname || booking.name || "Khách vãng lai",
+      email: booking.email || booking.user?.accounts[0]?.email || "",
+      phone: booking.phone || booking.user?.phone || "",
+      name: booking.name || booking.user?.fullname || "Khách vãng lai",
+      is_active: booking.user?.accounts[0]?.is_active ?? true,
+      account_created_at: booking.user?.accounts[0]?.created_at || null,
     },
     movie: booking.movie ? {
       id: booking.movie.id,
