@@ -27,8 +27,8 @@ export async function createTicketPackageImpl(anyDb: any, tables: { ticket_packa
     }
   }
   const nowIso = new Date().toISOString();
-  // Insert ticket package (tương thích với D1/SQLite không hỗ trợ .returning())
-  await anyDb.insert(tables.ticket_packages).values({
+  // Try .returning() to fetch created item when supported; fallback for D1/SQLite
+  const inserted = await anyDb.insert(tables.ticket_packages).values({
     name,
     code,
     description,
@@ -42,12 +42,13 @@ export async function createTicketPackageImpl(anyDb: any, tables: { ticket_packa
     display_order: display_order !== undefined ? Number(display_order) : 0,
     created_at: nowIso,
     updated_at: nowIso,
-  });
+  }).returning();
 
-  // Query lại ticket package vừa tạo
-  const item = await anyDb.query.ticket_packages.findFirst({
-    orderBy: [desc(tables.ticket_packages.id)],
-  });
+  let item: any = Array.isArray(inserted) ? inserted[0] : inserted;
+  // if (!item) {
+  //   // Fallback for DBs without returning()
+  //   item = await anyDb.query.ticket_packages.findFirst({ orderBy: [desc(tables.ticket_packages.id)] });
+  // }
 
   if (!item) throw new Error("Không thể tạo gói vé");
   return { item };
@@ -75,13 +76,12 @@ export async function updateTicketPackageImpl(anyDb: any, tables: { ticket_packa
   if (is_member_only !== undefined) data.is_member_only = Boolean(is_member_only);
   if (is_active !== undefined) data.is_active = Boolean(is_active);
   if (display_order !== undefined) data.display_order = Number(display_order);
-  // Update ticket package (tương thích với D1/SQLite không hỗ trợ .returning())
-  await anyDb.update(tables.ticket_packages).set(data).where(eq(tables.ticket_packages.id, id));
-
-  // Query lại ticket package vừa update
-  const item = await anyDb.query.ticket_packages.findFirst({
-    where: eq(tables.ticket_packages.id, id),
-  });
+  // Try to use .returning() for update, fallback to query
+  const updatedRes = await anyDb.update(tables.ticket_packages).set(data).where(eq(tables.ticket_packages.id, id)).returning();
+  let item: any = Array.isArray(updatedRes) ? updatedRes[0] : updatedRes;
+  // if (!item) {
+  //   item = await anyDb.query.ticket_packages.findFirst({ where: eq(tables.ticket_packages.id, id) });
+  // }
 
   return item || null;
 }

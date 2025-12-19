@@ -2,6 +2,12 @@ import { eq, desc, and, inArray } from "drizzle-orm";
 
 export async function createMovieImpl(anyDb: any, tables: { movies: any }, data: { title: string; description?: string; cover_image?: string | null; detail_images?: any; genres?: any; rating?: string | null; duration_min: number; is_active?: boolean; release_date: string | Date }) {
   const nowIso = new Date().toISOString();
+  let release_date_str: string | null;
+  if (data.release_date) {
+    release_date_str = new Date(data.release_date).toISOString();
+  } else {
+    release_date_str = null;
+  }
   const baseData: any = {
     title: data.title,
     description: data.description,
@@ -11,18 +17,18 @@ export async function createMovieImpl(anyDb: any, tables: { movies: any }, data:
     rating: data.rating ?? null,
     duration_min: data.duration_min,
     is_active: data.is_active === undefined ? true : Boolean(data.is_active),
-    release_date: data.release_date ? new Date(data.release_date).toISOString() : null,
+    release_date: release_date_str ? release_date_str : null,
     created_at: nowIso,
     updated_at: nowIso,
   };
   try {
-    // Insert movie (tương thích với D1/SQLite không hỗ trợ .returning())
-    await anyDb.insert(tables.movies).values(baseData);
-
-    // Query lại movie vừa tạo
-    const movie = await anyDb.query.movies.findFirst({
-      orderBy: [desc(tables.movies.id)],
-    });
+    const movieInsert = await anyDb.insert(tables.movies).values(baseData).returning();
+    let movie: any = Array.isArray(movieInsert) ? movieInsert[0] : movieInsert;
+    // if (!movie) {
+    //   movie = await anyDb.query.movies.findFirst({
+    //     orderBy: [desc(tables.movies.id)],
+    //   });
+    // }
 
     if (!movie) throw new Error("Không thể tạo phim");
     return { movie };
@@ -55,13 +61,12 @@ export async function updateMovieImpl(anyDb: any, tables: { movies: any }, id: n
   if (data.duration_min !== undefined) payload.duration_min = data.duration_min;
   if (data.is_active !== undefined) payload.is_active = Boolean(data.is_active);
   if (data.release_date !== undefined) payload.release_date = data.release_date ? new Date(data.release_date).toISOString() : null;
-  // Update movie (tương thích với D1/SQLite không hỗ trợ .returning())
-  await anyDb.update(tables.movies).set(payload).where(eq(tables.movies.id, id));
-
-  // Query lại movie vừa update
-  const movie = await anyDb.query.movies.findFirst({
-    where: eq(tables.movies.id, id),
-  });
+  // Try to use .returning() for update, fallback to query for DBs without returning support
+  const updatedRes = await anyDb.update(tables.movies).set(payload).where(eq(tables.movies.id, id)).returning();
+  let movie: any = Array.isArray(updatedRes) ? updatedRes[0] : updatedRes;
+  // if (!movie) {
+  //   movie = await anyDb.query.movies.findFirst({ where: eq(tables.movies.id, id) });
+  // }
 
   return movie || null;
 }
@@ -74,7 +79,6 @@ export async function deleteMovieImpl(anyDb: any, tables: { movies: any }, id: n
 
   if (!existing) return null;
 
-  // Delete movie (tương thích với D1/SQLite không hỗ trợ .returning())
   await anyDb.delete(tables.movies).where(eq(tables.movies.id, id));
 
   return { ok: true };

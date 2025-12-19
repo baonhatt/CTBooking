@@ -3,9 +3,9 @@ import { cloudinary, cloudinaryEnvOk } from "../../cloudinary";
 
 export async function createSiteMediaImpl(anyDb: any, tables: { site_media: any }, args: { section: string; type: string; title?: string; description?: string; public_id?: string; url: string; format?: string; width?: number; height?: number; duration?: string | number; display_order?: number; is_active?: boolean }) {
   const { section, type, title, description, public_id, url, format, width, height, duration, display_order, is_active } = args;
-  // Insert site media (tương thích với D1/SQLite không hỗ trợ .returning())
+  // Try .returning() to fetch created item when supported; fallback for D1/SQLite
   const nowIso = new Date().toISOString();
-  await anyDb.insert(tables.site_media).values({
+  const inserted = await anyDb.insert(tables.site_media).values({
     section: String(section),
     type: String(type),
     title: title ? String(title) : null,
@@ -20,12 +20,13 @@ export async function createSiteMediaImpl(anyDb: any, tables: { site_media: any 
     is_active: typeof is_active === "boolean" ? is_active : true,
     created_at: nowIso,
     updated_at: nowIso,
-  });
+  }).returning();
 
-  // Query lại site media vừa tạo
-  const item = await anyDb.query.site_media.findFirst({
-    orderBy: [desc(tables.site_media.id)],
-  });
+  let item: any = Array.isArray(inserted) ? inserted[0] : inserted;
+  // if (!item) {
+  //   // Fallback for DBs without returning()
+  //   item = await anyDb.query.site_media.findFirst({ orderBy: [desc(tables.site_media.id)] });
+  // }
 
   if (!item) throw new Error("Không thể tạo site media");
   return { item };
@@ -92,13 +93,12 @@ export async function updateSiteMediaImpl(
   if (display_order !== undefined) payload.display_order = display_order !== null && display_order !== undefined ? Number(display_order) : 0;
   if (is_active !== undefined) payload.is_active = Boolean(is_active);
   payload.updated_at = new Date().toISOString();
-  // Update site media (tương thích với D1/SQLite không hỗ trợ .returning())
-  await anyDb.update(tables.site_media).set(payload).where(eq(tables.site_media.id, Number(id)));
-
-  // Query lại site media vừa update
-  const item = await anyDb.query.site_media.findFirst({
-    where: eq(tables.site_media.id, Number(id)),
-  });
+  // Try to use .returning() for update, fallback to query
+  const updatedRes = await anyDb.update(tables.site_media).set(payload).where(eq(tables.site_media.id, Number(id))).returning();
+  let item: any = Array.isArray(updatedRes) ? updatedRes[0] : updatedRes;
+  // if (!item) {
+  //   item = await anyDb.query.site_media.findFirst({ where: eq(tables.site_media.id, Number(id)) });
+  // }
 
   return { item, success: Boolean(item) };
 }
