@@ -30,6 +30,7 @@ import { getTransactionById, getTickets } from "@/lib/api";
 
 interface Tx {
   id: string;
+  userId?: number | null;
   transactionId: string;
   email: string;
   userName: string;
@@ -243,6 +244,7 @@ export default function TransactionsContent({
                 <TableHead className="font-bold">
                   Ngày Giao Dịch
                 </TableHead>
+                <TableHead className="font-bold">Loại</TableHead>
                 <TableHead className="font-bold">Hành Động</TableHead>
               </TableRow>
             </TableHeader>
@@ -259,6 +261,7 @@ export default function TransactionsContent({
                       <TableCell><Skeleton className="h-4 w-16" /></TableCell>
                       <TableCell><Skeleton className="h-6 w-20" /></TableCell>
                       <TableCell><Skeleton className="h-4 w-36" /></TableCell>
+                      <TableCell><Skeleton className="h-4 w-20" /></TableCell>
                       <TableCell>
                         <Skeleton className="h-8 w-16" />
                       </TableCell>
@@ -295,6 +298,11 @@ export default function TransactionsContent({
                       </Badge>
                     </TableCell>
                     <TableCell>{t.createdAt.toLocaleString("vi-VN")}</TableCell>
+                    <TableCell>
+                      <Badge variant={t.userId ? "default" : "outline"} className={!t.userId ? "bg-gray-100 text-gray-800 border-gray-400" : "bg-blue-600 hover:bg-blue-700"}>
+                        {t.userId ? "Hệ Thống" : "Vãng Lai"}
+                      </Badge>
+                    </TableCell>
                   <TableCell>
                     <Button
                       variant="outline"
