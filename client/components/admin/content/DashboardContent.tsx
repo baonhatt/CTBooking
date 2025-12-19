@@ -77,7 +77,7 @@ export default function DashboardContent({
             const value = d[dataKey as keyof typeof d];
             const percentage = (value / maxValue) * 100;
             const height = Math.max(minBarHeight, (percentage / 100) * 180);
-            const color = colorScheme === "gradient" 
+            const color = colorScheme === "gradient"
               ? barColors[idx % barColors.length]
               : colors.primary;
 
@@ -107,7 +107,7 @@ export default function DashboardContent({
   const DonutChart = ({ data }: { data: { cash: number; momo: number; vnpay: number } }) => {
     const total = data.cash + data.momo + data.vnpay;
     if (total === 0) return null;
-    
+
     const percentages = {
       cash: (data.cash / total) * 100,
       momo: (data.momo / total) * 100,
@@ -172,15 +172,15 @@ export default function DashboardContent({
     "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
   ];
 
-  const StatCard = ({ 
-    title, 
-    value, 
-    icon: Icon, 
-    trend, 
-    color 
-  }: { 
-    title: string; 
-    value: number | string; 
+  const StatCard = ({
+    title,
+    value,
+    icon: Icon,
+    trend,
+    color
+  }: {
+    title: string;
+    value: number | string;
     icon: any;
     trend?: number;
     color: string;
@@ -206,7 +206,7 @@ export default function DashboardContent({
               </div>
             )}
           </div>
-          <div 
+          <div
             className="p-3 rounded-xl"
             style={{ backgroundColor: `${color}15` }}
           >
@@ -229,27 +229,27 @@ export default function DashboardContent({
 
       {/* Top Metrics */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <StatCard 
-          title="Phim" 
-          value={metrics.totalMovies} 
+        <StatCard
+          title="Phim"
+          value={metrics.totalMovies}
           icon={Film}
           color={colors.primary}
         />
-        <StatCard 
-          title="Đồ chơi" 
-          value={metrics.totalToys} 
+        <StatCard
+          title="Đồ chơi"
+          value={metrics.totalToys}
           icon={Package}
           color={colors.secondary}
         />
-        <StatCard 
-          title="Người dùng" 
-          value={metrics.totalUsers} 
+        <StatCard
+          title="Người dùng"
+          value={metrics.totalUsers}
           icon={Users}
           color={colors.accent}
         />
-        <StatCard 
-          title="Giao dịch" 
-          value={metrics.totalTransactions} 
+        <StatCard
+          title="Giao dịch"
+          value={metrics.totalTransactions}
           icon={CreditCard}
           color={colors.teal}
         />
@@ -272,11 +272,10 @@ export default function DashboardContent({
                   <button
                     key={tab.key}
                     onClick={() => setDateFilterType(tab.key as "all" | "day" | "month")}
-                    className={`px-3 py-1.5 text-sm font-medium rounded-md transition-all ${
-                      dateFilterType === tab.key
+                    className={`px-3 py-1.5 text-sm font-medium rounded-md transition-all ${dateFilterType === tab.key
                         ? "bg-white text-gray-900 shadow-sm"
                         : "text-gray-500 hover:text-gray-700"
-                    }`}
+                      }`}
                   >
                     {tab.label}
                   </button>
@@ -296,7 +295,7 @@ export default function DashboardContent({
                     value={selectedDate}
                     onChange={(e) => setSelectedDate(e.target.value)}
                     className="border border-gray-200 rounded-lg px-4 py-2.5 text-sm w-full focus:outline-none focus:ring-2 focus:ring-opacity-50"
-                    style={{ focusRing: colors.primary }}
+                    style={{ ['--tw-ring-color' as any]: colors.primary } as React.CSSProperties}
                   />
                 </div>
                 <button
@@ -308,7 +307,7 @@ export default function DashboardContent({
                 </button>
               </div>
             )}
-            
+
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-gray-500 mb-1">Tổng doanh thu</p>
@@ -338,7 +337,7 @@ export default function DashboardContent({
               <div className="space-y-3">
                 {metrics.topMoviesWeek.map((m, idx) => (
                   <div key={m.id} className="flex items-center gap-3 p-3 rounded-lg bg-gray-50 hover:bg-gray-100 transition-colors">
-                    <div 
+                    <div
                       className="w-8 h-8 rounded-lg flex items-center justify-center text-white font-bold text-sm"
                       style={{ backgroundColor: [colors.primary, colors.secondary, colors.accent][idx] }}
                     >
@@ -396,7 +395,7 @@ export default function DashboardContent({
           </CardHeader>
           <CardContent className="pt-4">
             <BarChart
-            
+
               data={revenueByMonthData.map((d) => ({
                 ...d,
                 label: monthNames[d.month - 1],

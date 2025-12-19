@@ -17,7 +17,7 @@ export async function forgetPassImpl(anyDb: any, tables: { accounts: any; tokens
     where: eq(tables.accounts.email, email),
   });
   if (!useracc) {
-    return { status: "error", message: "Email không tồn tại!" };
+    return { status: 404, message: "Email không tồn tại!" };
   }
   const token = randomToken();
   await anyDb.insert(tables.tokens).values({
@@ -44,7 +44,7 @@ export async function forgetPassImpl(anyDb: any, tables: { accounts: any; tokens
 
   const mailer = sendMailFn || sendMail;
   await mailer(email, "Đặt lại mật khẩu - Film", contentMail);
-  return { status: "success", message: "Vui lòng kiểm tra email!" };
+  return { status: 200, message: "Vui lòng kiểm tra email!" };
 }
 
 export async function resetPasswordImpl(anyDb: any, tables: { accounts: any; tokens: any }, payload: { token?: string; newPassword?: string }) {
@@ -57,31 +57,31 @@ export async function resetPasswordImpl(anyDb: any, tables: { accounts: any; tok
     ),
   });
   if (!tokenRecord) {
-    return { status: "error", message: "Token không hợp lệ hoặc đã hết hạn!" };
+    return { status: 400, message: "Token không hợp lệ hoặc đã hết hạn!" };
   }
   const hashedPassword = await bcrypt.hash(String(newPassword), 10);
   await anyDb.update(tables.accounts)
     .set({ password: hashedPassword })
     .where(eq(tables.accounts.id, tokenRecord.account_id));
   await anyDb.delete(tables.tokens).where(eq(tables.tokens.id, tokenRecord.id));
-  return { status: "success", message: "Mật khẩu đã được đặt lại thành công!" };
+  return { status: 200, message: "Mật khẩu đã được đặt lại thành công!" };
 }
 
 export async function changePasswordImpl(anyDb: any, tables: { accounts: any }, payload: { email?: string; oldPassword?: string; newPassword?: string }) {
   const { email, oldPassword, newPassword } = payload;
   if (!email || !oldPassword || !newPassword) {
-    return { status: "error", message: "Thiếu thông tin đổi mật khẩu" };
+    return { status: 400, message: "Thiếu thông tin đổi mật khẩu" };
   }
   const account = await anyDb.query.accounts.findFirst({ where: eq(tables.accounts.email, email) });
   if (!account || !account.password) {
-    return { status: "error", message: "Không tìm thấy tài khoản" };
+    return { status: 404, message: "Không tìm thấy tài khoản" };
   }
   const ok = await bcrypt.compare(oldPassword, account.password);
-  if (!ok) return { status: "error", message: "Mật khẩu hiện tại không đúng" };
+  if (!ok) return { status: 400, message: "Mật khẩu hiện tại không đúng" };
   const hashed = await bcrypt.hash(newPassword, 10);
   await anyDb.update(tables.accounts)
     .set({ password: hashed, updated_at: new Date().toISOString() })
     .where(eq(tables.accounts.id, account.id));
-  return { ok: true };
+  return { status: 200, message: "Đổi mật khẩu thành công" };
 }
 

@@ -11,17 +11,17 @@ export async function loginImpl(anyDb: any, tables: { accounts: any; users: any 
     where: eq(tables.accounts.email, email),
   });
   if (!useracc) {
-    return { status: "error", message: "Email không tồn tại!" };
+    return { status: 404, message: "Email không tồn tại!" };
   }
   const isPasswordValid = await bcrypt.compare(password, useracc.password || "");
   if (!isPasswordValid) {
-    return { status: "error", message: "Mật khẩu không đúng!" };
+    return { status: 400, message: "Mật khẩu không đúng!" };
   }
   const user = await anyDb.query.users.findFirst({
     where: eq(tables.users.id, useracc.user_id),
   });
   return {
-    status: "success",
+    status: 200,
     message: "Đăng nhập thành công!",
     user: { username: user?.fullname, email },
   };
@@ -35,12 +35,12 @@ export async function registerImpl(anyDb: any, tables: { accounts: any; users: a
     const phone = payload.phone;
 
     if (!email || !password) {
-      return { status: "error", message: "Email và mật khẩu không được để trống!" };
+      return { status: 400, message: "Email và mật khẩu không được để trống!" };
     }
 
     const existing = await anyDb.query.accounts.findFirst({ where: eq(tables.accounts.email, email) });
     if (existing) {
-      return { status: "error", message: "Email đã tồn tại" };
+      return { status: 400, message: "Email đã tồn tại" };
     }
 
     const hashedPassword = await bcrypt.hash(password, 10);
@@ -135,7 +135,7 @@ export async function registerImpl(anyDb: any, tables: { accounts: any; users: a
       // If we wanted to enforce "No Account if Email Fails", we would need to delete the user here 
       // or move email inside transaction (bad for performance).
       return {
-        status: "success",
+        status: 200,
         message: "Đăng ký thành công (nhưng gửi email thất bại)",
         user: { id: newUser.id, email },
         emailError: mailErr?.message || String(mailErr),
@@ -143,14 +143,14 @@ export async function registerImpl(anyDb: any, tables: { accounts: any; users: a
     }
 
     return {
-      status: "success",
+      status: 200,
       message: "Đăng ký thành công",
       user: { id: newUser.id, email },
       emailSent: true,
     };
   } catch (err: any) {
     console.error(err);
-    return { status: "error", message: `Server error: ${err?.message || String(err)}` };
+    return { status: 500, message: `Server error: ${err?.message || String(err)}` };
   }
 }
 

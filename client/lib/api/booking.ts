@@ -27,7 +27,7 @@ export async function validateBookingApi(body: {
   ticketPackageId?: number;
 }) {
   return request<{
-    ok: boolean;
+    status: string;
     message?: string;
     user?: { id: number; email: string; fullname?: string; phone?: string };
     movie?: { id: number; title: string; is_active?: boolean | null; duration_min?: number | null };

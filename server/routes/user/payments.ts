@@ -94,24 +94,30 @@ async function validateBookingInput(
 }
 
 export async function validateBookingImpl(anyDb: any, payload: PaymentRequest, tables: { users: any; accounts: any; movies: any; ticket_packages: any }) {
-  const result = await validateBookingInput(anyDb, payload, tables);
-  return {
-    ok: true,
-    user: result.user,
-    movie: result.movie ? {
-      id: result.movie.id,
-      title: result.movie.title,
-      is_active: result.movie.is_active,
-      duration_min: result.movie.duration_min,
-    } : undefined,
-    ticketPackage: {
-      id: result.ticketPackage.id,
-      name: result.ticketPackage.name,
-      price: Number(result.ticketPackage.price || 0),
-    },
-    unitPrice: result.unitPrice,
-    totalPrice: result.totalPrice,
-  };
+  try {
+    const result = await validateBookingInput(anyDb, payload, tables);
+    return {
+      status: 200,
+      user: result.user,
+      movie: result.movie ? {
+        id: result.movie.id,
+        title: result.movie.title,
+        is_active: result.movie.is_active,
+        duration_min: result.movie.duration_min,
+      } : undefined,
+      ticketPackage: {
+        id: result.ticketPackage.id,
+        name: result.ticketPackage.name,
+        price: Number(result.ticketPackage.price || 0),
+      },
+      unitPrice: result.unitPrice,
+      totalPrice: result.totalPrice,
+    };
+  } catch (err: any) {
+    const status = err?.status || 500;
+    const message = err?.message || "Lỗi máy chủ nội bộ";
+    return { status, message };
+  }
 }
 
 export async function createPaymentImpl(
@@ -119,62 +125,69 @@ export async function createPaymentImpl(
   payload: PaymentRequest,
   tables: { bookings: any; users: any; accounts: any; movies: any; ticket_packages: any }
 ) {
-  const validation = await validateBookingInput(anyDb, payload, tables);
-  const { user, totalPrice } = validation;
-  const { emailBook, phone, name, ticketCount, paymentMethod } = payload;
-  const userId = user?.id ? Number(user.id) : null;
+  try {
+    const validation = await validateBookingInput(anyDb, payload, tables);
+    const { user, totalPrice } = validation;
+    const { emailBook, phone, name, ticketCount, paymentMethod } = payload;
+    const userId = user?.id ? Number(user.id) : null;
 
-  const bookingsTable = tables.bookings;
+    const bookingsTable = tables.bookings;
 
-  // Use explicit UTC ISO timestamps for created_at/updated_at để đồng bộ giữa Postgres & D1
-  const nowIso = new Date().toISOString();
+    // Use explicit UTC ISO timestamps for created_at/updated_at để đồng bộ giữa Postgres & D1
+    const nowIso = new Date().toISOString();
 
-  await anyDb.insert(bookingsTable).values({
-    user_id: userId,
-    movie_id: validation.movie?.id ? Number(validation.movie.id) : null,
-    ticket_package_id: validation.ticketPackage?.id ? Number(validation.ticketPackage.id) : null,
-    ticket_count: ticketCount,
-    // Use a numeric value for total_price so it works for both:
-    // - Postgres DECIMAL
-    // - SQLite/D1 REAL
-    // String is fine for Postgres DECIMAL but can cause issues on D1,
-    // so we normalize to number here.
-    total_price: Number(totalPrice),
-    payment_method: (paymentMethod || "cash").toLowerCase(),
-    phone,
-    name,
-    email: emailBook,
-    created_at: nowIso,
-    updated_at: nowIso,
-  });
-  const bookingRow = await anyDb.query.bookings.findFirst({
-    where: and(
-      eq(bookingsTable.phone, phone),
-      eq(bookingsTable.email, emailBook),
-      eq(bookingsTable.ticket_count, ticketCount),
-    ),
-    orderBy: [desc(bookingsTable.id)],
-  });
-  if (!bookingRow) {
-    throw new Error("Không thể tạo đặt vé");
+    await anyDb.insert(bookingsTable).values({
+      user_id: userId,
+      movie_id: validation.movie?.id ? Number(validation.movie.id) : null,
+      ticket_package_id: validation.ticketPackage?.id ? Number(validation.ticketPackage.id) : null,
+      ticket_count: ticketCount,
+      // Use a numeric value for total_price so it works for both:
+      // - Postgres DECIMAL
+      // - SQLite/D1 REAL
+      // String is fine for Postgres DECIMAL but can cause issues on D1,
+      // so we normalize to number here.
+      total_price: Number(totalPrice),
+      payment_method: (paymentMethod || "cash").toLowerCase(),
+      phone,
+      name,
+      email: emailBook,
+      created_at: nowIso,
+      updated_at: nowIso,
+    });
+    const bookingRow = await anyDb.query.bookings.findFirst({
+      where: and(
+        eq(bookingsTable.phone, phone),
+        eq(bookingsTable.email, emailBook),
+        eq(bookingsTable.ticket_count, ticketCount),
+      ),
+      orderBy: [desc(bookingsTable.id)],
+    });
+    if (!bookingRow) {
+      return { status: 500, message: "Không thể tạo đặt vé" };
+    }
+    return {
+      status: 201,
+      message: "Khởi tạo đặt vé thành công",
+      booking: {
+        id: bookingRow.id,
+        user_id: bookingRow.user_id,
+        movie_id: bookingRow.movie_id,
+        ticket_package_id: bookingRow.ticket_package_id,
+        ticket_count: bookingRow.ticket_count,
+        total_price: bookingRow.total_price,
+        payment_method: bookingRow.payment_method,
+        phone: bookingRow.phone,
+        name: bookingRow.name,
+        email: bookingRow.email,
+        payment_status: bookingRow.payment_status,
+        created_at: bookingRow.created_at,
+      },
+    };
+  } catch (err: any) {
+    const status = err?.status || 500;
+    const message = err?.message || "Lỗi máy chủ nội bộ";
+    return { status, message };
   }
-  return {
-    message: "Khởi tạo đặt vé thành công",
-    booking: {
-      id: bookingRow.id,
-      user_id: bookingRow.user_id,
-      movie_id: bookingRow.movie_id,
-      ticket_package_id: bookingRow.ticket_package_id,
-      ticket_count: bookingRow.ticket_count,
-      total_price: bookingRow.total_price,
-      payment_method: bookingRow.payment_method,
-      phone: bookingRow.phone,
-      name: bookingRow.name,
-      email: bookingRow.email,
-      payment_status: bookingRow.payment_status,
-      created_at: bookingRow.created_at,
-    },
-  };
 }
 
 export async function updatePaymentImpl(
@@ -184,120 +197,127 @@ export async function updatePaymentImpl(
   getBookingEmailHtml?: (data: any) => string,
   tables?: { bookings: any; users: any; accounts: any; movies: any; ticket_packages: any }
 ) {
-  const { user_id, payment_id, payment_status, transaction_id, paid_at } = payload as any;
-  if (!payment_id || !payment_status) {
-    return { status: "error", message: "Vui lòng nhập đầy đủ thông tin hợp lệ." };
-  }
-  const bookingsTable = tables?.bookings;
-  if (!bookingsTable) throw new Error("Missing bookings table");
-  
-  let whereClause;
-  if (user_id && Number(user_id) !== 0) {
-    whereClause = and(eq(bookingsTable.id, Number(payment_id)), eq(bookingsTable.user_id, Number(user_id)));
-  } else {
-    whereClause = and(eq(bookingsTable.id, Number(payment_id)), isNull(bookingsTable.user_id));
-  }
+  try {
+    const { user_id, payment_id, payment_status, transaction_id, paid_at } = payload as any;
+    if (!payment_id || !payment_status) {
+      return { status: 400, message: "Vui lòng nhập đầy đủ thông tin hợp lệ." };
+    }
+    const bookingsTable = tables?.bookings;
+    if (!bookingsTable) return { status: 500, message: "Missing bookings table" };
+    
+    let whereClause;
+    if (user_id && Number(user_id) !== 0) {
+      whereClause = and(eq(bookingsTable.id, Number(payment_id)), eq(bookingsTable.user_id, Number(user_id)));
+    } else {
+      whereClause = and(eq(bookingsTable.id, Number(payment_id)), isNull(bookingsTable.user_id));
+    }
 
-  const booking = await anyDb.query.bookings.findFirst({
-    where: whereClause,
-    with: { movie: true, ticket_package: true },
-  });
-  if (!booking) return { status: "error", message: "Không tìm thấy đặt vé." };
-  let bookingCode = booking.booking_code;
-  if (payment_status && String(payment_status).toLowerCase() === "paid" && !bookingCode) {
-    bookingCode = await generateBookingCode(anyDb);
-  }
-  // Update booking (tương thích với D1/SQLite không hỗ trợ .returning())
-  // Build update payload - only include fields that should be updated
-  const updatePayload: any = {
-    payment_status,
-    updated_at: new Date().toISOString(), // Explicitly set updated_at
-  };
+    const booking = await anyDb.query.bookings.findFirst({
+      where: whereClause,
+      with: { movie: true, ticket_package: true },
+    });
+    if (!booking) return { status: 404, message: "Không tìm thấy đặt vé." };
+    let bookingCode = booking.booking_code;
+    if (payment_status && String(payment_status).toLowerCase() === "paid" && !bookingCode) {
+      bookingCode = await generateBookingCode(anyDb);
+    }
+    // Update booking (tương thích với D1/SQLite không hỗ trợ .returning())
+    // Build update payload - only include fields that should be updated
+    const updatePayload: any = {
+      payment_status,
+      updated_at: new Date().toISOString(), // Explicitly set updated_at
+    };
 
-  // Only set transaction_id if provided
-  if (transaction_id !== undefined && transaction_id !== null) {
-    updatePayload.transaction_id = transaction_id;
-  }
+    // Only set transaction_id if provided
+    if (transaction_id !== undefined && transaction_id !== null) {
+      updatePayload.transaction_id = transaction_id;
+    }
 
-  // Set paid_at and expiry_date when payment_status is "paid"
-  if (payment_status && String(payment_status).toLowerCase() === "paid") {
-    let paidAtDate: Date;
-    if (paid_at) {
-      paidAtDate = new Date(paid_at);
-      if (isNaN(paidAtDate.getTime())) {
-        // Invalid date, use current time
+    // Set paid_at and expiry_date when payment_status is "paid"
+    if (payment_status && String(payment_status).toLowerCase() === "paid") {
+      let paidAtDate: Date;
+      if (paid_at) {
+        paidAtDate = new Date(paid_at);
+        if (isNaN(paidAtDate.getTime())) {
+          // Invalid date, use current time
+          paidAtDate = new Date();
+        }
+      } else {
+        // If payment_status is "paid" but no paid_at provided, use current time
         paidAtDate = new Date();
       }
-    } else {
-      // If payment_status is "paid" but no paid_at provided, use current time
-      paidAtDate = new Date();
+      updatePayload.paid_at = paidAtDate.toISOString();
+      // Set expiry_date to 10 days after paid_at
+      updatePayload.expiry_date = new Date(paidAtDate.getTime() + 10 * 24 * 60 * 60 * 1000).toISOString();
     }
-    updatePayload.paid_at = paidAtDate.toISOString();
-    // Set expiry_date to 10 days after paid_at
-    updatePayload.expiry_date = new Date(paidAtDate.getTime() + 10 * 24 * 60 * 60 * 1000).toISOString();
-  }
 
-  // Only set booking_code if it exists
-  if (bookingCode) {
-    updatePayload.booking_code = bookingCode;
-  }
+    // Only set booking_code if it exists
+    if (bookingCode) {
+      updatePayload.booking_code = bookingCode;
+    }
 
-  await anyDb.update(bookingsTable)
-    .set(updatePayload)
-    .where(eq(bookingsTable.id, booking.id));
+    await anyDb.update(bookingsTable)
+      .set(updatePayload)
+      .where(eq(bookingsTable.id, booking.id));
 
-  // Query lại booking vừa update
-  const updatedBooking = await anyDb.query.bookings.findFirst({
-    where: eq(bookingsTable.id, booking.id),
-    with: { movie: true, ticket_package: true },
-  });
-  if (payment_status && String(payment_status).toLowerCase() === "paid") {
-    try {
-      const totalPrice = Number(booking.total_price).toLocaleString("vi-VN");
-      const movieTitle = booking.movie?.title || "";
+    // Query lại booking vừa update
+    const updatedBooking = await anyDb.query.bookings.findFirst({
+      where: eq(bookingsTable.id, booking.id),
+      with: { movie: true, ticket_package: true },
+    });
+    if (payment_status && String(payment_status).toLowerCase() === "paid") {
+      try {
+        const totalPrice = Number(booking.total_price).toLocaleString("vi-VN");
+        const movieTitle = booking.movie?.title || "";
 
-      const templateData = {
-        bookingCode: bookingCode || "",
-        customerName: booking.name || "Khách hàng",
-        movieTitle: movieTitle,
-        ticketCount: booking.ticket_count,
-        totalPrice,
-        movieImage: booking.movie?.cover_image || undefined,
-        durationMin: booking.movie?.duration_min || undefined,
-        ticketPackageName: booking.ticket_package?.name || undefined,
-        expiryDate: (updatedBooking as any)?.expiry_date || undefined,
-      };
+        const templateData = {
+          bookingCode: bookingCode || "",
+          customerName: booking.name || "Khách hàng",
+          movieTitle: movieTitle,
+          ticketCount: booking.ticket_count,
+          totalPrice,
+          movieImage: booking.movie?.cover_image || undefined,
+          durationMin: booking.movie?.duration_min || undefined,
+          ticketPackageName: booking.ticket_package?.name || undefined,
+          expiryDate: (updatedBooking as any)?.expiry_date || undefined,
+        };
 
-      let emailTemplate = "";
-      if (getBookingEmailHtml) {
-        emailTemplate = getBookingEmailHtml(templateData);
-      } else {
-        emailTemplate = getBookingEmailTemplate(templateData);
+        let emailTemplate = "";
+        if (getBookingEmailHtml) {
+          emailTemplate = getBookingEmailHtml(templateData);
+        } else {
+          emailTemplate = getBookingEmailTemplate(templateData);
+        }
+
+        const mailer = sendMailFn || sendMail;
+        await mailer(booking.email, `🎬 Xác nhận đặt vé - CINESPHERE`, emailTemplate);
+      } catch (err) {
+        console.error(`[${new Date().toISOString()}] ERROR in updatePaymentImpl email sending:`, err);
       }
-
-      const mailer = sendMailFn || sendMail;
-      await mailer(booking.email, `🎬 Xác nhận đặt vé - CINESPHERE`, emailTemplate);
-    } catch (err) {
-      console.error(`[${new Date().toISOString()}] ERROR in updatePaymentImpl email sending:`, err);
     }
+    const updatedBookingAny = updatedBooking as any;
+    return {
+      status: 200,
+      message: "Thanh toán thành công",
+      booking: {
+        id: updatedBooking.id,
+        user_id: updatedBooking.user_id,
+        movie_id: updatedBookingAny.movie_id,
+        ticket_package_id: updatedBookingAny.ticket_package_id,
+        ticket_count: updatedBooking.ticket_count,
+        total_price: updatedBooking.total_price,
+        payment_method: updatedBooking.payment_method,
+        payment_status: updatedBooking.payment_status,
+        transaction_id: updatedBooking.transaction_id,
+        created_at: updatedBooking.created_at,
+        paid_at: updatedBooking.paid_at,
+      },
+    };
+  } catch (err: any) {
+    const status = err?.status || 500;
+    const message = err?.message || "Lỗi máy chủ nội bộ";
+    return { status, message };
   }
-  const updatedBookingAny = updatedBooking as any;
-  return {
-    message: "Thanh toán thành công",
-    booking: {
-      id: updatedBooking.id,
-      user_id: updatedBooking.user_id,
-      movie_id: updatedBookingAny.movie_id,
-      ticket_package_id: updatedBookingAny.ticket_package_id,
-      ticket_count: updatedBooking.ticket_count,
-      total_price: updatedBooking.total_price,
-      payment_method: updatedBooking.payment_method,
-      payment_status: updatedBooking.payment_status,
-      transaction_id: updatedBooking.transaction_id,
-      created_at: updatedBooking.created_at,
-      paid_at: updatedBooking.paid_at,
-    },
-  };
 }
 
 export async function getBookingImpl(anyDb: any, id: number, tables: { bookings: any }) {
@@ -306,8 +326,9 @@ export async function getBookingImpl(anyDb: any, id: number, tables: { bookings:
     where: eq(bookingsTable.id, id),
     columns: { id: true, payment_status: true, total_price: true, ticket_count: true, created_at: true, name: true, email: true, phone: true, user_id: true, movie_id: true, ticket_package_id: true },
   });
-  if (!booking) return null;
+  if (!booking) return { status: 404, message: "Không tìm thấy" };
   return {
+    status: 200,
     id: booking.id,
     payment_status: booking.payment_status,
     total_price: booking.total_price,
@@ -324,8 +345,9 @@ export async function getBookingByIdImpl(anyDb: any, id: number, tables: { booki
     where: eq(bookingsTable.id, Number(id)),
     with: { movie: true, ticket_package: true },
   });
-  if (!booking) return null;
+  if (!booking) return { status: 404, message: "Không tìm thấy" };
   return {
+    status: 200,
     id: booking.id,
     booking_code: booking.booking_code,
     payment_status: booking.payment_status,
@@ -350,14 +372,14 @@ export async function getBookingByIdImpl(anyDb: any, id: number, tables: { booki
 
 export async function getBookingByCodeImpl(anyDb: any, codeRaw: string, tables: { bookings: any }) {
   const code = String(codeRaw || "");
-  if (!code || code.trim() === "") return null;
+  if (!code || code.trim() === "") return { status: 400, message: "Thiếu mã vé" };
   const normalizedCode = code.trim().toUpperCase();
   const bookingsTable = tables.bookings;
   const booking = await anyDb.query.bookings.findFirst({
     where: eq(bookingsTable.booking_code, normalizedCode),
     with: { user: { columns: { fullname: true } } },
   });
-  if (!booking) return null;
+  if (!booking) return { status: 404, message: "Không tìm thấy vé" };
   const now = new Date();
   const paidAt = booking.paid_at ? new Date(booking.paid_at) : null;
   const expiryAt = booking.expiry_date ? new Date(booking.expiry_date as any) : null;
@@ -367,6 +389,7 @@ export async function getBookingByCodeImpl(anyDb: any, codeRaw: string, tables: 
   const can_use = Boolean(valid);
   const daysLeft = expiryAt ? Math.ceil((expiryAt.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)) : null;
   return {
+    status: 200,
     id: booking.id,
     booking_code: booking.booking_code,
     payment_status: booking.payment_status,
@@ -392,27 +415,32 @@ export async function getBookingByCodeImpl(anyDb: any, codeRaw: string, tables: 
 }
 
 export async function confirmUseTicketImpl(anyDb: any, codeRaw: string, tables: { bookings: any }) {
-  const code = String(codeRaw || "");
-  if (!code || !code.trim()) return { status: "error", message: "Vui lòng nhập mã vé" };
-  const normalizedCode = code.trim().toUpperCase();
-  const bookingsTable = tables.bookings;
-  const booking = await anyDb.query.bookings.findFirst({ where: eq(bookingsTable.booking_code, normalizedCode) });
-  if (!booking) return { status: "error", message: "Không tìm thấy vé" };
-  const isPaid = (booking.payment_status || '').toLowerCase() === 'paid';
-  const paidAt = booking.paid_at ? new Date(booking.paid_at) : null;
-  const expiryAt = booking.expiry_date ? new Date(booking.expiry_date as any) : null;
-  const expired = Boolean(expiryAt && Date.now() > expiryAt.getTime());
-  const valid = Boolean(isPaid && paidAt && expiryAt && !expired && !booking.is_used);
-  if (!valid) return { status: "error", message: "Vé không còn hiệu lực hoặc đã sử dụng" };
-  // Update booking (tương thích với D1/SQLite không hỗ trợ .returning())
-  await anyDb.update(bookingsTable).set({ is_used: true, updated_at: new Date().toISOString() }).where(eq(bookingsTable.id, booking.id));
+  try {
+    const code = String(codeRaw || "");
+    if (!code || !code.trim()) return { status: 400, message: "Vui lòng nhập mã vé" };
+    const normalizedCode = code.trim().toUpperCase();
+    const bookingsTable = tables.bookings;
+    const booking = await anyDb.query.bookings.findFirst({ where: eq(bookingsTable.booking_code, normalizedCode) });
+    if (!booking) return { status: 404, message: "Không tìm thấy vé" };
+    const isPaid = (booking.payment_status || '').toLowerCase() === 'paid';
+    const paidAt = booking.paid_at ? new Date(booking.paid_at) : null;
+    const expiryAt = booking.expiry_date ? new Date(booking.expiry_date as any) : null;
+    const expired = Boolean(expiryAt && Date.now() > expiryAt.getTime());
+    const valid = Boolean(isPaid && paidAt && expiryAt && !expired && !booking.is_used);
+    if (!valid) return { status: 400, message: "Vé không còn hiệu lực hoặc đã sử dụng" };
+    // Update booking (tương thích với D1/SQLite không hỗ trợ .returning())
+    await anyDb.update(bookingsTable).set({ is_used: true, updated_at: new Date().toISOString() }).where(eq(bookingsTable.id, booking.id));
 
-  // Query lại booking vừa update
-  const updated = await anyDb.query.bookings.findFirst({
-    where: eq(bookingsTable.id, booking.id),
-  });
+    // Query lại booking vừa update
+    const updated = await anyDb.query.bookings.findFirst({
+      where: eq(bookingsTable.id, booking.id),
+    });
 
-  if (!updated) throw new Error("Không thể cập nhật trạng thái vé");
-  return { ok: true, message: "Xác nhận sử dụng vé thành công", booking: { id: updated.id, is_used: updated.is_used } };
+    if (!updated) return { status: 500, message: "Không thể cập nhật trạng thái vé" };
+    return { status: 200, message: "Xác nhận sử dụng vé thành công", booking: { id: updated.id, is_used: updated.is_used } };
+  } catch (err: any) {
+    const status = err?.status || 500;
+    const message = err?.message || "Lỗi máy chủ nội bộ";
+    return { status, message };
+  }
 }
-

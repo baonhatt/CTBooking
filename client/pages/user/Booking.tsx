@@ -232,7 +232,7 @@ export default function BookingPage() {
         ticketPackageId: selectedPackage?.id,
       });
 
-      if (!validation?.ok) {
+      if (!validation?.status) {
         throw new Error(validation?.message || "Không thể xác thực thông tin đặt vé");
       }
 
