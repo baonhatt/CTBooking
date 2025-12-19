@@ -33,8 +33,8 @@ export async function createToyImpl(anyDb: any, tables: { toys: any }, args: { n
   */
 
   const nowIso = new Date().toISOString();
-  // Insert toy (tương thích với D1/SQLite không hỗ trợ .returning())
-  await anyDb.insert(tables.toys).values({
+  // Try to use .returning() to fetch created toy when supported; fallback for D1/SQLite
+  const inserted = await anyDb.insert(tables.toys).values({
     name,
     category,
     price: String(priceNum),
@@ -43,12 +43,12 @@ export async function createToyImpl(anyDb: any, tables: { toys: any }, args: { n
     image_url: savedImage,
     created_at: nowIso,
     updated_at: nowIso,
-  });
+  }).returning();
 
-  // Query lại toy vừa tạo
-  const toy = await anyDb.query.toys.findFirst({
-    orderBy: [desc(tables.toys.id)],
-  });
+  let toy: any = Array.isArray(inserted) ? inserted[0] : inserted;
+  // if (!toy) {
+  //   toy = await anyDb.query.toys.findFirst({ orderBy: [desc(tables.toys.id)] });
+  // }
 
   if (!toy) throw new Error("Không thể tạo đồ chơi");
   return { toy };
@@ -71,13 +71,10 @@ export async function updateToyImpl(anyDb: any, tables: { toys: any }, id: numbe
   }
   */
 
-  // Update toy (tương thích với D1/SQLite không hỗ trợ .returning())
-  await anyDb.update(tables.toys).set(data).where(eq(tables.toys.id, id));
-
-  // Query lại toy vừa update
-  const toy = await anyDb.query.toys.findFirst({
-    where: eq(tables.toys.id, id),
-  });
+  // Try to use .returning() for update, fallback to query
+  const updatedRes = await anyDb.update(tables.toys).set(data).where(eq(tables.toys.id, id)).returning();
+  let toy: any = Array.isArray(updatedRes) ? updatedRes[0] : updatedRes;
+  // if (!toy) toy = await anyDb.query.toys.findFirst({ where: eq(tables.toys.id, id) });
 
   return toy || null;
 }

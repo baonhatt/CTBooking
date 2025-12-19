@@ -44,7 +44,7 @@ export const movies = pgTable("movies", {
   created_at: timestamp("created_at", { mode: 'string' }).defaultNow().notNull(),
   updated_at: timestamp("updated_at", { mode: 'string' }).defaultNow().notNull(),
   is_active: boolean("is_active").default(true),
-  release_date: timestamp("release_date", { mode: 'date' }),
+  release_date: timestamp("release_date", { mode: 'string' }),
 });
 
 export const ticket_packages = pgTable("ticket_packages", {

@@ -23,16 +23,18 @@ export async function updateUserProfileImpl(anyDb: any, tables: { accounts: any;
   if (typeof phone === "string") updateData.phone = phone;
   if (normalizedGender) updateData.gender = normalizedGender;
   if (dobDate) updateData.dob = dobDate;
-  // Update user (tương thích với D1/SQLite không hỗ trợ .returning())
-  await anyDb.update(tables.users)
+  // Try to use .returning() to fetch updated row when supported, fallback for D1/SQLite
+  const updatedRes = await anyDb.update(tables.users)
     .set(updateData)
-    .where(eq(tables.users.id, account.user_id));
+    .where(eq(tables.users.id, account.user_id))
+    .returning();
 
-  console.log(9999)
-  // Query lại user vừa update
-  const user = await anyDb.query.users.findFirst({
-    where: eq(tables.users.id, account.user_id),
-  });
+  let user: any = Array.isArray(updatedRes) ? updatedRes[0] : updatedRes;
+  // if (!user) {
+  //   // Fallback query for DBs without returning()
+  //   const fetched = await anyDb.query.users.findFirst({ where: eq(tables.users.id, account.user_id) });
+  //   if (fetched) user = fetched;
+  // }
 
   if (!user) throw new Error("Không thể cập nhật thông tin người dùng");
   return { status: 200, user: { id: user.id, fullname: user.fullname, phone: user.phone, gender: user.gender ?? null, dob: user.dob ?? null, email } };

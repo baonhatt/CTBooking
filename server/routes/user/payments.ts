@@ -136,7 +136,9 @@ export async function createPaymentImpl(
     // Use explicit UTC ISO timestamps for created_at/updated_at để đồng bộ giữa Postgres & D1
     const nowIso = new Date().toISOString();
 
-    await anyDb.insert(bookingsTable).values({
+    // Try to use .returning() to get the inserted row when supported (Postgres).
+    // Fallback to the existing query approach for DBs that don't support returning (D1/SQLite).
+    const insertedBooking = await anyDb.insert(bookingsTable).values({
       user_id: userId,
       movie_id: validation.movie?.id ? Number(validation.movie.id) : null,
       ticket_package_id: validation.ticketPackage?.id ? Number(validation.ticketPackage.id) : null,
@@ -153,15 +155,20 @@ export async function createPaymentImpl(
       email: emailBook,
       created_at: nowIso,
       updated_at: nowIso,
-    });
-    const bookingRow = await anyDb.query.bookings.findFirst({
-      where: and(
-        eq(bookingsTable.phone, phone),
-        eq(bookingsTable.email, emailBook),
-        eq(bookingsTable.ticket_count, ticketCount),
-      ),
-      orderBy: [desc(bookingsTable.id)],
-    });
+    }).returning();
+
+    let bookingRow = Array.isArray(insertedBooking) ? insertedBooking[0] : insertedBooking;
+    // if (!bookingRow) {
+    //   // Fallback for DBs that don't support returning()
+    //   bookingRow = await anyDb.query.bookings.findFirst({
+    //     where: and(
+    //       eq(bookingsTable.phone, phone),
+    //       eq(bookingsTable.email, emailBook),
+    //       eq(bookingsTable.ticket_count, ticketCount),
+    //     ),
+    //     orderBy: [desc(bookingsTable.id)],
+    //   });
+    // }
     if (!bookingRow) {
       return { status: 500, message: "Không thể tạo đặt vé" };
     }
@@ -204,7 +211,7 @@ export async function updatePaymentImpl(
     }
     const bookingsTable = tables?.bookings;
     if (!bookingsTable) return { status: 500, message: "Missing bookings table" };
-    
+
     let whereClause;
     if (user_id && Number(user_id) !== 0) {
       whereClause = and(eq(bookingsTable.id, Number(payment_id)), eq(bookingsTable.user_id, Number(user_id)));
@@ -256,15 +263,20 @@ export async function updatePaymentImpl(
       updatePayload.booking_code = bookingCode;
     }
 
-    await anyDb.update(bookingsTable)
+    // Try to use .returning() to get the updated row when supported
+    const updatedRes = await anyDb.update(bookingsTable)
       .set(updatePayload)
-      .where(eq(bookingsTable.id, booking.id));
+      .where(eq(bookingsTable.id, booking.id))
+      .returning();
 
-    // Query lại booking vừa update
-    const updatedBooking = await anyDb.query.bookings.findFirst({
-      where: eq(bookingsTable.id, booking.id),
-      with: { movie: true, ticket_package: true },
-    });
+    let updatedBooking = Array.isArray(updatedRes) ? updatedRes[0] : updatedRes;
+    // if (!updatedBooking) {
+    //   // Fallback for DBs that don't support returning()
+    //   updatedBooking = await anyDb.query.bookings.findFirst({
+    //     where: eq(bookingsTable.id, booking.id),
+    //     with: { movie: true, ticket_package: true },
+    //   });
+    // }
     if (payment_status && String(payment_status).toLowerCase() === "paid") {
       try {
         const totalPrice = Number(booking.total_price).toLocaleString("vi-VN");

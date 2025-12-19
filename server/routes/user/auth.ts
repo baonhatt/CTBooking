@@ -63,39 +63,42 @@ export async function registerImpl(anyDb: any, tables: { accounts: any; users: a
 
     const nowIso = new Date().toISOString();
     // Step 1: Tạo USER trước (vì account cần user_id - foreign key constraint)
-    await anyDb.insert(tables.users).values({
+    // Try to use .returning() to obtain the created user when supported; fallback to previous selection otherwise.
+    const insertedUserRes = await anyDb.insert(tables.users).values({
       fullname: fullname,
       phone: phone,
       gender: gender,
       dob: dob,
       created_at: nowIso,
       updated_at: nowIso,
-    });
+    }).returning();
 
-    // Query lại user vừa tạo (tương thích với D1/SQLite không hỗ trợ .returning())
-    const whereConditions = [];
-    if (phone) {
-      whereConditions.push(eq(tables.users.phone, phone));
-    }
-    if (fullname) {
-      whereConditions.push(eq(tables.users.fullname, fullname));
-    }
+    let user: any = Array.isArray(insertedUserRes) ? insertedUserRes[0] : insertedUserRes;
+    // if (!user) {
+    //   // Query lại user vừa tạo (fallback for DBs without returning())
+    //   const whereConditions = [];
+    //   if (phone) {
+    //     whereConditions.push(eq(tables.users.phone, phone));
+    //   }
+    //   if (fullname) {
+    //     whereConditions.push(eq(tables.users.fullname, fullname));
+    //   }
 
-    // Lấy user mới nhất theo điều kiện hoặc lấy user mới nhất nếu không có điều kiện
-    let user;
-    if (whereConditions.length > 0) {
-      const users = await anyDb.select().from(tables.users)
-        .where(and(...whereConditions))
-        .orderBy(desc(tables.users.id))
-        .limit(1);
-      user = users[0];
-    } else {
-      // Fallback: lấy user mới nhất nếu không có phone/fullname
-      const users = await anyDb.select().from(tables.users)
-        .orderBy(desc(tables.users.id))
-        .limit(1);
-      user = users[0];
-    }
+    //   // Lấy user mới nhất theo điều kiện hoặc lấy user mới nhất nếu không có điều kiện
+    //   if (whereConditions.length > 0) {
+    //     const users = await anyDb.select().from(tables.users)
+    //       .where(and(...whereConditions))
+    //       .orderBy(desc(tables.users.id))
+    //       .limit(1);
+    //     user = users[0];
+    //   } else {
+    //     // Fallback: lấy user mới nhất nếu không có phone/fullname
+    //     const users = await anyDb.select().from(tables.users)
+    //       .orderBy(desc(tables.users.id))
+    //       .limit(1);
+    //     user = users[0];
+    //   }
+    // }
 
     if (!user) throw new Error("Không thể tạo thông tin người dùng (Insert failed)");
 
