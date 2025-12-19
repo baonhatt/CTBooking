@@ -32,14 +32,14 @@ const VNP_RETURN_URL = "";
 export async function createVnpayPaymentImpl(payload: { amount: number; orderId: string; orderInfo: string; locale?: string; tmnCode?: string; hashSecret?: string; returnUrl?: string; ip?: string; gateway?: string }) {
   const { amount, orderId, orderInfo, locale = "vn" } = payload;
   if (!amount || !orderId || !orderInfo) {
-    return { status: "error", message: "Invalid payload" };
+    return { status: 400, message: "Invalid payload" };
   }
   const tmnCode = payload.tmnCode || VNP_TMNCODE || "";
   const hashSecret = payload.hashSecret || VNP_HASH_SECRET || "";
   const returnUrl = payload.returnUrl || VNP_RETURN_URL || "";
   const gateway = payload.gateway || VNP_GATEWAY || "";
   if (!tmnCode || !hashSecret || !returnUrl || !gateway) {
-    return { status: "error", message: "VNPay configuration missing" };
+    return { status: 500, message: "VNPay configuration missing" };
   }
   const vnp_TxnRef = orderId;
   const vnp_Version = "2.1.0";
@@ -68,7 +68,7 @@ export async function createVnpayPaymentImpl(payload: { amount: number; orderId:
   const vnp_SecureHash = await hmacSHA512(hashSecret, signData);
   const query = new URLSearchParams({ ...sorted, vnp_SecureHash }).toString();
   const payUrl = `${gateway}?${query}`;
-  return { payUrl };
+  return { status: 200, payUrl };
 }
 
 export async function vnpayIpnImpl() {

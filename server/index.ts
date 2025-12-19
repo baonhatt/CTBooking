@@ -158,7 +158,9 @@ export function createServer() {
   app.post("/api/login", async (req, res) => {
     try {
       const r = await loginImpl(db, { accounts: pgAccounts, users: pgUsers }, req.body as any);
-      res.status(200).json(r);
+      const status = typeof (r as any).status === "number" ? (r as any).status : 200;
+      const payload = { ...(r as any), status: status >= 400 ? "error" : "success" };
+      res.status(status).json(payload);
     } catch {
       res.status(500).json({ message: "Lỗi máy chủ nội bộ" });
     }
@@ -166,7 +168,9 @@ export function createServer() {
   app.post("/api/register", async (req, res) => {
     try {
       const r = await registerImpl(db, { accounts: pgAccounts, users: pgUsers }, req.body as any);
-      res.status(200).json(r);
+      const status = typeof (r as any).status === "number" ? (r as any).status : 200;
+      const payload = { ...(r as any), status: status >= 400 ? "error" : "success" };
+      res.status(status).json(payload);
     } catch {
       res.status(500).json({ message: "Lỗi máy chủ nội bộ" });
     }
@@ -175,7 +179,9 @@ export function createServer() {
     try {
       const email = String((req.body as any)?.email || "");
       const r = await forgetPassImpl(db, { accounts: pgAccounts, tokens: pgTokens }, email);
-      res.status(200).json(r);
+      const status = typeof (r as any).status === "number" ? (r as any).status : 200;
+      const payload = { ...(r as any), status: status >= 400 ? "error" : "success" };
+      res.status(status).json(payload);
     } catch {
       res.status(500).json({ message: "Lỗi máy chủ nội bộ" });
     }
@@ -183,7 +189,9 @@ export function createServer() {
   app.post("/api/reset-password", async (req, res) => {
     try {
       const r = await resetPasswordImpl(db, { accounts: pgAccounts, tokens: pgTokens }, req.body as any);
-      res.status(200).json(r);
+      const status = typeof (r as any).status === "number" ? (r as any).status : 200;
+      const payload = { ...(r as any), status: status >= 400 ? "error" : "success" };
+      res.status(status).json(payload);
     } catch {
       res.status(500).json({ message: "Lỗi máy chủ nội bộ" });
     }
@@ -203,9 +211,9 @@ export function createServer() {
   app.post("/api/momo/create-payment", async (req, res) => {
     try {
       const r = await createMomoPaymentImpl(req.body as any);
-      const status = (r as any)?.status === "error" ? 400 : 200;
-      const httpStatus = (r as any)?.httpStatus ? Number((r as any).httpStatus) : status;
-      res.status(httpStatus).json(r);
+      const status = typeof (r as any).status === "number" ? (r as any).status : 200;
+      const payload = { ...(r as any), status: status >= 400 ? "error" : "success" };
+      res.status(status).json(payload);
     } catch (err: any) {
       res.status(500).json({ message: err?.message || "Internal error" });
     }
@@ -222,8 +230,9 @@ export function createServer() {
     try {
       const ip = (req.headers["x-forwarded-for"] as any) || req.socket.remoteAddress || "127.0.0.1";
       const r = await createVnpayPaymentImpl({ ...(req.body as any), ip });
-      const status = (r as any)?.status === "error" ? 400 : 200;
-      res.status(status).json(r);
+      const status = typeof (r as any).status === "number" ? (r as any).status : 200;
+      const payload = { ...(r as any), status: status >= 400 ? "error" : "success" };
+      res.status(status).json(payload);
     } catch (err: any) {
       res.status(500).json({ message: err?.message || "Internal error" });
     }
@@ -244,17 +253,19 @@ export function createServer() {
   app.post("/api/validate-booking", async (req, res) => {
     try {
       const r = await validateBookingImpl(db, req.body as any, pgTables);
-      res.status(200).json(r);
+      const status = typeof (r as any).status === "number" ? (r as any).status : 200;
+      const payload = { ...(r as any), status: status >= 400 ? "error" : "success" };
+      res.status(status).json(payload);
     } catch (error: any) {
-      const status = error?.status || 500;
-      const message = error?.message || "Lỗi máy chủ nội bộ";
-      res.status(status).json({ ok: false, message });
+      res.status(500).json({ message: "Lỗi máy chủ nội bộ", error: error?.message });
     }
   });
   app.post("/api/create-booking", async (req, res) => {
     try {
       const r = await createPaymentImpl(db, req.body as any, pgTables);
-      res.status(201).json(r);
+      const status = typeof (r as any).status === "number" ? (r as any).status : 201;
+      const payload = { ...(r as any), status: status >= 400 ? "error" : "success" };
+      res.status(status).json(payload);
     } catch (error: any) {
       res.status(500).json({ message: "Lỗi máy chủ nội bộ", error: error?.message });
     }
@@ -262,8 +273,9 @@ export function createServer() {
   app.post("/api/confirm-booking", async (req, res) => {
     try {
       const r = await updatePaymentImpl(db, req.body as any, undefined, undefined, pgTables);
-      const status = (r as any)?.status === "error" ? 400 : 200;
-      res.status(status).json(r);
+      const status = typeof (r as any).status === "number" ? (r as any).status : 200;
+      const payload = { ...(r as any), status: status >= 400 ? "error" : "success" };
+      res.status(status).json(payload);
     } catch {
       res.status(500).json({ message: "Lỗi máy chủ nội bộ" });
     }
@@ -297,8 +309,9 @@ export function createServer() {
     try {
       const code = String((req.body as any)?.code || "");
       const r = await confirmUseTicketImpl(db, code, pgTables);
-      const status = (r as any)?.status === "error" ? 400 : 200;
-      res.status(status).json(r);
+      const status = typeof (r as any).status === "number" ? (r as any).status : 200;
+      const payload = { ...(r as any), status: status >= 400 ? "error" : "success" };
+      res.status(status).json(payload);
     } catch {
       res.status(500).json({ message: "Lỗi máy chủ nội bộ" });
     }
@@ -471,8 +484,9 @@ export function createServer() {
     try {
       const emailRaw = String(req.query.email || "");
       const r = await getUserProfileByEmailImpl(db, { accounts: pgAccounts, users: pgUsers }, emailRaw);
-      const status = (r as any)?.status === "error" ? 400 : 200;
-      res.status(status).json(r);
+      const status = typeof (r as any).status === "number" ? (r as any).status : 200;
+      const payload = { ...(r as any), status: status >= 400 ? "error" : "success" };
+      res.status(status).json(payload);
     } catch {
       res.status(500).json({ message: "Lỗi máy chủ nội bộ" });
     }
@@ -490,8 +504,9 @@ export function createServer() {
   app.post("/api/users/profile", async (req, res) => {
     try {
       const r = await updateUserProfileImpl(db, { accounts: pgAccounts, users: pgUsers }, req.body as any);
-      const status = (r as any)?.status === "error" ? 400 : 200;
-      res.status(status).json(r);
+      const status = typeof (r as any).status === "number" ? (r as any).status : 200;
+      const payload = { ...(r as any), status: status >= 400 ? "error" : "success" };
+      res.status(status).json(payload);
     } catch (err: any) {
       console.error("Error /api/users/profile:", err);
       res.status(500).json({ message: "Lỗi máy chủ nội bộ" });
@@ -500,8 +515,9 @@ export function createServer() {
   app.post("/api/users/password", async (req, res) => {
     try {
       const r = await changePasswordImpl(db, { accounts: pgAccounts }, req.body as any);
-      const status = (r as any)?.status === "error" ? 400 : 200;
-      res.status(status).json(r);
+      const status = typeof (r as any).status === "number" ? (r as any).status : 200;
+      const payload = { ...(r as any), status: status >= 400 ? "error" : "success" };
+      res.status(status).json(payload);
     } catch {
       res.status(500).json({ message: "Lỗi máy chủ nội bộ" });
     }

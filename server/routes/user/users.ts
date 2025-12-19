@@ -2,9 +2,9 @@ import { eq, and, inArray, gte, lte, or, desc, asc, count, SQL } from "drizzle-o
 
 export async function updateUserProfileImpl(anyDb: any, tables: { accounts: any; users: any }, payload: { email?: string; name?: string; phone?: string; gender?: string; dob?: string }) {
   const { email, name, phone, gender, dob } = payload;
-  if (!email) return { status: "error", message: "Thiếu email" };
+  if (!email) return { status: 400, message: "Thiếu email" };
   const account = await anyDb.query.accounts.findFirst({ where: eq(tables.accounts.email, email) });
-  if (!account) return { status: "error", message: "Không tìm thấy tài khoản" };
+  if (!account) return { status: 404, message: "Không tìm thấy tài khoản" };
   const dobDate = (() => {
     try {
       if (!dob) return undefined;
@@ -35,16 +35,17 @@ export async function updateUserProfileImpl(anyDb: any, tables: { accounts: any;
   });
 
   if (!user) throw new Error("Không thể cập nhật thông tin người dùng");
-  return { ok: true, user: { id: user.id, fullname: user.fullname, phone: user.phone, gender: user.gender ?? null, dob: user.dob ?? null, email } };
+  return { status: 200, user: { id: user.id, fullname: user.fullname, phone: user.phone, gender: user.gender ?? null, dob: user.dob ?? null, email } };
 }
 
 export async function getUserProfileByEmailImpl(anyDb: any, tables: { accounts: any; users: any }, emailRaw: string) {
   const email = (() => { try { return decodeURIComponent(emailRaw || ""); } catch { return String(emailRaw || ""); } })();
-  if (!email) return { status: "error", message: "Thiếu email" };
+  if (!email) return { status: 400, message: "Thiếu email" };
   const account = await anyDb.query.accounts.findFirst({ where: eq(tables.accounts.email, email) });
-  if (!account) return { status: "error", message: "Không tìm thấy tài khoản" };
+  if (!account) return { status: 404, message: "Không tìm thấy tài khoản" };
   const user = await anyDb.query.users.findFirst({ where: eq(tables.users.id, account.user_id) });
   return {
+    status: 200,
     id: user?.id ?? account.user_id,
     fullname: user?.fullname || "",
     phone: user?.phone || "",

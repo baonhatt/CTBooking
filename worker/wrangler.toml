@@ -34,6 +34,7 @@ bucket_name = "cinemastore"
 
 [env.preview]
 [env.preview.vars]
+IS_PREVIEW = "true"
 VITE_SERVER_BASE_URL = "https://cinema-worker-preview.baonhat20.workers.dev"
 
 VITE_MOMO_REDIRECT_URL = "/checkout"

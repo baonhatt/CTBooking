@@ -56,10 +56,10 @@ export async function createMomoPaymentImpl(payload: CreatePaymentBody & { reque
   const secretKey = secretKeyBody || ENV_SECRET_KEY || "";
   const endpoint = endpointBody || MOMO_ENDPOINT || "";
   if (!partnerCode || !accessKey || !secretKey) {
-    return { status: "error", message: "MOMO configuration missing" };
+    return { status: 500, message: "MOMO configuration missing" };
   }
   if (!amount || !orderId || !orderInfo || !redirectUrl || !ipnUrl) {
-    return { status: "error", message: "Invalid payload" };
+    return { status: 400, message: "Invalid payload" };
   }
   const requestId = requestIdFromBody || Date.now().toString();
   const rawSignature = `accessKey=${accessKey}&amount=${amount}&extraData=${extraData}&ipnUrl=${ipnUrl}&orderId=${orderId}&orderInfo=${orderInfo}&partnerCode=${partnerCode}&redirectUrl=${redirectUrl}&requestId=${requestId}&requestType=${requestType}`;
@@ -82,9 +82,9 @@ export async function createMomoPaymentImpl(payload: CreatePaymentBody & { reque
   const momoRes = await fetch(endpoint, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
   const data = await momoRes.json().catch(() => ({}));
   if (!momoRes.ok) {
-    return { status: "error", message: data?.message || "MOMO error", data, httpStatus: momoRes.status };
+    return { status: momoRes.status || 400, message: data?.message || "MOMO error", data };
   }
-  return { payUrl: data?.payUrl || data?.deeplink || data?.deeplinkWeb || "", data };
+  return { status: 200, payUrl: data?.payUrl || data?.deeplink || data?.deeplinkWeb || "", data };
 }
 
 export async function momoIpnImpl() {

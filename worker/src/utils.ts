@@ -31,6 +31,39 @@ export function logSystemError(context: string, error: any, payload?: any) {
 }
 
 export async function sendMail(env: any, toEmail: string, subject: string, html: string): Promise<{ ok: boolean; status: number; body: string; provider: string; missing: string[] }> {
+  // Check for Preview/Review environment
+  if (env.IS_PREVIEW === "true") {
+    const token = String(env.MAILTRAP_API_TOKEN || "");
+    const inboxId = String(env.MAILTRAP_INBOX_ID || "");
+
+    if (token && inboxId) {
+      const senderEmail = String(env.GMAIL_SENDER_EMAIL || "no-reply@cinesphere.com.vn");
+      const senderName = String(env.GMAIL_SENDER_NAME || "CINESPHERE");
+
+      const payload = {
+        to: [{ email: toEmail }],
+        from: { email: senderEmail, name: senderName },
+        subject,
+        html,
+        category: "Review Worker Test"
+      };
+
+      const res = await fetch(`https://sandbox.api.mailtrap.io/api/send/${inboxId}`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${token}`
+        },
+        body: JSON.stringify(payload)
+      });
+
+      const bodyText = await res.text().catch(() => "");
+      return { ok: res.ok, status: res.status, body: bodyText, provider: "mailtrap-sandbox", missing: [] };
+    }
+    
+    return { ok: false, status: 500, body: "Mailtrap provider is not configured for preview", provider: "mailtrap-sandbox", missing: ["MAILTRAP_API_TOKEN", "MAILTRAP_INBOX_ID"] };
+  }
+
   const brevoKey = String(env.BREVO_API_KEY || "");
   const useBrevo = Boolean(brevoKey);
   if (useBrevo) {
