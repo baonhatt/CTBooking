@@ -875,7 +875,7 @@ app.put("/api/tickets/:id", async (c) => {
     const id = Number(c.req.param("id"));
     const db = drizzle(c.env.cinema_db, { schema });
     const body = await c.req.json().catch(() => ({}));
-    const r = await updateTicketPackageImpl(db, { ticket_packages: schema.ticket_packages }, id, body as any, env.RUNTIME_ENV);
+    const r = await updateTicketPackageImpl(db, { ticket_packages: schema.ticket_packages }, id, body as any, c.env.RUNTIME_ENV);
     if (!r) return c.json({ status: "error", message: "Không tìm thấy" }, 404);
     return c.json(r, 200);
   } catch {
