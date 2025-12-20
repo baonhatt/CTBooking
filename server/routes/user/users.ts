@@ -1,6 +1,7 @@
 import { eq, and, inArray, gte, lte, or, desc, asc, count, SQL } from "drizzle-orm";
+import { formatDateForDb } from "../../lib/date-utils";
 
-export async function updateUserProfileImpl(anyDb: any, tables: { accounts: any; users: any }, payload: { email?: string; name?: string; phone?: string; gender?: string; dob?: string }) {
+export async function updateUserProfileImpl(anyDb: any, tables: { accounts: any; users: any }, payload: { email?: string; name?: string; phone?: string; gender?: string; dob?: string }, RUNTIME_ENV?: string) {
   const { email, name, phone, gender, dob } = payload;
   if (!email) return { status: 400, message: "Thiếu email" };
   const account = await anyDb.query.accounts.findFirst({ where: eq(tables.accounts.email, email) });
@@ -9,7 +10,7 @@ export async function updateUserProfileImpl(anyDb: any, tables: { accounts: any;
     try {
       if (!dob) return undefined;
       const d = new Date(dob);
-      return isNaN(d.getTime()) ? undefined : d.toISOString();
+      return d;
     } catch {
       return undefined;
     }
@@ -17,12 +18,12 @@ export async function updateUserProfileImpl(anyDb: any, tables: { accounts: any;
   const normalizedGender = (() => { try { const g = typeof gender === "string" ? gender.trim().toLowerCase() : ""; return g === "male" || g === "female" ? g : undefined; } catch { return undefined; } })();
 
   const updateData: any = {
-    updated_at: new Date().toISOString(),
+    updated_at: formatDateForDb(new Date(), RUNTIME_ENV),
   };
   if (typeof name === "string") updateData.fullname = name;
   if (typeof phone === "string") updateData.phone = phone;
   if (normalizedGender) updateData.gender = normalizedGender;
-  if (dobDate) updateData.dob = dobDate;
+  if (dobDate) updateData.dob = formatDateForDb(dobDate, RUNTIME_ENV);
   // Try to use .returning() to fetch updated row when supported, fallback for D1/SQLite
   const updatedRes = await anyDb.update(tables.users)
     .set(updateData)
@@ -30,11 +31,6 @@ export async function updateUserProfileImpl(anyDb: any, tables: { accounts: any;
     .returning();
 
   let user: any = Array.isArray(updatedRes) ? updatedRes[0] : updatedRes;
-  // if (!user) {
-  //   // Fallback query for DBs without returning()
-  //   const fetched = await anyDb.query.users.findFirst({ where: eq(tables.users.id, account.user_id) });
-  //   if (fetched) user = fetched;
-  // }
 
   if (!user) throw new Error("Không thể cập nhật thông tin người dùng");
   return { status: 200, user: { id: user.id, fullname: user.fullname, phone: user.phone, gender: user.gender ?? null, dob: user.dob ?? null, email } };

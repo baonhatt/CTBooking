@@ -3,6 +3,7 @@ import { eq, desc, and, sql } from "drizzle-orm";
 import bcrypt from "bcryptjs";
 import { sendMail } from "../mail-service";
 import { getWelcomeEmailTemplate } from "../../lib/booking-utils";
+import { formatDateForDb } from "../../lib/date-utils";
 
 export async function loginImpl(anyDb: any, tables: { accounts: any; users: any }, payload: Partial<Login>) {
   const email = payload.email || "";
@@ -27,7 +28,7 @@ export async function loginImpl(anyDb: any, tables: { accounts: any; users: any 
   };
 }
 
-export async function registerImpl(anyDb: any, tables: { accounts: any; users: any }, payload: Partial<Register> & { gender?: string; dob?: string; phone?: string; name?: string }, sendMailFn?: (to: string, subject: string, html: string) => Promise<any>, getWelcomeEmailHtml?: (data: { customerName: string; email: string }) => string) {
+export async function registerImpl(anyDb: any, tables: { accounts: any; users: any }, payload: Partial<Register> & { gender?: string; dob?: string; phone?: string; name?: string }, sendMailFn?: (to: string, subject: string, html: string) => Promise<any>, getWelcomeEmailHtml?: (data: { customerName: string; email: string }) => string, RUNTIME_ENV?: string) {
   try {
     const { email, password } = payload;
     const gender = payload.gender;
@@ -50,18 +51,15 @@ export async function registerImpl(anyDb: any, tables: { accounts: any; users: a
       fullname = email.split("@")[0];
     }
 
-    let dob: string | undefined;
+    let dob: string | undefined | Date;
     if (dobStr && typeof dobStr === "string" && dobStr.trim()) {
-      const d = new Date(dobStr);
-      if (!isNaN(d.getTime())) {
-        dob = d.toISOString();
-      }
+      dob = formatDateForDb(dobStr, RUNTIME_ENV);
     }
 
     // D1/SQLite có thể không hỗ trợ transaction đầy đủ như Postgres
     // Nên tách ra thành các bước riêng, nhưng vẫn đảm bảo thứ tự: USER → ACCOUNT
 
-    const nowIso = new Date().toISOString();
+    const nowIso = new Date();
     // Step 1: Tạo USER trước (vì account cần user_id - foreign key constraint)
     // Try to use .returning() to obtain the created user when supported; fallback to previous selection otherwise.
     const insertedUserRes = await anyDb.insert(tables.users).values({
@@ -69,36 +67,11 @@ export async function registerImpl(anyDb: any, tables: { accounts: any; users: a
       phone: phone,
       gender: gender,
       dob: dob,
-      created_at: nowIso,
-      updated_at: nowIso,
+      created_at: formatDateForDb(nowIso, RUNTIME_ENV),
+      updated_at: formatDateForDb(nowIso, RUNTIME_ENV),
     }).returning();
 
     let user: any = Array.isArray(insertedUserRes) ? insertedUserRes[0] : insertedUserRes;
-    // if (!user) {
-    //   // Query lại user vừa tạo (fallback for DBs without returning())
-    //   const whereConditions = [];
-    //   if (phone) {
-    //     whereConditions.push(eq(tables.users.phone, phone));
-    //   }
-    //   if (fullname) {
-    //     whereConditions.push(eq(tables.users.fullname, fullname));
-    //   }
-
-    //   // Lấy user mới nhất theo điều kiện hoặc lấy user mới nhất nếu không có điều kiện
-    //   if (whereConditions.length > 0) {
-    //     const users = await anyDb.select().from(tables.users)
-    //       .where(and(...whereConditions))
-    //       .orderBy(desc(tables.users.id))
-    //       .limit(1);
-    //     user = users[0];
-    //   } else {
-    //     // Fallback: lấy user mới nhất nếu không có phone/fullname
-    //     const users = await anyDb.select().from(tables.users)
-    //       .orderBy(desc(tables.users.id))
-    //       .limit(1);
-    //     user = users[0];
-    //   }
-    // }
 
     if (!user) throw new Error("Không thể tạo thông tin người dùng (Insert failed)");
 
@@ -109,8 +82,8 @@ export async function registerImpl(anyDb: any, tables: { accounts: any; users: a
       password: hashedPassword,
       login_type: "email",
       is_active: true,
-      created_at: nowIso,
-      updated_at: nowIso,
+      created_at: formatDateForDb(nowIso, RUNTIME_ENV),
+      updated_at: formatDateForDb(nowIso, RUNTIME_ENV),
     });
 
     const newUser = user;
@@ -131,8 +104,6 @@ export async function registerImpl(anyDb: any, tables: { accounts: any; users: a
       const mailer = sendMailFn || sendMail;
       await mailer(email, "🎉 Chào mừng bạn đến CINESPHERE", html);
     } catch (mailErr: any) {
-      console.error(`[${new Date().toISOString()}] ERROR in registerImpl email sending:`);
-      console.error(`Message: ${mailErr?.message || String(mailErr)}`);
       // We do NOT rollback user creation on email failure to avoid "ghost accounts" in the sense of 
       // "Error returned but Account Created". We return Success with a log.
       // If we wanted to enforce "No Account if Email Fails", we would need to delete the user here 
@@ -152,7 +123,6 @@ export async function registerImpl(anyDb: any, tables: { accounts: any; users: a
       emailSent: true,
     };
   } catch (err: any) {
-    console.error(err);
     return { status: 500, message: `Server error: ${err?.message || String(err)}` };
   }
 }

@@ -1,10 +1,11 @@
 import { eq, and, asc, desc } from "drizzle-orm";
 import { cloudinary, cloudinaryEnvOk } from "../../cloudinary";
+import { formatDateForDb } from "../../lib/date-utils";
 
-export async function createSiteMediaImpl(anyDb: any, tables: { site_media: any }, args: { section: string; type: string; title?: string; description?: string; public_id?: string; url: string; format?: string; width?: number; height?: number; duration?: string | number; display_order?: number; is_active?: boolean }) {
+export async function createSiteMediaImpl(anyDb: any, tables: { site_media: any }, args: { section: string; type: string; title?: string; description?: string; public_id?: string; url: string; format?: string; width?: number; height?: number; duration?: string | number; display_order?: number; is_active?: boolean }, RUNTIME_ENV?: string) {
   const { section, type, title, description, public_id, url, format, width, height, duration, display_order, is_active } = args;
   // Try .returning() to fetch created item when supported; fallback for D1/SQLite
-  const nowIso = new Date().toISOString();
+  const nowIso = new Date();
   const inserted = await anyDb.insert(tables.site_media).values({
     section: String(section),
     type: String(type),
@@ -18,8 +19,8 @@ export async function createSiteMediaImpl(anyDb: any, tables: { site_media: any 
     duration: duration !== undefined ? String(duration) : null,
     display_order: display_order !== undefined ? Number(display_order) : 0,
     is_active: typeof is_active === "boolean" ? is_active : true,
-    created_at: nowIso,
-    updated_at: nowIso,
+    created_at: formatDateForDb(nowIso, RUNTIME_ENV),
+    updated_at: formatDateForDb(nowIso, RUNTIME_ENV),
   }).returning();
 
   let item: any = Array.isArray(inserted) ? inserted[0] : inserted;
@@ -63,6 +64,7 @@ export async function updateSiteMediaImpl(
     display_order?: number;
     is_active?: boolean;
   },
+  RUNTIME_ENV?: string,
 ) {
   const {
     id,
@@ -79,7 +81,8 @@ export async function updateSiteMediaImpl(
     display_order,
     is_active,
   } = args;
-  const payload: any = { updated_at: new Date().toISOString() };
+  const now = new Date();
+  const payload: any = { updated_at: formatDateForDb(now,RUNTIME_ENV ) };
   if (section !== undefined) payload.section = String(section);
   if (type !== undefined) payload.type = String(type);
   if (title !== undefined) payload.title = title ? String(title) : null;
@@ -92,7 +95,6 @@ export async function updateSiteMediaImpl(
   if (duration !== undefined) payload.duration = duration !== null && duration !== undefined ? String(duration) : null;
   if (display_order !== undefined) payload.display_order = display_order !== null && display_order !== undefined ? Number(display_order) : 0;
   if (is_active !== undefined) payload.is_active = Boolean(is_active);
-  payload.updated_at = new Date().toISOString();
   // Try to use .returning() for update, fallback to query
   const updatedRes = await anyDb.update(tables.site_media).set(payload).where(eq(tables.site_media.id, Number(id))).returning();
   let item: any = Array.isArray(updatedRes) ? updatedRes[0] : updatedRes;

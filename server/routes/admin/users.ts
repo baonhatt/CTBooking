@@ -1,4 +1,5 @@
 import { eq, ilike, or, desc, count, sql, and } from "drizzle-orm";
+import { bookings } from "server/db/schema";
 
 export async function getUsersImpl(anyDb: any, tables: { users: any; accounts: any; bookings: any }, args: { page: number; pageSize: number; q: string }) {
   const { page, pageSize, q } = args;
@@ -54,6 +55,7 @@ export async function getUserByIdImpl(anyDb: any, tables: { users: any }, id: nu
       accounts: true,
       bookings: {
         with: { movie: true, ticket_package: true },
+        where: (bookingsTbl) => eq(bookingsTbl.payment_status, "paid"),
         orderBy: (bookingsTbl: any, { desc }: any) => [desc(bookingsTbl.created_at)],
         limit: 10,
       },

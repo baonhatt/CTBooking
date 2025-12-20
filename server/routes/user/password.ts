@@ -3,6 +3,8 @@ import { eq, and, gte } from "drizzle-orm";
 import bcrypt from "bcryptjs";
 import { sendMail } from "../mail-service";
 import "dotenv/config";
+import { getResetPasswordEmailTemplate } from "../../lib/booking-utils";
+import { formatDateForDb } from "../../lib/date-utils";
 
 function randomToken() {
   const array = new Uint8Array(32);
@@ -10,9 +12,7 @@ function randomToken() {
   return Array.from(array, (byte) => byte.toString(16).padStart(2, "0")).join("");
 }
 
-import { getResetPasswordEmailTemplate } from "../../lib/booking-utils";
-
-export async function forgetPassImpl(anyDb: any, tables: { accounts: any; tokens: any }, email: string, sendMailFn?: (to: string, subject: string, html: string) => Promise<any>, getResetPasswordEmailHtml?: (link: string) => string) {
+export async function forgetPassImpl(anyDb: any, tables: { accounts: any; tokens: any }, email: string, sendMailFn?: (to: string, subject: string, html: string) => Promise<any>, getResetPasswordEmailHtml?: (link: string) => string, RUNTIME_ENV?: string) {
   const useracc = await anyDb.query.accounts.findFirst({
     where: eq(tables.accounts.email, email),
   });
@@ -20,11 +20,12 @@ export async function forgetPassImpl(anyDb: any, tables: { accounts: any; tokens
     return { status: 404, message: "Email không tồn tại!" };
   }
   const token = randomToken();
+  const expired_at_dt = new Date(Date.now() + 60 * 60 * 1000);
   await anyDb.insert(tables.tokens).values({
     account_id: useracc.id,
     type: "reset_password",
     token: token,
-    expired_at: new Date(Date.now() + 60 * 60 * 1000).toISOString(),
+    expired_at: formatDateForDb(expired_at_dt, RUNTIME_ENV),
   });
 
   let contentMail = "";
@@ -47,13 +48,14 @@ export async function forgetPassImpl(anyDb: any, tables: { accounts: any; tokens
   return { status: 200, message: "Vui lòng kiểm tra email!" };
 }
 
-export async function resetPasswordImpl(anyDb: any, tables: { accounts: any; tokens: any }, payload: { token?: string; newPassword?: string }) {
+export async function resetPasswordImpl(anyDb: any, tables: { accounts: any; tokens: any }, payload: { token?: string; newPassword?: string }, RUNTIME_ENV?: string) {
   const { token, newPassword } = payload;
+  const now = new Date();
   const tokenRecord = await anyDb.query.tokens.findFirst({
     where: and(
       eq(tables.tokens.token, token || ""),
       eq(tables.tokens.type, "reset_password"),
-      gte(tables.tokens.expired_at, new Date().toISOString())
+      gte(tables.tokens.expired_at, formatDateForDb(now, RUNTIME_ENV))
     ),
   });
   if (!tokenRecord) {
@@ -61,13 +63,14 @@ export async function resetPasswordImpl(anyDb: any, tables: { accounts: any; tok
   }
   const hashedPassword = await bcrypt.hash(String(newPassword), 10);
   await anyDb.update(tables.accounts)
-    .set({ password: hashedPassword })
+    .set({ password: hashedPassword , updated_at: formatDateForDb(now, RUNTIME_ENV)})
     .where(eq(tables.accounts.id, tokenRecord.account_id));
   await anyDb.delete(tables.tokens).where(eq(tables.tokens.id, tokenRecord.id));
+
   return { status: 200, message: "Mật khẩu đã được đặt lại thành công!" };
 }
 
-export async function changePasswordImpl(anyDb: any, tables: { accounts: any }, payload: { email?: string; oldPassword?: string; newPassword?: string }) {
+export async function changePasswordImpl(anyDb: any, tables: { accounts: any }, payload: { email?: string; oldPassword?: string; newPassword?: string }, RUNTIME_ENV?: string) {
   const { email, oldPassword, newPassword } = payload;
   if (!email || !oldPassword || !newPassword) {
     return { status: 400, message: "Thiếu thông tin đổi mật khẩu" };
@@ -79,8 +82,9 @@ export async function changePasswordImpl(anyDb: any, tables: { accounts: any }, 
   const ok = await bcrypt.compare(oldPassword, account.password);
   if (!ok) return { status: 400, message: "Mật khẩu hiện tại không đúng" };
   const hashed = await bcrypt.hash(newPassword, 10);
+  const now = new Date();
   await anyDb.update(tables.accounts)
-    .set({ password: hashed, updated_at: new Date().toISOString() })
+    .set({ password: hashed, updated_at: formatDateForDb(now, RUNTIME_ENV) })
     .where(eq(tables.accounts.id, account.id));
   return { status: 200, message: "Đổi mật khẩu thành công" };
 }

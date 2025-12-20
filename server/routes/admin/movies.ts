@@ -1,13 +1,8 @@
 import { eq, desc, and, inArray } from "drizzle-orm";
+import { formatDateForDb } from "../../lib/date-utils";
 
-export async function createMovieImpl(anyDb: any, tables: { movies: any }, data: { title: string; description?: string; cover_image?: string | null; detail_images?: any; genres?: any; rating?: string | null; duration_min: number; is_active?: boolean; release_date: string | Date }) {
-  const nowIso = new Date().toISOString();
-  let release_date_str: string | null;
-  if (data.release_date) {
-    release_date_str = new Date(data.release_date).toISOString();
-  } else {
-    release_date_str = null;
-  }
+export async function createMovieImpl(anyDb: any, tables: { movies: any }, data: { title: string; description?: string; cover_image?: string | null; detail_images?: any; genres?: any; rating?: string | null; duration_min: number; is_active?: boolean; release_date: string | Date | null },RUNTIME_ENV? :string, ) {
+  const now = new Date();  
   const baseData: any = {
     title: data.title,
     description: data.description,
@@ -17,41 +12,24 @@ export async function createMovieImpl(anyDb: any, tables: { movies: any }, data:
     rating: data.rating ?? null,
     duration_min: data.duration_min,
     is_active: data.is_active === undefined ? true : Boolean(data.is_active),
-    release_date: release_date_str ? release_date_str : null,
-    created_at: nowIso,
-    updated_at: nowIso,
+    release_date: data.release_date ? formatDateForDb(data.release_date, RUNTIME_ENV) : null,
+    created_at: formatDateForDb(now, RUNTIME_ENV),
+    updated_at: formatDateForDb(now, RUNTIME_ENV),
   };
   try {
     const movieInsert = await anyDb.insert(tables.movies).values(baseData).returning();
     let movie: any = Array.isArray(movieInsert) ? movieInsert[0] : movieInsert;
-    // if (!movie) {
-    //   movie = await anyDb.query.movies.findFirst({
-    //     orderBy: [desc(tables.movies.id)],
-    //   });
-    // }
-
     if (!movie) throw new Error("Không thể tạo phim");
     return { movie };
   } catch (err: any) {
-    if ((err?.code === "23505" || err?.code === "P2002") && String(err?.detail || "").includes("id")) {
-      const last = await anyDb.query.movies.findFirst({ orderBy: [desc(tables.movies.id)] });
-      const nextId = ((last?.id as number) || 0) + 1;
-      await anyDb.insert(tables.movies).values({ ...baseData, id: nextId });
-
-      // Query lại movie vừa tạo
-      const movie = await anyDb.query.movies.findFirst({
-        where: eq(tables.movies.id, nextId),
-      });
-
-      if (!movie) throw new Error("Không thể tạo phim");
-      return { movie };
-    }
     throw err;
   }
 }
 
-export async function updateMovieImpl(anyDb: any, tables: { movies: any }, id: number, data: { title?: string; description?: string; cover_image?: string | null; detail_images?: any; genres?: any; rating?: string | null; duration_min?: number; is_active?: boolean; release_date?: string | Date | null }) {
-  const payload: any = { updated_at: new Date().toISOString() };
+export async function updateMovieImpl(anyDb: any, tables: { movies: any }, id: number, data: { title?: string; description?: string; cover_image?: string | null; detail_images?: any; genres?: any; rating?: string | null; duration_min?: number; is_active?: boolean; release_date?: string | Date | null }, RUNTIME_ENV?: string) {
+  const now = new Date();
+  const payload: any = { updated_at: formatDateForDb(now, RUNTIME_ENV) };
+
   if (data.title !== undefined) payload.title = data.title;
   if (data.description !== undefined) payload.description = data.description;
   if (data.cover_image !== undefined) payload.cover_image = data.cover_image;
@@ -60,13 +38,10 @@ export async function updateMovieImpl(anyDb: any, tables: { movies: any }, id: n
   if (data.rating !== undefined) payload.rating = data.rating ?? null;
   if (data.duration_min !== undefined) payload.duration_min = data.duration_min;
   if (data.is_active !== undefined) payload.is_active = Boolean(data.is_active);
-  if (data.release_date !== undefined) payload.release_date = data.release_date ? new Date(data.release_date).toISOString() : null;
-  // Try to use .returning() for update, fallback to query for DBs without returning support
+  if (data.release_date !== undefined) payload.release_date = data.release_date ? formatDateForDb(data.release_date, RUNTIME_ENV) : null;
+
   const updatedRes = await anyDb.update(tables.movies).set(payload).where(eq(tables.movies.id, id)).returning();
   let movie: any = Array.isArray(updatedRes) ? updatedRes[0] : updatedRes;
-  // if (!movie) {
-  //   movie = await anyDb.query.movies.findFirst({ where: eq(tables.movies.id, id) });
-  // }
 
   return movie || null;
 }

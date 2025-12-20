@@ -1,4 +1,5 @@
 import { eq, desc, or, ilike, count } from "drizzle-orm";
+import { formatDateForDb } from "../../lib/date-utils";
 
 export async function listToysImpl(anyDb: any, tables: { toys: any }, args: { page: number; pageSize: number; q: string }) {
   const { page, pageSize, q } = args;
@@ -17,7 +18,7 @@ export async function getToyImpl(anyDb: any, tables: { toys: any }, id: number) 
   return toy || null;
 }
 
-export async function createToyImpl(anyDb: any, tables: { toys: any }, args: { name: string; category?: string; price: number; stock?: number; status?: string; image_url?: string; image_base64?: string }) {
+export async function createToyImpl(anyDb: any, tables: { toys: any }, args: { name: string; category?: string; price: number; stock?: number; status?: string; image_url?: string; image_base64?: string }, RUNTIME_ENV?: string) {
   const { name, category, price, stock, status, image_url, image_base64 } = args as any;
   const priceNum = Number(price);
   let savedImage = image_url as string | undefined;
@@ -32,7 +33,7 @@ export async function createToyImpl(anyDb: any, tables: { toys: any }, args: { n
   }
   */
 
-  const nowIso = new Date().toISOString();
+  const nowIso = new Date();
   // Try to use .returning() to fetch created toy when supported; fallback for D1/SQLite
   const inserted = await anyDb.insert(tables.toys).values({
     name,
@@ -41,8 +42,8 @@ export async function createToyImpl(anyDb: any, tables: { toys: any }, args: { n
     stock: Number(stock ?? 0),
     status: status ?? "active",
     image_url: savedImage,
-    created_at: nowIso,
-    updated_at: nowIso,
+    created_at: formatDateForDb(nowIso, RUNTIME_ENV),
+    updated_at: formatDateForDb(nowIso, RUNTIME_ENV),
   }).returning();
 
   let toy: any = Array.isArray(inserted) ? inserted[0] : inserted;
@@ -54,10 +55,11 @@ export async function createToyImpl(anyDb: any, tables: { toys: any }, args: { n
   return { toy };
 }
 
-export async function updateToyImpl(anyDb: any, tables: { toys: any }, id: number, args: { name?: string; category?: string; price?: number; stock?: number; status?: string; image_url?: string; image_base64?: string }) {
+export async function updateToyImpl(anyDb: any, tables: { toys: any }, id: number, args: { name?: string; category?: string; price?: number; stock?: number; status?: string; image_url?: string; image_base64?: string }, RUNTIME_ENV?: string) {
   const { name, category, price, stock, status, image_url, image_base64 } = args as any;
   const priceNum = price === undefined ? undefined : Number(price);
-  const data: any = { updated_at: new Date().toISOString() };
+  const now = new Date();
+  const data: any = { updated_at: formatDateForDb(now, RUNTIME_ENV) };
   if (name !== undefined) data.name = name;
   if (category !== undefined) data.category = category;
   if (priceNum !== undefined) data.price = String(priceNum);
