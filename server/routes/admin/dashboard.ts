@@ -1,4 +1,7 @@
 import { count, sum, eq, inArray, and, or, gte, lte, gt, sql } from "drizzle-orm";
+import { formatDateForDb } from "../../lib/date-utils";
+
+const RUNTIME_ENV = "cloudflare-worker"; // Hardcode for worker context since this file is shared but we are fixing worker issue
 
 export async function getDashboardMetricsImpl(anyDb: any, tables: { movies: any; toys?: any; users: any; bookings: any }) {
   const [totalMoviesRes] = await anyDb.select({ count: count() }).from(tables.movies).where(eq(tables.movies.is_active, true));
@@ -20,7 +23,10 @@ export async function getDashboardMetricsImpl(anyDb: any, tables: { movies: any;
   const todayEnd = new Date(now);
   todayEnd.setHours(23, 59, 59, 999);
 
-  const dateCondition = or(and(gte(tables.bookings.created_at, todayStart), lte(tables.bookings.created_at, todayEnd)), and(gte(tables.bookings.paid_at, todayStart), lte(tables.bookings.paid_at, todayEnd)));
+  const todayStartStr = formatDateForDb(todayStart, RUNTIME_ENV) as string;
+  const todayEndStr = formatDateForDb(todayEnd, RUNTIME_ENV) as string;
+
+  const dateCondition = or(and(gte(tables.bookings.created_at, todayStartStr), lte(tables.bookings.created_at, todayEndStr)), and(gte(tables.bookings.paid_at, todayStartStr), lte(tables.bookings.paid_at, todayEndStr)));
   const [revenueData] = await anyDb.select({ sum: sum(tables.bookings.total_price) }).from(tables.bookings).where(and(inArray(tables.bookings.payment_status, ["paid"]), dateCondition));
   const revenueTotal = Number(revenueData?.sum || 0);
   const [revenueCashTodayAgg] = await anyDb.select({ sum: sum(tables.bookings.total_price) }).from(tables.bookings).where(and(inArray(tables.bookings.payment_status, ["paid"]), inArray(tables.bookings.payment_method, ["cash", "Cash"]), dateCondition));
@@ -29,16 +35,16 @@ export async function getDashboardMetricsImpl(anyDb: any, tables: { movies: any;
   const revenueByMethod = { cash: Number(revenueCashTodayAgg?.sum || 0), momo: Number(revenueMomoTodayAgg?.sum || 0), vnpay: Number(revenueVnpayTodayAgg?.sum || 0) };
   const [bookingsTodayRes] = await anyDb.select({ count: count() }).from(tables.bookings).where(and(inArray(tables.bookings.payment_status, ["paid"]), dateCondition));
   const bookingsToday = bookingsTodayRes?.count || 0;
-  const [bookingsFutureRes] = await anyDb.select({ count: count() }).from(tables.bookings).where(and(inArray(tables.bookings.payment_status, ["paid"]), gt(tables.bookings.created_at, todayEnd)));
+  const [bookingsFutureRes] = await anyDb.select({ count: count() }).from(tables.bookings).where(and(inArray(tables.bookings.payment_status, ["paid"]), gt(tables.bookings.created_at, todayEndStr)));
   const bookingsFuture = bookingsFutureRes?.count || 0;
   const weekStart = new Date(todayStart);
   weekStart.setDate(weekStart.getDate() - 6);
-  const weekStartStr = weekStart.toISOString();
+  const weekStartStr = formatDateForDb(weekStart, RUNTIME_ENV) as string;
   const weekBookings = await anyDb
     .select({ movie_id: tables.bookings.movie_id, total_price: tables.bookings.total_price, movie_title: tables.movies.title })
     .from(tables.bookings)
     .leftJoin(tables.movies, eq(tables.bookings.movie_id, tables.movies.id))
-    .where(and(inArray(tables.bookings.payment_status, ["paid"]), or(and(gte(tables.bookings.created_at, weekStart), lte(tables.bookings.created_at, todayEnd)), and(gte(tables.bookings.paid_at, weekStart), lte(tables.bookings.paid_at, todayEnd)))));
+    .where(and(inArray(tables.bookings.payment_status, ["paid"]), or(and(gte(tables.bookings.created_at, weekStartStr), lte(tables.bookings.created_at, todayEndStr)), and(gte(tables.bookings.paid_at, weekStartStr), lte(tables.bookings.paid_at, todayEndStr)))));
   const map = new Map<number, { title: string; revenue: number }>();
   for (const b of weekBookings) {
     const movieId = b.movie_id;
@@ -66,7 +72,7 @@ export async function getRevenueByDateImpl(anyDb: any, tables: { bookings: any }
     const dayEnd = new Date(date);
     dayEnd.setHours(23, 59, 59, 999);
   
-    dateCondition = or(and(gte(tables.bookings.created_at, dayStart), lte(tables.bookings.created_at, dayEnd)), and(gte(tables.bookings.paid_at, dayStart), lte(tables.bookings.paid_at, dayEnd)));
+    dateCondition = or(and(gte(tables.bookings.created_at, formatDateForDb(dayStart, RUNTIME_ENV)), lte(tables.bookings.created_at, formatDateForDb(dayEnd, RUNTIME_ENV))), and(gte(tables.bookings.paid_at, formatDateForDb(dayStart, RUNTIME_ENV)), lte(tables.bookings.paid_at, formatDateForDb(dayEnd, RUNTIME_ENV))));
   }
   const statusCondition = status !== "all" ? inArray(tables.bookings.payment_status, ["paid"]) : undefined;
   const whereCondition = and(dateCondition, statusCondition);
@@ -90,12 +96,12 @@ export async function getRevenue7DaysImpl(anyDb: any, tables: { bookings: any })
     dayStart.setHours(0, 0, 0, 0);
     const dayEnd = new Date(dayDate);
     dayEnd.setHours(23, 59, 59, 999);
-    const dayStartStr = dayStart.toISOString();
-    const dayEndStr = dayEnd.toISOString();
+    const dayStartStr = formatDateForDb(dayStart, RUNTIME_ENV) as string;
+    const dayEndStr = formatDateForDb(dayEnd, RUNTIME_ENV) as string;
     const [revenue] = await anyDb
       .select({ sum: sum(tables.bookings.total_price) })
       .from(tables.bookings)
-      .where(and(inArray(tables.bookings.payment_status, ["paid"]), or(and(gte(tables.bookings.created_at, dayStart), lte(tables.bookings.created_at, dayEnd)), and(gte(tables.bookings.paid_at, dayStart), lte(tables.bookings.paid_at, dayEnd)))));
+      .where(and(inArray(tables.bookings.payment_status, ["paid"]), or(and(gte(tables.bookings.created_at, dayStartStr), lte(tables.bookings.created_at, dayEndStr)), and(gte(tables.bookings.paid_at, dayStartStr), lte(tables.bookings.paid_at, dayEndStr)))));
     const monthStr = String(dayDate.getMonth() + 1).padStart(2, "0");
     const dateStr = String(dayDate.getDate()).padStart(2, "0");
     days.push({ day: `${monthStr}-${dateStr}`, revenue: Number(revenue?.sum || 0) });
@@ -114,7 +120,9 @@ export async function getRevenueByMonthImpl(anyDb: any, tables: { bookings: any 
     monthStart.setHours(0, 0, 0, 0);
     const monthEnd = new Date(year, month, 0);
     monthEnd.setHours(23, 59, 59, 999);
-    const dateCondition = or(and(gte(tables.bookings.created_at, monthStart), lte(tables.bookings.created_at, monthEnd)), and(gte(tables.bookings.paid_at, monthStart), lte(tables.bookings.paid_at, monthEnd)));
+    const monthStartStr = formatDateForDb(monthStart, RUNTIME_ENV) as string;
+    const monthEndStr = formatDateForDb(monthEnd, RUNTIME_ENV) as string;
+    const dateCondition = or(and(gte(tables.bookings.created_at, monthStartStr), lte(tables.bookings.created_at, monthEndStr)), and(gte(tables.bookings.paid_at, monthStartStr), lte(tables.bookings.paid_at, monthEndStr)));
     const statusCondition = status !== "all" ? inArray(tables.bookings.payment_status, ["paid"]) : undefined;
     const whereMonth = and(dateCondition, statusCondition);
     const [revenue] = await anyDb.select({ sum: sum(tables.bookings.total_price) }).from(tables.bookings).where(whereMonth);
@@ -135,7 +143,9 @@ export async function getRevenueByMonthImpl(anyDb: any, tables: { bookings: any 
     monthStart.setHours(0, 0, 0, 0);
     const monthEnd = new Date(targetYear, m + 1, 0);
     monthEnd.setHours(23, 59, 59, 999);
-    const dateCondition = or(and(gte(tables.bookings.created_at, monthStart), lte(tables.bookings.created_at, monthEnd)), and(gte(tables.bookings.paid_at, monthStart), lte(tables.bookings.paid_at, monthEnd)));
+    const monthStartStr = formatDateForDb(monthStart, RUNTIME_ENV) as string;
+    const monthEndStr = formatDateForDb(monthEnd, RUNTIME_ENV) as string;
+    const dateCondition = or(and(gte(tables.bookings.created_at, monthStartStr), lte(tables.bookings.created_at, monthEndStr)), and(gte(tables.bookings.paid_at, monthStartStr), lte(tables.bookings.paid_at, monthEndStr)));
     const statusCondition = status !== "all" ? inArray(tables.bookings.payment_status, ["paid"]) : undefined;
     const whereMonth = and(dateCondition, statusCondition);
     const [revenue] = await anyDb.select({ sum: sum(tables.bookings.total_price) }).from(tables.bookings).where(whereMonth);
