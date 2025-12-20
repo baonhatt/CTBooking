@@ -92,7 +92,7 @@ export async function getBookingByCodeApi(code: string) {
 }
 
 export async function useTicketApi(code: string) {
-  return request<{ ok: boolean; message: string; booking: { id: number; is_used: boolean } }>(`/api/bookings/use`, {
+  return request<{ status: string; message: string; booking: { id: number; is_used: boolean } }>(`/api/bookings/use`, {
     method: "POST",
     body: JSON.stringify({ code }),
   });

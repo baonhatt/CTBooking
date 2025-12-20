@@ -65,7 +65,7 @@ export default function TicketCheckContent() {
     try {
       setUseLoading(true);
       const res = await useTicketApi(ticketInfo.booking_code);
-      if (res?.ok) {
+      if (res?.status == "success") {
         setTicketInfo({ ...(ticketInfo as any), is_used: true, can_use: false, valid: false });
       }
     } catch (err: any) {
@@ -163,10 +163,10 @@ export default function TicketCheckContent() {
   const validityLabel = ticketInfo?.valid
     ? "Vé còn hiệu lực"
     : ticketInfo?.expired
-    ? "Vé đã hết hạn"
-    : ticketInfo?.is_used
-    ? "Vé đã sử dụng"
-    : "Vé vô hiệu";
+      ? "Vé đã hết hạn"
+      : ticketInfo?.is_used
+        ? "Vé đã sử dụng"
+        : "Vé vô hiệu";
 
   return (
     <div className="space-y-6">
@@ -218,10 +218,10 @@ export default function TicketCheckContent() {
               ticketInfo.expired
                 ? "border-l-4 border-l-red-600 bg-red-50"
                 : ticketInfo.is_used
-                ? "border-l-4 border-l-yellow-600 bg-yellow-50"
-                : ticketInfo.valid
-                ? "border-l-4 border-l-green-600 bg-green-50"
-                : "border-l-4 border-l-yellow-600 bg-yellow-50"
+                  ? "border-l-4 border-l-yellow-600 bg-yellow-50"
+                  : ticketInfo.valid
+                    ? "border-l-4 border-l-green-600 bg-green-50"
+                    : "border-l-4 border-l-yellow-600 bg-yellow-50"
             }
           >
             <CardContent className="pt-6">

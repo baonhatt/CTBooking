@@ -60,6 +60,7 @@ export async function getMovie(anyDb: any, tables: { movies: any }, id: number) 
   const movie = await anyDb.query.movies.findFirst({
     where: eq(tables.movies.id, id),
   });
+  if (!movie) return null;
   return movie;
 }
 
