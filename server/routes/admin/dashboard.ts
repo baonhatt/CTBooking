@@ -19,11 +19,8 @@ export async function getDashboardMetricsImpl(anyDb: any, tables: { movies: any;
   todayStart.setHours(0, 0, 0, 0);
   const todayEnd = new Date(now);
   todayEnd.setHours(23, 59, 59, 999);
-  
-  const todayStartStr = todayStart.toISOString();
-  const todayEndStr = todayEnd.toISOString();
-  
-  const dateCondition = or(and(gte(tables.bookings.created_at, todayStartStr), lte(tables.bookings.created_at, todayEndStr)), and(gte(tables.bookings.paid_at, todayStartStr), lte(tables.bookings.paid_at, todayEndStr)));
+
+  const dateCondition = or(and(gte(tables.bookings.created_at, todayStart), lte(tables.bookings.created_at, todayEnd)), and(gte(tables.bookings.paid_at, todayStart), lte(tables.bookings.paid_at, todayEnd)));
   const [revenueData] = await anyDb.select({ sum: sum(tables.bookings.total_price) }).from(tables.bookings).where(and(inArray(tables.bookings.payment_status, ["paid"]), dateCondition));
   const revenueTotal = Number(revenueData?.sum || 0);
   const [revenueCashTodayAgg] = await anyDb.select({ sum: sum(tables.bookings.total_price) }).from(tables.bookings).where(and(inArray(tables.bookings.payment_status, ["paid"]), inArray(tables.bookings.payment_method, ["cash", "Cash"]), dateCondition));
@@ -32,7 +29,7 @@ export async function getDashboardMetricsImpl(anyDb: any, tables: { movies: any;
   const revenueByMethod = { cash: Number(revenueCashTodayAgg?.sum || 0), momo: Number(revenueMomoTodayAgg?.sum || 0), vnpay: Number(revenueVnpayTodayAgg?.sum || 0) };
   const [bookingsTodayRes] = await anyDb.select({ count: count() }).from(tables.bookings).where(and(inArray(tables.bookings.payment_status, ["paid"]), dateCondition));
   const bookingsToday = bookingsTodayRes?.count || 0;
-  const [bookingsFutureRes] = await anyDb.select({ count: count() }).from(tables.bookings).where(and(inArray(tables.bookings.payment_status, ["paid"]), gt(tables.bookings.created_at, todayEnd.toISOString())));
+  const [bookingsFutureRes] = await anyDb.select({ count: count() }).from(tables.bookings).where(and(inArray(tables.bookings.payment_status, ["paid"]), gt(tables.bookings.created_at, todayEnd)));
   const bookingsFuture = bookingsFutureRes?.count || 0;
   const weekStart = new Date(todayStart);
   weekStart.setDate(weekStart.getDate() - 6);
@@ -41,7 +38,7 @@ export async function getDashboardMetricsImpl(anyDb: any, tables: { movies: any;
     .select({ movie_id: tables.bookings.movie_id, total_price: tables.bookings.total_price, movie_title: tables.movies.title })
     .from(tables.bookings)
     .leftJoin(tables.movies, eq(tables.bookings.movie_id, tables.movies.id))
-    .where(and(inArray(tables.bookings.payment_status, ["paid"]), or(and(gte(tables.bookings.created_at, weekStartStr), lte(tables.bookings.created_at, todayEndStr)), and(gte(tables.bookings.paid_at, weekStartStr), lte(tables.bookings.paid_at, todayEndStr)))));
+    .where(and(inArray(tables.bookings.payment_status, ["paid"]), or(and(gte(tables.bookings.created_at, weekStart), lte(tables.bookings.created_at, todayEnd)), and(gte(tables.bookings.paid_at, weekStart), lte(tables.bookings.paid_at, todayEnd)))));
   const map = new Map<number, { title: string; revenue: number }>();
   for (const b of weekBookings) {
     const movieId = b.movie_id;
@@ -68,9 +65,8 @@ export async function getRevenueByDateImpl(anyDb: any, tables: { bookings: any }
     dayStart.setHours(0, 0, 0, 0);
     const dayEnd = new Date(date);
     dayEnd.setHours(23, 59, 59, 999);
-    const dayStartStr = dayStart.toISOString();
-    const dayEndStr = dayEnd.toISOString();
-    dateCondition = or(and(gte(tables.bookings.created_at, dayStartStr), lte(tables.bookings.created_at, dayEndStr)), and(gte(tables.bookings.paid_at, dayStartStr), lte(tables.bookings.paid_at, dayEndStr)));
+  
+    dateCondition = or(and(gte(tables.bookings.created_at, dayStart), lte(tables.bookings.created_at, dayEnd)), and(gte(tables.bookings.paid_at, dayStart), lte(tables.bookings.paid_at, dayEnd)));
   }
   const statusCondition = status !== "all" ? inArray(tables.bookings.payment_status, ["paid"]) : undefined;
   const whereCondition = and(dateCondition, statusCondition);
@@ -99,7 +95,7 @@ export async function getRevenue7DaysImpl(anyDb: any, tables: { bookings: any })
     const [revenue] = await anyDb
       .select({ sum: sum(tables.bookings.total_price) })
       .from(tables.bookings)
-      .where(and(inArray(tables.bookings.payment_status, ["paid"]), or(and(gte(tables.bookings.created_at, dayStartStr), lte(tables.bookings.created_at, dayEndStr)), and(gte(tables.bookings.paid_at, dayStartStr), lte(tables.bookings.paid_at, dayEndStr)))));
+      .where(and(inArray(tables.bookings.payment_status, ["paid"]), or(and(gte(tables.bookings.created_at, dayStart), lte(tables.bookings.created_at, dayEnd)), and(gte(tables.bookings.paid_at, dayStart), lte(tables.bookings.paid_at, dayEnd)))));
     const monthStr = String(dayDate.getMonth() + 1).padStart(2, "0");
     const dateStr = String(dayDate.getDate()).padStart(2, "0");
     days.push({ day: `${monthStr}-${dateStr}`, revenue: Number(revenue?.sum || 0) });
@@ -118,9 +114,7 @@ export async function getRevenueByMonthImpl(anyDb: any, tables: { bookings: any 
     monthStart.setHours(0, 0, 0, 0);
     const monthEnd = new Date(year, month, 0);
     monthEnd.setHours(23, 59, 59, 999);
-    const monthStartStr = monthStart.toISOString();
-    const monthEndStr = monthEnd.toISOString();
-    const dateCondition = or(and(gte(tables.bookings.created_at, monthStartStr), lte(tables.bookings.created_at, monthEndStr)), and(gte(tables.bookings.paid_at, monthStartStr), lte(tables.bookings.paid_at, monthEndStr)));
+    const dateCondition = or(and(gte(tables.bookings.created_at, monthStart), lte(tables.bookings.created_at, monthEnd)), and(gte(tables.bookings.paid_at, monthStart), lte(tables.bookings.paid_at, monthEnd)));
     const statusCondition = status !== "all" ? inArray(tables.bookings.payment_status, ["paid"]) : undefined;
     const whereMonth = and(dateCondition, statusCondition);
     const [revenue] = await anyDb.select({ sum: sum(tables.bookings.total_price) }).from(tables.bookings).where(whereMonth);
@@ -141,9 +135,7 @@ export async function getRevenueByMonthImpl(anyDb: any, tables: { bookings: any 
     monthStart.setHours(0, 0, 0, 0);
     const monthEnd = new Date(targetYear, m + 1, 0);
     monthEnd.setHours(23, 59, 59, 999);
-    const monthStartStr = monthStart.toISOString();
-    const monthEndStr = monthEnd.toISOString();
-    const dateCondition = or(and(gte(tables.bookings.created_at, monthStartStr), lte(tables.bookings.created_at, monthEndStr)), and(gte(tables.bookings.paid_at, monthStartStr), lte(tables.bookings.paid_at, monthEndStr)));
+    const dateCondition = or(and(gte(tables.bookings.created_at, monthStart), lte(tables.bookings.created_at, monthEnd)), and(gte(tables.bookings.paid_at, monthStart), lte(tables.bookings.paid_at, monthEnd)));
     const statusCondition = status !== "all" ? inArray(tables.bookings.payment_status, ["paid"]) : undefined;
     const whereMonth = and(dateCondition, statusCondition);
     const [revenue] = await anyDb.select({ sum: sum(tables.bookings.total_price) }).from(tables.bookings).where(whereMonth);

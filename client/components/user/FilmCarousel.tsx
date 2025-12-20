@@ -189,13 +189,13 @@ export default function FilmCarousel({ onSelectFilm }: FilmCarouselProps) {
   return (
     <section
       id="films"
-      className="relative py-20 bg-gradient-to-b from-[#050915] via-[#0b1226] to-[#0e1b3d] overflow-hidden"
+      className="relative py-20 px-2 bg-gradient-to-b from-[#050915] via-[#0b1226] to-[#0e1b3d] overflow-hidden"
     >
       <div className="absolute inset-0 opacity-60 neon-noise pointer-events-none" />
       <div className="absolute -left-10 -top-10 w-72 h-72 rounded-full bg-cyan-500/15 blur-3xl" />
       <div className="absolute right-0 bottom-0 w-96 h-96 rounded-full bg-fuchsia-500/10 blur-[120px]" />
 
-      <div className="container mx-auto px-4 relative z-10">
+      <div className="container mx-auto px-3 relative z-10">
         <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-4 mb-10">
           <div>
             <p className="text-sm uppercase tracking-[0.24em] text-cyan-200">Phim</p>
@@ -226,16 +226,17 @@ export default function FilmCarousel({ onSelectFilm }: FilmCarouselProps) {
           </div>
         </div>
 
-        <div ref={emblaRef} className="overflow-hidden pb-4">
-          <div className="flex gap-6">
+        <div ref={emblaRef} className="overflow-hidden pb-4 w-full ">
+          <div className="flex -ml-6 mx-5 touch-pan-y">
           {films.map((film, index) => (
             <motion.div
+            
               key={film.id}
               initial={{ opacity: 0, y: 30 }}
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true }}
               transition={{ delay: index * 0.05, duration: 0.45 }}
-              className="flex-[0_0_auto] min-w-[240px] md:min-w-[280px]"
+              className="flex-[0_0_auto] min-w-[240px] md:min-w-[280px] pl-6"
             >
               <motion.button
                 onMouseEnter={() => setHoveredIndex(index)}
@@ -265,7 +266,7 @@ export default function FilmCarousel({ onSelectFilm }: FilmCarouselProps) {
                 <img
                   src={film.poster}
                   alt={film.title}
-                  className="absolute object-cover inset-0 w-full h-full object-contain transition-transform duration-500 group-hover:scale-110"
+                  className="absolute object-cover inset-0 w-full h-full  transition-transform duration-500 group-hover:scale-110"
                 />
                 <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/30 to-transparent" />
                 <div

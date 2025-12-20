@@ -1006,7 +1006,7 @@ export default function Header({ onBookClick = () => { }, disableNav = false, to
                 </AlertDialogDescription>
               </AlertDialogHeader>
               <AlertDialogFooter>
-                <AlertDialogAction className="bg-gradient-to-r from-cyan-400 via-blue-600 to-fuchsia-500 hover:from-fuchsia-500 hover:via-cyan-400 hover:to-blue-600 text-white font-semibold">
+                <AlertDialogAction onClick={()=> {setLoginEmail(""); setLoginPassword(""); setLoginSubmitError("")}} className="bg-gradient-to-r from-cyan-400 via-blue-600 to-fuchsia-500 hover:from-fuchsia-500 hover:via-cyan-400 hover:to-blue-600 text-white font-semibold">
                   Đóng
                 </AlertDialogAction>
               </AlertDialogFooter>
