@@ -79,31 +79,7 @@ export default function FilmCarousel({ onSelectFilm }: FilmCarouselProps) {
             "https://images.unsplash.com/photo-1464375117522-1311d6a5b81f?auto=format&fit=crop&w=900&q=80",
         })) || [];
 
-    if (fetched.length > 0) return fetched;
-
-    return [
-      {
-        id: "placeholder-1",
-        title: "Aurora Beyond",
-        genre: "Sci‑Fi • Space Opera",
-        poster:
-          "https://images.unsplash.com/photo-1504384308090-c894fdcc538d?auto=format&fit=crop&w=900&q=80",
-      },
-      {
-        id: "placeholder-2",
-        title: "Nebula Rising",
-        genre: "Adventure • 8K",
-        poster:
-          "https://images.unsplash.com/photo-1500530855697-b586d89ba3ee?auto=format&fit=crop&w=900&q=80",
-      },
-      {
-        id: "placeholder-3",
-        title: "Photon Drift",
-        genre: "Action • VR",
-        poster:
-          "https://images.unsplash.com/photo-1500530855697-b586d89ba3ee?auto=format&fit=crop&w=900&q=80",
-      },
-    ];
+    return fetched;
   }, [data]);
 
   // Update scroll buttons state
@@ -226,71 +202,77 @@ export default function FilmCarousel({ onSelectFilm }: FilmCarouselProps) {
           </div>
         </div>
 
-        <div ref={emblaRef} className="overflow-hidden pb-4 w-full ">
-          <div className="flex -ml-6 mx-5 touch-pan-y">
-          {films.map((film, index) => (
-            <motion.div
-            
-              key={film.id}
-              initial={{ opacity: 0, y: 30 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true }}
-              transition={{ delay: index * 0.05, duration: 0.45 }}
-              className="flex-[0_0_auto] min-w-[240px] md:min-w-[280px] pl-6"
-            >
-              <motion.button
-                onMouseEnter={() => setHoveredIndex(index)}
-                onMouseLeave={() => setHoveredIndex((prev) => (prev === index ? null : prev))}
-                onTouchStart={() => {
-                  setHoveredIndex(index);
-                  setLastTapTime(Date.now());
-                }}
-                onClick={() => {
-                  if (isTouchDevice) {
-                    const now = Date.now();
-                    if (!hoveredIndex || hoveredIndex !== index || now - lastTapTime > 350) {
-                      setHoveredIndex(index);
-                      setLastTapTime(now);
-                      return;
-                    }
-                  }
-                  handleOpen(film);
-                }}
-                className="group relative w-full rounded-3xl overflow-hidden border border-white/10 bg-white/5 backdrop-blur-lg shadow-[0_0_30px_rgba(59,130,246,0.2)] hover:shadow-[0_0_40px_rgba(236,72,153,0.25)] transition-all duration-300"
-              >
-              <div className="relative h-80 w-full overflow-hidden">
-                <div
-                  className="absolute inset-0 bg-center bg-cover blur-md object-cover scale-110"
-                  style={{ backgroundImage: `url(${film.poster})` }}
-                />
-                <img
-                  src={film.poster}
-                  alt={film.title}
-                  className="absolute object-cover inset-0 w-full h-full  transition-transform duration-500 group-hover:scale-110"
-                />
-                <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/30 to-transparent" />
-                <div
-                  className={`absolute bottom-4 left-4 right-4 space-y-2 text-left opacity-0 transition-opacity duration-300 ${
-                    hoveredIndex === index ? "opacity-100" : "group-hover:opacity-100"
-                  }`}
+        {films.length > 0 ? (
+          <div ref={emblaRef} className="overflow-hidden pb-4 w-full ">
+            <div className="flex -ml-6 mx-5 touch-pan-y">
+              {films.map((film, index) => (
+                <motion.div
+                  key={film.id}
+                  initial={{ opacity: 0, y: 30 }}
+                  whileInView={{ opacity: 1, y: 0 }}
+                  viewport={{ once: true }}
+                  transition={{ delay: index * 0.05, duration: 0.45 }}
+                  className="flex-[0_0_auto] min-w-[240px] md:min-w-[280px] pl-6"
                 >
-                  <p className="text-xs uppercase tracking-[0.18em] text-cyan-200">
-                    {film.genre}
-                  </p>
-                  <h3 className="text-xl font-semibold text-white drop-shadow-lg">
-                    {film.title}
-                  </h3>
-                  <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/10 border border-white/20 text-sm text-white">
-                    <Play className="h-4 w-4 text-cyan-300" />
-                    Mở chi tiết
-                  </div>
-                </div>
-              </div>
-            </motion.button>
-            </motion.div>
-          ))}
+                  <motion.button
+                    onMouseEnter={() => setHoveredIndex(index)}
+                    onMouseLeave={() => setHoveredIndex((prev) => (prev === index ? null : prev))}
+                    onTouchStart={() => {
+                      setHoveredIndex(index);
+                      setLastTapTime(Date.now());
+                    }}
+                    onClick={() => {
+                      if (isTouchDevice) {
+                        const now = Date.now();
+                        if (!hoveredIndex || hoveredIndex !== index || now - lastTapTime > 350) {
+                          setHoveredIndex(index);
+                          setLastTapTime(now);
+                          return;
+                        }
+                      }
+                      handleOpen(film);
+                    }}
+                    className="group relative w-full rounded-3xl overflow-hidden border border-white/10 bg-white/5 backdrop-blur-lg shadow-[0_0_30px_rgba(59,130,246,0.2)] hover:shadow-[0_0_40px_rgba(236,72,153,0.25)] transition-all duration-300"
+                  >
+                    <div className="relative h-80 w-full overflow-hidden">
+                      <div
+                        className="absolute inset-0 bg-center bg-cover blur-md object-cover scale-110"
+                        style={{ backgroundImage: `url(${film.poster})` }}
+                      />
+                      <img
+                        src={film.poster}
+                        alt={film.title}
+                        className="absolute object-cover inset-0 w-full h-full  transition-transform duration-500 group-hover:scale-110"
+                      />
+                      <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/30 to-transparent" />
+                      <div
+                        className={`absolute bottom-4 left-4 right-4 space-y-2 text-left opacity-0 transition-opacity duration-300 ${
+                          hoveredIndex === index ? "opacity-100" : "group-hover:opacity-100"
+                        }`}
+                      >
+                        <p className="text-xs uppercase tracking-[0.18em] text-cyan-200">
+                          {film.genre}
+                        </p>
+                        <h3 className="text-xl font-semibold text-white drop-shadow-lg">
+                          {film.title}
+                        </h3>
+                        <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/10 border border-white/20 text-sm text-white">
+                          <Play className="h-4 w-4 text-cyan-300" />
+                          Mở chi tiết
+                        </div>
+                      </div>
+                    </div>
+                  </motion.button>
+                </motion.div>
+              ))}
+            </div>
           </div>
-        </div>
+        ) : (
+          <div className="w-full text-center text-gray-400 py-20 bg-white/5 rounded-xl border border-white/10 backdrop-blur-sm">
+            <p className="text-xl font-medium text-cyan-100 mb-2">Không có phim</p>
+            <p className="text-sm">Hiện tại chưa có phim nào đang chiếu. Vui lòng quay lại sau.</p>
+          </div>
+        )}
       </div>
 
       {/* Movie Details Modal */}
