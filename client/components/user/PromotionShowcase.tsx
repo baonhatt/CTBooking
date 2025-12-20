@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { getActiveTickets } from "@/lib/api";
 import { toast } from "@/components/ui/use-toast";
+import { cn } from "@/lib/utils";
 import { Carousel, CarouselContent, CarouselItem, CarouselNext, CarouselPrevious } from "../ui/carousel";
 
 export default function PromotionShowcase() {
@@ -74,13 +75,21 @@ export default function PromotionShowcase() {
             <Carousel
               opts={{
                 align: "start",
-                loop: true,
+                loop: combos.length > 4,
               }}
               className="w-full"
             >
               <CarouselContent>
                 {combos.map((combo, index) => (
-                  <CarouselItem key={combo.id} className="md:basis-1/2 lg:basis-1/4 py-10 pl-6">
+                  <CarouselItem
+                    key={combo.id}
+                    className={cn(
+                      "md:basis-1/2 lg:basis-1/4 py-10 pl-6",
+                      index === 0 && combos.length === 1 && "md:ml-[25%] lg:ml-[37.5%]",
+                      index === 0 && combos.length === 2 && "lg:ml-[25%]",
+                      index === 0 && combos.length === 3 && "lg:ml-[12.5%]"
+                    )}
+                  >
                     <motion.div
                       initial={{ opacity: 0, y: 50 }}
                       whileInView={{ opacity: 1, y: 0 }}
@@ -95,7 +104,7 @@ export default function PromotionShowcase() {
                         type: "spring",
                         stiffness: 100,
                       }}
-                      className="h-full relative overflow-hidden rounded-3xl p-6 bg-white/5 border border-cyan-400/20 shadow-[0_10px_50px_rgba(59,130,246,0.15)] group transition-colors duration-300 flex flex-col justify-between"
+                      className="h-full relative overflow-hidden rounded-3xl p-6 px-4 bg-white/5 border border-cyan-400/20 shadow-[0_10px_50px_rgba(59,130,246,0.15)] group transition-colors duration-300 flex flex-col justify-between"
                     >
                       <div className="absolute inset-0 bg-gradient-to-br from-cyan-500/15 via-blue-600/10 to-fuchsia-500/12 opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
                       <div className="absolute -top-10 -right-10 w-28 h-28 bg-white/10 rounded-full blur-3xl group-hover:bg-cyan-400/20 transition-colors duration-500" />
@@ -112,7 +121,7 @@ export default function PromotionShowcase() {
                         </h3>
                         <motion.p
                           whileHover={{ scale: 1.1, originX: 0 }}
-                          className="text-3xl font-extrabold text-cyan-300 drop-shadow group-hover:text-cyan-200 transition-colors"
+                          className="text-3xl  font-extrabold text-cyan-300 drop-shadow group-hover:text-cyan-200 transition-colors"
                         >
                           {combo.price.toLocaleString("vi-VN")}₫
                         </motion.p>
@@ -133,13 +142,13 @@ export default function PromotionShowcase() {
                   </CarouselItem>
                 ))}
               </CarouselContent>
-              <div className="hidden md:block">
+              <div className={cn("hidden", combos.length > 2 ? "md:block" : "md:hidden", combos.length <= 4 && "lg:hidden")}>
                 <CarouselPrevious className="bg-white/10 hover:bg-cyan-500 hover:text-white border-none text-white -left-12" />
                 <CarouselNext className="bg-white/10 hover:bg-cyan-500 hover:text-white border-none text-white -right-12" />
               </div>
 
               {/* Mobile Navigation */}
-              <div className="flex justify-center gap-4 mt-6 md:hidden">
+              <div className={cn("flex justify-center gap-4 mt-6 md:hidden", combos.length <= 1 && "hidden")}>
                 <CarouselPrevious className="static translate-y-0 bg-white/10 hover:bg-cyan-500 hover:text-white border-none text-white" />
                 <CarouselNext className="static translate-y-0 bg-white/10 hover:bg-cyan-500 hover:text-white border-none text-white" />
               </div>

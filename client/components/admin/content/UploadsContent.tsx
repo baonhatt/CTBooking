@@ -399,8 +399,7 @@ export default function UploadsContent() {
             ) : (
               <div className="rounded-xl border border-dashed border-white/20 bg-white/5 p-8 flex flex-col items-center justify-center min-h-[200px]">
                 <div className="text-gray-500 text-sm text-center">
-                  <div className="mb-2">📁</div>
-                  <div>Chọn file để xem preview</div>
+                  <div>Preview file</div>
                 </div>
               </div>
             )}

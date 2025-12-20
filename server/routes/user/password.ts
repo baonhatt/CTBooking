@@ -61,6 +61,23 @@ export async function resetPasswordImpl(anyDb: any, tables: { accounts: any; tok
   if (!tokenRecord) {
     return { status: 400, message: "Token không hợp lệ hoặc đã hết hạn!" };
   }
+
+  // Lấy thông tin tài khoản để kiểm tra mật khẩu cũ
+  const account = await anyDb.query.accounts.findFirst({
+    where: eq(tables.accounts.id, tokenRecord.account_id),
+  });
+
+  if (!account) {
+    return { status: "error", message: "Tài khoản không tồn tại!" };
+  }
+
+  // Kiểm tra nếu mật khẩu mới trùng với mật khẩu cũ
+  const isMatch = await bcrypt.compare(String(newPassword), account.password);
+  if (isMatch) {
+    console.log(`[Security] User ${account.email} attempted to reset password with the same password.`);
+    return { status: "error", message: "Mật khẩu mới không được trùng với mật khẩu hiện tại" };
+  }
+
   const hashedPassword = await bcrypt.hash(String(newPassword), 10);
   await anyDb.update(tables.accounts)
     .set({ password: hashedPassword , updated_at: formatDateForDb(now, RUNTIME_ENV)})

@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { toast } from "@/components/ui/use-toast";
@@ -8,11 +8,26 @@ import { resetPasswordApi } from "@/lib/api/auth";
 export default function ConfirmToken() {
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
-  const { token } = useParams();
+  const [searchParams] = useSearchParams();
+  const token = searchParams.get("token") || "";
   const navigate = useNavigate();
+
+  const validatePassword = (password: string) => {
+    const regex = /^(?=.*[A-Za-z])(?=.*\d)[A-Za-z\d]{6,}$/;
+    return regex.test(password);
+  };
 
   const handleResetPassSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    if (!validatePassword(newPassword)) {
+      toast({
+        title: "Mật khẩu không hợp lệ",
+        description: "Mật khẩu phải có ít nhất 6 ký tự, bao gồm cả chữ cái và số",
+      });
+      return;
+    }
+    
     if (newPassword !== confirmPassword) {
       toast({
         title: "Mật khẩu không khớp",
@@ -20,6 +35,7 @@ export default function ConfirmToken() {
       });
       return;
     }
+    
     try {
       const response = await resetPasswordApi({ token, newPassword });
       if (response.status === "success") {
@@ -27,7 +43,11 @@ export default function ConfirmToken() {
         navigate("/");
       }
     } catch (err: any) {
-      toast({ title: "Thông báo hệ thống!", description: err.message });
+      toast({ 
+        title: "Lỗi đặt lại mật khẩu", 
+        description: err.message || "Đã xảy ra lỗi, vui lòng thử lại.",
+        variant: "destructive"
+      });
     }
   };
 
@@ -46,12 +66,9 @@ export default function ConfirmToken() {
           </label>
           <Input
             type="password"
-            placeholder="••••••••"
             value={newPassword}
             onChange={(e) => setNewPassword(e.target.value)}
             required
-            pattern="^(?=.*[A-Za-z])(?=.*\\d)[A-Za-z\\d]{6,}$"
-            title="Mật khẩu phải có ít nhất 6 ký tự, bao gồm cả chữ cái và số"
           />
         </div>
         <div>
@@ -60,12 +77,9 @@ export default function ConfirmToken() {
           </label>
           <Input
             type="password"
-            placeholder="••••••••"
             value={confirmPassword}
             onChange={(e) => setConfirmPassword(e.target.value)}
             required
-            pattern="^(?=.*[A-Za-z])(?=.*\\d)[A-Za-z\\d]{6,}$"
-            title="Mật khẩu phải có ít nhất 6 ký tự, bao gồm cả chữ cái và số"
           />
         </div>
         <Button
@@ -78,4 +92,3 @@ export default function ConfirmToken() {
     </div>
   );
 }
-
