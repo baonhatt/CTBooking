@@ -298,7 +298,7 @@ export default function UsersContent({
                 userDetails.recent_bookings.length > 0 && (
                   <div>
                     <h3 className="font-semibold mb-3">
-                      Đơn đặt vé gần đây (10 mới nhất)
+                      Đơn đặt vé gần đây (chỉ hiện 10 đơn)
                     </h3>
                     <div className="space-y-2 max-h-96 overflow-y-auto">
                       {userDetails.recent_bookings.map(
@@ -310,8 +310,8 @@ export default function UsersContent({
                             <div className="flex justify-between items-start mb-2">
                               <div>
                                 <p className="font-medium">
-                                  {booking.movies?.title ||
-                                    booking.ticket_packages?.name ||
+                                  {booking.movie_title ||
+                                    booking.ticket_package_name ||
                                     "Không xác định"}
                                 </p>
                                 <p className="text-sm text-gray-600">

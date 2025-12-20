@@ -1,4 +1,5 @@
 import { eq, or, ilike, desc, asc, count, sql } from "drizzle-orm";
+import { formatDateForDb } from "../../lib/date-utils";
 
 export async function listTicketPackagesImpl(anyDb: any, tables: { ticket_packages: any }, args: { page: number; pageSize: number; q: string }) {
   const { page, pageSize, q } = args;
@@ -16,7 +17,7 @@ export async function getTicketPackageImpl(anyDb: any, tables: { ticket_packages
   return item || null;
 }
 
-export async function createTicketPackageImpl(anyDb: any, tables: { ticket_packages: any }, args: { name: string; code?: string; description?: string; price: number; features?: any; type?: string; min_group_size?: number; max_group_size?: number; is_member_only?: boolean; is_active?: boolean; display_order?: number }) {
+export async function createTicketPackageImpl(anyDb: any, tables: { ticket_packages: any }, args: { name: string; code?: string; description?: string; price: number; features?: any; type?: string; min_group_size?: number; max_group_size?: number; is_member_only?: boolean; is_active?: boolean; display_order?: number }, RUNTIME_ENV?: string) {
   const { name, code, description, price, features, type, min_group_size, max_group_size, is_member_only, is_active, display_order } = args;
   const priceNum = Number(price);
   let featuresJson: any = undefined;
@@ -26,7 +27,7 @@ export async function createTicketPackageImpl(anyDb: any, tables: { ticket_packa
       featuresJson = (features as string).split(",").map((x: string) => x.trim()).filter(Boolean);
     }
   }
-  const nowIso = new Date().toISOString();
+  const nowIso = new Date();
   // Try .returning() to fetch created item when supported; fallback for D1/SQLite
   const inserted = await anyDb.insert(tables.ticket_packages).values({
     name,
@@ -40,8 +41,8 @@ export async function createTicketPackageImpl(anyDb: any, tables: { ticket_packa
     is_member_only: is_member_only ? Boolean(is_member_only) : false,
     is_active: is_active === undefined ? true : Boolean(is_active),
     display_order: display_order !== undefined ? Number(display_order) : 0,
-    created_at: nowIso,
-    updated_at: nowIso,
+    created_at: formatDateForDb(nowIso, RUNTIME_ENV),
+    updated_at: formatDateForDb(nowIso, RUNTIME_ENV),
   }).returning();
 
   let item: any = Array.isArray(inserted) ? inserted[0] : inserted;
@@ -54,9 +55,10 @@ export async function createTicketPackageImpl(anyDb: any, tables: { ticket_packa
   return { item };
 }
 
-export async function updateTicketPackageImpl(anyDb: any, tables: { ticket_packages: any }, id: number, args: { name?: string; code?: string; description?: string; price?: number; features?: any; type?: string; min_group_size?: number; max_group_size?: number; is_member_only?: boolean; is_active?: boolean; display_order?: number }) {
+export async function updateTicketPackageImpl(anyDb: any, tables: { ticket_packages: any }, id: number, args: { name?: string; code?: string; description?: string; price?: number; features?: any; type?: string; min_group_size?: number; max_group_size?: number; is_member_only?: boolean; is_active?: boolean; display_order?: number }, RUNTIME_ENV?: string) {
   const { name, code, description, price, features, type, min_group_size, max_group_size, is_member_only, is_active, display_order } = args;
-  const data: any = { updated_at: new Date().toISOString() };
+  const now = new Date();
+  const data: any = { updated_at: formatDateForDb(now, RUNTIME_ENV) };
   if (name !== undefined) data.name = name;
   if (code !== undefined) data.code = code;
   if (description !== undefined) data.description = description;
@@ -76,12 +78,8 @@ export async function updateTicketPackageImpl(anyDb: any, tables: { ticket_packa
   if (is_member_only !== undefined) data.is_member_only = Boolean(is_member_only);
   if (is_active !== undefined) data.is_active = Boolean(is_active);
   if (display_order !== undefined) data.display_order = Number(display_order);
-  // Try to use .returning() for update, fallback to query
   const updatedRes = await anyDb.update(tables.ticket_packages).set(data).where(eq(tables.ticket_packages.id, id)).returning();
   let item: any = Array.isArray(updatedRes) ? updatedRes[0] : updatedRes;
-  // if (!item) {
-  //   item = await anyDb.query.ticket_packages.findFirst({ where: eq(tables.ticket_packages.id, id) });
-  // }
 
   return item || null;
 }

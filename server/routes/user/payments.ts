@@ -2,6 +2,7 @@ import { PaymentRequest } from "@shared/api";
 import { eq, and, asc, desc, isNull } from "drizzle-orm";
 import { generateBookingCode, getBookingEmailTemplate } from "../../lib/booking-utils";
 import { sendMail } from "../mail-service";
+import { formatDateForDb } from "../../lib/date-utils";
 
 class HttpError extends Error {
   status: number;
@@ -123,7 +124,8 @@ export async function validateBookingImpl(anyDb: any, payload: PaymentRequest, t
 export async function createPaymentImpl(
   anyDb: any,
   payload: PaymentRequest,
-  tables: { bookings: any; users: any; accounts: any; movies: any; ticket_packages: any }
+  tables: { bookings: any; users: any; accounts: any; movies: any; ticket_packages: any },
+  RUNTIME_ENV?: string,
 ) {
   try {
     const validation = await validateBookingInput(anyDb, payload, tables);
@@ -134,7 +136,7 @@ export async function createPaymentImpl(
     const bookingsTable = tables.bookings;
 
     // Use explicit UTC ISO timestamps for created_at/updated_at để đồng bộ giữa Postgres & D1
-    const nowIso = new Date().toISOString();
+    const nowIso = new Date();
 
     // Try to use .returning() to get the inserted row when supported (Postgres).
     // Fallback to the existing query approach for DBs that don't support returning (D1/SQLite).
@@ -143,32 +145,16 @@ export async function createPaymentImpl(
       movie_id: validation.movie?.id ? Number(validation.movie.id) : null,
       ticket_package_id: validation.ticketPackage?.id ? Number(validation.ticketPackage.id) : null,
       ticket_count: ticketCount,
-      // Use a numeric value for total_price so it works for both:
-      // - Postgres DECIMAL
-      // - SQLite/D1 REAL
-      // String is fine for Postgres DECIMAL but can cause issues on D1,
-      // so we normalize to number here.
       total_price: Number(totalPrice),
       payment_method: (paymentMethod || "cash").toLowerCase(),
       phone,
       name,
       email: emailBook,
-      created_at: nowIso,
-      updated_at: nowIso,
+      created_at: formatDateForDb(nowIso, RUNTIME_ENV),
+      updated_at: formatDateForDb(nowIso, RUNTIME_ENV),
     }).returning();
 
     let bookingRow = Array.isArray(insertedBooking) ? insertedBooking[0] : insertedBooking;
-    // if (!bookingRow) {
-    //   // Fallback for DBs that don't support returning()
-    //   bookingRow = await anyDb.query.bookings.findFirst({
-    //     where: and(
-    //       eq(bookingsTable.phone, phone),
-    //       eq(bookingsTable.email, emailBook),
-    //       eq(bookingsTable.ticket_count, ticketCount),
-    //     ),
-    //     orderBy: [desc(bookingsTable.id)],
-    //   });
-    // }
     if (!bookingRow) {
       return { status: 500, message: "Không thể tạo đặt vé" };
     }
@@ -202,7 +188,8 @@ export async function updatePaymentImpl(
   payload: { user_id?: number; payment_id?: number; payment_status?: string; transaction_id?: string; paid_at?: string | Date },
   sendMailFn?: (to: string, subject: string, html: string) => Promise<any>,
   getBookingEmailHtml?: (data: any) => string,
-  tables?: { bookings: any; users: any; accounts: any; movies: any; ticket_packages: any }
+  tables?: { bookings: any; users: any; accounts: any; movies: any; ticket_packages: any },
+  RUNTIME_ENV?: string,
 ) {
   try {
     const { user_id, payment_id, payment_status, transaction_id, paid_at } = payload as any;
@@ -228,11 +215,10 @@ export async function updatePaymentImpl(
     if (payment_status && String(payment_status).toLowerCase() === "paid" && !bookingCode) {
       bookingCode = await generateBookingCode(anyDb);
     }
-    // Update booking (tương thích với D1/SQLite không hỗ trợ .returning())
-    // Build update payload - only include fields that should be updated
+    const now = new Date();
     const updatePayload: any = {
       payment_status,
-      updated_at: new Date().toISOString(), // Explicitly set updated_at
+      updated_at: formatDateForDb(now, RUNTIME_ENV), 
     };
 
     // Only set transaction_id if provided
@@ -253,9 +239,9 @@ export async function updatePaymentImpl(
         // If payment_status is "paid" but no paid_at provided, use current time
         paidAtDate = new Date();
       }
-      updatePayload.paid_at = paidAtDate.toISOString();
+      updatePayload.paid_at = formatDateForDb(paidAtDate, RUNTIME_ENV);
       // Set expiry_date to 10 days after paid_at
-      updatePayload.expiry_date = new Date(paidAtDate.getTime() + 10 * 24 * 60 * 60 * 1000).toISOString();
+      updatePayload.expiry_date = formatDateForDb(new Date(paidAtDate.getTime() + 10 * 24 * 60 * 60 * 1000), RUNTIME_ENV);
     }
 
     // Only set booking_code if it exists
@@ -270,13 +256,7 @@ export async function updatePaymentImpl(
       .returning();
 
     let updatedBooking = Array.isArray(updatedRes) ? updatedRes[0] : updatedRes;
-    // if (!updatedBooking) {
-    //   // Fallback for DBs that don't support returning()
-    //   updatedBooking = await anyDb.query.bookings.findFirst({
-    //     where: eq(bookingsTable.id, booking.id),
-    //     with: { movie: true, ticket_package: true },
-    //   });
-    // }
+    
     if (payment_status && String(payment_status).toLowerCase() === "paid") {
       try {
         const totalPrice = Number(booking.total_price).toLocaleString("vi-VN");
@@ -426,7 +406,7 @@ export async function getBookingByCodeImpl(anyDb: any, codeRaw: string, tables: 
   };
 }
 
-export async function confirmUseTicketImpl(anyDb: any, codeRaw: string, tables: { bookings: any }) {
+export async function confirmUseTicketImpl(anyDb: any, codeRaw: string, tables: { bookings: any }, RUNTIME_ENV?: string) {
   try {
     const code = String(codeRaw || "");
     if (!code || !code.trim()) return { status: 400, message: "Vui lòng nhập mã vé" };
@@ -441,7 +421,7 @@ export async function confirmUseTicketImpl(anyDb: any, codeRaw: string, tables: 
     const valid = Boolean(isPaid && paidAt && expiryAt && !expired && !booking.is_used);
     if (!valid) return { status: 400, message: "Vé không còn hiệu lực hoặc đã sử dụng" };
     // Update booking (tương thích với D1/SQLite không hỗ trợ .returning())
-    await anyDb.update(bookingsTable).set({ is_used: true, updated_at: new Date().toISOString() }).where(eq(bookingsTable.id, booking.id));
+    await anyDb.update(bookingsTable).set({ is_used: true, updated_at: formatDateForDb(new Date(), RUNTIME_ENV) }).where(eq(bookingsTable.id, booking.id));
 
     // Query lại booking vừa update
     const updated = await anyDb.query.bookings.findFirst({

@@ -35,6 +35,7 @@ import {
   getResetPasswordEmailTemplate,
   logSystemError,
 } from "./utils";
+import { env } from "process";
 
 type Bindings = {
   cinema_db: D1Database;
@@ -58,6 +59,7 @@ type Bindings = {
   BREVO_API_KEY: string;
   BREVO_SENDER_EMAIL: string;
   BREVO_SENDER_NAME: string;
+  RUNTIME_ENV: string;
   VITE_RATE_LIMIT_BOOKING_CHECK_MAX: string;
   VITE_RATE_LIMIT_BOOKING_CHECK_WINDOWMS: string;
 };
@@ -150,7 +152,7 @@ app.post("/api/register", async (c) => {
     const appBaseUrl = c.env.VITE_CLIENT_BASE_URL || "https://cinesphere.com.vn";
     const renderWelcome = (data: { customerName: string; email: string }) =>
       getWelcomeEmailTemplate(appBaseUrl, data);
-    const r = await registerImpl(db, { accounts: schema.accounts, users: schema.users }, body as any, mailer, renderWelcome);
+    const r = await registerImpl(db, { accounts: schema.accounts, users: schema.users }, body as any, mailer, renderWelcome, c.env.RUNTIME_ENV);
     const status = typeof (r as any).status === "number" ? (r as any).status : 200;
     const payload = { ...(r as any), status: status >= 400 ? "error" : "success" };
     return c.json(payload, status);
@@ -220,7 +222,7 @@ app.post("/api/forget-password", async (c) => {
        return getResetPasswordEmailTemplate(appBaseUrl, fullLink);
     };
 
-    const r = await forgetPassImpl(db, { accounts: schema.accounts, tokens: schema.tokens }, email, mailer, renderReset);
+    const r = await forgetPassImpl(db, { accounts: schema.accounts, tokens: schema.tokens }, email, mailer, renderReset, c.env.RUNTIME_ENV);
     const status = typeof (r as any).status === "number" ? (r as any).status : 200;
     const payload = { ...(r as any), status: status >= 400 ? "error" : "success" };
     return c.json(payload, status as any);
@@ -233,7 +235,7 @@ app.post("/api/reset-password", async (c) => {
   try {
     const db = drizzle(c.env.cinema_db, { schema });
     const body = await c.req.json().catch(() => ({}));
-    const r = await resetPasswordImpl(db, { accounts: schema.accounts, tokens: schema.tokens }, body as any);
+    const r = await resetPasswordImpl(db, { accounts: schema.accounts, tokens: schema.tokens }, body as any, c.env.RUNTIME_ENV);
     const status = typeof (r as any).status === "number" ? (r as any).status : 200;
     const payload = { ...(r as any), status: status >= 400 ? "error" : "success" };
     return c.json(payload, status as any);
@@ -508,7 +510,7 @@ app.post("/api/create-booking", async (c) => {
     const tables = getD1Tables(schema);
     body = await c.req.json().catch(() => ({}));
     // Pass schema tables to ensure correct schema is used (D1 schema instead of PostgreSQL)
-    const r = await createPaymentImpl(db, body as any, tables);
+    const r = await createPaymentImpl(db, body as any, tables, c.env.RUNTIME_ENV);
     const status = typeof (r as any).status === "number" ? (r as any).status : 201;
     return c.json(r, status as any);
   } catch (err: any) {
@@ -539,7 +541,7 @@ app.post("/api/confirm-booking", async (c) => {
     };
     const appBaseUrl = c.env.VITE_CLIENT_BASE_URL || "https://cinesphere.com.vn";
     const renderBooking = (data: any) => getBookingEmailTemplate(appBaseUrl, data);
-    const r = await updatePaymentImpl(db, body as any, mailer, renderBooking, tables);
+    const r = await updatePaymentImpl(db, body as any, mailer, renderBooking, tables, c.env.RUNTIME_ENV);
     const status = typeof (r as any).status === "number" ? (r as any).status : 200;
     return c.json(r, status);
   } catch (err: any) {
@@ -601,7 +603,7 @@ app.post("/api/bookings/use", async (c) => {
   const tables = getD1Tables(schema);
   const body = await c.req.json().catch(() => ({}));
   const code = String((body as any)?.code || "");
-  const r = await confirmUseTicketImpl(db, code, tables);
+  const r = await confirmUseTicketImpl(db, code, tables, c.env.RUNTIME_ENV);
   const status = (r as any)?.status === "error" ? 400 : 200;
   return c.json(r, status);
 });
@@ -625,7 +627,7 @@ app.post("/api/movies", async (c) => {
   try {
     const body = await c.req.json().catch(() => ({}));
     const db = drizzle(c.env.cinema_db, { schema });
-    const r = await createMovieImpl(db, { movies: schema.movies }, body as any);
+    const r = await createMovieImpl(db, { movies: schema.movies }, body as any, c.env.RUNTIME_ENV);
     return c.json(r, 201);
   } catch {
     return c.json({ message: "Lỗi máy chủ nội bộ" }, 500);
@@ -657,7 +659,7 @@ app.put("/api/movies/:id", async (c) => {
     const id = Number(c.req.param("id"));
     const body = await c.req.json().catch(() => ({}));
     const db = drizzle(c.env.cinema_db, { schema });
-    const r = await updateMovieImpl(db, { movies: schema.movies }, id, body as any);
+    const r = await updateMovieImpl(db, { movies: schema.movies }, id, body as any, c.env.RUNTIME_ENV);
     if (!r) return c.json({ message: "Không tìm thấy" }, 404);
     return c.json(r, 200);
   } catch {
@@ -713,7 +715,7 @@ app.post("/api/users/profile", async (c) => {
   try {
     const db = drizzle(c.env.cinema_db, { schema });
     const body = await c.req.json().catch(() => ({}));
-    const r = await updateUserProfileImpl(db, { accounts: schema.accounts, users: schema.users }, body as any);
+    const r = await updateUserProfileImpl(db, { accounts: schema.accounts, users: schema.users }, body as any, c.env.RUNTIME_ENV);
     const status = typeof (r as any).status === "number" ? (r as any).status : 200;
     const payload = { ...(r as any), status: status >= 400 ? "error" : "success" };
     return c.json(payload as any, status);
@@ -725,7 +727,7 @@ app.post("/api/users/password", async (c) => {
   try {
     const db = drizzle(c.env.cinema_db, { schema });
     const body = await c.req.json().catch(() => ({}));
-    const r = await changePasswordImpl(db, { accounts: schema.accounts }, body as any);
+    const r = await changePasswordImpl(db, { accounts: schema.accounts }, body as any, c.env.RUNTIME_ENV);
     const status = typeof (r as any).status === "number" ? (r as any).status : 200;
     const payload = { ...(r as any), status: status >= 400 ? "error" : "success" };
     return c.json(payload, status);
@@ -789,7 +791,7 @@ app.post("/api/toys", async (c) => {
   try {
     const db = drizzle(c.env.cinema_db, { schema });
     const body = await c.req.json().catch(() => ({}));
-    const r = await createToyImpl(db, { toys: schema.toys }, body as any);
+    const r = await createToyImpl(db, { toys: schema.toys }, body as any, c.env.RUNTIME_ENV);
     return c.json(r, 201);
   } catch {
     return c.json({ message: "Lỗi máy chủ nội bộ" }, 500);
@@ -800,7 +802,7 @@ app.put("/api/toys/:id", async (c) => {
     const id = Number(c.req.param("id"));
     const db = drizzle(c.env.cinema_db, { schema });
     const body = await c.req.json().catch(() => ({}));
-    const r = await updateToyImpl(db, { toys: schema.toys }, id, body as any);
+    const r = await updateToyImpl(db, { toys: schema.toys }, id, body as any, c.env.RUNTIME_ENV);
     if (!r) return c.json({ message: "Không tìm thấy" }, 404);
     return c.json(r, 200);
   } catch {
@@ -856,7 +858,7 @@ app.post("/api/tickets", async (c) => {
   try {
     const db = drizzle(c.env.cinema_db, { schema });
     const body = await c.req.json().catch(() => ({}));
-    const r = await createTicketPackageImpl(db, { ticket_packages: schema.ticket_packages }, body as any);
+    const r = await createTicketPackageImpl(db, { ticket_packages: schema.ticket_packages }, body as any, c.env.RUNTIME_ENV);
     return c.json(r, 201);
   } catch {
     return c.json({ message: "Lỗi máy chủ nội bộ" }, 500);
@@ -867,7 +869,7 @@ app.put("/api/tickets/:id", async (c) => {
     const id = Number(c.req.param("id"));
     const db = drizzle(c.env.cinema_db, { schema });
     const body = await c.req.json().catch(() => ({}));
-    const r = await updateTicketPackageImpl(db, { ticket_packages: schema.ticket_packages }, id, body as any);
+    const r = await updateTicketPackageImpl(db, { ticket_packages: schema.ticket_packages }, id, body as any, env.RUNTIME_ENV);
     if (!r) return c.json({ message: "Không tìm thấy" }, 404);
     return c.json(r, 200);
   } catch {
@@ -891,7 +893,7 @@ app.post("/api/admin/site-media", async (c) => {
   try {
     const db = drizzle(c.env.cinema_db, { schema });
     const body = await c.req.json().catch(() => ({}));
-    const r = await createSiteMediaImpl(db, { site_media: schema.site_media }, body as any);
+    const r = await createSiteMediaImpl(db, { site_media: schema.site_media }, body as any, c.env.RUNTIME_ENV);
     return c.json(r, 201);
   } catch {
     return c.json({ message: "Lỗi máy chủ nội bộ" }, 500);
@@ -901,7 +903,7 @@ app.put("/api/admin/site-media", async (c) => {
   try {
     const db = drizzle(c.env.cinema_db, { schema });
     const body = await c.req.json().catch(() => ({}));
-    const r = await updateSiteMediaImpl(db, { site_media: schema.site_media }, body as any);
+    const r = await updateSiteMediaImpl(db, { site_media: schema.site_media }, body as any, c.env.RUNTIME_ENV);
     const status = (r as any)?.item ? 200 : 404;
     const payload = { ...(r as any), status: status >= 400 ? "error" : "success" };
     return c.json(payload as any, status);

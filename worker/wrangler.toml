@@ -7,6 +7,7 @@ workers_dev = true
 preview_urls = true
 
 [vars]
+RUNTIME_ENV = "cloudflare-worker"
 VITE_SERVER_BASE_URL = "https://cinesphere.com.vn"
 VITE_CLIENT_BASE_URL = "https://cinesphere.com.vn"
 VITE_VNPAY_RETURN_URL = "/checkout"
@@ -27,10 +28,6 @@ VITE_RATE_LIMIT_BOOKING_CHECK_WINDOWMS = "60000"
 binding = "cinema_db"
 database_name = "cinema-db"
 database_id = "9bae4fb3-570a-4ded-9a75-922ce4d6ef81"
-
-[[r2_buckets]]
-binding = "r2_cinemastore"
-bucket_name = "cinemastore"
 
 [env.preview]
 [env.preview.vars]
@@ -57,13 +54,9 @@ VITE_CLOUDINARY_UPLOAD_PRESET_IMAGE="ctbooking_images_unsigned"
 
 
 [[env.preview.d1_databases]]
-binding = "cinema_db"
-database_name = "cinema-db"
-database_id = "9bae4fb3-570a-4ded-9a75-922ce4d6ef81"
-
-[[env.preview.r2_buckets]]
-binding = "r2_cinemastore"
-bucket_name = "cinemastore"
+binding = "cinema_db_preview"
+database_name = "cinema-db-preview"
+database_id = "fd9274ae-d1a3-42e2-b83d-2fc1bdc71caf"
 
 [env.production]
 [env.production.vars]
