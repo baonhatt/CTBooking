@@ -137,7 +137,7 @@ app.post("/api/login", async (c) => {
     const payload = { ...(r as any), status: status >= 400 ? "error" : "success" };
     return c.json(payload as any, status as any);
   } catch {
-    return c.json({ message: "Lỗi máy chủ nội bộ" }, 500);
+    return c.json({ status: "error", message: "Lỗi máy chủ nội bộ" }, 500);
   }
 });
 app.post("/api/register", async (c) => {
@@ -240,7 +240,7 @@ app.post("/api/reset-password", async (c) => {
     const payload = { ...(r as any), status: status >= 400 ? "error" : "success" };
     return c.json(payload, status as any);
   } catch {
-    return c.json({ message: "Lỗi máy chủ nội bộ" }, 500);
+    return c.json({ status: "error", message: "Lỗi máy chủ nội bộ" }, 500);
   }
 });
 
@@ -253,7 +253,7 @@ app.get("/api/admin/revenue", async (c) => {
     const r = await getRevenueImpl(db, { bookings: schema.bookings }, { from, to, status });
     return c.json(r);
   } catch (err: any) {
-    return c.json({ message: String(err?.message || "Internal error") }, 500);
+    return c.json({ status: "error", message: String(err?.message || "Internal error") }, 500);
   }
 });
 
@@ -272,7 +272,7 @@ app.get("/api/admin/transactions", async (c) => {
     const r = await listTransactionsImpl(db, { bookings: schema.bookings, users: schema.users, accounts: schema.accounts, movies: schema.movies, ticket_packages: schema.ticket_packages }, { page, pageSize, email, status, sort, dir, payment_method, from, to });
     return c.json(r);
   } catch (err: any) {
-    return c.json({ message: String(err?.message || "Internal error") }, 500);
+    return c.json({ status: "error", message: String(err?.message || "Internal error") }, 500);
   }
 });
 
@@ -284,7 +284,7 @@ app.get("/api/admin/transactions/:id", async (c) => {
     if (!r) return c.json({ message: "Không tìm thấy" }, 404);
     return c.json(r);
   } catch (err: any) {
-    return c.json({ message: String(err?.message || "Internal error") }, 500);
+    return c.json({ status: "error", message: String(err?.message || "Internal error") }, 500);
   }
 });
 
@@ -294,7 +294,7 @@ app.get("/api/admin/dashboard/metrics", async (c) => {
     const r = await getDashboardMetricsImpl(db, { movies: schema.movies, users: schema.users, bookings: schema.bookings });
     return c.json(r);
   } catch (err: any) {
-    return c.json({ message: String(err?.message || "Internal error") }, 500);
+    return c.json({ status: "error", message: String(err?.message || "Internal error") }, 500);
   }
 });
 
@@ -306,7 +306,7 @@ app.get("/api/admin/dashboard/revenue-date", async (c) => {
     const r = await getRevenueByDateImpl(db, { bookings: schema.bookings }, { date, status });
     return c.json(r);
   } catch (err: any) {
-    return c.json({ message: String(err?.message || "Internal error") }, 500);
+    return c.json({ status: "error", message: String(err?.message || "Internal error") }, 500);
   }
 });
 
@@ -316,7 +316,7 @@ app.get("/api/admin/dashboard/revenue-7days", async (c) => {
     const r = await getRevenue7DaysImpl(db, { bookings: schema.bookings });
     return c.json(r);
   } catch (err: any) {
-    return c.json({ message: String(err?.message || "Internal error") }, 500);
+    return c.json({ status: "error", message: String(err?.message || "Internal error") }, 500);
   }
 });
 
@@ -329,7 +329,7 @@ app.get("/api/admin/dashboard/revenue-month", async (c) => {
     const r = await getRevenueByMonthImpl(db, { bookings: schema.bookings }, { year, month, status });
     return c.json(r);
   } catch (err: any) {
-    return c.json({ message: String(err?.message || "Internal error") }, 500);
+    return c.json({ status: "error", message: String(err?.message || "Internal error") }, 500);
   }
 });
 
@@ -342,7 +342,7 @@ app.get("/api/admin/users", async (c) => {
     const r = await getUsersImpl(db, { users: schema.users, accounts: schema.accounts, bookings: schema.bookings }, { page, pageSize, q });
     return c.json(r);
   } catch (err: any) {
-    return c.json({ message: String(err?.message || "Internal error") }, 500);
+    return c.json({ status: "error", message: String(err?.message || "Internal error") }, 500);
   }
 });
 
@@ -351,10 +351,10 @@ app.get("/api/admin/users/:id", async (c) => {
     const id = Number(c.req.param("id"));
     const db = drizzle(c.env.cinema_db, { schema });
     const r = await getUserByIdImpl(db, { users: schema.users }, id);
-    if (!r) return c.json({ message: "Không tìm thấy" }, 404);
+    if (!r) return c.json({ status:"error", message: "Không tìm thấy" }, 404);
     return c.json(r);
   } catch (err: any) {
-    return c.json({ message: String(err?.message || "Internal error") }, 500);
+    return c.json({ status: "error", message: String(err?.message || "Internal error") }, 500);
   }
 });
 
@@ -377,7 +377,7 @@ app.post("/api/admin/cloudinary/sign", async (c) => {
     const signed = await cloudinarySignedParams(env, params);
     return c.json({ timestamp, signature: signed.signature, api_key: signed.api_key });
   } catch (err: any) {
-    return c.json({ message: String(err?.message || "Internal error") }, 500);
+    return c.json({ status: "error", message: String(err?.message || "Internal error") }, 500);
   }
 });
 
@@ -495,7 +495,8 @@ app.post("/api/validate-booking", async (c) => {
     const tables = getD1Tables(schema);
     const r = await validateBookingImpl(db, await c.req.json(), tables);
     const status = typeof (r as any).status === "number" ? (r as any).status : 200;
-    return c.json(r, status as any);
+    const payload = { ...(r as any), status: status >= 400 ? "error" : "success" };
+    return c.json(payload, status as any);
   } catch (err: any) {
     const status = err?.status || 500;
     const message = err?.message || "Lỗi máy chủ nội bộ";
@@ -511,8 +512,9 @@ app.post("/api/create-booking", async (c) => {
     body = await c.req.json().catch(() => ({}));
     // Pass schema tables to ensure correct schema is used (D1 schema instead of PostgreSQL)
     const r = await createPaymentImpl(db, body as any, tables, c.env.RUNTIME_ENV);
-    const status = typeof (r as any).status === "number" ? (r as any).status : 201;
-    return c.json(r, status as any);
+    const status = typeof (r as any).status === "number" ? (r as any).status : 200;
+    const payload = { ...(r as any), status: status >= 400 ? "error" : "success" };
+    return c.json(payload, status as any);
   } catch (err: any) {
     logSystemError("create-booking", err, body);
     const status = err?.status || 500;
@@ -543,7 +545,8 @@ app.post("/api/confirm-booking", async (c) => {
     const renderBooking = (data: any) => getBookingEmailTemplate(appBaseUrl, data);
     const r = await updatePaymentImpl(db, body as any, mailer, renderBooking, tables, c.env.RUNTIME_ENV);
     const status = typeof (r as any).status === "number" ? (r as any).status : 200;
-    return c.json(r, status);
+    const payload = { ...(r as any), status: status >= 400 ? "error" : "success" };
+    return c.json(payload, status as any);
   } catch (err: any) {
     logSystemError("confirm-booking", err, body);
     return c.json({ message: err?.message || "Lỗi máy chủ nội bộ" }, 500);
@@ -555,8 +558,9 @@ app.get("/api/bookings/:id", async (c) => {
   const tables = getD1Tables(schema);
   const id = Number(c.req.param("id"));
   const r = await getBookingByIdImpl(db, id, tables);
-  if (!r) return c.json({ message: "Không tìm thấy đặt vé" }, 404);
-  return c.json(r, 200);
+  const status = typeof (r as any).status === "number" ? (r as any).status : 200;
+  const payload = { ...(r as any), status: status >= 400 ? "error" : "success" };
+  return c.json(payload, status as any);
 });
 
 // Rate-limited code check with headers parity
@@ -577,7 +581,7 @@ app.get("/api/bookings/code/:code", async (c) => {
     c.header("X-RateLimit-Limit", String(max));
     c.header("X-RateLimit-Remaining", "0");
     c.header("X-RateLimit-WindowMS", String(windowMs));
-    return c.json({ message: `Quá nhiều yêu cầu, vui lòng thử lại sau ${retrySec}s` }, 429);
+    return c.json({ status: "error", message: `Quá nhiều yêu cầu, vui lòng thử lại sau ${retrySec}s` }, 429);
   }
 
   const remaining = Math.max(0, max - (filtered.length + 1));
@@ -592,10 +596,9 @@ app.get("/api/bookings/code/:code", async (c) => {
   const tables = getD1Tables(schema);
   const code = String(c.req.param("code") || "");
   const r = await getBookingByCodeImpl(db, code, tables);
-  if (!r) {
-    return c.json({ message: "Không tìm thấy vé với mã này." }, 404);
-  }
-  return c.json(r, 200);
+  const status = typeof (r as any).status === "number" ? (r as any).status : 200;
+  const payload = { ...(r as any), status: status >= 400 ? "error" : "success" };
+  return c.json(payload, status as any);
 });
 
 app.post("/api/bookings/use", async (c) => {
@@ -605,7 +608,8 @@ app.post("/api/bookings/use", async (c) => {
   const code = String((body as any)?.code || "");
   const r = await confirmUseTicketImpl(db, code, tables, c.env.RUNTIME_ENV);
   const status = (r as any)?.status === "error" ? 400 : 200;
-  return c.json(r, status);
+  const payload = { ...(r as any), status: status >= 400 ? "error" : "success" };
+  return c.json(payload, status);
 });
 app.get("/api/movies", async (c) => {
   try {
@@ -619,7 +623,7 @@ app.get("/api/movies", async (c) => {
     const { items, total } = await listMovies(db, { movies: schema.movies }, { page, pageSize, q, sort: sortKey, dir, status: status as any });
     return c.json({ items, page, pageSize, total }, 200);
   } catch {
-    return c.json({ message: "Lỗi máy chủ nội bộ" }, 500);
+    return c.json({ status: "error", message: "Lỗi máy chủ nội bộ" }, 500);
   }
 });
 
@@ -628,9 +632,11 @@ app.post("/api/movies", async (c) => {
     const body = await c.req.json().catch(() => ({}));
     const db = drizzle(c.env.cinema_db, { schema });
     const r = await createMovieImpl(db, { movies: schema.movies }, body as any, c.env.RUNTIME_ENV);
-    return c.json(r, 201);
+    const status = (r as any)?.status === "error" ? 400 : 200;
+    const payload = { ...(r as any), status: status >= 400 ? "error" : "success" };
+    return c.json(payload, status);
   } catch {
-    return c.json({ message: "Lỗi máy chủ nội bộ" }, 500);
+    return c.json({ status: "error", message: "Lỗi máy chủ nội bộ" }, 500);
   }
 });
 
@@ -642,7 +648,7 @@ app.get("/api/movies/:id", async (c) => {
     if (!movie) return c.json({ message: "Không tìm thấy" }, 404);
     return c.json({ movie }, 200);
   } catch {
-    return c.json({ message: "Lỗi máy chủ nội bộ" }, 500);
+    return c.json({ status: "error", message: "Lỗi máy chủ nội bộ" }, 500);
   }
 });
 
@@ -650,7 +656,7 @@ app.get("/api/movies/detail/:id", async (c) => {
   const id = Number(c.req.param("id"));
   const db = drizzle(c.env.cinema_db, { schema });
   const r = await getMovieByIdImpl(db, { movies: schema.movies, bookings: schema.bookings }, id);
-  if (!r) return c.json({ message: "Không tìm thấy phim" }, 404);
+  if (!r) return c.json({ status: "error", message: "Không tìm thấy phim" }, 404);
   return c.json(r);
 });
 
@@ -663,7 +669,7 @@ app.put("/api/movies/:id", async (c) => {
     if (!r) return c.json({ message: "Không tìm thấy" }, 404);
     return c.json(r, 200);
   } catch {
-    return c.json({ message: "Lỗi máy chủ nội bộ" }, 500);
+    return c.json({ status: "error", message: "Lỗi máy chủ nội bộ" }, 500);
   }
 });
 
@@ -671,7 +677,7 @@ app.delete("/api/movies/:id", async (c) => {
   const id = Number(c.req.param("id"));
   const db = drizzle(c.env.cinema_db, { schema });
   const r = await deleteMovieImpl(db, { movies: schema.movies }, id);
-  if (!r) return c.json({ message: "Không tìm thấy" }, 404);
+  if (!r) return c.json({ status: "error", message: "Không tìm thấy" }, 404);
   return c.json(r);
 });
 
@@ -685,7 +691,7 @@ app.get("/api/users", async (c) => {
     const r = await getUsersImpl(db, { users: schema.users, accounts: schema.accounts, bookings: schema.bookings }, { page, pageSize, q });
     return c.json(r, 200);
   } catch {
-    return c.json({ message: "Lỗi máy chủ nội bộ" }, 500);
+    return c.json({ status: "error", message: "Lỗi máy chủ nội bộ" }, 500);
   }
 });
 app.get("/api/users/:id", async (c) => {
@@ -693,10 +699,10 @@ app.get("/api/users/:id", async (c) => {
     const id = Number(c.req.param("id"));
     const db = drizzle(c.env.cinema_db, { schema });
     const r = await getUserByIdImpl(db, { users: schema.users }, id);
-    if (!r) return c.json({ message: "Không tìm thấy" }, 404);
+    if (!r) return c.json({ status: "error", message: "Không tìm thấy" }, 404);
     return c.json(r, 200);
   } catch {
-    return c.json({ message: "Lỗi máy chủ nội bộ" }, 500);
+    return c.json({ status: "error", message: "Lỗi máy chủ nội bộ" }, 500);
   }
 });
 app.get("/api/users/profile", async (c) => {
@@ -708,7 +714,7 @@ app.get("/api/users/profile", async (c) => {
       const payload = { ...(r as any), status: status >= 400 ? "error" : "success" };
       return c.json(payload as any, status as any);
     } catch {
-      return c.json({ message: "Lỗi máy chủ nội bộ" }, 500);
+      return c.json({ status: "error", message: "Lỗi máy chủ nội bộ" }, 500);
     }
   });
 app.post("/api/users/profile", async (c) => {
@@ -720,7 +726,7 @@ app.post("/api/users/profile", async (c) => {
     const payload = { ...(r as any), status: status >= 400 ? "error" : "success" };
     return c.json(payload as any, status);
   } catch {
-    return c.json({ message: "Lỗi máy chủ nội bộ" }, 500);
+    return c.json({ status: "error", message: "Lỗi máy chủ nội bộ" }, 500);
   }
 });
 app.post("/api/users/password", async (c) => {
@@ -732,7 +738,7 @@ app.post("/api/users/password", async (c) => {
     const payload = { ...(r as any), status: status >= 400 ? "error" : "success" };
     return c.json(payload, status);
   } catch {
-    return c.json({ message: "Lỗi máy chủ nội bộ" }, 500);
+    return c.json({ status: "error", message: "Lỗi máy chủ nội bộ" }, 500);
   }
 });
 app.get("/api/usersprofile/transactions", async (c) => {
@@ -750,7 +756,7 @@ app.get("/api/usersprofile/transactions", async (c) => {
     const r = await listUserTransactionsImpl(db, { accounts: schema.accounts, bookings: schema.bookings }, { email, status, page, pageSize, sort, dir, payment_method, from, to });
     return c.json(r, 200);
   } catch {
-    return c.json({ message: "Lỗi máy chủ nội bộ" }, 500);
+    return c.json({ status: "error", message: "Lỗi máy chủ nội bộ" }, 500);
   }
 });
 
@@ -764,7 +770,7 @@ app.get("/api/toys", async (c) => {
     const r = await listToysImpl(db, { toys: schema.toys }, { page, pageSize, q });
     return c.json(r, 200);
   } catch {
-    return c.json({ message: "Lỗi máy chủ nội bộ" }, 500);
+    return c.json({ status: "error", message: "Lỗi máy chủ nội bộ" }, 500);
   }
 });
 app.get("/api/toys/active", async (c) => {
@@ -773,7 +779,7 @@ app.get("/api/toys/active", async (c) => {
     const r = await listActiveToys(db, { toys: schema.toys });
     return c.json(r, 200);
   } catch {
-    return c.json({ message: "Lỗi máy chủ nội bộ" }, 500);
+    return c.json({ status: "error", message: "Lỗi máy chủ nội bộ" }, 500);
   }
 });
 app.get("/api/toys/:id", async (c) => {
@@ -784,7 +790,7 @@ app.get("/api/toys/:id", async (c) => {
     if (!r) return c.json({ message: "Không tìm thấy" }, 404);
     return c.json(r, 200);
   } catch {
-    return c.json({ message: "Lỗi máy chủ nội bộ" }, 500);
+    return c.json({ status: "error", message: "Lỗi máy chủ nội bộ" }, 500);
   }
 });
 app.post("/api/toys", async (c) => {
@@ -794,7 +800,7 @@ app.post("/api/toys", async (c) => {
     const r = await createToyImpl(db, { toys: schema.toys }, body as any, c.env.RUNTIME_ENV);
     return c.json(r, 201);
   } catch {
-    return c.json({ message: "Lỗi máy chủ nội bộ" }, 500);
+    return c.json({ status: "error", message: "Lỗi máy chủ nội bộ" }, 500);
   }
 });
 app.put("/api/toys/:id", async (c) => {
@@ -806,7 +812,7 @@ app.put("/api/toys/:id", async (c) => {
     if (!r) return c.json({ message: "Không tìm thấy" }, 404);
     return c.json(r, 200);
   } catch {
-    return c.json({ message: "Lỗi máy chủ nội bộ" }, 500);
+    return c.json({ status: "error", message: "Lỗi máy chủ nội bộ" }, 500);
   }
 });
 app.delete("/api/toys/:id", async (c) => {
@@ -817,7 +823,7 @@ app.delete("/api/toys/:id", async (c) => {
     if (!r) return c.json({ message: "Không tìm thấy" }, 404);
     return c.json(r, 200);
   } catch {
-    return c.json({ message: "Lỗi máy chủ nội bộ" }, 500);
+    return c.json({ status: "error", message: "Lỗi máy chủ nội bộ" }, 500);
   }
 });
 
@@ -831,7 +837,7 @@ app.get("/api/tickets", async (c) => {
     const r = await listTicketPackagesImpl(db, { ticket_packages: schema.ticket_packages }, { page, pageSize, q });
     return c.json(r, 200);
   } catch {
-    return c.json({ message: "Lỗi máy chủ nội bộ" }, 500);
+    return c.json({ status: "error", message: "Lỗi máy chủ nội bộ" }, 500);
   }
 });
 app.get("/api/tickets/active", async (c) => {
@@ -840,7 +846,7 @@ app.get("/api/tickets/active", async (c) => {
     const r = await listActiveTicketPackages(db, { ticket_packages: schema.ticket_packages });
     return c.json(r, 200);
   } catch {
-    return c.json({ message: "Lỗi máy chủ nội bộ" }, 500);
+    return c.json({ status: "error", message: "Lỗi máy chủ nội bộ" }, 500);
   }
 });
 app.get("/api/tickets/:id", async (c) => {
@@ -851,7 +857,7 @@ app.get("/api/tickets/:id", async (c) => {
     if (!r) return c.json({ message: "Không tìm thấy" }, 404);
     return c.json(r, 200);
   } catch {
-    return c.json({ message: "Lỗi máy chủ nội bộ" }, 500);
+    return c.json({ status: "error", message: "Lỗi máy chủ nội bộ" }, 500);
   }
 });
 app.post("/api/tickets", async (c) => {
@@ -861,7 +867,7 @@ app.post("/api/tickets", async (c) => {
     const r = await createTicketPackageImpl(db, { ticket_packages: schema.ticket_packages }, body as any, c.env.RUNTIME_ENV);
     return c.json(r, 201);
   } catch {
-    return c.json({ message: "Lỗi máy chủ nội bộ" }, 500);
+    return c.json({ status: "error", message: "Lỗi máy chủ nội bộ" }, 500);
   }
 });
 app.put("/api/tickets/:id", async (c) => {
@@ -870,10 +876,10 @@ app.put("/api/tickets/:id", async (c) => {
     const db = drizzle(c.env.cinema_db, { schema });
     const body = await c.req.json().catch(() => ({}));
     const r = await updateTicketPackageImpl(db, { ticket_packages: schema.ticket_packages }, id, body as any, env.RUNTIME_ENV);
-    if (!r) return c.json({ message: "Không tìm thấy" }, 404);
+    if (!r) return c.json({ status: "error", message: "Không tìm thấy" }, 404);
     return c.json(r, 200);
   } catch {
-    return c.json({ message: "Lỗi máy chủ nội bộ" }, 500);
+    return c.json({ status: "error", message: "Lỗi máy chủ nội bộ" }, 500);
   }
 });
 app.delete("/api/tickets/:id", async (c) => {
@@ -881,10 +887,10 @@ app.delete("/api/tickets/:id", async (c) => {
     const id = Number(c.req.param("id"));
     const db = drizzle(c.env.cinema_db, { schema });
     const r = await deleteTicketPackageImpl(db, { ticket_packages: schema.ticket_packages }, id);
-    if (!r) return c.json({ message: "Không tìm thấy" }, 404);
+    if (!r) return c.json({ status:"error", message: "Không tìm thấy" }, 404);
     return c.json(r, 200);
   } catch {
-    return c.json({ message: "Lỗi máy chủ nội bộ" }, 500);
+    return c.json({ status: "error", message: "Lỗi máy chủ nội bộ" }, 500);
   }
 });
 
@@ -896,7 +902,7 @@ app.post("/api/admin/site-media", async (c) => {
     const r = await createSiteMediaImpl(db, { site_media: schema.site_media }, body as any, c.env.RUNTIME_ENV);
     return c.json(r, 201);
   } catch {
-    return c.json({ message: "Lỗi máy chủ nội bộ" }, 500);
+    return c.json({ status: "error", message: "Lỗi máy chủ nội bộ" }, 500);
   }
 });
 app.put("/api/admin/site-media", async (c) => {
@@ -908,7 +914,7 @@ app.put("/api/admin/site-media", async (c) => {
     const payload = { ...(r as any), status: status >= 400 ? "error" : "success" };
     return c.json(payload as any, status);
   } catch {
-    return c.json({ message: "Lỗi máy chủ nội bộ" }, 500);
+    return c.json({ status: "error", message: "Lỗi máy chủ nội bộ" }, 500);
   }
 });
 app.get("/api/site-media", async (c) => {
@@ -920,7 +926,7 @@ app.get("/api/site-media", async (c) => {
     const r = await listSiteMediaImpl(db, { site_media: schema.site_media }, { section, type, active });
     return c.json(r, 200);
   } catch {
-    return c.json({ message: "Lỗi máy chủ nội bộ" }, 500);
+    return c.json({ status: "error", message: "Lỗi máy chủ nội bộ" }, 500);
   }
 });
 

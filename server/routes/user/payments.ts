@@ -337,7 +337,7 @@ export async function getBookingByIdImpl(anyDb: any, id: number, tables: { booki
     where: eq(bookingsTable.id, Number(id)),
     with: { movie: true, ticket_package: true },
   });
-  if (!booking) return { status: 404, message: "Không tìm thấy" };
+  if (!booking) return { status: 404, message: "Không tìm thấy thông tin đặt vé" };
   return {
     status: 200,
     id: booking.id,

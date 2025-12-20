@@ -1,12 +1,27 @@
 import { eq, desc, and, inArray } from "drizzle-orm";
 import { formatDateForDb } from "../../lib/date-utils";
+import { uploadCloudinaryImageDataURI } from '../../../worker/src/utils';
 
-export async function createMovieImpl(anyDb: any, tables: { movies: any }, data: { title: string; description?: string; cover_image?: string | null; detail_images?: any; genres?: any; rating?: string | null; duration_min: number; is_active?: boolean; release_date: string | Date | null },RUNTIME_ENV? :string, ) {
+export async function createMovieImpl(anyDb: any, tables: { movies: any }, data: { title: string; description?: string; cover_image?: string | null; cover_image_base64?: string | null; detail_images?: any; genres?: any; rating?: string | null; duration_min: number; is_active?: boolean; release_date: string | Date | null }, RUNTIME_ENV? :string, ) {
   const now = new Date();  
+  let coverImageUrl = data.cover_image || null;
+  if (data.cover_image_base64) {
+    try {
+      const uploadResult = await uploadCloudinaryImageDataURI(
+        process.env, // Truyền env chứa thông tin Cloudinary
+        data.cover_image_base64,
+        'ctbooking/images/movies' // Thư mục lưu ảnh trên Cloudinary
+      );
+      coverImageUrl = uploadResult.url;
+    } catch (error) {
+      console.error('Lỗi khi upload ảnh lên Cloudinary:', error);
+      // Có thể throw lỗi hoặc tiếp tục với ảnh mặc định
+    }
+  }
   const baseData: any = {
     title: data.title,
     description: data.description,
-    cover_image: data.cover_image ?? null,
+    cover_image: coverImageUrl,
     detail_images: data.detail_images,
     genres: data.genres,
     rating: data.rating ?? null,
@@ -26,25 +41,61 @@ export async function createMovieImpl(anyDb: any, tables: { movies: any }, data:
   }
 }
 
-export async function updateMovieImpl(anyDb: any, tables: { movies: any }, id: number, data: { title?: string; description?: string; cover_image?: string | null; detail_images?: any; genres?: any; rating?: string | null; duration_min?: number; is_active?: boolean; release_date?: string | Date | null }, RUNTIME_ENV?: string) {
+export async function updateMovieImpl(anyDb: any, tables: { movies: any }, id: number, data: { 
+  title?: string; 
+  description?: string; 
+  cover_image?: string | null; 
+  cover_image_base64?: string; // Thêm trường này
+  detail_images?: any; 
+  genres?: any; 
+  rating?: string | null; 
+  duration_min?: number; 
+  is_active?: boolean; 
+  release_date?: string | Date | null 
+}, RUNTIME_ENV?: string) {
   const now = new Date();
   const payload: any = { updated_at: formatDateForDb(now, RUNTIME_ENV) };
-
+  // Xử lý upload ảnh nếu có base64
+  if (data.cover_image_base64) {
+    try {
+      const uploadResult = await uploadCloudinaryImageDataURI(
+        process.env,
+        data.cover_image_base64,
+        'ctbooking/movies'
+      );
+      payload.cover_image = uploadResult.url;
+    } catch (error) {
+      console.error('Lỗi khi upload ảnh lên Cloudinary:', error);
+      // Có thể throw lỗi hoặc bỏ qua
+    }
+  } else if (data.cover_image !== undefined) {
+    payload.cover_image = data.cover_image;
+  }
+  // Các trường khác
   if (data.title !== undefined) payload.title = data.title;
   if (data.description !== undefined) payload.description = data.description;
-  if (data.cover_image !== undefined) payload.cover_image = data.cover_image;
   if (data.detail_images !== undefined) payload.detail_images = data.detail_images;
   if (data.genres !== undefined) payload.genres = data.genres;
   if (data.rating !== undefined) payload.rating = data.rating ?? null;
   if (data.duration_min !== undefined) payload.duration_min = data.duration_min;
-  if (data.is_active !== undefined) payload.is_active = Boolean(data.is_active);
-  if (data.release_date !== undefined) payload.release_date = data.release_date ? formatDateForDb(data.release_date, RUNTIME_ENV) : null;
-
-  const updatedRes = await anyDb.update(tables.movies).set(payload).where(eq(tables.movies.id, id)).returning();
-  let movie: any = Array.isArray(updatedRes) ? updatedRes[0] : updatedRes;
-
-  return movie || null;
+  if (data.is_active !== undefined) payload.is_active = data.is_active;
+  if (data.release_date !== undefined) {
+    payload.release_date = data.release_date ? formatDateForDb(data.release_date, RUNTIME_ENV) : null;
+  }
+  try {
+    const updated = await anyDb.update(tables.movies)
+      .set(payload)
+      .where(eq(tables.movies.id, id))
+      .returning();
+    
+    const movie = Array.isArray(updated) ? updated[0] : updated;
+    if (!movie) throw new Error("Không tìm thấy phim để cập nhật");
+    return { movie };
+  } catch (err: any) {
+    throw err;
+  }
 }
+
 
 export async function deleteMovieImpl(anyDb: any, tables: { movies: any }, id: number) {
   // Check if movie exists before deleting
