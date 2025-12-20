@@ -54,7 +54,7 @@ VITE_CLOUDINARY_UPLOAD_PRESET_IMAGE="ctbooking_images_unsigned"
 
 
 [[env.preview.d1_databases]]
-binding = "cinema_db_preview"
+binding = "cinema_db"
 database_name = "cinema-db-preview"
 database_id = "fd9274ae-d1a3-42e2-b83d-2fc1bdc71caf"
 
