@@ -321,6 +321,7 @@ export default function Header({ onBookClick = () => { }, disableNav = false, to
       if (data?.status === "success") {
         setIsForgetPassOpen(false);
         setForgetPassEmail("");
+        toast({ title: "Đổi mật khẩu thành công!", description: data.message });
       }
     } catch (err: any) {
       setForgetSubmitError(String(err?.message || "Yêu cầu thất bại"));
