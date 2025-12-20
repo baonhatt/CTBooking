@@ -291,7 +291,7 @@ app.get("/api/admin/transactions/:id", async (c) => {
 app.get("/api/admin/dashboard/metrics", async (c) => {
   try {
     const db = drizzle(c.env.cinema_db, { schema });
-    const r = await getDashboardMetricsImpl(db, { movies: schema.movies, users: schema.users, bookings: schema.bookings });
+    const r = await getDashboardMetricsImpl(db, { movies: schema.movies, users: schema.users, bookings: schema.bookings }, c.env.RUNTIME_ENV);
     return c.json(r);
   } catch (err: any) {
     return c.json({ status: "error", message: String(err?.message || "Internal error") }, 500);
@@ -303,7 +303,7 @@ app.get("/api/admin/dashboard/revenue-date", async (c) => {
     const date = String(c.req.query("date") || "");
     const status = String(c.req.query("status") || "paid");
     const db = drizzle(c.env.cinema_db, { schema });
-    const r = await getRevenueByDateImpl(db, { bookings: schema.bookings }, { date, status });
+    const r = await getRevenueByDateImpl(db, { bookings: schema.bookings }, { date, status }, c.env.RUNTIME_ENV);
     return c.json(r);
   } catch (err: any) {
     return c.json({ status: "error", message: String(err?.message || "Internal error") }, 500);
@@ -313,7 +313,7 @@ app.get("/api/admin/dashboard/revenue-date", async (c) => {
 app.get("/api/admin/dashboard/revenue-7days", async (c) => {
   try {
     const db = drizzle(c.env.cinema_db, { schema });
-    const r = await getRevenue7DaysImpl(db, { bookings: schema.bookings });
+    const r = await getRevenue7DaysImpl(db, { bookings: schema.bookings }, c.env.RUNTIME_ENV);
     return c.json(r);
   } catch (err: any) {
     return c.json({ status: "error", message: String(err?.message || "Internal error") }, 500);
@@ -326,7 +326,7 @@ app.get("/api/admin/dashboard/revenue-month", async (c) => {
     const month = String(c.req.query("month") || "");
     const status = String(c.req.query("status") || "paid");
     const db = drizzle(c.env.cinema_db, { schema });
-    const r = await getRevenueByMonthImpl(db, { bookings: schema.bookings }, { year, month, status });
+    const r = await getRevenueByMonthImpl(db, { bookings: schema.bookings }, { year, month, status }, c.env.RUNTIME_ENV);
     return c.json(r);
   } catch (err: any) {
     return c.json({ status: "error", message: String(err?.message || "Internal error") }, 500);
