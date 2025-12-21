@@ -36,6 +36,7 @@ export async function createTicketApi(body: {
   price: number;
   features?: string[];
   type?: string;
+  combo: string[];
   min_group_size?: number;
   max_group_size?: number;
   is_member_only?: boolean;
@@ -57,6 +58,7 @@ export async function updateTicketApi(
     price?: number;
     features?: string[] | string;
     type?: string;
+    combo?: string[];
     min_group_size?: number;
     max_group_size?: number;
     is_member_only?: boolean;
