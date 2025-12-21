@@ -614,18 +614,34 @@ export default function BookingPage() {
                         <div className="flex justify-between border-t border-white/10 pt-2 mt-2"><span className="text-white font-semibold">Tổng Tiền</span><span className="text-white font-bold">{totalPrice.toLocaleString('vi-VN')}₫</span></div>
                       </div>
                     </div>
+
                   </div>
-                  <div className="md:col-span-2 pt-3 mt-1 border-t border-white/10 flex items-center gap-3">
-                    <Checkbox
-                      checked={confirmChecked}
-                      onCheckedChange={(v) => setConfirmChecked(Boolean(v))}
-                      className="border-white/40 data-[state=checked]:bg-blue-500"
-                      aria-label="Xác nhận thông tin đặt vé"
-                      id="confirm-checkbox"
-                    />
-                    <label htmlFor="confirm-checkbox" className="text-xs sm:text-sm text-gray-300">
-                      Vui lòng xác nhận lại thông tin, bao gồm: loại vé, số lượng vé và email. Mã đặt vé sẽ gửi tới email này nếu thanh toán thành công.
-                    </label>
+                  <div className="md:col-span-2 mt-4 mb-2 p-4 rounded-lg border border-[#FF5252]/30 bg-[#FF5252]/10">
+                    <h3 className="text-[#FF5252] font-bold text-lg mb-2">Lưu ý</h3>
+                    <ul className="list-disc list-inside space-y-1 text-sm text-gray-300">
+                      <li>Trò chơi phù hợp với trẻ em có chiều cao từ 70cm trở lên. Trẻ em dưới 1m4 bắt buộc có người lớn đi kèm.</li>
+                      <li>Những người mắc bệnh tim mạch, chóng mặt, sợ độ cao, phụ nữ mang thai và những người có vấn đề về sức khỏe, vui lòng cân nhắc kỹ trước khi mua vé.</li>
+                      <li>Mỗi vé tương ứng 1 lượt xem 1 phim cho 1 khách.</li>
+                      <li>Quý khách vui lòng đến đúng ngày được ghi trên vé.</li>
+                      <li>Vé đã mua không được hoàn tiền và đổi trả vé. Giá vé sẽ thay đổi theo từng thời điểm.</li>
+                      <li>Thức ăn và nước uống không được phép mang vào khu vực trải nghiệm trò chơi.</li>
+                    </ul>
+                  </div>
+
+                  <div className="md:col-span-2 pt-3 mt-1 border-t border-white/10 space-y-3">
+                  
+                    <div className="flex items-center gap-3">
+                      <Checkbox
+                        checked={confirmChecked}
+                        onCheckedChange={(v) => setConfirmChecked(Boolean(v))}
+                        className="border-white/40 data-[state=checked]:bg-blue-500"
+                        aria-label="Xác nhận thông tin đặt vé"
+                        id="confirm-checkbox"
+                      />
+                      <label htmlFor="confirm-checkbox" className="text-xs sm:text-sm text-gray-300 cursor-pointer select-none">
+                        Vui lòng xác nhận lại thông tin, bao gồm: loại vé, số lượng vé và email. Mã đặt vé sẽ gửi tới email này nếu thanh toán thành công.
+                      </label>
+                    </div>
                   </div>
                 </CardContent>
               </Card>
@@ -649,3 +665,4 @@ export default function BookingPage() {
     </UserLayout>
   );
 }
+
