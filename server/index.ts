@@ -106,9 +106,9 @@ export function createServer() {
       res.status(200).json({ items, page, pageSize, total });
     } catch (error: any) {
       const errorMessage = error?.message || "Lỗi máy chủ nội bộ";
-      res.status(500).json({ 
+      res.status(500).json({
         status: "error",
-        message: errorMessage 
+        message: errorMessage
       });
     }
   });
@@ -121,9 +121,9 @@ export function createServer() {
       res.status(200).json({ movie });
     } catch (error: any) {
       const errorMessage = error?.message || "Lỗi máy chủ nội bộ";
-      res.status(500).json({ 
+      res.status(500).json({
         status: "error",
-        message: errorMessage 
+        message: errorMessage
       });
     }
   });
@@ -134,11 +134,11 @@ export function createServer() {
       const r = await getMovieByIdImpl(db, { movies: pgMovies, bookings: pgBookings }, id);
       if (!r) return res.status(404).json({ status: "error", message: "Không tìm thấy phim" });
       res.status(200).json(r);
-   } catch (error: any) {
+    } catch (error: any) {
       const errorMessage = error?.message || "Lỗi máy chủ nội bộ";
-      res.status(500).json({ 
+      res.status(500).json({
         status: "error",
-        message: errorMessage 
+        message: errorMessage
       });
     }
   });
@@ -148,9 +148,9 @@ export function createServer() {
       res.status(201).json(r);
     } catch (error: any) {
       const errorMessage = error?.message || "Lỗi máy chủ nội bộ";
-      res.status(500).json({ 
+      res.status(500).json({
         status: "error",
-        message: errorMessage 
+        message: errorMessage
       });
     }
   });
@@ -162,9 +162,9 @@ export function createServer() {
       res.status(200).json(r);
     } catch (error: any) {
       const errorMessage = error?.message || "Lỗi máy chủ nội bộ";
-      res.status(500).json({ 
+      res.status(500).json({
         status: "error",
-        message: errorMessage 
+        message: errorMessage
       });
     }
   });
@@ -176,9 +176,9 @@ export function createServer() {
       res.status(200).json(r);
     } catch (error: any) {
       const errorMessage = error?.message || "Lỗi máy chủ nội bộ";
-      res.status(500).json({ 
+      res.status(500).json({
         status: "error",
-        message: errorMessage 
+        message: errorMessage
       });
     }
   });
@@ -190,9 +190,9 @@ export function createServer() {
       res.status(status).json(payload);
     } catch (error: any) {
       const errorMessage = error?.message || "Lỗi máy chủ nội bộ";
-      res.status(500).json({ 
+      res.status(500).json({
         status: "error",
-        message: errorMessage 
+        message: errorMessage
       });
     }
   });
@@ -204,9 +204,9 @@ export function createServer() {
       res.status(status).json(payload);
     } catch (error: any) {
       const errorMessage = error?.message || "Lỗi máy chủ nội bộ";
-      res.status(500).json({ 
+      res.status(500).json({
         status: "error",
-        message: errorMessage 
+        message: errorMessage
       });
     }
   });
@@ -219,9 +219,9 @@ export function createServer() {
       res.status(status).json(payload);
     } catch (error: any) {
       const errorMessage = error?.message || "Lỗi máy chủ nội bộ";
-      res.status(500).json({ 
+      res.status(500).json({
         status: "error",
-        message: errorMessage 
+        message: errorMessage
       });
     }
   });
@@ -233,9 +233,9 @@ export function createServer() {
       res.status(status).json(payload);
     } catch (error: any) {
       const errorMessage = error?.message || "Lỗi máy chủ nội bộ";
-      res.status(500).json({ 
+      res.status(500).json({
         status: "error",
-        message: errorMessage 
+        message: errorMessage
       });
     }
   });
@@ -321,9 +321,9 @@ export function createServer() {
       res.status(status).json(payload);
     } catch (error: any) {
       const errorMessage = error?.message || "Lỗi máy chủ nội bộ";
-      res.status(500).json({ 
+      res.status(500).json({
         status: "error",
-        message: errorMessage 
+        message: errorMessage
       });
     }
   });
@@ -343,7 +343,7 @@ export function createServer() {
       const code = String(req.params.code || "");
       const r = await getBookingByCodeImpl(db, code, pgTables);
       const status = typeof (r as any).status === "number" ? (r as any).status : 200;
-      if (status == 404) {        
+      if (status == 404) {
         const remaining = typeof (res.locals as any).rateLimitRemaining === "number" ? (res.locals as any).rateLimitRemaining : undefined;
         const windowMs = typeof (res.locals as any).rateLimitWindowMs === "number" ? (res.locals as any).rateLimitWindowMs : undefined;
         const suffix = remaining !== undefined && windowMs !== undefined ? ` Bạn còn ${remaining} lần thử trong ${Math.ceil(windowMs / 1000)}s` : "";
@@ -364,9 +364,9 @@ export function createServer() {
       res.status(status).json(payload);
     } catch (error: any) {
       const errorMessage = error?.message || "Lỗi máy chủ nội bộ";
-      res.status(500).json({ 
+      res.status(500).json({
         status: "error",
-        message: errorMessage 
+        message: errorMessage
       });
     }
   });
@@ -379,9 +379,9 @@ export function createServer() {
       res.status(200).json(r);
     } catch (error: any) {
       const errorMessage = error?.message || "Lỗi máy chủ nội bộ";
-      res.status(500).json({ 
+      res.status(500).json({
         status: "error",
-        message: errorMessage 
+        message: errorMessage
       });
     }
   });
@@ -400,9 +400,9 @@ export function createServer() {
       res.status(200).json(r);
     } catch (error: any) {
       const errorMessage = error?.message || "Lỗi máy chủ nội bộ";
-      res.status(500).json({ 
+      res.status(500).json({
         status: "error",
-        message: errorMessage 
+        message: errorMessage
       });
     }
   });
@@ -414,9 +414,9 @@ export function createServer() {
       res.status(200).json(r);
     } catch (error: any) {
       const errorMessage = error?.message || "Lỗi máy chủ nội bộ";
-      res.status(500).json({ 
+      res.status(500).json({
         status: "error",
-        message: errorMessage 
+        message: errorMessage
       });
     }
   });
@@ -429,9 +429,9 @@ export function createServer() {
       res.status(200).json(r);
     } catch (error: any) {
       const errorMessage = error?.message || "Lỗi máy chủ nội bộ";
-      res.status(500).json({ 
+      res.status(500).json({
         status: "error",
-        message: errorMessage 
+        message: errorMessage
       });
     }
   });
@@ -441,9 +441,9 @@ export function createServer() {
       res.status(200).json(r);
     } catch (error: any) {
       const errorMessage = error?.message || "Lỗi máy chủ nội bộ";
-      res.status(500).json({ 
+      res.status(500).json({
         status: "error",
-        message: errorMessage 
+        message: errorMessage
       });
     }
   });
@@ -455,9 +455,9 @@ export function createServer() {
       res.status(200).json(r);
     } catch (error: any) {
       const errorMessage = error?.message || "Lỗi máy chủ nội bộ";
-      res.status(500).json({ 
+      res.status(500).json({
         status: "error",
-        message: errorMessage 
+        message: errorMessage
       });
     }
   });
@@ -467,9 +467,9 @@ export function createServer() {
       res.status(201).json(r);
     } catch (error: any) {
       const errorMessage = error?.message || "Lỗi máy chủ nội bộ";
-      res.status(500).json({ 
+      res.status(500).json({
         status: "error",
-        message: errorMessage 
+        message: errorMessage
       });
     }
   });
@@ -481,9 +481,9 @@ export function createServer() {
       res.status(200).json(r);
     } catch (error: any) {
       const errorMessage = error?.message || "Lỗi máy chủ nội bộ";
-      res.status(500).json({ 
+      res.status(500).json({
         status: "error",
-        message: errorMessage 
+        message: errorMessage
       });
     }
   });
@@ -495,9 +495,9 @@ export function createServer() {
       res.status(200).json(r);
     } catch (error: any) {
       const errorMessage = error?.message || "Lỗi máy chủ nội bộ";
-      res.status(500).json({ 
+      res.status(500).json({
         status: "error",
-        message: errorMessage 
+        message: errorMessage
       });
     }
   });
@@ -507,9 +507,9 @@ export function createServer() {
       res.status(200).json(r);
     } catch (error: any) {
       const errorMessage = error?.message || "Lỗi máy chủ nội bộ";
-      res.status(500).json({ 
+      res.status(500).json({
         status: "error",
-        message: errorMessage 
+        message: errorMessage
       });
     }
   });
@@ -521,9 +521,9 @@ export function createServer() {
       res.status(200).json(r);
     } catch (error: any) {
       const errorMessage = error?.message || "Lỗi máy chủ nội bộ";
-      res.status(500).json({ 
+      res.status(500).json({
         status: "error",
-        message: errorMessage 
+        message: errorMessage
       });
     }
   });
@@ -533,9 +533,9 @@ export function createServer() {
       res.status(200).json(r);
     } catch (error: any) {
       const errorMessage = error?.message || "Lỗi máy chủ nội bộ";
-      res.status(500).json({ 
+      res.status(500).json({
         status: "error",
-        message: errorMessage 
+        message: errorMessage
       });
     }
   });
@@ -548,9 +548,9 @@ export function createServer() {
       res.status(200).json(r);
     } catch (error: any) {
       const errorMessage = error?.message || "Lỗi máy chủ nội bộ";
-      res.status(500).json({ 
+      res.status(500).json({
         status: "error",
-        message: errorMessage 
+        message: errorMessage
       });
     }
   });
@@ -563,9 +563,9 @@ export function createServer() {
       res.status(200).json(r);
     } catch (error: any) {
       const errorMessage = error?.message || "Lỗi máy chủ nội bộ";
-      res.status(500).json({ 
+      res.status(500).json({
         status: "error",
-        message: errorMessage 
+        message: errorMessage
       });
     }
   });
@@ -577,9 +577,9 @@ export function createServer() {
       res.status(200).json(r);
     } catch (error: any) {
       const errorMessage = error?.message || "Lỗi máy chủ nội bộ";
-      res.status(500).json({ 
+      res.status(500).json({
         status: "error",
-        message: errorMessage 
+        message: errorMessage
       });
     }
   });
@@ -592,9 +592,9 @@ export function createServer() {
       res.status(200).json(r);
     } catch (error: any) {
       const errorMessage = error?.message || "Lỗi máy chủ nội bộ";
-      res.status(500).json({ 
+      res.status(500).json({
         status: "error",
-        message: errorMessage 
+        message: errorMessage
       });
     }
   });
@@ -607,9 +607,9 @@ export function createServer() {
       res.status(status).json(payload);
     } catch (error: any) {
       const errorMessage = error?.message || "Lỗi máy chủ nội bộ";
-      res.status(500).json({ 
+      res.status(500).json({
         status: "error",
-        message: errorMessage 
+        message: errorMessage
       });
     }
   });
@@ -621,9 +621,9 @@ export function createServer() {
       res.status(200).json(r);
     } catch (error: any) {
       const errorMessage = error?.message || "Lỗi máy chủ nội bộ";
-      res.status(500).json({ 
+      res.status(500).json({
         status: "error",
-        message: errorMessage 
+        message: errorMessage
       });
     }
   });
@@ -645,9 +645,9 @@ export function createServer() {
       res.status(status).json(payload);
     } catch (error: any) {
       const errorMessage = error?.message || "Lỗi máy chủ nội bộ";
-      res.status(500).json({ 
+      res.status(500).json({
         status: "error",
-        message: errorMessage 
+        message: errorMessage
       });
     }
   });
@@ -662,7 +662,7 @@ export function createServer() {
       const payment_method = String(req.query.payment_method || "");
       const from = String(req.query.from || "");
       const to = String(req.query.to || "");
-      const r = await listUserTransactionsImpl(db, { accounts: pgAccounts, bookings: pgBookings, movies: pgMovies, ticket_packages: pgTicketPackages}, { email, status, page, pageSize, sort, dir, payment_method, from, to });
+      const r = await listUserTransactionsImpl(db, { accounts: pgAccounts, bookings: pgBookings, movies: pgMovies, ticket_packages: pgTicketPackages }, { email, status, page, pageSize, sort, dir, payment_method, from, to });
       res.status(200).json(r);
     } catch (err) {
       res.status(500).json({ message: "Lỗi máy chủ nội bộ" });
@@ -673,13 +673,13 @@ export function createServer() {
       const page = Number(req.query.page || 1);
       const pageSize = Number(req.query.pageSize || 20);
       const q = String(req.query.q || "");
-      const r = await listTicketPackagesImpl(db, { ticket_packages: pgTicketPackages }, { page, pageSize, q });
+      const r = await listTicketPackagesImpl(db, { ticket_packages: pgTicketPackages, movies: pgMovies }, { page, pageSize, q });
       res.status(200).json(r);
     } catch (error: any) {
       const errorMessage = error?.message || "Lỗi máy chủ nội bộ";
-      res.status(500).json({ 
+      res.status(500).json({
         status: "error",
-        message: errorMessage 
+        message: errorMessage
       });
     }
   });
@@ -689,9 +689,9 @@ export function createServer() {
       res.status(200).json(r);
     } catch (error: any) {
       const errorMessage = error?.message || "Lỗi máy chủ nội bộ";
-      res.status(500).json({ 
+      res.status(500).json({
         status: "error",
-        message: errorMessage 
+        message: errorMessage
       });
     }
   });
@@ -703,35 +703,35 @@ export function createServer() {
       res.status(200).json(r);
     } catch (error: any) {
       const errorMessage = error?.message || "Lỗi máy chủ nội bộ";
-      res.status(500).json({ 
+      res.status(500).json({
         status: "error",
-        message: errorMessage 
+        message: errorMessage
       });
     }
   });
   app.post("/api/tickets", async (req, res) => {
     try {
-      const r = await createTicketPackageImpl(db, { ticket_packages: pgTicketPackages }, req.body as any);
+      const r = await createTicketPackageImpl(db, { ticket_packages: pgTicketPackages, movies: pgMovies }, req.body as any);
       res.status(201).json(r);
     } catch (error: any) {
       const errorMessage = error?.message || "Lỗi máy chủ nội bộ";
-      res.status(500).json({ 
+      res.status(500).json({
         status: "error",
-        message: errorMessage 
+        message: errorMessage
       });
     }
   });
   app.put("/api/tickets/:id", async (req, res) => {
     try {
       const id = Number(req.params.id);
-      const r = await updateTicketPackageImpl(db, { ticket_packages: pgTicketPackages }, id, req.body as any);
+      const r = await updateTicketPackageImpl(db, { ticket_packages: pgTicketPackages, movies: pgMovies }, id, req.body as any);
       if (!r) return res.status(404).json({ status: "error", message: "Không tìm thấy" });
       res.status(200).json(r);
     } catch (error: any) {
       const errorMessage = error?.message || "Lỗi máy chủ nội bộ";
-      res.status(500).json({ 
+      res.status(500).json({
         status: "error",
-        message: errorMessage 
+        message: errorMessage
       });
     }
   });
@@ -743,9 +743,9 @@ export function createServer() {
       res.status(200).json(r);
     } catch (error: any) {
       const errorMessage = error?.message || "Lỗi máy chủ nội bộ";
-      res.status(500).json({ 
+      res.status(500).json({
         status: "error",
-        message: errorMessage 
+        message: errorMessage
       });
     }
   });
@@ -757,9 +757,9 @@ export function createServer() {
       res.status(201).json(r);
     } catch (error: any) {
       const errorMessage = error?.message || "Lỗi máy chủ nội bộ";
-      res.status(500).json({ 
+      res.status(500).json({
         status: "error",
-        message: errorMessage 
+        message: errorMessage
       });
     }
   });
@@ -770,9 +770,9 @@ export function createServer() {
       res.status(status).json({ ...r });
     } catch (error: any) {
       const errorMessage = error?.message || "Lỗi máy chủ nội bộ";
-      res.status(500).json({ 
+      res.status(500).json({
         status: "error",
-        message: errorMessage 
+        message: errorMessage
       });
     }
   });
@@ -796,9 +796,9 @@ export function createServer() {
       res.status(200).json(r);
     } catch (error: any) {
       const errorMessage = error?.message || "Lỗi máy chủ nội bộ";
-      res.status(500).json({ 
+      res.status(500).json({
         status: "error",
-        message: errorMessage 
+        message: errorMessage
       });
     }
   });

@@ -55,6 +55,7 @@ export const ticket_packages = sqliteTable("ticket_packages", {
   price: real("price").notNull(),
   features: text("features"), // JSON
   type: text("type"),
+  bombo: text("type"),
   min_group_size: integer("min_group_size"),
   max_group_size: integer("max_group_size"),
   is_member_only: integer("is_member_only", { mode: "boolean" }).default(false),
