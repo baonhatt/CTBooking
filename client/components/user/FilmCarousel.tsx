@@ -38,7 +38,7 @@ export default function FilmCarousel({ onSelectFilm }: FilmCarouselProps) {
         (window.matchMedia && window.matchMedia("(pointer: coarse)").matches)),
     [],
   );
-  
+
   // Embla Carousel setup with optimized options for mobile
   const [emblaRef, emblaApi] = useEmblaCarousel(
     {
@@ -92,11 +92,11 @@ export default function FilmCarousel({ onSelectFilm }: FilmCarouselProps) {
   // Setup Embla event listeners
   useEffect(() => {
     if (!emblaApi) return;
-    
+
     onSelect(emblaApi);
     emblaApi.on("reInit", onSelect);
     emblaApi.on("select", onSelect);
-    
+
     return () => {
       emblaApi.off("select", onSelect);
     };
@@ -157,7 +157,7 @@ export default function FilmCarousel({ onSelectFilm }: FilmCarouselProps) {
       if (film) {
         localStorage.setItem("selectedFilm", JSON.stringify(film));
       }
-    } catch {}
+    } catch { }
     setIsModalOpen(false);
     navigate("/booking");
   };
@@ -222,14 +222,6 @@ export default function FilmCarousel({ onSelectFilm }: FilmCarouselProps) {
                       setLastTapTime(Date.now());
                     }}
                     onClick={() => {
-                      if (isTouchDevice) {
-                        const now = Date.now();
-                        if (!hoveredIndex || hoveredIndex !== index || now - lastTapTime > 350) {
-                          setHoveredIndex(index);
-                          setLastTapTime(now);
-                          return;
-                        }
-                      }
                       handleOpen(film);
                     }}
                     className="group relative w-full rounded-3xl overflow-hidden border border-white/10 bg-white/5 backdrop-blur-lg shadow-[0_0_30px_rgba(59,130,246,0.2)] hover:shadow-[0_0_40px_rgba(236,72,153,0.25)] transition-all duration-300"
@@ -246,9 +238,8 @@ export default function FilmCarousel({ onSelectFilm }: FilmCarouselProps) {
                       />
                       <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/30 to-transparent" />
                       <div
-                        className={`absolute bottom-4 left-4 right-4 space-y-2 text-left opacity-0 transition-opacity duration-300 ${
-                          hoveredIndex === index ? "opacity-100" : "group-hover:opacity-100"
-                        }`}
+                        className={`absolute bottom-4 left-4 right-4 space-y-2 text-left opacity-0 transition-opacity duration-300 ${hoveredIndex === index ? "opacity-100" : "group-hover:opacity-100"
+                          }`}
                       >
                         <p className="text-xs uppercase tracking-[0.18em] text-cyan-200">
                           {film.genre}
@@ -256,7 +247,9 @@ export default function FilmCarousel({ onSelectFilm }: FilmCarouselProps) {
                         <h3 className="text-xl font-semibold text-white drop-shadow-lg">
                           {film.title}
                         </h3>
-                        <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/10 border border-white/20 text-sm text-white">
+                        <div onClick={() => {
+                          handleOpen(film);
+                        }} className="inline-flex hover:bg-white/20 items-center gap-2 px-3 py-1 rounded-full bg-white/10 border border-white/20 text-sm text-white">
                           <Play className="h-4 w-4 text-cyan-300" />
                           Mở chi tiết
                         </div>
@@ -298,8 +291,8 @@ export default function FilmCarousel({ onSelectFilm }: FilmCarouselProps) {
                         const genres = Array.isArray(movieDetails.genres)
                           ? movieDetails.genres
                           : typeof movieDetails.genres === "string"
-                          ? JSON.parse(movieDetails.genres)
-                          : [];
+                            ? JSON.parse(movieDetails.genres)
+                            : [];
                         return Array.isArray(genres) && genres.length > 0 ? genres.join(" • ") : "Chưa phân loại";
                       } catch {
                         return "Chưa phân loại";
