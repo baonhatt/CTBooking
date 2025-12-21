@@ -1,4 +1,4 @@
-import { eq, and, inArray, gte, lte, or, desc, asc, count, SQL } from "drizzle-orm";
+import { eq, and, inArray, sql, gte, lte, or, desc, asc, count, SQL } from "drizzle-orm";
 import { formatDateForDb } from "../../lib/date-utils";
 
 export async function updateUserProfileImpl(anyDb: any, tables: { accounts: any; users: any }, payload: { email?: string; name?: string; phone?: string; gender?: string; dob?: string }, RUNTIME_ENV?: string) {
@@ -36,12 +36,43 @@ export async function updateUserProfileImpl(anyDb: any, tables: { accounts: any;
   return { status: 200, user: { id: user.id, fullname: user.fullname, phone: user.phone, gender: user.gender ?? null, dob: user.dob ?? null, email } };
 }
 
-export async function getUserProfileByEmailImpl(anyDb: any, tables: { accounts: any; users: any }, emailRaw: string) {
-  const email = (() => { try { return decodeURIComponent(emailRaw || ""); } catch { return String(emailRaw || ""); } })();
+export async function getUserProfileByEmailImpl(
+  anyDb: any, 
+  tables: { accounts: any; users: any }, 
+  emailRaw: string
+) {
+  // 1. Chuẩn hóa email đầu vào
+  const email = (() => {
+    try {
+      return decodeURIComponent(emailRaw || "").trim().toLowerCase();
+    } catch {
+      return String(emailRaw || "").trim().toLowerCase();
+    }
+  })();
+
   if (!email) return { status: 400, message: "Thiếu email" };
-  const account = await anyDb.query.accounts.findFirst({ where: eq(tables.accounts.email, email) });
-  if (!account) return { status: 404, message: "Không tìm thấy tài khoản" };
-  const user = await anyDb.query.users.findFirst({ where: eq(tables.users.id, account.user_id) });
+
+  // 2. Sử dụng JOIN để lấy dữ liệu trong 1 câu query
+  // Dùng sql`lower(...)` để bỏ qua phân biệt hoa thường của D1
+  const result = await anyDb
+    .select({
+      account: tables.accounts,
+      user: tables.users,
+    })
+    .from(tables.accounts)
+    .leftJoin(tables.users, eq(tables.accounts.user_id, tables.users.id))
+    .where(sql`lower(${tables.accounts.email}) = ${email}`)
+    .limit(1);
+
+  const data = result[0];
+
+  // 3. Kiểm tra kết quả
+  if (!data || !data.account) {
+    return { status: 404, message: "Không tìm thấy tài khoản" };
+  }
+
+  const { account, user } = data;
+
   return {
     status: 200,
     id: user?.id ?? account.user_id,
@@ -49,7 +80,7 @@ export async function getUserProfileByEmailImpl(anyDb: any, tables: { accounts: 
     phone: user?.phone || "",
     gender: user?.gender ?? null,
     dob: user?.dob ?? null,
-    email,
+    email: account.email, // Trả về email gốc trong DB
     is_active: account.is_active ?? true,
     login_type: account.login_type || "email",
     user_created_at: user?.created_at ?? null,
@@ -58,94 +89,116 @@ export async function getUserProfileByEmailImpl(anyDb: any, tables: { accounts: 
   };
 }
 
-export async function listUserTransactionsImpl(anyDb: any, tables: { accounts: any; bookings: any }, args: { email: string; status: string; page: number; pageSize: number; sort: string; dir: "asc" | "desc"; payment_method: string; from?: string; to?: string }) {
+export async function listUserTransactionsImpl(
+  anyDb: any, 
+  tables: { accounts: any; bookings: any; movies: any; ticket_packages: any }, // Thêm bảng vào đây
+  args: { email: string; status: string; page: number; pageSize: number; sort: string; dir: "asc" | "desc"; payment_method: string; from?: string; to?: string }, 
+  RUNTIME_ENV?: string
+) {
   const { email: emailRaw, status, page, pageSize, sort, dir, payment_method, from: fromStr, to: toStr } = args;
   const skip = (page - 1) * pageSize;
-  const email = (() => { try { return decodeURIComponent(emailRaw || ""); } catch { return String(emailRaw || ""); } })();
+  
+  // 1. Chuẩn hóa Email (D1/SQLite rất nhạy cảm hoa thường)
+  const email = decodeURIComponent(emailRaw || "").trim().toLowerCase();
   if (!email) return { items: [], page, pageSize, total: 0 };
-  const account = await anyDb.query.accounts.findFirst({ where: eq(tables.accounts.email, email) });
+
+  // 2. Tìm Account bằng sql`lower` để chắc chắn khớp trên D1
+  const account = (await anyDb
+    .select()
+    .from(tables.accounts)
+    .where(sql`lower(${tables.accounts.email}) = ${email}`)
+    .limit(1))[0];
+  
   if (!account) return { items: [], page, pageSize, total: 0 };
-  const conditions: SQL[] = [eq(tables.bookings.user_id, account.user_id)];
-  if (status) {
-    const s = status.toLowerCase();
-    if (s === "paid") conditions.push(inArray(tables.bookings.payment_status, ["paid"]));
+
+  // 3. Xây dựng điều kiện lọc
+  const conditions: any[] = [eq(tables.bookings.user_id, account.user_id)];
+  
+  if (status && status.toLowerCase() === "paid") {
+    conditions.push(eq(tables.bookings.payment_status, "paid"));
   }
-  if (payment_method) conditions.push(eq(tables.bookings.payment_method, payment_method));
+  
+  if (payment_method) {
+    conditions.push(eq(tables.bookings.payment_method, payment_method));
+  }
+
+  // Xử lý ngày tháng (Đảm bảo formatDateForDb trả về string ISO hoặc format SQLite hiểu)
   if (fromStr || toStr) {
-    const from = fromStr ? new Date(fromStr).toISOString() : undefined;
-    const to = toStr ? new Date(toStr).toISOString() : undefined;
-    const dateConditions: SQL[] = [];
+    const from = fromStr ? formatDateForDb(new Date(fromStr), RUNTIME_ENV) : null;
+    const to = toStr ? formatDateForDb(new Date(toStr), RUNTIME_ENV) : null;
+    
+    const dateConditions: any[] = [];
     if (from && to) {
-      dateConditions.push(and(gte(tables.bookings.created_at, from as any), lte(tables.bookings.created_at, to as any))!);
-      dateConditions.push(and(gte(tables.bookings.paid_at, from as any), lte(tables.bookings.paid_at, to as any))!);
+      dateConditions.push(and(gte(tables.bookings.created_at, from), lte(tables.bookings.created_at, to)));
+      dateConditions.push(and(gte(tables.bookings.paid_at, from), lte(tables.bookings.paid_at, to)));
     } else if (from) {
-      dateConditions.push(gte(tables.bookings.created_at, from as any));
-      dateConditions.push(gte(tables.bookings.paid_at, from as any));
+      dateConditions.push(gte(tables.bookings.created_at, from), gte(tables.bookings.paid_at, from));
     } else if (to) {
-      dateConditions.push(lte(tables.bookings.created_at, to as any));
-      dateConditions.push(lte(tables.bookings.paid_at, to as any));
+      dateConditions.push(lte(tables.bookings.created_at, to), lte(tables.bookings.paid_at, to));
     }
-    if (dateConditions.length > 0) conditions.push(or(...dateConditions)!);
+    if (dateConditions.length > 0) conditions.push(or(...dateConditions));
   }
+
   const whereClause = and(...conditions);
-  const [totalResult] = await anyDb.select({ count: count() }).from(tables.bookings).where(whereClause);
+
+  // 4. Lấy Total Count
+  const [totalResult] = await anyDb
+    .select({ count: count() })
+    .from(tables.bookings)
+    .where(whereClause);
   const total = totalResult?.count ?? 0;
-  const items = await anyDb.query.bookings.findMany({
-    where: whereClause,
-    with: { movie: true, ticket_package: true },
-    orderBy: sort === "paid_at" ? (dir === "asc" ? asc(tables.bookings.paid_at) : desc(tables.bookings.paid_at)) : (dir === "asc" ? asc(tables.bookings.created_at) : desc(tables.bookings.created_at)),
-    offset: skip,
-    limit: pageSize,
+
+  // 5. Query chính sử dụng JOIN thay vì `with` (Để tránh lỗi D1 json_array)
+  const sortCol = sort === "paid_at" ? tables.bookings.paid_at : tables.bookings.created_at;
+  const sortDir = dir === "asc" ? asc(sortCol) : desc(sortCol);
+
+  const rows = await anyDb
+    .select({
+      booking: tables.bookings,
+      movie: tables.movies,
+      ticket_package: tables.ticket_packages
+    })
+    .from(tables.bookings)
+    .leftJoin(tables.movies, eq(tables.bookings.movie_id, tables.movies.id))
+    .leftJoin(tables.ticket_packages, eq(tables.bookings.ticket_package_id, tables.ticket_packages.id))
+    .where(whereClause)
+    .orderBy(sortDir)
+    .offset(skip)
+    .limit(pageSize);
+
+  // 6. Map lại dữ liệu về cấu trúc cũ
+  const now = new Date();
+  const mapped = rows.map((row: any) => {
+    const b = row.booking;
+    const movie = row.movie;
+    const pkg = row.ticket_package;
+    
+    const expiryAt = b.expiry_date ? new Date(b.expiry_date) : null;
+    const expired = !!(expiryAt && now.getTime() > expiryAt.getTime());
+    const daysLeft = expiryAt ? Math.ceil((expiryAt.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)) : null;
+
+    return {
+      booking_id: b.id,
+      booking_code: b.booking_code,
+      user_id: b.user_id,
+      movie: movie?.title || "",
+      ticket_package: pkg?.name || "",
+      quantity: Number(b.ticket_count || 0),
+      amount: Number(b.total_price || 0),
+      method: b.payment_method || "",
+      payment_status: b.payment_status || "",
+      created_at: b.created_at,
+      paid_at: b.paid_at,
+      expiry_date: b.expiry_date,
+      expired,
+      days_left: daysLeft,
+      is_used: !!b.is_used,
+      name: b.name || "",
+      phone: b.phone || "",
+      email: email, // Email đã decode ở trên
+      poster_url: movie?.cover_image || null,
+    };
   });
-  const mapped = items.map((b: any) => {
-    try {
-      const movie = b?.movie;
-      const amount = (() => { try { return Number(b?.total_price ?? 0); } catch { return 0; } })();
-      const coverImage = movie?.cover_image || null;
-      const now = new Date();
-      const expiryAt = b?.expiry_date ? new Date(b.expiry_date as any) : null;
-      const expired = Boolean(expiryAt && now.getTime() > expiryAt.getTime());
-      const daysLeft = expiryAt ? Math.ceil((expiryAt.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)) : null;
-      return {
-        booking_id: b.id,
-        booking_code: b.booking_code || null,
-        user_id: b.user_id,
-        movie: movie?.title || "",
-        ticket_package: b?.ticket_package?.name || "",
-        quantity: Number(b?.ticket_count ?? 0),
-        amount,
-        method: b?.payment_method || "",
-        payment_status: b?.payment_status || "",
-        created_at: b?.created_at || null,
-        paid_at: b?.paid_at || null,
-        expiry_date: b?.expiry_date || null,
-        expired,
-        days_left: daysLeft,
-        is_used: !!b?.is_used,
-        name: b?.name || "",
-        phone: b?.phone || "",
-        email,
-        poster_url: coverImage,
-      };
-    } catch {
-      return {
-        booking_id: Number(b?.id ?? 0),
-        booking_code: b?.booking_code || null,
-        user_id: Number(b?.user_id ?? 0),
-        movie: b?.movie?.title || "",
-        ticket_package: b?.ticket_package?.name || "",
-        quantity: Number(b?.ticket_count ?? 0),
-        amount: 0,
-        method: b?.payment_method || "",
-        payment_status: b?.payment_status || "",
-        created_at: b?.created_at || null,
-        paid_at: b?.paid_at || null,
-        name: b?.name || "",
-        phone: b?.phone || "",
-        email,
-        poster_url: null,
-      };
-    }
-  });
+
   return { items: mapped, page, pageSize, total };
 }

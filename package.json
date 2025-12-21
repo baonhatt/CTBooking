@@ -21,9 +21,8 @@
     "test": "vitest --run",
     "format.fix": "prettier --write .",
     "typecheck": "tsc",
-    "deploy:preview": "npx wrangler deploy --env preview --config worker/wrangler.toml",
-    "deploy:prod": "npx wrangler deploy --config worker/wrangler.toml",
-    "pages:deploy": "npm run build:client && npx wrangler pages deploy dist/spa --project-name=cinema-pages",
+    "deploy:preview": "npm run build:server && npx wrangler deploy --env preview --config worker/wrangler.toml",
+    "deploy:prod": "npm run build:server && npx wrangler deploy --config worker/wrangler.toml",
     "pages:deploy:prod": "npm run build:client && npx wrangler pages deploy dist/spa --project-name=cinema-pages --branch=main",
     "pages:deploy:preview": "npm run build:client:preview && npx wrangler pages deploy dist/spa --project-name=cinema-pages --branch=preview"
   },
