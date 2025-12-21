@@ -20,7 +20,7 @@ export async function getToys(options?: {
 }
 
 export async function getActiveToys(options?: { signal?: AbortSignal }) {
-  return request<{ items: any[] }>("/api/toys/active", {
+  return request<{ items: any[] }>("/api/toys-active", {
     signal: options?.signal,
   });
 }

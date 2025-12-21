@@ -104,7 +104,7 @@ export async function getMovieById(id: number) {
       totalRevenue: number;
       successfulBookings: number;
     };
-  }>(`/api/movies/detail/${id}`);
+  }>(`/api/movies-detail/${id}`);
 }
 
 export type { Movie, MoviesResponse, ActiveMoviesTodayResponse };

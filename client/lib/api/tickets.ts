@@ -20,7 +20,7 @@ export async function getTickets(options?: {
 }
 
 export async function getActiveTickets(options?: { signal?: AbortSignal }) {
-  return request<{ items: any[] }>(`/api/tickets/active`, {
+  return request<{ items: any[] }>(`/api/tickets-active`, {
     signal: options?.signal,
   });
 }

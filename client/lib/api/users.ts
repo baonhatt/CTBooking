@@ -45,7 +45,7 @@ export async function getUserById(id: number) {
 }
 
 export async function updateUserProfileApi(body: { email: string; name?: string; phone?: string; gender?: string; dob?: string }) {
-  return request<{ ok: boolean; user: any }>(`/api/users/profile`, {
+  return request<{ ok: boolean; user: any }>(`/api/users-profile`, {
     method: "POST",
     body: JSON.stringify(body),
   });
@@ -81,6 +81,6 @@ export async function getUserProfileByEmailApi(email: string) {
     user_created_at?: string | null;
     user_updated_at?: string | null;
     account_created_at?: string | null;
-  }>(`/api/users/profile?${params.toString()}`);
+  }>(`/api/users-profile?${params.toString()}`);
 }
 

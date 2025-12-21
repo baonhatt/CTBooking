@@ -128,7 +128,7 @@ export function createServer() {
     }
   });
   //get detail movies cho modal detail 
-  app.get("/api/movies/detail/:id", async (req, res) => {
+  app.get("/api/movies-detail/:id", async (req, res) => {
     try {
       const id = Number(req.params.id);
       const r = await getMovieByIdImpl(db, { movies: pgMovies, bookings: pgBookings }, id);
@@ -338,7 +338,7 @@ export function createServer() {
       res.status(500).json({ message: "Lỗi máy chủ nội bộ" });
     }
   });
-  app.get("/api/bookings/code/:code", noStore, rateLimitCheckCode(), async (req, res) => {
+  app.get("/api/bookings-code/:code", noStore, rateLimitCheckCode(), async (req, res) => {
     try {
       const code = String(req.params.code || "");
       const r = await getBookingByCodeImpl(db, code, pgTables);
@@ -355,7 +355,7 @@ export function createServer() {
       res.status(500).json({ message: "Lỗi máy chủ nội bộ" });
     }
   });
-  app.post("/api/bookings/use", async (req, res) => {
+  app.post("/api/bookings-use", async (req, res) => {
     try {
       const code = String((req.body as any)?.code || "");
       const r = await confirmUseTicketImpl(db, code, pgTables);
@@ -435,7 +435,7 @@ export function createServer() {
       });
     }
   });
-  app.get("/api/toys/active", async (_req, res) => {
+  app.get("/api/toys-active", async (_req, res) => {
     try {
       const r = await listActiveToys(db, { toys: pgToys });
       res.status(200).json(r);
@@ -572,7 +572,7 @@ export function createServer() {
   app.get("/api/admin/users/:id", async (req, res) => {
     try {
       const id = Number(req.params.id);
-      const r = await getUserByIdImpl(db, { users: pgUsers }, id);
+      const r = await getUserByIdImpl(db, { users: pgUsers, bookings: pgBookings, movies: pgMovies, ticket_packages: pgTicketPackages }, id);
       if (!r) return res.status(404).json({ message: "Không tìm thấy" });
       res.status(200).json(r);
     } catch (error: any) {
@@ -598,7 +598,7 @@ export function createServer() {
       });
     }
   });
-  app.get("/api/users/profile", async (req, res) => {
+  app.get("/api/users-profile", async (req, res) => {
     try {
       const emailRaw = String(req.query.email || "");
       const r = await getUserProfileByEmailImpl(db, { accounts: pgAccounts, users: pgUsers }, emailRaw);
@@ -616,7 +616,7 @@ export function createServer() {
   app.get("/api/users/:id", async (req, res) => {
     try {
       const id = Number(req.params.id);
-      const r = await getUserByIdImpl(db, { users: pgUsers }, id);
+      const r = await getUserByIdImpl(db, { users: pgUsers, bookings: pgBookings, movies: pgMovies, ticket_packages: pgTicketPackages }, id);
       if (!r) return res.status(404).json({ message: "Không tìm thấy" });
       res.status(200).json(r);
     } catch (error: any) {
@@ -627,14 +627,13 @@ export function createServer() {
       });
     }
   });
-  app.post("/api/users/profile", async (req, res) => {
+  app.post("/api/users-profile", async (req, res) => {
     try {
       const r = await updateUserProfileImpl(db, { accounts: pgAccounts, users: pgUsers }, req.body as any);
       const status = typeof (r as any).status === "number" ? (r as any).status : 200;
       const payload = { ...(r as any), status: status >= 400 ? "error" : "success" };
       res.status(status).json(payload);
     } catch (err: any) {
-      console.error("Error /api/users/profile:", err);
       res.status(500).json({ message: "Lỗi máy chủ nội bộ" });
     }
   });
@@ -663,7 +662,7 @@ export function createServer() {
       const payment_method = String(req.query.payment_method || "");
       const from = String(req.query.from || "");
       const to = String(req.query.to || "");
-      const r = await listUserTransactionsImpl(db, { accounts: pgAccounts, bookings: pgBookings }, { email, status, page, pageSize, sort, dir, payment_method, from, to });
+      const r = await listUserTransactionsImpl(db, { accounts: pgAccounts, bookings: pgBookings, movies: pgMovies, ticket_packages: pgTicketPackages}, { email, status, page, pageSize, sort, dir, payment_method, from, to });
       res.status(200).json(r);
     } catch (err) {
       res.status(500).json({ message: "Lỗi máy chủ nội bộ" });
@@ -684,7 +683,7 @@ export function createServer() {
       });
     }
   });
-  app.get("/api/tickets/active", async (_req, res) => {
+  app.get("/api/tickets-active", async (_req, res) => {
     try {
       const r = await listActiveTicketPackages(db, { ticket_packages: pgTicketPackages });
       res.status(200).json(r);

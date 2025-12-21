@@ -88,11 +88,11 @@ export async function getBookingByCodeApi(code: string) {
     can_use: boolean;
     validity_days: number | null;
     expired: boolean;
-  }>(`/api/bookings/code/${code}`);
+  }>(`/api/bookings-code/${code}`);
 }
 
 export async function useTicketApi(code: string) {
-  return request<{ status: string; message: string; booking: { id: number; is_used: boolean } }>(`/api/bookings/use`, {
+  return request<{ status: string; message: string; booking: { id: number; is_used: boolean } }>(`/api/bookings-use`, {
     method: "POST",
     body: JSON.stringify({ code }),
   });
