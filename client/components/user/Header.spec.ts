@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { PASSWORD_PATTERN } from "./Header";
+import { PASSWORD_PATTERN } from "../constants";
 
 describe("PASSWORD_PATTERN", () => {
   it("accepts letters and digits (min 6)", () => {
