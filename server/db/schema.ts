@@ -52,6 +52,7 @@ export const ticket_packages = pgTable("ticket_packages", {
   name: varchar("name", { length: 255 }).notNull(),
   code: varchar("code", { length: 50 }).unique(),
   description: text("description"),
+  combo: json("combo"),
   price: decimal("price", { precision: 10, scale: 2 }).notNull(),
   features: json("features"),
   type: varchar("type", { length: 50 }),

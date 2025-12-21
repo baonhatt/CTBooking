@@ -279,7 +279,7 @@ app.post("/api/forget-password", async (c) => {
         if (allowHost(u.hostname)) {
           appBaseUrl = origin;
         }
-      } catch {}
+      } catch { }
     }
 
     // 2. Fallback về env
@@ -1011,7 +1011,7 @@ app.get("/api/users-profile", async (c) => {
   try {
     const emailRaw = String(c.req.query("email") || "");
     const db = drizzle(c.env.cinema_db, { schema });
-    const r = await getUserProfileByEmailImpl(  
+    const r = await getUserProfileByEmailImpl(
       db,
       { accounts: schema.accounts, users: schema.users },
       emailRaw,
@@ -1192,7 +1192,7 @@ app.get("/api/tickets", async (c) => {
     const db = drizzle(c.env.cinema_db, { schema });
     const r = await listTicketPackagesImpl(
       db,
-      { ticket_packages: schema.ticket_packages },
+      { ticket_packages: schema.ticket_packages, movies: schema.movies },
       { page, pageSize, q },
     );
     return c.json(r, 200);
@@ -1347,7 +1347,7 @@ app.delete("/api/admin/site-media/:id", async (c) => {
       if (env.r2_cinemastore) {
         try {
           await env.r2_cinemastore.delete(publicId);
-        } catch {}
+        } catch { }
       }
 
       // Try Cloudinary (manual fetch because SDK might not work in Worker or env missing in shared code)
@@ -1365,7 +1365,7 @@ app.delete("/api/admin/site-media/:id", async (c) => {
           const cloudName = env.CLOUDINARY_CLOUD_NAME;
           const endpoint = `https://api.cloudinary.com/v1_1/${cloudName}/${type}/destroy`;
           await fetch(endpoint, { method: "POST", body: fd });
-        } catch {}
+        } catch { }
       }
     }
 
@@ -1438,7 +1438,7 @@ app.post("/api/momo/create-payment", async (c) => {
             const redirectPath = c.env.VITE_MOMO_REDIRECT_URL || "/checkout";
             redirectUrl = `${origin}${redirectPath}`;
           }
-        } catch {}
+        } catch { }
       }
     }
 
@@ -1528,7 +1528,7 @@ app.post("/api/vnpay/create-payment", async (c) => {
             const returnPath = c.env.VITE_VNPAY_RETURN_URL || "/checkout";
             returnUrl = `${origin}${returnPath}`;
           }
-        } catch {}
+        } catch { }
       }
     }
 
