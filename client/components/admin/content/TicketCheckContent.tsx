@@ -4,8 +4,23 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { getBookingByCodeApi, useTicketApi } from "@/lib/api";
-import { AlertCircle, CheckCircle, Clock, MapPin, Users, DollarSign, Mail, Phone, User } from "lucide-react";
+import {
+  confirmBookingApi,
+  getBookingByCodeApi,
+  useTicketApi,
+} from "@/lib/api";
+import {
+  AlertCircle,
+  CheckCircle,
+  Clock,
+  MapPin,
+  Users,
+  DollarSign,
+  Mail,
+  Phone,
+  User,
+} from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
 
 interface TicketInfo {
   id: number;
@@ -25,6 +40,7 @@ interface TicketInfo {
   is_used: boolean;
   valid: boolean;
   can_use: boolean;
+  pay_txt_code?: string;
   validity_days: number | null;
   expired: boolean;
 }
@@ -36,6 +52,7 @@ export default function TicketCheckContent() {
   const [error, setError] = useState<string | null>(null);
   const [useLoading, setUseLoading] = useState(false);
   const [countdown, setCountdown] = useState<string | null>(null);
+  const { toast } = useToast();
 
   const handleSearch = async () => {
     if (!code.trim()) {
@@ -66,8 +83,35 @@ export default function TicketCheckContent() {
       setUseLoading(true);
       const res = await useTicketApi(ticketInfo.booking_code);
       if (res?.status == "success") {
-        setTicketInfo({ ...(ticketInfo as any), is_used: true, can_use: false, valid: false });
+        setTicketInfo({
+          ...(ticketInfo as any),
+          is_used: true,
+          can_use: false,
+          valid: false,
+        });
       }
+    } catch (err: any) {
+      setError(err?.message || "Không thể xác nhận sử dụng vé");
+    } finally {
+      setUseLoading(false);
+    }
+  };
+
+  const handleConfirmPayment = async () => {
+    try {
+      setUseLoading(true);
+      const payload = {
+        user_id: ticketInfo.user_id,
+        payment_id: ticketInfo.id,
+        payment_status: "paid",
+        transaction_id: null,
+        paid_at: new Date().toISOString(),
+      };
+      const res = await confirmBookingApi(payload);
+      toast({
+        title: "Thành công",
+        description: res.message,
+      });
     } catch (err: any) {
       setError(err?.message || "Không thể xác nhận sử dụng vé");
     } finally {
@@ -129,9 +173,7 @@ export default function TicketCheckContent() {
           </Badge>
         );
       case "failed":
-        return (
-          <Badge className="bg-red-600 hover:bg-red-700">Thất bại</Badge>
-        );
+        return <Badge className="bg-red-600 hover:bg-red-700">Thất bại</Badge>;
       default:
         return <Badge variant="outline">{status}</Badge>;
     }
@@ -172,7 +214,9 @@ export default function TicketCheckContent() {
     <div className="space-y-6">
       <div className="flex flex-col gap-4">
         <h1 className="text-3xl font-bold">Kiểm Tra Vé</h1>
-        <p className="text-gray-600">Nhập mã vé từ email để xem thông tin chi tiết</p>
+        <p className="text-gray-600">
+          Nhập mã vé từ email để xem thông tin chi tiết
+        </p>
       </div>
 
       {/* Search Section */}
@@ -235,15 +279,37 @@ export default function TicketCheckContent() {
                     <CheckCircle className="w-6 h-6 text-green-600" />
                   )}
                   <div>
-                    <p className={ticketInfo.expired ? "font-semibold text-red-800" : ticketInfo.is_used ? "font-semibold text-yellow-800" : "font-semibold text-green-800"}>Trạng thái vé</p>
-                    <p className={ticketInfo.expired ? "text-sm text-red-700" : ticketInfo.is_used ? "text-sm text-yellow-700" : "text-sm text-green-700"}>{validityLabel}</p>
+                    <p
+                      className={
+                        ticketInfo.expired
+                          ? "font-semibold text-red-800"
+                          : ticketInfo.is_used
+                            ? "font-semibold text-yellow-800"
+                            : "font-semibold text-green-800"
+                      }
+                    >
+                      Trạng thái vé
+                    </p>
+                    <p
+                      className={
+                        ticketInfo.expired
+                          ? "text-sm text-red-700"
+                          : ticketInfo.is_used
+                            ? "text-sm text-yellow-700"
+                            : "text-sm text-green-700"
+                      }
+                    >
+                      {validityLabel}
+                    </p>
                   </div>
                 </div>
                 <div className="text-right">
                   {ticketInfo.expiry_date ? (
                     <div className="text-sm">
                       <p className="text-gray-600">Hết hạn</p>
-                      <p className="font-semibold">{formatDate(ticketInfo.expiry_date)}</p>
+                      <p className="font-semibold">
+                        {formatDate(ticketInfo.expiry_date)}
+                      </p>
                     </div>
                   ) : null}
                   {ticketInfo.valid && ticketInfo.validity_days !== null ? (
@@ -258,10 +324,28 @@ export default function TicketCheckContent() {
                   ) : null}
                 </div>
                 {ticketInfo.can_use && !ticketInfo.is_used && (
-                  <Button onClick={handleConfirmUse} disabled={useLoading} className="bg-green-600 hover:bg-green-700 text-white">
+                  <Button
+                    onClick={handleConfirmUse}
+                    disabled={useLoading}
+                    className="bg-green-600 hover:bg-green-700 text-white"
+                  >
                     {useLoading ? "Đang xác nhận..." : "Xác nhận sử dụng vé"}
                   </Button>
                 )}
+                {!ticketInfo.can_use &&
+                  !ticketInfo.is_used &&
+                  ticketInfo.payment_method === "vietqr" &&
+                  ticketInfo.pay_txt_code != "" && (
+                    <Button
+                      onClick={handleConfirmPayment}
+                      disabled={useLoading}
+                      className="bg-green-600 hover:bg-green-700 text-white"
+                    >
+                      {useLoading
+                        ? "Đang xác nhận..."
+                        : "Xác nhận đã thanh toán"}
+                    </Button>
+                  )}
               </div>
             </CardContent>
           </Card>
@@ -277,7 +361,9 @@ export default function TicketCheckContent() {
                   </p>
                 </div>
                 <div>
-                  <p className="text-sm text-gray-600 mb-1">Trạng Thái Thanh Toán</p>
+                  <p className="text-sm text-gray-600 mb-1">
+                    Trạng Thái Thanh Toán
+                  </p>
                   <div>{getStatusBadge(ticketInfo.payment_status)}</div>
                 </div>
                 <div>
@@ -317,11 +403,25 @@ export default function TicketCheckContent() {
                   <Clock className="w-5 h-5 text-blue-600" />
                   <div>
                     <p className="text-xs text-gray-600">Ngày Thanh Toán</p>
-                    <p className="font-semibold">{ticketInfo.paid_at ? formatDate(ticketInfo.paid_at) : ""}</p>
+                    <p className="font-semibold">
+                      {ticketInfo.paid_at ? formatDate(ticketInfo.paid_at) : ""}
+                    </p>
                   </div>
                 </div>
                 <div className="flex items-center gap-2">
-                  <Badge className={ticketInfo.valid ? "bg-green-600" : ticketInfo.expired ? "bg-red-600" : ticketInfo.is_used ? "bg-yellow-600" : "bg-yellow-600"}>{validityLabel}</Badge>
+                  <Badge
+                    className={
+                      ticketInfo.valid
+                        ? "bg-green-600"
+                        : ticketInfo.expired
+                          ? "bg-red-600"
+                          : ticketInfo.is_used
+                            ? "bg-yellow-600"
+                            : "bg-yellow-600"
+                    }
+                  >
+                    {validityLabel}
+                  </Badge>
                 </div>
               </div>
             </CardContent>
@@ -364,7 +464,9 @@ export default function TicketCheckContent() {
 
                 <div className="space-y-4">
                   <div>
-                    <p className="text-sm text-gray-600 mb-1">Phương Thức Thanh Toán</p>
+                    <p className="text-sm text-gray-600 mb-1">
+                      Phương Thức Thanh Toán
+                    </p>
                     <Badge variant="outline" className="text-base py-2 px-3">
                       {ticketInfo.payment_method?.toUpperCase() || ""}
                     </Badge>
@@ -372,7 +474,9 @@ export default function TicketCheckContent() {
 
                   {ticketInfo.paid_at && (
                     <div>
-                      <p className="text-sm text-gray-600 mb-1">Ngày Thanh Toán</p>
+                      <p className="text-sm text-gray-600 mb-1">
+                        Ngày Thanh Toán
+                      </p>
                       <p className="font-semibold">
                         {formatDate(ticketInfo.paid_at)}
                       </p>
@@ -389,7 +493,6 @@ export default function TicketCheckContent() {
               </div>
             </CardContent>
           </Card>
-
         </div>
       )}
 
