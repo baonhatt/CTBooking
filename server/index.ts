@@ -738,7 +738,7 @@ export function createServer() {
   app.delete("/api/tickets/:id", async (req, res) => {
     try {
       const id = Number(req.params.id);
-      const r = await deleteTicketPackageImpl(db, { ticket_packages: pgTicketPackages }, id);
+      const r = await deleteTicketPackageImpl(db, { ticket_packages: pgTicketPackages, bookings: pgBookings }, id);
       if (!r) return res.status(404).json({ message: "Không tìm thấy" });
       res.status(200).json(r);
     } catch (error: any) {

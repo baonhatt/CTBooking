@@ -1,81 +1,171 @@
-import { eq, or, ilike, desc, asc, count, sql, inArray } from "drizzle-orm";
+// Import các hàm cần thiết từ thư viện
+import { eq, or, ilike, desc, asc, count, inArray, and, sql } from "drizzle-orm";
 import { formatDateForDb } from "../../lib/date-utils";
 
-export async function listTicketPackagesImpl(
-  anyDb: any,
-  tables: { ticket_packages: any; movies: any }, // Thêm tables.movies vào đây
-  args: { page: number; pageSize: number; q: string }
-) {
-  const { page, pageSize, q } = args;
-
-  // 1. Điều kiện tìm kiếm (D1 dùng like, Postgres dùng ilike)
-  const whereCondition = q
-    ? or(
-      ilike(tables.ticket_packages.name, `%${q}%`),
-      ilike(tables.ticket_packages.description, `%${q}%`),
-      ilike(tables.ticket_packages.type, `%${q}%`)
-    )
-    : undefined;
-
-  // 2. Đếm tổng số bản ghi
-  const [totalResult] = await anyDb.select({ count: count() }).from(tables.ticket_packages).where(whereCondition);
-  const total = totalResult ? Number(totalResult.count) : 0;
-  // 3. Lấy danh sách gói vé
-  const packages = await anyDb
-    .select()
-    .from(tables.ticket_packages)
-    .where(whereCondition)
-    .orderBy(asc(tables.ticket_packages.display_order), desc(tables.ticket_packages.id))
-    .limit(pageSize)
-    .offset((page - 1) * pageSize);
-  // 4. Xử lý lấy thông tin Movies kèm theo
-  // Thu thập tất cả Movie ID từ tất cả các gói vé (đã lưu dạng JSON "[1,3]")
-  let comboIds: any[] = [];
-  packages.forEach((pkg: any) => {
-    if (pkg.combo) {
+/**
+ * Hàm helper xử lý dữ liệu combo
+ * @param combo Dữ liệu combo đầu vào (có thể là mảng hoặc chuỗi)
+ * @returns Mảng các ID đã được xử lý và làm sạch
+ */
+function processComboInput(combo: any): number[] {
+  if (!combo) return [];
+  
+  try {
+    // Nếu là chuỗi, chuyển đổi thành mảng
+    if (typeof combo === 'string') {
+      // Thử parse nếu là JSON string
       try {
-        comboIds = typeof pkg.combo === 'string' ? JSON.parse(pkg.combo) : pkg.combo;
-      } catch (e) {
-        comboIds = [];
+        const parsed = JSON.parse(combo);
+        if (Array.isArray(parsed)) {
+          return parsed.map(Number).filter(id => !isNaN(id) && id > 0);
+        }
+      } catch {
+        // Nếu không phải JSON, xử lý như chuỗi thông thường
+        return combo
+          .split(',')
+          .map(x => parseInt(x.trim(), 10))
+          .filter(id => !isNaN(id) && id > 0);
       }
     }
-  });
-  if (!Array.isArray(comboIds)) comboIds = [];
-  // 5. Truy vấn bảng Movies để lấy id, name, code
-  let movieMap: Record<number, { id: number; name: string; code: string }> = {};
-  if (comboIds.length > 0) {
-    const movieData = await anyDb
-      .select({
-        id: tables.movies.id,
-        name: tables.movies.name,
-        code: tables.movies.code,
-      })
-      .from(tables.movies)
-      .where(inArray(tables.movies.id, Array.from(comboIds)));
+    
+    // Nếu là mảng, xử lý các phần tử
+    if (Array.isArray(combo)) {
+      return combo
+        .map(item => typeof item === 'number' ? item : parseInt(item, 10))
+        .filter(id => !isNaN(id) && id > 0);
+    }
+    
+    return [];
+  } catch (error) {
+    console.error('Lỗi khi xử lý combo:', error);
+    return [];
+  }
+}
 
-      movieData.forEach((m: any) => {
-      movieMap[m.id] = m;
-    });
+/**
+ * Lấy danh sách các gói vé có phân trang và tìm kiếm
+ * @param anyDb Kết nối database
+ * @param tables Danh sách các bảng cần sử dụng
+ * @param args Tham số phân trang và tìm kiếm
+ * @returns Danh sách gói vé kèm thông tin phân trang
+ */
+export async function listTicketPackagesImpl(
+  anyDb: any,
+  tables: { ticket_packages: any; movies: any },
+  args: { page: number; pageSize: number; q: string; includeInactive?: boolean },
+) {
+  const { page, pageSize, q, includeInactive = false } = args;
+  
+  // 1. Xây dựng điều kiện where
+  let whereCondition = includeInactive 
+    ? undefined 
+    : eq(tables.ticket_packages.is_active, true);
+  
+  if (q) {
+    const searchTerm = `%${q}%`;
+    const searchCondition = or(
+      ilike(tables.ticket_packages.name, searchTerm),
+      ilike(tables.ticket_packages.description, searchTerm),
+      ilike(tables.ticket_packages.type, searchTerm)
+    );
+    
+    whereCondition = whereCondition 
+      ? and(whereCondition, searchCondition)
+      : searchCondition;
+  }
+
+  // 2. Sử dụng một transaction để thực hiện cả đếm và lấy dữ liệu
+  const [totalResult, packages] = await anyDb.transaction(async (tx: any) => {
+    const [totalRes] = await tx
+      .select({ count: count() })
+      .from(tables.ticket_packages)
+      .where(whereCondition);
+    
+    const pkgList = await tx
+      .select()
+      .from(tables.ticket_packages)
+      .where(whereCondition)
+      .orderBy(
+        asc(tables.ticket_packages.display_order),
+        desc(tables.ticket_packages.id)
+      )
+      .limit(pageSize)
+      .offset((page - 1) * pageSize);
+      
+    return [totalRes, pkgList];
+  });
+  
+  const total = totalResult ? Number(totalResult.count) : 0;
+  
+  // 3. Xử lý thông tin combo và lấy dữ liệu phim
+  const allComboIds = new Set<number>();
+  const packageCombos: Record<number, number[]> = {};
+  
+  // Xử lý combo cho từng gói vé
+  packages.forEach((pkg: any) => {
+    if (!pkg.combo) return;
+    
+    const comboIds = processComboInput(pkg.combo);
+    if (comboIds.length > 0) {
+      packageCombos[pkg.id] = comboIds;
+      comboIds.forEach(id => allComboIds.add(id));
+    }
+  });
+  
+  // 4. Lấy thông tin chi tiết các phim trong combo (nếu có)
+  const movieMap: Record<number, any> = {};
+  if (allComboIds.size > 0) {
+    try {
+      const movieData = await anyDb
+        .select({
+          id: tables.movies.id,
+          title: tables.movies.title,
+          description: tables.movies.description,
+          // Thêm các trường khác nếu cần
+        })
+        .from(tables.movies)
+        .where(inArray(tables.movies.id, Array.from(allComboIds)));
+        
+      // Tạo map ID phim -> thông tin phim
+      movieData.forEach((movie: any) => {
+        movieMap[movie.id] = movie;
+      });
+    } catch (error) {
+      console.error('Lỗi khi lấy thông tin phim:', error);
+      // Tiếp tục xử lý ngay cả khi có lỗi
+    }
   }
   
-  // 6. Map lại Movies vào từng Item
+  // 5. Kết hợp thông tin phim vào từng gói vé
   const items = packages.map((pkg: any) => {
-    let comboIds: number[] = [];
-    try {
-      comboIds = typeof pkg.combo === 'string' ? JSON.parse(pkg.combo) : (pkg.combo || []);
-    } catch (e) {
-      comboIds = [];
-    }
-
+    const comboIds = packageCombos[pkg.id] || [];
+    const movies = comboIds
+      .map((id: number) => movieMap[id])
+      .filter(Boolean); // Lọc bỏ các phim không tồn tại
+    
     return {
       ...pkg,
-      movies: comboIds.map(id => movieMap[id]).filter(Boolean) // Chỉ lấy những phim tồn tại
+      movies: movies.length > 0 ? movies : undefined
     };
   });
 
-  return { items, page, pageSize, total };
+  // 6. Trả về kết quả phân trang
+  return { 
+    items, 
+    page, 
+    pageSize, 
+    total,
+    totalPages: Math.ceil(total / pageSize)
+  };
 }
 
+/**
+ * Lấy thông tin chi tiết một gói vé theo ID
+ * @param anyDb Kết nối database
+ * @param tables Danh sách các bảng cần sử dụng
+ * @param id ID của gói vé cần lấy
+ * @returns Thông tin chi tiết gói vé hoặc null nếu không tìm thấy
+ */
 export async function getTicketPackageImpl(
   anyDb: any,
   tables: { ticket_packages: any },
@@ -84,27 +174,35 @@ export async function getTicketPackageImpl(
   const [item] = await anyDb
     .select()
     .from(tables.ticket_packages)
-    .where(eq(tables.ticket_packages.id, id))
-    .limit(1);
-  return item || null;
+    .where(eq(tables.ticket_packages.id, id))  // Tìm theo ID
+    .limit(1);  // Chỉ lấy 1 bản ghi
+  return item || null;  // Trả về null nếu không tìm thấy
 }
 
+/**
+ * Tạo mới một gói vé
+ * @param anyDb Kết nối database
+ * @param tables Danh sách các bảng cần sử dụng
+ * @param args Thông tin gói vé cần tạo
+ * @param RUNTIME_ENV Môi trường chạy (tùy chọn)
+ * @returns Thông tin gói vé vừa tạo
+ */
 export async function createTicketPackageImpl(
   anyDb: any,
-  tables: { ticket_packages: any; movies?: any },
+  tables: { ticket_packages: any; movies: any },
   args: {
-    name: string;
-    code?: string;
-    description?: string;
-    price: number;
-    features?: any;
-    combo?: any;
-    type?: string;
-    min_group_size?: number;
-    max_group_size?: number;
-    is_member_only?: boolean;
-    is_active?: boolean;
-    display_order?: number;
+    name: string;                  // Tên gói vé
+    code?: string;                 // Mã gói vé
+    description?: string;          // Mô tả
+    price: number;                 // Giá
+    features?: any;                // Các tính năng (dạng mảng)
+    combo?: any;                   // Danh sách ID phim (dạng mảng hoặc chuỗi)
+    type?: string;                 // Loại gói vé
+    min_group_size?: number;       // Số lượng tối thiểu
+    max_group_size?: number;       // Số lượng tối đa
+    is_member_only?: boolean;      // Chỉ dành cho thành viên
+    is_active?: boolean;           // Trạng thái hoạt động
+    display_order?: number;        // Thứ tự hiển thị
   },
   RUNTIME_ENV?: string,
 ) {
@@ -123,93 +221,129 @@ export async function createTicketPackageImpl(
     display_order,
   } = args;
 
+  // 1. Chuẩn bị thời gian tạo và cập nhật
   const now = new Date();
   const formattedNow = formatDateForDb(now, RUNTIME_ENV);
 
-  // 1. Tối ưu xử lý Features (Chuyển thành mảng string hoặc undefined)
+  // 2. Xử lý danh sách tính năng (features)
+  // Chuyển đổi features thành mảng nếu là chuỗi, ngược lại giữ nguyên nếu đã là mảng
   let processedFeatures = undefined;
   if (features) {
     processedFeatures = Array.isArray(features)
-      ? features
-      : String(features)
+      ? features  // Nếu đã là mảng thì giữ nguyên
+      : String(features)  // Nếu là chuỗi thì tách thành mảng
         .split(",")
-        .map((x) => x.trim())
-        .filter(Boolean);
+        .map((x) => x.trim())  // Xóa khoảng trắng thừa
+        .filter(Boolean);      // Lọc bỏ các phần tử rỗng
   }
 
-  // 2. Tối ưu xử lý Combo (Mảng ID -> Chuỗi "1|2|3")
-  let processedCombo = "";
-  if (combo) {
-    let comboArr: number[] = Array.isArray(combo)
-      ? combo.map((v) => Number(v))
-      : String(combo)
+  // 3. Xử lý danh sách phim (combo)
+  let processedCombo: (number | string)[] = [];
+  
+  if (combo !== undefined && combo !== null) {
+    // Xử lý tùy theo kiểu dữ liệu của combo
+    if (Array.isArray(combo)) {
+      // Nếu là mảng, lọc bỏ các giá trị null/undefined
+      processedCombo = combo.filter((v) => v !== null && v !== undefined);
+    } else if (typeof combo === "string") {
+      // Nếu là chuỗi, tách thành mảng dựa trên dấu phẩy
+      processedCombo = combo
         .split(",")
-        .map((x) => Number(x.trim()));
+        .map((x) => x.trim())  // Xóa khoảng trắng thừa
+        .filter(Boolean);      // Lọc bỏ các phần tử rỗng
+    }
 
-    // Loại bỏ các giá trị NaN và trùng lặp
-    comboArr = Array.from(new Set(comboArr.filter((v) => !Number.isNaN(v))));
+    // Loại bỏ các ID trùng lặp bằng cách chuyển qua Set
+    processedCombo = Array.from(new Set(processedCombo));
 
-    if (comboArr.length > 0) {
-      // Xác thực ID phim tồn tại trong database
+    // Nếu có ID phim, kiểm tra tính hợp lệ
+    if (processedCombo.length > 0) {
+      // Chuyển đổi tất cả ID sang số và lọc bỏ các giá trị không hợp lệ
+      const numericIds = processedCombo
+        .map((v) => Number(v))
+        .filter((v) => !Number.isNaN(v));
+      
+      // Kiểm tra xem tất cả ID phim có tồn tại trong database không
       const [movieCountRes] = await anyDb
         .select({ count: count() })
         .from(tables.movies)
-        .where(inArray(tables.movies.id, comboArr));
+        .where(inArray(tables.movies.id, numericIds));
 
       const movieCount = movieCountRes ? Number(movieCountRes.count) : 0;
-      if (movieCount !== comboArr.length) {
+      if (movieCount !== numericIds.length) {
         throw new Error("Một hoặc nhiều ID phim trong combo không tồn tại");
       }
-      processedCombo = comboArr.join("|");
+      
+      // Cập nhật lại danh sách ID đã được kiểm tra và chuyển đổi
+      processedCombo = numericIds;
     }
   }
 
-  // 3. Thực hiện Insert
+  // 4. Thực hiện thêm mới gói vé vào database
   const inserted = await anyDb
     .insert(tables.ticket_packages)
     .values({
-      name,
-      code,
-      description,
-      combo: processedCombo || null, // Lưu null hoặc chuỗi "1|2|3"
+      name,  // Tên gói vé (bắt buộc)
+      code,  // Mã gói vé
+      description,  // Mô tả
+      // Lưu danh sách ID phim dưới dạng mảng hoặc null nếu không có
+      combo: processedCombo.length > 0 ? processedCombo : null,
+      // Đảm bảo giá luôn là chuỗi
       price: Number(price).toString(),
+      // Danh sách tính năng đã xử lý
       features: processedFeatures,
-      type,
-      min_group_size:
-        min_group_size !== undefined ? Number(min_group_size) : null,
-      max_group_size:
-        max_group_size !== undefined ? Number(max_group_size) : null,
+      type,  // Loại gói vé
+      // Xử lý giá trị mặc định cho các trường tùy chọn
+      min_group_size: min_group_size !== undefined ? Number(min_group_size) : null,
+      max_group_size: max_group_size !== undefined ? Number(max_group_size) : null,
+      // Đảm bảo giá trị boolean
       is_member_only: Boolean(is_member_only),
-      is_active: is_active ?? true, // Default là true nếu undefined
+      // Mặc định là true nếu không xác định
+      is_active: is_active ?? true,
+      // Mặc định thứ tự hiển thị là 0 nếu không xác định
       display_order: Number(display_order ?? 0),
+      // Thời gian tạo và cập nhật
       created_at: formattedNow,
       updated_at: formattedNow,
     })
-    .returning();
+    .returning();  // Trả về bản ghi vừa được tạo
 
+  // Xử lý kết quả trả về từ database
   const item = Array.isArray(inserted) ? inserted[0] : inserted;
 
+  // Nếu không tạo được gói vé, ném lỗi
   if (!item) throw new Error("Không thể tạo gói vé");
+  
+  // Trả về thông tin gói vé vừa tạo
   return { item };
 }
 
+/**
+ * Cập nhật thông tin gói vé
+ * @param anyDb Kết nối database
+ * @param tables Danh sách các bảng cần sử dụng
+ * @param id ID của gói vé cần cập nhật
+ * @param args Thông tin cập nhật
+ * @param RUNTIME_ENV Môi trường chạy (tùy chọn)
+ * @returns Thông tin gói vé đã được cập nhật
+ */
 export async function updateTicketPackageImpl(
   anyDb: any,
-  tables: { ticket_packages: any; movies?: any },
+  tables: { ticket_packages: any; movies: any },
   id: number,
   args: {
-    name?: string;
-    code?: string;
-    description?: string;
-    price?: number;
-    features?: any;
-    combo?: any;
-    type?: string;
-    min_group_size?: number;
-    max_group_size?: number;
-    is_member_only?: boolean;
-    is_active?: boolean;
-    display_order?: number;
+    name?: string;                  // Tên gói vé
+    code?: string;                  // Mã gói vé
+    description?: string;           // Mô tả
+    price?: number;                 // Giá
+    features?: any;                 // Các tính năng
+    combo?: any;                    // Danh sách ID phim
+    type?: string;                  // Loại gói vé
+    min_group_size?: number;        // Số lượng tối thiểu
+    max_group_size?: number;        // Số lượng tối đa
+    is_member_only?: boolean;       // Chỉ dành cho thành viên
+    is_active?: boolean;            // Trạng thái hoạt động
+    display_order?: number;         // Thứ tự hiển thị
   },
   RUNTIME_ENV?: string,
 ) {
@@ -304,22 +438,61 @@ export async function updateTicketPackageImpl(
   return item || null;
 }
 
+/**
+ * Xóa gói vé (soft delete hoặc hard delete)
+ * @param anyDb Kết nối database
+ * @param tables Danh sách các bảng cần sử dụng
+ * @param id ID của gói vé cần xóa
+ * @returns Kết quả thực hiện xóa
+ */
 export async function deleteTicketPackageImpl(
   anyDb: any,
-  tables: { ticket_packages: any },
+  tables: { ticket_packages: any; bookings: any },
   id: number,
 ) {
-  // Check if ticket package exists before deleting
-  const existing = await anyDb.query.ticket_packages.findFirst({
-    where: eq(tables.ticket_packages.id, id),
-  });
-
-  if (!existing) return null;
-
-  // Delete ticket package (tương thích với D1/SQLite không hỗ trợ .returning())
-  await anyDb
-    .delete(tables.ticket_packages)
-    .where(eq(tables.ticket_packages.id, id));
-
-  return { ok: true };
+  try {
+    // 1. Kiểm tra gói vé có tồn tại không
+    const existing = await anyDb.query.ticket_packages.findFirst({
+      where: eq(tables.ticket_packages.id, id),
+    });
+  
+    // Nếu không tìm thấy gói vé, trả về null
+    if (!existing) return null;
+  
+    // 2. Kiểm tra xem có đơn đặt vé nào liên quan đến gói vé này không
+    const hasBookings = await anyDb.query.bookings.findFirst({
+      where: eq(tables.bookings.ticket_package_id, id),
+    });
+    // 3. Nếu có đơn đặt vé, thực hiện soft delete
+    if (hasBookings) {
+      // Cập nhật trạng thái is_active = false thay vì xóa
+      await anyDb
+        .update(tables.ticket_packages)
+        .set({ 
+          is_active: false,  // Đánh dấu không hoạt động
+          updated_at: new Date()  // Cập nhật thời gian chỉnh sửa
+        })
+        .where(eq(tables.ticket_packages.id, id));
+      
+      // Thông báo đã vô hiệu hóa thay vì xóa
+      return { 
+        status: 200, 
+        message: 'Gói vé đã được đánh dấu là không hoạt động do có đơn đặt vé liên quan',
+      };
+    }
+  
+    // 4. Nếu không có đơn đặt vé nào, thực hiện xóa hoàn toàn
+    await anyDb
+      .delete(tables.ticket_packages)
+      .where(eq(tables.ticket_packages.id, id));
+  
+    // Trả về thông báo xóa thành công
+    return { 
+      status: 200, 
+      message: 'Gói vé đã được xóa thành công',
+    };
+  } catch (err: any) {
+    // Bắt và ném lại lỗi nếu có
+    throw err;
+  }
 }
