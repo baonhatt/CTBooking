@@ -59,6 +59,7 @@ export interface PaymentRequest {
   phone: string;
   name: string;
   movieId?: number;
+  combo?: number[];
   ticketCount: number;
   paymentMethod: 'cash' | 'momo' | 'vnpay';
   totalPrice?: number;
