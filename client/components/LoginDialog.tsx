@@ -97,7 +97,7 @@ export function LoginDialog({
           localStorage.setItem("userProfile", JSON.stringify(profile));
         } catch {
         } finally {
-            navigator('/');
+          navigator("/");
         }
         setUserName(data.user.username);
         window.dispatchEvent(new Event("user-auth-changed"));
@@ -125,11 +125,8 @@ export function LoginDialog({
       } else if (
         msg.toLowerCase().includes("mật khẩu") ||
         msg.toLowerCase().includes("password")
-      ) {
-        setPasswordError(msg);
-      } else {
+      )
         setSubmitError(msg);
-      }
       setErrorModal({ open: true, title: "Đăng nhập thất bại", message: msg });
     } finally {
       setIsLoading(false);
