@@ -80,13 +80,12 @@ export default function BookingPage() {
   const totalPrice = unitPrice * ticketCount;
   const MIN_TICKETS = 1;
   const MAX_TICKETS = 10;
-  const [combo, setCombo] = useState<any>()
+  const [combo, setCombo] = useState<any>();
   useEffect(() => {
     return () => {
       if (countdownRef.current) clearInterval(countdownRef.current);
     };
   }, []);
-
 
   useEffect(() => {
     if (
@@ -223,6 +222,8 @@ export default function BookingPage() {
     } catch {}
     try {
       const raw = localStorage.getItem("authUser");
+     
+
       if (raw) {
         const parsed = JSON.parse(raw);
         const authEmail = parsed?.user?.email || parsed?.email || "";
@@ -245,12 +246,11 @@ export default function BookingPage() {
     return `${API_BASE_URL}${path}`;
   };
 
-  const comboData = ticketsData?.items.find(value => value?.id === selectedPackage?.id)
-  console.log(comboData)
   const handleCreateAndPay = async () => {
     if (isProcessing) return;
     if (!confirmChecked) {
       toast({
+  
         title: "Vui lòng xác nhận thông tin",
         description: "Hãy tick vào ô xác nhận trước khi thanh toán",
       });
@@ -301,6 +301,10 @@ export default function BookingPage() {
     if (!confirmed) return;
 
     try {
+      const comboData = ticketsData?.items.find(
+        (value) => value?.id === selectedPackage?.id,
+        
+      );
       setIsProcessing(true);
       const orderId = `ORDER_${Date.now()}`;
       const movieDetail = selectedMovie;
@@ -314,6 +318,7 @@ export default function BookingPage() {
         movieId: selectedMovie?.id,
         ticketCount,
         ticketPackageId: selectedPackage?.id,
+        combo: comboData.combo,
       });
 
       if (!validation?.status) {
@@ -358,7 +363,7 @@ export default function BookingPage() {
         totalPrice: canonicalTotal,
         ticketPackageId: selectedPackage?.id,
         pay_txt_code: orderId,
-        combo: comboData.combo
+        combo: comboData.combo,
       });
 
       localStorage.setItem(
@@ -543,11 +548,17 @@ export default function BookingPage() {
               </CardHeader>
               <CardContent className="space-y-6">
                 <div className="space-y-3">
-                  <div className="text-sm font-medium text-gray-400">Chọn Loại Vé</div>
+                  <div className="text-sm font-medium text-gray-400">
+                    Chọn Loại Vé
+                  </div>
                   <Select
-                    value={selectedPackage?.id ? String(selectedPackage.id) : ""}
+                    value={
+                      selectedPackage?.id ? String(selectedPackage.id) : ""
+                    }
                     onValueChange={(v) => {
-                      const pkg = ticketPackages.find((p: any) => String(p.id) === String(v));
+                      const pkg = ticketPackages.find(
+                        (p: any) => String(p.id) === String(v),
+                      );
                       setSelectedPackage(pkg || null);
                       // Update activeMoviesFull with the selected package's movies
                       if (pkg?.movies) {
@@ -560,14 +571,22 @@ export default function BookingPage() {
                     }}
                   >
                     <SelectTrigger className="w-full bg-white/10 backdrop-blur-sm text-white border-white/20 hover:bg-white/15 h-11">
-                      <span className="truncate">{selectedPackage?.name || "Chọn loại vé"}</span>
+                      <span className="truncate">
+                        {selectedPackage?.name || "Chọn loại vé"}
+                      </span>
                     </SelectTrigger>
                     <SelectContent className="bg-[#0b1226]/95 backdrop-blur-md text-white border border-white/20">
                       {ticketPackages.map((t: any) => (
-                        <SelectItem key={t.id} value={String(t.id)} className="text-white py-2">
+                        <SelectItem
+                          key={t.id}
+                          value={String(t.id)}
+                          className="text-white py-2"
+                        >
                           <div className="flex items-center justify-between gap-3 w-full">
                             <span className="font-medium">{t.name}</span>
-                            <span className="text-sm text-blue-300">{Number(t.price || 0).toLocaleString("vi-VN")}₫</span>
+                            <span className="text-sm text-blue-300">
+                              {Number(t.price || 0).toLocaleString("vi-VN")}₫
+                            </span>
                           </div>
                         </SelectItem>
                       ))}
@@ -577,23 +596,36 @@ export default function BookingPage() {
 
                 {selectedPackage && (
                   <div className="space-y-3">
-                    <div className="text-sm font-medium text-gray-400">Chọn Phim</div>
-                    <Select 
-                      value={movie} 
-                      onValueChange={setMovie}
-                    >
+                    <div className="text-sm font-medium text-gray-400">
+                      Chọn Phim
+                    </div>
+                    <Select value={movie} onValueChange={setMovie}>
                       <SelectTrigger className="w-full bg-white/10 backdrop-blur-sm text-white border-white/20 hover:bg-white/15 h-11">
-                        <span className="truncate">{selectedMovie?.title || "Chọn phim"}</span>
+                        <span className="truncate">
+                          {selectedMovie?.title || "Chọn phim"}
+                        </span>
                       </SelectTrigger>
                       <SelectContent className="bg-[#0b1226]/95 backdrop-blur-md text-white border border-white/20">
                         {activeMoviesFull && activeMoviesFull.length > 0 ? (
                           activeMoviesFull.map((m: any) => (
-                            <SelectItem className="text-white py-2" key={m.id ?? m.title} value={m.title}>
+                            <SelectItem
+                              className="text-white py-2"
+                              key={m.id ?? m.title}
+                              value={m.title}
+                            >
                               <div className="flex items-center gap-3">
-                                <img src={resolveImageUrl(m.cover_image)} alt={m.title} className="w-10 h-14 object-cover rounded border border-white/10" />
+                                <img
+                                  src={resolveImageUrl(m.cover_image)}
+                                  alt={m.title}
+                                  className="w-10 h-14 object-cover rounded border border-white/10"
+                                />
                                 <div className="flex flex-col">
                                   <span className="font-medium">{m.title}</span>
-                                  <span className="text-xs text-gray-400">{m.duration_min ? `${m.duration_min} phút` : "--"}</span>
+                                  <span className="text-xs text-gray-400">
+                                    {m.duration_min
+                                      ? `${m.duration_min} phút`
+                                      : "--"}
+                                  </span>
                                 </div>
                               </div>
                             </SelectItem>
@@ -607,12 +639,27 @@ export default function BookingPage() {
                     </Select>
                     {selectedMovie && (
                       <div className="mt-3 flex items-center gap-4 p-3 rounded-lg border border-white/15 bg-white/5 backdrop-blur-sm">
-                        <img src={resolveImageUrl(selectedMovie.cover_image)} alt={selectedMovie.title} className="w-20 h-28 object-cover rounded" />
+                        <img
+                          src={resolveImageUrl(selectedMovie.cover_image)}
+                          alt={selectedMovie.title}
+                          className="w-20 h-28 object-cover rounded"
+                        />
                         <div className="flex-1">
-                          <div className="text-white font-semibold mb-1">{selectedMovie.title}</div>
-                          <div className="text-sm text-gray-400">Thời lượng: {selectedMovie.duration_min ? `${selectedMovie.duration_min} phút` : "--"}</div>
+                          <div className="text-white font-semibold mb-1">
+                            {selectedMovie.title}
+                          </div>
+                          <div className="text-sm text-gray-400">
+                            Thời lượng:{" "}
+                            {selectedMovie.duration_min
+                              ? `${selectedMovie.duration_min} phút`
+                              : "--"}
+                          </div>
                           {selectedMovie.genres && (
-                            <div className="text-xs text-gray-500 mt-1">{Array.isArray(selectedMovie.genres) ? selectedMovie.genres.join(" / ") : selectedMovie.genres}</div>
+                            <div className="text-xs text-gray-500 mt-1">
+                              {Array.isArray(selectedMovie.genres)
+                                ? selectedMovie.genres.join(" / ")
+                                : selectedMovie.genres}
+                            </div>
                           )}
                         </div>
                       </div>
@@ -746,28 +793,39 @@ export default function BookingPage() {
                     </div>
                   </div>
                 </div>
-                
+
                 {selectedPackage && (
                   <div className="rounded-lg p-4 border border-white/15 bg-white/5 backdrop-blur-sm space-y-3">
                     <div className="flex items-center justify-between">
-                      <span className="text-white font-semibold">{selectedPackage.name}</span>
+                      <span className="text-white font-semibold">
+                        {selectedPackage.name}
+                      </span>
                       <div className="text-right text-md font-bold text-white">
                         {unitPrice.toLocaleString("vi-VN")}₫
-                        <span className="text-xs font-normal text-gray-400"> / vé</span>
+                        <span className="text-xs font-normal text-gray-400">
+                          {" "}
+                          / vé
+                        </span>
                       </div>
                     </div>
                     {(selectedPackage.description || selectedPackage.type) && (
                       <p className="text-sm text-gray-400">
-                        {selectedPackage.description || `Gói vé ${selectedPackage.type}`}
+                        {selectedPackage.description ||
+                          `Gói vé ${selectedPackage.type}`}
                       </p>
                     )}
-                    {Array.isArray(selectedPackage.features) && selectedPackage.features.length > 0 && (
-                      <ul className="space-y-1">
-                        {selectedPackage.features.map((f: string, idx: number) => (
-                          <li key={idx} className="text-sm text-gray-300">• {f}</li>
-                        ))}
-                      </ul>
-                    )}
+                    {Array.isArray(selectedPackage.features) &&
+                      selectedPackage.features.length > 0 && (
+                        <ul className="space-y-1">
+                          {selectedPackage.features.map(
+                            (f: string, idx: number) => (
+                              <li key={idx} className="text-sm text-gray-300">
+                                • {f}
+                              </li>
+                            ),
+                          )}
+                        </ul>
+                      )}
                     <div className="pt-3 mt-2 border-t border-white/10 text-right">
                       <span className="text-lg font-bold text-white">
                         Tạm tính: {totalPrice.toLocaleString("vi-VN")}₫

@@ -10,8 +10,8 @@ export async function createBookingApi(body: {
   paymentMethod: "vietqr" | "momo" | "vnpay";
   totalPrice?: number;
   ticketPackageId?: number;
-  pay_txt_code: string
-  combo: string[]
+  pay_txt_code: string;
+  combo: string[];
 }) {
   return request<{ message: string; booking: any }>("/api/create-booking", {
     method: "POST",
@@ -27,6 +27,7 @@ export async function validateBookingApi(body: {
   movieId?: number;
   ticketCount: number;
   ticketPackageId?: number;
+  combo: string[]
 }) {
   return request<{
     status: string;
