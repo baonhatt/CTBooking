@@ -838,17 +838,21 @@ app.post("/api/confirm-booking", async (c) => {
 });
 
 app.get("/api/bookings/:id", async (c) => {
-  const db = drizzle(c.env.cinema_db, { schema });
-  const tables = getD1Tables(schema);
-  const id = Number(c.req.param("id"));
-  const r = await getBookingByIdImpl(db, id, tables);
-  const status =
-    typeof (r as any).status === "number" ? (r as any).status : 200;
-  const payload = {
-    ...(r as any),
-    status: status >= 400 ? "error" : "success",
-  };
-  return c.json(payload, status as any);
+  try {
+    const db = drizzle(c.env.cinema_db, { schema });
+    const tables = getD1Tables(schema);
+    const id = Number(c.req.param("id"));
+    const r = await getBookingByIdImpl(db, id, tables);
+    const status =
+      typeof (r as any).status === "number" ? (r as any).status : 200;
+    const payload = {
+      ...(r as any),
+      status: status >= 400 ? "error" : "success",
+    };
+    return c.json(payload, status as any);
+  } catch (err: any) {
+    return c.json({ message: err?.message || "Lỗi máy chủ nội bộ" }, 500);
+  }
 });
 
 // Rate-limited code check with headers parity
@@ -1533,7 +1537,7 @@ app.get("/api/debug/test-mail", async (c) => {
 // Create MoMo payment request
 // POST /api/payments/momo/create
 // Body: { amount: number, orderId: string, orderInfo: string, ... }
-app.post("/api/payments/momo/create", async (c) => {
+app.post("/api/momo/create-payment", async (c) => {
   try {
     const body = await c.req.json().catch(() => ({}));
 
