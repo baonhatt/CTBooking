@@ -18,10 +18,10 @@ export default function QRPaymentPage() {
 
   // Thông tin ngân hàng
   const BANK_INFO = {
-    bankName: "Vietcombank",
-    accountNumber: "1234567890",
+    bankName: "Techcombank",
+    accountNumber: "0914475148",
     accountName: "CONG TY CINESPHERE",
-    bankCode: "VCB",
+    bankCode: "TCB",
   };
 
   useEffect(() => {
@@ -80,16 +80,15 @@ export default function QRPaymentPage() {
   };
 
   const checkPaymentStatus = async () => {
-    // TODO: Gọi API kiểm tra trạng thái thanh toán
     // Tạm thời để pending, bạn cần implement API check payment
-    console.log("Checking payment status...");
+    console.log("Checking payment status..."); 
     
     // Demo: Sau 30 giây tự động chuyển thành success
     if (countdown < 570) {
       // setPaymentStatus("success");
-      // if (checkPaymentRef.current) clearInterval(checkPaymentRef.current);
     }
   };
+
 
   const copyToClipboard = (text: string, label: string) => {
     navigator.clipboard.writeText(text);
@@ -241,13 +240,7 @@ export default function QRPaymentPage() {
                 <div className="text-center text-sm text-gray-400">
                   Sử dụng app ngân hàng để quét mã QR
                 </div>
-                <Button
-                  className="w-full bg-emerald-600 hover:bg-emerald-700"
-                  onClick={handleCheckManually}
-                  disabled={paymentStatus === "checking"}
-                >
-                  {paymentStatus === "checking" ? "Đang kiểm tra..." : "Tôi đã chuyển khoản"}
-                </Button>
+               
               </CardContent>
             </Card>
 
@@ -387,11 +380,10 @@ export default function QRPaymentPage() {
                 <li>Quét mã QR hoặc nhập thông tin chuyển khoản bên trên</li>
                 <li>Kiểm tra kỹ số tiền và nội dung chuyển khoản</li>
                 <li>Xác nhận giao dịch</li>
-                <li>Sau khi chuyển khoản thành công, nhấn "Tôi đã chuyển khoản"</li>
               </ol>
               <div className="mt-4 p-3 rounded-lg bg-orange-500/20 border border-orange-500/30">
                 <p className="text-xs text-orange-300">
-                  <strong>Lưu ý:</strong> Vui lòng nhập đúng nội dung chuyển khoản để hệ thống tự động xác nhận thanh toán.
+                  <strong>Lưu ý:</strong> Vui lòng nhập đúng nội dung chuyển khoản để hệ thống tự động xác nhận thanh toán.<br /> Nếu có vấn đề cần hỗ trợ vui lòng liên hệ <b>036 643 1179</b>
                 </p>
               </div>
             </CardContent>
