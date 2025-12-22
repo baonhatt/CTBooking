@@ -5,13 +5,28 @@ import { Button } from "@/components/ui/button";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@/components/ui/select";
+import {
+  Select,
+  SelectTrigger,
+  SelectContent,
+  SelectItem,
+} from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
 import { toast } from "@/components/ui/use-toast";
-import { getAllActiveMoviesToday, getActiveTickets, createBookingApi, createMomoPaymentApi, createVnpayPaymentApi, API_BASE_URL, validateBookingApi } from "@/lib/api";
+import {
+  getAllActiveMoviesToday,
+  getActiveTickets,
+  createBookingApi,
+  createMomoPaymentApi,
+  createVnpayPaymentApi,
+  API_BASE_URL,
+  validateBookingApi,
+} from "@/lib/api";
 import UserLayout from "@/user/layouts/UserLayout";
 
 export default function BookingPage() {
+  // Đổi USE_MOCK_DATA = false khi đã có API thật
+  const USE_MOCK_DATA = true;
   const navigate = useNavigate();
   const [step, setStep] = useState<0 | 1>(0);
   const [movie, setMovie] = useState<string>("");
@@ -22,7 +37,9 @@ export default function BookingPage() {
   const [phoneError, setPhoneError] = useState<string>("");
   const [email, setEmail] = useState<string>("");
   const [emailError, setEmailError] = useState<string>("");
-  const [paymentMethod, setPaymentMethod] = useState<"momo" | "vnpay">("momo");
+  const [paymentMethod, setPaymentMethod] = useState<
+    "momo" | "vnpay" | "vietqr"
+  >("vietqr");
   const [isProcessing, setIsProcessing] = useState(false);
   const countdownRef = useRef<NodeJS.Timeout | null>(null);
   const [countdown, setCountdown] = useState(600);
@@ -31,7 +48,9 @@ export default function BookingPage() {
     base: Number((import.meta as any).env?.VITE_BACKDROP_DARK_BASE ?? 0.5),
     min: Number((import.meta as any).env?.VITE_BACKDROP_DARK_MIN ?? 0.4),
     max: Number((import.meta as any).env?.VITE_BACKDROP_DARK_MAX ?? 0.7),
-    brightness: Number((import.meta as any).env?.VITE_BACKDROP_BRIGHTNESS ?? 0.85),
+    brightness: Number(
+      (import.meta as any).env?.VITE_BACKDROP_BRIGHTNESS ?? 0.85,
+    ),
     blurPx: Number((import.meta as any).env?.VITE_BACKDROP_BLUR ?? 2),
   };
   const [overlayDark, setOverlayDark] = useState(backdropConfig.base);
@@ -54,26 +73,37 @@ export default function BookingPage() {
     display_order: t.display_order || 0,
     movies: t.movies || [],
   }));
-  const defaultTicket = ticketPackages.sort((a, b) => a.display_order - b.display_order)[0];
+  const defaultTicket = ticketPackages.sort(
+    (a, b) => a.display_order - b.display_order,
+  )[0];
   const unitPrice = Number(selectedPackage?.price || 0);
   const totalPrice = unitPrice * ticketCount;
   const MIN_TICKETS = 1;
   const MAX_TICKETS = 10;
 
-
-
   useEffect(() => {
-    return () => { if (countdownRef.current) clearInterval(countdownRef.current); };
+    return () => {
+      if (countdownRef.current) clearInterval(countdownRef.current);
+    };
   }, []);
 
   useEffect(() => {
-    if (selectedPackage && Array.isArray(ticketPackages) && ticketPackages.length > 0) {
-      const canonical = ticketPackages.find((p: any) => Number(p.id) === Number(selectedPackage.id));
+    if (
+      selectedPackage &&
+      Array.isArray(ticketPackages) &&
+      ticketPackages.length > 0
+    ) {
+      const canonical = ticketPackages.find(
+        (p: any) => Number(p.id) === Number(selectedPackage.id),
+      );
       if (canonical) {
         const hasFull =
           Array.isArray(selectedPackage.features) &&
           typeof selectedPackage.description === "string";
-        if (!hasFull || JSON.stringify(selectedPackage) !== JSON.stringify(canonical)) {
+        if (
+          !hasFull ||
+          JSON.stringify(selectedPackage) !== JSON.stringify(canonical)
+        ) {
           setSelectedPackage(canonical);
           // Update activeMoviesFull when package changes
           setActiveMoviesFull(canonical.movies || []);
@@ -83,7 +113,25 @@ export default function BookingPage() {
       }
     }
   }, [ticketPackages, selectedPackage]);
-  // Remove the effect that loads from localStorage since we don't need it anymore
+  useEffect(() => {
+    try {
+      const rawSel = localStorage.getItem("selectedFilm");
+      if (
+        rawSel &&
+        Array.isArray(activeMoviesFull) &&
+        activeMoviesFull.length > 0
+      ) {
+        const sel = JSON.parse(rawSel);
+        const found = activeMoviesFull.find(
+          (m: any) => m?.id === sel?.id || m?.title === sel?.title,
+        );
+        if (found?.title) {
+          setMovie(found.title);
+        }
+        localStorage.removeItem("selectedFilm");
+      }
+    } catch {}
+  }, [activeMoviesFull]);
 
   useEffect(() => {
     try {
@@ -93,7 +141,7 @@ export default function BookingPage() {
         setSelectedPackage(pkg);
         localStorage.removeItem("selectedTicketPackage");
       }
-    } catch { }
+    } catch {}
   }, []);
 
   useEffect(() => {
@@ -106,26 +154,36 @@ export default function BookingPage() {
       img.onload = () => {
         try {
           const canvas = document.createElement("canvas");
-          const w = 32, h = 32;
-          canvas.width = w; canvas.height = h;
+          const w = 32,
+            h = 32;
+          canvas.width = w;
+          canvas.height = h;
           const ctx = canvas.getContext("2d");
           if (!ctx) return;
           ctx.drawImage(img, 0, 0, w, h);
           const data = ctx.getImageData(0, 0, w, h).data;
           let sum = 0;
           for (let i = 0; i < data.length; i += 4) {
-            const r = data[i], g = data[i + 1], b = data[i + 2];
+            const r = data[i],
+              g = data[i + 1],
+              b = data[i + 2];
             const lum = 0.2126 * r + 0.7152 * g + 0.0722 * b;
             sum += lum;
           }
           const avg = sum / (data.length / 4);
           // Map brightness to overlay opacity with clamps
           let dark =
-            avg >= 180 ? backdropConfig.base + 0.18
-              : avg >= 150 ? backdropConfig.base + 0.12
-                : avg >= 120 ? backdropConfig.base + 0.06
+            avg >= 180
+              ? backdropConfig.base + 0.18
+              : avg >= 150
+                ? backdropConfig.base + 0.12
+                : avg >= 120
+                  ? backdropConfig.base + 0.06
                   : backdropConfig.base - 0.06;
-          dark = Math.max(backdropConfig.min, Math.min(backdropConfig.max, dark));
+          dark = Math.max(
+            backdropConfig.min,
+            Math.min(backdropConfig.max, dark),
+          );
           setOverlayDark(dark);
         } catch {
           setOverlayDark(backdropConfig.base);
@@ -161,19 +219,22 @@ export default function BookingPage() {
         if (!phone && p?.phone) setPhone(p.phone);
         return;
       }
-    } catch { }
+    } catch {}
     try {
       const raw = localStorage.getItem("authUser");
       if (raw) {
         const parsed = JSON.parse(raw);
         const authEmail = parsed?.user?.email || parsed?.email || "";
-        const authName = parsed?.user?.username || parsed?.username || (authEmail ? authEmail.split("@")[0] : "");
+        const authName =
+          parsed?.user?.username ||
+          parsed?.username ||
+          (authEmail ? authEmail.split("@")[0] : "");
         const authPhone = parsed?.user?.phone || parsed?.phone || "";
         if (!email && authEmail) setEmail(authEmail);
         if (!name && authName) setName(authName);
         if (!phone && authPhone) setPhone(authPhone);
       }
-    } catch { }
+    } catch {}
   }, [email, name, phone]);
 
   const resolveImageUrl = (u: string | undefined | null) => {
@@ -186,29 +247,62 @@ export default function BookingPage() {
   const handleCreateAndPay = async () => {
     if (isProcessing) return;
     if (!confirmChecked) {
-      toast({ title: "Vui lòng xác nhận thông tin", description: "Hãy tick vào ô xác nhận trước khi thanh toán" });
+      toast({
+        title: "Vui lòng xác nhận thông tin",
+        description: "Hãy tick vào ô xác nhận trước khi thanh toán",
+      });
       return;
     }
     if (!selectedMovie) {
-      toast({ title: "Chưa chọn phim", description: "Vui lòng chọn một bộ phim" });
+      toast({
+        title: "Chưa chọn phim",
+        description: "Vui lòng chọn một bộ phim",
+      });
       return;
     }
     if (!selectedPackage?.id) {
-      toast({ title: "Chưa chọn loại vé", description: "Vui lòng chọn một loại vé trong danh sách" });
+      toast({
+        title: "Chưa chọn loại vé",
+        description: "Vui lòng chọn một loại vé trong danh sách",
+      });
       return;
     }
     if (!name || !phone || !email) {
-      toast({ title: "Thiếu thông tin", description: "Vui lòng nhập họ tên, số điện thoại và email" });
+      toast({
+        title: "Thiếu thông tin",
+        description: "Vui lòng nhập họ tên, số điện thoại và email",
+      });
       return;
     }
-    const confirmed = window.confirm("Xác nhận đặt vé và chuyển sang thanh toán?");
+
+    // Nếu đang dùng mock data, hiển thị thông báo demo
+    if (!USE_MOCK_DATA) {
+      toast({
+        title: "Demo Mode",
+        description:
+          "Đang sử dụng mock data. Chức năng thanh toán sẽ hoạt động khi có API thật.",
+      });
+      console.log("Demo booking:", {
+        movie: selectedMovie.title,
+        ticket: selectedPackage.name,
+        quantity: ticketCount,
+        total: totalPrice,
+        customer: { name, email, phone },
+      });
+      return;
+    }
+
+    const confirmed = window.confirm(
+      "Xác nhận đặt vé và chuyển sang thanh toán?",
+    );
     if (!confirmed) return;
+
     try {
       setIsProcessing(true);
       const orderId = `ORDER_${Date.now()}`;
       const movieDetail = selectedMovie;
       const ticketPackageId = selectedPackage?.id || defaultTicket?.id;
-      // Validate booking data on server to prevent tampering
+
       const validation = await validateBookingApi({
         email,
         emailBook: email,
@@ -220,7 +314,9 @@ export default function BookingPage() {
       });
 
       if (!validation?.status) {
-        throw new Error(validation?.message || "Không thể xác thực thông tin đặt vé");
+        throw new Error(
+          validation?.message || "Không thể xác thực thông tin đặt vé",
+        );
       }
 
       const canonicalTotal = Number(validation.totalPrice ?? totalPrice);
@@ -236,12 +332,17 @@ export default function BookingPage() {
         amount: canonicalTotal,
         method: paymentMethod,
         poster: movieDetail?.cover_image || "",
-        duration: movieDetail?.duration_min ? `${movieDetail.duration_min}` : "",
+        duration: movieDetail?.duration_min
+          ? `${movieDetail.duration_min}`
+          : "",
         genres: movieDetail?.genres || "",
         ticketPackageId: selectedPackage?.id,
       };
 
-      countdownRef.current = setInterval(() => setCountdown((c) => c - 1), 1000);
+      countdownRef.current = setInterval(
+        () => setCountdown((c) => c - 1),
+        1000,
+      );
 
       const { booking } = await createBookingApi({
         email,
@@ -253,52 +354,135 @@ export default function BookingPage() {
         paymentMethod,
         totalPrice: canonicalTotal,
         ticketPackageId: selectedPackage?.id,
+        pay_txt_code: orderId,
       });
-      localStorage.setItem("pendingOrder", JSON.stringify({ ...summary, booking_id: booking?.id, user_id: booking?.user_id }));
+
+      localStorage.setItem(
+        "pendingOrder",
+        JSON.stringify({
+          ...summary,
+          booking_id: booking?.id,
+          user_id: booking?.user_id,
+        }),
+      );
       let orderInfoText = `${selectedMovie?.title || "Movie"} | ${ticketCount} vé`;
+
+      if (paymentMethod === "vietqr") {
+        // Lưu thông tin booking để hiển thị trên màn QR
+        localStorage.setItem(
+          "qrPaymentData",
+          JSON.stringify({
+            ...summary,
+            booking_id: booking?.id,
+            user_id: booking?.user_id,
+            totalAmount: canonicalTotal,
+            movieTitle: selectedMovie?.title,
+            ticketType: selectedPackage?.name,
+          }),
+        );
+
+        // Chuyển sang trang QR payment
+        navigate("/qr-payment", {
+          state: {
+            bookingId: booking?.id,
+            amount: canonicalTotal,
+            orderId,
+          },
+        });
+        return;
+      }
+
       if (paymentMethod === "momo") {
-        const extraDataEncoded = btoa(unescape(encodeURIComponent(JSON.stringify({ ...summary, booking_id: booking?.id, user_id: booking?.user_id }))));
-        const partnerCode = (import.meta as any).env?.VITE_MOMO_PARTNER_CODE || "";
-        const partnerName = (import.meta as any).env?.VITE_MOMO_PARTNER_NAME || "CineSphere";
-        const storeId = (import.meta as any).env?.VITE_MOMO_STORE_ID || "devstore";
-        const clientBase = (import.meta as any).env?.VITE_CLIENT_BASE_URL || window.location.origin;
-        const serverBase = (import.meta as any).env?.VITE_SERVER_BASE_URL || clientBase;
-        const redirectPath = (import.meta as any).env?.VITE_MOMO_REDIRECT_URL || "/checkout";
-        const ipnPath = (import.meta as any).env?.VITE_MOMO_IPN_URL || "/api/momo/ipn";
+        const extraDataEncoded = btoa(
+          unescape(
+            encodeURIComponent(
+              JSON.stringify({
+                ...summary,
+                booking_id: booking?.id,
+                user_id: booking?.user_id,
+              }),
+            ),
+          ),
+        );
+        const partnerCode =
+          (import.meta as any).env?.VITE_MOMO_PARTNER_CODE || "";
+        const partnerName =
+          (import.meta as any).env?.VITE_MOMO_PARTNER_NAME || "CineSphere";
+        const storeId =
+          (import.meta as any).env?.VITE_MOMO_STORE_ID || "devstore";
+        const clientBase =
+          (import.meta as any).env?.VITE_CLIENT_BASE_URL ||
+          window.location.origin;
+        const serverBase =
+          (import.meta as any).env?.VITE_SERVER_BASE_URL || clientBase;
+        const redirectPath =
+          (import.meta as any).env?.VITE_MOMO_REDIRECT_URL || "/checkout";
+        const ipnPath =
+          (import.meta as any).env?.VITE_MOMO_IPN_URL || "/api/momo/ipn";
         const redirectUrl = `${clientBase}${redirectPath}`;
         const ipnUrl = `${serverBase}${ipnPath}`;
         const accessKey = (import.meta as any).env?.VITE_MOMO_ACCESS_KEY || "";
         const secretKey = (import.meta as any).env?.VITE_MOMO_SECRET_KEY || "";
         const requestId = Date.now().toString();
-        const payload: any = { partnerCode, partnerName, storeId, requestId, amount: canonicalTotal, orderId, orderInfo: orderInfoText, redirectUrl, ipnUrl, lang: "vi", extraData: extraDataEncoded, requestType: "captureWallet", signature: "", accessKey, secretKey };
+        const payload: any = {
+          partnerCode,
+          partnerName,
+          storeId,
+          requestId,
+          amount: canonicalTotal,
+          orderId,
+          orderInfo: orderInfoText,
+          redirectUrl,
+          ipnUrl,
+          lang: "vi",
+          extraData: extraDataEncoded,
+          requestType: "captureWallet",
+          signature: "",
+          accessKey,
+          secretKey,
+        };
         const res = await createMomoPaymentApi(payload);
-        if (res?.payUrl) { window.location.href = res.payUrl; return; }
+        if (res?.payUrl) {
+          window.location.href = res.payUrl;
+          return;
+        }
         throw new Error("Không nhận được liên kết thanh toán MoMo");
       } else if (paymentMethod === "vnpay") {
         orderInfoText = booking?.id;
-        // returnUrl phải là URL của frontend (Pages / site hiện tại), không phải URL backend
         const clientBaseForVnp =
-          (import.meta as any).env?.VITE_CLIENT_BASE_URL || window.location.origin;
+          (import.meta as any).env?.VITE_CLIENT_BASE_URL ||
+          window.location.origin;
         const returnPathForVnp =
           (import.meta as any).env?.VITE_VNPAY_RETURN_URL || "/checkout";
         const returnUrl = `${clientBaseForVnp}${returnPathForVnp}`;
         const locale = "vn";
-        const res = await createVnpayPaymentApi({ amount: canonicalTotal, orderId, orderInfo: orderInfoText, locale, returnUrl });
-        if (res?.payUrl) { window.location.href = res.payUrl; return; }
+        const res = await createVnpayPaymentApi({
+          amount: canonicalTotal,
+          orderId,
+          orderInfo: orderInfoText,
+          locale,
+          returnUrl,
+        });
+        if (res?.payUrl) {
+          window.location.href = res.payUrl;
+          return;
+        }
         throw new Error("Không nhận được liên kết thanh toán VNPay");
       }
     } catch (err: any) {
       setIsProcessing(false);
-      toast({ title: "Không thể tạo đặt vé", description: "Đã xảy ra lỗi, vui lòng thử lại sau" });
+      toast({
+        title: "Không thể tạo đặt vé",
+        description: "Đã xảy ra lỗi, vui lòng thử lại sau",
+      });
     } finally {
       setIsProcessing(false);
     }
   };
-
   return (
     <UserLayout
       className="bg-gradient-to-br from-[#050915] via-[#0b1226] to-[#0e1b3d]"
-      headerProps={{ onBookClick: () => { }, disableNav: true }}
+      headerProps={{ onBookClick: () => {}, disableNav: true }}
       hideFooter
       contentClassName="text-white"
     >
@@ -310,17 +494,27 @@ export default function BookingPage() {
               src={resolveImageUrl(selectedMovie.cover_image)}
               alt="Backdrop"
               className="w-full h-full object-cover opacity-40"
-              style={{ filter: `brightness(${backdropConfig.brightness}) blur(${backdropConfig.blurPx}px)` }}
+              style={{
+                filter: `brightness(${backdropConfig.brightness}) blur(${backdropConfig.blurPx}px)`,
+              }}
             />
           )}
           <div className="absolute inset-0 bg-[radial-gradient(circle_at_20%_20%,rgba(59,130,246,0.35),transparent_30%),radial-gradient(circle_at_80%_30%,rgba(236,72,153,0.25),transparent_35%),radial-gradient(circle_at_50%_70%,rgba(34,211,238,0.3),transparent_30%)]" />
-          <div className="absolute inset-0" style={{ backgroundColor: `rgba(0,0,0,${overlayDark})` }} />
+          <div
+            className="absolute inset-0"
+            style={{ backgroundColor: `rgba(0,0,0,${overlayDark})` }}
+          />
           <div className="absolute inset-0 bg-gradient-to-b from-black/50 via-black/25 to-transparent" />
           <div className="absolute inset-0 neon-noise opacity-25" />
         </div>
         <div className="relative z-10 max-w-5xl mx-auto p-4 pt-28">
           <div className="text-sm py-9">
-            <button className="text-blue-300 hover:text-blue-400 underline" onClick={() => navigate("/")}>Home</button>
+            <button
+              className="text-blue-300 hover:text-blue-400 underline"
+              onClick={() => navigate("/")}
+            >
+              Home
+            </button>
             <span className="mx-2 text-white/60">&gt;</span>
             <span className="text-white">Đặt vé</span>
           </div>
@@ -339,7 +533,9 @@ export default function BookingPage() {
           {!isLoadingPage && step === 0 && (
             <Card className="bg-white/5 backdrop-blur-md border border-white/15 text-white shadow-xl">
               <CardHeader className="pb-2">
-                <CardTitle className="text-2xl font-bold text-white">Đặt Vé</CardTitle>
+                <CardTitle className="text-2xl font-bold text-white">
+                  Đặt Vé
+                </CardTitle>
               </CardHeader>
               <CardContent className="space-y-6">
                 <div className="space-y-3">
@@ -421,34 +617,59 @@ export default function BookingPage() {
                 )}
 
                 <div className="space-y-3">
-                  <div className="text-sm font-medium text-gray-400">Thông Tin Khách Hàng</div>
+                  <div className="text-sm font-medium text-gray-400">
+                    Thông Tin Khách Hàng
+                  </div>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div className="space-y-1.5">
-                      <Label className="text-sm font-normal text-gray-300">Họ Và Tên</Label>
-                      <Input className="bg-white/10 backdrop-blur-sm text-white border-white/20 focus-visible:ring-blue-400 hover:bg-white/15 h-11 placeholder:text-gray-500" value={name} onChange={(e) => setName(e.target.value)} placeholder="Nhập họ và tên" minLength={2} />
+                      <Label className="text-sm font-normal text-gray-300">
+                        Họ Và Tên
+                      </Label>
+                      <Input
+                        className="bg-white/10 backdrop-blur-sm text-white border-white/20 focus-visible:ring-blue-400 hover:bg-white/15 h-11 placeholder:text-gray-500"
+                        value={name}
+                        onChange={(e) => setName(e.target.value)}
+                        placeholder="Nhập họ và tên"
+                        minLength={2}
+                      />
                     </div>
                     <div className="space-y-1.5">
-                      <Label className="text-sm font-normal text-gray-300">Số Điện Thoại</Label>
+                      <Label className="text-sm font-normal text-gray-300">
+                        Số Điện Thoại
+                      </Label>
                       <Input
                         className="bg-white/10 backdrop-blur-sm text-white border-white/20 focus-visible:ring-blue-400 hover:bg-white/15 h-11 placeholder:text-gray-500"
                         value={phone}
                         inputMode="numeric"
+                        maxLength={10}
                         placeholder="VD: 0912345678"
                         onChange={(e) => {
-                          const digits = e.target.value.replace(/\D+/g, "");
-                          setPhone(digits);
-                          if (digits !== e.target.value) {
+                          const value = e.target.value;
+                          // Chỉ cho phép số
+                          if (!/^\d*$/.test(value)) {
                             setPhoneError("Chỉ cho phép nhập số 0-9");
-                          } else if (digits && !digits.startsWith("0")) {
-                            setPhoneError("Số điện thoại phải bắt đầu bằng số 0");
-                          } else if (digits && digits.length !== 10) {
-                            setPhoneError("Số điện thoại phải có đúng 10 chữ số");
+                            return;
+                          }
+                          setPhone(value);
+
+                          if (value && !value.startsWith("0")) {
+                            setPhoneError(
+                              "Số điện thoại phải bắt đầu bằng số 0",
+                            );
                           } else {
                             setPhoneError("");
                           }
                         }}
                         onKeyDown={(e) => {
-                          const allow = ["Backspace", "Delete", "Tab", "ArrowLeft", "ArrowRight", "Home", "End"];
+                          const allow = [
+                            "Backspace",
+                            "Delete",
+                            "Tab",
+                            "ArrowLeft",
+                            "ArrowRight",
+                            "Home",
+                            "End",
+                          ];
                           if (allow.includes(e.key)) return;
                           if (!/^[0-9]$/.test(e.key)) {
                             e.preventDefault();
@@ -458,10 +679,16 @@ export default function BookingPage() {
                           }
                         }}
                       />
-                      {phoneError && <div className="text-orange-400 text-xs mt-1">{phoneError}</div>}
+                      {phoneError && (
+                        <div className="text-orange-400 text-xs mt-1">
+                          {phoneError}
+                        </div>
+                      )}
                     </div>
                     <div className="space-y-1.5">
-                      <Label className="text-sm font-normal text-gray-300">Email Nhận Vé</Label>
+                      <Label className="text-sm font-normal text-gray-300">
+                        Email Nhận Vé
+                      </Label>
                       <Input
                         className="bg-white/10 backdrop-blur-sm text-white border-white/20 focus-visible:ring-blue-400 hover:bg-white/15 h-11 placeholder:text-gray-500"
                         value={email}
@@ -477,16 +704,24 @@ export default function BookingPage() {
                         type="email"
                         placeholder="you@email.com"
                       />
-                      {emailError && <div className="text-orange-400 text-xs mt-1">{emailError}</div>}
+                      {emailError && (
+                        <div className="text-orange-400 text-xs mt-1">
+                          {emailError}
+                        </div>
+                      )}
                     </div>
                     <div className="space-y-1.5">
-                      <Label className="text-sm font-normal text-gray-300">Số Lượng Vé</Label>
+                      <Label className="text-sm font-normal text-gray-300">
+                        Số Lượng Vé
+                      </Label>
                       <div className="flex items-center gap-2">
                         <Button
                           type="button"
                           variant="outline"
                           className="bg-white/10 border-white/20 text-white hover:bg-white/20 h-11 w-11"
-                          onClick={() => setTicketCount((c) => Math.max(MIN_TICKETS, c - 1))}
+                          onClick={() =>
+                            setTicketCount((c) => Math.max(MIN_TICKETS, c - 1))
+                          }
                         >
                           -
                         </Button>
@@ -497,7 +732,9 @@ export default function BookingPage() {
                           type="button"
                           variant="outline"
                           className="bg-white/10 border-white/20 text-white hover:bg-white/20 h-11 w-11"
-                          onClick={() => setTicketCount((c) => Math.min(MAX_TICKETS, c + 1))}
+                          onClick={() =>
+                            setTicketCount((c) => Math.min(MAX_TICKETS, c + 1))
+                          }
                         >
                           +
                         </Button>
@@ -536,14 +773,33 @@ export default function BookingPage() {
                 )}
 
                 <div className="flex justify-end gap-3 pt-2">
-                  <Button variant="outline" className="bg-transparent border-white/30 text-white hover:bg-white/10 h-11 px-6" onClick={() => navigate("/")} disabled={isProcessing}>Hủy</Button>
+                  <Button
+                    variant="outline"
+                    className="bg-transparent border-white/30 text-white hover:bg-white/10 h-11 px-6"
+                    onClick={() => navigate("/")}
+                    disabled={isProcessing}
+                  >
+                    Hủy
+                  </Button>
                   <Button
                     className="bg-blue-600 hover:bg-blue-700 text-white font-semibold shadow-lg disabled:opacity-50 h-11 px-6"
                     onClick={() => {
-                      const ok = window.confirm("Lưu ý thông tin vé của bạn sẽ được gửi đến email này");
+                      const ok = window.confirm(
+                        "Lưu ý thông tin vé của bạn sẽ được gửi đến email này",
+                      );
                       if (ok) setStep(1);
                     }}
-                    disabled={!movie || !selectedPackage || !name || !phone || !email || isProcessing || !!phoneError || !!emailError || phone.length !== 10}
+                    disabled={
+                      !movie ||
+                      !selectedPackage ||
+                      !name ||
+                      !phone ||
+                      !email ||
+                      isProcessing ||
+                      !!phoneError ||
+                      !!emailError ||
+                      phone.length !== 10
+                    }
                   >
                     Tiếp tục
                   </Button>
@@ -556,40 +812,73 @@ export default function BookingPage() {
             <>
               <Card className="bg-white/5 backdrop-blur-md border border-white/15 text-white shadow-xl">
                 <CardHeader className="pb-2">
-                  <CardTitle className="text-2xl font-bold text-white">Thông tin đặt vé</CardTitle>
+                  <CardTitle className="text-2xl font-bold text-white">
+                    Thông tin đặt vé
+                  </CardTitle>
                 </CardHeader>
                 <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="space-y-3">
                     <div className="rounded-lg p-4 border border-white/15 bg-white/5 backdrop-blur-sm">
-                      <div className="text-sm font-medium text-gray-400 mb-3">Thông tin người đặt</div>
+                      <div className="text-sm font-medium text-gray-400 mb-3">
+                        Thông tin người đặt
+                      </div>
                       <div className="grid grid-cols-[100px_1fr] gap-x-4 gap-y-2 text-sm">
-                        <span className="text-gray-400">Họ tên</span><span className="font-medium text-white">{name}</span>
-                        <span className="text-gray-400">Email</span><span className="font-medium text-white">{email}</span>
-                        <span className="text-gray-400">Số lượng</span><span className="font-medium text-white">{ticketCount}</span>
+                        <span className="text-gray-400">Họ tên</span>
+                        <span className="font-medium text-white">{name}</span>
+                        <span className="text-gray-400">Email</span>
+                        <span className="font-medium text-white">{email}</span>
+                        <span className="text-gray-400">Số lượng</span>
+                        <span className="font-medium text-white">
+                          {ticketCount}
+                        </span>
                       </div>
                     </div>
                     {selectedMovie?.cover_image && (
                       <div className="p-3 rounded-lg border border-white/15 bg-white/5 backdrop-blur-sm">
                         <div className="flex items-center gap-3">
-                          <img src={resolveImageUrl(selectedMovie.cover_image)} alt={selectedMovie.title} className="w-16 h-24 object-cover rounded" />
+                          <img
+                            src={resolveImageUrl(selectedMovie.cover_image)}
+                            alt={selectedMovie.title}
+                            className="w-16 h-24 object-cover rounded"
+                          />
                           <div className="flex-1 grid grid-cols-[100px_1fr] gap-x-4 gap-y-1 text-sm">
                             <span className="text-gray-400">Phim</span>
-                            <span className="font-medium text-white">{selectedMovie.title}</span>
+                            <span className="font-medium text-white">
+                              {selectedMovie.title}
+                            </span>
                             <span className="text-gray-400">Thời lượng</span>
-                            <span className="font-medium text-white">{selectedMovie.duration_min ? `${selectedMovie.duration_min} phút` : "--"}</span>
+                            <span className="font-medium text-white">
+                              {selectedMovie.duration_min
+                                ? `${selectedMovie.duration_min} phút`
+                                : "--"}
+                            </span>
                             <span className="text-gray-400">Thể loại</span>
-                            <span className="font-medium text-white">{selectedMovie.genres ? (Array.isArray(selectedMovie.genres) ? selectedMovie.genres.join(" / ") : selectedMovie.genres) : "--"}</span>
+                            <span className="font-medium text-white">
+                              {selectedMovie.genres
+                                ? Array.isArray(selectedMovie.genres)
+                                  ? selectedMovie.genres.join(" / ")
+                                  : selectedMovie.genres
+                                : "--"}
+                            </span>
                             <span className="text-gray-400">Khởi chiếu</span>
-                            <span className="font-medium text-white">{selectedMovie.release_date ? new Date(selectedMovie.release_date).toLocaleDateString("vi-VN") : "--"}</span>
+                            <span className="font-medium text-white">
+                              {selectedMovie.release_date
+                                ? new Date(
+                                    selectedMovie.release_date,
+                                  ).toLocaleDateString("vi-VN")
+                                : "--"}
+                            </span>
                           </div>
                         </div>
                       </div>
                     )}
                   </div>
                   <div className="space-y-3">
-                    <div className="text-sm font-medium text-gray-400">Phương thức thanh toán</div>
-                    <div className="grid grid-cols-2 gap-3">
-                      <button
+                    <div className="text-sm font-medium text-gray-400">
+                      Phương thức thanh toán
+                    </div>
+                    <div className="grid grid-cols-3 gap-3">
+                      {/* <button
                         type="button"
                         onClick={() => setPaymentMethod("momo")}
                         className={`${paymentMethod === 'momo' ? 'border-pink-500 bg-pink-600/20' : 'border-white/20 bg-white/10 backdrop-blur-sm'} cursor-pointer rounded-lg border p-3 flex items-center gap-3 focus:outline-none focus:ring-2 focus:ring-pink-500 hover:bg-white/15 h-11`}
@@ -610,33 +899,85 @@ export default function BookingPage() {
                           <span className="w-7 h-7 rounded bg-blue-600 text-white grid place-items-center text-[10px] font-extrabold">VN</span>
                           <span>VNPay</span>
                         </span>
+                      </button> */}
+                      <button
+                        type="button"
+                        onClick={() => setPaymentMethod("vietqr")}
+                        className={`${paymentMethod === "vietqr" ? "border-red-500 bg-red-600/20" : "border-white/20 bg-white/10 backdrop-blur-sm"} cursor-pointer rounded-lg border p-3 flex items-center gap-3 focus:outline-none focus:ring-2 focus:ring-red-500 hover:bg-white/15 h-11`}
+                        aria-pressed={paymentMethod === "vietqr"}
+                      >
+                        <span className="inline-flex items-center gap-2 text-white">
+                          <span className="w-7 h-7 rounded bg-red-600 text-white grid place-items-center text-[10px] font-extrabold">
+                            VQ
+                          </span>
+                          <span>VietQr</span>
+                        </span>
                       </button>
                     </div>
                     <div className="bg-white/5 backdrop-blur-sm rounded-lg p-4 border border-white/15">
-                      <div className="text-sm font-medium text-gray-400 mb-3">Booking Summary</div>
+                      <div className="text-sm font-medium text-gray-400 mb-3">
+                        Booking Summary
+                      </div>
                       <div className="space-y-2 text-sm">
-                        <div className="flex justify-between"><span className="text-gray-400">Loại vé</span><span className="text-white font-medium">{selectedPackage?.name || defaultTicket?.name || 'Vé tiêu chuẩn'}</span></div>
-                        <div className="flex justify-between"><span className="text-gray-400">Đơn giá</span><span className="text-white">{unitPrice.toLocaleString('vi-VN')}₫</span></div>
-                        <div className="flex justify-between"><span className="text-gray-400">Số lượng</span><span className="text-white">{ticketCount}</span></div>
-                        <div className="flex justify-between border-t border-white/10 pt-2 mt-2"><span className="text-white font-semibold">Tổng Tiền</span><span className="text-white font-bold">{totalPrice.toLocaleString('vi-VN')}₫</span></div>
+                        <div className="flex justify-between">
+                          <span className="text-gray-400">Loại vé</span>
+                          <span className="text-white font-medium">
+                            {selectedPackage?.name ||
+                              defaultTicket?.name ||
+                              "Vé tiêu chuẩn"}
+                          </span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-gray-400">Đơn giá</span>
+                          <span className="text-white">
+                            {unitPrice.toLocaleString("vi-VN")}₫
+                          </span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-gray-400">Số lượng</span>
+                          <span className="text-white">{ticketCount}</span>
+                        </div>
+                        <div className="flex justify-between border-t border-white/10 pt-2 mt-2">
+                          <span className="text-white font-semibold">
+                            Tổng Tiền
+                          </span>
+                          <span className="text-white font-bold">
+                            {totalPrice.toLocaleString("vi-VN")}₫
+                          </span>
+                        </div>
                       </div>
                     </div>
-
                   </div>
                   <div className="md:col-span-2 mt-4 mb-2 p-4 rounded-lg border border-[#FF5252]/30 bg-[#FF5252]/10">
-                    <h3 className="text-[#FF5252] font-bold text-lg mb-2">Lưu ý</h3>
+                    <h3 className="text-[#FF5252] font-bold text-lg mb-2">
+                      Lưu ý
+                    </h3>
                     <ul className="list-disc list-inside space-y-1 text-sm text-gray-300">
-                      <li>Trò chơi phù hợp với trẻ em có chiều cao từ 70cm trở lên. Trẻ em dưới 1m4 bắt buộc có người lớn đi kèm.</li>
-                      <li>Những người mắc bệnh tim mạch, chóng mặt, sợ độ cao, phụ nữ mang thai và những người có vấn đề về sức khỏe, vui lòng cân nhắc kỹ trước khi mua vé.</li>
+                      <li>
+                        Trò chơi phù hợp với trẻ em có chiều cao từ 70cm trở
+                        lên. Trẻ em dưới 1m4 bắt buộc có người lớn đi kèm.
+                      </li>
+                      <li>
+                        Những người mắc bệnh tim mạch, chóng mặt, sợ độ cao, phụ
+                        nữ mang thai và những người có vấn đề về sức khỏe, vui
+                        lòng cân nhắc kỹ trước khi mua vé.
+                      </li>
                       <li>Mỗi vé tương ứng 1 lượt xem 1 phim cho 1 khách.</li>
-                      <li>Quý khách vui lòng đến đúng ngày được ghi trên vé.</li>
-                      <li>Vé đã mua không được hoàn tiền và đổi trả vé. Giá vé sẽ thay đổi theo từng thời điểm.</li>
-                      <li>Thức ăn và nước uống không được phép mang vào khu vực trải nghiệm trò chơi.</li>
+                      <li>
+                        Quý khách vui lòng đến đúng ngày được ghi trên vé.
+                      </li>
+                      <li>
+                        Vé đã mua không được hoàn tiền và đổi trả vé. Giá vé sẽ
+                        thay đổi theo từng thời điểm.
+                      </li>
+                      <li>
+                        Thức ăn và nước uống không được phép mang vào khu vực
+                        trải nghiệm trò chơi.
+                      </li>
                     </ul>
                   </div>
 
                   <div className="md:col-span-2 pt-3 mt-1 border-t border-white/10 space-y-3">
-                  
                     <div className="flex items-center gap-3">
                       <Checkbox
                         checked={confirmChecked}
@@ -645,16 +986,32 @@ export default function BookingPage() {
                         aria-label="Xác nhận thông tin đặt vé"
                         id="confirm-checkbox"
                       />
-                      <label htmlFor="confirm-checkbox" className="text-xs sm:text-sm text-gray-300 cursor-pointer select-none">
-                        Vui lòng xác nhận lại thông tin, bao gồm: loại vé, số lượng vé và email. Mã đặt vé sẽ gửi tới email này nếu thanh toán thành công.
+                      <label
+                        htmlFor="confirm-checkbox"
+                        className="text-xs sm:text-sm text-gray-300 cursor-pointer select-none"
+                      >
+                        Vui lòng xác nhận lại thông tin, bao gồm: loại vé, số
+                        lượng vé và email. Mã đặt vé sẽ gửi tới email này nếu
+                        thanh toán thành công.
                       </label>
                     </div>
                   </div>
                 </CardContent>
               </Card>
               <div className="flex justify-between pt-4">
-                <Button variant="outline" className="bg-transparent border-white/30 text-white hover:bg-white/10 h-11 px-6" onClick={() => setStep(0)} disabled={isProcessing}>Quay lại</Button>
-                <Button className="bg-blue-600 hover:bg-blue-700 text-white font-semibold shadow-lg disabled:opacity-50 h-11 px-6" disabled={!confirmChecked || isProcessing} onClick={handleCreateAndPay}>
+                <Button
+                  variant="outline"
+                  className="bg-transparent border-white/30 text-white hover:bg-white/10 h-11 px-6"
+                  onClick={() => setStep(0)}
+                  disabled={isProcessing}
+                >
+                  Quay lại
+                </Button>
+                <Button
+                  className="bg-blue-600 hover:bg-blue-700 text-white font-semibold shadow-lg disabled:opacity-50 h-11 px-6"
+                  disabled={!confirmChecked || isProcessing}
+                  onClick={handleCreateAndPay}
+                >
                   {isProcessing ? "Đang xử lý..." : "Thanh toán"}
                 </Button>
               </div>
@@ -666,10 +1023,12 @@ export default function BookingPage() {
         <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex flex-col items-center justify-center text-white">
           <div className="w-12 h-12 border-4 border-blue-400 border-t-transparent rounded-full animate-spin mb-4" />
           <div className="text-lg font-semibold">Đang xử lý thanh toán...</div>
-          <div className="text-sm text-white/70 mt-1">Vui lòng không đóng hoặc rời khỏi trang cho đến khi chuyển sang cổng thanh toán.</div>
+          <div className="text-sm text-white/70 mt-1">
+            Vui lòng không đóng hoặc rời khỏi trang cho đến khi chuyển sang cổng
+            thanh toán.
+          </div>
         </div>
       )}
     </UserLayout>
   );
 }
-
