@@ -151,15 +151,14 @@ export default function FilmCarousel({ onSelectFilm }: FilmCarouselProps) {
   }, [selectedMovieId, storeUpdateTrigger]);
 
   const handleBookTicket = () => {
-    if (!movieDetails) return;
-    try {
-      const film = films.find((f) => f.id === movieDetails.id);
-      if (film) {
-        localStorage.setItem("selectedFilm", JSON.stringify(film));
-      }
-    } catch { }
+    // Close the modal
     setIsModalOpen(false);
-    navigate("/booking");
+    
+    // Scroll to promotions section
+    const promotionsSection = document.getElementById('promotions');
+    if (promotionsSection) {
+      promotionsSection.scrollIntoView({ behavior: 'smooth' });
+    }
   };
 
   return (

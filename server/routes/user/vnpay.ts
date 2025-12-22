@@ -1,4 +1,5 @@
 // import crypto from "crypto";
+import { formatDateForDb } from "../../../server/lib/date-utils"
 
 async function hmacSHA512(key: string, data: string) {
     const encoder = new TextEncoder();
@@ -24,12 +25,24 @@ function sortObject(obj: Record<string, any>) {
   return sorted;
 }
 
+function formatVnpayDate(date: Date): string {
+  const pad = (n: number) => n.toString().padStart(2, '0');
+  return (
+    date.getFullYear().toString() +
+    pad(date.getMonth() + 1) +
+    pad(date.getDate()) +
+    pad(date.getHours()) +
+    pad(date.getMinutes()) +
+    pad(date.getSeconds())
+  );
+}
+
 const VNP_TMNCODE = process.env.VITE_VNPAY_TMN_CODE || "";
 const VNP_HASH_SECRET = process.env.VITE_VNPAY_HASH_SECRET || "";
 const VNP_GATEWAY = process.env.VITE_VNPAY_GATEWAY || "";
 const VNP_RETURN_URL = "";
 
-export async function createVnpayPaymentImpl(payload: { amount: number; orderId: string; orderInfo: string; locale?: string; tmnCode?: string; hashSecret?: string; returnUrl?: string; ip?: string; gateway?: string }) {
+export async function createVnpayPaymentImpl(payload: { amount: number; orderId: string; orderInfo: string; locale?: string; tmnCode?: string; hashSecret?: string; returnUrl?: string; ip?: string; gateway?: string }, RUNTIME_ENV?: string) {
   const { amount, orderId, orderInfo, locale = "vn" } = payload;
   if (!amount || !orderId || !orderInfo) {
     return { status: 400, message: "Invalid payload" };
@@ -44,7 +57,7 @@ export async function createVnpayPaymentImpl(payload: { amount: number; orderId:
   const vnp_TxnRef = orderId;
   const vnp_Version = "2.1.0";
   const vnp_Command = "pay";
-  const vnp_CreateDate = new Date().toISOString().replace(/[-:TZ.]/g, "").slice(0, 14);
+  const vnp_CreateDate = new Date();
   const vnp_IpAddr = payload.ip || "127.0.0.1";
   const vnp_Amount = amount * 100;
   const params: Record<string, any> = {
@@ -59,7 +72,7 @@ export async function createVnpayPaymentImpl(payload: { amount: number; orderId:
     vnp_Amount,
     vnp_ReturnUrl: returnUrl,
     vnp_IpAddr,
-    vnp_CreateDate,
+    vnp_CreateDate: formatVnpayDate(vnp_CreateDate),
   };
   const sorted = sortObject(params);
   const signData = new URLSearchParams(sorted).toString();

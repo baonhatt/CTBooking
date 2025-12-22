@@ -593,7 +593,7 @@ export default function Account() {
                 <div className="space-y-1">
                   <div className="text-base font-semibold text-white">{selectedTx.movie}</div>
                   <div className="text-sm text-gray-300">{selectedTx.ticket_package ? `Gói: ${selectedTx.ticket_package}` : ""}</div>
-                  <div className="text-sm text-gray-300">{selectedTx.dateDisplay}</div>
+                  <div className="text-sm text-gray-300">Số lượng: {selectedTx.quantity}</div>
                 </div>
               </div>
 
@@ -602,9 +602,7 @@ export default function Account() {
                 <span className="font-medium text-white">{selectedTx.name}</span>
                 <span className="text-gray-400">Email</span>
                 <span className="font-medium break-all text-white">{selectedTx.email}</span>
-                <span className="text-gray-400">Số lượng</span>
-                <span className="font-medium text-white">{selectedTx.quantity}</span>
-                <span className="text-gray-400">Thanh toán</span>
+                <span className="text-gray-400">Phương Thức Thanh toán</span>
                 <span className="font-medium text-white">{selectedTx.method === "momo" ? "MoMo" : "VNPay"}</span>
                 <span className="text-gray-400">Ngày thanh toán</span>
                 <span className="font-medium text-white">{selectedTx.dateDisplay || "--"}</span>

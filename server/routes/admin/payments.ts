@@ -1,22 +1,21 @@
 import { eq, and, or, gte, lte, inArray, desc, asc, sum, count, ilike } from "drizzle-orm";
+import { formatDateForDb } from "../../../server/lib/date-utils"
 
-export async function getRevenueImpl(anyDb: any, tables: { bookings: any }, args: { from?: string; to?: string; status?: string }) {
-  const fromStr = String(args.from || "");
-  const toStr = String(args.to || "");
-  const from = fromStr ? new Date(fromStr).toISOString() : undefined;
-  const to = toStr ? new Date(toStr).toISOString() : undefined;
+export async function getRevenueImpl(anyDb: any, tables: { bookings: any }, args: { from?: string; to?: string; status?: string }, RUNTIME_ENV?: string) {
+  const from = args.from ? new Date(args.from) : undefined;
+  const to = args.to ? new Date(args.to) : undefined;
   const status = String(args.status || "paid").toLowerCase();
-  const whereCondition = status === "all" ? undefined : inArray(tables.bookings.payment_status, ["success", "paid"]);
+  const whereCondition = status === "all" ? undefined : inArray(tables.bookings.payment_status, ["paid"]);
   let dateCondition = undefined as any;
   if (from && to) {
     dateCondition = or(
-      and(gte(tables.bookings.paid_at, from), lte(tables.bookings.paid_at, to)),
-      and(gte(tables.bookings.created_at, from), lte(tables.bookings.created_at, to))
+      and(gte(tables.bookings.paid_at, formatDateForDb(from, RUNTIME_ENV)), lte(tables.bookings.paid_at, formatDateForDb(to, RUNTIME_ENV))),
+      and(gte(tables.bookings.created_at, formatDateForDb(from, RUNTIME_ENV)), lte(tables.bookings.created_at, formatDateForDb(to, RUNTIME_ENV)))
     );
   } else if (from) {
-    dateCondition = or(gte(tables.bookings.paid_at, from), gte(tables.bookings.created_at, from));
+    dateCondition = or(gte(tables.bookings.paid_at, formatDateForDb(from, RUNTIME_ENV)), gte(tables.bookings.created_at, formatDateForDb(from, RUNTIME_ENV)));
   } else if (to) {
-    dateCondition = or(lte(tables.bookings.paid_at, to), lte(tables.bookings.created_at, to));
+    dateCondition = or(lte(tables.bookings.paid_at, formatDateForDb(to, RUNTIME_ENV)), lte(tables.bookings.created_at, formatDateForDb(to, RUNTIME_ENV)));
   }
   const finalWhere = and(whereCondition, dateCondition);
   const [agg] = await anyDb
@@ -28,21 +27,21 @@ export async function getRevenueImpl(anyDb: any, tables: { bookings: any }, args
   return { total, count: countVal };
 }
 
-export async function listTransactionsImpl(anyDb: any, tables: { bookings: any; users: any; accounts: any; movies: any; ticket_packages: any }, args: { page: number; pageSize: number; email: string; status: string; sort: string; dir: "asc" | "desc"; payment_method: string; from?: string; to?: string }) {
+export async function listTransactionsImpl(anyDb: any, tables: { bookings: any; users: any; accounts: any; movies: any; ticket_packages: any }, args: { page: number; pageSize: number; email: string; status: string; sort: string; dir: "asc" | "desc"; payment_method: string; from?: string; to?: string }, RUNTIME_ENV?: string) {
   const { page, pageSize, email, status, sort, dir, payment_method, from, to } = args;
   const skip = (page - 1) * pageSize;
   const whereCondition: any[] = [];
   if (status && status !== "all") whereCondition.push(eq(tables.bookings.payment_status, status));
   if (payment_method) whereCondition.push(eq(tables.bookings.payment_method, payment_method));
   if (from || to) {
-    const f = from ? new Date(from).toISOString() : undefined;
-    const t = to ? new Date(to).toISOString() : undefined;
+    const f = from ? new Date(from) : undefined;
+    const t = to ? new Date(to) : undefined;
     if (f && t) {
-      whereCondition.push(or(and(gte(tables.bookings.created_at, f), lte(tables.bookings.created_at, t)), and(gte(tables.bookings.paid_at, f), lte(tables.bookings.paid_at, t))));
+      whereCondition.push(or(and(gte(tables.bookings.created_at, formatDateForDb(f, RUNTIME_ENV)), lte(tables.bookings.created_at, formatDateForDb(t, RUNTIME_ENV))), and(gte(tables.bookings.paid_at, formatDateForDb(f, RUNTIME_ENV)), lte(tables.bookings.paid_at, formatDateForDb(t, RUNTIME_ENV)))));
     } else if (f) {
-      whereCondition.push(or(gte(tables.bookings.created_at, f), gte(tables.bookings.paid_at, f)));
+      whereCondition.push(or(gte(tables.bookings.created_at, formatDateForDb(f, RUNTIME_ENV)), gte(tables.bookings.paid_at, formatDateForDb(f, RUNTIME_ENV))));
     } else if (t) {
-      whereCondition.push(or(lte(tables.bookings.created_at, t), lte(tables.bookings.paid_at, t)));
+      whereCondition.push(or(lte(tables.bookings.created_at, formatDateForDb(t, RUNTIME_ENV)), lte(tables.bookings.paid_at, formatDateForDb(t, RUNTIME_ENV))));
     }
   }
   const emailFilter = email ? ilike(tables.accounts.email, `%${email}%`) : undefined;
@@ -113,6 +112,25 @@ export async function getTransactionByIdImpl(anyDb: any, tables: { bookings: any
   const expiryAt = booking.expiry_date ? new Date(booking.expiry_date) : null;
   const expired = Boolean(expiryAt && now.getTime() > expiryAt.getTime());
   const daysLeft = expiryAt ? Math.ceil((expiryAt.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)) : null;
+
+  let movieIds: number[] = [];
+  try {
+    if (booking.combo) {
+      const comboData = typeof booking.combo === 'string' 
+        ? JSON.parse(booking.combo)
+        : booking.combo;
+      movieIds = Array.isArray(comboData) ? comboData : [];
+    }
+  } catch (e) {
+    console.error('Error parsing combo data:', e);
+  }
+  // Get movie details for the combo
+  let movies = [];
+  if (movieIds.length > 0) {
+    movies = await anyDb.query.movies.findMany({
+      where: inArray(tables.movies.id, movieIds)
+    });
+  }
   const mapped = {
     id: booking.id,
     user: {
@@ -135,18 +153,22 @@ export async function getTransactionByIdImpl(anyDb: any, tables: { bookings: any
     ticket_package: booking.ticket_package ? {
       id: booking.ticket_package.id,
       name: booking.ticket_package.name,
-      price: booking.ticket_package.price
+      price: booking.ticket_package.price,
+      combo: booking.combo,
+      movies: movies
     } : null,
     booking_details: {
       ticket_count: booking.ticket_count,
       total_price: Number(booking.total_price),
       price_per_ticket: booking.ticket_count > 0 ? Number(booking.total_price) / booking.ticket_count : 0,
+      combo: booking.ticket_package.combo,
     },
     payment_info: {
       payment_method: booking.payment_method || "",
       payment_status: booking.payment_status || "pending",
       transaction_id: booking.transaction_id || "",
       created_at: booking.created_at,
+      updated_at: booking.updated_at,
       paid_at: booking.paid_at,
       expiry_date: booking.expiry_date || null,
       expired,

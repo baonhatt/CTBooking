@@ -40,6 +40,8 @@ export default function TicketsPage() {
         description: t.description || undefined,
         price: Number(t.price),
         features: Array.isArray(t.features) ? t.features : [],
+        combo: Array.isArray(t.combo) ? t.combo : [],  
+        movies: Array.isArray(t.movies) ? t.movies : [], 
         type: t.type || undefined,
         min_group_size: t.min_group_size ?? undefined,
         max_group_size: t.max_group_size ?? undefined,
