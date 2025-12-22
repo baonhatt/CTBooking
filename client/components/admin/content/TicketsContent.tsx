@@ -369,7 +369,7 @@ export default function TicketsContent(props: Props) {
                 </div>
                 <div>
                   <Label className="text-sm font-medium">
-                    Combo Phim (Chọn nhiều)
+                    Combo Phim ({editData?.combo?.length || 0})
                   </Label>
                   <div className="border rounded-md p-3 h-36 overflow-y-auto space-y-2 mt-1.5 bg-gray-50">
                     {movies.length === 0 ? (

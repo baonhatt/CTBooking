@@ -74,7 +74,7 @@ export async function listTicketPackagesImpl(
       : searchCondition;
   }
 
-  // 2. Sử dụng một transaction để thực hiện cả đếm và lấy dữ liệu
+  // 2. Lấy dữ liệu phân trang
   const [totalResult, packages] = await anyDb.transaction(async (tx: any) => {
     const [totalRes] = await tx
       .select({ count: count() })
@@ -95,61 +95,17 @@ export async function listTicketPackagesImpl(
     return [totalRes, pkgList];
   });
   
-  const total = totalResult ? Number(totalResult.count) : 0;
+  const total = totalResult ? Number(totalResult.count) : 0;  
   
-  // 3. Xử lý thông tin combo và lấy dữ liệu phim
-  const allComboIds = new Set<number>();
-  const packageCombos: Record<number, number[]> = {};
-  
-  // Xử lý combo cho từng gói vé
-  packages.forEach((pkg: any) => {
-    if (!pkg.combo) return;
-    
-    const comboIds = processComboInput(pkg.combo);
-    if (comboIds.length > 0) {
-      packageCombos[pkg.id] = comboIds;
-      comboIds.forEach(id => allComboIds.add(id));
-    }
-  });
-  
-  // 4. Lấy thông tin chi tiết các phim trong combo (nếu có)
-  const movieMap: Record<number, any> = {};
-  if (allComboIds.size > 0) {
-    try {
-      const movieData = await anyDb
-        .select({
-          id: tables.movies.id,
-          title: tables.movies.title,
-          description: tables.movies.description,
-          // Thêm các trường khác nếu cần
-        })
-        .from(tables.movies)
-        .where(inArray(tables.movies.id, Array.from(allComboIds)));
-        
-      // Tạo map ID phim -> thông tin phim
-      movieData.forEach((movie: any) => {
-        movieMap[movie.id] = movie;
-      });
-    } catch (error) {
-      console.error('Lỗi khi lấy thông tin phim:', error);
-      // Tiếp tục xử lý ngay cả khi có lỗi
-    }
-  }
-  
-  // 5. Kết hợp thông tin phim vào từng gói vé
-  const items = packages.map((pkg: any) => {
-    const comboIds = packageCombos[pkg.id] || [];
-    const movies = comboIds
-      .map((id: number) => movieMap[id])
-      .filter(Boolean); // Lọc bỏ các phim không tồn tại
-    
-    return {
-      ...pkg,
-      movies: movies.length > 0 ? movies : undefined
-    };
-  });
+  // 3. Xử lý combo cho từng gói vé
+  const items = packages.map((pkg: any) => ({
+  ...pkg,
+  // Giữ nguyên giá trị combo từ database
+  // Nếu cần đảm bảo combo là mảng, có thể thêm:
+    combo: Array.isArray(pkg.combo) ? pkg.combo : undefined
+  }));
 
-  // 6. Trả về kết quả phân trang
+  // 4. Trả về kết quả phân trang
   return { 
     items, 
     page, 

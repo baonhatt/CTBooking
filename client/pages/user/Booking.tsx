@@ -36,19 +36,13 @@ export default function BookingPage() {
   };
   const [overlayDark, setOverlayDark] = useState(backdropConfig.base);
 
-  const { data: activeData, refetch: refetchActive, isLoading: isLoadingActive } = useQuery({
-    queryKey: ["activeMovies", "today"],
-    queryFn: () => getAllActiveMoviesToday(),
-    staleTime: 60000,
-  });
   const { data: ticketsData, isLoading: isLoadingTickets } = useQuery({
     queryKey: ["activeTickets"],
     queryFn: ({ signal }) => getActiveTickets({ signal }),
   });
-  const isLoadingPage = isLoadingActive || isLoadingTickets;
+  const isLoadingPage = isLoadingTickets;
 
-  const activeMoviesFull = activeData?.activeMovies || [];
-  const movies = (activeMoviesFull || []).map((m: any) => ({ id: m.title, title: m.title }));
+  const [activeMoviesFull, setActiveMoviesFull] = useState<any[]>([]);
   const selectedMovie = activeMoviesFull.find((x: any) => x.title === movie);
   const ticketPackages = (ticketsData?.items || []).map((t: any) => ({
     id: t.id,
@@ -58,6 +52,7 @@ export default function BookingPage() {
     features: Array.isArray(t.features) ? t.features : [],
     type: t.type || "",
     display_order: t.display_order || 0,
+    movies: t.movies || [],
   }));
   const defaultTicket = ticketPackages.sort((a, b) => a.display_order - b.display_order)[0];
   const unitPrice = Number(selectedPackage?.price || 0);
@@ -80,23 +75,15 @@ export default function BookingPage() {
           typeof selectedPackage.description === "string";
         if (!hasFull || JSON.stringify(selectedPackage) !== JSON.stringify(canonical)) {
           setSelectedPackage(canonical);
+          // Update activeMoviesFull when package changes
+          setActiveMoviesFull(canonical.movies || []);
+          // Clear selected movie when package changes
+          setMovie("");
         }
       }
     }
   }, [ticketPackages, selectedPackage]);
-  useEffect(() => {
-    try {
-      const rawSel = localStorage.getItem("selectedFilm");
-      if (rawSel && Array.isArray(activeMoviesFull) && activeMoviesFull.length > 0) {
-        const sel = JSON.parse(rawSel);
-        const found = activeMoviesFull.find((m: any) => m?.id === sel?.id || m?.title === sel?.title);
-        if (found?.title) {
-          setMovie(found.title);
-        }
-        localStorage.removeItem("selectedFilm");
-      }
-    } catch { }
-  }, [activeMoviesFull]);
+  // Remove the effect that loads from localStorage since we don't need it anymore
 
   useEffect(() => {
     try {
@@ -356,38 +343,82 @@ export default function BookingPage() {
               </CardHeader>
               <CardContent className="space-y-6">
                 <div className="space-y-3">
-                  <div className="text-sm font-medium text-gray-400">Chọn Phim</div>
-                  <Select value={movie} onValueChange={(v) => { setMovie(v); try { refetchActive(); } catch { } }}>
+                  <div className="text-sm font-medium text-gray-400">Chọn Loại Vé</div>
+                  <Select
+                    value={selectedPackage?.id ? String(selectedPackage.id) : ""}
+                    onValueChange={(v) => {
+                      const pkg = ticketPackages.find((p: any) => String(p.id) === String(v));
+                      setSelectedPackage(pkg || null);
+                      // Update activeMoviesFull with the selected package's movies
+                      if (pkg?.movies) {
+                        setActiveMoviesFull([...pkg.movies]);
+                      } else {
+                        setActiveMoviesFull([]);
+                      }
+                      // Clear selected movie when package changes
+                      setMovie("");
+                    }}
+                  >
                     <SelectTrigger className="w-full bg-white/10 backdrop-blur-sm text-white border-white/20 hover:bg-white/15 h-11">
-                      <span className="truncate">{selectedMovie?.title || "Chọn phim"}</span>
+                      <span className="truncate">{selectedPackage?.name || "Chọn loại vé"}</span>
                     </SelectTrigger>
                     <SelectContent className="bg-[#0b1226]/95 backdrop-blur-md text-white border border-white/20">
-                      {(activeMoviesFull || []).map((m: any) => (
-                        <SelectItem className="text-white py-2" key={m.id ?? m.title} value={m.title}>
-                          <div className="flex items-center gap-3">
-                            <img src={resolveImageUrl(m.cover_image)} alt={m.title} className="w-10 h-14 object-cover rounded border border-white/10" />
-                            <div className="flex flex-col">
-                              <span className="font-medium">{m.title}</span>
-                              <span className="text-xs text-gray-400">{m.duration_min ? `${m.duration_min} phút` : "--"}</span>
-                            </div>
+                      {ticketPackages.map((t: any) => (
+                        <SelectItem key={t.id} value={String(t.id)} className="text-white py-2">
+                          <div className="flex items-center justify-between gap-3 w-full">
+                            <span className="font-medium">{t.name}</span>
+                            <span className="text-sm text-blue-300">{Number(t.price || 0).toLocaleString("vi-VN")}₫</span>
                           </div>
                         </SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
-                  {selectedMovie && (
-                    <div className="mt-3 flex items-center gap-4 p-3 rounded-lg border border-white/15 bg-white/5 backdrop-blur-sm">
-                      <img src={resolveImageUrl(selectedMovie.cover_image)} alt={selectedMovie.title} className="w-20 h-28 object-cover rounded" />
-                      <div className="flex-1">
-                        <div className="text-white font-semibold mb-1">{selectedMovie.title}</div>
-                        <div className="text-sm text-gray-400">Thời lượng: {selectedMovie.duration_min ? `${selectedMovie.duration_min} phút` : "--"}</div>
-                        {selectedMovie.genres && (
-                          <div className="text-xs text-gray-500 mt-1">{Array.isArray(selectedMovie.genres) ? selectedMovie.genres.join(" / ") : selectedMovie.genres}</div>
-                        )}
-                      </div>
-                    </div>
-                  )}
                 </div>
+
+                {selectedPackage && (
+                  <div className="space-y-3">
+                    <div className="text-sm font-medium text-gray-400">Chọn Phim</div>
+                    <Select 
+                      value={movie} 
+                      onValueChange={setMovie}
+                    >
+                      <SelectTrigger className="w-full bg-white/10 backdrop-blur-sm text-white border-white/20 hover:bg-white/15 h-11">
+                        <span className="truncate">{selectedMovie?.title || "Chọn phim"}</span>
+                      </SelectTrigger>
+                      <SelectContent className="bg-[#0b1226]/95 backdrop-blur-md text-white border border-white/20">
+                        {activeMoviesFull && activeMoviesFull.length > 0 ? (
+                          activeMoviesFull.map((m: any) => (
+                            <SelectItem className="text-white py-2" key={m.id ?? m.title} value={m.title}>
+                              <div className="flex items-center gap-3">
+                                <img src={resolveImageUrl(m.cover_image)} alt={m.title} className="w-10 h-14 object-cover rounded border border-white/10" />
+                                <div className="flex flex-col">
+                                  <span className="font-medium">{m.title}</span>
+                                  <span className="text-xs text-gray-400">{m.duration_min ? `${m.duration_min} phút` : "--"}</span>
+                                </div>
+                              </div>
+                            </SelectItem>
+                          ))
+                        ) : (
+                          <div className="px-3 py-2 text-sm text-gray-400">
+                            Không tồn tại phim cho loại vé này
+                          </div>
+                        )}
+                      </SelectContent>
+                    </Select>
+                    {selectedMovie && (
+                      <div className="mt-3 flex items-center gap-4 p-3 rounded-lg border border-white/15 bg-white/5 backdrop-blur-sm">
+                        <img src={resolveImageUrl(selectedMovie.cover_image)} alt={selectedMovie.title} className="w-20 h-28 object-cover rounded" />
+                        <div className="flex-1">
+                          <div className="text-white font-semibold mb-1">{selectedMovie.title}</div>
+                          <div className="text-sm text-gray-400">Thời lượng: {selectedMovie.duration_min ? `${selectedMovie.duration_min} phút` : "--"}</div>
+                          {selectedMovie.genres && (
+                            <div className="text-xs text-gray-500 mt-1">{Array.isArray(selectedMovie.genres) ? selectedMovie.genres.join(" / ") : selectedMovie.genres}</div>
+                          )}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
 
                 <div className="space-y-3">
                   <div className="text-sm font-medium text-gray-400">Thông Tin Khách Hàng</div>
@@ -474,59 +505,35 @@ export default function BookingPage() {
                     </div>
                   </div>
                 </div>
-
-                <div className="space-y-3">
-                  <div className="text-sm font-medium text-gray-400">Chọn Loại Vé</div>
-                  <Select
-                    value={selectedPackage?.id ? String(selectedPackage.id) : ""}
-                    onValueChange={(v) => {
-                      const pkg = ticketPackages.find((p: any) => String(p.id) === String(v));
-                      setSelectedPackage(pkg || null);
-                    }}
-                  >
-                    <SelectTrigger className="w-full bg-white/10 backdrop-blur-sm text-white border-white/20 hover:bg-white/15 h-11">
-                      <span className="truncate">{selectedPackage?.name || "Chọn loại vé"}</span>
-                    </SelectTrigger>
-                    <SelectContent className="bg-[#0b1226]/95 backdrop-blur-md text-white border border-white/20">
-                      {ticketPackages.map((t: any) => (
-                        <SelectItem key={t.id} value={String(t.id)} className="text-white py-2">
-                          <div className="flex items-center justify-between gap-3 w-full">
-                            <span className="font-medium">{t.name}</span>
-                            <span className="text-sm text-blue-300">{Number(t.price || 0).toLocaleString("vi-VN")}₫</span>
-                          </div>
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  {selectedPackage && (
-                    <div className="rounded-lg p-4 border border-white/15 bg-white/5 backdrop-blur-sm space-y-3">
-                      <div className="flex items-center justify-between">
-                        <span className="text-white font-semibold">{selectedPackage.name}</span>
-                        <div className="text-right text-md font-bold text-white">
-                          {unitPrice.toLocaleString("vi-VN")}₫
-                          <span className="text-xs font-normal text-gray-400"> / vé</span>
-                        </div>
-                      </div>
-                      {(selectedPackage.description || selectedPackage.type) && (
-                        <p className="text-sm text-gray-400">
-                          {selectedPackage.description || `Gói vé ${selectedPackage.type}`}
-                        </p>
-                      )}
-                      {Array.isArray(selectedPackage.features) && selectedPackage.features.length > 0 && (
-                        <ul className="space-y-1">
-                          {selectedPackage.features.map((f: string, idx: number) => (
-                            <li key={idx} className="text-sm text-gray-300">• {f}</li>
-                          ))}
-                        </ul>
-                      )}
-                      <div className="pt-3 mt-2 border-t border-white/10 text-right">
-                        <span className="text-lg font-bold text-white">
-                          Tạm tính: {totalPrice.toLocaleString("vi-VN")}₫
-                        </span>
+                
+                {selectedPackage && (
+                  <div className="rounded-lg p-4 border border-white/15 bg-white/5 backdrop-blur-sm space-y-3">
+                    <div className="flex items-center justify-between">
+                      <span className="text-white font-semibold">{selectedPackage.name}</span>
+                      <div className="text-right text-md font-bold text-white">
+                        {unitPrice.toLocaleString("vi-VN")}₫
+                        <span className="text-xs font-normal text-gray-400"> / vé</span>
                       </div>
                     </div>
-                  )}
-                </div>
+                    {(selectedPackage.description || selectedPackage.type) && (
+                      <p className="text-sm text-gray-400">
+                        {selectedPackage.description || `Gói vé ${selectedPackage.type}`}
+                      </p>
+                    )}
+                    {Array.isArray(selectedPackage.features) && selectedPackage.features.length > 0 && (
+                      <ul className="space-y-1">
+                        {selectedPackage.features.map((f: string, idx: number) => (
+                          <li key={idx} className="text-sm text-gray-300">• {f}</li>
+                        ))}
+                      </ul>
+                    )}
+                    <div className="pt-3 mt-2 border-t border-white/10 text-right">
+                      <span className="text-lg font-bold text-white">
+                        Tạm tính: {totalPrice.toLocaleString("vi-VN")}₫
+                      </span>
+                    </div>
+                  </div>
+                )}
 
                 <div className="flex justify-end gap-3 pt-2">
                   <Button variant="outline" className="bg-transparent border-white/30 text-white hover:bg-white/10 h-11 px-6" onClick={() => navigate("/")} disabled={isProcessing}>Hủy</Button>

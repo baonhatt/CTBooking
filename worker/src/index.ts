@@ -1,3 +1,4 @@
+// Main API server setup using Hono framework
 import { Hono } from "hono";
 import { cors } from "hono/cors";
 import { drizzle } from "drizzle-orm/d1";
@@ -187,7 +188,11 @@ app.get("/api/demo", (c) => {
   return c.json({ message: "Hello from Express server" }, 200);
 });
 
-// ----- Auth endpoints parity -----
+// ===== AUTHENTICATION ENDPOINTS =====
+// Handles user authentication and account management
+// User login endpoint
+// POST /api/login
+// Body: { email: string, password: string }
 app.post("/api/login", async (c) => {
   try {
     const db = drizzle(c.env.cinema_db, { schema });
@@ -208,6 +213,9 @@ app.post("/api/login", async (c) => {
     return c.json({ status: "error", message: "Lỗi máy chủ nội bộ" }, 500);
   }
 });
+// User registration endpoint
+// POST /api/register
+// Body: { name: string, email: string, password: string, ... }
 app.post("/api/register", async (c) => {
   try {
     const db = drizzle(c.env.cinema_db, { schema });
@@ -251,6 +259,9 @@ app.post("/api/register", async (c) => {
     );
   }
 });
+// Password reset request endpoint
+// POST /api/forget-password
+// Body: { email: string }
 app.post("/api/forget-password", async (c) => {
   let body: any = {};
   try {
@@ -325,6 +336,9 @@ app.post("/api/forget-password", async (c) => {
     );
   }
 });
+// Password reset confirmation endpoint
+// POST /api/reset-password
+// Body: { token: string, newPassword: string, confirmPassword: string }
 app.post("/api/reset-password", async (c) => {
   try {
     const db = drizzle(c.env.cinema_db, { schema });
@@ -357,6 +371,7 @@ app.get("/api/admin/revenue", async (c) => {
       db,
       { bookings: schema.bookings },
       { from, to, status },
+      c.env.RUNTIME_ENV
     );
     return c.json(r);
   } catch (err: any) {
@@ -392,6 +407,7 @@ app.get("/api/admin/transactions", async (c) => {
         ticket_packages: schema.ticket_packages,
       },
       { page, pageSize, email, status, sort, dir, payment_method, from, to },
+      c.env.RUNTIME_ENV
     );
     return c.json(r);
   } catch (err: any) {
@@ -427,6 +443,8 @@ app.get("/api/admin/transactions/:id", async (c) => {
   }
 });
 
+// Get dashboard metrics (total users, movies, revenue, etc.)
+// GET /api/admin/dashboard/metrics
 app.get("/api/admin/dashboard/metrics", async (c) => {
   try {
     const db = drizzle(c.env.cinema_db, { schema });
@@ -444,6 +462,8 @@ app.get("/api/admin/dashboard/metrics", async (c) => {
   }
 });
 
+// Get revenue for a specific date
+// GET /api/admin/dashboard/revenue-date?date=YYYY-MM-DD&status=paid
 app.get("/api/admin/dashboard/revenue-date", async (c) => {
   try {
     const date = String(c.req.query("date") || "");
@@ -464,6 +484,8 @@ app.get("/api/admin/dashboard/revenue-date", async (c) => {
   }
 });
 
+// Get revenue data for the last 7 days
+// GET /api/admin/dashboard/revenue-7days
 app.get("/api/admin/dashboard/revenue-7days", async (c) => {
   try {
     const db = drizzle(c.env.cinema_db, { schema });
@@ -481,6 +503,8 @@ app.get("/api/admin/dashboard/revenue-7days", async (c) => {
   }
 });
 
+// Get monthly revenue data
+// GET /api/admin/dashboard/revenue-month?year=YYYY&month=MM&status=paid
 app.get("/api/admin/dashboard/revenue-month", async (c) => {
   try {
     const year = String(c.req.query("year") || "");
@@ -502,6 +526,8 @@ app.get("/api/admin/dashboard/revenue-month", async (c) => {
   }
 });
 
+// Get paginated list of users with optional search
+// GET /api/admin/users?page=1&pageSize=20&q=search_term
 app.get("/api/admin/users", async (c) => {
   try {
     const page = Number(c.req.query("page") || 1);
@@ -526,6 +552,8 @@ app.get("/api/admin/users", async (c) => {
   }
 });
 
+// Get user details by ID
+// GET /api/admin/users/:id
 app.get("/api/admin/users/:id", async (c) => {
   try {
     const id = Number(c.req.param("id"));
@@ -550,6 +578,9 @@ app.get("/api/admin/users/:id", async (c) => {
   }
 });
 
+// Generate Cloudinary signature for direct uploads
+// POST /api/admin/cloudinary/sign
+// Body: { folder: string, resource_type: string }
 app.post("/api/admin/cloudinary/sign", async (c) => {
   try {
     const env = c.env;
@@ -582,6 +613,9 @@ app.post("/api/admin/cloudinary/sign", async (c) => {
   }
 });
 
+// Upload video file to Cloudinary or R2 storage
+// POST /api/admin/uploads/video
+// FormData: { file: File }
 app.post("/api/admin/uploads/video", async (c) => {
   try {
     const form = await c.req.parseBody();
@@ -704,6 +738,9 @@ const getD1Tables = (schema: any) => ({
   ticket_packages: schema.ticket_packages,
 });
 
+// Validate booking details before payment
+// POST /api/validate-booking
+// Body: { movieId: number, showtime: string, seats: string[], ... }
 app.post("/api/validate-booking", async (c) => {
   try {
     const db = drizzle(c.env.cinema_db, { schema });
@@ -723,6 +760,9 @@ app.post("/api/validate-booking", async (c) => {
   }
 });
 
+// Create a new booking
+// POST /api/create-booking
+// Body: { movieId: number, showtime: string, seats: string[], paymentMethod: string, ... }
 app.post("/api/create-booking", async (c) => {
   let body: any = {};
   try {
@@ -758,6 +798,9 @@ app.post("/api/create-booking", async (c) => {
   }
 });
 
+// Confirm a booking after payment
+// POST /api/confirm-booking
+// Body: { bookingId: string, paymentDetails: object }
 app.post("/api/confirm-booking", async (c) => {
   let body: any = {};
   try {
@@ -870,6 +913,9 @@ app.post("/api/bookings-use", async (c) => {
   };
   return c.json(payload, status);
 });
+
+// Get list of movies
+// GET /api/movies?page=1&pageSize=20&q=search_term
 app.get("/api/movies", async (c) => {
   try {
     const page = Number(c.req.query("page") || 1);
@@ -893,6 +939,9 @@ app.get("/api/movies", async (c) => {
   }
 });
 
+// Create a new movie
+// POST /api/movies
+// Body: { title: string, description: string, ... }
 app.post("/api/movies", async (c) => {
   try {
     const body = await c.req.json().catch(() => ({}));
@@ -914,6 +963,8 @@ app.post("/api/movies", async (c) => {
   }
 });
 
+// Get movie details by ID
+// GET /api/movies/:id
 app.get("/api/movies/:id", async (c) => {
   try {
     const id = Number(c.req.param("id"));
@@ -926,6 +977,8 @@ app.get("/api/movies/:id", async (c) => {
   }
 });
 
+// Get movie details by ID (detailed)
+// GET /api/movies-detail/:id
 app.get("/api/movies-detail/:id", async (c) => {
   const id = Number(c.req.param("id"));
   const db = drizzle(c.env.cinema_db, { schema });
@@ -939,6 +992,9 @@ app.get("/api/movies-detail/:id", async (c) => {
   return c.json(r);
 });
 
+// Update a movie
+// PUT /api/movies/:id
+// Body: { title: string, description: string, ... }
 app.put("/api/movies/:id", async (c) => {
   try {
     const id = Number(c.req.param("id"));
@@ -958,6 +1014,8 @@ app.put("/api/movies/:id", async (c) => {
   }
 });
 
+// Delete a movie
+// DELETE /api/movies/:id
 app.delete("/api/movies/:id", async (c) => {
   const id = Number(c.req.param("id"));
   const db = drizzle(c.env.cinema_db, { schema });
@@ -966,7 +1024,8 @@ app.delete("/api/movies/:id", async (c) => {
   return c.json(r);
 });
 
-// ----- Users parity endpoints -----
+// Get list of users
+// GET /api/users?page=1&pageSize=20&q=search_term
 app.get("/api/users", async (c) => {
   try {
     const page = Number(c.req.query("page") || 1);
@@ -987,6 +1046,9 @@ app.get("/api/users", async (c) => {
     return c.json({ status: "error", message: "Lỗi máy chủ nội bộ" }, 500);
   }
 });
+
+// Get user details by ID
+// GET /api/users/:id
 app.get("/api/users/:id", async (c) => {
   try {
     const id = Number(c.req.param("id"));
@@ -1007,6 +1069,9 @@ app.get("/api/users/:id", async (c) => {
     return c.json({ status: "error", message: "Lỗi máy chủ nội bộ" }, 500);
   }
 });
+
+// Get user profile by email
+// GET /api/users-profile?email=user@example.com
 app.get("/api/users-profile", async (c) => {
   try {
     const emailRaw = String(c.req.query("email") || "");
@@ -1027,6 +1092,10 @@ app.get("/api/users-profile", async (c) => {
     return c.json({ status: "error", message: "Lỗi máy chủ nội bộ" }, 500);
   }
 });
+
+// Update user profile
+// POST /api/users-profile
+// Body: { email: string, name: string, ... }
 app.post("/api/users-profile", async (c) => {
   try {
     const db = drizzle(c.env.cinema_db, { schema });
@@ -1048,6 +1117,10 @@ app.post("/api/users-profile", async (c) => {
     return c.json({ status: "error", message: "Lỗi máy chủ nội bộ" }, 500);
   }
 });
+
+// Change user password
+// POST /api/users-password
+// Body: { oldPassword: string, newPassword: string }
 app.post("/api/users-password", async (c) => {
   try {
     const db = drizzle(c.env.cinema_db, { schema });
@@ -1069,6 +1142,9 @@ app.post("/api/users-password", async (c) => {
     return c.json({ status: "error", message: "Lỗi máy chủ nội bộ" }, 500);
   }
 });
+
+// Get user's transaction history
+// GET /api/usersprofile/transactions?email=user@example.com&status=paid&page=1
 app.get("/api/usersprofile/transactions", async (c) => {
   try {
     const email = String(c.req.query("email") || "");
@@ -1101,7 +1177,8 @@ app.get("/api/usersprofile/transactions", async (c) => {
   }
 });
 
-// ----- Toys endpoints -----
+// Get list of toys
+// GET /api/toys?page=1&pageSize=20&q=search_term
 app.get("/api/toys", async (c) => {
   try {
     const page = Number(c.req.query("page") || 1);
@@ -1118,6 +1195,9 @@ app.get("/api/toys", async (c) => {
     return c.json({ status: "error", message: "Lỗi máy chủ nội bộ" }, 500);
   }
 });
+
+// Get list of active toys
+// GET /api/toys-active
 app.get("/api/toys-active", async (c) => {
   try {
     const db = drizzle(c.env.cinema_db, { schema });
@@ -1127,6 +1207,9 @@ app.get("/api/toys-active", async (c) => {
     return c.json({ status: "error", message: "Lỗi máy chủ nội bộ" }, 500);
   }
 });
+
+// Get toy details by ID
+// GET /api/toys/:id
 app.get("/api/toys/:id", async (c) => {
   try {
     const id = Number(c.req.param("id"));
@@ -1138,6 +1221,10 @@ app.get("/api/toys/:id", async (c) => {
     return c.json({ status: "error", message: "Lỗi máy chủ nội bộ" }, 500);
   }
 });
+
+// Create a new toy
+// POST /api/toys
+// Body: { name: string, description: string, ... }
 app.post("/api/toys", async (c) => {
   try {
     const db = drizzle(c.env.cinema_db, { schema });
@@ -1153,6 +1240,10 @@ app.post("/api/toys", async (c) => {
     return c.json({ status: "error", message: "Lỗi máy chủ nội bộ" }, 500);
   }
 });
+
+// Update a toy
+// PUT /api/toys/:id
+// Body: { name: string, description: string, ... }
 app.put("/api/toys/:id", async (c) => {
   try {
     const id = Number(c.req.param("id"));
@@ -1171,6 +1262,9 @@ app.put("/api/toys/:id", async (c) => {
     return c.json({ status: "error", message: "Lỗi máy chủ nội bộ" }, 500);
   }
 });
+
+// Delete a toy
+// DELETE /api/toys/:id
 app.delete("/api/toys/:id", async (c) => {
   try {
     const id = Number(c.req.param("id"));
@@ -1183,7 +1277,8 @@ app.delete("/api/toys/:id", async (c) => {
   }
 });
 
-// ----- Tickets endpoints -----
+// Get list of ticket packages
+// GET /api/tickets?page=1&pageSize=20&q=search_term
 app.get("/api/tickets", async (c) => {
   try {
     const page = Number(c.req.query("page") || 1);
@@ -1200,17 +1295,24 @@ app.get("/api/tickets", async (c) => {
     return c.json({ status: "error", message: "Lỗi máy chủ nội bộ" }, 500);
   }
 });
+
+// Get list of active ticket packages
+// GET /api/tickets-active
 app.get("/api/tickets-active", async (c) => {
   try {
     const db = drizzle(c.env.cinema_db, { schema });
     const r = await listActiveTicketPackages(db, {
       ticket_packages: schema.ticket_packages,
+      movies: schema.movies
     });
     return c.json(r, 200);
   } catch {
     return c.json({ status: "error", message: "Lỗi máy chủ nội bộ" }, 500);
   }
 });
+
+// Get ticket package details by ID
+// GET /api/tickets/:id
 app.get("/api/tickets/:id", async (c) => {
   try {
     const id = Number(c.req.param("id"));
@@ -1226,6 +1328,10 @@ app.get("/api/tickets/:id", async (c) => {
     return c.json({ status: "error", message: "Lỗi máy chủ nội bộ" }, 500);
   }
 });
+
+// Create a new ticket package
+// POST /api/tickets
+// Body: { name: string, description: string, ... }
 app.post("/api/tickets", async (c) => {
   try {
     const db = drizzle(c.env.cinema_db, { schema });
@@ -1241,6 +1347,10 @@ app.post("/api/tickets", async (c) => {
     return c.json({ status: "error", message: "Lỗi máy chủ nội bộ" }, 500);
   }
 });
+
+// Update a ticket package
+// PUT /api/tickets/:id
+// Body: { name: string, description: string, ... }
 app.put("/api/tickets/:id", async (c) => {
   try {
     const id = Number(c.req.param("id"));
@@ -1259,6 +1369,9 @@ app.put("/api/tickets/:id", async (c) => {
     return c.json({ status: "error", message: "Lỗi máy chủ nội bộ" }, 500);
   }
 });
+
+// Delete a ticket package
+// DELETE /api/tickets/:id
 app.delete("/api/tickets/:id", async (c) => {
   try {
     const id = Number(c.req.param("id"));
@@ -1275,7 +1388,9 @@ app.delete("/api/tickets/:id", async (c) => {
   }
 });
 
-// ----- Site media endpoints -----
+// Create site media
+// POST /api/admin/site-media
+// Body: { type: string, url: string, ... }
 app.post("/api/admin/site-media", async (c) => {
   try {
     const db = drizzle(c.env.cinema_db, { schema });
@@ -1291,6 +1406,10 @@ app.post("/api/admin/site-media", async (c) => {
     return c.json({ status: "error", message: "Lỗi máy chủ nội bộ" }, 500);
   }
 });
+
+// Update site media
+// PUT /api/admin/site-media
+// Body: { type: string, url: string, ... }
 app.put("/api/admin/site-media", async (c) => {
   try {
     const db = drizzle(c.env.cinema_db, { schema });
@@ -1311,6 +1430,9 @@ app.put("/api/admin/site-media", async (c) => {
     return c.json({ status: "error", message: "Lỗi máy chủ nội bộ" }, 500);
   }
 });
+
+// Get list of site media
+// GET /api/site-media?section=string&type=string&active=string
 app.get("/api/site-media", async (c) => {
   try {
     const section = String(c.req.query("section") || "");
@@ -1328,6 +1450,8 @@ app.get("/api/site-media", async (c) => {
   }
 });
 
+// Delete site media by ID
+// DELETE /api/admin/site-media/:id
 app.delete("/api/admin/site-media/:id", async (c) => {
   try {
     const id = Number(c.req.param("id"));
@@ -1403,8 +1527,10 @@ app.get("/api/debug/test-mail", async (c) => {
   return c.json(res);
 });
 
-// ----- Payment provider endpoints -----
-app.post("/api/momo/create-payment", async (c) => {
+// Create MoMo payment request
+// POST /api/payments/momo/create
+// Body: { amount: number, orderId: string, orderInfo: string, ... }
+app.post("/api/payments/momo/create", async (c) => {
   try {
     const body = await c.req.json().catch(() => ({}));
 
@@ -1547,7 +1673,7 @@ app.post("/api/vnpay/create-payment", async (c) => {
       gateway: c.env.VITE_VNPAY_GATEWAY,
       returnUrl,
     };
-    const r = await createVnpayPaymentImpl({ ...(body as any), ip, ...config });
+    const r = await createVnpayPaymentImpl({ ...(body as any), ip, ...config }, c.env.RUNTIME_ENV);
     const status =
       typeof (r as any).status === "number" ? (r as any).status : 200;
     const payload = {

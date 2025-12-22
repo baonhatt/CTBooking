@@ -375,7 +375,7 @@ export function createServer() {
       const from = String(req.query.from || "");
       const to = String(req.query.to || "");
       const status = String(req.query.status || "paid");
-      const r = await getRevenueImpl(db, { bookings: pgBookings }, { from, to, status });
+      const r = await getRevenueImpl(db, { bookings: pgBookings }, { from, to, status } );
       res.status(200).json(r);
     } catch (error: any) {
       const errorMessage = error?.message || "Lỗi máy chủ nội bộ";
@@ -409,7 +409,13 @@ export function createServer() {
   app.get("/api/admin/transactions/:id", async (req, res) => {
     try {
       const id = Number(req.params.id);
-      const r = await getTransactionByIdImpl(db, { bookings: pgBookings, users: pgUsers, accounts: pgAccounts, movies: pgMovies, ticket_packages: pgTicketPackages }, id);
+      const r = await getTransactionByIdImpl(db, { 
+        bookings: pgBookings, 
+        users: pgUsers, 
+        accounts: pgAccounts, 
+        movies: pgMovies, 
+        ticket_packages: pgTicketPackages
+      }, id);
       if (!r) return res.status(404).json({ status: "error", message: "Không tìm thấy" });
       res.status(200).json(r);
     } catch (error: any) {
@@ -685,7 +691,7 @@ export function createServer() {
   });
   app.get("/api/tickets-active", async (_req, res) => {
     try {
-      const r = await listActiveTicketPackages(db, { ticket_packages: pgTicketPackages });
+      const r = await listActiveTicketPackages(db, { ticket_packages: pgTicketPackages, movies: pgMovies});
       res.status(200).json(r);
     } catch (error: any) {
       const errorMessage = error?.message || "Lỗi máy chủ nội bộ";

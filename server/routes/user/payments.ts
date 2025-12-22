@@ -150,9 +150,15 @@ export async function createPaymentImpl(
       phone,
       name,
       email: emailBook,
+      combo: validation.ticketPackage?.combo || [],
+      movie_title: validation.movie?.title || null,
+      movie_duration: validation.movie?.duration_min ? Number(validation.movie.duration_min) : 0,
+      movie_poster: validation.movie?.cover_image || null,
+      ticket_package_name: validation.ticketPackage?.name || null,
+      ticket_unit_price: validation.ticketPackage?.price ? Number(validation.ticketPackage.price) : null,
       created_at: formatDateForDb(nowIso, RUNTIME_ENV),
       updated_at: formatDateForDb(nowIso, RUNTIME_ENV),
-    }).returning();
+  }).returning();
 
     let bookingRow = Array.isArray(insertedBooking) ? insertedBooking[0] : insertedBooking;
     if (!bookingRow) {

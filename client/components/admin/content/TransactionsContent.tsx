@@ -140,7 +140,10 @@ export default function TransactionsContent({
     const per = txDetails?.booking_details?.price_per_ticket;
     if (per !== undefined && per !== null) return Number(per);
     const total = Number(txDetails?.booking_details?.total_price || 0);
-    const count = Math.max(1, Number(txDetails?.booking_details?.ticket_count || 1));
+    const count = Math.max(
+      1,
+      Number(txDetails?.booking_details?.ticket_count || 1),
+    );
     return total && count ? Math.round(total / count) : 0;
   })();
   const matchedTicket = allTickets.find((t: any) => {
@@ -222,9 +225,19 @@ export default function TransactionsContent({
           </div>
           <div className="flex items-center gap-3 mb-4">
             <span className="text-sm text-gray-600">Từ</span>
-            <Input type="date" value={fromDate} onChange={(e) => setFromDate?.(e.target.value)} className="w-44" />
+            <Input
+              type="date"
+              value={fromDate}
+              onChange={(e) => setFromDate?.(e.target.value)}
+              className="w-44"
+            />
             <span className="text-sm text-gray-600">Đến</span>
-            <Input type="date" value={toDate} onChange={(e) => setToDate?.(e.target.value)} className="w-44" />
+            <Input
+              type="date"
+              value={toDate}
+              onChange={(e) => setToDate?.(e.target.value)}
+              className="w-44"
+            />
           </div>
           <Table>
             <TableHeader>
@@ -235,15 +248,9 @@ export default function TransactionsContent({
                 <TableHead className="font-bold">Phim</TableHead>
                 <TableHead className="font-bold">Số Vé</TableHead>
                 <TableHead className="font-bold">Số Tiền</TableHead>
-                <TableHead className="font-bold">
-                  Phương Thức
-                </TableHead>
-                <TableHead className="font-bold">
-                  Trạng Thái
-                </TableHead>
-                <TableHead className="font-bold">
-                  Ngày Giao Dịch
-                </TableHead>
+                <TableHead className="font-bold">Phương Thức</TableHead>
+                <TableHead className="font-bold">Trạng Thái</TableHead>
+                <TableHead className="font-bold">Ngày Giao Dịch</TableHead>
                 <TableHead className="font-bold">Loại</TableHead>
                 <TableHead className="font-bold">Hành Động</TableHead>
               </TableRow>
@@ -252,68 +259,97 @@ export default function TransactionsContent({
               {isLoading
                 ? Array.from({ length: 5 }).map((_, idx) => (
                     <TableRow key={`sk-${idx}`}>
-                      <TableCell><Skeleton className="h-4 w-40" /></TableCell>
-                      <TableCell><Skeleton className="h-4 w-40" /></TableCell>
-                      <TableCell><Skeleton className="h-4 w-24" /></TableCell>
-                      <TableCell><Skeleton className="h-4 w-32" /></TableCell>
-                      <TableCell><Skeleton className="h-4 w-12" /></TableCell>
-                      <TableCell><Skeleton className="h-4 w-20" /></TableCell>
-                      <TableCell><Skeleton className="h-4 w-16" /></TableCell>
-                      <TableCell><Skeleton className="h-6 w-20" /></TableCell>
-                      <TableCell><Skeleton className="h-4 w-36" /></TableCell>
-                      <TableCell><Skeleton className="h-4 w-20" /></TableCell>
+                      <TableCell>
+                        <Skeleton className="h-4 w-40" />
+                      </TableCell>
+                      <TableCell>
+                        <Skeleton className="h-4 w-40" />
+                      </TableCell>
+                      <TableCell>
+                        <Skeleton className="h-4 w-24" />
+                      </TableCell>
+                      <TableCell>
+                        <Skeleton className="h-4 w-32" />
+                      </TableCell>
+                      <TableCell>
+                        <Skeleton className="h-4 w-12" />
+                      </TableCell>
+                      <TableCell>
+                        <Skeleton className="h-4 w-20" />
+                      </TableCell>
+                      <TableCell>
+                        <Skeleton className="h-4 w-16" />
+                      </TableCell>
+                      <TableCell>
+                        <Skeleton className="h-6 w-20" />
+                      </TableCell>
+                      <TableCell>
+                        <Skeleton className="h-4 w-36" />
+                      </TableCell>
+                      <TableCell>
+                        <Skeleton className="h-4 w-20" />
+                      </TableCell>
                       <TableCell>
                         <Skeleton className="h-8 w-16" />
                       </TableCell>
                     </TableRow>
                   ))
                 : data.map((t) => (
-                  <TableRow key={t.id}>
-                    <TableCell className="font-semibold text-sm">
-                      {t.id}
-                    </TableCell>
-                    <TableCell className="font-semibold text-sm">
-                      {t.email}
-                    </TableCell>
-                    <TableCell>{t.userName || "-"}</TableCell>
-                    <TableCell>{t.movieTitle}</TableCell>
-                    <TableCell>{t.ticketCount}</TableCell>
-                    <TableCell>
-                      {t.totalPrice.toLocaleString("vi-VN")} đ
-                    </TableCell>
-                    <TableCell className="capitalize">
-                      {t.paymentMethod}
-                    </TableCell>
-                    <TableCell>
-                      <Badge
-                        className={
-                          t.paymentStatus === "paid"
-                            ? "bg-green-100 text-green-800 hover:bg-green-100"
-                            : t.paymentStatus === "pending"
-                              ? "bg-yellow-100 text-yellow-800 hover:bg-yellow-100"
-                              : "bg-red-100 text-red-800 hover:bg-red-100"
-                        }
-                      >
-                        {t.paymentStatus}
-                      </Badge>
-                    </TableCell>
-                    <TableCell>{t.createdAt.toLocaleString("vi-VN")}</TableCell>
-                    <TableCell>
-                      <Badge variant={t.userId ? "default" : "outline"} className={!t.userId ? "bg-gray-100 text-gray-800 border-gray-400" : "bg-blue-600 hover:bg-blue-700"}>
-                        {t.userId ? "Hệ Thống" : "Vãng Lai"}
-                      </Badge>
-                    </TableCell>
-                  <TableCell>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => handleViewDetails(t)}
-                    >
-                      Xem
-                    </Button>
-                  </TableCell>
-                </TableRow>
-              ))}
+                    <TableRow key={t.id}>
+                      <TableCell className="font-semibold text-sm">
+                        {t.id}
+                      </TableCell>
+                      <TableCell className="font-semibold text-sm">
+                        {t.email}
+                      </TableCell>
+                      <TableCell>{t.userName || "-"}</TableCell>
+                      <TableCell>{t.movieTitle}</TableCell>
+                      <TableCell>{t.ticketCount}</TableCell>
+                      <TableCell>
+                        {t.totalPrice.toLocaleString("vi-VN")} đ
+                      </TableCell>
+                      <TableCell className="capitalize">
+                        {t.paymentMethod}
+                      </TableCell>
+                      <TableCell>
+                        <Badge
+                          className={
+                            t.paymentStatus === "paid"
+                              ? "bg-green-100 text-green-800 hover:bg-green-100"
+                              : t.paymentStatus === "pending"
+                                ? "bg-yellow-100 text-yellow-800 hover:bg-yellow-100"
+                                : "bg-red-100 text-red-800 hover:bg-red-100"
+                          }
+                        >
+                          {t.paymentStatus}
+                        </Badge>
+                      </TableCell>
+                      <TableCell>
+                        {t.createdAt.toLocaleString("vi-VN")}
+                      </TableCell>
+                      <TableCell>
+                        <Badge
+                          variant={t.userId ? "default" : "outline"}
+                          className={
+                            !t.userId
+                              ? "bg-gray-100 text-gray-800 border-gray-400"
+                              : "bg-blue-600 hover:bg-blue-700"
+                          }
+                        >
+                          {t.userId ? "Hệ Thống" : "Vãng Lai"}
+                        </Badge>
+                      </TableCell>
+                      <TableCell>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleViewDetails(t)}
+                        >
+                          Xem
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  ))}
             </TableBody>
           </Table>
           <Pagination className="mt-4">
@@ -381,47 +417,73 @@ export default function TransactionsContent({
             <div className="space-y-6">
               {/* User Info Section */}
               <div className="rounded-lg bg-blue-50 p-4 space-y-3">
-                <h3 className="font-semibold text-blue-900">Thông tin khách hàng</h3>
+                <h3 className="font-semibold text-blue-900">
+                  Thông tin khách hàng{!txDetails.user?.id ? ' (Vãng Lai)' : ''}
+                </h3>
                 <div className="grid grid-cols-2 gap-3">
                   <div>
                     <p className="text-sm text-gray-600">Tên khách hàng</p>
-                    <p className="font-medium">{txDetails.user?.fullname || ""}</p>
+                    <p className="font-medium">
+                      {txDetails.user?.fullname || ""}
+                    </p>
                   </div>
                   <div>
                     <p className="text-sm text-gray-600">Email</p>
-                    <p className="font-medium text-sm">{txDetails.user?.email || ""}</p>
+                    <p className="font-medium text-sm">
+                      {txDetails.user?.email || ""}
+                    </p>
                   </div>
                   <div>
                     <p className="text-sm text-gray-600">Số điện thoại</p>
                     <p className="font-medium">{txDetails.user?.phone || ""}</p>
                   </div>
                   <div>
-                    <p className="text-sm text-gray-600">Trạng thái tài khoản</p>
-                    <Badge variant={txDetails.user?.is_active ? "secondary" : "outline"}>
-                      {txDetails.user?.is_active ? "Hoạt động" : "Vô hiệu"}
+                    <p className="text-sm text-gray-600">
+                      Trạng thái tài khoản
+                    </p>
+                    <Badge variant="outline">
+                      {!txDetails.user?.id ? 'none' : (txDetails.user?.is_active ? 'Hoạt động' : 'Vô hiệu')}
                     </Badge>
                   </div>
                 </div>
               </div>
 
-
               {/* Booking Details Section */}
               <div className="rounded-lg bg-amber-50 p-4 space-y-3">
-                <h3 className="font-semibold text-amber-900">Chi tiết đặt vé</h3>
+                <h3 className="font-semibold text-amber-900">
+                  Chi tiết đặt vé
+                </h3>
                 <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <p className="text-sm text-gray-600">Phim đã đặt</p>
-                    <p className="font-medium">{selectedTxSummary?.movieTitle || ""}</p>
-                  </div>
                   <div>
                     <p className="text-sm text-gray-600">Loại vé</p>
                     <p className="font-medium">
-                      {matchedTicket?.name
-                        ? matchedTicket.name
-                        : unitPrice
-                          ? `${unitPrice.toLocaleString("vi-VN")} đ / vé`
-                          : ""}
+                      {txDetails.ticket_package?.name || ""}
                     </p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-gray-600">Giá vé</p>
+                    <p className="font-medium">
+                      {unitPrice
+                        ? `${unitPrice.toLocaleString("vi-VN")} đ / vé`
+                        : ""}
+                    </p>
+                  </div>
+                </div>
+                <div>
+                  <p className="text-sm text-gray-600 mb-2">
+                    Danh sách phim (
+                    {txDetails.ticket_package?.movies?.length || 0})
+                  </p>
+                  <div className="space-y-1">
+                    {txDetails.ticket_package?.movies?.length > 0 ? (
+                      txDetails.ticket_package.movies.map((movie: any) => (
+                        <div key={movie.id} className="text-sm">
+                          • {movie.title}
+                        </div>
+                      ))
+                    ) : (
+                      <p className="text-sm text-gray-500">Không có thông tin phim</p>
+                    )}
                   </div>
                 </div>
                 <div className="grid grid-cols-3 gap-3">
@@ -435,7 +497,12 @@ export default function TransactionsContent({
                   <div>
                     <p className="text-sm text-gray-600">Tổng tiền</p>
                     <p className="text-xl font-bold text-green-600">
-                      {txDetails.booking_details?.total_price ? txDetails.booking_details.total_price.toLocaleString("vi-VN") : ""} đ
+                      {txDetails.booking_details?.total_price
+                        ? txDetails.booking_details.total_price.toLocaleString(
+                            "vi-VN",
+                          )
+                        : ""}{" "}
+                      đ
                     </p>
                   </div>
                 </div>
@@ -443,11 +510,15 @@ export default function TransactionsContent({
 
               {/* Payment Info Section */}
               <div className="rounded-lg bg-green-50 p-4 space-y-3">
-                <h3 className="font-semibold text-green-900">Thông tin thanh toán</h3>
+                <h3 className="font-semibold text-green-900">
+                  Thông tin thanh toán
+                </h3>
                 <div className="space-y-2 text-sm">
                   <div className="flex justify-between">
                     <span className="text-gray-600">Phương thức:</span>
-                    <span className="font-medium capitalize">{txDetails.payment_info?.payment_method || ""}</span>
+                    <span className="font-medium capitalize">
+                      {txDetails.payment_info?.payment_method || ""}
+                    </span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-gray-600">Trạng thái:</span>
@@ -465,35 +536,54 @@ export default function TransactionsContent({
                   </div>
                   <div className="flex justify-between">
                     <span className="text-gray-600">Mã giao dịch:</span>
-                    <span className="font-mono text-xs">{txDetails.payment_info?.transaction_id || ""}</span>
+                    <span className="font-mono text-xs">
+                      {txDetails.payment_info?.transaction_id || ""}
+                    </span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-gray-600">Thời gian tạo:</span>
                     <span className="font-medium">
-                      {txDetails.payment_info?.created_at ? new Date(txDetails.payment_info.created_at).toLocaleString("vi-VN") : ""}
+                      {txDetails.payment_info?.created_at
+                        ? new Date(
+                            txDetails.payment_info.created_at,
+                          )?.toLocaleString("vi-VN")
+                        : ""}
                     </span>
                   </div>
+                  {txDetails.payment_info?.updated_at && (
+                    <div className="flex justify-between">
+                      <span className="text-gray-600">Cập nhập lần cuối:</span>
+                      <span className="font-medium">
+                        {new Date(txDetails.payment_info.updated_at)?.toLocaleString("vi-VN")}
+                      </span>
+                    </div>
+                  )}
                   {txDetails.payment_info?.paid_at && (
                     <div className="flex justify-between">
-                      <span className="text-gray-600">Thời gian thanh toán:</span>
+                      <span className="text-gray-600">
+                        Thời gian thanh toán:
+                      </span>
                       <span className="font-medium">
-                        {new Date(txDetails.payment_info.paid_at).toLocaleString("vi-VN")}
+                        {new Date(txDetails.payment_info.paid_at)?.toLocaleString("vi-VN")}
                       </span>
                     </div>
                   )}
                   {txDetails.payment_info?.expiry_date && (
                     <div className="flex justify-between">
-                      <span className="text-gray-600">Ngày hết hạn:</span>
+                      <span className="text-gray-600">Ngày hết hạn vé:</span>
                       <span className="font-medium">
-                        {new Date(txDetails.payment_info.expiry_date).toLocaleString("vi-VN")}
+                        {new Date(
+                          txDetails.payment_info.expiry_date,
+                        ).toLocaleString("vi-VN")}
                       </span>
                     </div>
                   )}
                   {typeof txDetails.payment_info?.days_left === "number" && (
                     <div className="flex justify-between">
-                      <span className="text-gray-600">Thời gian còn lại:</span>
+                      <span className="text-gray-600">Dự kiến còn:</span>
                       <span className="font-medium">
-                        {Math.max(0, Number(txDetails.payment_info.days_left))} ngày
+                        {Math.max(0, Number(txDetails.payment_info.days_left))}{" "}
+                        ngày
                       </span>
                     </div>
                   )}
