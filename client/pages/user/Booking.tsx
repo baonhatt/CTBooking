@@ -12,6 +12,103 @@ import { getAllActiveMoviesToday, getActiveTickets, createBookingApi, createMomo
 import UserLayout from "@/user/layouts/UserLayout";
 
 export default function BookingPage() {
+
+  const MOCK_MOVIES = [
+  {
+    id: 1,
+    title: "Avengers: Endgame",
+    cover_image: "https://images.unsplash.com/photo-1536440136628-849c177e76a1?w=400",
+    duration_min: 181,
+    genres: ["Hành động", "Phiêu lưu", "Khoa học viễn tưởng"],
+    release_date: "2019-04-26",
+  },
+  {
+    id: 2,
+    title: "Parasite",
+    cover_image: "https://images.unsplash.com/photo-1594908900066-3f47337549d8?w=400",
+    duration_min: 132,
+    genres: ["Kinh dị", "Hài", "Chính kịch"],
+    release_date: "2019-05-30",
+  },
+  {
+    id: 3,
+    title: "The Dark Knight",
+    cover_image: "https://images.unsplash.com/photo-1509347528160-9a9e33742cdb?w=400",
+    duration_min: 152,
+    genres: ["Hành động", "Tội phạm", "Chính kịch"],
+    release_date: "2008-07-18",
+  },
+  {
+    id: 4,
+    title: "Inception",
+    cover_image: "https://images.unsplash.com/photo-1478720568477-152d9b164e26?w=400",
+    duration_min: 148,
+    genres: ["Hành động", "Khoa học viễn tưởng", "Giật gân"],
+    release_date: "2010-07-16",
+  },
+];
+
+const MOCK_TICKETS = [
+  {
+    id: 1,
+    name: "Vé Standard",
+    description: "Vé xem phim tiêu chuẩn với chất lượng hình ảnh và âm thanh tốt",
+    price: 75000,
+    type: "standard",
+    display_order: 1,
+    features: [
+      "Ghế ngồi tiêu chuẩn",
+      "Màn hình 2D",
+      "Âm thanh Dolby Digital",
+      "Không bao gồm đồ ăn"
+    ]
+  },
+  {
+    id: 2,
+    name: "Vé VIP",
+    description: "Trải nghiệm cao cấp với ghế ngồi rộng rãi và tiện nghi",
+    price: 120000,
+    type: "vip",
+    display_order: 2,
+    features: [
+      "Ghế da cao cấp có thể ngả",
+      "Chỗ để chân rộng rãi",
+      "Âm thanh Dolby Atmos",
+      "Tặng 1 combo popcorn + nước"
+    ]
+  },
+  {
+    id: 3,
+    name: "Vé Couple",
+    description: "Ghế đôi lý tưởng cho các cặp đôi",
+    price: 200000,
+    type: "couple",
+    display_order: 3,
+    features: [
+      "Ghế sofa đôi siêu rộng",
+      "Không gian riêng tư",
+      "Gối và chăn êm ái",
+      "Tặng combo đôi cao cấp"
+    ]
+  },
+  {
+    id: 4,
+    name: "Vé IMAX",
+    description: "Trải nghiệm điện ảnh đỉnh cao với công nghệ IMAX",
+    price: 150000,
+    type: "imax",
+    display_order: 4,
+    features: [
+      "Màn hình IMAX khổng lồ",
+      "Hệ thống âm thanh 12 kênh",
+      "Hình ảnh siêu sắc nét",
+      "Ghế thiết kế đặc biệt"
+    ]
+  },
+];
+
+// Đổi USE_MOCK_DATA = false khi đã có API thật
+const USE_MOCK_DATA = true;
   const navigate = useNavigate();
   const [step, setStep] = useState<0 | 1>(0);
   const [movie, setMovie] = useState<string>("");
@@ -22,7 +119,7 @@ export default function BookingPage() {
   const [phoneError, setPhoneError] = useState<string>("");
   const [email, setEmail] = useState<string>("");
   const [emailError, setEmailError] = useState<string>("");
-  const [paymentMethod, setPaymentMethod] = useState<"momo" | "vnpay">("momo");
+  const [paymentMethod, setPaymentMethod] = useState<"momo" | "vnpay"| "vietqr">("momo");
   const [isProcessing, setIsProcessing] = useState(false);
   const countdownRef = useRef<NodeJS.Timeout | null>(null);
   const [countdown, setCountdown] = useState(600);
@@ -38,7 +135,9 @@ export default function BookingPage() {
 
   const { data: ticketsData, isLoading: isLoadingTickets } = useQuery({
     queryKey: ["activeTickets"],
-    queryFn: ({ signal }) => getActiveTickets({ signal }),
+    queryFn: ({ signal }) => USE_MOCK_DATA 
+      ? Promise.resolve({ items: MOCK_TICKETS }) 
+      : getActiveTickets({ signal }),
   });
   const isLoadingPage = isLoadingTickets;
 
@@ -201,14 +300,32 @@ export default function BookingPage() {
       toast({ title: "Thiếu thông tin", description: "Vui lòng nhập họ tên, số điện thoại và email" });
       return;
     }
+    
+    // Nếu đang dùng mock data, hiển thị thông báo demo
+    if (!USE_MOCK_DATA) {
+      toast({ 
+        title: "Demo Mode", 
+        description: "Đang sử dụng mock data. Chức năng thanh toán sẽ hoạt động khi có API thật." 
+      });
+      console.log("Demo booking:", {
+        movie: selectedMovie.title,
+        ticket: selectedPackage.name,
+        quantity: ticketCount,
+        total: totalPrice,
+        customer: { name, email, phone }
+      });
+      return;
+    }
+    
     const confirmed = window.confirm("Xác nhận đặt vé và chuyển sang thanh toán?");
     if (!confirmed) return;
+    
     try {
       setIsProcessing(true);
       const orderId = `ORDER_${Date.now()}`;
       const movieDetail = selectedMovie;
       const ticketPackageId = selectedPackage?.id || defaultTicket?.id;
-      // Validate booking data on server to prevent tampering
+      
       const validation = await validateBookingApi({
         email,
         emailBook: email,
@@ -254,8 +371,32 @@ export default function BookingPage() {
         totalPrice: canonicalTotal,
         ticketPackageId: selectedPackage?.id,
       });
+      
       localStorage.setItem("pendingOrder", JSON.stringify({ ...summary, booking_id: booking?.id, user_id: booking?.user_id }));
       let orderInfoText = `${selectedMovie?.title || "Movie"} | ${ticketCount} vé`;
+      
+      if (paymentMethod === "vietqr") {
+        // Lưu thông tin booking để hiển thị trên màn QR
+        localStorage.setItem("qrPaymentData", JSON.stringify({
+          ...summary,
+          booking_id: booking?.id,
+          user_id: booking?.user_id,
+          totalAmount: canonicalTotal,
+          movieTitle: selectedMovie?.title,
+          ticketType: selectedPackage?.name,
+        }));
+        
+        // Chuyển sang trang QR payment
+        navigate("/qr-payment", { 
+          state: { 
+            bookingId: booking?.id,
+            amount: canonicalTotal,
+            orderId 
+          } 
+        });
+        return;
+      }
+      
       if (paymentMethod === "momo") {
         const extraDataEncoded = btoa(unescape(encodeURIComponent(JSON.stringify({ ...summary, booking_id: booking?.id, user_id: booking?.user_id }))));
         const partnerCode = (import.meta as any).env?.VITE_MOMO_PARTNER_CODE || "";
@@ -276,11 +417,8 @@ export default function BookingPage() {
         throw new Error("Không nhận được liên kết thanh toán MoMo");
       } else if (paymentMethod === "vnpay") {
         orderInfoText = booking?.id;
-        // returnUrl phải là URL của frontend (Pages / site hiện tại), không phải URL backend
-        const clientBaseForVnp =
-          (import.meta as any).env?.VITE_CLIENT_BASE_URL || window.location.origin;
-        const returnPathForVnp =
-          (import.meta as any).env?.VITE_VNPAY_RETURN_URL || "/checkout";
+        const clientBaseForVnp = (import.meta as any).env?.VITE_CLIENT_BASE_URL || window.location.origin;
+        const returnPathForVnp = (import.meta as any).env?.VITE_VNPAY_RETURN_URL || "/checkout";
         const returnUrl = `${clientBaseForVnp}${returnPathForVnp}`;
         const locale = "vn";
         const res = await createVnpayPaymentApi({ amount: canonicalTotal, orderId, orderInfo: orderInfoText, locale, returnUrl });
@@ -294,7 +432,6 @@ export default function BookingPage() {
       setIsProcessing(false);
     }
   };
-
   return (
     <UserLayout
       className="bg-gradient-to-br from-[#050915] via-[#0b1226] to-[#0e1b3d]"
@@ -588,7 +725,7 @@ export default function BookingPage() {
                   </div>
                   <div className="space-y-3">
                     <div className="text-sm font-medium text-gray-400">Phương thức thanh toán</div>
-                    <div className="grid grid-cols-2 gap-3">
+                    <div className="grid grid-cols-3 gap-3">
                       <button
                         type="button"
                         onClick={() => setPaymentMethod("momo")}
@@ -609,6 +746,17 @@ export default function BookingPage() {
                         <span className="inline-flex items-center gap-2 text-white">
                           <span className="w-7 h-7 rounded bg-blue-600 text-white grid place-items-center text-[10px] font-extrabold">VN</span>
                           <span>VNPay</span>
+                        </span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setPaymentMethod("vietqr")}
+                        className={`${paymentMethod === 'vietqr' ? 'border-red-500 bg-red-600/20' : 'border-white/20 bg-white/10 backdrop-blur-sm'} cursor-pointer rounded-lg border p-3 flex items-center gap-3 focus:outline-none focus:ring-2 focus:ring-red-500 hover:bg-white/15 h-11`}
+                        aria-pressed={paymentMethod === 'vietqr'}
+                      >
+                        <span className="inline-flex items-center gap-2 text-white">
+                          <span className="w-7 h-7 rounded bg-red-600 text-white grid place-items-center text-[10px] font-extrabold">VQ</span>
+                          <span>VietQr</span>
                         </span>
                       </button>
                     </div>
