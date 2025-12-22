@@ -1,5 +1,5 @@
 import { PaymentRequest } from "@shared/api";
-import { eq, and, asc, desc, isNull, or } from "drizzle-orm";
+import { eq, and, asc, desc, isNull, or, inArray } from "drizzle-orm";
 import { generateBookingCode, getBookingEmailTemplate } from "../../lib/booking-utils";
 import { sendMail } from "../mail-service";
 import { formatDateForDb } from "../../lib/date-utils";
@@ -16,7 +16,7 @@ const MAX_TICKET_PER_ORDER = 10;
 
 type BookingValidationResult = {
   user: { id: number | null; email: string; fullname?: string | null; phone?: string | null };
-  movie?: any;
+  movies: any[];
   ticketPackage: any;
   unitPrice: number;
   totalPrice: number;
@@ -27,13 +27,16 @@ async function validateBookingInput(
   body: PaymentRequest,
   tables: { users: any; accounts: any; movies: any; ticket_packages: any; }
 ): Promise<BookingValidationResult> {
-  const { email, emailBook, phone, name, movieId, ticketCount, ticketPackageId } = body;
+  const { email, emailBook, phone, name, combo, ticketCount, ticketPackageId } = body;
 
   if (!email || !phone || !emailBook || !name || !ticketCount || ticketCount <= 0) {
     throw new HttpError(400, "Vui lòng nhập đầy đủ thông tin hợp lệ.");
   }
   if (ticketCount > MAX_TICKET_PER_ORDER) {
     throw new HttpError(400, `Mỗi lượt chỉ đặt tối đa ${MAX_TICKET_PER_ORDER} vé.`);
+  }
+  if (!combo || !Array.isArray(combo) || combo.length === 0) {
+    throw new HttpError(400, "Vui lòng chọn ít nhất một bộ phim trong combo.");
   }
 
   const usersTable = tables.users;
@@ -55,12 +58,16 @@ async function validateBookingInput(
   const user = userResult[0];
   const userEmail = user?.email || email;
 
-  let movie: any = null;
-  if (movieId) {
-    movie = await anyDb.query.movies.findFirst({ where: eq(moviesTable.id, Number(movieId)) });
-    if (!movie || movie.is_active === false) {
-      throw new HttpError(404, "Phim không hợp lệ hoặc đã ngừng hoạt động.");
-    }
+  // Fetch all movies in the combo
+  const movies = await anyDb.query.movies.findMany({
+    where: and(
+      inArray(moviesTable.id, combo.map(id => Number(id))),
+      eq(moviesTable.is_active, true)
+    )
+  });
+
+  if (movies.length !== combo.length) {
+    throw new HttpError(404, "Một số phim trong combo không hợp lệ hoặc đã ngừng hoạt động.");
   }
 
   let ticketPackage: any = null;
@@ -87,7 +94,7 @@ async function validateBookingInput(
 
   return {
     user: { id: user?.id ?? null, email: userEmail, fullname: user?.fullname ?? name, phone: user?.phone ?? phone },
-    movie,
+    movies,
     ticketPackage,
     unitPrice,
     totalPrice,
@@ -100,12 +107,13 @@ export async function validateBookingImpl(anyDb: any, payload: PaymentRequest, t
     return {
       status: 200,
       user: result.user,
-      movie: result.movie ? {
-        id: result.movie.id,
-        title: result.movie.title,
-        is_active: result.movie.is_active,
-        duration_min: result.movie.duration_min,
-      } : undefined,
+      movies: result.movies.map(movie => ({
+        id: movie.id,
+        title: movie.title,
+        is_active: movie.is_active,
+        duration_min: movie.duration_min,
+        cover_image: movie.cover_image
+      })),
       ticketPackage: {
         id: result.ticketPackage.id,
         name: result.ticketPackage.name,
@@ -129,16 +137,21 @@ export async function createPaymentImpl(
 ) {
   try {
     const validation = await validateBookingInput(anyDb, payload, tables);
-    const { user, totalPrice } = validation;
-    const { emailBook, phone, name, ticketCount, paymentMethod, pay_txt_code} = payload;
+    const { user, movies, totalPrice } = validation;
+    const { emailBook, phone, name, ticketCount, paymentMethod, pay_txt_code, combo } = payload;
     const userId = user?.id ? Number(user.id) : null;
 
     const bookingsTable = tables.bookings;
 
+    // Format movie details as pipe-separated strings
+    const movieTitles = movies.map(m => m.title).join('|');
+    const movieDurations = movies.map(m => m.duration_min).join('|');
+    const moviePosters = movies.map(m => m.cover_image).join('|');
+
     // Use explicit UTC ISO timestamps for created_at/updated_at để đồng bộ giữa Postgres & D1
     const nowIso = new Date();
     let pay_txt_code_dt = "";
-    if(pay_txt_code){
+    if (pay_txt_code) {
       pay_txt_code_dt = pay_txt_code;
     }
 
@@ -146,7 +159,7 @@ export async function createPaymentImpl(
     // Fallback to the existing query approach for DBs that don't support returning (D1/SQLite).
     const insertedBooking = await anyDb.insert(bookingsTable).values({
       user_id: userId,
-      movie_id: validation.movie?.id ? Number(validation.movie.id) : null,
+      movie_id: null, // No single movie ID for combo
       ticket_package_id: validation.ticketPackage?.id ? Number(validation.ticketPackage.id) : null,
       ticket_count: ticketCount,
       total_price: Number(totalPrice),
@@ -154,16 +167,16 @@ export async function createPaymentImpl(
       phone,
       name,
       email: emailBook,
-      combo: validation.ticketPackage?.combo || [],
-      movie_title: validation.movie?.title || null,
-      movie_duration: validation.movie?.duration_min ? Number(validation.movie.duration_min) : 0,
-      movie_poster: validation.movie?.cover_image || null,
+      combo: combo || [],
+      movie_title: movieTitles,
+      movie_duration: movieDurations,
+      movie_poster: moviePosters,
       ticket_package_name: validation.ticketPackage?.name || null,
       ticket_unit_price: validation.ticketPackage?.price ? Number(validation.ticketPackage.price) : null,
       pay_txt_code: pay_txt_code_dt,
       created_at: formatDateForDb(nowIso, RUNTIME_ENV),
       updated_at: formatDateForDb(nowIso, RUNTIME_ENV),
-  }).returning();
+    }).returning();
 
     let bookingRow = Array.isArray(insertedBooking) ? insertedBooking[0] : insertedBooking;
     if (!bookingRow) {
