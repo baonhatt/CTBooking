@@ -18,6 +18,7 @@ import Booking from "./pages/user/Booking";
 import Account from "./pages/user/Account";
 import SuccessPayment from "./pages/user/SuccessPayment";
 import { AdminGate } from "@/admin/auth/AdminGate";
+import QRPaymentPage from "./components/user/QRPaymentPage";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -43,6 +44,7 @@ const App = () => (
           <Route path="/account" element={<Account />} />
           <Route path="/reset-password" element={<ConfirmToken />} />
           <Route path="/admin/*" element={<AdminGate />} />
+          <Route path="/qr-payment" element={<QRPaymentPage/>} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
         </Routes>
