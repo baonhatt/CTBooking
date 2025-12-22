@@ -10,8 +10,9 @@ export default function QRPaymentPage() {
   const navigate = useNavigate();
   const location = useLocation();
   const [paymentData, setPaymentData] = useState<any>(null);
-  const [countdown, setCountdown] = useState(600); // 10 phút
-  const [paymentStatus, setPaymentStatus] = useState<"pending" | "checking" | "success" | "failed">("pending");
+  const [paymentStatus, setPaymentStatus] = useState<
+    "pending" | "checking" | "success" | "failed"
+  >("pending");
   const [qrCodeUrl, setQrCodeUrl] = useState<string>("");
   const countdownRef = useRef<NodeJS.Timeout | null>(null);
   const checkPaymentRef = useRef<NodeJS.Timeout | null>(null);
@@ -23,71 +24,66 @@ export default function QRPaymentPage() {
     accountName: "CONG TY CINESPHERE",
     bankCode: "TCB",
   };
+// Hàm xử lý khi hết giờ
+const handleExpire = () => {
+  localStorage.removeItem("qrPaymentData");
+  localStorage.removeItem("qrPaymentEndTime");
 
-  useEffect(() => {
-    // Lấy dữ liệu từ localStorage hoặc location state
-    const savedData = localStorage.getItem("qrPaymentData");
-    const stateData = location.state;
-    
-    if (savedData) {
-      const data = JSON.parse(savedData);
-      setPaymentData(data);
-      generateQRCode(data);
-    } else if (stateData) {
-      setPaymentData(stateData);
-      generateQRCode(stateData);
-    } else {
-      toast({
-        title: "Lỗi",
-        description: "Không tìm thấy thông tin thanh toán",
-      });
-      navigate("/booking");
-    }
+  setPaymentStatus("failed");
 
-    // Đếm ngược thời gian
-    countdownRef.current = setInterval(() => {
-      setCountdown((prev) => {
-        if (prev <= 1) {
-          clearInterval(countdownRef.current!);
-          setPaymentStatus("failed");
-          return 0;
-        }
-        return prev - 1;
-      });
-    }, 1000);
+  // Điều hướng sau 1 tick để tránh setState race
+  setTimeout(() => {
+    navigate("/booking", { replace: true });
+  }, 0);
+};
 
-    // Kiểm tra trạng thái thanh toán mỗi 5 giây
-    checkPaymentRef.current = setInterval(() => {
-      checkPaymentStatus();
-    }, 5000);
+// Cập nhật hàm Hủy thanh toán
 
-    return () => {
-      if (countdownRef.current) clearInterval(countdownRef.current);
-      if (checkPaymentRef.current) clearInterval(checkPaymentRef.current);
-    };
-  }, []);
+const handleCancelPayment = () => {
+  const confirmed = window.confirm("Bạn có chắc muốn hủy thanh toán?");
+  if (!confirmed) return;
+
+  if (countdownRef.current) clearInterval(countdownRef.current);
+  if (checkPaymentRef.current) clearInterval(checkPaymentRef.current);
+
+  localStorage.removeItem("qrPaymentData");
+  localStorage.removeItem("qrPaymentEndTime");
+
+  navigate("/booking", { replace: true });
+};
+
+
+useEffect(() => {
+  const savedData = localStorage.getItem("qrPaymentData");
+  const stateData = location.state;
+
+  if (!savedData && !stateData) {
+    navigate("/booking", { replace: true });
+    return;
+  }
+
+  const data = savedData ? JSON.parse(savedData) : stateData;
+  setPaymentData(data);
+  generateQRCode(data);
+
+
+  
+
+}, []);
+
 
   const generateQRCode = (data: any) => {
     // Tạo nội dung chuyển khoản theo chuẩn VietQR
     const amount = data.totalAmount || data.amount || 0;
     const orderId = data.orderId || data.booking_id || "";
     const description = `CINESPHERE ${orderId}`;
-    
+
     // VietQR API format
     const qrContent = `https://img.vietqr.io/image/${BANK_INFO.bankCode}-${BANK_INFO.accountNumber}-compact2.png?amount=${amount}&addInfo=${encodeURIComponent(description)}&accountName=${encodeURIComponent(BANK_INFO.accountName)}`;
-    
+
     setQrCodeUrl(qrContent);
   };
 
-  const checkPaymentStatus = async () => {
-    // Tạm thời để pending, bạn cần implement API check payment
-    console.log("Checking payment status..."); 
-    
-    // Demo: Sau 30 giây tự động chuyển thành success
-    if (countdown < 570) {
-      // setPaymentStatus("success");
-    }
-  };
 
 
   const copyToClipboard = (text: string, label: string) => {
@@ -98,27 +94,9 @@ export default function QRPaymentPage() {
     });
   };
 
-  const formatTime = (seconds: number) => {
-    const mins = Math.floor(seconds / 60);
-    const secs = seconds % 60;
-    return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
-  };
 
-  const handleCancelPayment = () => {
-    const confirmed = window.confirm("Bạn có chắc muốn hủy thanh toán?");
-    if (confirmed) {
-      localStorage.removeItem("qrPaymentData");
-      navigate("/booking");
-    }
-  };
 
-  const handleCheckManually = () => {
-    setPaymentStatus("checking");
-    setTimeout(() => {
-      checkPaymentStatus();
-      setPaymentStatus("pending");
-    }, 2000);
-  };
+
 
   if (paymentStatus === "success") {
     return (
@@ -198,25 +176,23 @@ export default function QRPaymentPage() {
 
         <div className="relative z-10 max-w-4xl mx-auto p-4 pt-28">
           <div className="text-sm py-6 mb-4">
-            <button className="text-blue-300 hover:text-blue-400 underline" onClick={() => navigate("/")}>
+            <button
+              className="text-blue-300 hover:text-blue-400 underline"
+              onClick={() => navigate("/")}
+            >
               Home
             </button>
             <span className="mx-2 text-white/60">&gt;</span>
-            <button className="text-blue-300 hover:text-blue-400 underline" onClick={() => navigate("/booking")}>
+            <button
+              className="text-blue-300 hover:text-blue-400 underline"
+              onClick={() => navigate("/booking")}
+            >
               Đặt vé
             </button>
             <span className="mx-2 text-white/60">&gt;</span>
             <span className="text-white">Thanh toán QR</span>
           </div>
 
-          {/* Countdown Timer */}
-          <div className="mb-6 p-4 rounded-lg bg-orange-500/20 border border-orange-500/30 flex items-center gap-3">
-            <Clock className="w-6 h-6 text-orange-400" />
-            <div className="flex-1">
-              <div className="text-sm text-gray-300">Thời gian còn lại</div>
-              <div className="text-2xl font-bold text-orange-400">{formatTime(countdown)}</div>
-            </div>
-          </div>
 
           <div className="grid md:grid-cols-2 gap-6">
             {/* QR Code Section */}
@@ -230,7 +206,11 @@ export default function QRPaymentPage() {
               <CardContent className="space-y-4">
                 <div className="bg-white p-4 rounded-lg">
                   {qrCodeUrl ? (
-                    <img src={qrCodeUrl} alt="QR Code" className="w-full h-auto" />
+                    <img
+                      src={qrCodeUrl}
+                      alt="QR Code"
+                      className="w-full h-auto"
+                    />
                   ) : (
                     <div className="aspect-square flex items-center justify-center bg-gray-200">
                       <span className="text-gray-500">Đang tạo mã QR...</span>
@@ -240,7 +220,6 @@ export default function QRPaymentPage() {
                 <div className="text-center text-sm text-gray-400">
                   Sử dụng app ngân hàng để quét mã QR
                 </div>
-               
               </CardContent>
             </Card>
 
@@ -248,7 +227,9 @@ export default function QRPaymentPage() {
             <div className="space-y-4">
               <Card className="bg-white/5 backdrop-blur-md border border-white/15 text-white shadow-xl">
                 <CardHeader>
-                  <CardTitle className="text-xl font-bold">Thông tin chuyển khoản</CardTitle>
+                  <CardTitle className="text-xl font-bold">
+                    Thông tin chuyển khoản
+                  </CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-4">
                   <div className="space-y-3">
@@ -260,7 +241,9 @@ export default function QRPaymentPage() {
                       <Button
                         variant="ghost"
                         size="sm"
-                        onClick={() => copyToClipboard(BANK_INFO.bankName, "Tên ngân hàng")}
+                        onClick={() =>
+                          copyToClipboard(BANK_INFO.bankName, "Tên ngân hàng")
+                        }
                       >
                         <Copy className="w-4 h-4" />
                       </Button>
@@ -268,13 +251,22 @@ export default function QRPaymentPage() {
 
                     <div className="flex justify-between items-center p-3 rounded-lg bg-white/5">
                       <div>
-                        <div className="text-xs text-gray-400">Số tài khoản</div>
-                        <div className="font-medium font-mono">{BANK_INFO.accountNumber}</div>
+                        <div className="text-xs text-gray-400">
+                          Số tài khoản
+                        </div>
+                        <div className="font-medium font-mono">
+                          {BANK_INFO.accountNumber}
+                        </div>
                       </div>
                       <Button
                         variant="ghost"
                         size="sm"
-                        onClick={() => copyToClipboard(BANK_INFO.accountNumber, "Số tài khoản")}
+                        onClick={() =>
+                          copyToClipboard(
+                            BANK_INFO.accountNumber,
+                            "Số tài khoản",
+                          )
+                        }
                       >
                         <Copy className="w-4 h-4" />
                       </Button>
@@ -282,13 +274,22 @@ export default function QRPaymentPage() {
 
                     <div className="flex justify-between items-center p-3 rounded-lg bg-white/5">
                       <div>
-                        <div className="text-xs text-gray-400">Chủ tài khoản</div>
-                        <div className="font-medium">{BANK_INFO.accountName}</div>
+                        <div className="text-xs text-gray-400">
+                          Chủ tài khoản
+                        </div>
+                        <div className="font-medium">
+                          {BANK_INFO.accountName}
+                        </div>
                       </div>
                       <Button
                         variant="ghost"
                         size="sm"
-                        onClick={() => copyToClipboard(BANK_INFO.accountName, "Chủ tài khoản")}
+                        onClick={() =>
+                          copyToClipboard(
+                            BANK_INFO.accountName,
+                            "Chủ tài khoản",
+                          )
+                        }
                       >
                         <Copy className="w-4 h-4" />
                       </Button>
@@ -298,16 +299,27 @@ export default function QRPaymentPage() {
                       <div>
                         <div className="text-xs text-gray-400">Số tiền</div>
                         <div className="font-bold text-lg text-emerald-400">
-                          {(paymentData?.totalAmount || paymentData?.amount || 0).toLocaleString("vi-VN")}₫
+                          {(
+                            paymentData?.totalAmount ||
+                            paymentData?.amount ||
+                            0
+                          ).toLocaleString("vi-VN")}
+                          ₫
                         </div>
                       </div>
                       <Button
                         variant="ghost"
                         size="sm"
-                        onClick={() => copyToClipboard(
-                          (paymentData?.totalAmount || paymentData?.amount || 0).toString(),
-                          "Số tiền"
-                        )}
+                        onClick={() =>
+                          copyToClipboard(
+                            (
+                              paymentData?.totalAmount ||
+                              paymentData?.amount ||
+                              0
+                            ).toString(),
+                            "Số tiền",
+                          )
+                        }
                       >
                         <Copy className="w-4 h-4" />
                       </Button>
@@ -315,18 +327,23 @@ export default function QRPaymentPage() {
 
                     <div className="flex justify-between items-center p-3 rounded-lg bg-white/5">
                       <div>
-                        <div className="text-xs text-gray-400">Nội dung chuyển khoản</div>
+                        <div className="text-xs text-gray-400">
+                          Nội dung chuyển khoản
+                        </div>
                         <div className="font-medium font-mono text-sm">
-                          CINESPHERE {paymentData?.orderId || paymentData?.booking_id}
+                          CINESPHERE{" "}
+                          {paymentData?.orderId || paymentData?.booking_id}
                         </div>
                       </div>
                       <Button
                         variant="ghost"
                         size="sm"
-                        onClick={() => copyToClipboard(
-                          `CINESPHERE ${paymentData?.orderId || paymentData?.booking_id}`,
-                          "Nội dung"
-                        )}
+                        onClick={() =>
+                          copyToClipboard(
+                            `CINESPHERE ${paymentData?.orderId || paymentData?.booking_id}`,
+                            "Nội dung",
+                          )
+                        }
                       >
                         <Copy className="w-4 h-4" />
                       </Button>
@@ -337,25 +354,38 @@ export default function QRPaymentPage() {
 
               <Card className="bg-white/5 backdrop-blur-md border border-white/15 text-white shadow-xl">
                 <CardHeader>
-                  <CardTitle className="text-lg font-bold">Chi tiết đơn hàng</CardTitle>
+                  <CardTitle className="text-lg font-bold">
+                    Chi tiết đơn hàng
+                  </CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-2 text-sm">
                   <div className="flex justify-between">
                     <span className="text-gray-400">Phim</span>
-                    <span className="font-medium">{paymentData?.movieTitle || paymentData?.movie}</span>
+                    <span className="font-medium">
+                      {paymentData?.movieTitle || paymentData?.movie}
+                    </span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-gray-400">Loại vé</span>
-                    <span className="font-medium">{paymentData?.ticketType}</span>
+                    <span className="font-medium">
+                      {paymentData?.ticketType}
+                    </span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-gray-400">Số lượng</span>
-                    <span className="font-medium">{paymentData?.quantity} vé</span>
+                    <span className="font-medium">
+                      {paymentData?.quantity} vé
+                    </span>
                   </div>
                   <div className="border-t border-white/10 pt-2 mt-2 flex justify-between">
                     <span className="font-semibold">Tổng tiền</span>
                     <span className="font-bold text-emerald-400">
-                      {(paymentData?.totalAmount || paymentData?.amount || 0).toLocaleString("vi-VN")}₫
+                      {(
+                        paymentData?.totalAmount ||
+                        paymentData?.amount ||
+                        0
+                      ).toLocaleString("vi-VN")}
+                      ₫
                     </span>
                   </div>
                 </CardContent>
@@ -374,7 +404,9 @@ export default function QRPaymentPage() {
           {/* Instructions */}
           <Card className="mt-6 bg-blue-500/10 backdrop-blur-md border border-blue-500/30 text-white">
             <CardContent className="pt-6">
-              <h3 className="font-bold mb-3 text-blue-300">Hướng dẫn thanh toán:</h3>
+              <h3 className="font-bold mb-3 text-blue-300">
+                Hướng dẫn thanh toán:
+              </h3>
               <ol className="list-decimal list-inside space-y-2 text-sm text-gray-300">
                 <li>Mở ứng dụng ngân hàng trên điện thoại</li>
                 <li>Quét mã QR hoặc nhập thông tin chuyển khoản bên trên</li>
@@ -383,7 +415,10 @@ export default function QRPaymentPage() {
               </ol>
               <div className="mt-4 p-3 rounded-lg bg-orange-500/20 border border-orange-500/30">
                 <p className="text-xs text-orange-300">
-                  <strong>Lưu ý:</strong> Vui lòng nhập đúng nội dung chuyển khoản để hệ thống tự động xác nhận thanh toán.<br /> Nếu có vấn đề cần hỗ trợ vui lòng liên hệ <b>036 643 1179</b>
+                  <strong>Lưu ý:</strong> Vui lòng nhập đúng nội dung chuyển
+                  khoản để hệ thống tự động xác nhận thanh toán.
+                  <br /> Nếu có vấn đề cần hỗ trợ vui lòng liên hệ{" "}
+                  <b>036 643 1179</b>
                 </p>
               </div>
             </CardContent>
