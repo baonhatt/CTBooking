@@ -1291,8 +1291,11 @@ app.get("/api/tickets", async (c) => {
       { page, pageSize, q },
     );
     return c.json(r, 200);
-  } catch {
-    return c.json({ status: "error", message: "Lỗi máy chủ nội bộ" }, 500);
+  } catch (err: any) {
+    return c.json(
+      { status: "error", message: String(err?.message || "Internal error") },
+      500,
+    );
   }
 });
 

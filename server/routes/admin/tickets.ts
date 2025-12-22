@@ -75,13 +75,12 @@ export async function listTicketPackagesImpl(
   }
 
   // 2. Lấy dữ liệu phân trang
-  const [totalResult, packages] = await anyDb.transaction(async (tx: any) => {
-    const [totalRes] = await tx
+  const [totalResArray, pkgList] = await Promise.all([
+    anyDb
       .select({ count: count() })
       .from(tables.ticket_packages)
-      .where(whereCondition);
-    
-    const pkgList = await tx
+      .where(whereCondition),
+    anyDb
       .select()
       .from(tables.ticket_packages)
       .where(whereCondition)
@@ -90,10 +89,10 @@ export async function listTicketPackagesImpl(
         desc(tables.ticket_packages.id)
       )
       .limit(pageSize)
-      .offset((page - 1) * pageSize);
-      
-    return [totalRes, pkgList];
-  });
+      .offset((page - 1) * pageSize)
+  ]);
+  const totalResult = totalResArray[0];
+  const packages = pkgList;
   
   const total = totalResult ? Number(totalResult.count) : 0;  
   
