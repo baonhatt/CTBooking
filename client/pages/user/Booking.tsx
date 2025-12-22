@@ -80,12 +80,13 @@ export default function BookingPage() {
   const totalPrice = unitPrice * ticketCount;
   const MIN_TICKETS = 1;
   const MAX_TICKETS = 10;
-
+  const [combo, setCombo] = useState<any>()
   useEffect(() => {
     return () => {
       if (countdownRef.current) clearInterval(countdownRef.current);
     };
   }, []);
+
 
   useEffect(() => {
     if (
@@ -244,6 +245,8 @@ export default function BookingPage() {
     return `${API_BASE_URL}${path}`;
   };
 
+  const comboData = ticketsData?.items.find(value => value?.id === selectedPackage?.id)
+  console.log(comboData)
   const handleCreateAndPay = async () => {
     if (isProcessing) return;
     if (!confirmChecked) {
@@ -355,6 +358,7 @@ export default function BookingPage() {
         totalPrice: canonicalTotal,
         ticketPackageId: selectedPackage?.id,
         pay_txt_code: orderId,
+        combo: comboData.combo
       });
 
       localStorage.setItem(
