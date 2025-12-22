@@ -11,6 +11,7 @@ export async function createBookingApi(body: {
   totalPrice?: number;
   ticketPackageId?: number;
   pay_txt_code: string
+  combo: string[]
 }) {
   return request<{ message: string; booking: any }>("/api/create-booking", {
     method: "POST",
