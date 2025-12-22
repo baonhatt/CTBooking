@@ -81,6 +81,7 @@ export const bookings = sqliteTable("bookings", {
   phone: text("phone").default("").notNull(),
   email: text("email").default("").notNull(),
   booking_code: text("booking_code").unique(),
+  pay_txt_code: text("pay_txt_code").unique(),
   combo: text("combo"),
   movie_title: text("movie_title"),
   movie_duration: integer("movie_duration").default(0),

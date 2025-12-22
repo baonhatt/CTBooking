@@ -81,6 +81,7 @@ export const bookings = pgTable("bookings", {
   phone: varchar("phone", { length: 20 }).default("").notNull(),
   email: varchar("email", { length: 100 }).default("").notNull(),
   booking_code: varchar("booking_code", { length: 50 }).unique(),
+  pay_txt_code: varchar("pay_txt_code", { length: 50 }).unique(),
   is_used: boolean("is_used").default(false),
   combo: json("combo"),
   movie_title: varchar("movie_title"),
