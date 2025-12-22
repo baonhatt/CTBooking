@@ -1,5 +1,5 @@
 import { PaymentRequest } from "@shared/api";
-import { eq, and, asc, desc, isNull } from "drizzle-orm";
+import { eq, and, asc, desc, isNull, or } from "drizzle-orm";
 import { generateBookingCode, getBookingEmailTemplate } from "../../lib/booking-utils";
 import { sendMail } from "../mail-service";
 import { formatDateForDb } from "../../lib/date-utils";
@@ -25,7 +25,7 @@ type BookingValidationResult = {
 async function validateBookingInput(
   anyDb: any,
   body: PaymentRequest,
-  tables: { users: any; accounts: any; movies: any; ticket_packages: any }
+  tables: { users: any; accounts: any; movies: any; ticket_packages: any; }
 ): Promise<BookingValidationResult> {
   const { email, emailBook, phone, name, movieId, ticketCount, ticketPackageId } = body;
 
@@ -130,13 +130,17 @@ export async function createPaymentImpl(
   try {
     const validation = await validateBookingInput(anyDb, payload, tables);
     const { user, totalPrice } = validation;
-    const { emailBook, phone, name, ticketCount, paymentMethod } = payload;
+    const { emailBook, phone, name, ticketCount, paymentMethod, pay_txt_code} = payload;
     const userId = user?.id ? Number(user.id) : null;
 
     const bookingsTable = tables.bookings;
 
     // Use explicit UTC ISO timestamps for created_at/updated_at để đồng bộ giữa Postgres & D1
     const nowIso = new Date();
+    let pay_txt_code_dt = "";
+    if(pay_txt_code){
+      pay_txt_code_dt = pay_txt_code;
+    }
 
     // Try to use .returning() to get the inserted row when supported (Postgres).
     // Fallback to the existing query approach for DBs that don't support returning (D1/SQLite).
@@ -156,6 +160,7 @@ export async function createPaymentImpl(
       movie_poster: validation.movie?.cover_image || null,
       ticket_package_name: validation.ticketPackage?.name || null,
       ticket_unit_price: validation.ticketPackage?.price ? Number(validation.ticketPackage.price) : null,
+      pay_txt_code: pay_txt_code_dt,
       created_at: formatDateForDb(nowIso, RUNTIME_ENV),
       updated_at: formatDateForDb(nowIso, RUNTIME_ENV),
   }).returning();
@@ -377,8 +382,23 @@ export async function getBookingByCodeImpl(anyDb: any, codeRaw: string, tables: 
   const normalizedCode = code.trim().toUpperCase();
   const bookingsTable = tables.bookings;
   const booking = await anyDb.query.bookings.findFirst({
-    where: eq(bookingsTable.booking_code, normalizedCode),
-    with: { user: { columns: { fullname: true } } },
+  where: or(
+    // Điều kiện 1: booking_code khớp
+      eq(bookingsTable.booking_code, normalizedCode),
+      
+      // Điều kiện 2: pay_txt_code khớp VÀ method là vietqr
+      and(
+        eq(bookingsTable.pay_txt_code, normalizedCode),
+        eq(bookingsTable.payment_method, 'vietqr')
+      )
+    ),
+    with: { 
+      user: { 
+        columns: { 
+          fullname: true 
+        } 
+      } 
+    },
   });
   if (!booking) return { status: 404, message: "Không tìm thấy vé" };
   const now = new Date();
@@ -410,6 +430,7 @@ export async function getBookingByCodeImpl(anyDb: any, codeRaw: string, tables: 
     is_used: Boolean(booking.is_used),
     valid,
     can_use,
+    pay_txt_code: booking.pay_txt_code,
     validity_days: daysLeft,
     expired,
   };

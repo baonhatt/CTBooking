@@ -63,4 +63,5 @@ export interface PaymentRequest {
   paymentMethod: 'cash' | 'momo' | 'vnpay';
   totalPrice?: number;
   ticketPackageId?: number;
+  pay_txt_code?: string;
 }
