@@ -24,7 +24,7 @@ export async function loginImpl(anyDb: any, tables: { accounts: any; users: any 
   return {
     status: 200,
     message: "Đăng nhập thành công!",
-    user: { username: user?.fullname, email },
+    user: { username: user?.fullname, email, phone: user?.phone },
   };
 }
 
