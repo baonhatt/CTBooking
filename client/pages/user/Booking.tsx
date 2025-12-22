@@ -222,7 +222,6 @@ export default function BookingPage() {
     } catch {}
     try {
       const raw = localStorage.getItem("authUser");
-     
 
       if (raw) {
         const parsed = JSON.parse(raw);
@@ -250,7 +249,6 @@ export default function BookingPage() {
     if (isProcessing) return;
     if (!confirmChecked) {
       toast({
-  
         title: "Vui lòng xác nhận thông tin",
         description: "Hãy tick vào ô xác nhận trước khi thanh toán",
       });
@@ -303,7 +301,6 @@ export default function BookingPage() {
     try {
       const comboData = ticketsData?.items.find(
         (value) => value?.id === selectedPackage?.id,
-        
       );
       setIsProcessing(true);
       const orderId = `ORDER_${Date.now()}`;
@@ -597,71 +594,47 @@ export default function BookingPage() {
                 {selectedPackage && (
                   <div className="space-y-3">
                     <div className="text-sm font-medium text-gray-400">
-                      Chọn Phim
+                      Danh sách phim áp dụng cho vé
                     </div>
-                    <Select value={movie} onValueChange={setMovie}>
-                      <SelectTrigger className="w-full bg-white/10 backdrop-blur-sm text-white border-white/20 hover:bg-white/15 h-11">
-                        <span className="truncate">
-                          {selectedMovie?.title || "Chọn phim"}
-                        </span>
-                      </SelectTrigger>
-                      <SelectContent className="bg-[#0b1226]/95 backdrop-blur-md text-white border border-white/20">
-                        {activeMoviesFull && activeMoviesFull.length > 0 ? (
-                          activeMoviesFull.map((m: any) => (
-                            <SelectItem
-                              className="text-white py-2"
-                              key={m.id ?? m.title}
-                              value={m.title}
+
+                    {activeMoviesFull && activeMoviesFull.length > 0 ? (
+                      <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                        {activeMoviesFull.map((m: any) => {
+                          return (
+                            <button
+                              key={m.id}
+                              type="button"
+                              onClick={() => setMovie(m.title)}
+                              className={`
+                relative rounded-lg overflow-hidden border
+                transition-all text-left
+                "border-white/15 hover:border-white/40"
+                }
+              `}
                             >
-                              <div className="flex items-center gap-3">
-                                <img
-                                  src={resolveImageUrl(m.cover_image)}
-                                  alt={m.title}
-                                  className="w-10 h-14 object-cover rounded border border-white/10"
-                                />
-                                <div className="flex flex-col">
-                                  <span className="font-medium">{m.title}</span>
-                                  <span className="text-xs text-gray-400">
-                                    {m.duration_min
-                                      ? `${m.duration_min} phút`
-                                      : "--"}
-                                  </span>
+                              <img
+                                src={resolveImageUrl(m.cover_image)}
+                                alt={m.title}
+                                className="w-full h-44 object-cover"
+                              />
+
+                              <div className="p-2 bg-black/60 backdrop-blur-sm">
+                                <div className="text-sm font-semibold text-white truncate">
+                                  {m.title}
+                                </div>
+                                <div className="text-xs text-gray-300">
+                                  {m.duration_min
+                                    ? `${m.duration_min} phút`
+                                    : "--"}
                                 </div>
                               </div>
-                            </SelectItem>
-                          ))
-                        ) : (
-                          <div className="px-3 py-2 text-sm text-gray-400">
-                            Không tồn tại phim cho loại vé này
-                          </div>
-                        )}
-                      </SelectContent>
-                    </Select>
-                    {selectedMovie && (
-                      <div className="mt-3 flex items-center gap-4 p-3 rounded-lg border border-white/15 bg-white/5 backdrop-blur-sm">
-                        <img
-                          src={resolveImageUrl(selectedMovie.cover_image)}
-                          alt={selectedMovie.title}
-                          className="w-20 h-28 object-cover rounded"
-                        />
-                        <div className="flex-1">
-                          <div className="text-white font-semibold mb-1">
-                            {selectedMovie.title}
-                          </div>
-                          <div className="text-sm text-gray-400">
-                            Thời lượng:{" "}
-                            {selectedMovie.duration_min
-                              ? `${selectedMovie.duration_min} phút`
-                              : "--"}
-                          </div>
-                          {selectedMovie.genres && (
-                            <div className="text-xs text-gray-500 mt-1">
-                              {Array.isArray(selectedMovie.genres)
-                                ? selectedMovie.genres.join(" / ")
-                                : selectedMovie.genres}
-                            </div>
-                          )}
-                        </div>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    ) : (
+                      <div className="text-sm text-gray-400">
+                        Không có phim áp dụng cho loại vé này
                       </div>
                     )}
                   </div>
@@ -796,6 +769,7 @@ export default function BookingPage() {
 
                 {selectedPackage && (
                   <div className="rounded-lg p-4 border border-white/15 bg-white/5 backdrop-blur-sm space-y-3">
+                    <div className="movie">{movie}</div>
                     <div className="flex items-center justify-between">
                       <span className="text-white font-semibold">
                         {selectedPackage.name}
@@ -814,6 +788,7 @@ export default function BookingPage() {
                           `Gói vé ${selectedPackage.type}`}
                       </p>
                     )}
+
                     {Array.isArray(selectedPackage.features) &&
                       selectedPackage.features.length > 0 && (
                         <ul className="space-y-1">
@@ -852,7 +827,6 @@ export default function BookingPage() {
                       if (ok) setStep(1);
                     }}
                     disabled={
-                      !movie ||
                       !selectedPackage ||
                       !name ||
                       !phone ||
@@ -895,40 +869,36 @@ export default function BookingPage() {
                         </span>
                       </div>
                     </div>
-                    {selectedMovie?.cover_image && (
+                    {true  && (
                       <div className="p-3 rounded-lg border border-white/15 bg-white/5 backdrop-blur-sm">
                         <div className="flex items-center gap-3">
-                          <img
-                            src={resolveImageUrl(selectedMovie.cover_image)}
-                            alt={selectedMovie.title}
-                            className="w-16 h-24 object-cover rounded"
-                          />
+                         
                           <div className="flex-1 grid grid-cols-[100px_1fr] gap-x-4 gap-y-1 text-sm">
                             <span className="text-gray-400">Phim</span>
                             <span className="font-medium text-white">
-                              {selectedMovie.title}
+                              {/* {activeMoviesFull.title} */}
                             </span>
                             <span className="text-gray-400">Thời lượng</span>
                             <span className="font-medium text-white">
-                              {selectedMovie.duration_min
+                              {/* {selectedMovie.duration_min
                                 ? `${selectedMovie.duration_min} phút`
-                                : "--"}
+                                : "--"} */}
                             </span>
                             <span className="text-gray-400">Thể loại</span>
                             <span className="font-medium text-white">
-                              {selectedMovie.genres
+                              {/* {selectedMovie.genres
                                 ? Array.isArray(selectedMovie.genres)
                                   ? selectedMovie.genres.join(" / ")
                                   : selectedMovie.genres
-                                : "--"}
+                                : "--"} */}
                             </span>
                             <span className="text-gray-400">Khởi chiếu</span>
                             <span className="font-medium text-white">
-                              {selectedMovie.release_date
+                              {/* {selectedMovie.release_date
                                 ? new Date(
                                     selectedMovie.release_date,
                                   ).toLocaleDateString("vi-VN")
-                                : "--"}
+                                : "--"} */}
                             </span>
                           </div>
                         </div>
