@@ -703,7 +703,7 @@ app.post("/api/admin/uploads/video", async (c) => {
   }
 });
 
-app.post("/api/getActiveMovies", async (c) => {
+app.get("/api/getActiveMovies", async (c) => {
   const db = drizzle(c.env.cinema_db, { schema });
   const { activeMovies } = await getAllActiveMoviesToday(db, {
     movies: schema.movies,
