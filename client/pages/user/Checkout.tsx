@@ -10,7 +10,17 @@ import {
 } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { motion } from "framer-motion";
-import { CheckCircle2, XCircle, Mail, Ticket, User, Film, ShoppingCart, ArrowLeft, Sparkles } from "lucide-react";
+import {
+  CheckCircle2,
+  XCircle,
+  Mail,
+  Ticket,
+  User,
+  Film,
+  ShoppingCart,
+  ArrowLeft,
+  Sparkles,
+} from "lucide-react";
 import UserLayout from "@/user/layouts/UserLayout";
 import {
   createMomoPaymentApi,
@@ -28,7 +38,8 @@ export default function Checkout() {
   const [isLoggedIn, setIsLoggedIn] = useState<boolean>(
     !!localStorage.getItem("authUser"),
   );
-  const formatMoney = (n: number | string) => new Intl.NumberFormat("en-US").format(Number(n || 0));
+  const formatMoney = (n: number | string) =>
+    new Intl.NumberFormat("en-US").format(Number(n || 0));
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -66,20 +77,20 @@ export default function Checkout() {
     if (extraData) {
       try {
         pending = JSON.parse(decodeURIComponent(escape(atob(extraData))));
-      } catch { }
+      } catch {}
     }
 
     // Nếu là VNPay với booking_id từ URL hoặc sessionStorage, fetch booking info từ API
     if (bookingId_vnpay && !pending) {
       // Kiểm tra nếu booking_id từ URL (lần đầu callback) hay từ sessionStorage (load lại)
-      const isFirstCallback = raw && (vnpResponseCode && vnpTxnRef);
+      const isFirstCallback = raw && vnpResponseCode && vnpTxnRef;
 
       (async () => {
         try {
           const bookingData = await getBookingByIdApi(Number(bookingId_vnpay));
           if (bookingData) {
             const pendingFromApi = {
-              orderId: `ORDER_${bookingData.id}`,
+              orderId: `ORDER${bookingData.id}`,
               movie: "",
               dateDisplay: "",
               name: bookingData.name,
@@ -94,11 +105,21 @@ export default function Checkout() {
               payment_status: bookingData.payment_status,
             };
             setOrder(pendingFromApi);
-            try { localStorage.setItem("lastCheckoutOrder", JSON.stringify(pendingFromApi)); } catch { }
+            try {
+              localStorage.setItem(
+                "lastCheckoutOrder",
+                JSON.stringify(pendingFromApi),
+              );
+            } catch {}
 
             // Chỉ gọi handleVNPayCallback nếu là lần đầu callback (URL có vnp params)
             if (isFirstCallback) {
-              handleVNPayCallback(vnpResponseCode, vnpTxnRef, vnpTransactionNo, pendingFromApi);
+              handleVNPayCallback(
+                vnpResponseCode,
+                vnpTxnRef,
+                vnpTransactionNo,
+                pendingFromApi,
+              );
             } else {
               // Load lại hoặc vào từ sessionStorage - chỉ show status, không gọi update API
               if (bookingData.payment_status === "paid") {
@@ -134,10 +155,12 @@ export default function Checkout() {
         bookingId_vnpay = savedId;
         (async () => {
           try {
-            const bookingData = await getBookingByIdApi(Number(bookingId_vnpay));
+            const bookingData = await getBookingByIdApi(
+              Number(bookingId_vnpay),
+            );
             if (bookingData) {
               const pendingFromApi = {
-                orderId: `ORDER_${bookingData.id}`,
+                orderId: `ORDER${bookingData.id}`,
                 movie: "",
                 dateDisplay: "",
                 name: bookingData.name,
@@ -159,16 +182,25 @@ export default function Checkout() {
                     ? "failed"
                     : "",
               );
-              localStorage.setItem("lastCheckoutOrder", JSON.stringify(pendingFromApi));
+              localStorage.setItem(
+                "lastCheckoutOrder",
+                JSON.stringify(pendingFromApi),
+              );
             }
-          } catch { }
+          } catch {}
         })();
       } else if (savedOrder) {
         try {
           const o = JSON.parse(savedOrder);
           setOrder(o);
-          setStatus(o.payment_status === "paid" ? "success" : o.payment_status === "failed" ? "failed" : "");
-        } catch { }
+          setStatus(
+            o.payment_status === "paid"
+              ? "success"
+              : o.payment_status === "failed"
+                ? "failed"
+                : "",
+          );
+        } catch {}
       } else {
         navigate("/");
       }
@@ -198,15 +230,21 @@ export default function Checkout() {
           payment_status,
           transaction_id: transId as any,
           paid_at: new Date().toISOString(),
-        }).then(() => {
-          // Xóa URL params sau khi update thành công
-          window.history.replaceState({}, document.title, window.location.pathname);
-        }).catch(() => { });
+        })
+          .then(() => {
+            // Xóa URL params sau khi update thành công
+            window.history.replaceState(
+              {},
+              document.title,
+              window.location.pathname,
+            );
+          })
+          .catch(() => {});
       }
       try {
         const snap = { ...(pending || {}), payment_status };
         localStorage.setItem("lastCheckoutOrder", JSON.stringify(snap));
-      } catch { }
+      } catch {}
       localStorage.removeItem("pendingOrder");
     }
 
@@ -247,17 +285,26 @@ export default function Checkout() {
             movie: (bookingData as any).movie_title || order.movie,
             poster: (bookingData as any).movie_image || order.poster,
             duration: (bookingData as any).duration_min || order.duration,
-            ticketPackageName: (bookingData as any).ticket_package_name || order.ticketPackageName,
+            ticketPackageName:
+              (bookingData as any).ticket_package_name ||
+              order.ticketPackageName,
             expiryDate: (bookingData as any).expiry_date || order.expiryDate,
           } as any;
           setOrder(merged);
-          try { localStorage.setItem("lastCheckoutOrder", JSON.stringify(merged)); } catch { }
+          try {
+            localStorage.setItem("lastCheckoutOrder", JSON.stringify(merged));
+          } catch {}
         }
-      } catch { }
+      } catch {}
     })();
   }, [order?.booking_id]);
 
-  const handleVNPayCallback = (vnpResponseCode: string | null, vnpTxnRef: string | null, vnpTransactionNo: string | null, pendingData: any) => {
+  const handleVNPayCallback = (
+    vnpResponseCode: string | null,
+    vnpTxnRef: string | null,
+    vnpTransactionNo: string | null,
+    pendingData: any,
+  ) => {
     const isSuccess = vnpResponseCode === "00";
     setStatus(isSuccess ? "success" : "failed");
 
@@ -269,12 +316,18 @@ export default function Checkout() {
         payment_status: "paid",
         transaction_id: vnpTransactionNo || vnpTxnRef,
         paid_at: new Date().toISOString(),
-      }).then(() => {
-        // Xóa URL params sau khi update thành công, tránh gọi API lặp lại khi load lại trang
-        window.history.replaceState({}, document.title, window.location.pathname);
-      }).catch((err) => {
-        console.error("Error confirming booking:", err);
-      });
+      })
+        .then(() => {
+          // Xóa URL params sau khi update thành công, tránh gọi API lặp lại khi load lại trang
+          window.history.replaceState(
+            {},
+            document.title,
+            window.location.pathname,
+          );
+        })
+        .catch((err) => {
+          console.error("Error confirming booking:", err);
+        });
     } else if (!isSuccess && pendingData && pendingData.booking_id) {
       console.log("VNPay payment failed, updating status to failed...");
       confirmBookingApi({
@@ -283,12 +336,18 @@ export default function Checkout() {
         payment_status: "failed",
         transaction_id: vnpTransactionNo || vnpTxnRef,
         paid_at: new Date().toISOString(),
-      }).then(() => {
-        // Xóa URL params sau khi update thành công
-        window.history.replaceState({}, document.title, window.location.pathname);
-      }).catch((err) => {
-        console.error("Error confirming booking:", err);
-      });
+      })
+        .then(() => {
+          // Xóa URL params sau khi update thành công
+          window.history.replaceState(
+            {},
+            document.title,
+            window.location.pathname,
+          );
+        })
+        .catch((err) => {
+          console.error("Error confirming booking:", err);
+        });
     }
     localStorage.removeItem("pendingOrder");
   };
@@ -303,21 +362,26 @@ export default function Checkout() {
         (import.meta as any).env?.VITE_MOMO_PARTNER_NAME || "CineSphere";
       const storeId =
         (import.meta as any).env?.VITE_MOMO_STORE_ID || "devstore";
-      const clientBase = (import.meta as any).env?.VITE_CLIENT_BASE_URL || window.location.origin;
-      const redirectPath = (import.meta as any).env?.VITE_MOMO_REDIRECT_URL || "/checkout";
-      const ipnPath = (import.meta as any).env?.VITE_MOMO_IPN_URL || "/api/momo/ipn";
+      const clientBase =
+        (import.meta as any).env?.VITE_CLIENT_BASE_URL ||
+        window.location.origin;
+      const redirectPath =
+        (import.meta as any).env?.VITE_MOMO_REDIRECT_URL || "/checkout";
+      const ipnPath =
+        (import.meta as any).env?.VITE_MOMO_IPN_URL || "/api/momo/ipn";
       const redirectUrl = `${clientBase}${redirectPath}`;
       // Nếu clientBase là localhost thì serverBase cũng phải là localhost khi dev
       // Nhưng nếu đang chạy production thì serverBase phải là domain thật
       // Tuy nhiên logic serverBase ở đây hơi rối, nên tách bạch:
       // - redirectUrl: URL user sẽ được chuyển về (Client URL)
       // - ipnUrl: URL MoMo gọi server (Server API URL)
-      const serverBase = (import.meta as any).env?.VITE_SERVER_BASE_URL || clientBase;
+      const serverBase =
+        (import.meta as any).env?.VITE_SERVER_BASE_URL || clientBase;
       const ipnUrl = `${serverBase}${ipnPath}`;
       const accessKey = (import.meta as any).env?.VITE_MOMO_ACCESS_KEY || "";
       const secretKey = (import.meta as any).env?.VITE_MOMO_SECRET_KEY || "";
       const requestId = Date.now().toString();
-      const orderId = order.orderId || `ORDER_${Date.now()}`;
+      const orderId = order.orderId || `ORDER${Date.now()}`;
       const orderInfo = `${order.movie || "Movie"} | ${order.quantity} vé`;
       const extraDataEncoded = btoa(
         unescape(encodeURIComponent(JSON.stringify(order))),
@@ -379,7 +443,7 @@ export default function Checkout() {
   return (
     <UserLayout
       className="bg-gradient-dark"
-      headerProps={{ onBookClick: () => { }, forceDark: true }}
+      headerProps={{ onBookClick: () => {}, forceDark: true }}
       hideFooter
     >
       <section className="relative min-h-screen overflow-hidden">
@@ -440,15 +504,26 @@ export default function Checkout() {
                   {/* Booking Details - Right Side */}
                   <div className="w-full md:w-2/3 p-5 md:p-6 flex flex-col justify-between bg-black/10">
                     <div>
-                      <h2 className="text-2xl md:text-3xl font-bold text-white mb-3">{order.movie}</h2>
+                      <h2 className="text-2xl md:text-3xl font-bold text-white mb-3">
+                        {order.movie}
+                      </h2>
                       <div className="space-y-2 text-base text-white/90">
-                        {order.duration && <p>Thời lượng: {order.duration} phút</p>}
+                        {order.duration && (
+                          <p>Thời lượng: {order.duration} phút</p>
+                        )}
                         {order.genres && <p>{getGenresText(order.genres)}</p>}
-                        {order.ticketPackageName && <p className="text-emerald-400 font-semibold text-lg">Gói vé: {order.ticketPackageName}</p>}
+                        {order.ticketPackageName && (
+                          <p className="text-emerald-400 font-semibold text-lg">
+                            Gói vé: {order.ticketPackageName}
+                          </p>
+                        )}
                         {order.expiryDate && (
-                            <p className="text-yellow-400 font-medium">
-                                Hạn sử dụng: {new Date(order.expiryDate).toLocaleDateString('vi-VN')}
-                            </p>
+                          <p className="text-yellow-400 font-medium">
+                            Hạn sử dụng:{" "}
+                            {new Date(order.expiryDate).toLocaleDateString(
+                              "vi-VN",
+                            )}
+                          </p>
                         )}
                       </div>
 
@@ -457,19 +532,31 @@ export default function Checkout() {
                       {/* Ticket Info */}
                       <div className="space-y-4">
                         <div className="flex items-center justify-between">
-                          <span className="text-white/80 text-base">Số lượng vé</span>
-                          <span className="font-bold text-white text-xl">{order.quantity}</span>
+                          <span className="text-white/80 text-base">
+                            Số lượng vé
+                          </span>
+                          <span className="font-bold text-white text-xl">
+                            {order.quantity}
+                          </span>
                         </div>
                         <div className="flex items-center justify-between">
-                          <span className="text-white/80 text-base">Tổng tiền</span>
+                          <span className="text-white/80 text-base">
+                            Tổng tiền
+                          </span>
                           <span className="text-2xl font-extrabold bg-gradient-to-r from-blue-400 to-purple-400 bg-clip-text text-transparent">
                             {formatMoney(order.amount)}₫
                           </span>
                         </div>
                         <div className="flex items-center justify-between">
-                          <span className="text-white/80 text-base">Phương thức</span>
+                          <span className="text-white/80 text-base">
+                            Phương thức
+                          </span>
                           <span className="font-medium text-white text-lg capitalize">
-                            {order.method === 'momo' ? 'Momo' : order.method === 'vnpay' ? 'VN Pay' : order.method}
+                            {order.method === "momo"
+                              ? "Momo"
+                              : order.method === "vnpay"
+                                ? "VN Pay"
+                                : order.method}
                           </span>
                         </div>
                       </div>
@@ -480,16 +567,22 @@ export default function Checkout() {
                       <div className="space-y-3 text-base">
                         <div className="flex justify-between">
                           <span className="text-white/70">Khách hàng</span>
-                          <span className="text-white font-medium">{order.name}</span>
+                          <span className="text-white font-medium">
+                            {order.name}
+                          </span>
                         </div>
                         <div className="flex justify-between">
                           <span className="text-white/70">Email</span>
-                          <span className="text-white font-medium">{order.email}</span>
+                          <span className="text-white font-medium">
+                            {order.email}
+                          </span>
                         </div>
                         {order.phone && (
                           <div className="flex justify-between">
                             <span className="text-white/70">SĐT</span>
-                            <span className="text-white font-medium">{order.phone}</span>
+                            <span className="text-white font-medium">
+                              {order.phone}
+                            </span>
                           </div>
                         )}
                       </div>
@@ -500,7 +593,10 @@ export default function Checkout() {
                       {status === "success" && (
                         <div className="flex items-start gap-3 text-emerald-300 bg-emerald-500/10 p-4 rounded-lg border border-emerald-500/20">
                           <Mail className="h-5 w-5 flex-shrink-0 mt-0.5" />
-                          <span className="font-bold text-base">Lưu ý: Vé đã được gửi tới email của bạn. Vui lòng kiểm tra hộp thư.</span>
+                          <span className="font-bold text-base">
+                            Lưu ý: Vé đã được gửi tới email của bạn. Vui lòng
+                            kiểm tra hộp thư.
+                          </span>
                         </div>
                       )}
                       {status === "failed" && (
@@ -521,7 +617,7 @@ export default function Checkout() {
                         localStorage.removeItem("pendingOrder");
                         localStorage.removeItem("lastCheckoutOrder");
                         localStorage.removeItem("lastVnpayBookingId");
-                      } catch { }
+                      } catch {}
                       navigate("/");
                     }}
                   >

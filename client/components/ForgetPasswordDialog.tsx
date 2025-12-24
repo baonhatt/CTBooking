@@ -10,6 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import icon from "@/assets/images/icon.svg";
+import { toast } from "@/components/ui/use-toast";
 
 interface ForgetPasswordDialogProps {
   isOpen: boolean;
@@ -44,10 +45,11 @@ export function ForgetPasswordDialog({
     try {
       setIsLoading(true);
       const data = await auth.forgetPass(email);
-      
+
       if (data?.status === "success") {
         onOpenChange(false);
         setEmail("");
+        toast({ title: "Đổi mật khẩu thành công!", description: data.message });
       }
     } catch (err: any) {
       setSubmitError(String(err?.message || "Yêu cầu thất bại"));
@@ -76,7 +78,7 @@ export function ForgetPasswordDialog({
               type="email"
               className={cn(
                 "bg-white/10 border-white/20 text-white placeholder:text-gray-400 focus-visible:ring-cyan-400 focus-visible:ring-offset-1 rounded-lg",
-                emailError && "border-yellow-500 focus-visible:ring-yellow-500"
+                emailError && "border-yellow-500 focus-visible:ring-yellow-500",
               )}
               placeholder="you@gmail.com"
               value={email}
@@ -85,7 +87,8 @@ export function ForgetPasswordDialog({
                 setEmail(val);
                 const ok = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(val);
                 if (ok) setEmailError("");
-                else if (val.length > 0) setEmailError("Vui lòng nhập email hợp lệ");
+                else if (val.length > 0)
+                  setEmailError("Vui lòng nhập email hợp lệ");
                 if (submitError) setSubmitError("");
               }}
               maxLength={50}

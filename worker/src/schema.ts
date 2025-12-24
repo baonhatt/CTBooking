@@ -14,7 +14,9 @@ export const users = sqliteTable("users", {
 
 export const accounts = sqliteTable("accounts", {
   id: integer("id").primaryKey({ autoIncrement: true }),
-  user_id: integer("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  user_id: integer("user_id")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
   email: text("email").notNull().unique(),
   password: text("password"),
   login_type: text("login_type").default("email").notNull(),
@@ -25,11 +27,15 @@ export const accounts = sqliteTable("accounts", {
 
 export const tokens = sqliteTable("tokens", {
   id: integer("id").primaryKey({ autoIncrement: true }),
-  account_id: integer("account_id").notNull().references(() => accounts.id, { onDelete: "cascade" }),
+  account_id: integer("account_id")
+    .notNull()
+    .references(() => accounts.id, { onDelete: "cascade" }),
   type: text("type").notNull(),
   token: text("token").notNull().unique(),
   expired_at: text("expired_at"),
-  created_at: text("created_at").default(sql`(CURRENT_TIMESTAMP)`).notNull(),
+  created_at: text("created_at")
+    .default(sql`(CURRENT_TIMESTAMP)`)
+    .notNull(),
 });
 
 export const movies = sqliteTable("movies", {
@@ -41,8 +47,12 @@ export const movies = sqliteTable("movies", {
   genres: text("genres"), // JSON string in SQLite
   rating: real("rating"),
   duration_min: integer("duration_min"),
-  created_at: text("created_at").default(sql`(CURRENT_TIMESTAMP)`).notNull(),
-  updated_at: text("updated_at").default(sql`(CURRENT_TIMESTAMP)`).notNull(),
+  created_at: text("created_at")
+    .default(sql`(CURRENT_TIMESTAMP)`)
+    .notNull(),
+  updated_at: text("updated_at")
+    .default(sql`(CURRENT_TIMESTAMP)`)
+    .notNull(),
   is_active: integer("is_active", { mode: "boolean" }).default(true),
   release_date: text("release_date"),
 });
@@ -61,22 +71,32 @@ export const ticket_packages = sqliteTable("ticket_packages", {
   is_member_only: integer("is_member_only", { mode: "boolean" }).default(false),
   is_active: integer("is_active", { mode: "boolean" }).default(true),
   display_order: integer("display_order").default(0),
-  created_at: text("created_at").default(sql`(CURRENT_TIMESTAMP)`).notNull(),
-  updated_at: text("updated_at").default(sql`(CURRENT_TIMESTAMP)`).notNull(),
+  created_at: text("created_at")
+    .default(sql`(CURRENT_TIMESTAMP)`)
+    .notNull(),
+  updated_at: text("updated_at")
+    .default(sql`(CURRENT_TIMESTAMP)`)
+    .notNull(),
 });
 
 export const bookings = sqliteTable("bookings", {
   id: integer("id").primaryKey({ autoIncrement: true }),
   // Cho phép null để lưu booking của khách vãng lai (không có user/account)
-  user_id: integer("user_id").references(() => users.id, { onDelete: "cascade" }),
+  user_id: integer("user_id").references(() => users.id, {
+    onDelete: "cascade",
+  }),
   ticket_count: integer("ticket_count").default(1).notNull(),
   total_price: real("total_price").notNull(),
-  created_at: text("created_at").default(sql`(CURRENT_TIMESTAMP)`).notNull(),
+  created_at: text("created_at")
+    .default(sql`(CURRENT_TIMESTAMP)`)
+    .notNull(),
   paid_at: text("paid_at"),
   payment_method: text("payment_method").default("cash"),
   payment_status: text("payment_status").default("pending"),
   transaction_id: text("transaction_id"),
-  updated_at: text("updated_at").default(sql`(CURRENT_TIMESTAMP)`).notNull(),
+  updated_at: text("updated_at")
+    .default(sql`(CURRENT_TIMESTAMP)`)
+    .notNull(),
   name: text("name").default("").notNull(),
   phone: text("phone").default("").notNull(),
   email: text("email").default("").notNull(),
@@ -84,13 +104,17 @@ export const bookings = sqliteTable("bookings", {
   pay_txt_code: text("pay_txt_code").unique(),
   combo: text("combo"),
   movie_title: text("movie_title"),
-  movie_duration: integer("movie_duration").default(0),
+  movie_duration: text("movie_duration"),
   movie_poster: text("movie_poster"),
   ticket_package_name: text("ticket_package_name"),
   ticket_unit_price: real("ticket_unit_price"),
   is_used: integer("is_used", { mode: "boolean" }).default(false),
-  movie_id: integer("movie_id").references(() => movies.id, { onDelete: "cascade" }),
-  ticket_package_id: integer("ticket_package_id").references(() => ticket_packages.id),
+  movie_id: integer("movie_id").references(() => movies.id, {
+    onDelete: "cascade",
+  }),
+  ticket_package_id: integer("ticket_package_id").references(
+    () => ticket_packages.id,
+  ),
   expiry_date: text("expiry_date"),
 });
 
@@ -102,8 +126,12 @@ export const toys = sqliteTable("toys", {
   stock: integer("stock").default(0).notNull(),
   status: text("status").default("active").notNull(),
   image_url: text("image_url"),
-  created_at: text("created_at").default(sql`(CURRENT_TIMESTAMP)`).notNull(),
-  updated_at: text("updated_at").default(sql`(CURRENT_TIMESTAMP)`).notNull(),
+  created_at: text("created_at")
+    .default(sql`(CURRENT_TIMESTAMP)`)
+    .notNull(),
+  updated_at: text("updated_at")
+    .default(sql`(CURRENT_TIMESTAMP)`)
+    .notNull(),
 });
 
 export const site_media = sqliteTable("site_media", {
@@ -120,8 +148,12 @@ export const site_media = sqliteTable("site_media", {
   duration: real("duration"),
   display_order: integer("display_order").default(0),
   is_active: integer("is_active", { mode: "boolean" }).default(true),
-  created_at: text("created_at").default(sql`(CURRENT_TIMESTAMP)`).notNull(),
-  updated_at: text("updated_at").default(sql`(CURRENT_TIMESTAMP)`).notNull(),
+  created_at: text("created_at")
+    .default(sql`(CURRENT_TIMESTAMP)`)
+    .notNull(),
+  updated_at: text("updated_at")
+    .default(sql`(CURRENT_TIMESTAMP)`)
+    .notNull(),
 });
 
 // Relations

@@ -29,7 +29,7 @@ export default function BookingPage() {
   const USE_MOCK_DATA = true;
   const navigate = useNavigate();
   const [step, setStep] = useState<0 | 1>(0);
-  const [movie, setMovie] = useState<string>("");
+  const [movie, setMovie] = useState<string>(""); // Keep for backward compatibility
   const [ticketCount, setTicketCount] = useState<number>(1);
   const [selectedPackage, setSelectedPackage] = useState<any | null>(null);
   const [name, setName] = useState<string>("");
@@ -62,7 +62,7 @@ export default function BookingPage() {
   const isLoadingPage = isLoadingTickets;
 
   const [activeMoviesFull, setActiveMoviesFull] = useState<any[]>([]);
-  const selectedMovie = activeMoviesFull.find((x: any) => x.title === movie);
+  const selectedMovie = activeMoviesFull[0]; // Just use the first movie if available
   const ticketPackages = (ticketsData?.items || []).map((t: any) => ({
     id: t.id,
     name: t.name,
@@ -303,7 +303,7 @@ export default function BookingPage() {
         (value) => value?.id === selectedPackage?.id,
       );
       setIsProcessing(true);
-      const orderId = `ORDER_${Date.now()}`;
+      const orderId = `ORDER${Date.now()}`;
       const movieDetail = selectedMovie;
       const ticketPackageId = selectedPackage?.id || defaultTicket?.id;
 
@@ -513,7 +513,7 @@ export default function BookingPage() {
           <div className="absolute inset-0 bg-gradient-to-b from-black/50 via-black/25 to-transparent" />
           <div className="absolute inset-0 neon-noise opacity-25" />
         </div>
-        <div className="relative z-10 max-w-5xl mx-auto p-4 pt-28">
+        <div className="relative z-10 max-w-6xl mx-auto p-4 pt-28">
           <div className="text-sm py-9">
             <button
               className="text-blue-300 hover:text-blue-400 underline"
@@ -537,15 +537,19 @@ export default function BookingPage() {
           )}
 
           {!isLoadingPage && step === 0 && (
-            <Card className="bg-white/5 backdrop-blur-md border border-white/15 text-white shadow-xl">
-              <CardHeader className="pb-2">
-                <CardTitle className="text-2xl font-bold text-white">
-                  Đặt Vé
+            <Card className="bg-white/5 backdrop-blur-md border border-white/15 text-white shadow-2xl overflow-hidden">
+              <CardHeader className="bg-white/5 border-b border-white/10 pb-4">
+                <CardTitle className="text-2xl font-bold text-white flex items-center gap-2">
+                  <span className="w-1.5 h-8 bg-blue-500 rounded-full"></span>
+                  Đặt Vé Trải Nghiệm
                 </CardTitle>
               </CardHeader>
-              <CardContent className="space-y-6">
-                <div className="space-y-3">
-                  <div className="text-sm font-medium text-gray-400">
+
+              <CardContent className="p-6 space-y-8">
+                {/* PHẦN 1: CHỌN VÉ */}
+                <section className="space-y-4">
+                  <div className="flex items-center gap-2 text-sm font-semibold text-blue-400 uppercase tracking-wider">
+                    <span className="p-1 rounded bg-blue-500/20">01</span>
                     Chọn Loại Vé
                   </div>
                   <Select
@@ -557,31 +561,29 @@ export default function BookingPage() {
                         (p: any) => String(p.id) === String(v),
                       );
                       setSelectedPackage(pkg || null);
-                      // Update activeMoviesFull with the selected package's movies
                       if (pkg?.movies) {
                         setActiveMoviesFull([...pkg.movies]);
                       } else {
                         setActiveMoviesFull([]);
                       }
-                      // Clear selected movie when package changes
                       setMovie("");
                     }}
                   >
-                    <SelectTrigger className="w-full bg-white/10 backdrop-blur-sm text-white border-white/20 hover:bg-white/15 h-11">
-                      <span className="truncate">
-                        {selectedPackage?.name || "Chọn loại vé"}
+                    <SelectTrigger className="w-full bg-white/10 border-white/20 hover:bg-white/15 h-12 rounded-xl transition-all">
+                      <span className="truncate font-medium">
+                        {selectedPackage?.name || "Chọn loại vé bạn muốn..."}
                       </span>
                     </SelectTrigger>
-                    <SelectContent className="bg-[#0b1226]/95 backdrop-blur-md text-white border border-white/20">
+                    <SelectContent className="bg-[#1a1f2e] text-white border-white/20 shadow-2xl">
                       {ticketPackages.map((t: any) => (
                         <SelectItem
                           key={t.id}
                           value={String(t.id)}
-                          className="text-white py-2"
+                          className="focus:bg-blue-600 focus:text-white py-3"
                         >
-                          <div className="flex items-center justify-between gap-3 w-full">
+                          <div className="flex items-center justify-between gap-8 w-full">
                             <span className="font-medium">{t.name}</span>
-                            <span className="text-sm text-blue-300">
+                            <span className="font-bold text-blue-400">
                               {Number(t.price || 0).toLocaleString("vi-VN")}₫
                             </span>
                           </div>
@@ -589,93 +591,96 @@ export default function BookingPage() {
                       ))}
                     </SelectContent>
                   </Select>
-                </div>
+                </section>
 
+                {/* PHẦN 2: DANH SÁCH PHIM - Fix 5 phim/hàng */}
                 {selectedPackage && (
-                  <div className="space-y-3">
-                    <div className="text-sm font-medium text-gray-400">
-                      Danh sách phim áp dụng cho vé
+                  <section className="space-y-4 animate-in fade-in slide-in-from-top-2 duration-300">
+                    <div className="text-[13px] font-semibold text-blue-400 uppercase tracking-wider">
+                      Danh sách phim áp dụng
                     </div>
 
                     {activeMoviesFull && activeMoviesFull.length > 0 ? (
-                      <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-                        {activeMoviesFull.map((m: any) => {
-                          return (
-                            <button
-                              key={m.id}
-                              type="button"
-                              onClick={() => setMovie(m.title)}
-                              className={`
-                relative rounded-lg overflow-hidden border
-                transition-all text-left
-                "border-white/15 hover:border-white/40"
-                }
-              `}
-                            >
+                      /* Sử dụng grid-cols-2 cho mobile và grid-cols-5 cho desktop */
+                      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3">
+                        {activeMoviesFull.map((m: any) => (
+                          <div
+                            key={m.id}
+                            className="group relative rounded-lg overflow-hidden border border-white/10 bg-white/5 hover:border-blue-500/50 transition-all shadow-md"
+                          >
+                            <div className="aspect-[2/3] relative">
+                              {" "}
+                              {/* Tỉ lệ 2:3 chuẩn poster phim */}
                               <img
                                 src={resolveImageUrl(m.cover_image)}
                                 alt={m.title}
-                                className="w-full h-44 object-cover"
+                                className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                               />
-
-                              <div className="p-2 bg-black/60 backdrop-blur-sm">
-                                <div className="text-sm font-semibold text-white truncate">
+                              <div className="absolute inset-0 bg-gradient-to-t from-black via-black/20 to-transparent opacity-90" />
+                              {/* Thông tin đè lên ảnh để tiết kiệm không gian */}
+                              <div className="absolute bottom-0 p-2 w-full">
+                                <div className="text-[12px] font-bold text-white leading-tight truncate mb-1">
                                   {m.title}
                                 </div>
-                                <div className="text-xs text-gray-300">
-                                  {m.duration_min
-                                    ? `${m.duration_min} phút`
-                                    : "--"}
+                                <div className="flex items-center gap-1.5">
+                                  <span className="px-1 py-0.5 rounded bg-blue-600/80 text-[9px] text-white font-black">
+                                    {m.duration_min
+                                      ? `${m.duration_min}'`
+                                      : "--"}
+                                  </span>
+                                  <span className="text-[10px] text-gray-300 truncate font-light italic">
+                                    {m.description || "Phim đặc sắc"}
+                                  </span>
                                 </div>
                               </div>
-                            </button>
-                          );
-                        })}
+                            </div>
+                          </div>
+                        ))}
                       </div>
                     ) : (
-                      <div className="text-sm text-gray-400">
+                      <div className="p-6 text-center border border-dashed border-white/10 rounded-xl text-gray-500 text-sm italic">
                         Không có phim áp dụng cho loại vé này
                       </div>
                     )}
-                  </div>
+                  </section>
                 )}
 
-                <div className="space-y-3">
-                  <div className="text-sm font-medium text-gray-400">
+                {/* PHẦN 3: THÔNG TIN KHÁCH HÀNG */}
+                <section className="space-y-4">
+                  <div className="flex items-center gap-2 text-sm font-semibold text-blue-400 uppercase tracking-wider">
+                    <span className="p-1 rounded bg-blue-500/20">02</span>
                     Thông Tin Khách Hàng
                   </div>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="space-y-1.5">
-                      <Label className="text-sm font-normal text-gray-300">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-5 bg-white/5 p-5 rounded-2xl border border-white/10">
+                    <div className="space-y-2">
+                      <Label className="text-sm font-medium text-gray-300 ml-1">
                         Họ Và Tên
                       </Label>
                       <Input
-                        className="bg-white/10 backdrop-blur-sm text-white border-white/20 focus-visible:ring-blue-400 hover:bg-white/15 h-11 placeholder:text-gray-500"
+                        className="bg-white/5 border-white/15 focus:border-blue-500 focus:ring-blue-500/20 h-11 rounded-lg placeholder:text-gray-600"
                         value={name}
                         onChange={(e) => setName(e.target.value)}
                         placeholder="Nhập họ và tên"
                         minLength={2}
                       />
                     </div>
-                    <div className="space-y-1.5">
-                      <Label className="text-sm font-normal text-gray-300">
+                    <div className="space-y-2">
+                      <Label className="text-sm font-medium text-gray-300 ml-1">
                         Số Điện Thoại
                       </Label>
                       <Input
-                        className="bg-white/10 backdrop-blur-sm text-white border-white/20 focus-visible:ring-blue-400 hover:bg-white/15 h-11 placeholder:text-gray-500"
+                        className={`bg-white/5 h-11 rounded-lg transition-colors ${phoneError ? "border-orange-500/50 focus:ring-orange-500/20" : "border-white/15 focus:border-blue-500"}`}
                         value={phone}
                         inputMode="numeric"
                         maxLength={10}
                         placeholder="VD: 0912345678"
                         onChange={(e) => {
                           const value = e.target.value;
-                          // Chỉ cho phép số
                           if (!/^\d*$/.test(value)) {
                             setPhoneError("Chỉ cho phép nhập số 0-9");
                             return;
                           }
                           setPhone(value);
-
                           if (value && !value.startsWith("0")) {
                             setPhoneError(
                               "Số điện thoại phải bắt đầu bằng số 0",
@@ -684,38 +689,22 @@ export default function BookingPage() {
                             setPhoneError("");
                           }
                         }}
-                        onKeyDown={(e) => {
-                          const allow = [
-                            "Backspace",
-                            "Delete",
-                            "Tab",
-                            "ArrowLeft",
-                            "ArrowRight",
-                            "Home",
-                            "End",
-                          ];
-                          if (allow.includes(e.key)) return;
-                          if (!/^[0-9]$/.test(e.key)) {
-                            e.preventDefault();
-                            setPhoneError("Chỉ cho phép nhập số 0-9");
-                          } else {
-                            setPhoneError("");
-                          }
-                        }}
                       />
                       {phoneError && (
-                        <div className="text-orange-400 text-xs mt-1">
+                        <p className="text-orange-400 text-xs mt-1 animate-pulse">
                           {phoneError}
-                        </div>
+                        </p>
                       )}
                     </div>
-                    <div className="space-y-1.5">
-                      <Label className="text-sm font-normal text-gray-300">
+                    <div className="space-y-2">
+                      <Label className="text-sm font-medium text-gray-300 ml-1">
                         Email Nhận Vé
                       </Label>
                       <Input
-                        className="bg-white/10 backdrop-blur-sm text-white border-white/20 focus-visible:ring-blue-400 hover:bg-white/15 h-11 placeholder:text-gray-500"
+                        className={`bg-white/5 h-11 rounded-lg ${emailError ? "border-orange-500/50" : "border-white/15"}`}
                         value={email}
+                        type="email"
+                        placeholder="you@email.com"
                         onChange={(e) => {
                           const val = e.target.value;
                           setEmail(val);
@@ -725,37 +714,35 @@ export default function BookingPage() {
                             setEmailError("");
                           }
                         }}
-                        type="email"
-                        placeholder="you@email.com"
                       />
                       {emailError && (
-                        <div className="text-orange-400 text-xs mt-1">
+                        <p className="text-orange-400 text-xs mt-1">
                           {emailError}
-                        </div>
+                        </p>
                       )}
                     </div>
-                    <div className="space-y-1.5">
-                      <Label className="text-sm font-normal text-gray-300">
+                    <div className="space-y-2">
+                      <Label className="text-sm font-medium text-gray-300 ml-1">
                         Số Lượng Vé
                       </Label>
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-3">
                         <Button
                           type="button"
                           variant="outline"
-                          className="bg-white/10 border-white/20 text-white hover:bg-white/20 h-11 w-11"
+                          className="bg-white/10 border-white/20 hover:bg-red-500/20 hover:text-red-400 h-11 w-11 rounded-lg transition-colors"
                           onClick={() =>
                             setTicketCount((c) => Math.max(MIN_TICKETS, c - 1))
                           }
                         >
                           -
                         </Button>
-                        <div className="min-w-[3rem] text-center py-2.5 bg-white/10 backdrop-blur-sm border border-white/20 rounded text-white h-11 flex items-center justify-center">
+                        <div className="flex-1 text-center font-bold bg-white/10 border border-white/20 rounded-lg h-11 flex items-center justify-center text-lg">
                           {ticketCount}
                         </div>
                         <Button
                           type="button"
                           variant="outline"
-                          className="bg-white/10 border-white/20 text-white hover:bg-white/20 h-11 w-11"
+                          className="bg-white/10 border-white/20 hover:bg-green-500/20 hover:text-green-400 h-11 w-11 rounded-lg transition-colors"
                           onClick={() =>
                             setTicketCount((c) => Math.min(MAX_TICKETS, c + 1))
                           }
@@ -765,66 +752,44 @@ export default function BookingPage() {
                       </div>
                     </div>
                   </div>
-                </div>
+                </section>
 
+                {/* TÓM TẮT TẠM TÍNH (Nhìn sang trọng hơn) */}
                 {selectedPackage && (
-                  <div className="rounded-lg p-4 border border-white/15 bg-white/5 backdrop-blur-sm space-y-3">
-                    <div className="movie">{movie}</div>
-                    <div className="flex items-center justify-between">
-                      <span className="text-white font-semibold">
+                  <div className="overflow-hidden rounded-2xl border border-blue-500/30 bg-blue-500/5 p-5 flex flex-col sm:flex-row justify-between items-center gap-4">
+                    <div>
+                      <h4 className="text-white font-bold text-lg">
                         {selectedPackage.name}
-                      </span>
-                      <div className="text-right text-md font-bold text-white">
-                        {unitPrice.toLocaleString("vi-VN")}₫
-                        <span className="text-xs font-normal text-gray-400">
-                          {" "}
-                          / vé
-                        </span>
-                      </div>
-                    </div>
-                    {(selectedPackage.description || selectedPackage.type) && (
+                      </h4>
                       <p className="text-sm text-gray-400">
                         {selectedPackage.description ||
-                          `Gói vé ${selectedPackage.type}`}
+                          `Gói vé ${selectedPackage.type || "tiêu chuẩn"}`}
                       </p>
-                    )}
-
-                    {Array.isArray(selectedPackage.features) &&
-                      selectedPackage.features.length > 0 && (
-                        <ul className="space-y-1">
-                          {selectedPackage.features.map(
-                            (f: string, idx: number) => (
-                              <li key={idx} className="text-sm text-gray-300">
-                                • {f}
-                              </li>
-                            ),
-                          )}
-                        </ul>
-                      )}
-                    <div className="pt-3 mt-2 border-t border-white/10 text-right">
-                      <span className="text-lg font-bold text-white">
-                        Tạm tính: {totalPrice.toLocaleString("vi-VN")}₫
-                      </span>
+                    </div>
+                    <div className="text-center sm:text-right">
+                      <p className="text-xs text-gray-400 uppercase tracking-widest">
+                        Tổng cộng tạm tính
+                      </p>
+                      <p className="text-3xl font-black text-blue-400 drop-shadow-[0_0_10px_rgba(96,165,250,0.3)]">
+                        {totalPrice.toLocaleString("vi-VN")}₫
+                      </p>
                     </div>
                   </div>
                 )}
 
-                <div className="flex justify-end gap-3 pt-2">
+                {/* FOOTER ACTIONS - Tối ưu chống tràn cho Mobile */}
+                <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-4 border-t border-white/10">
+                  {/* Nút chính cho lên trên ở Mobile (order-1) để tiện thao tác */}
                   <Button
-                    variant="outline"
-                    className="bg-transparent border-white/30 text-white hover:bg-white/10 h-11 px-6"
-                    onClick={() => navigate("/")}
-                    disabled={isProcessing}
-                  >
-                    Hủy
-                  </Button>
-                  <Button
-                    className="bg-blue-600 hover:bg-blue-700 text-white font-semibold shadow-lg disabled:opacity-50 h-11 px-6"
+                    className="w-full sm:w-auto order-1 sm:order-2 bg-blue-600 hover:bg-blue-500 text-white font-bold px-10 h-12 rounded-xl shadow-[0_0_20px_rgba(37,99,235,0.4)] disabled:opacity-30 disabled:grayscale transition-all transform active:scale-95 whitespace-nowrap text-base sm:text-lg"
                     onClick={() => {
-                      const ok = window.confirm(
-                        "Lưu ý thông tin vé của bạn sẽ được gửi đến email này",
-                      );
-                      if (ok) setStep(1);
+                      if (
+                        window.confirm(
+                          "Lưu ý thông tin vé sẽ được gửi đến email: " + email,
+                        )
+                      ) {
+                        setStep(1);
+                      }
                     }}
                     disabled={
                       !selectedPackage ||
@@ -837,7 +802,16 @@ export default function BookingPage() {
                       phone.length !== 10
                     }
                   >
-                    Tiếp tục
+                    Tiếp tục đặt vé
+                  </Button>
+
+                  <Button
+                    variant="ghost"
+                    className="w-full sm:w-auto order-2 sm:order-1 text-gray-400 hover:text-white hover:bg-white/5 px-6 h-12 rounded-xl transition-colors"
+                    onClick={() => navigate("/")}
+                    disabled={isProcessing}
+                  >
+                    Hủy bỏ
                   </Button>
                 </div>
               </CardContent>
@@ -846,205 +820,176 @@ export default function BookingPage() {
 
           {step === 1 && (
             <>
-              <Card className="bg-white/5 backdrop-blur-md border border-white/15 text-white shadow-xl">
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-2xl font-bold text-white">
-                    Thông tin đặt vé
+              <Card className="bg-white/5 backdrop-blur-md border border-white/15 text-white shadow-xl overflow-hidden">
+                <CardHeader className="bg-white/5 border-b border-white/10">
+                  <CardTitle className="text-xl font-bold text-white flex items-center gap-2">
+                    <span className="w-1 h-6 bg-blue-500 rounded-full"></span>
+                    Xác nhận thông tin đặt vé
                   </CardTitle>
                 </CardHeader>
-                <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="space-y-3">
-                    <div className="rounded-lg p-4 border border-white/15 bg-white/5 backdrop-blur-sm">
-                      <div className="text-sm font-medium text-gray-400 mb-3">
-                        Thông tin người đặt
+
+                <CardContent className="grid grid-cols-1 md:grid-cols-3 gap-0 p-0">
+                  {/* CỘT TRÁI: THÔNG TIN CHI TIẾT */}
+                  <div className="md:col-span-2 p-6 space-y-6 border-r border-white/10">
+                    <section>
+                      <h3 className="text-sm font-semibold text-blue-400 uppercase tracking-wider mb-4">
+                        Thông tin khách hàng
+                      </h3>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 bg-white/5 p-4 rounded-xl border border-white/5">
+                        <div>
+                          <p className="text-xs text-gray-400">Họ tên</p>
+                          <p className="font-medium">{name}</p>
+                        </div>
+                        <div>
+                          <p className="text-xs text-gray-400">Số điện thoại</p>
+                          <p className="font-medium">{phone}</p>
+                        </div>
+                        <div className="sm:col-span-2">
+                          <p className="text-xs text-gray-400">Email nhận vé</p>
+                          <p className="font-medium text-blue-300">{email}</p>
+                        </div>
                       </div>
-                      <div className="grid grid-cols-[100px_1fr] gap-x-4 gap-y-2 text-sm">
-                        <span className="text-gray-400">Họ tên</span>
-                        <span className="font-medium text-white">{name}</span>
-                        <span className="text-gray-400">Email</span>
-                        <span className="font-medium text-white">{email}</span>
-                        <span className="text-gray-400">Số lượng</span>
-                        <span className="font-medium text-white">
-                          {ticketCount}
-                        </span>
-                      </div>
+                    </section>
+
+                    {activeMoviesFull && activeMoviesFull.length > 0 && (
+                      <section>
+                        <h3 className="text-sm font-semibold text-blue-400 uppercase tracking-wider mb-3">
+                          Danh sách phim trải nghiệm
+                        </h3>
+                        <div className="flex flex-wrap gap-2">
+                          {activeMoviesFull.map((m: any) => (
+                            <div
+                              key={m.id}
+                              className="bg-blue-500/10 border border-blue-500/30 px-3 py-1.5 rounded-full text-sm flex items-center gap-2"
+                            >
+                              <span className="w-1.5 h-1.5 bg-blue-500 rounded-full"></span>
+                              {m.title}
+                            </div>
+                          ))}
+                        </div>
+                      </section>
+                    )}
+
+                    {/* LƯU Ý GỌN GÀNG HƠN */}
+                    <div className="p-4 rounded-xl border border-amber-500/20 bg-amber-500/5">
+                      <h4 className="text-amber-500 font-bold text-sm mb-2 flex items-center gap-2">
+                        ⚠️ Một số lưu ý quan trọng:
+                      </h4>
+                      <ul className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-1 text-[13px] text-gray-400 list-inside list-disc">
+                        <li>Trẻ em &gt;70cm. Dưới 1m4 cần người lớn.</li>
+                        <li>Cân nhắc nếu có bệnh tim, sợ độ cao.</li>
+                        <li>Vé không hoàn trả hoặc đổi ngày.</li>
+                        <li>Không mang thức ăn/nước uống ngoài.</li>
+                      </ul>
                     </div>
-                    {true  && (
-                      <div className="p-3 rounded-lg border border-white/15 bg-white/5 backdrop-blur-sm">
-                        <div className="flex items-center gap-3">
-                         
-                          <div className="flex-1 grid grid-cols-[100px_1fr] gap-x-4 gap-y-1 text-sm">
-                            <span className="text-gray-400">Phim</span>
-                            <span className="font-medium text-white">
-                              {/* {activeMoviesFull.title} */}
+                  </div>
+
+                  {/* CỘT PHẢI: THANH TOÁN & TÓM TẮT */}
+                  <div className="bg-black/20 p-6 flex flex-col justify-between">
+                    <div className="space-y-6">
+                      <div>
+                        <h3 className="text-sm font-semibold text-gray-400 uppercase tracking-wider mb-4">
+                          Thanh toán qua
+                        </h3>
+                        <button
+                          type="button"
+                          onClick={() => setPaymentMethod("vietqr")}
+                          className={`${paymentMethod === "vietqr" ? "border-red-500 bg-red-600/20" : "border-white/20 bg-white/10"} w-full cursor-pointer rounded-xl border p-3 flex items-center justify-center gap-3 transition-all hover:bg-white/15 h-12`}
+                        >
+                          <span className="w-7 h-7 rounded bg-red-600 text-white grid place-items-center text-[10px] font-extrabold shadow-lg">
+                            VQ
+                          </span>
+                          <span className="font-bold tracking-tight">
+                            VietQR (Ngân hàng)
+                          </span>
+                        </button>
+                      </div>
+
+                      <div className="space-y-3">
+                        <h3 className="text-sm font-semibold text-gray-400 uppercase tracking-wider">
+                          Booking Summary
+                        </h3>
+                        <div className="bg-white/5 rounded-xl p-4 border border-white/10 space-y-3 text-sm">
+                          <div className="flex justify-between">
+                            <span className="text-gray-400">Loại vé</span>
+                            <span className="text-white font-medium">
+                              {selectedPackage?.name ||
+                                defaultTicket?.name ||
+                                "Vé tiêu chuẩn"}
                             </span>
-                            <span className="text-gray-400">Thời lượng</span>
-                            <span className="font-medium text-white">
-                              {/* {selectedMovie.duration_min
-                                ? `${selectedMovie.duration_min} phút`
-                                : "--"} */}
+                          </div>
+                          <div className="flex justify-between">
+                            <span className="text-gray-400">Đơn giá</span>
+                            <span className="text-white font-medium">
+                              {unitPrice.toLocaleString("vi-VN")}₫
                             </span>
-                            <span className="text-gray-400">Thể loại</span>
-                            <span className="font-medium text-white">
-                              {/* {selectedMovie.genres
-                                ? Array.isArray(selectedMovie.genres)
-                                  ? selectedMovie.genres.join(" / ")
-                                  : selectedMovie.genres
-                                : "--"} */}
+                          </div>
+                          <div className="flex justify-between pb-3 border-b border-white/10">
+                            <span className="text-gray-400">Số lượng</span>
+                            <span className="text-white font-medium">
+                              x{ticketCount}
                             </span>
-                            <span className="text-gray-400">Khởi chiếu</span>
-                            <span className="font-medium text-white">
-                              {/* {selectedMovie.release_date
-                                ? new Date(
-                                    selectedMovie.release_date,
-                                  ).toLocaleDateString("vi-VN")
-                                : "--"} */}
+                          </div>
+                          <div className="flex justify-between pt-1">
+                            <span className="text-white font-bold text-lg">
+                              Tổng tiền
+                            </span>
+                            <span className="text-blue-400 font-black text-xl">
+                              {totalPrice.toLocaleString("vi-VN")}₫
                             </span>
                           </div>
                         </div>
                       </div>
-                    )}
-                  </div>
-                  <div className="space-y-3">
-                    <div className="text-sm font-medium text-gray-400">
-                      Phương thức thanh toán
                     </div>
-                    <div className="grid grid-cols-3 gap-3">
-                      {/* <button
-                        type="button"
-                        onClick={() => setPaymentMethod("momo")}
-                        className={`${paymentMethod === 'momo' ? 'border-pink-500 bg-pink-600/20' : 'border-white/20 bg-white/10 backdrop-blur-sm'} cursor-pointer rounded-lg border p-3 flex items-center gap-3 focus:outline-none focus:ring-2 focus:ring-pink-500 hover:bg-white/15 h-11`}
-                        aria-pressed={paymentMethod === 'momo'}
-                      >
-                        <span className="inline-flex items-center gap-2 text-white">
-                          <span className="w-7 h-7 rounded bg-pink-600 text-white grid place-items-center text-xs font-extrabold">Mo</span>
-                          <span>MoMo</span>
-                        </span>
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setPaymentMethod("vnpay")}
-                        className={`${paymentMethod === 'vnpay' ? 'border-blue-500 bg-blue-600/20' : 'border-white/20 bg-white/10 backdrop-blur-sm'} cursor-pointer rounded-lg border p-3 flex items-center gap-3 focus:outline-none focus:ring-2 focus:ring-blue-500 hover:bg-white/15 h-11`}
-                        aria-pressed={paymentMethod === 'vnpay'}
-                      >
-                        <span className="inline-flex items-center gap-2 text-white">
-                          <span className="w-7 h-7 rounded bg-blue-600 text-white grid place-items-center text-[10px] font-extrabold">VN</span>
-                          <span>VNPay</span>
-                        </span>
-                      </button> */}
-                      <button
-                        type="button"
-                        onClick={() => setPaymentMethod("vietqr")}
-                        className={`${paymentMethod === "vietqr" ? "border-red-500 bg-red-600/20" : "border-white/20 bg-white/10 backdrop-blur-sm"} cursor-pointer rounded-lg border p-3 flex items-center gap-3 focus:outline-none focus:ring-2 focus:ring-red-500 hover:bg-white/15 h-11`}
-                        aria-pressed={paymentMethod === "vietqr"}
-                      >
-                        <span className="inline-flex items-center gap-2 text-white">
-                          <span className="w-7 h-7 rounded bg-red-600 text-white grid place-items-center text-[10px] font-extrabold">
-                            VQ
-                          </span>
-                          <span>VietQr</span>
-                        </span>
-                      </button>
-                    </div>
-                    <div className="bg-white/5 backdrop-blur-sm rounded-lg p-4 border border-white/15">
-                      <div className="text-sm font-medium text-gray-400 mb-3">
-                        Booking Summary
-                      </div>
-                      <div className="space-y-2 text-sm">
-                        <div className="flex justify-between">
-                          <span className="text-gray-400">Loại vé</span>
-                          <span className="text-white font-medium">
-                            {selectedPackage?.name ||
-                              defaultTicket?.name ||
-                              "Vé tiêu chuẩn"}
-                          </span>
-                        </div>
-                        <div className="flex justify-between">
-                          <span className="text-gray-400">Đơn giá</span>
-                          <span className="text-white">
-                            {unitPrice.toLocaleString("vi-VN")}₫
-                          </span>
-                        </div>
-                        <div className="flex justify-between">
-                          <span className="text-gray-400">Số lượng</span>
-                          <span className="text-white">{ticketCount}</span>
-                        </div>
-                        <div className="flex justify-between border-t border-white/10 pt-2 mt-2">
-                          <span className="text-white font-semibold">
-                            Tổng Tiền
-                          </span>
-                          <span className="text-white font-bold">
-                            {totalPrice.toLocaleString("vi-VN")}₫
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                  <div className="md:col-span-2 mt-4 mb-2 p-4 rounded-lg border border-[#FF5252]/30 bg-[#FF5252]/10">
-                    <h3 className="text-[#FF5252] font-bold text-lg mb-2">
-                      Lưu ý
-                    </h3>
-                    <ul className="list-disc list-inside space-y-1 text-sm text-gray-300">
-                      <li>
-                        Trò chơi phù hợp với trẻ em có chiều cao từ 70cm trở
-                        lên. Trẻ em dưới 1m4 bắt buộc có người lớn đi kèm.
-                      </li>
-                      <li>
-                        Những người mắc bệnh tim mạch, chóng mặt, sợ độ cao, phụ
-                        nữ mang thai và những người có vấn đề về sức khỏe, vui
-                        lòng cân nhắc kỹ trước khi mua vé.
-                      </li>
-                      <li>Mỗi vé tương ứng 1 lượt xem 1 phim cho 1 khách.</li>
-                      <li>
-                        Quý khách vui lòng đến đúng ngày được ghi trên vé.
-                      </li>
-                      <li>
-                        Vé đã mua không được hoàn tiền và đổi trả vé. Giá vé sẽ
-                        thay đổi theo từng thời điểm.
-                      </li>
-                      <li>
-                        Thức ăn và nước uống không được phép mang vào khu vực
-                        trải nghiệm trò chơi.
-                      </li>
-                    </ul>
-                  </div>
 
-                  <div className="md:col-span-2 pt-3 mt-1 border-t border-white/10 space-y-3">
-                    <div className="flex items-center gap-3">
-                      <Checkbox
-                        checked={confirmChecked}
-                        onCheckedChange={(v) => setConfirmChecked(Boolean(v))}
-                        className="border-white/40 data-[state=checked]:bg-blue-500"
-                        aria-label="Xác nhận thông tin đặt vé"
-                        id="confirm-checkbox"
-                      />
-                      <label
-                        htmlFor="confirm-checkbox"
-                        className="text-xs sm:text-sm text-gray-300 cursor-pointer select-none"
+                    <div className="mt-8 space-y-4">
+                      <div
+                        className="flex items-start gap-3 group cursor-pointer"
+                        onClick={() => setConfirmChecked(!confirmChecked)}
                       >
-                        Vui lòng xác nhận lại thông tin, bao gồm: loại vé, số
-                        lượng vé và email. Mã đặt vé sẽ gửi tới email này nếu
-                        thanh toán thành công.
-                      </label>
+                        <Checkbox
+                          checked={confirmChecked}
+                          onCheckedChange={(v) => setConfirmChecked(Boolean(v))}
+                          className="mt-1 border-white/40 data-[state=checked]:bg-blue-500"
+                          id="confirm-checkbox"
+                        />
+                        <label
+                          htmlFor="confirm-checkbox"
+                          className="text-[11px] leading-relaxed text-gray-400 group-hover:text-gray-200 transition-colors cursor-pointer"
+                        >
+                          Tôi đã kiểm tra kỹ thông tin và đồng ý với điều khoản
+                          dịch vụ.
+                        </label>
+                      </div>
                     </div>
                   </div>
                 </CardContent>
               </Card>
-              <div className="flex justify-between pt-4">
+
+              <div className="flex flex-col sm:flex-row gap-3 pt-6">
+                {/* Nút chính đặt lên trước ở Mobile để ưu tiên, dùng order-1/2 để đảo vị trí trên Desktop */}
+                <Button
+                  className="w-full sm:flex-[2] bg-blue-600 hover:bg-blue-500 text-white font-bold shadow-[0_0_20px_rgba(37,99,235,0.3)] disabled:opacity-30 h-12 rounded-xl transition-all text-base sm:text-lg order-1 sm:order-2 whitespace-nowrap"
+                  disabled={!confirmChecked || isProcessing}
+                  onClick={handleCreateAndPay}
+                >
+                  {isProcessing ? (
+                    <span className="flex items-center justify-center gap-2">
+                      <span className="animate-spin text-lg">◌</span> Đang xử
+                      lý...
+                    </span>
+                  ) : (
+                    "Xác nhận Thanh toán ngay"
+                  )}
+                </Button>
+
                 <Button
                   variant="outline"
-                  className="bg-transparent border-white/30 text-white hover:bg-white/10 h-11 px-6"
+                  className="w-full sm:flex-1 bg-transparent border-white/20 text-white hover:bg-white/10 h-12 rounded-xl transition-all order-2 sm:order-1"
                   onClick={() => setStep(0)}
                   disabled={isProcessing}
                 >
                   Quay lại
-                </Button>
-                <Button
-                  className="bg-blue-600 hover:bg-blue-700 text-white font-semibold shadow-lg disabled:opacity-50 h-11 px-6"
-                  disabled={!confirmChecked || isProcessing}
-                  onClick={handleCreateAndPay}
-                >
-                  {isProcessing ? "Đang xử lý..." : "Thanh toán"}
                 </Button>
               </div>
             </>

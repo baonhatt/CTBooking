@@ -1,10 +1,35 @@
-import { eq, and, inArray, sql, gte, lte, or, desc, asc, count, SQL } from "drizzle-orm";
+import {
+  eq,
+  and,
+  inArray,
+  sql,
+  gte,
+  lte,
+  or,
+  desc,
+  asc,
+  count,
+  SQL,
+} from "drizzle-orm";
 import { formatDateForDb } from "../../lib/date-utils";
 
-export async function updateUserProfileImpl(anyDb: any, tables: { accounts: any; users: any }, payload: { email?: string; name?: string; phone?: string; gender?: string; dob?: string }, RUNTIME_ENV?: string) {
+export async function updateUserProfileImpl(
+  anyDb: any,
+  tables: { accounts: any; users: any },
+  payload: {
+    email?: string;
+    name?: string;
+    phone?: string;
+    gender?: string;
+    dob?: string;
+  },
+  RUNTIME_ENV?: string,
+) {
   const { email, name, phone, gender, dob } = payload;
   if (!email) return { status: 400, message: "Thiếu email" };
-  const account = await anyDb.query.accounts.findFirst({ where: eq(tables.accounts.email, email) });
+  const account = await anyDb.query.accounts.findFirst({
+    where: eq(tables.accounts.email, email),
+  });
   if (!account) return { status: 404, message: "Không tìm thấy tài khoản" };
   const dobDate = (() => {
     try {
@@ -15,7 +40,14 @@ export async function updateUserProfileImpl(anyDb: any, tables: { accounts: any;
       return undefined;
     }
   })();
-  const normalizedGender = (() => { try { const g = typeof gender === "string" ? gender.trim().toLowerCase() : ""; return g === "male" || g === "female" ? g : undefined; } catch { return undefined; } })();
+  const normalizedGender = (() => {
+    try {
+      const g = typeof gender === "string" ? gender.trim().toLowerCase() : "";
+      return g === "male" || g === "female" ? g : undefined;
+    } catch {
+      return undefined;
+    }
+  })();
 
   const updateData: any = {
     updated_at: formatDateForDb(new Date(), RUNTIME_ENV),
@@ -25,7 +57,8 @@ export async function updateUserProfileImpl(anyDb: any, tables: { accounts: any;
   if (normalizedGender) updateData.gender = normalizedGender;
   if (dobDate) updateData.dob = formatDateForDb(dobDate, RUNTIME_ENV);
   // Try to use .returning() to fetch updated row when supported, fallback for D1/SQLite
-  const updatedRes = await anyDb.update(tables.users)
+  const updatedRes = await anyDb
+    .update(tables.users)
     .set(updateData)
     .where(eq(tables.users.id, account.user_id))
     .returning();
@@ -33,20 +66,34 @@ export async function updateUserProfileImpl(anyDb: any, tables: { accounts: any;
   let user: any = Array.isArray(updatedRes) ? updatedRes[0] : updatedRes;
 
   if (!user) throw new Error("Không thể cập nhật thông tin người dùng");
-  return { status: 200, user: { id: user.id, fullname: user.fullname, phone: user.phone, gender: user.gender ?? null, dob: user.dob ?? null, email } };
+  return {
+    status: 200,
+    user: {
+      id: user.id,
+      fullname: user.fullname,
+      phone: user.phone,
+      gender: user.gender ?? null,
+      dob: user.dob ?? null,
+      email,
+    },
+  };
 }
 
 export async function getUserProfileByEmailImpl(
-  anyDb: any, 
-  tables: { accounts: any; users: any }, 
-  emailRaw: string
+  anyDb: any,
+  tables: { accounts: any; users: any },
+  emailRaw: string,
 ) {
   // 1. Chuẩn hóa email đầu vào
   const email = (() => {
     try {
-      return decodeURIComponent(emailRaw || "").trim().toLowerCase();
+      return decodeURIComponent(emailRaw || "")
+        .trim()
+        .toLowerCase();
     } catch {
-      return String(emailRaw || "").trim().toLowerCase();
+      return String(emailRaw || "")
+        .trim()
+        .toLowerCase();
     }
   })();
 
@@ -90,55 +137,100 @@ export async function getUserProfileByEmailImpl(
 }
 
 export async function listUserTransactionsImpl(
-  anyDb: any, 
+  anyDb: any,
   tables: { accounts: any; bookings: any; movies: any; ticket_packages: any }, // Thêm bảng vào đây
-  args: { email: string; status: string; page: number; pageSize: number; sort: string; dir: "asc" | "desc"; payment_method: string; from?: string; to?: string }, 
-  RUNTIME_ENV?: string
+  args: {
+    email: string;
+    status: string;
+    page: number;
+    pageSize: number;
+    sort: string;
+    dir: "asc" | "desc";
+    payment_method: string;
+    from?: string;
+    to?: string;
+  },
+  RUNTIME_ENV?: string,
 ) {
-  const { email: emailRaw, status, page, pageSize, sort, dir, payment_method, from: fromStr, to: toStr } = args;
+  const {
+    email: emailRaw,
+    status,
+    page,
+    pageSize,
+    sort,
+    dir,
+    payment_method,
+    from: fromStr,
+    to: toStr,
+  } = args;
   const skip = (page - 1) * pageSize;
-  
+
   // 1. Chuẩn hóa Email (D1/SQLite rất nhạy cảm hoa thường)
-  const email = decodeURIComponent(emailRaw || "").trim().toLowerCase();
+  const email = decodeURIComponent(emailRaw || "")
+    .trim()
+    .toLowerCase();
   if (!email) return { items: [], page, pageSize, total: 0 };
 
   // 2. Tìm Account bằng sql`lower` để chắc chắn khớp trên D1
-  const account = (await anyDb
-    .select()
-    .from(tables.accounts)
-    .where(sql`lower(${tables.accounts.email}) = ${email}`)
-    .limit(1))[0];
-  
+  const account = (
+    await anyDb
+      .select()
+      .from(tables.accounts)
+      .where(sql`lower(${tables.accounts.email}) = ${email}`)
+      .limit(1)
+  )[0];
+
   if (!account) return { items: [], page, pageSize, total: 0 };
 
   // 3. Xây dựng điều kiện lọc
   const conditions: any[] = [eq(tables.bookings.user_id, account.user_id)];
-  
-  if (status && status.toLowerCase() === "paid") {
-    conditions.push(eq(tables.bookings.payment_status, "paid"));
-  }
-  
-  if (payment_method) {
-    conditions.push(eq(tables.bookings.payment_method, payment_method));
-  }
 
+  const mainFilter = or(
+    sql`lower(${tables.bookings.payment_method}) = 'vietqr'`,
+    eq(tables.bookings.payment_status, "paid"),
+  );
+
+  conditions.push(mainFilter);
+
+  if (payment_method && payment_method.toLowerCase() !== "all") {
+    conditions.push(
+      sql`lower(${tables.bookings.payment_method}) = ${payment_method.toLowerCase()}`,
+    );
+  }
   // Xử lý ngày tháng (Đảm bảo formatDateForDb trả về string ISO hoặc format SQLite hiểu)
   if (fromStr || toStr) {
-    const from = fromStr ? formatDateForDb(new Date(fromStr), RUNTIME_ENV) : null;
+    const from = fromStr
+      ? formatDateForDb(new Date(fromStr), RUNTIME_ENV)
+      : null;
     const to = toStr ? formatDateForDb(new Date(toStr), RUNTIME_ENV) : null;
-    
+
     const dateConditions: any[] = [];
     if (from && to) {
-      dateConditions.push(and(gte(tables.bookings.created_at, from), lte(tables.bookings.created_at, to)));
-      dateConditions.push(and(gte(tables.bookings.paid_at, from), lte(tables.bookings.paid_at, to)));
+      dateConditions.push(
+        and(
+          gte(tables.bookings.created_at, from),
+          lte(tables.bookings.created_at, to),
+        ),
+      );
+      dateConditions.push(
+        and(
+          gte(tables.bookings.paid_at, from),
+          lte(tables.bookings.paid_at, to),
+        ),
+      );
     } else if (from) {
-      dateConditions.push(gte(tables.bookings.created_at, from), gte(tables.bookings.paid_at, from));
+      dateConditions.push(
+        gte(tables.bookings.created_at, from),
+        gte(tables.bookings.paid_at, from),
+      );
     } else if (to) {
-      dateConditions.push(lte(tables.bookings.created_at, to), lte(tables.bookings.paid_at, to));
+      dateConditions.push(
+        lte(tables.bookings.created_at, to),
+        lte(tables.bookings.paid_at, to),
+      );
     }
     if (dateConditions.length > 0) conditions.push(or(...dateConditions));
   }
-
   const whereClause = and(...conditions);
 
   // 4. Lấy Total Count
@@ -149,18 +241,22 @@ export async function listUserTransactionsImpl(
   const total = totalResult?.count ?? 0;
 
   // 5. Query chính sử dụng JOIN thay vì `with` (Để tránh lỗi D1 json_array)
-  const sortCol = sort === "paid_at" ? tables.bookings.paid_at : tables.bookings.created_at;
+  const sortCol =
+    sort === "paid_at" ? tables.bookings.paid_at : tables.bookings.created_at;
   const sortDir = dir === "asc" ? asc(sortCol) : desc(sortCol);
 
   const rows = await anyDb
     .select({
       booking: tables.bookings,
       movie: tables.movies,
-      ticket_package: tables.ticket_packages
+      ticket_package: tables.ticket_packages,
     })
     .from(tables.bookings)
     .leftJoin(tables.movies, eq(tables.bookings.movie_id, tables.movies.id))
-    .leftJoin(tables.ticket_packages, eq(tables.bookings.ticket_package_id, tables.ticket_packages.id))
+    .leftJoin(
+      tables.ticket_packages,
+      eq(tables.bookings.ticket_package_id, tables.ticket_packages.id),
+    )
     .where(whereClause)
     .orderBy(sortDir)
     .offset(skip)
@@ -172,19 +268,23 @@ export async function listUserTransactionsImpl(
     const b = row.booking;
     const movie = row.movie;
     const pkg = row.ticket_package;
-    
+
     const expiryAt = b.expiry_date ? new Date(b.expiry_date) : null;
     const expired = !!(expiryAt && now.getTime() > expiryAt.getTime());
-    const daysLeft = expiryAt ? Math.ceil((expiryAt.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)) : null;
+    const daysLeft = expiryAt
+      ? Math.ceil((expiryAt.getTime() - now.getTime()) / (1000 * 60 * 60 * 24))
+      : null;
 
     return {
       booking_id: b.id,
       booking_code: b.booking_code,
+      pay_txt_code: b.pay_txt_code,
       user_id: b.user_id,
-      movie: movie?.title || "",
-      ticket_package: pkg?.name || "",
+      movie: b.movie_title || "",
+      ticket_package: b.ticket_package_name || "",
       quantity: Number(b.ticket_count || 0),
       amount: Number(b.total_price || 0),
+      ticket_unit_price: Number(b.ticket_unit_price || 0),
       method: b.payment_method || "",
       payment_status: b.payment_status || "",
       created_at: b.created_at,
@@ -195,8 +295,10 @@ export async function listUserTransactionsImpl(
       is_used: !!b.is_used,
       name: b.name || "",
       phone: b.phone || "",
-      email: email, // Email đã decode ở trên
-      poster_url: movie?.cover_image || null,
+      email: b.email,
+      poster_url: b.movie_poster || "",
+      combo: b.combo || "",
+      movie_duration: b.movie_duration || "",
     };
   });
 

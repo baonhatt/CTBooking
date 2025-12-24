@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -11,14 +11,14 @@ import {
 } from "@/lib/api";
 import {
   AlertCircle,
-  CheckCircle,
-  Clock,
-  MapPin,
-  Users,
-  DollarSign,
-  Mail,
   Phone,
   User,
+  Film,
+  Search,
+  CheckCircle2,
+  Mail,
+  Ticket,
+  Info,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
@@ -31,7 +31,7 @@ interface TicketInfo {
   phone: string;
   email: string;
   ticket_count: number;
-  total_price: number;
+  total_price: number | string;
   created_at: string;
   paid_at: string | null;
   expiry_date: string | null;
@@ -43,6 +43,9 @@ interface TicketInfo {
   pay_txt_code?: string;
   validity_days: number | null;
   expired: boolean;
+  movie_title?: string;
+  movie_duration?: string;
+  ticket_package_name?: string;
 }
 
 export default function TicketCheckContent() {
@@ -51,26 +54,28 @@ export default function TicketCheckContent() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [useLoading, setUseLoading] = useState(false);
-  const [countdown, setCountdown] = useState<string | null>(null);
   const { toast } = useToast();
 
   const handleSearch = async () => {
-    if (!code.trim()) {
-      setError("Vui lòng nhập mã vé");
+    let searchCode = code.trim().toUpperCase();
+
+    // Tự động thêm ORDER nếu chỉ nhập số
+    if (/^\d+$/.test(searchCode)) {
+      searchCode = `ORDER${searchCode}`;
+    }
+
+    if (!searchCode) {
+      setError("Vui lòng nhập mã vé hoặc đơn hàng");
       return;
     }
 
     setIsLoading(true);
     setError(null);
-    setTicketInfo(null);
-
     try {
-      // Normalize code: uppercase and trim whitespace
-      const normalizedCode = code.trim().toUpperCase();
-      const data = await getBookingByCodeApi(normalizedCode);
+      const data = await getBookingByCodeApi(searchCode);
       setTicketInfo(data);
     } catch (err: any) {
-      setError(err.message || "Không tìm thấy vé");
+      setError(err.message || "Không tìm thấy thông tin");
       setTicketInfo(null);
     } finally {
       setIsLoading(false);
@@ -78,26 +83,28 @@ export default function TicketCheckContent() {
   };
 
   const handleConfirmUse = async () => {
-    if (!ticketInfo?.booking_code || !ticketInfo.can_use) return;
+    if (!ticketInfo?.booking_code) return;
     try {
       setUseLoading(true);
       const res = await useTicketApi(ticketInfo.booking_code);
-      if (res?.status == "success") {
+      if (res?.status === "success") {
+        toast({ title: "Thành công", description: "Đã xác nhận vào cổng" });
         setTicketInfo({
-          ...(ticketInfo as any),
+          ...ticketInfo,
           is_used: true,
           can_use: false,
           valid: false,
         });
       }
     } catch (err: any) {
-      setError(err?.message || "Không thể xác nhận sử dụng vé");
+      toast({ variant: "destructive", title: "Lỗi", description: err.message });
     } finally {
       setUseLoading(false);
     }
   };
 
   const handleConfirmPayment = async () => {
+    if (!ticketInfo) return;
     try {
       setUseLoading(true);
       const payload = {
@@ -108,402 +115,312 @@ export default function TicketCheckContent() {
         paid_at: new Date().toISOString(),
       };
       const res = await confirmBookingApi(payload);
-      toast({
-        title: "Thành công",
-        description: res.message,
-      });
+      toast({ title: "Thành công", description: res.message });
+      handleSearch();
     } catch (err: any) {
-      setError(err?.message || "Không thể xác nhận sử dụng vé");
+      toast({ variant: "destructive", title: "Lỗi", description: err.message });
     } finally {
       setUseLoading(false);
     }
   };
 
-  const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === "Enter") {
-      handleSearch();
-    }
-  };
+  const formatDate = (str: string | null) =>
+    str
+      ? new Date(str).toLocaleString("vi-VN", {
+          hour: "2-digit",
+          minute: "2-digit",
+          second: "2-digit",
+          day: "2-digit",
+          month: "2-digit",
+          year: "numeric",
+        })
+      : "---";
 
-  useEffect(() => {
-    if (!ticketInfo?.expiry_date || !ticketInfo?.valid) {
-      setCountdown(null);
-      return;
-    }
-    let expiry = 0;
+  const parseJsonData = (data: string | undefined) => {
+    if (!data) return [];
     try {
-      expiry = new Date(ticketInfo.expiry_date as any).getTime();
+      return JSON.parse(data);
     } catch {
-      expiry = 0;
-    }
-    if (!expiry) {
-      setCountdown(null);
-      return;
-    }
-    const update = () => {
-      const now = Date.now();
-      const diff = Math.max(0, expiry - now);
-      const hours = Math.floor(diff / 3600000);
-      const minutes = Math.floor((diff % 3600000) / 60000);
-      const seconds = Math.floor((diff % 60000) / 1000);
-      setCountdown(
-        `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`,
-      );
-    };
-    update();
-    const id = setInterval(update, 1000);
-    return () => clearInterval(id);
-  }, [ticketInfo?.expiry_date, ticketInfo?.valid]);
-
-  const getStatusBadge = (status: string) => {
-    switch (status?.toLowerCase()) {
-      case "paid":
-      case "success":
-        return (
-          <Badge className="bg-green-600 hover:bg-green-700">
-            <CheckCircle className="w-3 h-3 mr-1" />
-            Đã thanh toán
-          </Badge>
-        );
-      case "pending":
-        return (
-          <Badge className="bg-yellow-600 hover:bg-yellow-700">
-            <Clock className="w-3 h-3 mr-1" />
-            Chờ thanh toán
-          </Badge>
-        );
-      case "failed":
-        return <Badge className="bg-red-600 hover:bg-red-700">Thất bại</Badge>;
-      default:
-        return <Badge variant="outline">{status}</Badge>;
+      return [];
     }
   };
-
-  const formatDate = (dateString: string) => {
-    const date = new Date(dateString);
-    return date.toLocaleString("vi-VN", {
-      year: "numeric",
-      month: "2-digit",
-      day: "2-digit",
-      hour: "2-digit",
-      minute: "2-digit",
-      second: "2-digit",
-    });
-  };
-
-  const formatTime = (timeString: string) => {
-    const date = new Date(timeString);
-    return date.toLocaleString("vi-VN", {
-      year: "numeric",
-      month: "2-digit",
-      day: "2-digit",
-      hour: "2-digit",
-      minute: "2-digit",
-    });
-  };
-
-  const validityLabel = ticketInfo?.valid
-    ? "Vé còn hiệu lực"
-    : ticketInfo?.expired
-      ? "Vé đã hết hạn"
-      : ticketInfo?.is_used
-        ? "Vé đã sử dụng"
-        : "Vé vô hiệu";
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col gap-4">
-        <h1 className="text-3xl font-bold">Kiểm Tra Vé</h1>
-        <p className="text-gray-600">
-          Nhập mã vé từ email để xem thông tin chi tiết
+    <div className="max-w-8xl mx-auto space-y-8 pb-20">
+      <div className="space-y-1">
+        <h1 className="text-4xl font-extrabold tracking-tight text-slate-900">
+          HỆ THỐNG KIỂM SOÁT
+        </h1>
+        <p className="text-muted-foreground italic text-sm">
+          * Nhập mã đơn hàng hoặc mã vé để tra cứu thông tin phim và trạng thái.
         </p>
       </div>
 
-      {/* Search Section */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Tìm Kiếm Vé</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="flex gap-3">
+      {/* Search & Instruction Section */}
+      <div className="max-w-3xl space-y-4">
+        <div className="flex gap-3">
+          <div className="relative flex-1">
+            <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-slate-400" />
             <Input
-              placeholder="Nhập mã vé (vd: BOOKING-20251205-001)"
+              className="pl-12 h-14 text-lg shadow-sm border-slate-200 focus:ring-2"
+              placeholder="Nhập mã vé hoặc ID (VD: 1766461)..."
               value={code}
               onChange={(e) => setCode(e.target.value)}
-              onKeyDown={handleKeyDown}
-              className="flex-1"
+              onKeyDown={(e) => e.key === "Enter" && handleSearch()}
             />
-            <Button
-              onClick={handleSearch}
-              disabled={isLoading}
-              className="px-6"
-            >
-              {isLoading ? "Đang tìm..." : "Tìm Kiếm"}
-            </Button>
           </div>
-
-          {error && (
-            <Alert className="border-red-200 bg-red-50">
-              <AlertCircle className="h-4 w-4 text-red-600" />
-              <AlertDescription className="text-red-600">
-                {error}
-              </AlertDescription>
-            </Alert>
-          )}
-        </CardContent>
-      </Card>
-
-      {/* Ticket Details Section */}
-      {ticketInfo && (
-        <div className="space-y-4">
-          {/* Status Banner - moved to top */}
-          <Card
-            className={
-              ticketInfo.expired
-                ? "border-l-4 border-l-red-600 bg-red-50"
-                : ticketInfo.is_used
-                  ? "border-l-4 border-l-yellow-600 bg-yellow-50"
-                  : ticketInfo.valid
-                    ? "border-l-4 border-l-green-600 bg-green-50"
-                    : "border-l-4 border-l-yellow-600 bg-yellow-50"
-            }
+          <Button
+            onClick={handleSearch}
+            disabled={isLoading}
+            size="lg"
+            className="h-14 px-8 bg-slate-900 hover:bg-slate-800"
           >
-            <CardContent className="pt-6">
-              <div className="flex items-center gap-3 justify-between">
-                <div className="flex items-center gap-3">
-                  {ticketInfo.expired ? (
-                    <AlertCircle className="w-6 h-6 text-red-600" />
-                  ) : ticketInfo.is_used ? (
-                    <Clock className="w-6 h-6 text-yellow-600" />
-                  ) : (
-                    <CheckCircle className="w-6 h-6 text-green-600" />
-                  )}
-                  <div>
-                    <p
-                      className={
-                        ticketInfo.expired
-                          ? "font-semibold text-red-800"
-                          : ticketInfo.is_used
-                            ? "font-semibold text-yellow-800"
-                            : "font-semibold text-green-800"
-                      }
-                    >
-                      Trạng thái vé
-                    </p>
-                    <p
-                      className={
-                        ticketInfo.expired
-                          ? "text-sm text-red-700"
-                          : ticketInfo.is_used
-                            ? "text-sm text-yellow-700"
-                            : "text-sm text-green-700"
-                      }
-                    >
-                      {validityLabel}
-                    </p>
-                  </div>
-                </div>
-                <div className="text-right">
-                  {ticketInfo.expiry_date ? (
-                    <div className="text-sm">
-                      <p className="text-gray-600">Hết hạn</p>
-                      <p className="font-semibold">
-                        {formatDate(ticketInfo.expiry_date)}
-                      </p>
-                    </div>
-                  ) : null}
-                  {ticketInfo.valid && ticketInfo.validity_days !== null ? (
-                    <div className="mt-1 text-xs text-gray-700">
-                      Còn {Math.max(0, Number(ticketInfo.validity_days))} ngày
-                    </div>
-                  ) : null}
-                  {ticketInfo.valid && countdown ? (
-                    <div className="mt-1 text-xs text-gray-700">
-                      Đếm ngược {countdown}
-                    </div>
-                  ) : null}
-                </div>
-                {ticketInfo.can_use && !ticketInfo.is_used && (
-                  <Button
-                    onClick={handleConfirmUse}
-                    disabled={useLoading}
-                    className="bg-green-600 hover:bg-green-700 text-white"
-                  >
-                    {useLoading ? "Đang xác nhận..." : "Xác nhận sử dụng vé"}
-                  </Button>
-                )}
-                {!ticketInfo.can_use &&
-                  !ticketInfo.is_used &&
-                  ticketInfo.payment_method === "vietqr" &&
-                  ticketInfo.pay_txt_code != "" && (
-                    <Button
-                      onClick={handleConfirmPayment}
-                      disabled={useLoading}
-                      className="bg-green-600 hover:bg-green-700 text-white"
-                    >
-                      {useLoading
-                        ? "Đang xác nhận..."
-                        : "Xác nhận đã thanh toán"}
-                    </Button>
-                  )}
-              </div>
-            </CardContent>
-          </Card>
+            {isLoading ? "Đang quét..." : "Kiểm tra"}
+          </Button>
+        </div>
 
-          {/* Booking Code & Status */}
-          <Card className="border-l-4 border-l-blue-600">
-            <CardContent className="pt-6">
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div>
-                  <p className="text-sm text-gray-600 mb-1">Mã Vé</p>
-                  <p className="text-xl font-bold text-blue-600">
-                    {ticketInfo.booking_code}
-                  </p>
-                </div>
-                <div>
-                  <p className="text-sm text-gray-600 mb-1">
-                    Trạng Thái Thanh Toán
-                  </p>
-                  <div>{getStatusBadge(ticketInfo.payment_status)}</div>
-                </div>
-                <div>
-                  <p className="text-sm text-gray-600 mb-1">Ngày Đặt Vé</p>
-                  <p className="font-semibold text-gray-800">
-                    {formatDate(ticketInfo.created_at)}
-                  </p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+        <div className="bg-amber-50 border border-amber-100 rounded-xl p-4 flex gap-3 shadow-sm">
+          <div className="p-2 bg-amber-100 rounded-full h-fit text-amber-600">
+            <Info size={16} />
+          </div>
+          <div className="text-xs text-amber-800 leading-relaxed">
+            <p className="font-bold mb-1 uppercase">
+              Hướng dẫn đối soát nhanh:
+            </p>
+            <p>
+              Nếu khách thanh toán qua Ngân hàng, tìm nội dung có mã{" "}
+              <span className="font-mono font-bold bg-amber-200 px-1 rounded text-orange-700">
+                ORDER
+              </span>{" "}
+              khớp với ID.
+            </p>
+          </div>
+        </div>
+      </div>
 
-          {/* Ticket Summary */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-2xl">Thông tin vé</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                <div className="flex items-center gap-2">
-                  <Users className="w-5 h-5 text-blue-600" />
-                  <div>
-                    <p className="text-xs text-gray-600">Số Vé</p>
-                    <p className="font-semibold">{ticketInfo.ticket_count}</p>
-                  </div>
-                </div>
-                <div className="flex items-center gap-2">
-                  <DollarSign className="w-5 h-5 text-blue-600" />
-                  <div>
-                    <p className="text-xs text-gray-600">Tổng Tiền</p>
-                    <p className="font-semibold text-green-600">
-                      {Number(ticketInfo.total_price).toLocaleString("vi-VN")} ₫
-                    </p>
-                  </div>
-                </div>
-                <div className="flex items-center gap-2">
-                  <Clock className="w-5 h-5 text-blue-600" />
-                  <div>
-                    <p className="text-xs text-gray-600">Ngày Thanh Toán</p>
-                    <p className="font-semibold">
-                      {ticketInfo.paid_at ? formatDate(ticketInfo.paid_at) : ""}
-                    </p>
-                  </div>
-                </div>
-                <div className="flex items-center gap-2">
-                  <Badge
-                    className={
-                      ticketInfo.valid
-                        ? "bg-green-600"
-                        : ticketInfo.expired
-                          ? "bg-red-600"
-                          : ticketInfo.is_used
-                            ? "bg-yellow-600"
-                            : "bg-yellow-600"
-                    }
-                  >
-                    {validityLabel}
-                  </Badge>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+      {error && (
+        <Alert
+          variant="destructive"
+          className="max-w-md animate-in fade-in zoom-in duration-300"
+        >
+          <AlertCircle className="h-4 w-4" />
+          <AlertDescription>{error}</AlertDescription>
+        </Alert>
+      )}
 
-          {/* Customer Information */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Thông Tin Khách Hàng</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div className="space-y-4">
-                  <div className="flex items-start gap-3">
-                    <User className="w-5 h-5 text-blue-600 mt-1" />
-                    <div className="flex-1">
-                      <p className="text-sm text-gray-600">Tên Khách Hàng</p>
-                      <p className="font-semibold text-lg">{ticketInfo.name}</p>
+      {ticketInfo && (
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
+          <div className="lg:col-span-8 space-y-6">
+            <Card
+              className={`overflow-hidden border-slate-200 shadow-sm transition-all ${ticketInfo.is_used ? "opacity-60 grayscale-[0.5]" : ""}`}
+            >
+              <CardContent className="p-0">
+                <div className="bg-slate-50/50 p-6 border-b flex justify-between items-center">
+                  <div className="flex flex-col gap-1">
+                    <div className="flex items-center gap-2 text-blue-600 font-bold">
+                      <Ticket className="w-5 h-5" />
+                      <span>Gói: {ticketInfo.ticket_package_name}</span>
                     </div>
+                    {/* Hiển thị giá 1 vé */}
+                    <span className="text-[11px] font-bold text-blue-500 ml-7">
+                      GIÁ 1 VÉ:{" "}
+                      {Number(
+                        Number(ticketInfo.total_price) /
+                          ticketInfo.ticket_count,
+                      ).toLocaleString("vi-VN")}{" "}
+                      đ
+                    </span>
                   </div>
-
-                  <div className="flex items-start gap-3">
-                    <Phone className="w-5 h-5 text-blue-600 mt-1" />
-                    <div className="flex-1">
-                      <p className="text-sm text-gray-600">Số Điện Thoại</p>
-                      <p className="font-semibold">{ticketInfo.phone}</p>
-                    </div>
-                  </div>
-
-                  <div className="flex items-start gap-3">
-                    <Mail className="w-5 h-5 text-blue-600 mt-1" />
-                    <div className="flex-1">
-                      <p className="text-sm text-gray-600">Email</p>
-                      <p className="font-semibold text-blue-600">
-                        {ticketInfo.email}
-                      </p>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="space-y-4">
-                  <div>
-                    <p className="text-sm text-gray-600 mb-1">
-                      Phương Thức Thanh Toán
-                    </p>
-                    <Badge variant="outline" className="text-base py-2 px-3">
-                      {ticketInfo.payment_method?.toUpperCase() || ""}
+                  <div className="flex flex-col items-end gap-1">
+                    <span className="text-[10px] text-slate-400 font-bold uppercase">
+                      Số người vào:
+                    </span>
+                    <Badge className="bg-red-500 text-white px-4 py-1.5 flex gap-2 items-center border-none font-black text-sm shadow-sm">
+                      <User size={16} /> {ticketInfo.ticket_count} VÉ
                     </Badge>
                   </div>
+                </div>
 
-                  {ticketInfo.paid_at && (
-                    <div>
-                      <p className="text-sm text-gray-600 mb-1">
-                        Ngày Thanh Toán
+                <div className="p-8 space-y-8">
+                  <div>
+                    <h3 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-4 flex items-center gap-2">
+                      <Film size={14} /> DANH SÁCH PHIM & THỜI LƯỢNG:
+                    </h3>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                      {parseJsonData(ticketInfo.movie_title).map(
+                        (title: string, i: number) => (
+                          <div
+                            key={i}
+                            className="flex items-center justify-between p-4 rounded-xl border border-slate-100 bg-slate-50/30"
+                          >
+                            <span className="font-bold text-slate-700 text-sm">
+                              {title}
+                            </span>
+                            <span className="text-[10px] font-bold text-slate-400 bg-white px-2 py-1 rounded-md border border-slate-100">
+                              {parseJsonData(ticketInfo.movie_duration)[i]} ph
+                            </span>
+                          </div>
+                        ),
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 md:grid-cols-3 gap-6 pt-6 border-t border-slate-100">
+                    <div className="space-y-1">
+                      <p className="text-[10px] font-bold text-slate-400 uppercase">
+                        Ngày đặt
                       </p>
-                      <p className="font-semibold">
+                      <p className="text-sm font-semibold text-slate-600">
+                        {formatDate(ticketInfo.created_at)}
+                      </p>
+                    </div>
+                    <div className="space-y-1">
+                      <p className="text-[10px] font-bold text-green-500 uppercase">
+                        Thanh toán
+                      </p>
+                      <p className="text-sm font-semibold text-green-600">
                         {formatDate(ticketInfo.paid_at)}
                       </p>
                     </div>
-                  )}
-
-                  <div>
-                    <p className="text-sm text-gray-600 mb-1">ID Khách Hàng</p>
-                    <p className="font-mono text-sm bg-gray-100 p-2 rounded">
-                      {ticketInfo.user_id}
-                    </p>
+                    <div className="space-y-1">
+                      <p className="text-[10px] font-bold text-red-400 uppercase">
+                        Hết hạn
+                      </p>
+                      <p className="text-sm font-semibold text-red-500">
+                        {formatDate(ticketInfo.expiry_date)}
+                      </p>
+                    </div>
                   </div>
                 </div>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-      )}
+              </CardContent>
+            </Card>
 
-      {/* Empty State */}
-      {!ticketInfo && !error && code && (
-        <Card>
-          <CardContent className="text-center py-12">
-            <Clock className="w-12 h-12 text-gray-400 mx-auto mb-3" />
-            <p className="text-gray-600">Nhập mã vé để bắt đầu tìm kiếm</p>
-          </CardContent>
-        </Card>
+            {/* Thông tin khách hàng Grid */}
+            <div className="grid grid-cols-1 md:grid-cols-12 gap-4">
+              <Card className="md:col-span-4 p-5 flex items-center gap-4 border-slate-100 bg-white shadow-sm">
+                <div className="p-2 bg-slate-50 rounded-lg text-slate-400">
+                  <User size={20} />
+                </div>
+                <div className="min-w-0">
+                  <p className="text-[10px] font-bold text-slate-400 uppercase">
+                    Khách hàng
+                  </p>
+                  <p className="font-bold truncate text-slate-700">
+                    {ticketInfo.name}
+                  </p>
+                </div>
+              </Card>
+              <Card className="md:col-span-3 p-5 flex items-center gap-4 border-slate-100 bg-white shadow-sm">
+                <div className="p-2 bg-slate-50 rounded-lg text-slate-400">
+                  <Phone size={20} />
+                </div>
+                <div className="min-w-0">
+                  <p className="text-[10px] font-bold text-slate-400 uppercase">
+                    SĐT
+                  </p>
+                  <p className="font-bold text-slate-700">{ticketInfo.phone}</p>
+                </div>
+              </Card>
+              <Card className="md:col-span-5 p-5 flex items-center gap-4 border-slate-100 bg-white shadow-sm">
+                <div className="p-2 bg-slate-50 rounded-lg text-slate-400">
+                  <Mail size={20} />
+                </div>
+                <div className="min-w-0 w-full">
+                  <p className="text-[10px] font-bold text-slate-400 uppercase">
+                    Email (Dùng để check tại quầy)
+                  </p>
+                  <p className="font-bold text-slate-700 break-all">
+                    {ticketInfo.email}
+                  </p>
+                </div>
+              </Card>
+            </div>
+          </div>
+
+          {/* Right Sidebar: Status & Payment */}
+          <div className="lg:col-span-4 space-y-6">
+            <Card
+              className={`border-2 transition-all ${ticketInfo.valid ? "border-green-500 bg-green-50/10" : "border-slate-200 shadow-lg"} ${ticketInfo.is_used ? "bg-slate-50" : ""}`}
+            >
+              <CardContent className="p-8 text-center space-y-6">
+                <div className="space-y-2">
+                  <h2
+                    className={`text-3xl font-black uppercase tracking-tighter ${ticketInfo.valid ? "text-green-600" : "text-slate-400"}`}
+                  >
+                    {ticketInfo.valid
+                      ? "VÉ HỢP LỆ"
+                      : ticketInfo.is_used
+                        ? "VÉ ĐÃ DÙNG"
+                        : "KHÔNG HỢP LỆ"}
+                  </h2>
+                  <div className="flex flex-col items-center gap-1">
+                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+                      Mã vé (Booking Code)
+                    </span>
+                    <span
+                      className={`text-4xl font-mono font-bold ${ticketInfo.is_used ? "text-slate-300 line-through decoration-slate-400/50" : "text-blue-600"}`}
+                    >
+                      {ticketInfo.booking_code}
+                    </span>
+                  </div>
+                </div>
+
+                <div className="pt-4">
+                  {ticketInfo.payment_status !== "paid" ? (
+                    <Button
+                      onClick={handleConfirmPayment}
+                      disabled={useLoading}
+                      className="w-full h-16 bg-amber-500 hover:bg-amber-600 text-lg font-black uppercase shadow-lg shadow-amber-200"
+                    >
+                      Xác nhận thanh toán
+                    </Button>
+                  ) : ticketInfo.can_use && !ticketInfo.is_used ? (
+                    <Button
+                      onClick={handleConfirmUse}
+                      disabled={useLoading}
+                      className="w-full h-16 bg-green-600 hover:bg-green-700 text-lg font-black uppercase shadow-lg shadow-green-200"
+                    >
+                      Xác nhận cho vào cổng
+                    </Button>
+                  ) : (
+                    /* Trạng thái đã sử dụng màu đen mờ */
+                    <div className="py-5 px-6 rounded-2xl bg-black/5 text-slate-400 font-bold italic border border-black/5 flex flex-col gap-1">
+                      <span className="text-xl uppercase not-italic">
+                        Đã sử dụng vào cổng
+                      </span>
+                      <span className="text-[10px] font-medium opacity-60">
+                        Vé này đã quét check-in trước đó
+                      </span>
+                    </div>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card className="bg-slate-900 text-white overflow-hidden relative shadow-xl">
+              <div className="absolute -top-4 -right-4 opacity-10">
+                <CheckCircle2 className="w-32 h-32" />
+              </div>
+              <CardContent className="p-6 space-y-5 relative z-10">
+                <div className="flex justify-between items-center text-[10px] opacity-60 font-black uppercase tracking-widest">
+                  <span>Phương thức</span>
+                  <span className="text-amber-400 bg-amber-400/10 px-2 py-0.5 rounded">
+                    {ticketInfo.payment_method || "VIETQR"}
+                  </span>
+                </div>
+                <div className="pt-5 border-t border-slate-800 flex justify-between items-end">
+                  <span className="text-xs font-bold opacity-60 uppercase">
+                    Tổng thanh toán:
+                  </span>
+                  <span className="text-4xl font-black text-green-400 leading-none tracking-tighter">
+                    {Number(ticketInfo.total_price).toLocaleString("vi-VN")}
+                    <span className="text-base ml-1 font-bold">đ</span>
+                  </span>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        </div>
       )}
     </div>
   );
