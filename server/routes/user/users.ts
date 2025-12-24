@@ -288,6 +288,7 @@ export async function listUserTransactionsImpl(
       method: b.payment_method || "",
       payment_status: b.payment_status || "",
       created_at: b.created_at,
+      updated_at: b.updated_at,
       paid_at: b.paid_at,
       expiry_date: b.expiry_date,
       expired,

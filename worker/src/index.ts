@@ -91,6 +91,7 @@ import {
   getBookingEmailTemplate,
   getResetPasswordEmailTemplate,
   logSystemError,
+  withCache,
 } from "./utils";
 import { env } from "process";
 
@@ -704,29 +705,45 @@ app.post("/api/admin/uploads/video", async (c) => {
 });
 
 app.get("/api/getActiveMovies", async (c) => {
-  const db = drizzle(c.env.cinema_db, { schema });
-  const { activeMovies } = await getAllActiveMoviesToday(db, {
-    movies: schema.movies,
-  });
-  const optimized = activeMovies.map((m) => ({
-    ...m,
-    cover_image: optimizeCloudinaryUrl(m.cover_image ?? ""),
-    detail_images: (() => {
-      const v = m.detail_images;
-      if (v === null || v === undefined) return "[]";
-      try {
-        const parsed = typeof v === "string" ? JSON.parse(v) : v;
-        if (Array.isArray(parsed)) {
-          const opt = parsed.map((u: string) => optimizeCloudinaryUrl(u));
-          return JSON.stringify(opt);
-        }
-        return typeof v === "string" ? v : JSON.stringify(v);
-      } catch {
-        return "[]";
-      }
-    })(),
-  }));
-  return c.json({ activeMovies: optimized });
+  return await withCache(
+    c.req.raw, // Đối tượng Request gốc
+    c.env,
+    c.executionCtx,
+    async () => {
+      const db = drizzle(c.env.cinema_db, { schema });
+      const { activeMovies } = await getAllActiveMoviesToday(db, {
+        movies: schema.movies,
+      });
+      const optimized = activeMovies.map((m) => ({
+        ...m,
+        cover_image: optimizeCloudinaryUrl(m.cover_image ?? ""),
+        detail_images: (() => {
+          const v = m.detail_images;
+          if (v === null || v === undefined) return "[]";
+          try {
+            const parsed = typeof v === "string" ? JSON.parse(v) : v;
+            if (Array.isArray(parsed)) {
+              const opt = parsed.map((u: string) => optimizeCloudinaryUrl(u));
+              return JSON.stringify(opt);
+            }
+            return typeof v === "string" ? v : JSON.stringify(v);
+          } catch {
+            return "[]";
+          }
+        })(),
+      }));
+      return new Response(JSON.stringify({ activeMovies: optimized }), {
+        status: 200,
+        headers: {
+          "Content-Type": "application/json",
+          "Cache-Control": "public, s-maxage=3600",
+          "Cloudflare-CDN-Cache-Control": "max-age=3600",
+          Vary: "Origin",
+        },
+      });
+    },
+    3600,
+  );
 });
 
 // Schema tables for D1
@@ -963,6 +980,29 @@ app.post("/api/movies", async (c) => {
       c.env.RUNTIME_ENV,
     );
     const status = (r as any)?.status === "error" ? 400 : 200;
+    // --- LOGIC XÓA CACHE BẮT ĐẦU ---
+    if (status === 200) {
+      const cache = (caches as any).default;
+      const frontendOrigin = c.req.header("Origin");
+
+      // Lấy domain backend tự động
+      const backendOrigin = new URL(c.req.url).origin;
+      const moviesApiUrl = `${backendOrigin}/api/getActiveMovies`;
+
+      // 1. Xóa bản cache có Origin (dành cho trình duyệt/frontend)
+      if (frontendOrigin) {
+        c.executionCtx.waitUntil(
+          cache.delete(
+            new Request(moviesApiUrl, {
+              headers: { Origin: frontendOrigin },
+            }),
+          ),
+        );
+      }
+      // 2. Xóa bản cache không có Origin (dành cho gọi trực tiếp/postman)
+      c.executionCtx.waitUntil(cache.delete(new Request(moviesApiUrl)));
+    }
+    // --- LOGIC XÓA CACHE KẾT THÚC ---
     const payload = {
       ...(r as any),
       status: status >= 400 ? "error" : "success",
@@ -1023,6 +1063,27 @@ app.put("/api/movies/:id", async (c) => {
       config,
       c.env.RUNTIME_ENV,
     );
+
+    // 1. Lấy Origin của chính Backend (Worker) đang chạy
+    const backendUrl = new URL(c.req.url);
+    const backendOrigin = backendUrl.origin; // Kết quả sẽ là https://cinema-worker-preview...
+    // 2. Tạo URL đầy đủ cho API cần xóa cache
+    const moviesApiUrl = `${backendOrigin}/api/getActiveMovies`;
+    // 3. Lấy Origin của Frontend (để khớp với Vary: Origin)
+    const frontendOrigin = c.req.header("Origin");
+    const cache = (caches as any).default;
+    // 4. Thực hiện xóa cache
+    if (frontendOrigin) {
+      // Trường hợp gọi từ Web (có Origin)
+      const cacheKey = new Request(moviesApiUrl, {
+        headers: { Origin: frontendOrigin },
+      });
+      c.executionCtx.waitUntil(cache.delete(cacheKey));
+    }
+
+    // Xóa thêm bản không có Origin (để chắc chắn)
+    c.executionCtx.waitUntil(cache.delete(new Request(moviesApiUrl)));
+
     if (!r) return c.json({ message: "Không tìm thấy" }, 404);
     return c.json(r, 200);
   } catch {
@@ -1213,15 +1274,34 @@ app.get("/api/toys", async (c) => {
 });
 
 // Get list of active toys
-// GET /api/toys-active
 app.get("/api/toys-active", async (c) => {
-  try {
-    const db = drizzle(c.env.cinema_db, { schema });
-    const r = await listActiveToys(db, { toys: schema.toys });
-    return c.json(r, 200);
-  } catch {
-    return c.json({ status: "error", message: "Lỗi máy chủ nội bộ" }, 500);
-  }
+  return await withCache(
+    c.req.raw,
+    c.env,
+    c.executionCtx,
+    async () => {
+      try {
+        const db = drizzle(c.env.cinema_db, { schema });
+        const r = await listActiveToys(db, { toys: schema.toys });
+
+        return new Response(JSON.stringify(r), {
+          status: 200,
+          headers: {
+            "Content-Type": "application/json",
+            "Cache-Control": "public, s-maxage=3600",
+            "Cloudflare-CDN-Cache-Control": "max-age=3600",
+            Vary: "Origin",
+          },
+        });
+      } catch (err) {
+        return new Response(
+          JSON.stringify({ status: "error", message: "Lỗi máy chủ nội bộ" }),
+          { status: 500, headers: { "Content-Type": "application/json" } },
+        );
+      }
+    },
+    3600,
+  );
 });
 
 // Get toy details by ID
@@ -1251,6 +1331,29 @@ app.post("/api/toys", async (c) => {
       body as any,
       c.env.RUNTIME_ENV,
     );
+    // --- LOGIC XÓA CACHE BẮT ĐẦU ---
+    if (r) {
+      const cache = (caches as any).default;
+      const frontendOrigin = c.req.header("Origin");
+
+      // Lấy domain backend tự động
+      const backendOrigin = new URL(c.req.url).origin;
+      const toytApiUrl = `${backendOrigin}/api/toys-active`;
+
+      // 1. Xóa bản cache có Origin (dành cho trình duyệt/frontend)
+      if (frontendOrigin) {
+        c.executionCtx.waitUntil(
+          cache.delete(
+            new Request(toytApiUrl, {
+              headers: { Origin: frontendOrigin },
+            }),
+          ),
+        );
+      }
+      // 2. Xóa bản cache không có Origin (dành cho gọi trực tiếp/postman)
+      c.executionCtx.waitUntil(cache.delete(new Request(toytApiUrl)));
+    }
+    // --- LOGIC XÓA CACHE KẾT THÚC ---
     return c.json(r, 201);
   } catch {
     return c.json({ status: "error", message: "Lỗi máy chủ nội bộ" }, 500);
@@ -1273,6 +1376,29 @@ app.put("/api/toys/:id", async (c) => {
       c.env.RUNTIME_ENV,
     );
     if (!r) return c.json({ message: "Không tìm thấy" }, 404);
+    // --- LOGIC XÓA CACHE BẮT ĐẦU ---
+    if (r) {
+      const cache = (caches as any).default;
+      const frontendOrigin = c.req.header("Origin");
+
+      // Lấy domain backend tự động
+      const backendOrigin = new URL(c.req.url).origin;
+      const toytApiUrl = `${backendOrigin}/api/toys-active`;
+
+      // 1. Xóa bản cache có Origin (dành cho trình duyệt/frontend)
+      if (frontendOrigin) {
+        c.executionCtx.waitUntil(
+          cache.delete(
+            new Request(toytApiUrl, {
+              headers: { Origin: frontendOrigin },
+            }),
+          ),
+        );
+      }
+      // 2. Xóa bản cache không có Origin (dành cho gọi trực tiếp/postman)
+      c.executionCtx.waitUntil(cache.delete(new Request(toytApiUrl)));
+    }
+    // --- LOGIC XÓA CACHE KẾT THÚC ---
     return c.json(r, 200);
   } catch {
     return c.json({ status: "error", message: "Lỗi máy chủ nội bộ" }, 500);
@@ -1287,6 +1413,29 @@ app.delete("/api/toys/:id", async (c) => {
     const db = drizzle(c.env.cinema_db, { schema });
     const r = await deleteToyImpl(db, { toys: schema.toys }, id);
     if (!r) return c.json({ message: "Không tìm thấy" }, 404);
+    // --- LOGIC XÓA CACHE BẮT ĐẦU ---
+    if (r) {
+      const cache = (caches as any).default;
+      const frontendOrigin = c.req.header("Origin");
+
+      // Lấy domain backend tự động
+      const backendOrigin = new URL(c.req.url).origin;
+      const toytApiUrl = `${backendOrigin}/api/toys-active`;
+
+      // 1. Xóa bản cache có Origin (dành cho trình duyệt/frontend)
+      if (frontendOrigin) {
+        c.executionCtx.waitUntil(
+          cache.delete(
+            new Request(toytApiUrl, {
+              headers: { Origin: frontendOrigin },
+            }),
+          ),
+        );
+      }
+      // 2. Xóa bản cache không có Origin (dành cho gọi trực tiếp/postman)
+      c.executionCtx.waitUntil(cache.delete(new Request(toytApiUrl)));
+    }
+    // --- LOGIC XÓA CACHE KẾT THÚC ---
     return c.json(r, 200);
   } catch {
     return c.json({ status: "error", message: "Lỗi máy chủ nội bộ" }, 500);
@@ -1316,18 +1465,38 @@ app.get("/api/tickets", async (c) => {
 });
 
 // Get list of active ticket packages
-// GET /api/tickets-active
 app.get("/api/tickets-active", async (c) => {
-  try {
-    const db = drizzle(c.env.cinema_db, { schema });
-    const r = await listActiveTicketPackages(db, {
-      ticket_packages: schema.ticket_packages,
-      movies: schema.movies,
-    });
-    return c.json(r, 200);
-  } catch {
-    return c.json({ status: "error", message: "Lỗi máy chủ nội bộ" }, 500);
-  }
+  return await withCache(
+    c.req.raw, // Đối tượng Request gốc để làm Cache Key
+    c.env,
+    c.executionCtx,
+    async () => {
+      try {
+        const db = drizzle(c.env.cinema_db, { schema });
+        const r = await listActiveTicketPackages(db, {
+          ticket_packages: schema.ticket_packages,
+          movies: schema.movies,
+        });
+
+        // Trả về Response kèm theo header để Cloudflare lưu trữ
+        return new Response(JSON.stringify(r), {
+          status: 200,
+          headers: {
+            "Content-Type": "application/json",
+            "Cache-Control": "public, s-maxage=3600",
+            "Cloudflare-CDN-Cache-Control": "max-age=3600",
+            Vary: "Origin",
+          },
+        });
+      } catch (err) {
+        return new Response(
+          JSON.stringify({ status: "error", message: "Lỗi máy chủ nội bộ" }),
+          { status: 500, headers: { "Content-Type": "application/json" } },
+        );
+      }
+    },
+    3600,
+  );
 });
 
 // Get ticket package details by ID
@@ -1361,6 +1530,29 @@ app.post("/api/tickets", async (c) => {
       body as any,
       c.env.RUNTIME_ENV,
     );
+    // --- LOGIC XÓA CACHE BẮT ĐẦU ---
+    if (r) {
+      const cache = (caches as any).default;
+      const frontendOrigin = c.req.header("Origin");
+
+      // Lấy domain backend tự động
+      const backendOrigin = new URL(c.req.url).origin;
+      const ticketApiUrl = `${backendOrigin}/api/tickets-active`;
+
+      // 1. Xóa bản cache có Origin (dành cho trình duyệt/frontend)
+      if (frontendOrigin) {
+        c.executionCtx.waitUntil(
+          cache.delete(
+            new Request(ticketApiUrl, {
+              headers: { Origin: frontendOrigin },
+            }),
+          ),
+        );
+      }
+      // 2. Xóa bản cache không có Origin (dành cho gọi trực tiếp/postman)
+      c.executionCtx.waitUntil(cache.delete(new Request(ticketApiUrl)));
+    }
+    // --- LOGIC XÓA CACHE KẾT THÚC ---
     return c.json(r, 201);
   } catch {
     return c.json({ status: "error", message: "Lỗi máy chủ nội bộ" }, 500);
@@ -1383,6 +1575,29 @@ app.put("/api/tickets/:id", async (c) => {
       c.env.RUNTIME_ENV,
     );
     if (!r) return c.json({ status: "error", message: "Không tìm thấy" }, 404);
+    // --- LOGIC XÓA CACHE BẮT ĐẦU ---
+    if (r) {
+      const cache = (caches as any).default;
+      const frontendOrigin = c.req.header("Origin");
+
+      // Lấy domain backend tự động
+      const backendOrigin = new URL(c.req.url).origin;
+      const ticketApiUrl = `${backendOrigin}/api/tickets-active`;
+
+      // 1. Xóa bản cache có Origin (dành cho trình duyệt/frontend)
+      if (frontendOrigin) {
+        c.executionCtx.waitUntil(
+          cache.delete(
+            new Request(ticketApiUrl, {
+              headers: { Origin: frontendOrigin },
+            }),
+          ),
+        );
+      }
+      // 2. Xóa bản cache không có Origin (dành cho gọi trực tiếp/postman)
+      c.executionCtx.waitUntil(cache.delete(new Request(ticketApiUrl)));
+    }
+    // --- LOGIC XÓA CACHE KẾT THÚC ---
     return c.json(r, 200);
   } catch {
     return c.json({ status: "error", message: "Lỗi máy chủ nội bộ" }, 500);
@@ -1401,6 +1616,29 @@ app.delete("/api/tickets/:id", async (c) => {
       id,
     );
     if (!r) return c.json({ status: "error", message: "Không tìm thấy" }, 404);
+    // --- LOGIC XÓA CACHE BẮT ĐẦU ---
+    if (r) {
+      const cache = (caches as any).default;
+      const frontendOrigin = c.req.header("Origin");
+
+      // Lấy domain backend tự động
+      const backendOrigin = new URL(c.req.url).origin;
+      const ticketApiUrl = `${backendOrigin}/api/tickets-active`;
+
+      // 1. Xóa bản cache có Origin (dành cho trình duyệt/frontend)
+      if (frontendOrigin) {
+        c.executionCtx.waitUntil(
+          cache.delete(
+            new Request(ticketApiUrl, {
+              headers: { Origin: frontendOrigin },
+            }),
+          ),
+        );
+      }
+      // 2. Xóa bản cache không có Origin (dành cho gọi trực tiếp/postman)
+      c.executionCtx.waitUntil(cache.delete(new Request(ticketApiUrl)));
+    }
+    // --- LOGIC XÓA CACHE KẾT THÚC ---
     return c.json(r, 200);
   } catch {
     return c.json({ status: "error", message: "Lỗi máy chủ nội bộ" }, 500);
@@ -1453,20 +1691,36 @@ app.put("/api/admin/site-media", async (c) => {
 // Get list of site media
 // GET /api/site-media?section=string&type=string&active=string
 app.get("/api/site-media", async (c) => {
-  try {
-    const section = String(c.req.query("section") || "");
-    const type = String(c.req.query("type") || "");
-    const active = String(c.req.query("active") || "");
-    const db = drizzle(c.env.cinema_db, { schema });
-    const r = await listSiteMediaImpl(
-      db,
-      { site_media: schema.site_media },
-      { section, type, active },
-    );
-    return c.json(r, 200);
-  } catch {
-    return c.json({ status: "error", message: "Lỗi máy chủ nội bộ" }, 500);
-  }
+  return await withCache(
+    c.req.raw, // Đối tượng Request gốc
+    c.env, // Các biến môi trường và bindings
+    c.executionCtx, // Context để xử lý các tác vụ nền
+    async () => {
+      // Lấy các tham số từ query string
+      const section = String(c.req.query("section") || "");
+      const type = String(c.req.query("type") || "");
+      const active = String(c.req.query("active") || "");
+
+      // Khởi tạo Drizzle và truy vấn Database
+      const db = drizzle(c.env.cinema_db, { schema });
+      const r = await listSiteMediaImpl(
+        db,
+        { site_media: schema.site_media },
+        { section, type, active },
+      );
+
+      return new Response(JSON.stringify(r), {
+        status: 200,
+        headers: {
+          "Content-Type": "application/json",
+          "Cache-Control": "public, s-maxage=3600",
+          "Cloudflare-CDN-Cache-Control": "max-age=3600",
+          Vary: "Origin",
+        },
+      });
+    },
+    3600, // Thời gian cache là 3600 giây (1 tiếng)
+  );
 });
 
 // Delete site media by ID

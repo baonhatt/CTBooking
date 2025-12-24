@@ -4,6 +4,43 @@ export const RL_MAX = 100;
 export const RL_WINDOW_MS = 60_000;
 export const attempts = new Map<string, number[]>();
 
+export async function withCache(
+  request: Request,
+  env: any,
+  ctx: any, // Thêm tham số ctx (đó chính là c.executionCtx)
+  handler: () => Promise<Response>,
+  ttl = 3600,
+) {
+  const cache = typeof caches !== "undefined" ? (caches as any).default : null;
+
+  if (!cache || request.method !== "GET") {
+    return await handler();
+  }
+
+  const cacheKey = new Request(request.url, request);
+  let response = await cache.match(cacheKey);
+
+  if (!response) {
+    const originalResponse = await handler();
+
+    if (originalResponse.status === 200) {
+      response = new Response(originalResponse.body, originalResponse);
+      response.headers.set("Cache-Control", `public, max-age=${ttl}`);
+
+      // SỬ DỤNG ctx.waitUntil Ở ĐÂY:
+      // Việc ghi vào cache sẽ không làm chậm request của khách
+      ctx.waitUntil(cache.put(cacheKey, response.clone()));
+    } else {
+      return originalResponse;
+    }
+  } else {
+    response = new Response(response.body, response);
+    response.headers.set("X-Cache", "HIT");
+  }
+
+  return response;
+}
+
 export async function hmacHex(
   algo: "SHA-256" | "SHA-512",
   key: string,

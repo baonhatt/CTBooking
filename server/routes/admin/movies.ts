@@ -187,6 +187,8 @@ export async function getMovieByIdImpl(
     duration_min: movie.duration_min || 0,
     is_active: movie.is_active,
     release_date: movie.release_date,
+    created_at: movie.created_at,
+    updated_at: movie.updated_at,
     stats: { totalTicketsSold, totalRevenue, successfulBookings },
     detail_images: movie.detail_images || [],
   };
