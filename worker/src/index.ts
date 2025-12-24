@@ -371,7 +371,7 @@ app.get("/api/admin/revenue", async (c) => {
       db,
       { bookings: schema.bookings },
       { from, to, status },
-      c.env.RUNTIME_ENV
+      c.env.RUNTIME_ENV,
     );
     return c.json(r);
   } catch (err: any) {
@@ -407,7 +407,7 @@ app.get("/api/admin/transactions", async (c) => {
         ticket_packages: schema.ticket_packages,
       },
       { page, pageSize, email, status, sort, dir, payment_method, from, to },
-      c.env.RUNTIME_ENV
+      c.env.RUNTIME_ENV,
     );
     return c.json(r);
   } catch (err: any) {
@@ -858,7 +858,7 @@ app.get("/api/bookings/:id", async (c) => {
 // Rate-limited code check with headers parity
 app.get("/api/bookings-code/:code", async (c) => {
   // Rate Limit Check
-  const max = Number(c.env.VITE_RATE_LIMIT_BOOKING_CHECK_MAX) || 5;
+  const max = Number(c.env.VITE_RATE_LIMIT_BOOKING_CHECK_MAX) || 10;
   const windowMs =
     Number(c.env.VITE_RATE_LIMIT_BOOKING_CHECK_WINDOWMS) || 60000;
   const ip = c.req.header("CF-Connecting-IP") || "unknown";
@@ -950,10 +950,16 @@ app.post("/api/movies", async (c) => {
   try {
     const body = await c.req.json().catch(() => ({}));
     const db = drizzle(c.env.cinema_db, { schema });
+    const config = {
+      CLOUDINARY_API_KEY: c.env.CLOUDINARY_API_KEY,
+      CLOUDINARY_API_SECRET: c.env.CLOUDINARY_API_SECRET,
+      CLOUDINARY_CLOUD_NAME: c.env.CLOUDINARY_CLOUD_NAME,
+    };
     const r = await createMovieImpl(
       db,
       { movies: schema.movies },
       body as any,
+      config,
       c.env.RUNTIME_ENV,
     );
     const status = (r as any)?.status === "error" ? 400 : 200;
@@ -1004,11 +1010,17 @@ app.put("/api/movies/:id", async (c) => {
     const id = Number(c.req.param("id"));
     const body = await c.req.json().catch(() => ({}));
     const db = drizzle(c.env.cinema_db, { schema });
+    const config = {
+      CLOUDINARY_API_KEY: c.env.CLOUDINARY_API_KEY,
+      CLOUDINARY_API_SECRET: c.env.CLOUDINARY_API_SECRET,
+      CLOUDINARY_CLOUD_NAME: c.env.CLOUDINARY_CLOUD_NAME,
+    };
     const r = await updateMovieImpl(
       db,
       { movies: schema.movies },
       id,
       body as any,
+      config,
       c.env.RUNTIME_ENV,
     );
     if (!r) return c.json({ message: "Không tìm thấy" }, 404);
@@ -1310,7 +1322,7 @@ app.get("/api/tickets-active", async (c) => {
     const db = drizzle(c.env.cinema_db, { schema });
     const r = await listActiveTicketPackages(db, {
       ticket_packages: schema.ticket_packages,
-      movies: schema.movies
+      movies: schema.movies,
     });
     return c.json(r, 200);
   } catch {
@@ -1680,7 +1692,10 @@ app.post("/api/vnpay/create-payment", async (c) => {
       gateway: c.env.VITE_VNPAY_GATEWAY,
       returnUrl,
     };
-    const r = await createVnpayPaymentImpl({ ...(body as any), ip, ...config }, c.env.RUNTIME_ENV);
+    const r = await createVnpayPaymentImpl(
+      { ...(body as any), ip, ...config },
+      c.env.RUNTIME_ENV,
+    );
     const status =
       typeof (r as any).status === "number" ? (r as any).status : 200;
     const payload = {

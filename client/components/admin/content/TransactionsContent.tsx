@@ -27,6 +27,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { getTransactionById, getTickets } from "@/lib/api";
+import { Copy } from "lucide-react";
 
 interface Tx {
   id: string;
@@ -418,7 +419,7 @@ export default function TransactionsContent({
               {/* User Info Section */}
               <div className="rounded-lg bg-blue-50 p-4 space-y-3">
                 <h3 className="font-semibold text-blue-900">
-                  Thông tin khách hàng{!txDetails.user?.id ? ' (Vãng Lai)' : ''}
+                  Thông tin khách hàng{!txDetails.user?.id ? " (Vãng Lai)" : ""}
                 </h3>
                 <div className="grid grid-cols-2 gap-3">
                   <div>
@@ -442,7 +443,11 @@ export default function TransactionsContent({
                       Trạng thái tài khoản
                     </p>
                     <Badge variant="outline">
-                      {!txDetails.user?.id ? 'none' : (txDetails.user?.is_active ? 'Hoạt động' : 'Vô hiệu')}
+                      {!txDetails.user?.id
+                        ? "none"
+                        : txDetails.user?.is_active
+                          ? "Hoạt động"
+                          : "Vô hiệu"}
                     </Badge>
                   </div>
                 </div>
@@ -482,7 +487,9 @@ export default function TransactionsContent({
                         </div>
                       ))
                     ) : (
-                      <p className="text-sm text-gray-500">Không có thông tin phim</p>
+                      <p className="text-sm text-gray-500">
+                        Không có thông tin phim
+                      </p>
                     )}
                   </div>
                 </div>
@@ -534,12 +541,60 @@ export default function TransactionsContent({
                       {txDetails.payment_info?.payment_status || ""}
                     </Badge>
                   </div>
-                  <div className="flex justify-between">
-                    <span className="text-gray-600">Mã giao dịch:</span>
-                    <span className="font-mono text-xs">
-                      {txDetails.payment_info?.transaction_id || ""}
-                    </span>
-                  </div>
+                  {txDetails.payment_info?.payment_method !== "vietqr" && (
+                    <div className="flex justify-between">
+                      <span className="text-gray-600">Mã giao dịch:</span>
+                      <span className="font-mono text-xs">
+                        {txDetails.payment_info?.transaction_id || ""}
+                      </span>
+                    </div>
+                  )}
+                  {txDetails.payment_info?.payment_method === "vietqr" && (
+                    <div className="flex justify-between items-center py-2">
+                      <span className="text-gray-500 text-sm">
+                        Nội dung chuyển khoản:
+                      </span>
+                      <div className="flex items-center gap-2 bg-gray-50 px-2 py-1 rounded border border-gray-200 group">
+                        <span className="font-mono text-sm font-bold text-blue-600">
+                          {txDetails.payment_info?.pay_txt_code || "N/A"}
+                        </span>
+                        <button
+                          onClick={() => {
+                            const code =
+                              txDetails.payment_info?.pay_txt_code || "";
+                            navigator.clipboard.writeText(code);
+                            // Bạn có thể thêm thông báo toast ở đây nếu có
+                            alert("Đã sao chép mã đơn hàng!");
+                          }}
+                          className="p-1 hover:bg-gray-200 rounded transition-colors"
+                          title="Sao chép mã"
+                        >
+                          <svg
+                            xmlns="http://www.w3.org/2000/svg"
+                            width="14"
+                            height="14"
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="currentColor"
+                            strokeWidth="2"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            className="text-gray-400 group-hover:text-blue-500"
+                          >
+                            <rect
+                              width="14"
+                              height="14"
+                              x="8"
+                              y="8"
+                              rx="2"
+                              ry="2"
+                            />
+                            <path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2" />
+                          </svg>
+                        </button>
+                      </div>
+                    </div>
+                  )}
                   <div className="flex justify-between">
                     <span className="text-gray-600">Thời gian tạo:</span>
                     <span className="font-medium">
@@ -554,7 +609,9 @@ export default function TransactionsContent({
                     <div className="flex justify-between">
                       <span className="text-gray-600">Cập nhập lần cuối:</span>
                       <span className="font-medium">
-                        {new Date(txDetails.payment_info.updated_at)?.toLocaleString("vi-VN")}
+                        {new Date(
+                          txDetails.payment_info.updated_at,
+                        )?.toLocaleString("vi-VN")}
                       </span>
                     </div>
                   )}
@@ -564,7 +621,9 @@ export default function TransactionsContent({
                         Thời gian thanh toán:
                       </span>
                       <span className="font-medium">
-                        {new Date(txDetails.payment_info.paid_at)?.toLocaleString("vi-VN")}
+                        {new Date(
+                          txDetails.payment_info.paid_at,
+                        )?.toLocaleString("vi-VN")}
                       </span>
                     </div>
                   )}

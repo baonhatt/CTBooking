@@ -4,12 +4,28 @@ export const RL_MAX = 100;
 export const RL_WINDOW_MS = 60_000;
 export const attempts = new Map<string, number[]>();
 
-export async function hmacHex(algo: "SHA-256" | "SHA-512", key: string, message: string): Promise<string> {
+export async function hmacHex(
+  algo: "SHA-256" | "SHA-512",
+  key: string,
+  message: string,
+): Promise<string> {
   const enc = new TextEncoder();
-  const cryptoKey = await crypto.subtle.importKey("raw", enc.encode(key), { name: "HMAC", hash: algo }, false, ["sign"]);
-  const signature = await crypto.subtle.sign("HMAC", cryptoKey, enc.encode(message));
+  const cryptoKey = await crypto.subtle.importKey(
+    "raw",
+    enc.encode(key),
+    { name: "HMAC", hash: algo },
+    false,
+    ["sign"],
+  );
+  const signature = await crypto.subtle.sign(
+    "HMAC",
+    cryptoKey,
+    enc.encode(message),
+  );
   const bytes = new Uint8Array(signature as ArrayBuffer);
-  return Array.from(bytes).map((b) => b.toString(16).padStart(2, "0")).join("");
+  return Array.from(bytes)
+    .map((b) => b.toString(16).padStart(2, "0"))
+    .join("");
 }
 
 export function logSystemError(context: string, error: any, payload?: any) {
@@ -17,7 +33,7 @@ export function logSystemError(context: string, error: any, payload?: any) {
   const errorMsg = error?.message || String(error);
   const stack = error?.stack || "No stack trace";
   const safePayload = payload ? { ...payload } : "No payload";
-  
+
   // Mask sensitive fields
   if (typeof safePayload === "object" && safePayload !== null) {
     if ("password" in safePayload) safePayload.password = "***";
@@ -30,14 +46,27 @@ export function logSystemError(context: string, error: any, payload?: any) {
   console.error(`Payload:`, JSON.stringify(safePayload, null, 2));
 }
 
-export async function sendMail(env: any, toEmail: string, subject: string, html: string): Promise<{ ok: boolean; status: number; body: string; provider: string; missing: string[] }> {
+export async function sendMail(
+  env: any,
+  toEmail: string,
+  subject: string,
+  html: string,
+): Promise<{
+  ok: boolean;
+  status: number;
+  body: string;
+  provider: string;
+  missing: string[];
+}> {
   // Check for Preview/Review environment
   if (env.IS_PREVIEW === "true") {
     const token = String(env.MAILTRAP_API_TOKEN || "");
     const inboxId = String(env.MAILTRAP_INBOX_ID || "");
 
     if (token && inboxId) {
-      const senderEmail = String(env.GMAIL_SENDER_EMAIL || "no-reply@cinesphere.com.vn");
+      const senderEmail = String(
+        env.GMAIL_SENDER_EMAIL || "no-reply@cinesphere.com.vn",
+      );
       const senderName = String(env.GMAIL_SENDER_NAME || "CINESPHERE");
 
       const payload = {
@@ -45,23 +74,38 @@ export async function sendMail(env: any, toEmail: string, subject: string, html:
         from: { email: senderEmail, name: senderName },
         subject,
         html,
-        category: "Review Worker Test"
+        category: "Review Worker Test",
       };
 
-      const res = await fetch(`https://sandbox.api.mailtrap.io/api/send/${inboxId}`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${token}`
+      const res = await fetch(
+        `https://sandbox.api.mailtrap.io/api/send/${inboxId}`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify(payload),
         },
-        body: JSON.stringify(payload)
-      });
+      );
 
       const bodyText = await res.text().catch(() => "");
-      return { ok: res.ok, status: res.status, body: bodyText, provider: "mailtrap-sandbox", missing: [] };
+      return {
+        ok: res.ok,
+        status: res.status,
+        body: bodyText,
+        provider: "mailtrap-sandbox",
+        missing: [],
+      };
     }
-    
-    return { ok: false, status: 500, body: "Mailtrap provider is not configured for preview", provider: "mailtrap-sandbox", missing: ["MAILTRAP_API_TOKEN", "MAILTRAP_INBOX_ID"] };
+
+    return {
+      ok: false,
+      status: 500,
+      body: "Mailtrap provider is not configured for preview",
+      provider: "mailtrap-sandbox",
+      missing: ["MAILTRAP_API_TOKEN", "MAILTRAP_INBOX_ID"],
+    };
   }
 
   const brevoKey = String(env.BREVO_API_KEY || "");
@@ -69,7 +113,9 @@ export async function sendMail(env: any, toEmail: string, subject: string, html:
   if (useBrevo) {
     const senderEmailBrevo = String(env.BREVO_SENDER_EMAIL || "");
     const senderNameBrevo = String(env.BREVO_SENDER_NAME || "");
-    const senderEmailFallback = String(env.GMAIL_SENDER_EMAIL || "no-reply@example.com");
+    const senderEmailFallback = String(
+      env.GMAIL_SENDER_EMAIL || "no-reply@example.com",
+    );
     const senderNameFallback = String(env.GMAIL_SENDER_NAME || "CTBOOKING");
     const missing: string[] = [];
     if (!brevoKey) missing.push("BREVO_API_KEY");
@@ -89,12 +135,21 @@ export async function sendMail(env: any, toEmail: string, subject: string, html:
       body: JSON.stringify(payload),
     });
     const bodyText = await res.text().catch(() => "");
-    return { ok: res.ok, status: res.status, body: bodyText, provider: "brevo", missing };
+    return {
+      ok: res.ok,
+      status: res.status,
+      body: bodyText,
+      provider: "brevo",
+      missing,
+    };
   } else {
-    const fromEmail = String(env.GMAIL_SENDER_EMAIL || env.GMAIL_USER || "no-reply@example.com");
+    const fromEmail = String(
+      env.GMAIL_SENDER_EMAIL || env.GMAIL_USER || "no-reply@example.com",
+    );
     const fromName = String(env.GMAIL_SENDER_NAME || "CTBOOKING");
     const missing: string[] = [];
-    if (!String(env.GMAIL_SENDER_EMAIL || env.GMAIL_USER || "")) missing.push("GMAIL_SENDER_EMAIL");
+    if (!String(env.GMAIL_SENDER_EMAIL || env.GMAIL_USER || ""))
+      missing.push("GMAIL_SENDER_EMAIL");
     if (!String(env.GMAIL_SENDER_NAME || "")) missing.push("GMAIL_SENDER_NAME");
     const payload = {
       personalizations: [{ to: [{ email: toEmail }] }],
@@ -108,7 +163,13 @@ export async function sendMail(env: any, toEmail: string, subject: string, html:
       body: JSON.stringify(payload),
     });
     const bodyText = await res.text().catch(() => "");
-    return { ok: res.ok, status: res.status, body: bodyText, provider: "mailchannels", missing };
+    return {
+      ok: res.ok,
+      status: res.status,
+      body: bodyText,
+      provider: "mailchannels",
+      missing,
+    };
   }
 }
 
@@ -116,116 +177,150 @@ export function formatCurrencyVi(amount: number): string {
   return `${Number(amount || 0).toLocaleString("vi-VN")}đ`;
 }
 
-export function getBookingEmailTemplate(baseUrl: string, data: {
-  bookingCode: string;
-  customerName: string;
-  movieTitle: string;
-  ticketCount: number;
-  totalPrice: string;
-  movieImage?: string;
-  durationMin?: number | string;
-  ticketPackageName?: string;
-  expiryDate?: string | Date | null;
-}): string {
-  const imgSrc = data.movieImage?.startsWith("http") ? data.movieImage : `${baseUrl}${data.movieImage}`;
-  // const imgHtml = data.movieImage ? `<img src="${imgSrc}" alt="${data.movieTitle}" class="movie-poster">` : "";
-  const durationHtml = data.durationMin !== undefined && data.durationMin !== null ? `
-                <div class="detail-row">
-                    <span class="detail-label">Thời lượng:&nbsp;</span>
-                    <span class="detail-value">${data.durationMin} phút</span>
-                </div>` : ``;
-  const pkgHtml = data.ticketPackageName ? `
-              <div class="detail-row">
-                  <span class="detail-label">Loại vé:&nbsp;</span>
-                  <span class="detail-value">${data.ticketPackageName}</span>
-              </div>` : ``;
-  const expiryHtml = data.expiryDate ? `
-              <div class="detail-row">
-                  <span class="detail-label">Ngày hết hạn:&nbsp;</span>
-                  <span class="detail-value">${(() => { try { const d = new Date(String(data.expiryDate)); const dd = String(d.getDate()).padStart(2,"0"); const mm = String(d.getMonth()+1).padStart(2,"0"); const yyyy = d.getFullYear(); const hh = String(d.getHours()).padStart(2,"0"); const mi = String(d.getMinutes()).padStart(2,"0"); return dd+"/"+mm+"/"+yyyy+" "+hh+":"+mi; } catch { return String(data.expiryDate); } })()}</span>
-              </div>` : ``;
+export function getBookingEmailTemplate(
+  baseUrl: string,
+  data: {
+    bookingCode: string;
+    customerName: string;
+    movieTitle: string; // Nhận chuỗi JSON: "["Phim A","Phim B"]"
+    ticketCount: number;
+    totalPrice: string;
+    movieImage?: string;
+    durationMin?: number | string; // Nhận chuỗi JSON: "[10, 12]"
+    ticketPackageName?: string;
+    expiryDate?: string | Date | null;
+  },
+): string {
+  // 1. XỬ LÝ PARSE JSON CHO DANH SÁCH PHIM
+  let movieTitles: string[] = [];
+  let durations: string[] = [];
+
+  try {
+    movieTitles = JSON.parse(data.movieTitle || "[]");
+    durations = JSON.parse(String(data.durationMin) || "[]");
+  } catch (e) {
+    movieTitles = data.movieTitle ? [data.movieTitle] : [];
+    durations = data.durationMin ? [String(data.durationMin)] : [];
+  }
+
+  // 2. TẠO HTML DANH SÁCH PHIM (Đồng bộ giao diện Admin)
+  const moviesListHtml = movieTitles
+    .map(
+      (title, index) => `
+    <div style="display: flex; justify-content: space-between; align-items: center; padding: 10px 12px; margin-bottom: 6px; background-color: #f8f9fa; border-radius: 6px; border: 1px solid #edf2f7;">
+        <span style="font-weight: 600; color: #2d3748; font-size: 14px;">🎬 ${title}</span>
+        <span style="font-size: 11px; color: #a0aec0; font-weight: bold; background: #fff; padding: 2px 6px; border-radius: 4px; border: 1px solid #e2e8f0;">
+          ${durations[index] || "--"} ph
+        </span>
+    </div>
+  `,
+    )
+    .join("");
+
+  // 3. XỬ LÝ CÁC THÀNH PHẦN KHÁC
+  const pkgHtml = data.ticketPackageName
+    ? `
+    <div class="detail-row">
+        <span class="detail-label">Loại vé:</span>
+        <span class="detail-value" style="color: #4a5568;">${data.ticketPackageName}</span>
+    </div>`
+    : ``;
+
+  const expiryHtml = data.expiryDate
+    ? `
+    <div class="detail-row">
+        <span class="detail-label">Ngày hết hạn:</span>
+        <span class="detail-value" style="color: #e53e3e;">${(() => {
+          try {
+            const d = new Date(String(data.expiryDate));
+            return (
+              d.toLocaleDateString("vi-VN") +
+              " " +
+              d.toLocaleTimeString("vi-VN", {
+                hour: "2-digit",
+                minute: "2-digit",
+              })
+            );
+          } catch {
+            return String(data.expiryDate);
+          }
+        })()}</span>
+    </div>`
+    : ``;
+
   return `
 <!DOCTYPE html>
 <html lang="vi">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Xác nhận đặt vé - CINESPHERE</title>
     <style>
-        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f5f5f5; margin: 0; padding: 0; }
-        .container { max-width: 600px; margin: 0 auto; background-color: #ffffff; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); overflow: hidden; }
-        .header { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 30px 20px; text-align: center; }
-        .header h1 { margin: 0; font-size: 28px; font-weight: 600; }
-        .header p { margin: 8px 0 0 0; font-size: 14px; opacity: 0.9; }
+        body { font-family: 'Segoe UI', Arial, sans-serif; background-color: #f4f7f6; margin: 0; padding: 0; }
+        .container { max-width: 600px; margin: 20px auto; background-color: #ffffff; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.08); overflow: hidden; }
+        .header { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 40px 20px; text-align: center; }
+        .header h1 { margin: 0; font-size: 30px; letter-spacing: 2px; text-transform: uppercase; }
         .content { padding: 30px; }
-        .greeting { font-size: 16px; color: #333; margin-bottom: 20px; }
-        .booking-code-box { background-color: #f8f9fa; border-left: 4px solid #667eea; padding: 20px; margin: 20px 0; border-radius: 4px; }
-        .booking-code-label { font-size: 12px; color: #666; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px; }
-        .booking-code { font-size: 32px; font-weight: 700; color: #667eea; font-family: 'Courier New', monospace; letter-spacing: 2px; }
-        .details-section { margin: 25px 0; }
-        .section-title { font-size: 14px; font-weight: 600; color: #333; text-transform: uppercase; margin-bottom: 15px; border-bottom: 2px solid #667eea; padding-bottom: 8px; }
-        .detail-row { display: flex; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid #eee; font-size: 14px; }
-        .detail-row:last-child { border-bottom: none; }
-        .detail-label { color: #666; font-weight: 500; }
-        .detail-value { color: #333; font-weight: 600; }
-        .price-highlight { color: #27ae60; font-size: 18px; }
-        .movie-poster { width: 100%; max-width: 200px; margin: 15px auto; border-radius: 4px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
-        .footer { background-color: #f8f9fa; padding: 20px; text-align: center; font-size: 12px; color: #666; border-top: 1px solid #eee; }
-        .footer p { margin: 5px 0; }
-        .warning { background-color: #fff3cd; border-left: 4px solid #ffc107; padding: 12px; margin: 15px 0; border-radius: 4px; font-size: 13px; color: #856404; }
+        .booking-code-box { background-color: #f0f4ff; border: 2px dashed #667eea; padding: 25px; margin: 20px 0; border-radius: 10px; text-align: center; }
+        .booking-code { font-size: 40px; font-weight: 800; color: #667eea; font-family: 'Courier New', monospace; letter-spacing: 5px; }
+        .section-title { font-size: 13px; font-weight: 700; color: #4a5568; text-transform: uppercase; margin: 25px 0 15px; border-bottom: 2px solid #edf2f7; padding-bottom: 8px; }
+        .detail-row { display: flex; justify-content: space-between; padding: 12px 0; border-bottom: 1px solid #f7fafc; font-size: 14px; }
+        .detail-label { color: #718096; font-weight: 500; }
+        .detail-value { color: #1a202c; font-weight: 700; }
+        .footer { background-color: #f8f9fa; padding: 25px; text-align: center; font-size: 12px; color: #a0aec0; border-top: 1px solid #edf2f7; }
     </style>
 </head>
 <body>
     <div class="container">
         <div class="header">
-            <h1>🎬 CINESPHERE</h1>
-            <p>Xác nhận đặt vé thành công</p>
+            <h1>CINESPHERE</h1>
+            <p style="margin-top: 5px; opacity: 0.9;">XÁC NHẬN ĐẶT VÉ THÀNH CÔNG</p>
         </div>
         <div class="content">
-            <div class="greeting">
+            <div style="font-size: 16px; color: #2d3748; margin-bottom: 20px;">
                 Xin chào <strong>${data.customerName}</strong>,<br>
-                Cảm ơn bạn đã đặt vé tại CINESPHERE. Vui lòng sử dụng mã đặt vé sau để check-in tại rạp.
+                Đơn hàng của bạn đã được xác nhận. Vui lòng xuất trình mã vé dưới đây tại quầy soát vé.
             </div>
+            
             <div class="booking-code-box">
-                <div class="booking-code-label">Mã đặt vé của bạn</div>
+                <div style="font-size: 12px; color: #718096; margin-bottom: 8px; font-weight: bold;">MÃ ĐẶT VÉ CỦA BẠN</div>
                 <div class="booking-code">${data.bookingCode}</div>
-                <div style="font-size: 12px; color: #999; margin-top: 10px;">Vui lòng lưu lại mã này để check-in tại rạp</div>
             </div>
-            <div class="details-section">
-                <div class="section-title">Thông tin phim</div>
-                <div class="detail-row">
-                    <span class="detail-label">Tên phim:&nbsp;</span>
-                    <span class="detail-value">${data.movieTitle}</span>
-                </div>
-                ${durationHtml}
+
+            <div class="section-title">Thông tin phim</div>
+            ${moviesListHtml}
+
+            <div class="section-title">Chi tiết đơn hàng</div>
+            <div class="detail-row">
+                <span class="detail-label">Số lượng vé:</span>
+                <span class="detail-value" style="background: #fed7d7; color: #c53030; padding: 2px 8px; border-radius: 4px;">${data.ticketCount} VÉ</span>
             </div>
-            <div class="details-section">
-              <div class="section-title">Chi tiết đơn hàng</div>
-              <div class="detail-row">
-                  <span class="detail-label">Số lượng vé:&nbsp;</span>
-                  <span class="detail-value">${data.ticketCount} vé</span>
-              </div>
-              ${pkgHtml}
-              <div class="detail-row">
-                  <span class="detail-label">Tổng tiền:&nbsp;</span>
-                  <span class="detail-value">${data.totalPrice}</span>
-              </div>
-              ${expiryHtml}
+            ${pkgHtml}
+            <div class="detail-row">
+                <span class="detail-label">Tổng thanh toán:</span>
+                <span class="detail-value" style="font-size: 18px; color: #38a169;">${data.totalPrice}đ</span>
             </div>
-            <div class="warning">⏰ <strong>Lưu ý:</strong> Mang theo mã đặt vé để nhân viên xác nhận.</div>
+            ${expiryHtml}
+
+            <div style="background-color: #fffaf0; border-left: 4px solid #f6ad55; padding: 15px; margin-top: 30px; border-radius: 4px;">
+                <p style="margin: 0; font-size: 13px; color: #9c4221;">
+                    ⏰ <strong>Lưu ý:</strong> Mang theo mã đặt vé để nhân viên quét xác nhận tại cổng.
+                </p>
+            </div>
         </div>
         <div class="footer">
-            <p><strong>CINESPHERE - Rạp chiếu phim hiện đại</strong></p>
+            <p><strong>CINESPHERE - TRẢI NGHIỆM ĐIỆN ẢNH VŨ TRỤ</strong></p>
             <p>Email: cinesphere0629@gmail.com | Hotline: 1900-xxxx</p>
-            <p style="margin-top: 15px; color: #999;">Đây là email tự động, vui lòng không trả lời email này.</p>
+            <p style="margin-top: 15px;">Đây là email tự động, vui lòng không trả lời.</p>
         </div>
     </div>
 </body>
-</html>
-  `;
+</html>`;
 }
 
-export function getWelcomeEmailTemplate(baseUrl: string, data: { customerName: string; email: string }): string {
+export function getWelcomeEmailTemplate(
+  baseUrl: string,
+  data: { customerName: string; email: string },
+): string {
   const homeUrl = `${baseUrl}/`;
   return `
 <!DOCTYPE html>
@@ -286,7 +381,10 @@ export function getWelcomeEmailTemplate(baseUrl: string, data: { customerName: s
   `;
 }
 
-export function getResetPasswordEmailTemplate(baseUrl: string, link: string): string {
+export function getResetPasswordEmailTemplate(
+  baseUrl: string,
+  link: string,
+): string {
   return `
 <!DOCTYPE html>
 <html lang="vi">
@@ -406,7 +504,9 @@ export async function sha1Hex(input: string): Promise<string> {
   const enc = new TextEncoder();
   const buf = await crypto.subtle.digest("SHA-1", enc.encode(input));
   const bytes = new Uint8Array(buf as ArrayBuffer);
-  return Array.from(bytes).map((b) => b.toString(16).padStart(2, "0")).join("");
+  return Array.from(bytes)
+    .map((b) => b.toString(16).padStart(2, "0"))
+    .join("");
 }
 
 export function hasCloudinary(env: any) {
@@ -416,7 +516,10 @@ export function hasCloudinary(env: any) {
   return Boolean(cloudName && apiKey && apiSecret);
 }
 
-export async function cloudinarySignedParams(env: any, params: Record<string, string | number>) {
+export async function cloudinarySignedParams(
+  env: any,
+  params: Record<string, string | number>,
+) {
   const apiKey = String(env.CLOUDINARY_API_KEY || "");
   const apiSecret = String(env.CLOUDINARY_API_SECRET || "");
   const keys = Object.keys(params).sort();
@@ -426,7 +529,8 @@ export async function cloudinarySignedParams(env: any, params: Record<string, st
 }
 
 export function optimizeCloudinaryUrl(url: string, width?: number) {
-  if (!url || typeof url !== "string" || !url.includes("cloudinary.com")) return url;
+  if (!url || typeof url !== "string" || !url.includes("cloudinary.com"))
+    return url;
   const parts = url.split("/upload/");
   if (parts.length !== 2) return url;
   const transformations = ["f_auto", "q_auto"];
@@ -435,7 +539,11 @@ export function optimizeCloudinaryUrl(url: string, width?: number) {
   return `${parts[0]}/upload/${transformString}/${parts[1]}`;
 }
 
-export async function uploadCloudinaryImageDataURI(env: any, dataUri: string, folder: string) {
+export async function uploadCloudinaryImageDataURI(
+  env: any,
+  dataUri: string,
+  folder: string,
+) {
   const cloudName = String(env.CLOUDINARY_CLOUD_NAME || "");
   const timestamp = Math.floor(Date.now() / 1000);
   const params = {
@@ -460,7 +568,8 @@ export async function uploadCloudinaryImageDataURI(env: any, dataUri: string, fo
   const endpoint = `https://api.cloudinary.com/v1_1/${cloudName}/image/upload`;
   const res = await fetch(endpoint, { method: "POST", body: form });
   const json: any = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error(String(json?.error?.message || `Cloudinary ${res.status}`));
+  if (!res.ok)
+    throw new Error(String(json?.error?.message || `Cloudinary ${res.status}`));
   return {
     url: String(json.secure_url || json.url || ""),
     width: Number(json.width || 0),
