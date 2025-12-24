@@ -1,4 +1,8 @@
-import type { Movie, MoviesResponse, ActiveMoviesTodayResponse } from "@shared/api";
+import type {
+  Movie,
+  MoviesResponse,
+  ActiveMoviesTodayResponse,
+} from "@shared/api";
 import { request } from "./http";
 
 export async function getMovies2025(options?: { signal?: AbortSignal }) {
@@ -7,11 +11,13 @@ export async function getMovies2025(options?: { signal?: AbortSignal }) {
   });
 }
 
-export async function getAllActiveMoviesToday(options?: { signal?: AbortSignal }) {
+export async function getAllActiveMoviesToday(options?: {
+  signal?: AbortSignal;
+}) {
   return request<{ activeMovies: ActiveMoviesTodayResponse[] }>(
     "/api/getActiveMovies",
     {
-      method: "POST",
+      method: "GET",
       signal: options?.signal,
     },
   );
@@ -108,4 +114,3 @@ export async function getMovieById(id: number) {
 }
 
 export type { Movie, MoviesResponse, ActiveMoviesTodayResponse };
-

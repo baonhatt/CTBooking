@@ -367,7 +367,7 @@ export function createServer() {
       });
     }
   });
-  app.post("/api/getActiveMovies", async (_req, res) => {
+  app.get("/api/getActiveMovies", async (_req, res) => {
     try {
       const result = await getAllActiveMoviesToday(db, { movies: pgMovies });
       return res.status(200).json(result);
