@@ -8,7 +8,10 @@ export interface UploadResult {
   height?: number;
 }
 
-export function uploadAdminVideo(file: File, onProgress?: (percent: number) => void): Promise<UploadResult> {
+export function uploadAdminVideo(
+  file: File,
+  onProgress?: (percent: number) => void,
+): Promise<UploadResult> {
   return new Promise((resolve, reject) => {
     const xhr = new XMLHttpRequest();
     xhr.open("POST", "/api/admin/uploads/video");
@@ -26,7 +29,9 @@ export function uploadAdminVideo(file: File, onProgress?: (percent: number) => v
       if (status >= 200 && status < 300) {
         resolve(res as UploadResult);
       } else {
-        reject(new Error(res?.message || `Upload failed with status ${status}`));
+        reject(
+          new Error(res?.message || `Upload failed with status ${status}`),
+        );
       }
     };
     const form = new FormData();
@@ -35,13 +40,17 @@ export function uploadAdminVideo(file: File, onProgress?: (percent: number) => v
   });
 }
 
-export function uploadDirectToCloudinary(file: File, onProgress?: (percent: number) => void): Promise<UploadResult> {
+export function uploadDirectToCloudinary(
+  file: File,
+  onProgress?: (percent: number) => void,
+): Promise<UploadResult> {
   return new Promise((resolve, reject) => {
     const env = (import.meta as any).env || {};
     const cloudName = env.VITE_CLOUDINARY_CLOUD_NAME || "";
     const presetVideo = env.VITE_CLOUDINARY_UPLOAD_PRESET_VIDEO || "";
     const presetImage = env.VITE_CLOUDINARY_UPLOAD_PRESET_IMAGE || "";
-    if (!cloudName) return reject(new Error("Thiếu VITE_CLOUDINARY_CLOUD_NAME"));
+    if (!cloudName)
+      return reject(new Error("Thiếu VITE_CLOUDINARY_CLOUD_NAME"));
     const isVideo = /^video\//.test(file.type);
     const isImage = /^image\//.test(file.type);
     const uploadPreset = isVideo ? presetVideo : presetImage;
@@ -65,7 +74,11 @@ export function uploadDirectToCloudinary(file: File, onProgress?: (percent: numb
         if (!resp.ok) return null;
         const data = await resp.json().catch(() => null);
         if (!data?.signature || !data?.timestamp || !data?.api_key) return null;
-        return { signature: String(data.signature), timestamp: Number(data.timestamp), api_key: String(data.api_key) };
+        return {
+          signature: String(data.signature),
+          timestamp: Number(data.timestamp),
+          api_key: String(data.api_key),
+        };
       } catch {
         return null;
       }
@@ -111,7 +124,11 @@ export function uploadDirectToCloudinary(file: File, onProgress?: (percent: numb
         form.append("upload_preset", uploadPreset);
       } else {
         // Neither signature nor preset available
-        reject(new Error("Thiếu cấu hình upload: cần VITE_CLOUDINARY_UPLOAD_PRESET_* hoặc bật ký server"));
+        reject(
+          new Error(
+            "Thiếu cấu hình upload: cần VITE_CLOUDINARY_UPLOAD_PRESET_* hoặc bật ký server",
+          ),
+        );
         return;
       }
       xhr.send(form);
@@ -181,8 +198,10 @@ export async function getSiteMediaApi(options?: {
   const params = new URLSearchParams();
   if (options?.section) params.set("section", options.section);
   if (options?.type) params.set("type", options.type);
-  if (typeof options?.active === "boolean") params.set("active", String(options.active));
-  const path = `/api/site-media${params.toString() ? `?${params.toString()}` : ""}`;
+  if (typeof options?.active === "boolean")
+    params.set("active", String(options.active));
+  const baseUrl = (import.meta as any).env?.VITE_SERVER_BASE_URL || "";
+  const path = `${baseUrl}/api/site-media${params.toString() ? `?${params.toString()}` : ""}`;
   const res = await fetch(path, { signal: options?.signal });
   if (!res.ok) {
     const data = await res.json().catch(() => ({}));

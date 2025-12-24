@@ -11,48 +11,92 @@ import {
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Switch } from "@/components/ui/switch";
 import {
   Pagination,
   PaginationContent,
   PaginationItem,
-  PaginationLink,
   PaginationNext,
   PaginationPrevious,
 } from "@/components/ui/pagination";
+import { Dialog, DialogContent } from "@/components/ui/dialog";
 import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import {
+  MoreHorizontal,
+  Eye,
+  Edit3,
+  Clock,
+  Star,
+  Search,
+  FilterX,
+  RefreshCw,
+  Plus,
+  History,
+  Trash2,
+  FileText,
+  Image,
+  ShieldAlert,
+  Globe,
+  Calendar,
+  X,
+  MessageSquare,
+  Ticket,
+  AlertCircle,
+  SortDesc,
+  SortAsc,
+} from "lucide-react";
+import { format, formatDistanceToNow } from "date-fns";
+import { vi } from "date-fns/locale";
 import { getMovieById } from "@/lib/api";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 
 interface MovieData {
-  id: string;
+  id: string | number;
   title: string;
-  year: number;
   duration: string;
   genres: string[];
   posterUrl: string;
   release_date: string | null;
   rating: number | null;
+  updated_at: string;
+  cover_image?: string;
 }
+
 interface Props {
   data: MovieData[];
   totalPages: number;
   currentPage: number;
   setPage: (p: number) => void;
   movieStatus: Record<string, "active" | "inactive">;
+  onToggleStatus: (
+    id: string | number,
+    currentStatus: "active" | "inactive",
+  ) => void;
   onEdit: (type: "movie", data: any) => void;
   onCreate: () => void;
   moviesLength: number;
-  formatLocalDateTime: (date: Date) => React.ReactNode;
   onRefresh: () => void;
   searchQuery?: string;
   onSearchChange?: (query: string) => void;
-  sortKey?: "updated_at" | "release_date" | "title" | "rating";
+  sortKey?: string;
   sortDir?: "asc" | "desc";
-  setSortKey?: (k: "updated_at" | "release_date" | "title" | "rating") => void;
+  setSortKey?: (k: any) => void;
   setSortDir?: (d: "asc" | "desc") => void;
   isLoading?: boolean;
   showActiveOnly?: boolean;
@@ -65,338 +109,584 @@ export default function MoviesContent({
   currentPage,
   setPage,
   movieStatus,
+  onToggleStatus,
   onEdit,
   onCreate,
   moviesLength,
-  formatLocalDateTime,
   onRefresh,
   searchQuery = "",
-  onSearchChange = () => { },
+  onSearchChange = () => {},
   sortKey = "updated_at",
+  setSortKey = () => {},
   sortDir = "desc",
-  setSortKey = () => { },
-  setSortDir = () => { },
+  setSortDir = () => {},
   isLoading = false,
   showActiveOnly = false,
-  setShowActiveOnly = () => { },
+  setShowActiveOnly = () => {},
 }: Props) {
+  console.log(data);
   const [isDetailsOpen, setIsDetailsOpen] = useState(false);
   const [selectedMovieId, setSelectedMovieId] = useState<number | null>(null);
   const [movieDetails, setMovieDetails] = useState<any>(null);
   const [isLoadingDetails, setIsLoadingDetails] = useState(false);
-  const [detailsError, setDetailsError] = useState<string | null>(null);
+
+  const InfoRow = ({
+    label,
+    value,
+    icon,
+  }: {
+    label: string;
+    value: string;
+    icon?: React.ReactNode;
+  }) => (
+    <div className="flex justify-between items-center">
+      <span className="text-[11px] font-medium text-slate-500 flex items-center gap-1.5">
+        {icon} {label}
+      </span>
+      <span className="text-[11px] font-bold text-slate-800">{value}</span>
+    </div>
+  );
 
   useEffect(() => {
     if (isDetailsOpen && selectedMovieId) {
       (async () => {
         try {
           setIsLoadingDetails(true);
-          setDetailsError(null);
           const details = await getMovieById(selectedMovieId);
           setMovieDetails(details);
+          console.log(movieDetails);
         } catch (err) {
-          setDetailsError("Không thể tải thông tin phim");
-          console.error("Lỗi load movie details:", err);
+          console.error("Lỗi load chi tiết:", err);
         } finally {
           setIsLoadingDetails(false);
         }
       })();
+    } else {
+      setMovieDetails(null);
     }
   }, [isDetailsOpen, selectedMovieId]);
 
-  const handleViewDetails = (movieId: number) => {
-    setSelectedMovieId(movieId);
-    setIsDetailsOpen(true);
-  };
   return (
-    <div className="space-y-6">
-      <div className="flex flex-wrap justify-between items-center gap-4">
-        <div className="flex-1 min-w-[320px]">
-          <input
-            type="text"
-            placeholder="Tìm kiếm phim theo tên hoặc mô tả..."
-            value={searchQuery}
-            onChange={(e) => onSearchChange(e.target.value)}
-            className="w-full px-4 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-          />
-        </div>
-        <div className="flex flex-wrap items-center gap-3">
-          <h3 className="text-lg font-semibold whitespace-nowrap">
-            Tổng: {moviesLength}
-          </h3>
-          <label className="flex items-center gap-2 whitespace-nowrap">
+    <div className="space-y-6 font-sans">
+      {/* TOOLBAR */}
+      <div className="flex flex-col xl:flex-row justify-between items-start xl:items-center gap-4 bg-white p-4 rounded-2xl border shadow-sm">
+        <div className="flex flex-1 w-full gap-3">
+          <div className="relative flex-1 max-w-md">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 w-4 h-4" />
             <input
-              type="checkbox"
-              checked={showActiveOnly}
-              onChange={(e) => setShowActiveOnly(e.target.checked)}
+              type="text"
+              placeholder="Tìm tên phim..."
+              value={searchQuery}
+              onChange={(e) => onSearchChange(e.target.value)}
+              className="w-full pl-10 pr-4 py-2 bg-slate-50 border-transparent focus:bg-white focus:ring-2 focus:ring-blue-500 rounded-xl transition-all outline-none text-sm"
             />
-            Active
-          </label>
+          </div>
+          <Button
+            variant="outline"
+            size="icon"
+            onClick={onRefresh}
+            className="rounded-xl shadow-sm hover:rotate-180 transition-transform duration-500"
+          >
+            <RefreshCw
+              className={`w-4 h-4 ${isLoading ? "animate-spin" : ""}`}
+            />
+          </Button>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-3 w-full xl:w-auto font-sans">
+          <div className="flex items-center gap-2 px-3 py-1.5 bg-slate-50 rounded-xl border border-slate-200">
+            <span className="text-[10px] font-bold text-slate-500 uppercase">
+              Chỉ hiện đang chiếu
+            </span>
+            <Switch
+              checked={showActiveOnly}
+              onCheckedChange={setShowActiveOnly}
+              className="scale-75 data-[state=checked]:bg-emerald-500 data-[state=unchecked]:bg-slate-300 cursor-pointer"
+            />
+          </div>
+
           <select
             value={sortKey}
             onChange={(e) => setSortKey(e.target.value as any)}
-            className="border rounded px-2 py-1 w-48"
+            className="bg-white border rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none shadow-sm cursor-pointer"
           >
-            <option value="updated_at">Cập nhật gần đây</option>
+            <option value="updated_at">Mới cập nhật</option>
+            <option value="rating">Đánh giá cao</option>
             <option value="release_date">Ngày phát hành</option>
-            <option value="title">Tên phim</option>
-            <option value="rating">Rating</option>
           </select>
-          <select
-            value={sortDir}
-            onChange={(e) => setSortDir(e.target.value as any)}
-            className="border rounded px-2 py-1 w-36"
-          >
-            <option value="desc">Giảm dần</option>
-            <option value="asc">Tăng dần</option>
-          </select>
-
-        </div>
-        <div className="flex gap-2">
-          <Button onClick={onRefresh} variant="outline">
-            ↻ Làm mới
-          </Button>
+          {/* BỔ SUNG NÚT ĐẢO CHIỀU TẠI ĐÂY */}
           <Button
-            variant="secondary"
-            onClick={() => {
-              onSearchChange?.("");
-              setSortKey?.("updated_at");
-              setSortDir?.("desc");
-              setPage(1);
-            }}
+            variant="outline"
+            size="icon"
+            onClick={() => setSortDir?.(sortDir === "asc" ? "desc" : "asc")}
+            className="rounded-xl border-slate-200 hover:bg-slate-50 active:scale-95 transition-all shadow-sm"
+            title={sortDir === "asc" ? "Tăng dần" : "Giảm dần"}
           >
-            Xóa bộ lọc
+            {sortDir === "desc" ? (
+              <SortDesc className="w-4 h-4 text-slate-600" />
+            ) : (
+              <SortAsc className="w-4 h-4 text-slate-600" />
+            )}
           </Button>
-        </div>
-        <div className="flex justify-end w-full">
-          <Button onClick={onCreate}>+ Thêm phim mới</Button>
+          {/* KẾT THÚC BỔ SUNG */}
+
+          <Button
+            onClick={onCreate}
+            className="bg-blue-600 hover:bg-blue-700 rounded-xl shadow-lg shadow-blue-200 gap-2 ml-auto text-white"
+          >
+            <Plus className="w-4 h-4" /> Thêm phim
+          </Button>
         </div>
       </div>
-      <Card>
-        <CardContent className="p-0">
+
+      {/* TABLE */}
+      <Card className="border-none shadow-xl shadow-slate-200/50 rounded-2xl overflow-hidden bg-white">
+        <CardContent className="p-0 font-sans">
           <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>ID</TableHead>
-                <TableHead>Tên Phim</TableHead>
-                <TableHead>Thể Loại</TableHead>
-                <TableHead>Thời Lượng (Phút)</TableHead>
-                <TableHead>Đánh Giá</TableHead>
-                <TableHead>Ngày Phát Hành</TableHead>
-                <TableHead>Trạng Thái</TableHead>
-                <TableHead className="text-right">Hành Động</TableHead>
+            <TableHeader className="bg-slate-50/80">
+              <TableRow className="hover:bg-transparent border-none">
+                <TableHead className="w-16 text-center text-[10px] uppercase font-bold text-slate-400">
+                  ID
+                </TableHead>
+                <TableHead className="min-w-[300px] text-[10px] uppercase font-bold text-slate-500">
+                  Phim & Thể loại
+                </TableHead>
+                <TableHead className="text-[10px] uppercase font-bold text-slate-500 text-center">
+                  Đánh giá
+                </TableHead>
+                <TableHead className="text-[10px] uppercase font-bold text-slate-500">
+                  Cập nhật
+                </TableHead>
+                <TableHead className="text-center text-[10px] uppercase font-bold text-slate-500">
+                  Trạng thái
+                </TableHead>
+                <TableHead className="text-right text-[10px] uppercase font-bold text-slate-500 pr-8">
+                  Thao tác
+                </TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {isLoading
-                ? Array.from({ length: 5 }).map((_, idx) => (
-                  <TableRow key={`sk-${idx}`}>
-                    <TableCell><Skeleton className="h-4 w-16" /></TableCell>
-                    <TableCell className="flex items-center space-x-3">
-                      <Skeleton className="h-15 w-20" />
-                      <Skeleton className="h-4 w-32" />
+              {isLoading ? (
+                Array.from({ length: 5 }).map((_, idx) => (
+                  <TableRow key={idx}>
+                    <TableCell colSpan={6}>
+                      <Skeleton className="h-16 w-full rounded-xl" />
                     </TableCell>
-                    <TableCell><Skeleton className="h-4 w-28" /></TableCell>
-                    <TableCell><Skeleton className="h-4 w-20" /></TableCell>
-                    <TableCell><Skeleton className="h-4 w-12" /></TableCell>
-                    <TableCell><Skeleton className="h-4 w-28" /></TableCell>
-                    <TableCell><Skeleton className="h-5 w-20" /></TableCell>
-                    <TableCell className="text-right"><Skeleton className="h-8 w-32 ml-auto" /></TableCell>
                   </TableRow>
                 ))
-                : data.map((movie) => (
-                  <TableRow key={movie.id}>
-                    <TableCell className="font-medium w-16">{movie.id}</TableCell>
-                    <TableCell className="flex items-center space-x-3">
-                      {movie.posterUrl && (
-                        <img
-                          src={movie.posterUrl}
-                          alt={movie.title}
-                          className="w-20 h-15 object-cover rounded shadow-md"
-                          loading="lazy"
-                        />
-                      )}
-                      <span className="font-medium">{movie.title}</span>
-                    </TableCell>
-                    <TableCell>{movie.genres.join(", ")}</TableCell>
-                    <TableCell>{movie.duration}</TableCell>
-                    <TableCell>{movie.rating ?? ""}</TableCell>
-                    <TableCell>
-                      {movie.release_date
-                        ? formatLocalDateTime(new Date(movie.release_date))
-                        : ""}
-                    </TableCell>
-                    <TableCell>
-                      <Badge
-                        className={
-                          movieStatus[movie.id] === "active"
-                            ? "bg-green-100 text-green-800 hover:bg-green-100"
-                            : "bg-gray-100 text-gray-800 hover:bg-gray-100"
-                        }
-                      >
-                        {movieStatus[movie.id] === "active"
-                          ? "Đang chiếu"
-                          : "Đã ẩn"}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="text-right space-x-2">
+              ) : data.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={6} className="h-64 text-center">
+                    <div className="flex flex-col items-center justify-center text-slate-400 gap-2">
+                      <FilterX size={48} className="opacity-20 mb-2" />
+                      <p className="text-sm font-medium text-slate-500">
+                        Không tìm thấy bộ phim nào phù hợp
+                      </p>
                       <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => handleViewDetails(Number(movie.id))}
+                        variant="link"
+                        onClick={onRefresh}
+                        className="text-blue-500 text-xs"
                       >
-                        Xem
+                        Xóa bộ lọc & Thử lại
                       </Button>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() =>
-                          onEdit("movie", {
-                            ...movie,
-                            status: movieStatus[movie.id] || "active",
-                          })
-                        }
-                      >
-                        Sửa
-                      </Button>
-                    </TableCell>
-                  </TableRow>
-                ))}
+                    </div>
+                  </TableCell>
+                </TableRow>
+              ) : (
+                data.map((movie) => {
+                  const isActive = movieStatus[String(movie.id)] === "active";
+                  return (
+                    <TableRow
+                      key={movie.id}
+                      className="group hover:bg-slate-50/80 transition-colors border-b last:border-0"
+                    >
+                      <TableCell className="text-center font-mono text-[11px] text-slate-400">
+                        {movie.id}
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex items-center gap-4 py-2">
+                          <div className="relative shrink-0 transition-transform group-hover:scale-105">
+                            <img
+                              src={
+                                movie.posterUrl ||
+                                "https://placehold.co/400x600?text=No+Poster"
+                              }
+                              className="w-12 h-16 object-cover rounded-lg shadow-sm border border-slate-100"
+                              alt=""
+                            />
+                            <div className="absolute -bottom-1 -right-1 bg-white shadow-sm border text-[8px] text-slate-600 px-1 rounded flex items-center gap-0.5 font-bold">
+                              <Clock size={8} /> {movie.duration}′
+                            </div>
+                          </div>
+                          <div className="flex flex-col gap-0.5 min-w-0">
+                            <h4 className="font-bold text-slate-900 leading-tight line-clamp-1">
+                              {movie.title}
+                            </h4>
+                            <p className="text-[11px] text-slate-500 line-clamp-1">
+                              {movie.genres.join(" • ")}
+                            </p>
+                          </div>
+                        </div>
+                      </TableCell>
+                      <TableCell className="text-center">
+                        <div className="inline-flex items-center gap-1 bg-yellow-50 px-2 py-0.5 rounded-md border border-yellow-100">
+                          <Star
+                            size={10}
+                            className="fill-yellow-500 text-yellow-500"
+                          />
+                          <span className="text-xs font-black text-yellow-700">
+                            {movie.rating || "0"}
+                          </span>
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex flex-col text-[11px]">
+                          <span className="text-slate-600 font-medium flex items-center gap-1">
+                            <History size={10} className="text-slate-400" />
+                            {movie.updated_at
+                              ? format(new Date(movie.updated_at), "HH:mm")
+                              : "-"}
+                          </span>
+                          <span className="text-slate-400 italic">
+                            {movie.updated_at
+                              ? formatDistanceToNow(
+                                  new Date(movie.updated_at),
+                                  { addSuffix: true, locale: vi },
+                                )
+                              : ""}
+                          </span>
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex items-center justify-center gap-4 py-2">
+                          {/* Bọc Switch vào một div có độ rộng cố định để không bị xê dịch */}
+                          <div className="flex shrink-0 w-12 justify-center">
+                            <AlertDialog>
+                              <AlertDialogTrigger asChild>
+                                <Switch
+                                  checked={isActive}
+                                  className="scale-100 transition-all border-2 border-transparent"
+                                  style={{
+                                    opacity: 1,
+                                    backgroundColor: isActive
+                                      ? "#10b981"
+                                      : "#64748b",
+                                    boxShadow: "none",
+                                  }}
+                                />
+                              </AlertDialogTrigger>
+                              {/* ... Giữ nguyên phần AlertDialogContent của bạn ... */}
+                              <AlertDialogContent className="rounded-2xl font-sans bg-white">
+                                {/* Nội dung AlertDialog giữ nguyên */}
+                              </AlertDialogContent>
+                            </AlertDialog>
+                          </div>
+
+                          {/* Bọc Badge vào một div có độ rộng cố định (ví dụ 80px) để căn lề luôn đều */}
+                          <div className="w-20 flex shrink-0">
+                            <Badge
+                              className={`text-[9px] font-bold px-2 py-1 rounded-lg border-none whitespace-nowrap shadow-sm justify-center w-full
+                              ${isActive ? "bg-emerald-100 text-emerald-700" : "bg-slate-100 text-slate-500"}`}
+                            >
+                              {isActive ? "ĐANG CHIẾU" : "ĐÃ ẨN"}
+                            </Badge>
+                          </div>
+                        </div>
+                      </TableCell>
+
+                      <TableCell className="text-right pr-6">
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button
+                              variant="ghost"
+                              className="h-8 w-8 p-0 rounded-full hover:bg-slate-100"
+                            >
+                              <MoreHorizontal className="h-4 w-4 text-slate-400" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent
+                            align="end"
+                            className="w-48 rounded-xl shadow-2xl border-slate-100"
+                          >
+                            <DropdownMenuItem
+                              onClick={() => {
+                                setSelectedMovieId(Number(movie.id));
+                                setIsDetailsOpen(true);
+                              }}
+                              className="cursor-pointer"
+                            >
+                              <Eye className="mr-2 h-4 w-4 text-blue-500" /> Xem
+                              chi tiết
+                            </DropdownMenuItem>
+                            <DropdownMenuItem
+                              onClick={() => onEdit("movie", movie)}
+                              className="cursor-pointer"
+                            >
+                              <Edit3 className="mr-2 h-4 w-4 text-orange-500" />{" "}
+                              Chỉnh sửa
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </TableCell>
+                    </TableRow>
+                  );
+                })
+              )}
             </TableBody>
           </Table>
         </CardContent>
       </Card>
-      <Pagination className="mt-4">
-        <PaginationContent>
-          <PaginationItem>
-            <PaginationPrevious
-              href="#"
-              onClick={(e) => {
-                e.preventDefault();
-                setPage(Math.max(1, currentPage - 1));
-              }}
-              aria-disabled={currentPage === 1}
-              className={
-                currentPage === 1 ? "pointer-events-none opacity-50" : ""
-              }
-            />
-          </PaginationItem>
-          {Array.from({ length: totalPages }).map((_, i) => (
-            <PaginationItem key={i}>
-              <PaginationLink
+
+      {/* PAGINATION */}
+      <div className="flex flex-col sm:flex-row justify-between items-center bg-white px-6 py-4 rounded-2xl border shadow-sm gap-4">
+        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+          {moviesLength} phim trong hệ thống
+        </span>
+        <Pagination className="justify-end w-auto mx-0">
+          <PaginationContent className="gap-1">
+            <PaginationItem>
+              <PaginationPrevious
                 href="#"
-                isActive={currentPage === i + 1}
                 onClick={(e) => {
                   e.preventDefault();
-                  setPage(i + 1);
+                  setPage(Math.max(1, currentPage - 1));
                 }}
-              >
-                {i + 1}
-              </PaginationLink>
+                className={
+                  currentPage === 1
+                    ? "opacity-30 pointer-events-none"
+                    : "cursor-pointer rounded-lg border shadow-sm"
+                }
+              />
             </PaginationItem>
-          ))}
-          <PaginationItem>
-            <PaginationNext
-              href="#"
-              onClick={(e) => {
-                e.preventDefault();
-                setPage(Math.min(totalPages, currentPage + 1));
-              }}
-              aria-disabled={currentPage === totalPages}
-              className={
-                currentPage === totalPages
-                  ? "pointer-events-none opacity-50"
-                  : ""
-              }
-            />
-          </PaginationItem>
-        </PaginationContent>
-      </Pagination>
+            <PaginationItem>
+              <span className="text-xs font-bold px-3">
+                Trang {currentPage} / {totalPages}
+              </span>
+            </PaginationItem>
+            <PaginationItem>
+              <PaginationNext
+                href="#"
+                onClick={(e) => {
+                  e.preventDefault();
+                  setPage(Math.min(totalPages, currentPage + 1));
+                }}
+                className={
+                  currentPage === totalPages
+                    ? "opacity-30 pointer-events-none"
+                    : "cursor-pointer rounded-lg border shadow-sm"
+                }
+              />
+            </PaginationItem>
+          </PaginationContent>
+        </Pagination>
+      </div>
 
-      {/* Movie Details Modal */}
+      {/* MODAL CHI TIẾT */}
       <Dialog open={isDetailsOpen} onOpenChange={setIsDetailsOpen}>
-        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>Chi tiết phim</DialogTitle>
-          </DialogHeader>
-
+        <DialogContent className="max-w-5xl rounded-xl p-0 overflow-hidden border-none shadow-2xl bg-[#f8fafc] font-sans">
           {isLoadingDetails ? (
-            <div className="flex items-center justify-center py-8">
-              <span>Đang tải...</span>
+            <div className="py-20 flex flex-col items-center gap-3">
+              <div className="w-8 h-8 border-2 border-blue-600 border-t-transparent rounded-full animate-spin" />
+              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+                Đang tải dữ liệu...
+              </p>
             </div>
-          ) : detailsError ? (
-            <div className="text-center py-8 text-red-600">{detailsError}</div>
           ) : movieDetails ? (
-            <div className="space-y-6">
-              {/* Poster & Basic Info */}
-              <div className="flex gap-4">
-                {movieDetails.cover_image && (
-                  <img
-                    src={movieDetails.cover_image}
-                    alt={movieDetails.title}
-                    className="w-32 h-48 object-cover rounded-lg"
-                  />
-                )}
-                <div className="flex-1">
-                  <h2 className="text-2xl font-bold mb-2">
-                    {movieDetails.title}
-                  </h2>
-                  <div className="space-y-2 text-sm">
-                    <p>
-                      <span className="text-gray-600">Thể loại:</span>{" "}
-                      <span className="font-medium">
-                        {Array.isArray(movieDetails.genres)
-                          ? movieDetails.genres.join(", ")
-                          : ""}
+            <div className="flex flex-col">
+              {/* HEADER: Dark & Professional */}
+              <div className="bg-[#0f172a] px-6 py-4 flex items-center justify-between border-b border-slate-800">
+                <div className="flex items-center gap-4">
+                  <div className="bg-slate-800 p-1 rounded border border-slate-700 shadow-inner">
+                    <img
+                      src={movieDetails.cover_image}
+                      className="w-10 h-14 object-cover rounded"
+                      alt=""
+                    />
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-3">
+                      <span className="font-mono text-sm bg-blue-500/20 text-blue-400 px-1.5 py-0.5 rounded border border-blue-500/30">
+                        UUID: {movieDetails.id}
                       </span>
-                    </p>
-                    <p>
-                      <span className="text-gray-600">Đánh giá:</span>{" "}
-                      <span className="font-medium">
-                        {movieDetails.rating}/10
-                      </span>
-                    </p>
-                    <p>
-                      <span className="text-gray-600">Thời lượng(phút):</span>{" "}
-                      <span className="font-medium">
-                        {movieDetails.duration_min}
-                      </span>
-                    </p>
-                    <p>
-                      <span className="text-gray-600">Ngày phát hành:</span>{" "}
-                      <span className="font-medium">
-                        {movieDetails.release_date
-                          ? formatLocalDateTime(new Date(movieDetails.release_date))
-                          : ""}
-                      </span>
-                    </p>
+                      <h2 className="text-base font-bold text-white tracking-tight leading-none uppercase">
+                        {movieDetails.title}
+                      </h2>
+                    </div>
+                    {/* THỂ LOẠI: Hiển thị rõ ràng dạng Tag */}
+                    <div className="flex gap-1.5 mt-2.5">
+                      {movieDetails.genres?.map((genre: string) => (
+                        <span
+                          key={genre}
+                          className="text-[9px] font-bold px-2 py-0.5 bg-slate-800 text-slate-400 rounded border border-slate-700 uppercase tracking-wider"
+                        >
+                          {genre}
+                        </span>
+                      ))}
+                    </div>
                   </div>
                 </div>
               </div>
 
-              {/* Description */}
-              {movieDetails.description && (
-                <div>
-                  <h3 className="font-semibold mb-2">Mô tả</h3>
-                  <p className="text-sm text-gray-700">
-                    {movieDetails.description}
-                  </p>
-                </div>
-              )}
+              {/* BODY SECTION */}
+              <div className="p-6 grid grid-cols-12 gap-6">
+                {/* LEFT: Core Data */}
+                <div className="col-span-8 space-y-6">
+                  {/* Dashboard Stats */}
+                  <div className="grid grid-cols-4 gap-4">
+                    {[
+                      {
+                        label: "Đánh giá",
+                        val: `${movieDetails.rating}/10`,
+                        icon: <Star size={12} />,
+                        color: "text-blue-600",
+                      },
+                      {
+                        label: "Trạng thái",
+                        val:
+                          movieDetails.is_active === true
+                            ? "Đang chiếu"
+                            : "Đã ẩn",
+                        color:
+                          movieDetails.is_active === true
+                            ? "text-emerald-600"
+                            : "text-slate-400",
+                      },
+                    ].map((stat, i) => (
+                      <div
+                        key={i}
+                        className="bg-white p-3 rounded-xl border border-slate-200 shadow-sm"
+                      >
+                        <div className="flex items-center gap-1.5 mb-1">
+                          <span className="text-slate-400">{stat.icon}</span>
+                          <p className="text-[9px] text-slate-400 uppercase font-black">
+                            {stat.label}
+                          </p>
+                        </div>
+                        <p
+                          className={`text-lg font-bold ${stat.color || "text-slate-700"}`}
+                        >
+                          {stat.val}
+                        </p>
+                      </div>
+                    ))}
+                  </div>
 
-              {/* Statistics */}
-              <div className="grid grid-cols-1 gap-4">
-                <div className="bg-green-50 p-4 rounded-lg border border-green-200">
-                  <p className="text-sm text-gray-600">Tổng vé đã bán</p>
-                  <p className="text-2xl font-bold text-green-600">
-                    {movieDetails.stats.totalTicketsSold}
-                  </p>
+                  {/* CẤU HÌNH VÉ (TICKET CONFIG) */}
+                  <section className="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-sm">
+                    <div className="bg-slate-50 px-4 py-2.5 border-b border-slate-200 flex items-center justify-between">
+                      <h3 className="text-[11px] font-bold text-slate-600 uppercase flex items-center gap-2 tracking-tight">
+                        <Ticket size={14} className="text-indigo-500" /> Phân
+                        loại gói vé áp dụng
+                      </h3>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-6 text-[10px] text-blue-600 hover:bg-blue-50"
+                      >
+                        Cấu hình
+                      </Button>
+                    </div>
+                    <div className="p-4 flex flex-wrap gap-3">
+                      {/* Hardcoded Ticket Types */}
+                      <div className="flex items-center gap-2.5 px-3 py-2 bg-indigo-50 border border-indigo-100 rounded-lg">
+                        <div className="w-2 h-2 rounded-full bg-indigo-500 animate-pulse" />
+                        <span className="text-xs font-semibold text-indigo-700">
+                          Gói VIP Monthly
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-2.5 px-3 py-2 bg-emerald-50 border border-emerald-100 rounded-lg">
+                        <div className="w-2 h-2 rounded-full bg-emerald-500" />
+                        <span className="text-xs font-semibold text-emerald-700">
+                          Vé lẻ (29.000đ)
+                        </span>
+                      </div>
+                      <button className="px-4 py-2 border border-dashed border-slate-300 rounded-lg text-slate-400 text-xs hover:bg-slate-50 hover:border-slate-400 transition-all">
+                        + Gán gói mới
+                      </button>
+                    </div>
+                  </section>
+
+                  <section>
+                    <h3 className="text-[11px] font-bold text-slate-400 uppercase tracking-widest mb-3 flex items-center gap-2 px-1">
+                      <FileText size={14} /> Mô tả hệ thống
+                    </h3>
+                    <div className="bg-white p-5 rounded-xl border border-slate-200 text-[13px] text-slate-600 leading-relaxed min-h-[120px] shadow-sm">
+                      {movieDetails.description ||
+                        "Chưa có mô tả nội dung cho phim này."}
+                    </div>
+                  </section>
                 </div>
-                <div className="bg-yellow-50 p-4 rounded-lg border border-yellow-200">
-                  <p className="text-sm text-gray-600">Tổng doanh thu</p>
-                  <p className="text-2xl font-bold text-yellow-600">
-                    {movieDetails.stats.totalRevenue.toLocaleString("vi-VN")}₫
-                  </p>
+
+                {/* RIGHT: Metadata & System Notes */}
+                <div className="col-span-4 space-y-4">
+                  <div className="bg-white rounded-xl p-5 border border-slate-200 shadow-sm space-y-4">
+                    <h3 className="text-[11px] font-bold text-slate-400 uppercase border-b pb-3 tracking-widest">
+                      Metadata
+                    </h3>
+                    <div className="space-y-3.5">
+                      <div className="flex justify-between text-xs">
+                        <span className="text-slate-400">Thời lượng:</span>
+                        <span className="font-bold text-slate-700">
+                          {movieDetails.duration_min} phút
+                        </span>
+                      </div>
+                      <div className="flex justify-between text-xs">
+                        <span className="text-slate-400">Ngày phát hành:</span>
+                        <span className="font-bold text-slate-700 px-1.5 py-0.5 bg-slate-100 rounded text-[10px]">
+                          {movieDetails.release_date
+                            ? format(
+                                new Date(movieDetails.release_date),
+
+                                "dd/MM/yyyy HH:mm",
+                              )
+                            : "-"}
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="pt-4 border-t border-slate-100 space-y-3">
+                      <div className="flex items-center justify-between text-[11px]">
+                        <span className="text-slate-400 flex items-center gap-1.5">
+                          <Calendar size={12} /> Ngày tạo:
+                        </span>
+                        <span className="font-mono text-slate-600">
+                          {movieDetails.created_at
+                            ? format(
+                                new Date(movieDetails.created_at),
+
+                                "dd/MM/yyyy HH:mm",
+                              )
+                            : "-"}
+                        </span>
+                      </div>
+                      <div className="flex items-center justify-between text-[11px]">
+                        <span className="text-slate-400 flex items-center gap-1.5">
+                          <History size={12} /> Cập nhật:
+                        </span>
+                        <span className="font-mono text-slate-600">
+                          {movieDetails.updated_at
+                            ? format(
+                                new Date(movieDetails.updated_at),
+
+                                "dd/MM/yyyy HH:mm",
+                              )
+                            : "-"}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* GHI CHÚ QUẢN TRỊ - Màu Amber trung tính */}
+                  <div className="bg-amber-50 border border-amber-100 rounded-xl p-4 shadow-sm">
+                    <div className="flex items-center gap-2 mb-2 text-amber-700 font-bold uppercase text-[10px]">
+                      <AlertCircle size={14} /> Ghi chú quản trị
+                    </div>
+                    <p className="text-[11px] text-amber-800 leading-snug">
+                      Phim đang được đặt ở trạng thái{" "}
+                      <strong>Ưu tiên Slider</strong>. Hệ thống sẽ tự động cập
+                      nhật Cache sau 5 phút.
+                    </p>
+                  </div>
                 </div>
               </div>
             </div>

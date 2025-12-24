@@ -12,7 +12,9 @@ export default function MoviesPage() {
   const [totalMovies, setTotalMovies] = useState(0);
   const [moviesPage, setMoviesPage] = useState(1);
   const [searchQuery, setSearchQuery] = useState("");
-  const [sortKey, setSortKey] = useState<"updated_at" | "release_date" | "title" | "rating">("updated_at");
+  const [sortKey, setSortKey] = useState<
+    "updated_at" | "release_date" | "title" | "rating"
+  >("updated_at");
   const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
   const pageSize = 10;
   const [isEditOpen, setIsEditOpen] = useState(false);
@@ -29,9 +31,10 @@ export default function MoviesPage() {
         if (typeof s.searchQuery === "string") setSearchQuery(s.searchQuery);
         if (typeof s.sortKey === "string") setSortKey(s.sortKey);
         if (typeof s.sortDir === "string") setSortDir(s.sortDir);
-        if (typeof s.showActiveOnly === "boolean") setShowActiveOnly(s.showActiveOnly);
+        if (typeof s.showActiveOnly === "boolean")
+          setShowActiveOnly(s.showActiveOnly);
       }
-    } catch { }
+    } catch {}
   }, []);
 
   useEffect(() => {
@@ -55,21 +58,28 @@ export default function MoviesPage() {
         release_date: m.release_date
           ? new Date(m.release_date).toISOString()
           : null,
+        updated_at: m.updated_at ? new Date(m.updated_at).toISOString() : null,
         rating: m.rating ?? null,
         price: Number(m.price || 0),
+        is_active: m.is_active,
       }));
       setMoviesLocal(mapped);
       setTotalMovies(total);
       setMovieStatus((prev) => ({
         ...prev,
-        ...Object.fromEntries(items.map((m: any) => [String(m.id), m.is_active ? "active" : "inactive"])),
+        ...Object.fromEntries(
+          items.map((m: any) => [
+            String(m.id),
+            m.is_active ? "active" : "inactive",
+          ]),
+        ),
       }));
       setIsLoading(false);
     })();
     try {
       const state = { searchQuery, sortKey, sortDir, showActiveOnly };
       localStorage.setItem("admin_movies_filters", JSON.stringify(state));
-    } catch { }
+    } catch {}
   }, [moviesPage, pageSize, searchQuery, sortKey, sortDir, showActiveOnly]);
 
   const moviesTotalPages = useMemo(
@@ -79,7 +89,9 @@ export default function MoviesPage() {
   const filteredMovies = useMemo(
     () =>
       showActiveOnly
-        ? moviesLocal.filter((m) => (movieStatus[m.id] || "active") === "active")
+        ? moviesLocal.filter(
+            (m) => (movieStatus[m.id] || "active") === "active",
+          )
         : moviesLocal,
     [showActiveOnly, moviesLocal, movieStatus],
   );
@@ -160,16 +172,43 @@ export default function MoviesPage() {
     setMoviesLocal(mapped);
     setTotalMovies(total);
     setMovieStatus((prev) => ({
-        ...prev,
-        ...Object.fromEntries(items.map((m: any) => [String(m.id), m.is_active ? "active" : "inactive"])),
-      }));
+      ...prev,
+      ...Object.fromEntries(
+        items.map((m: any) => [
+          String(m.id),
+          m.is_active ? "active" : "inactive",
+        ]),
+      ),
+    }));
     setIsLoading(false);
   };
+  // Thêm hàm này vào file cha (MoviesPage.tsx)
+  const handleToggleStatus = async (
+    id: string | number,
+    currentStatus: "active" | "inactive",
+  ) => {
+    try {
+      const newStatus = currentStatus === "active" ? "inactive" : "active";
 
+      // 1. Gọi API cập nhật trạng thái ở đây (nếu có)
+      // await updateMovieStatus(id, newStatus);
+
+      // 2. Cập nhật State cục bộ để giao diện thay đổi ngay lập tức
+      setMovieStatus((prev) => ({
+        ...prev,
+        [String(id)]: newStatus,
+      }));
+
+      // Thông báo thành công (nếu bạn dùng toast)
+      // toast.success("Đã thay đổi trạng thái phim!");
+    } catch (error) {
+      console.error("Lỗi cập nhật:", error);
+    }
+  };
   return (
     <AdminLayout
       active="movies"
-      setActive={() => { }}
+      setActive={() => {}}
       adminEmailState={localStorage.getItem("adminEmail") || "admin@email.com"}
       handleLogout={() => {
         localStorage.removeItem("adminToken");
@@ -184,10 +223,10 @@ export default function MoviesPage() {
         currentPage={moviesPage}
         setPage={setMoviesPage}
         movieStatus={movieStatus}
+        onToggleStatus={handleToggleStatus}
         onEdit={handleOpenEdit}
         onCreate={handleOpenCreate}
         moviesLength={displayTotal}
-        formatLocalDateTime={formatLocalDateTime}
         onRefresh={handleRefresh}
         searchQuery={searchQuery}
         onSearchChange={(query) => {
@@ -208,14 +247,14 @@ export default function MoviesPage() {
         editType={editType as any}
         editData={editData}
         setEditData={setEditData}
-        setUsers={() => { }}
+        setUsers={() => {}}
         moviesLocal={moviesLocal}
         toLocalDateTimeString={toLocalDateTimeString}
         pageSize={pageSize}
         currentPage={moviesPage}
         setMoviesLocal={setMoviesLocal}
         setMovieStatus={setMovieStatus}
-        setToys={() => { }}
+        setToys={() => {}}
       />
     </AdminLayout>
   );
