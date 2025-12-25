@@ -1,4 +1,4 @@
-import { eq, desc, and, inArray } from "drizzle-orm";
+import { eq, desc, and, inArray, sql, or } from "drizzle-orm";
 import { formatDateForDb } from "../../lib/date-utils";
 import { uploadCloudinaryImageDataURI } from "../../../worker/src/utils";
 
@@ -68,7 +68,7 @@ export async function createMovieImpl(
 
 export async function updateMovieImpl(
   anyDb: any,
-  tables: { movies: any },
+  tables: { movies: any; ticket_packages: any },
   id: number,
   data: {
     title?: string;
@@ -120,6 +120,30 @@ export async function updateMovieImpl(
       ? formatDateForDb(data.release_date, RUNTIME_ENV)
       : null;
   }
+  if (data.is_active === false) {
+    const searchId = String(id);
+
+    const activePackages = await anyDb
+      .select({ name: tables.ticket_packages.name })
+      .from(tables.ticket_packages)
+      .where(
+        and(
+          eq(tables.ticket_packages.is_active, true),
+          // Sử dụng CAST để đưa về dạng chuỗi trước khi LIKE
+          sql`CAST(${tables.ticket_packages.combo} AS TEXT) LIKE ${"%[" + searchId + "]%"} OR 
+            CAST(${tables.ticket_packages.combo} AS TEXT) LIKE ${"%[" + searchId + ",%"} OR 
+            CAST(${tables.ticket_packages.combo} AS TEXT) LIKE ${"%," + searchId + ",%"} OR 
+            CAST(${tables.ticket_packages.combo} AS TEXT) LIKE ${"%," + searchId + "]%"}`,
+        ),
+      );
+
+    if (activePackages.length > 0) {
+      const packageNames = activePackages.map((p: any) => p.name).join(", ");
+      throw new Error(
+        `Không thể ẩn phim vì phim đang được sử dụng trong các gói: ${packageNames}`,
+      );
+    }
+  }
   try {
     const updated = await anyDb
       .update(tables.movies)
@@ -150,6 +174,66 @@ export async function deleteMovieImpl(
   await anyDb.delete(tables.movies).where(eq(tables.movies.id, id));
 
   return { ok: true };
+}
+
+export async function updateMovieStatusImpl(
+  anyDb: any,
+  tables: { movies: any; ticket_packages: any },
+  id: number,
+  isActive: boolean,
+  RUNTIME_ENV?: string,
+) {
+  try {
+    if (typeof isActive !== "boolean") {
+      throw new Error("isActive must be a boolean");
+    }
+    if (isActive === false) {
+      const searchId = String(id);
+
+      const activePackages = await anyDb
+        .select({ name: tables.ticket_packages.name })
+        .from(tables.ticket_packages)
+        .where(
+          and(
+            eq(tables.ticket_packages.is_active, true),
+            // Sử dụng CAST để đưa về dạng chuỗi trước khi LIKE
+            sql`CAST(${tables.ticket_packages.combo} AS TEXT) LIKE ${"%[" + searchId + "]%"} OR 
+            CAST(${tables.ticket_packages.combo} AS TEXT) LIKE ${"%[" + searchId + ",%"} OR 
+            CAST(${tables.ticket_packages.combo} AS TEXT) LIKE ${"%," + searchId + ",%"} OR 
+            CAST(${tables.ticket_packages.combo} AS TEXT) LIKE ${"%," + searchId + "]%"}`,
+          ),
+        );
+
+      if (activePackages.length > 0) {
+        const packageNames = activePackages.map((p: any) => p.name).join(", ");
+        return {
+          status: 400,
+          message: `Không thể ẩn phim vì phim đang được sử dụng trong các gói: ${packageNames}`,
+        };
+      }
+    }
+    const [updatedMovie] = await anyDb
+      .update(tables.movies)
+      .set({
+        is_active: isActive,
+        updated_at: formatDateForDb(new Date(), RUNTIME_ENV),
+      })
+      .where(eq(tables.movies.id, id))
+      .returning();
+
+    if (!updatedMovie) {
+      throw new Error("Movie not found");
+    }
+
+    return {
+      status: 200,
+      message: "Đã thay đổi trạng thái thành công!",
+      item: updatedMovie,
+    };
+  } catch (error) {
+    console.error("Error updating movie status:", error);
+    throw error;
+  }
 }
 
 export async function getMovieByIdImpl(

@@ -27,13 +27,18 @@ export async function validateBookingApi(body: {
   movieId?: number;
   ticketCount: number;
   ticketPackageId?: number;
-  combo: string[]
+  combo: string[];
 }) {
   return request<{
     status: string;
     message?: string;
     user?: { id: number; email: string; fullname?: string; phone?: string };
-    movie?: { id: number; title: string; is_active?: boolean | null; duration_min?: number | null };
+    movie?: {
+      id: number;
+      title: string;
+      is_active?: boolean | null;
+      duration_min?: number | null;
+    };
     ticketPackage?: { id: number; name: string; price: number };
     unitPrice?: number;
     totalPrice?: number;
@@ -84,6 +89,7 @@ export async function getBookingByCodeApi(code: string) {
     created_at: string;
     paid_at: string | null;
     expiry_date: string | null;
+    checked_in_at: string | null;
     payment_method: string | null;
     userName: string;
     is_used: boolean;
@@ -95,9 +101,12 @@ export async function getBookingByCodeApi(code: string) {
 }
 
 export async function useTicketApi(code: string) {
-  return request<{ status: string; message: string; booking: { id: number; is_used: boolean } }>(`/api/bookings-use`, {
+  return request<{
+    status: string;
+    message: string;
+    booking: { id: number; is_used: boolean };
+  }>(`/api/bookings-use`, {
     method: "POST",
     body: JSON.stringify({ code }),
   });
 }
-

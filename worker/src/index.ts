@@ -15,6 +15,7 @@ import {
   updateMovieImpl,
   deleteMovieImpl,
   getMovieByIdImpl,
+  updateMovieStatusImpl,
 } from "../../server/routes/admin/movies";
 import {
   getRevenueImpl,
@@ -387,7 +388,7 @@ app.get("/api/admin/transactions", async (c) => {
   try {
     const page = Number(c.req.query("page") || 1);
     const pageSize = Number(c.req.query("pageSize") || 20);
-    const email = String(c.req.query("email") || "");
+    const searchText = String(c.req.query("searchText") || "");
     const status = String(c.req.query("status") || "all");
     const sort = String(c.req.query("sort") || "created_at");
     const dir =
@@ -407,7 +408,17 @@ app.get("/api/admin/transactions", async (c) => {
         movies: schema.movies,
         ticket_packages: schema.ticket_packages,
       },
-      { page, pageSize, email, status, sort, dir, payment_method, from, to },
+      {
+        page,
+        pageSize,
+        searchText,
+        status,
+        sort,
+        dir,
+        payment_method,
+        from,
+        to,
+      },
       c.env.RUNTIME_ENV,
     );
     return c.json(r);
@@ -1057,7 +1068,7 @@ app.put("/api/movies/:id", async (c) => {
     };
     const r = await updateMovieImpl(
       db,
-      { movies: schema.movies },
+      { movies: schema.movies, ticket_packages: schema.ticket_packages },
       id,
       body as any,
       config,
@@ -1088,6 +1099,33 @@ app.put("/api/movies/:id", async (c) => {
     return c.json(r, 200);
   } catch {
     return c.json({ status: "error", message: "Lỗi máy chủ nội bộ" }, 500);
+  }
+});
+
+app.get("/api/movies-status/:id", async (c) => {
+  try {
+    const id = Number(c.req.param("id"));
+    const is_active = Boolean(c.req.param("is_active"));
+    const db = drizzle(c.env.cinema_db, { schema });
+    const r = await updateMovieStatusImpl(
+      db,
+      { movies: schema.movies, ticket_packages: schema.ticket_packages },
+      id,
+      is_active,
+      c.env.RUNTIME_ENV,
+    );
+    const status =
+      typeof (r as any).status === "number" ? (r as any).status : 200;
+    const payload = {
+      ...(r as any),
+      status: status >= 400 ? "error" : "success",
+    };
+    return c.json(payload, status);
+  } catch (err) {
+    return new Response(
+      JSON.stringify({ status: "error", message: "Lỗi máy chủ nội bộ" }),
+      { status: 500, headers: { "Content-Type": "application/json" } },
+    );
   }
 });
 

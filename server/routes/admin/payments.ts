@@ -71,7 +71,7 @@ export async function listTransactionsImpl(
   args: {
     page: number;
     pageSize: number;
-    email: string;
+    searchText: string;
     status: string;
     sort: string;
     dir: "asc" | "desc";
@@ -81,60 +81,96 @@ export async function listTransactionsImpl(
   },
   RUNTIME_ENV?: string,
 ) {
-  const { page, pageSize, email, status, sort, dir, payment_method, from, to } =
-    args;
+  const {
+    page,
+    pageSize,
+    searchText,
+    status,
+    sort,
+    dir,
+    payment_method,
+    from,
+    to,
+  } = args;
   const skip = (page - 1) * pageSize;
   const whereCondition: any[] = [];
+
+  // Filter theo status
   if (status && status !== "all")
     whereCondition.push(eq(tables.bookings.payment_status, status));
+
+  // Filter theo phương thức thanh toán
   if (payment_method)
     whereCondition.push(eq(tables.bookings.payment_method, payment_method));
+
+  // Filter theo khoảng thời gian
   if (from || to) {
     const f = from ? new Date(from) : undefined;
     const t = to ? new Date(to) : undefined;
+    const createdField = tables.bookings.created_at;
+    const paidField = tables.bookings.paid_at;
+
     if (f && t) {
       whereCondition.push(
         or(
           and(
-            gte(tables.bookings.created_at, formatDateForDb(f, RUNTIME_ENV)),
-            lte(tables.bookings.created_at, formatDateForDb(t, RUNTIME_ENV)),
+            gte(createdField, formatDateForDb(f, RUNTIME_ENV)),
+            lte(createdField, formatDateForDb(t, RUNTIME_ENV)),
           ),
           and(
-            gte(tables.bookings.paid_at, formatDateForDb(f, RUNTIME_ENV)),
-            lte(tables.bookings.paid_at, formatDateForDb(t, RUNTIME_ENV)),
+            gte(paidField, formatDateForDb(f, RUNTIME_ENV)),
+            lte(paidField, formatDateForDb(t, RUNTIME_ENV)),
           ),
         ),
       );
     } else if (f) {
       whereCondition.push(
         or(
-          gte(tables.bookings.created_at, formatDateForDb(f, RUNTIME_ENV)),
-          gte(tables.bookings.paid_at, formatDateForDb(f, RUNTIME_ENV)),
+          gte(createdField, formatDateForDb(f, RUNTIME_ENV)),
+          gte(paidField, formatDateForDb(f, RUNTIME_ENV)),
         ),
       );
     } else if (t) {
       whereCondition.push(
         or(
-          lte(tables.bookings.created_at, formatDateForDb(t, RUNTIME_ENV)),
-          lte(tables.bookings.paid_at, formatDateForDb(t, RUNTIME_ENV)),
+          lte(createdField, formatDateForDb(t, RUNTIME_ENV)),
+          lte(paidField, formatDateForDb(t, RUNTIME_ENV)),
         ),
       );
     }
   }
-  const emailFilter = email
-    ? ilike(tables.accounts.email, `%${email}%`)
-    : undefined;
-  if (emailFilter) whereCondition.push(emailFilter);
+
+  // --- CẬP NHẬT PHẦN SEARCH TẠI ĐÂY ---
+  if (searchText) {
+    const isNumber = /^\d+$/.test(searchText); // Kiểm tra nếu chỉ toàn là số
+
+    if (isNumber) {
+      // Nếu là số: CHỈ tìm đích danh theo ID của booking
+      whereCondition.push(eq(tables.bookings.id, Number(searchText)));
+    } else {
+      // Nếu có chứa ký tự chữ: Tìm theo Email booking HOẶC Booking Code
+      whereCondition.push(
+        or(
+          ilike(tables.bookings.email, `%${searchText}%`),
+          ilike(tables.bookings.booking_code, `%${searchText}%`),
+        ),
+      );
+    }
+  }
+  // ------------------------------------
+
   const finalWhere = and(...whereCondition);
-  const countQueryBase = anyDb.select({ count: count() }).from(tables.bookings);
-  const countQuery = email
-    ? countQueryBase
-        .leftJoin(tables.users, eq(tables.bookings.user_id, tables.users.id))
-        .leftJoin(tables.accounts, eq(tables.users.id, tables.accounts.user_id))
-    : countQueryBase;
-  const [totalRes] = await countQuery.where(finalWhere);
+
+  // Query đếm tổng số bản ghi
+  const [totalRes] = await anyDb
+    .select({ count: count() })
+    .from(tables.bookings)
+    .where(finalWhere);
+
   const total = totalRes?.count || 0;
-  let queryBase = anyDb
+
+  // Query lấy dữ liệu chi tiết
+  const itemsRaw = await anyDb
     .select({
       booking: tables.bookings,
       user: tables.users,
@@ -150,20 +186,19 @@ export async function listTransactionsImpl(
       tables.ticket_packages,
       eq(tables.bookings.ticket_package_id, tables.ticket_packages.id),
     )
-    .where(finalWhere);
-  const orderedQuery =
-    sort === "paid_at"
-      ? queryBase.orderBy(
-          dir === "asc"
-            ? asc(tables.bookings.paid_at)
-            : desc(tables.bookings.paid_at),
-        )
-      : queryBase.orderBy(
-          dir === "asc"
-            ? asc(tables.bookings.created_at)
-            : desc(tables.bookings.created_at),
-        );
-  const itemsRaw = await orderedQuery.limit(pageSize).offset(skip);
+    .where(finalWhere)
+    .orderBy(
+      sort === "paid_at"
+        ? dir === "asc"
+          ? asc(tables.bookings.paid_at)
+          : desc(tables.bookings.paid_at)
+        : dir === "asc"
+          ? asc(tables.bookings.created_at)
+          : desc(tables.bookings.created_at),
+    )
+    .limit(pageSize)
+    .offset(skip);
+
   const items = itemsRaw.map((row: any) => {
     const tx = row.booking;
     const now = new Date();
@@ -172,17 +207,18 @@ export async function listTransactionsImpl(
     const daysLeft = expiryAt
       ? Math.ceil((expiryAt.getTime() - now.getTime()) / (1000 * 60 * 60 * 24))
       : null;
+
     return {
       id: tx.id,
       bookingId: tx.id,
       user_id: tx.user_id,
-      email: tx.email || row.account_email || "",
+      email: tx.email || "", // Ưu tiên email trong booking
       phone: tx.phone || "",
       name: tx.name || row.user?.fullname || "",
-      userName: row.user?.fullname || tx.name || "Khách vãng lai",
-      movieTitle: row.movie_title || "",
-      ticketPackageName: row.ticket_package_name || "",
+      userName: row.user?.fullname || "Khách Vãng Lai",
+      ticket_package_name: tx.ticket_package_name || "",
       ticketCount: tx.ticket_count,
+      is_used: tx.is_used,
       totalPrice: Number(tx.total_price),
       paymentMethod: tx.payment_method,
       paymentStatus: tx.payment_status,
@@ -194,6 +230,7 @@ export async function listTransactionsImpl(
       daysLeft,
     };
   });
+
   return { items, page, pageSize, total };
 }
 
@@ -263,34 +300,35 @@ export async function getTransactionByIdImpl(
   return {
     id: booking.id,
     user: {
-      id: user?.id || 0,
-      fullname: booking.name || user?.fullname || "Khách hàng",
-      email: booking.email || account?.email || "",
-      phone: booking.phone || user?.phone || "",
+      email_auth: account?.email || "",
+      fullname: booking.name || "Tên mặc định",
+      email: booking.email || "",
+      phone: booking.phone || "",
       is_active: account?.is_active ?? true,
     },
-    movie: movie ? { ...movie } : null,
-    ticket_package: ticket_package
-      ? {
-          ...ticket_package,
-          movies: comboMovies, // Hiển thị danh sách phim trong gói
-        }
-      : null,
+    ticket_package: {
+      name: ticket_package.name,
+      ticket_unit_price: booking.ticket_unit_price,
+      movies: comboMovies,
+    },
     booking_details: {
       ticket_count: booking.ticket_count,
       total_price: Number(booking.total_price),
-      combo: booking?.combo || false,
+      combo: booking?.combo || "",
+      pay_txt_code: booking?.pay_txt_code,
+      booking_code: booking?.booking_code,
+      checked_in_at: booking?.checked_in_at,
+      is_used: booking?.is_used,
+      created_at: booking.created_at,
     },
     payment_info: {
       payment_method: booking.payment_method,
       payment_status: booking.payment_status,
       transaction_id: booking.transaction_id,
-      created_at: booking.created_at,
       paid_at: booking.paid_at,
       expiry_date: booking.expiry_date,
       expired,
       days_left: daysLeft,
-      pay_txt_code: booking?.pay_txt_code,
     },
   };
 }

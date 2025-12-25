@@ -116,6 +116,7 @@ export const bookings = sqliteTable("bookings", {
     () => ticket_packages.id,
   ),
   expiry_date: text("expiry_date"),
+  checked_in_at: text("checked_in_at"),
 });
 
 export const toys = sqliteTable("toys", {

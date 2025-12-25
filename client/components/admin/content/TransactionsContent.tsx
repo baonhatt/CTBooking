@@ -27,7 +27,15 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { getTransactionById, getTickets } from "@/lib/api";
-import { Copy } from "lucide-react";
+import {
+  CheckCheck,
+  CheckIcon,
+  Copy,
+  TicketIcon,
+  UserIcon,
+  X,
+} from "lucide-react";
+import { toast } from "sonner";
 
 interface Tx {
   id: string;
@@ -35,12 +43,14 @@ interface Tx {
   transactionId: string;
   email: string;
   userName: string;
-  movieTitle: string;
+  ticket_package_name: string;
   ticketCount: number;
   totalPrice: number;
   paymentMethod: string;
   paymentStatus: string;
+  is_used: boolean;
   createdAt: Date;
+  expired: boolean;
 }
 interface Metrics {
   totalUsers: number;
@@ -107,7 +117,6 @@ export default function TransactionsContent({
   const [isLoadingDetails, setIsLoadingDetails] = useState(false);
   const [detailsError, setDetailsError] = useState<string | null>(null);
   const [allTickets, setAllTickets] = useState<any[]>([]);
-  console.log(data);
   useEffect(() => {
     if (isDetailsOpen && selectedTxId) {
       (async () => {
@@ -137,79 +146,211 @@ export default function TransactionsContent({
     setSelectedTxSummary(tx);
     setIsDetailsOpen(true);
   };
-  const unitPrice = (() => {
-    const per = txDetails?.booking_details?.price_per_ticket;
-    if (per !== undefined && per !== null) return Number(per);
-    const total = Number(txDetails?.booking_details?.total_price || 0);
-    const count = Math.max(
-      1,
-      Number(txDetails?.booking_details?.ticket_count || 1),
+  const SectionHeader = ({ color, title, icon }) => (
+    <div className={`flex items-center gap-2 ${color} mb-2`}>
+      {icon}
+      <h3 className="font-bold uppercase text-xs tracking-widest">{title}</h3>
+    </div>
+  );
+
+  // Thêm dấu "?" sau tên các thuộc tính để TypeScript hiểu chúng không bắt buộc
+  const InfoRow = ({
+    label,
+    value,
+    color = "text-gray-800",
+    bold,
+    large,
+  }: {
+    label: string;
+    value: any;
+    color?: string;
+    bold?: boolean;
+    large?: boolean; // Thêm dấu ? ở đây
+  }) => (
+    <div>
+      <p className="text-[10px] text-gray-400 uppercase font-bold leading-tight">
+        {label}
+      </p>
+      <p
+        className={`
+      ${large ? "text-2xl font-black" : "text-sm"} 
+      ${bold ? "font-bold" : "font-medium"} 
+      ${color} mt-0.5
+    `}
+      >
+        {value || "---"}
+      </p>
+    </div>
+  );
+
+  const TicketStatusBadge = ({ paymentStatus, isUsed }) => {
+    if (paymentStatus === "pending") {
+      return (
+        <Badge className="bg-orange-100 text-orange-700 border-orange-200 py-1">
+          <span className="w-2 h-2 rounded-full bg-orange-500 mr-2 animate-pulse" />{" "}
+          CHỜ THANH TOÁN
+        </Badge>
+      );
+    }
+    if (isUsed) {
+      return (
+        <Badge className="bg-blue-100 text-blue-700 border-blue-200 py-1 font-bold">
+          ĐÃ SỬ DỤNG
+        </Badge>
+      );
+    }
+    return (
+      <Badge className="bg-emerald-100 text-emerald-700 border-emerald-200 py-1 font-bold">
+        SẴN SÀNG SỬ DỤNG
+      </Badge>
     );
-    return total && count ? Math.round(total / count) : 0;
-  })();
-  const matchedTicket = allTickets.find((t: any) => {
-    const p = Number(t?.price || 0);
-    return Number.isFinite(p) && Math.round(p) === Math.round(unitPrice || 0);
-  });
+  };
+
+  const formatDate = (date, onlyDate = false) => {
+    if (!date) return "---";
+    const d = new Date(date);
+    return onlyDate ? d.toLocaleDateString("vi-VN") : d.toLocaleString("vi-VN");
+  };
+  const CopyableText = ({ text, label }: { text: string; label?: string }) => {
+    const [copied, setCopied] = useState(false);
+
+    const handleCopy = () => {
+      if (!text) return;
+      navigator.clipboard.writeText(text);
+      setCopied(true);
+      toast.success(`Đã sao chép ${label || ""}`);
+      setTimeout(() => setCopied(false), 2000);
+    };
+
+    return (
+      <div
+        onClick={handleCopy}
+        className="group flex items-center gap-2 cursor-pointer hover:opacity-80 transition-all"
+      >
+        <span className="font-mono">{text}</span>
+        {copied ? (
+          <CheckCheck size={14} className="text-emerald-500" />
+        ) : (
+          <Copy
+            size={14}
+            className="text-slate-400 group-hover:text-blue-500"
+          />
+        )}
+      </div>
+    );
+  };
   return (
     <div className="space-y-6">
-      <Card>
-        <CardHeader>
-          <div className="flex justify-between items-center">
-            <CardTitle>Lịch Sử Giao Dịch ({transactionsLength})</CardTitle>
-            <button
+      <Card className="shadow-md border-none">
+        <CardHeader className="border-b bg-gray-50/50">
+          <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+            <div>
+              <CardTitle className="text-xl font-bold flex items-center gap-2">
+                Lịch Sử Giao Dịch
+                <Badge variant="secondary" className="rounded-full">
+                  {transactionsLength}
+                </Badge>
+              </CardTitle>
+              <p className="text-sm text-muted-foreground mt-1">
+                Quản lý và đối soát thông tin đặt vé hệ thống.
+              </p>
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
               onClick={onRefresh}
-              className="px-3 py-1 border border-gray-300 rounded text-sm hover:bg-gray-100 transition"
+              className="flex items-center gap-2 bg-white hover:bg-blue-50 hover:text-blue-600 transition-all"
             >
-              ↻ Làm Mới
-            </button>
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                width="16"
+                height="16"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8" />
+                <path d="M21 3v5h-5" />
+                <path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16" />
+                <path d="M3 21v-5h5" />
+              </svg>
+              Làm Mới
+            </Button>
           </div>
         </CardHeader>
-        <CardContent>
-          <div className="flex flex-wrap items-center gap-3 mb-4">
-            <Input
-              placeholder="Tìm kiếm theo email"
-              value={txQuery}
-              onChange={(e) => setTxQuery(e.target.value)}
-              className="flex-1 min-w-[320px]"
-            />
+
+        <CardContent className="pt-6">
+          {/* Thanh công cụ Bộ lọc (Toolbar) */}
+          <div className="flex flex-wrap items-center gap-3 mb-6">
+            <div className="relative flex-1 min-w-[300px]">
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                className="absolute left-3 top-3 h-4 w-4 text-gray-400"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+                />
+              </svg>
+              <Input
+                placeholder="Tìm email hoặc mã giao dịch..."
+                value={txQuery}
+                onChange={(e) => setTxQuery(e.target.value)}
+                className="pl-9 h-10"
+              />
+            </div>
+
             <select
               value={txStatus}
-              onChange={(e) => setTxStatus?.(e.target.value as "paid" | "all")}
-              className="px-3 py-2 border rounded-md bg-white w-44"
+              onChange={(e) => setTxStatus?.(e.target.value as any)}
+              className="h-10 px-3 border rounded-md bg-white text-sm focus:ring-2 focus:ring-blue-500 outline-none w-40"
             >
               <option value="paid">Đã thanh toán</option>
-              <option value="all">Tất cả giao dịch</option>
+              <option value="all">Tất cả trạng thái</option>
             </select>
+
             <select
               value={paymentMethod}
               onChange={(e) => setPaymentMethod?.(e.target.value)}
-              className="px-3 py-2 border rounded-md bg-white w-44"
+              className="h-10 px-3 border rounded-md bg-white text-sm w-44"
             >
               <option value="">Tất cả phương thức</option>
               <option value="cash">Tiền mặt</option>
               <option value="momo">MoMo</option>
               <option value="vnpay">VNPay</option>
+              <option value="vietqr">VietQR</option>
             </select>
+
             <select
               value={sortKey}
               onChange={(e) => setSortKey(e.target.value as any)}
-              className="px-3 py-2 border rounded-md bg-white w-52"
+              className="h-10 px-3 border rounded-md bg-white text-sm w-48"
             >
-              <option value="created_at">Theo thời gian tạo</option>
-              <option value="paid_at">Theo thời gian thanh toán</option>
+              <option value="created_at">Thời gian tạo</option>
+              <option value="paid_at">Thời gian thanh toán</option>
             </select>
+
             <select
               value={sortDir}
               onChange={(e) => setSortDir(e.target.value as any)}
-              className="px-3 py-2 border rounded-md bg-white w-36"
+              className="h-10 px-3 border rounded-md bg-white text-sm w-32"
             >
               <option value="desc">Giảm dần</option>
               <option value="asc">Tăng dần</option>
             </select>
+
             <Button
-              variant="secondary"
-              className="ml-auto"
+              variant="ghost"
+              size="sm"
+              className="text-gray-500 hover:text-red-600 hover:bg-red-50 h-10 px-3 flex items-center gap-2 border border-dashed border-gray-200"
               onClick={() => {
                 setTxQuery("");
                 setTxStatus?.("paid");
@@ -221,435 +362,530 @@ export default function TransactionsContent({
                 setPage(1);
               }}
             >
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                width="14"
+                height="14"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <path d="M3 6h18" />
+                <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6" />
+                <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2" />
+              </svg>
               Xóa Bộ Lọc
             </Button>
           </div>
-          <div className="flex items-center gap-3 mb-4">
-            <span className="text-sm text-gray-600">Từ</span>
-            <Input
-              type="date"
-              value={fromDate}
-              onChange={(e) => setFromDate?.(e.target.value)}
-              className="w-44"
-            />
-            <span className="text-sm text-gray-600">Đến</span>
-            <Input
-              type="date"
-              value={toDate}
-              onChange={(e) => setToDate?.(e.target.value)}
-              className="w-44"
-            />
+
+          <div className="flex items-center gap-3 mb-6 p-3 bg-gray-50 rounded-lg border border-gray-100 w-fit">
+            <span className="text-xs font-bold uppercase text-gray-400">
+              Khoảng thời gian:
+            </span>
+            <div className="flex items-center gap-2">
+              <span className="text-sm text-gray-500 font-medium">Từ</span>
+              <Input
+                type="date"
+                value={fromDate}
+                onChange={(e) => setFromDate?.(e.target.value)}
+                className="w-40 h-9 bg-white"
+              />
+              <span className="text-sm text-gray-500 font-medium">Đến</span>
+              <Input
+                type="date"
+                value={toDate}
+                onChange={(e) => setToDate?.(e.target.value)}
+                className="w-40 h-9 bg-white"
+              />
+            </div>
           </div>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead className="font-bold">Mã Giao Dịch</TableHead>
-                <TableHead className="font-bold">Email</TableHead>
-                <TableHead className="font-bold">Tên</TableHead>
-                <TableHead className="font-bold">Phim</TableHead>
-                <TableHead className="font-bold">Số Vé</TableHead>
-                <TableHead className="font-bold">Số Tiền</TableHead>
-                <TableHead className="font-bold">Phương Thức</TableHead>
-                <TableHead className="font-bold">Trạng Thái</TableHead>
-                <TableHead className="font-bold">Ngày Giao Dịch</TableHead>
-                <TableHead className="font-bold">Loại</TableHead>
-                <TableHead className="font-bold">Hành Động</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {isLoading
-                ? Array.from({ length: 5 }).map((_, idx) => (
-                    <TableRow key={`sk-${idx}`}>
-                      <TableCell>
-                        <Skeleton className="h-4 w-40" />
-                      </TableCell>
-                      <TableCell>
-                        <Skeleton className="h-4 w-40" />
-                      </TableCell>
-                      <TableCell>
-                        <Skeleton className="h-4 w-24" />
-                      </TableCell>
-                      <TableCell>
-                        <Skeleton className="h-4 w-32" />
-                      </TableCell>
-                      <TableCell>
-                        <Skeleton className="h-4 w-12" />
-                      </TableCell>
-                      <TableCell>
-                        <Skeleton className="h-4 w-20" />
-                      </TableCell>
-                      <TableCell>
-                        <Skeleton className="h-4 w-16" />
-                      </TableCell>
-                      <TableCell>
-                        <Skeleton className="h-6 w-20" />
-                      </TableCell>
-                      <TableCell>
-                        <Skeleton className="h-4 w-36" />
-                      </TableCell>
-                      <TableCell>
-                        <Skeleton className="h-4 w-20" />
-                      </TableCell>
-                      <TableCell>
-                        <Skeleton className="h-8 w-16" />
-                      </TableCell>
-                    </TableRow>
-                  ))
-                : data.map((t) => (
-                    <TableRow key={t.id}>
-                      <TableCell className="font-semibold text-sm">
-                        {t.id}
-                      </TableCell>
-                      <TableCell className="font-semibold text-sm">
-                        {t.email}
-                      </TableCell>
-                      <TableCell>{t.userName || "-"}</TableCell>
-                      <TableCell>{t.movieTitle}</TableCell>
-                      <TableCell>{t.ticketCount}</TableCell>
-                      <TableCell>
-                        {t.totalPrice.toLocaleString("vi-VN")} đ
-                      </TableCell>
-                      <TableCell className="capitalize">
-                        {t.paymentMethod}
-                      </TableCell>
-                      <TableCell>
-                        <Badge
-                          className={
-                            t.paymentStatus === "paid"
-                              ? "bg-green-100 text-green-800 hover:bg-green-100"
-                              : t.paymentStatus === "pending"
-                                ? "bg-yellow-100 text-yellow-800 hover:bg-yellow-100"
-                                : "bg-red-100 text-red-800 hover:bg-red-100"
+
+          {/* Bảng dữ liệu đã tối ưu cột */}
+          <div className="rounded-lg border border-gray-200 overflow-hidden shadow-sm">
+            <Table>
+              <TableHeader className="bg-gray-50">
+                <TableRow>
+                  <TableHead className="font-bold w-[80px]">ID</TableHead>
+                  <TableHead className="font-bold">Khách Hàng</TableHead>
+                  <TableHead className="font-bold">Vé</TableHead>
+                  <TableHead className="font-bold text-center">Số Vé</TableHead>
+                  <TableHead className="font-bold">Tổng Tiền</TableHead>
+                  <TableHead className="font-bold text-center">
+                    Thanh Toán
+                  </TableHead>
+                  <TableHead className="font-bold">Trạng Thái Vé</TableHead>
+                  <TableHead className="font-bold text-right">
+                    Hành Động
+                  </TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {isLoading
+                  ? Array.from({ length: 5 }).map((_, idx) => (
+                      <TableRow key={`sk-${idx}`}>
+                        <TableCell colSpan={8}>
+                          <Skeleton className="h-10 w-full" />
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  : data.map((t) => {
+                      // 1. Tối ưu logic xác định trạng thái hiển thị
+                      const getStatusConfig = () => {
+                        // Trường hợp 1: Thanh toán thất bại/Đã hủy
+                        if (t.paymentStatus === "failed") {
+                          return {
+                            text: "Đã Hủy",
+                            style: "border-red-200 bg-red-50 text-red-700",
+                            ticketText: "Đã Hủy",
+                            ticketStyle:
+                              "bg-red-100 text-red-700 border-red-200 animate-pulse",
+                          };
+                        }
+
+                        // Trường hợp 2: Chờ thanh toán
+                        if (t.paymentStatus === "pending") {
+                          return {
+                            text: "Chờ Thanh Toán",
+                            style:
+                              "border-amber-200 bg-amber-50 text-amber-700",
+                            ticketText: "Chờ Thanh Toán",
+                            ticketStyle:
+                              "bg-orange-100 text-orange-700 border-orange-200",
+                          };
+                        }
+
+                        // Trường hợp 3: Đã thanh toán (Cần check thêm expired và is_used)
+                        if (t.paymentStatus === "paid") {
+                          // Ưu tiên check Hết hạn trước
+                          if (t.expired) {
+                            return {
+                              text: "Đã Thanh Toán",
+                              style:
+                                "border-emerald-200 bg-emerald-50 text-emerald-700",
+                              ticketText: "Hết Hạn Sử Dụng",
+                              ticketStyle:
+                                "bg-gray-500 text-white border-gray-600", // Màu xám đậm/đen để tách biệt hẳn
+                            };
                           }
+
+                          return {
+                            text: "Đã Thanh Toán",
+                            style:
+                              "border-emerald-200 bg-emerald-50 text-emerald-700",
+                            ticketText: t.is_used
+                              ? "Đã Sử Dụng"
+                              : "Chưa Sử Dụng",
+                            ticketStyle: t.is_used
+                              ? "bg-blue-100 text-blue-700 border-blue-200"
+                              : "bg-emerald-100 text-emerald-700 border-emerald-200",
+                          };
+                        }
+
+                        return {
+                          text: "N/A",
+                          style: "bg-gray-100 text-gray-400",
+                          ticketText: "N/A",
+                          ticketStyle: "bg-gray-100 text-gray-400",
+                        };
+                      };
+
+                      const config = getStatusConfig();
+
+                      return (
+                        <TableRow
+                          key={t.id}
+                          className="hover:bg-blue-50/30 transition-colors"
                         >
-                          {t.paymentStatus}
-                        </Badge>
-                      </TableCell>
-                      <TableCell>
-                        {t.createdAt.toLocaleString("vi-VN")}
-                      </TableCell>
-                      <TableCell>
-                        <Badge
-                          variant={t.userId ? "default" : "outline"}
-                          className={
-                            !t.userId
-                              ? "bg-gray-100 text-gray-800 border-gray-400"
-                              : "bg-blue-600 hover:bg-blue-700"
-                          }
-                        >
-                          {t.userId ? "Hệ Thống" : "Vãng Lai"}
-                        </Badge>
-                      </TableCell>
-                      <TableCell>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => handleViewDetails(t)}
-                        >
-                          Xem
-                        </Button>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-            </TableBody>
-          </Table>
-          <Pagination className="mt-4">
-            <PaginationContent>
-              <PaginationItem>
-                <PaginationPrevious
-                  href="#"
-                  onClick={(e) => {
-                    e.preventDefault();
-                    setPage(Math.max(1, currentPage - 1));
-                  }}
-                  aria-disabled={currentPage === 1}
-                  className={
-                    currentPage === 1 ? "pointer-events-none opacity-50" : ""
-                  }
-                />
-              </PaginationItem>
-              {Array.from({ length: totalPages }).map((_, i) => (
-                <PaginationItem key={i}>
-                  <PaginationLink
+                          <TableCell className="font-mono text-xs text-gray-500">
+                            #{t.id}
+                          </TableCell>
+                          <TableCell>
+                            <div className="flex flex-col">
+                              <span className="font-semibold text-sm text-gray-900">
+                                {t.userName || "Khách Vãng Lai"}
+                              </span>
+                              <span className="text-[11px] text-gray-500">
+                                {t.email}
+                              </span>
+                            </div>
+                          </TableCell>
+                          <TableCell className="max-w-[150px] truncate font-medium text-sm">
+                            {t.ticket_package_name}
+                          </TableCell>
+                          <TableCell className="text-center font-bold">
+                            {t.ticketCount}
+                          </TableCell>
+                          <TableCell className="font-bold text-blue-700">
+                            {t.totalPrice.toLocaleString("vi-VN")}đ
+                          </TableCell>
+
+                          <TableCell className="text-center">
+                            <div className="flex flex-col items-center gap-1">
+                              <span className="text-[9px] font-bold uppercase text-gray-400">
+                                {t.paymentMethod}
+                              </span>
+                              <Badge
+                                variant="outline"
+                                className={`${config.style} px-2 py-0 h-5 text-[10px] font-medium`}
+                              >
+                                {config.text}
+                              </Badge>
+                            </div>
+                          </TableCell>
+
+                          <TableCell>
+                            <Badge
+                              className={`${config.ticketStyle} shadow-sm border whitespace-nowrap text-[11px] font-bold`}
+                            >
+                              {config.ticketText}
+                            </Badge>
+                          </TableCell>
+
+                          <TableCell className="text-right">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handleViewDetails(t)}
+                              className="h-8 hover:bg-blue-600 hover:text-white transition-all shadow-sm text-xs"
+                            >
+                              Xem chi tiết
+                            </Button>
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
+              </TableBody>
+            </Table>
+          </div>
+
+          <div className="mt-6 flex flex-col md:flex-row items-center justify-between gap-4">
+            <p className="text-sm text-muted-foreground italic">
+              Hiển thị {data.length} giao dịch trên trang này.
+            </p>
+            <Pagination>
+              <PaginationContent>
+                <PaginationItem>
+                  <PaginationPrevious
                     href="#"
-                    isActive={currentPage === i + 1}
                     onClick={(e) => {
                       e.preventDefault();
-                      setPage(i + 1);
+                      setPage(Math.max(1, currentPage - 1));
                     }}
-                  >
-                    {i + 1}
-                  </PaginationLink>
+                    className={
+                      currentPage === 1 ? "pointer-events-none opacity-50" : ""
+                    }
+                  />
                 </PaginationItem>
-              ))}
-              <PaginationItem>
-                <PaginationNext
-                  href="#"
-                  onClick={(e) => {
-                    e.preventDefault();
-                    setPage(Math.min(totalPages, currentPage + 1));
-                  }}
-                  aria-disabled={currentPage === totalPages}
-                  className={
-                    currentPage === totalPages
-                      ? "pointer-events-none opacity-50"
-                      : ""
-                  }
-                />
-              </PaginationItem>
-            </PaginationContent>
-          </Pagination>
+                {Array.from({ length: totalPages }).map((_, i) => (
+                  <PaginationItem key={i}>
+                    <PaginationLink
+                      href="#"
+                      isActive={currentPage === i + 1}
+                      onClick={(e) => {
+                        e.preventDefault();
+                        setPage(i + 1);
+                      }}
+                    >
+                      {i + 1}
+                    </PaginationLink>
+                  </PaginationItem>
+                ))}
+                <PaginationItem>
+                  <PaginationNext
+                    href="#"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      setPage(Math.min(totalPages, currentPage + 1));
+                    }}
+                    className={
+                      currentPage === totalPages
+                        ? "pointer-events-none opacity-50"
+                        : ""
+                    }
+                  />
+                </PaginationItem>
+              </PaginationContent>
+            </Pagination>
+          </div>
         </CardContent>
       </Card>
 
-      {/* Transaction Details Modal */}
+      {/* --- MODAL CHI TIẾT GIAO DỊCH (TỐI ƯU TOÀN DIỆN) --- */}
       <Dialog open={isDetailsOpen} onOpenChange={setIsDetailsOpen}>
-        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>Chi tiết giao dịch</DialogTitle>
-          </DialogHeader>
-          {isLoadingDetails ? (
-            <div className="flex items-center justify-center py-8">
-              <span>Đang tải...</span>
-            </div>
-          ) : detailsError ? (
-            <div className="text-center py-8 text-red-600">{detailsError}</div>
-          ) : txDetails ? (
-            <div className="space-y-6">
-              {/* User Info Section */}
-              <div className="rounded-lg bg-blue-50 p-4 space-y-3">
-                <h3 className="font-semibold text-blue-900">
-                  Thông tin khách hàng{!txDetails.user?.id ? " (Vãng Lai)" : ""}
-                </h3>
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <p className="text-sm text-gray-600">Tên khách hàng</p>
-                    <p className="font-medium">
-                      {txDetails.user?.fullname || ""}
-                    </p>
-                  </div>
-                  <div>
-                    <p className="text-sm text-gray-600">Email</p>
-                    <p className="font-medium text-sm">
-                      {txDetails.user?.email || ""}
-                    </p>
-                  </div>
-                  <div>
-                    <p className="text-sm text-gray-600">Số điện thoại</p>
-                    <p className="font-medium">{txDetails.user?.phone || ""}</p>
-                  </div>
-                  <div>
-                    <p className="text-sm text-gray-600">
-                      Trạng thái tài khoản
-                    </p>
-                    <Badge variant="outline">
-                      {!txDetails.user?.id
-                        ? "none"
-                        : txDetails.user?.is_active
-                          ? "Hoạt động"
-                          : "Vô hiệu"}
-                    </Badge>
-                  </div>
+        {/* Tăng max-w-2xl lên max-w-4xl để không gian rộng rãi, chuyên nghiệp hơn */}
+        <DialogContent className="max-w-4xl p-0 border-none shadow-2xl overflow-hidden bg-white flex flex-col max-h-[92vh] [&>button]:hidden">
+          {/* HEADER CỐ ĐỊNH */}
+          <div className="bg-slate-900 p-5 text-white shrink-0">
+            <div className="flex justify-between items-start">
+              <div>
+                <DialogTitle className="text-xl font-bold text-white">
+                  Chi Tiết Giao Dịch
+                </DialogTitle>
+                <div className="flex items-center gap-2 text-slate-400 text-[11px] mt-1 italic">
+                  ID Hệ thống:
+                  <CopyableText
+                    text={txDetails?.id?.toString() || ""}
+                    label="ID hệ thống"
+                  />
                 </div>
               </div>
 
-              {/* Booking Details Section */}
-              <div className="rounded-lg bg-amber-50 p-4 space-y-3">
-                <h3 className="font-semibold text-amber-900">
-                  Chi tiết đặt vé
-                </h3>
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <p className="text-sm text-gray-600">Loại vé</p>
-                    <p className="font-medium">
-                      {txDetails.ticket_package?.name || ""}
-                    </p>
-                  </div>
-                  <div>
-                    <p className="text-sm text-gray-600">Giá vé</p>
-                    <p className="font-medium">
-                      {unitPrice
-                        ? `${unitPrice.toLocaleString("vi-VN")} đ / vé`
-                        : ""}
-                    </p>
-                  </div>
-                </div>
-                <div>
-                  <p className="text-sm text-gray-600 mb-2">
-                    Danh sách phim (
-                    {txDetails.ticket_package?.movies?.length || 0})
-                  </p>
-                  <div className="space-y-1">
-                    {txDetails.ticket_package?.movies?.length > 0 ? (
-                      txDetails.ticket_package.movies.map((movie: any) => (
-                        <div key={movie.id} className="text-sm">
-                          • {movie.title}
-                        </div>
-                      ))
-                    ) : (
-                      <p className="text-sm text-gray-500">
-                        Không có thông tin phim
-                      </p>
-                    )}
-                  </div>
-                </div>
-                <div className="grid grid-cols-3 gap-3">
-                  <div>
-                    <p className="text-sm text-gray-600">Số lượng vé</p>
-                    <p className="text-2xl font-bold text-amber-600">
-                      {txDetails.booking_details?.ticket_count || ""}
-                    </p>
-                  </div>
-
-                  <div>
-                    <p className="text-sm text-gray-600">Tổng tiền</p>
-                    <p className="text-xl font-bold text-green-600">
-                      {txDetails.booking_details?.total_price
-                        ? txDetails.booking_details.total_price.toLocaleString(
-                            "vi-VN",
-                          )
-                        : ""}{" "}
-                      đ
-                    </p>
-                  </div>
-                </div>
-              </div>
-
-              {/* Payment Info Section */}
-              <div className="rounded-lg bg-green-50 p-4 space-y-3">
-                <h3 className="font-semibold text-green-900">
-                  Thông tin thanh toán
-                </h3>
-                <div className="space-y-2 text-sm">
-                  <div className="flex justify-between">
-                    <span className="text-gray-600">Phương thức:</span>
-                    <span className="font-medium capitalize">
-                      {txDetails.payment_info?.payment_method || ""}
+              <div className="flex items-center gap-3">
+                {txDetails?.payment_info?.payment_status === "paid" && (
+                  <div className="bg-emerald-500/15 text-emerald-400 px-3 py-1 rounded-full border border-emerald-500/30 flex items-center gap-2">
+                    <div className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse" />
+                    <span className="text-[10px] font-bold uppercase tracking-tight">
+                      Đã thanh toán
                     </span>
                   </div>
-                  <div className="flex justify-between">
-                    <span className="text-gray-600">Trạng thái:</span>
-                    <Badge
-                      className={
-                        txDetails.payment_info?.payment_status === "paid"
-                          ? "bg-green-100 text-green-800 hover:bg-green-100"
-                          : txDetails.payment_info?.payment_status === "pending"
-                            ? "bg-yellow-100 text-yellow-800 hover:bg-yellow-100"
-                            : "bg-red-100 text-red-800 hover:bg-red-100"
-                      }
-                    >
-                      {txDetails.payment_info?.payment_status || ""}
-                    </Badge>
-                  </div>
-                  {txDetails.payment_info?.payment_method !== "vietqr" && (
-                    <div className="flex justify-between">
-                      <span className="text-gray-600">Mã giao dịch:</span>
-                      <span className="font-mono text-xs">
-                        {txDetails.payment_info?.transaction_id || ""}
-                      </span>
-                    </div>
-                  )}
-                  {txDetails.payment_info?.payment_method === "vietqr" && (
-                    <div className="flex justify-between items-center py-2">
-                      <span className="text-gray-500 text-sm">
-                        Nội dung chuyển khoản:
-                      </span>
-                      <div className="flex items-center gap-2 bg-gray-50 px-2 py-1 rounded border border-gray-200 group">
-                        <span className="font-mono text-sm font-bold text-blue-600">
-                          {txDetails.payment_info?.pay_txt_code || "N/A"}
-                        </span>
-                        <button
-                          onClick={() => {
-                            const code =
-                              txDetails.payment_info?.pay_txt_code || "";
-                            navigator.clipboard.writeText(code);
-                            // Bạn có thể thêm thông báo toast ở đây nếu có
-                            alert("Đã sao chép mã đơn hàng!");
-                          }}
-                          className="p-1 hover:bg-gray-200 rounded transition-colors"
-                          title="Sao chép mã"
+                )}
+                <button
+                  onClick={() => setIsDetailsOpen(false)}
+                  className="p-1.5 rounded-md hover:bg-white/10 text-slate-400 hover:text-white transition-colors"
+                >
+                  <X size={20} />
+                </button>
+              </div>
+            </div>
+          </div>
+
+          {/* NỘI DUNG CUỘN */}
+          <div className="flex-1 overflow-y-auto custom-scrollbar p-6">
+            {isLoadingDetails ? (
+              <div className="flex flex-col items-center justify-center py-20 gap-3">
+                <div className="w-8 h-8 border-3 border-blue-600 border-t-transparent rounded-full animate-spin" />
+                <span className="text-slate-500 text-sm italic">
+                  Đang tải dữ liệu...
+                </span>
+              </div>
+            ) : detailsError ? (
+              <div className="text-center py-12 bg-red-50/50 rounded-lg border border-red-100 m-4">
+                <p className="text-red-600 italic text-sm">{detailsError}</p>
+              </div>
+            ) : txDetails ? (
+              <div className="space-y-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  {/* Cột 1: Khách Hàng */}
+                  <div className="space-y-3">
+                    <SectionHeader
+                      color="text-blue-600"
+                      title="Khách Hàng"
+                      icon={<UserIcon size={14} />}
+                    />
+                    <div className="bg-slate-50 rounded-xl p-4 border border-slate-100 space-y-3 shadow-sm">
+                      <InfoRow
+                        label="Họ và Tên"
+                        value={txDetails.user?.fullname}
+                        bold
+                      />
+                      <InfoRow
+                        label="Email"
+                        value={txDetails.user?.email}
+                        color="text-blue-600"
+                      />
+                      <InfoRow
+                        label="Email Tài Khoản"
+                        value={
+                          txDetails.user?.email_auth
+                            ? txDetails.user?.email_auth
+                            : "VÃNG LAI"
+                        }
+                        color="text-red-600"
+                      />
+                      <div className="flex justify-between items-end border-t border-slate-200/60 pt-2">
+                        <InfoRow
+                          label="Số điện thoại"
+                          value={txDetails.user?.phone}
+                        />
+                        <Badge
+                          variant={
+                            txDetails.user?.is_active
+                              ? "default"
+                              : "destructive"
+                          }
+                          className="text-[9px] h-4"
                         >
-                          <svg
-                            xmlns="http://www.w3.org/2000/svg"
-                            width="14"
-                            height="14"
-                            viewBox="0 0 24 24"
-                            fill="none"
-                            stroke="currentColor"
-                            strokeWidth="2"
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            className="text-gray-400 group-hover:text-blue-500"
-                          >
-                            <rect
-                              width="14"
-                              height="14"
-                              x="8"
-                              y="8"
-                              rx="2"
-                              ry="2"
-                            />
-                            <path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2" />
-                          </svg>
-                        </button>
+                          {txDetails.user?.is_active ? "Hoạt động" : "Vô hiệu"}
+                        </Badge>
                       </div>
                     </div>
-                  )}
-                  <div className="flex justify-between">
-                    <span className="text-gray-600">Thời gian tạo:</span>
-                    <span className="font-medium">
-                      {txDetails.payment_info?.created_at
-                        ? new Date(
-                            txDetails.payment_info.created_at,
-                          )?.toLocaleString("vi-VN")
-                        : ""}
-                    </span>
                   </div>
-                  {txDetails.payment_info?.updated_at && (
-                    <div className="flex justify-between">
-                      <span className="text-gray-600">Cập nhập lần cuối:</span>
-                      <span className="font-medium">
-                        {new Date(
-                          txDetails.payment_info.updated_at,
-                        )?.toLocaleString("vi-VN")}
-                      </span>
+
+                  {/* Cột 2: Gói & Phim */}
+                  <div className="space-y-3">
+                    <SectionHeader
+                      color="text-amber-600"
+                      title="Gói & Phim"
+                      icon={<TicketIcon size={14} />}
+                    />
+                    <div className="bg-amber-50/40 rounded-xl p-4 border border-amber-100 space-y-3 shadow-sm">
+                      <div className="flex justify-between">
+                        <InfoRow
+                          label="Loại Vé"
+                          value={txDetails.ticket_package?.name}
+                          bold
+                        />
+                        <span className="text-[13px] font-bold text-slate-600">
+                          {txDetails.ticket_package?.ticket_unit_price?.toLocaleString()}
+                          đ
+                        </span>
+                      </div>
+                      <div className="flex flex-wrap gap-1 border-t border-amber-200/30 pt-2 min-h-[40px]">
+                        {txDetails.ticket_package?.movies?.map((m: any) => (
+                          <Badge
+                            key={m.id}
+                            variant="outline"
+                            className="bg-white text-[9px] border-amber-200 text-amber-800"
+                          >
+                            {m.title}
+                          </Badge>
+                        ))}
+                      </div>
+                      <div className="flex justify-between items-end border-t border-amber-200/30 pt-2">
+                        <InfoRow
+                          label="Số lượng"
+                          value={txDetails.booking_details?.ticket_count}
+                          large
+                          color="text-amber-700"
+                        />
+                        <div className="text-right">
+                          <p className="text-[9px] text-amber-600 uppercase font-bold">
+                            Tổng tiền
+                          </p>
+                          <p className="text-2xl font-black text-emerald-700">
+                            {txDetails.booking_details?.total_price?.toLocaleString()}
+                            đ
+                          </p>
+                        </div>
+                      </div>
                     </div>
-                  )}
-                  {txDetails.payment_info?.paid_at && (
-                    <div className="flex justify-between">
-                      <span className="text-gray-600">
-                        Thời gian thanh toán:
-                      </span>
-                      <span className="font-medium">
-                        {new Date(
-                          txDetails.payment_info.paid_at,
-                        )?.toLocaleString("vi-VN")}
-                      </span>
+                  </div>
+                </div>
+
+                {/* Phần 3: Trạng thái & Đối soát */}
+                <div className="space-y-3">
+                  <SectionHeader
+                    color="text-emerald-600"
+                    title="Đối Soát & Trạng Thái"
+                    icon={<CheckIcon size={14} />}
+                  />
+                  <div className="bg-white rounded-xl border border-slate-200 shadow-sm divide-y divide-slate-100 overflow-hidden">
+                    {/* Hàng 1: Trạng thái và Check-in */}
+                    <div className="flex justify-between p-4 bg-slate-50/50 items-center">
+                      <TicketStatusBadge
+                        paymentStatus={txDetails.payment_info?.payment_status}
+                        isUsed={txDetails.booking_details?.is_used}
+                      />
+                      {txDetails.booking_details?.is_used && (
+                        <div className="text-right">
+                          <p className="text-[10px] text-slate-400 uppercase font-bold">
+                            Thời điểm sử dụng
+                          </p>
+                          <p className="text-[12px] font-bold text-blue-600 italic">
+                            {formatDate(
+                              txDetails.booking_details.checked_in_at,
+                            )}
+                          </p>
+                        </div>
+                      )}
                     </div>
-                  )}
-                  {txDetails.payment_info?.expiry_date && (
-                    <div className="flex justify-between">
-                      <span className="text-gray-600">Ngày hết hạn vé:</span>
-                      <span className="font-medium">
-                        {new Date(
-                          txDetails.payment_info.expiry_date,
-                        ).toLocaleString("vi-VN")}
-                      </span>
+
+                    {/* Hàng 2: Mã đặt chỗ & Mã QR (Đối soát) - Tách biệt rõ ràng */}
+                    <div className="grid grid-cols-1 md:grid-cols-3 p-4 gap-6">
+                      <div>
+                        <p className="text-[10px] text-slate-400 uppercase font-bold mb-1">
+                          Phương thức
+                        </p>
+                        <span className="text-[13px] font-bold text-slate-700 uppercase">
+                          {txDetails.payment_info?.payment_method}
+                        </span>
+                      </div>
+
+                      {/* Booking Code - Dùng để khách nhận vé */}
+                      <div className="md:border-x md:px-6">
+                        <p className="text-[10px] text-blue-500 uppercase font-bold mb-1 italic">
+                          Mã đặt chỗ (Booking Code)
+                        </p>
+                        <div className="flex items-center gap-2">
+                          {txDetails.booking_details?.booking_code && (
+                            <CopyableText
+                              text={txDetails.booking_details.booking_code}
+                              label="mã đặt chỗ"
+                            />
+                          )}
+                        </div>
+                      </div>
+
+                      {/* QR Content - Dùng để đối soát ngân hàng */}
+                      <div className="flex flex-col md:items-end">
+                        <p className="text-[10px] text-slate-400 uppercase font-bold mb-1">
+                          Nội dung chuyển khoản (Đối soát)
+                        </p>
+                        <div className="bg-slate-100 text-slate-600 px-2 py-1 rounded border border-slate-200 text-[11px] font-mono">
+                          <CopyableText
+                            text={
+                              txDetails.booking_details?.pay_txt_code ||
+                              txDetails.booking_details?.transaction_id ||
+                              ""
+                            }
+                            label="nội dung đối soát"
+                          />
+                        </div>
+                      </div>
                     </div>
-                  )}
-                  {typeof txDetails.payment_info?.days_left === "number" && (
-                    <div className="flex justify-between">
-                      <span className="text-gray-600">Dự kiến còn:</span>
-                      <span className="font-medium">
-                        {Math.max(0, Number(txDetails.payment_info.days_left))}{" "}
-                        ngày
-                      </span>
+
+                    {/* Hàng 3: Timeline */}
+                    <div className="grid grid-cols-4 p-4 gap-2 bg-slate-50/30 text-center">
+                      <InfoRow
+                        label="Ngày tạo"
+                        value={formatDate(
+                          txDetails.booking_details?.created_at,
+                        )}
+                      />
+                      <InfoRow
+                        label="Thanh toán"
+                        value={formatDate(txDetails.payment_info?.paid_at)}
+                      />
+                      <InfoRow
+                        label="Hạn dùng"
+                        value={formatDate(txDetails.payment_info?.expiry_date)}
+                        color="text-red-500"
+                      />
+                      <InfoRow
+                        label="Còn lại"
+                        value={
+                          (txDetails.payment_info?.days_left ?? 0) < 0
+                            ? "Đã hết hạn sử dụng"
+                            : `${txDetails.payment_info?.days_left || 0} ngày`
+                        }
+                        // Đổi màu sang đỏ nếu đã hết hạn
+                        color={
+                          (txDetails.payment_info?.days_left ?? 0) < 0
+                            ? "text-red-500"
+                            : "text-emerald-600"
+                        }
+                        bold
+                      />
                     </div>
-                  )}
+                  </div>
                 </div>
               </div>
-            </div>
-          ) : null}
+            ) : null}
+          </div>
+
+          {/* FOOTER CỐ ĐỊNH */}
+          <div className="p-4 bg-slate-50 border-t flex justify-end shrink-0 gap-3">
+            <Button
+              variant="outline"
+              onClick={() => setIsDetailsOpen(false)}
+              className="h-10 px-10 border-slate-300 hover:bg-white font-bold text-xs uppercase"
+            >
+              Đóng cửa sổ
+            </Button>
+          </div>
         </DialogContent>
       </Dialog>
     </div>

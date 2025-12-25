@@ -126,6 +126,7 @@ export const bookings = pgTable("bookings", {
     () => ticket_packages.id,
   ),
   expiry_date: timestamp("expiry_date", { mode: "date" }),
+  checked_in_at: timestamp("checked_in_at", { mode: "date" }),
 });
 
 export const toys = pgTable("toys", {

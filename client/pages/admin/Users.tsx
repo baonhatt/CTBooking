@@ -13,7 +13,7 @@ export default function UsersPage() {
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [editData, setEditData] = useState<any>(null);
   const [moviesLocal, setMoviesLocal] = useState<any[]>([]);
-  const [movieStatus, setMovieStatus] = useState<Record<string, "active" | "inactive">>({});
+  const [movieStatus, setMovieStatus] = useState({});
   const [isLoading, setIsLoading] = useState(false);
 
   function toLocalDateTimeString(date: Date) {
@@ -90,7 +90,7 @@ export default function UsersPage() {
   return (
     <AdminLayout
       active="users"
-      setActive={() => { }}
+      setActive={() => {}}
       adminEmailState={localStorage.getItem("adminEmail") || "admin@email.com"}
       handleLogout={() => {
         localStorage.removeItem("adminToken");
@@ -124,7 +124,7 @@ export default function UsersPage() {
         currentPage={usersPage}
         setMoviesLocal={setMoviesLocal}
         setMovieStatus={setMovieStatus}
-        setToys={() => { }}
+        setToys={() => {}}
       />
     </AdminLayout>
   );
