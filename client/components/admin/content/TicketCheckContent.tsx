@@ -33,6 +33,7 @@ import {
   Clock,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { differenceInDays } from "date-fns";
 
 interface TicketInfo {
   id: number;
@@ -316,7 +317,15 @@ export default function TicketCheckContent() {
                     </div>
                     <div className="space-y-1">
                       <p className="text-[10px] font-bold text-red-400 uppercase">
-                        Hết hạn
+                        Hết hạn (
+                        {(() => {
+                          const days = differenceInDays(
+                            new Date(ticketInfo.expiry_date),
+                            new Date(),
+                          );
+                          return days < 0 ? "Đã hết hạn" : ` ${days} ngày nữa`;
+                        })()}
+                        )
                       </p>
                       <p className="text-sm font-semibold text-red-500">
                         {formatDate(ticketInfo.expiry_date)}
@@ -370,25 +379,45 @@ export default function TicketCheckContent() {
 
           <div className="lg:col-span-4 space-y-6">
             <Card
-              className={`border-2 transition-all shadow-xl ${ticketInfo.valid && !ticketInfo.is_used ? "border-green-500 bg-green-50/10" : "border-slate-200 bg-white"}`}
+              className={`border-2 transition-all shadow-xl ${
+                ticketInfo.expired
+                  ? "border-slate-400 bg-slate-50" // Giao diện khi hết hạn
+                  : ticketInfo.valid && !ticketInfo.is_used
+                    ? "border-green-500 bg-green-50/10"
+                    : "border-slate-200 bg-white"
+              }`}
             >
               <CardContent className="p-8 text-center space-y-6">
                 <div className="space-y-2">
                   <h2
-                    className={`text-3xl font-black uppercase tracking-tighter ${ticketInfo.valid && !ticketInfo.is_used ? "text-green-600" : "text-slate-400"}`}
+                    className={`text-3xl font-black uppercase tracking-tighter ${
+                      ticketInfo.expired
+                        ? "text-slate-500" // Màu chữ khi hết hạn
+                        : ticketInfo.valid && !ticketInfo.is_used
+                          ? "text-green-600"
+                          : "text-slate-400"
+                    }`}
                   >
-                    {ticketInfo.valid && !ticketInfo.is_used
-                      ? "VÉ HỢP LỆ"
-                      : ticketInfo.is_used
-                        ? "VÉ ĐÃ DÙNG"
-                        : "CHƯA THANH TOÁN"}
+                    {/* Ưu tiên hiển thị Hết hạn lên đầu tiên */}
+                    {ticketInfo.expired
+                      ? "VÉ HẾT HẠN"
+                      : ticketInfo.valid && !ticketInfo.is_used
+                        ? "VÉ HỢP LỆ"
+                        : ticketInfo.is_used
+                          ? "VÉ ĐÃ DÙNG"
+                          : "CHƯA THANH TOÁN"}
                   </h2>
+
                   <div className="flex flex-col items-center gap-1">
                     <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
                       Mã vé (Booking Code)
                     </span>
                     <span
-                      className={`text-5xl font-mono font-black ${ticketInfo.is_used ? "text-slate-300 line-through decoration-slate-400/50" : "text-blue-600"}`}
+                      className={`text-5xl font-mono font-black ${
+                        ticketInfo.is_used || ticketInfo.expired
+                          ? "text-slate-300 line-through decoration-slate-400/50"
+                          : "text-blue-600"
+                      }`}
                     >
                       {ticketInfo.booking_code}
                     </span>
@@ -396,7 +425,21 @@ export default function TicketCheckContent() {
                 </div>
 
                 <div className="pt-4">
-                  {ticketInfo.payment_status !== "paid" ? (
+                  {/* Trường hợp 1: Vé đã hết hạn (Khóa mọi hành động) */}
+                  {ticketInfo.expired ? (
+                    <div className="py-5 px-6 rounded-2xl bg-slate-200 text-slate-600 font-bold border border-slate-300 flex flex-col gap-2 shadow-inner">
+                      <div className="flex items-center justify-center gap-2">
+                        <AlertCircle size={24} />
+                        <span className="text-xl uppercase font-black">
+                          Không thể sử dụng
+                        </span>
+                      </div>
+                      <p className="text-xs opacity-80">
+                        Vé này đã quá hạn dùng và bị vô hiệu hóa
+                      </p>
+                    </div>
+                  ) : /* Trường hợp 2: Chưa thanh toán */
+                  ticketInfo.payment_status !== "paid" ? (
                     <Button
                       onClick={() => {
                         setConfirmType("payment");
@@ -407,7 +450,8 @@ export default function TicketCheckContent() {
                     >
                       Xác nhận thanh toán
                     </Button>
-                  ) : ticketInfo.can_use && !ticketInfo.is_used ? (
+                  ) : /* Trường hợp 3: Hợp lệ để vào cổng */
+                  ticketInfo.can_use && !ticketInfo.is_used ? (
                     <Button
                       onClick={() => {
                         setConfirmType("checkin");
@@ -419,6 +463,7 @@ export default function TicketCheckContent() {
                       Xác nhận cho vào cổng
                     </Button>
                   ) : (
+                    /* Trường hợp 4: Đã sử dụng */
                     <div className="space-y-4">
                       <div className="py-5 px-6 rounded-2xl bg-slate-50 text-slate-400 font-bold border border-slate-100 flex flex-col gap-2">
                         <div className="flex items-center justify-center gap-2 text-red-500">
@@ -444,7 +489,10 @@ export default function TicketCheckContent() {
               </CardContent>
             </Card>
 
-            <Card className="bg-slate-900 text-white overflow-hidden relative shadow-xl">
+            {/* Card thông tin thanh toán - Chuyển màu tối nếu hết hạn */}
+            <Card
+              className={`${ticketInfo.expired ? "bg-slate-700" : "bg-slate-900"} text-white overflow-hidden relative shadow-xl transition-colors`}
+            >
               <CheckCircle2 className="absolute -top-4 -right-4 opacity-10 w-32 h-32" />
               <CardContent className="p-6 space-y-5 relative z-10">
                 <div className="flex justify-between items-center text-[10px] opacity-60 font-black uppercase tracking-widest">
@@ -457,7 +505,9 @@ export default function TicketCheckContent() {
                   <span className="text-xs font-bold opacity-60 uppercase">
                     Tổng thanh toán:
                   </span>
-                  <span className="text-4xl font-black text-green-400 leading-none tracking-tighter">
+                  <span
+                    className={`text-4xl font-black leading-none tracking-tighter ${ticketInfo.expired ? "text-slate-400" : "text-green-400"}`}
+                  >
                     {Number(ticketInfo.total_price).toLocaleString("vi-VN")}
                     <span className="text-base ml-1 font-bold">đ</span>
                   </span>

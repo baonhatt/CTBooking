@@ -2,7 +2,15 @@ import { useMemo, useState, useCallback, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { motion } from "framer-motion";
-import { ChevronLeft, ChevronRight, Play, Clock, Star, Calendar, Ticket } from "lucide-react";
+import {
+  ChevronLeft,
+  ChevronRight,
+  Play,
+  Clock,
+  Star,
+  Calendar,
+  Ticket,
+} from "lucide-react";
 import { getAllActiveMoviesToday, getMovieById } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { toast } from "@/components/ui/use-toast";
@@ -34,7 +42,7 @@ export default function FilmCarousel({ onSelectFilm }: FilmCarouselProps) {
   const isTouchDevice = useMemo(
     () =>
       typeof window !== "undefined" &&
-      (("ontouchstart" in window) ||
+      ("ontouchstart" in window ||
         (window.matchMedia && window.matchMedia("(pointer: coarse)").matches)),
     [],
   );
@@ -50,7 +58,7 @@ export default function FilmCarousel({ onSelectFilm }: FilmCarouselProps) {
         "(min-width: 768px)": { slidesToScroll: 2 },
       },
     },
-    []
+    [],
   );
 
   const { data } = useQuery({
@@ -153,11 +161,11 @@ export default function FilmCarousel({ onSelectFilm }: FilmCarouselProps) {
   const handleBookTicket = () => {
     // Close the modal
     setIsModalOpen(false);
-    
+
     // Scroll to promotions section
-    const promotionsSection = document.getElementById('promotions');
+    const promotionsSection = document.getElementById("promotions");
     if (promotionsSection) {
-      promotionsSection.scrollIntoView({ behavior: 'smooth' });
+      promotionsSection.scrollIntoView({ behavior: "smooth" });
     }
   };
 
@@ -173,12 +181,15 @@ export default function FilmCarousel({ onSelectFilm }: FilmCarouselProps) {
       <div className="container mx-auto px-3 relative z-10">
         <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-4 mb-10">
           <div>
-            <p className="text-sm uppercase tracking-[0.24em] text-cyan-200">Phim</p>
+            <p className="text-sm uppercase tracking-[0.24em] text-cyan-200">
+              Phim
+            </p>
             <h2 className="text-3xl md:text-4xl font-bold text-white mt-2">
               Thư viện phim hologram 8K
             </h2>
             <p className="text-gray-300 mt-2 max-w-2xl">
-              Lướt qua các suất chiếu đa chiều. Chọn phim để mở chi tiết và chuyển tới bước đặt vé ngay.
+              Lướt qua các suất chiếu đa chiều. Chọn phim để mở chi tiết và
+              chuyển tới bước đặt vé ngay.
             </p>
           </div>
           <div className="flex items-center gap-3">
@@ -215,7 +226,9 @@ export default function FilmCarousel({ onSelectFilm }: FilmCarouselProps) {
                 >
                   <motion.button
                     onMouseEnter={() => setHoveredIndex(index)}
-                    onMouseLeave={() => setHoveredIndex((prev) => (prev === index ? null : prev))}
+                    onMouseLeave={() =>
+                      setHoveredIndex((prev) => (prev === index ? null : prev))
+                    }
                     onTouchStart={() => {
                       setHoveredIndex(index);
                       setLastTapTime(Date.now());
@@ -237,8 +250,11 @@ export default function FilmCarousel({ onSelectFilm }: FilmCarouselProps) {
                       />
                       <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/30 to-transparent" />
                       <div
-                        className={`absolute bottom-4 left-4 right-4 space-y-2 text-left opacity-0 transition-opacity duration-300 ${hoveredIndex === index ? "opacity-100" : "group-hover:opacity-100"
-                          }`}
+                        className={`absolute bottom-4 left-4 right-4 space-y-2 text-left opacity-0 transition-opacity duration-300 ${
+                          hoveredIndex === index
+                            ? "opacity-100"
+                            : "group-hover:opacity-100"
+                        }`}
                       >
                         <p className="text-xs uppercase tracking-[0.18em] text-cyan-200">
                           {film.genre}
@@ -246,9 +262,12 @@ export default function FilmCarousel({ onSelectFilm }: FilmCarouselProps) {
                         <h3 className="text-xl font-semibold text-white drop-shadow-lg">
                           {film.title}
                         </h3>
-                        <div onClick={() => {
-                          handleOpen(film);
-                        }} className="inline-flex hover:bg-white/20 items-center gap-2 px-3 py-1 rounded-full bg-white/10 border border-white/20 text-sm text-white">
+                        <div
+                          onClick={() => {
+                            handleOpen(film);
+                          }}
+                          className="inline-flex hover:bg-white/20 items-center gap-2 px-3 py-1 rounded-full bg-white/10 border border-white/20 text-sm text-white"
+                        >
                           <Play className="h-4 w-4 text-cyan-300" />
                           Mở chi tiết
                         </div>
@@ -261,8 +280,12 @@ export default function FilmCarousel({ onSelectFilm }: FilmCarouselProps) {
           </div>
         ) : (
           <div className="w-full text-center text-gray-400 py-20 bg-white/5 rounded-xl border border-white/10 backdrop-blur-sm">
-            <p className="text-xl font-medium text-cyan-100 mb-2">Không có phim</p>
-            <p className="text-sm">Hiện tại chưa có phim nào đang chiếu. Vui lòng quay lại sau.</p>
+            <p className="text-xl font-medium text-cyan-100 mb-2">
+              Không có phim
+            </p>
+            <p className="text-sm">
+              Hiện tại chưa có phim nào đang chiếu. Vui lòng quay lại sau.
+            </p>
           </div>
         )}
       </div>
@@ -292,7 +315,9 @@ export default function FilmCarousel({ onSelectFilm }: FilmCarouselProps) {
                           : typeof movieDetails.genres === "string"
                             ? JSON.parse(movieDetails.genres)
                             : [];
-                        return Array.isArray(genres) && genres.length > 0 ? genres.join(" • ") : "Chưa phân loại";
+                        return Array.isArray(genres) && genres.length > 0
+                          ? genres.join(" • ")
+                          : "Chưa phân loại";
                       } catch {
                         return "Chưa phân loại";
                       }
@@ -322,19 +347,21 @@ export default function FilmCarousel({ onSelectFilm }: FilmCarouselProps) {
                         Mô tả
                       </h3>
                       <p className="text-gray-300 leading-relaxed text-sm">
-                        {movieDetails.description || "Chưa có mô tả cho bộ phim này."}
+                        {movieDetails.description ||
+                          "Chưa có mô tả cho bộ phim này."}
                       </p>
                     </div>
 
                     <div className="grid grid-cols-2 gap-4 pt-4 border-t border-white/10">
-                      {movieDetails.rating !== null && movieDetails.rating !== undefined && (
-                        <div className="flex items-center gap-2 p-2 rounded-lg bg-white/5 border border-white/10">
-                          <Star className="h-4 w-4 text-yellow-400 fill-yellow-400" />
-                          <span className="text-white font-medium text-sm">
-                            {movieDetails.rating.toFixed(1)} / 10
-                          </span>
-                        </div>
-                      )}
+                      {movieDetails.rating !== null &&
+                        movieDetails.rating !== undefined && (
+                          <div className="flex items-center gap-2 p-2 rounded-lg bg-white/5 border border-white/10">
+                            <Star className="h-4 w-4 text-yellow-400 fill-yellow-400" />
+                            <span className="text-white font-medium text-sm">
+                              {movieDetails.rating.toFixed(1)} / 10
+                            </span>
+                          </div>
+                        )}
                       {movieDetails.duration_min && (
                         <div className="flex items-center gap-2 p-2 rounded-lg bg-white/5 border border-white/10">
                           <Clock className="h-4 w-4 text-cyan-400" />
@@ -343,30 +370,7 @@ export default function FilmCarousel({ onSelectFilm }: FilmCarouselProps) {
                           </span>
                         </div>
                       )}
-                      {movieDetails.release_date && (
-                        <div className="flex items-center gap-2 p-2 rounded-lg bg-white/5 border border-white/10">
-                          <Calendar className="h-4 w-4 text-fuchsia-400" />
-                          <span className="text-white font-medium text-sm">
-                            {new Date(movieDetails.release_date).toLocaleDateString("vi-VN")}
-                          </span>
-                        </div>
-                      )}
                     </div>
-
-                    {movieDetails.stats && (
-                      <div className="pt-4 border-t border-white/10">
-                        <h4 className="text-sm font-semibold text-cyan-300 mb-3 flex items-center gap-2">
-                          <span className="w-1 h-4 bg-gradient-to-b from-cyan-400 to-blue-500 rounded-full"></span>
-                          Thống kê
-                        </h4>
-                        <div className="grid grid-cols-2 gap-3">
-                          <div className="p-3 rounded-lg bg-white/5 border border-white/10">
-                            <div className="text-xs text-gray-400 mb-1">Vé đã bán</div>
-                            <div className="text-lg font-bold text-cyan-300">{movieDetails.stats.totalTicketsSold}</div>
-                          </div>
-                        </div>
-                      </div>
-                    )}
                   </div>
                 </div>
               </>
@@ -397,4 +401,3 @@ export default function FilmCarousel({ onSelectFilm }: FilmCarouselProps) {
     </section>
   );
 }
-
