@@ -12,7 +12,9 @@ export default function TransactionsPage() {
   const [revenueTotal, setRevenueTotal] = useState(0);
   const [revenueCount, setRevenueCount] = useState(0);
   const [txStatus, setTxStatus] = useState<"paid" | "all">("paid");
-  const [sortKey, setSortKey] = useState<"created_at" | "paid_at">("created_at");
+  const [sortKey, setSortKey] = useState<"created_at" | "paid_at">(
+    "created_at",
+  );
   const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
   const [paymentMethod, setPaymentMethod] = useState<string>("");
   const [fromDate, setFromDate] = useState<string>("");
@@ -25,14 +27,27 @@ export default function TransactionsPage() {
       if (raw) {
         const s = JSON.parse(raw);
         if (typeof s.txQuery === "string") setTxQuery(s.txQuery);
-        if (typeof s.txStatus === "string" && (s.txStatus === "paid" || s.txStatus === "all")) setTxStatus(s.txStatus);
-        if (typeof s.sortKey === "string" && (s.sortKey === "created_at" || s.sortKey === "paid_at")) setSortKey(s.sortKey);
-        if (typeof s.sortDir === "string" && (s.sortDir === "asc" || s.sortDir === "desc")) setSortDir(s.sortDir);
-        if (typeof s.paymentMethod === "string") setPaymentMethod(s.paymentMethod);
+        if (
+          typeof s.txStatus === "string" &&
+          (s.txStatus === "paid" || s.txStatus === "all")
+        )
+          setTxStatus(s.txStatus);
+        if (
+          typeof s.sortKey === "string" &&
+          (s.sortKey === "created_at" || s.sortKey === "paid_at")
+        )
+          setSortKey(s.sortKey);
+        if (
+          typeof s.sortDir === "string" &&
+          (s.sortDir === "asc" || s.sortDir === "desc")
+        )
+          setSortDir(s.sortDir);
+        if (typeof s.paymentMethod === "string")
+          setPaymentMethod(s.paymentMethod);
         if (typeof s.fromDate === "string") setFromDate(s.fromDate);
         if (typeof s.toDate === "string") setToDate(s.toDate);
       }
-    } catch { }
+    } catch {}
   }, []);
 
   useEffect(() => {
@@ -47,7 +62,7 @@ export default function TransactionsPage() {
         toDate,
       };
       localStorage.setItem("admin_transactions_filters", JSON.stringify(state));
-    } catch { }
+    } catch {}
   }, [txQuery, txStatus, sortKey, sortDir, paymentMethod, fromDate, toDate]);
 
   // Load transactions khi page hoặc query thay đổi
@@ -58,7 +73,7 @@ export default function TransactionsPage() {
         const { items, total } = await getTransactions({
           page: txPage,
           pageSize,
-          email: txQuery,
+          searchText: txQuery,
           status: txStatus,
           sort: sortKey,
           dir: sortDir,
@@ -72,11 +87,13 @@ export default function TransactionsPage() {
             userId: t.user_id,
             email: t.email,
             userName: t.userName,
-            movieTitle: t.movieTitle,
+            ticket_package_name: t.ticket_package_name,
             ticketCount: t.ticketCount,
             totalPrice: t.totalPrice,
             paymentMethod: t.paymentMethod,
             paymentStatus: t.paymentStatus,
+            is_used: t.is_used,
+            expired: t.expired,
             createdAt: new Date(t.createdAt),
           })),
         );
@@ -87,7 +104,17 @@ export default function TransactionsPage() {
         setIsLoading(false);
       }
     })();
-  }, [txPage, pageSize, txQuery, txStatus, sortKey, sortDir, paymentMethod, fromDate, toDate]);
+  }, [
+    txPage,
+    pageSize,
+    txQuery,
+    txStatus,
+    sortKey,
+    sortDir,
+    paymentMethod,
+    fromDate,
+    toDate,
+  ]);
 
   useEffect(() => {
     (async () => {
@@ -132,7 +159,7 @@ export default function TransactionsPage() {
       const { items, total } = await getTransactions({
         page: txPage,
         pageSize,
-        email: txQuery,
+        searchText: txQuery,
         status: txStatus,
         sort: sortKey,
         dir: sortDir,
@@ -142,11 +169,11 @@ export default function TransactionsPage() {
       });
       setTransactions(
         items.map((t: any) => ({
-            id: String(t.id),
-            userId: t.user_id,
-            email: t.email,
+          id: String(t.id),
+          userId: t.user_id,
+          email: t.email,
           userName: t.userName,
-          movieTitle: t.movieTitle,
+          ticket_package_name: t.ticket_package_name,
           ticketCount: t.ticketCount,
           totalPrice: t.totalPrice,
           paymentMethod: t.paymentMethod,
@@ -176,7 +203,7 @@ export default function TransactionsPage() {
   return (
     <AdminLayout
       active="transactions"
-      setActive={() => { }}
+      setActive={() => {}}
       adminEmailState={localStorage.getItem("adminEmail") || "admin@email.com"}
       handleLogout={() => {
         localStorage.removeItem("adminToken");

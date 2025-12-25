@@ -1,8 +1,9 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { getMoviesAdmin } from "@/lib/api";
+import { getMoviesAdmin, updateMovieStatus } from "@/lib/api";
 import AdminLayout from "@/admin/layouts/AdminLayout";
 import MoviesContent from "@/components/admin/content/MoviesContent";
 import AdminEditModal from "@/components/admin/AdminEditModal";
+import { toast } from "@/hooks/use-toast";
 
 export default function MoviesPage() {
   const [moviesLocal, setMoviesLocal] = useState<any[]>([]);
@@ -168,6 +169,7 @@ export default function MoviesPage() {
         : null,
       rating: m.rating ?? null,
       price: Number(m.price || 0),
+      updated_at: m.updated_at ? new Date(m.updated_at).toISOString() : null,
     }));
     setMoviesLocal(mapped);
     setTotalMovies(total);
@@ -183,26 +185,31 @@ export default function MoviesPage() {
     setIsLoading(false);
   };
   // Thêm hàm này vào file cha (MoviesPage.tsx)
+  // In client/pages/admin/Movies.tsx
+
   const handleToggleStatus = async (
     id: string | number,
-    currentStatus: "active" | "inactive",
+    currentStatus: boolean,
   ) => {
     try {
-      const newStatus = currentStatus === "active" ? "inactive" : "active";
-
-      // 1. Gọi API cập nhật trạng thái ở đây (nếu có)
-      // await updateMovieStatus(id, newStatus);
-
-      // 2. Cập nhật State cục bộ để giao diện thay đổi ngay lập tức
+      const newStatus = !currentStatus;
+      const response = await updateMovieStatus(Number(id), newStatus);
       setMovieStatus((prev) => ({
         ...prev,
-        [String(id)]: newStatus,
+        [String(id)]: newStatus ? "active" : "inactive",
       }));
 
-      // Thông báo thành công (nếu bạn dùng toast)
-      // toast.success("Đã thay đổi trạng thái phim!");
-    } catch (error) {
-      console.error("Lỗi cập nhật:", error);
+      toast({
+        title: response.status == "success" ? "Thành công" : "Thất bại",
+        description: response.message,
+      });
+    } catch (e: any) {
+      toast({
+        title: "Lỗi",
+        description: e?.message || "Có lỗi xảy ra",
+        variant: "destructive",
+      });
+    } finally {
     }
   };
   return (

@@ -476,6 +476,7 @@ export async function getBookingByIdImpl(
       movie_id: bookings.movie_id,
       ticket_package_id: bookings.ticket_package_id,
       expiry_date: bookings.expiry_date,
+      checked_in_at: bookings.checked_in_at,
       created_at: bookings.created_at,
       paid_at: bookings.paid_at,
       payment_method: bookings.payment_method,
@@ -585,6 +586,7 @@ export async function getBookingByCodeImpl(
     pay_txt_code: booking.pay_txt_code,
     validity_days: daysLeft,
     expired,
+    checked_in_at: booking.checked_in_at,
   };
 }
 
@@ -616,18 +618,17 @@ export async function confirmUseTicketImpl(
     if (!valid)
       return { status: 400, message: "Vé không còn hiệu lực hoặc đã sử dụng" };
     // Update booking (tương thích với D1/SQLite không hỗ trợ .returning())
-    await anyDb
+    const updatedRes = await anyDb
       .update(bookingsTable)
       .set({
         is_used: true,
         updated_at: formatDateForDb(new Date(), RUNTIME_ENV),
+        checked_in_at: formatDateForDb(new Date(), RUNTIME_ENV),
       })
-      .where(eq(bookingsTable.id, booking.id));
+      .where(eq(bookingsTable.id, booking.id))
+      .returning();
 
-    // Query lại booking vừa update
-    const updated = await anyDb.query.bookings.findFirst({
-      where: eq(bookingsTable.id, booking.id),
-    });
+    const updated = Array.isArray(updatedRes) ? updatedRes[0] : updatedRes;
 
     if (!updated)
       return { status: 500, message: "Không thể cập nhật trạng thái vé" };

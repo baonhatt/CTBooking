@@ -29,7 +29,7 @@ export async function getAdminRevenue(options?: {
 export async function getTransactions(options?: {
   page?: number;
   pageSize?: number;
-  email?: string;
+  searchText?: string;
   status?: "all" | "paid" | "failed" | "pending";
   payment_method?: string;
   from?: string;
@@ -41,9 +41,10 @@ export async function getTransactions(options?: {
   const params = new URLSearchParams();
   if (options?.page) params.set("page", String(options.page));
   if (options?.pageSize) params.set("pageSize", String(options.pageSize));
-  if (options?.email) params.set("email", options.email);
+  if (options?.searchText) params.set("searchText", options.searchText);
   if (options?.status) params.set("status", options.status);
-  if (options?.payment_method) params.set("payment_method", options.payment_method);
+  if (options?.payment_method)
+    params.set("payment_method", options.payment_method);
   if (options?.from) params.set("from", options.from);
   if (options?.to) params.set("to", options.to);
   if (options?.sort) params.set("sort", options.sort);
@@ -73,9 +74,12 @@ export async function getRevenueByDate(date?: string, status?: "all" | "paid") {
   const params = new URLSearchParams();
   if (date) params.append("date", date);
   if (status) params.append("status", status);
-  return request<{ date: string; total: number; count: number; revenueByMethod: { cash: number; momo: number; vnpay: number } }>(
-    `/api/admin/dashboard/revenue-date?${params.toString()}`
-  );
+  return request<{
+    date: string;
+    total: number;
+    count: number;
+    revenueByMethod: { cash: number; momo: number; vnpay: number };
+  }>(`/api/admin/dashboard/revenue-date?${params.toString()}`);
 }
 
 export async function getRevenue7Days() {
@@ -84,7 +88,11 @@ export async function getRevenue7Days() {
   }>("/api/admin/dashboard/revenue-7days");
 }
 
-export async function getRevenueByMonth(year?: number, month?: number, status?: "all" | "paid") {
+export async function getRevenueByMonth(
+  year?: number,
+  month?: number,
+  status?: "all" | "paid",
+) {
   const params = new URLSearchParams();
   if (year) params.append("year", String(year));
   if (month) params.append("month", String(month));
@@ -108,23 +116,31 @@ export async function getTransactionById(id: number) {
   return request<{
     id: number;
     user: {
-      id: number;
+      email_auth: string;
       fullname: string;
       email: string;
       phone: string | null;
       is_active: boolean;
-      account_created_at: string;
+    };
+    ticket_package: {
+      name: string;
+      ticket_unit_price: number;
+      movies: string;
     };
     booking_details: {
       ticket_count: number;
       total_price: number;
-      price_per_ticket: number;
+      combo: string;
+      pay_txt_code: string | null;
+      booking_code: string | null;
+      is_used: boolean;
+      checked_in_at: string;
+      created_at: string;
     };
     payment_info: {
-      payment_method: string;
-      payment_status: string;
-      transaction_id: string;
-      created_at: string;
+      payment_method: string | null;
+      payment_status: string | null;
+      transaction_id: string | null;
       paid_at: string | null;
       expiry_date: string | null;
       expired: boolean;
@@ -132,4 +148,3 @@ export async function getTransactionById(id: number) {
     };
   }>(`/api/admin/transactions/${id}`);
 }
-

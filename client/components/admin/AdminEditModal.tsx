@@ -5,7 +5,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Calendar, Loader2, Plus } from "lucide-react";
+import { Calendar, Loader2, Lock, Plus } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import React, { useEffect, useState } from "react";
@@ -272,34 +272,46 @@ const AdminEditModal: React.FC<AdminEditModalProps> = (props) => {
         )}
 
         {editType === "movie" && (
-          <div className="flex flex-col h-full overflow-hidden">
+          <div className="flex flex-col h-full overflow-hidden bg-white">
             {/* VÙNG CUỘN (SCROLLABLE AREA) */}
-            <div className="flex-1 overflow-y-auto px-6 py-4 space-y-4 bg-slate-50/30">
-              {/* Container chính cho form */}
-              <div className="grid grid-cols-12 gap-6">
-                {/* Cột trái: Poster */}
-                <div className="col-span-12 md:col-span-4 space-y-3">
-                  <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
-                    <Label className="text-[11px] font-bold uppercase text-slate-400 mb-2 block">
+            <div className="flex-1 overflow-y-auto px-6 py-6 space-y-6 bg-slate-50/30">
+              <div className="grid grid-cols-12 gap-8">
+                {/* Cột trái: Poster (Cố định hoặc cuộn theo tùy màn hình) */}
+                <div className="col-span-12 md:col-span-4 lg:col-span-3 space-y-4">
+                  <label className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm block cursor-pointer group hover:border-blue-400 transition-all">
+                    <span className="text-[11px] font-bold uppercase text-slate-400 mb-3 block tracking-wider">
                       Poster Phim
-                    </Label>
-                    <div className="aspect-[2/3] relative border-2 border-dashed rounded-lg overflow-hidden group hover:border-blue-400 transition-colors bg-slate-50">
+                    </span>
+
+                    <div className="aspect-[2/3] relative border-2 border-dashed rounded-xl overflow-hidden bg-slate-50 group-hover:border-blue-200 transition-colors">
                       {editData?.posterUrl ? (
-                        <img
-                          src={editData.posterUrl}
-                          className="w-full h-full object-cover"
-                          alt="Poster preview"
-                        />
+                        <>
+                          <img
+                            src={editData.posterUrl}
+                            className="w-full h-full object-cover"
+                            alt="Poster preview"
+                          />
+                          <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                            <span className="text-white text-xs font-medium bg-black/50 px-3 py-1.5 rounded-full backdrop-blur-sm">
+                              Thay đổi ảnh
+                            </span>
+                          </div>
+                        </>
                       ) : (
                         <div className="absolute inset-0 flex flex-col items-center justify-center text-slate-400">
-                          <Plus size={24} />
-                          <span className="text-xs mt-2">Chọn ảnh</span>
+                          <div className="p-3 rounded-full bg-slate-100 mb-2 group-hover:bg-blue-50 group-hover:text-blue-500 transition-colors">
+                            <Plus size={24} />
+                          </div>
+                          <span className="text-xs font-medium">
+                            Tải ảnh lên
+                          </span>
                         </div>
                       )}
-                      <Input
+
+                      <input
                         type="file"
                         accept="image/*"
-                        className="absolute inset-0 opacity-0 cursor-pointer"
+                        className="hidden"
                         onChange={(e) => {
                           const file = e.target.files?.[0];
                           if (file) {
@@ -313,71 +325,56 @@ const AdminEditModal: React.FC<AdminEditModalProps> = (props) => {
                         }}
                       />
                     </div>
-                    <p className="text-[10px] text-slate-400 mt-2 text-center">
-                      Định dạng: JPG, PNG (Max 15MB)
+
+                    <p className="text-[10px] text-slate-400 mt-3 text-center italic">
+                      Hỗ trợ: JPG, PNG, WEBP (Tối đa 15MB)
                     </p>
-                  </div>
+                  </label>
                 </div>
 
                 {/* Cột phải: Thông tin chi tiết */}
-                <div className="col-span-12 md:col-span-8 space-y-4">
-                  <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm space-y-4">
-                    <div className="grid grid-cols-2 gap-4">
-                      {/* TRƯỜNG ID: Đã đưa vào đây để bạn nhập */}
-                      <div className="col-span-1">
-                        <Label className="text-[11px] font-bold uppercase text-slate-400 mb-1.5 block">
-                          ID Hệ thống
-                        </Label>
-                        <div className="relative">
-                          <Input
-                            readOnly
-                            value={editData?.id ? `${editData.id}` : "N/A"}
-                            className="bg-slate-50/50 border-dashed border-slate-200 font-mono text-blue-600 cursor-default focus-visible:ring-0 shadow-none"
-                          />
-                          {/* Biểu tượng khóa nhỏ tinh tế ở góc */}
-                          <div className="absolute right-3 top-1/2 -translate-y-1/2">
-                            <div className="p-1 bg-slate-100 rounded text-slate-400">
-                              <svg
-                                xmlns="http://www.w3.org/2000/svg"
-                                width="12"
-                                height="12"
-                                viewBox="0 0 24 24"
-                                fill="none"
-                                stroke="currentColor"
-                                strokeWidth="2"
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                              >
-                                <rect
-                                  width="18"
-                                  height="11"
-                                  x="3"
-                                  y="11"
-                                  rx="2"
-                                  ry="2"
-                                />
-                                <path d="M7 11V7a5 5 0 0 1 10 0v4" />
-                              </svg>
+                <div className="col-span-12 md:col-span-8 lg:col-span-9 space-y-6">
+                  <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm space-y-6">
+                    {/* Hàng 1: ID & Tên phim */}
+                    <div className="grid grid-cols-12 gap-4">
+                      {editData?.id ? (
+                        <div className="col-span-12 lg:col-span-3">
+                          <Label className="text-[11px] font-bold uppercase text-slate-400 mb-1.5 block">
+                            ID Hệ thống
+                          </Label>
+                          <div className="relative group">
+                            <Input
+                              readOnly
+                              value={`#${editData.id}`}
+                              className="bg-slate-50/80 border-dashed border-slate-200 font-mono text-blue-600 cursor-not-allowed shadow-none"
+                            />
+                            <div className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-300">
+                              <Lock size={12} />
                             </div>
                           </div>
                         </div>
-                      </div>
+                      ) : null}
 
-                      <div className="col-span-1">
-                        <Label className="text-[11px] font-bold uppercase text-slate-400">
+                      <div
+                        className={`${editData?.id ? "col-span-12 lg:col-span-9" : "col-span-12"}`}
+                      >
+                        <Label className="text-[11px] font-bold uppercase text-slate-400 mb-1.5 block">
                           Tên phim
                         </Label>
                         <Input
+                          placeholder="Ví dụ: Đào, Phở và Piano"
                           value={editData?.title || ""}
                           onChange={(e) =>
                             setEditData({ ...editData, title: e.target.value })
                           }
+                          className="focus-visible:ring-blue-500/20"
                         />
                       </div>
                     </div>
 
+                    {/* Hàng 2: Mô tả */}
                     <div className="space-y-1.5">
-                      <Label className="text-[11px] font-bold uppercase text-slate-400">
+                      <Label className="text-[11px] font-bold uppercase text-slate-400 mb-1.5 block">
                         Mô tả nội dung
                       </Label>
                       <textarea
@@ -388,40 +385,44 @@ const AdminEditModal: React.FC<AdminEditModalProps> = (props) => {
                             description: e.target.value,
                           })
                         }
-                        placeholder="Nhập mô tả phim..."
-                        className="w-full h-32 border border-slate-200 rounded-md px-3 py-2.5 text-sm leading-relaxed focus:border-blue-500 focus:ring-4 focus:ring-blue-500/5 outline-none resize-none transition-all placeholder:text-slate-300 shadow-sm"
+                        placeholder="Nhập tóm tắt nội dung phim..."
+                        className="w-full h-32 border border-slate-200 rounded-xl px-3 py-2.5 text-sm leading-relaxed focus:border-blue-400 focus:ring-4 focus:ring-blue-500/5 outline-none resize-none transition-all placeholder:text-slate-300"
                       />
                     </div>
 
-                    <div className="grid grid-cols-2 gap-4">
-                      <div className="col-span-2">
-                        <Label className="text-[11px] font-bold uppercase text-slate-400">
-                          Thể loại (cách nhau bởi dấu phẩy)
-                        </Label>
-                        <Input
-                          value={
-                            editData?.genresText ??
-                            (editData?.genres || []).join(", ")
-                          }
-                          onChange={(e) =>
-                            setEditData({
-                              ...editData,
-                              genresText: e.target.value,
-                              genres: e.target.value
-                                .split(/[,;|\n]| {2,}/)
-                                .map((x) => x.trim())
-                                .filter(Boolean),
-                            })
-                          }
-                        />
-                      </div>
+                    {/* Hàng 3: Thể loại */}
+                    <div className="space-y-1.5">
+                      <Label className="text-[11px] font-bold uppercase text-slate-400 mb-1.5 block">
+                        Thể loại (Ví dụ: Hành động, Tình cảm)
+                      </Label>
+                      <Input
+                        placeholder="Nhập các thể loại, ngăn cách bằng dấu phẩy"
+                        value={
+                          editData?.genresText ??
+                          (editData?.genres || []).join(", ")
+                        }
+                        onChange={(e) =>
+                          setEditData({
+                            ...editData,
+                            genresText: e.target.value,
+                            genres: e.target.value
+                              .split(/[,;|\n]| {2,}/)
+                              .map((x) => x.trim())
+                              .filter(Boolean),
+                          })
+                        }
+                      />
+                    </div>
 
+                    {/* Hàng 4: Thời lượng, Đánh giá, Ngày & Trạng thái */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                       <div>
-                        <Label className="text-[11px] font-bold uppercase text-slate-400">
-                          Thời lượng (phút)
+                        <Label className="text-[11px] font-bold uppercase text-slate-400 mb-1.5 block">
+                          Thời lượng (Phút)
                         </Label>
                         <Input
                           type="number"
+                          placeholder="120"
                           value={editData?.duration || ""}
                           onChange={(e) =>
                             setEditData({
@@ -436,12 +437,13 @@ const AdminEditModal: React.FC<AdminEditModalProps> = (props) => {
                       </div>
 
                       <div>
-                        <Label className="text-[11px] font-bold uppercase text-slate-400">
+                        <Label className="text-[11px] font-bold uppercase text-slate-400 mb-1.5 block">
                           Đánh giá (0-10)
                         </Label>
                         <Input
                           type="number"
                           step="0.1"
+                          placeholder="8.5"
                           value={editData?.rating ?? ""}
                           onChange={(e) =>
                             setEditData({
@@ -454,12 +456,11 @@ const AdminEditModal: React.FC<AdminEditModalProps> = (props) => {
                         />
                       </div>
 
-                      <div>
+                      <div className="relative group">
                         <Label className="text-[11px] font-bold uppercase text-slate-400 mb-1.5 block">
                           Ngày phát hành
                         </Label>
-                        <div className="relative h-11 group">
-                          {/* 1. Input thật: Ẩn đi bằng opacity nhưng bao phủ toàn bộ để kích hoạt trình chọn ngày */}
+                        <div className="relative h-10">
                           <input
                             type="datetime-local"
                             value={
@@ -480,30 +481,26 @@ const AdminEditModal: React.FC<AdminEditModalProps> = (props) => {
                             }
                             className="absolute inset-0 w-full h-full opacity-0 z-20 cursor-pointer"
                           />
-
-                          {/* 2. Giao diện hiển thị giả lập: Đảm bảo 1 dòng, đúng định dạng dd/MM/yyyy */}
                           <div className="absolute inset-0 w-full h-full border rounded-md px-3 flex items-center justify-between bg-white group-hover:border-blue-400 transition-all z-10">
                             <span className="text-sm truncate">
                               {editData?.release_date
                                 ? format(
                                     new Date(editData.release_date),
-                                    "dd/MM/yyyy hh:mm a",
+                                    "dd/MM/yyyy HH:mm",
                                   )
-                                : "Chọn ngày phát hành"}
+                                : "Chọn ngày"}
                             </span>
-
-                            {/* 3. Icon lịch duy nhất, không bị đè (khớp với image_71521f.png) */}
                             <Calendar
-                              size={18}
-                              className="text-slate-400 shrink-0 ml-2"
+                              size={16}
+                              className="text-slate-400 shrink-0"
                             />
                           </div>
                         </div>
                       </div>
 
                       <div>
-                        <Label className="text-[11px] font-bold uppercase text-slate-400">
-                          Trạng thái hiển thị
+                        <Label className="text-[11px] font-bold uppercase text-slate-400 mb-1.5 block">
+                          Trạng thái
                         </Label>
                         <select
                           value={
@@ -517,10 +514,10 @@ const AdminEditModal: React.FC<AdminEditModalProps> = (props) => {
                               is_active: e.target.value === "active",
                             })
                           }
-                          className="w-full h-10 border rounded-md px-3 text-sm"
+                          className="w-full h-10 border border-slate-200 rounded-md px-3 text-sm focus:border-blue-400 focus:ring-4 focus:ring-blue-500/5 outline-none transition-all"
                         >
-                          <option value="active">🟢 Đang hoạt động</option>
-                          <option value="inactive">🔴 Tạm ẩn</option>
+                          <option value="active">🟢 Đang chiếu</option>
+                          <option value="inactive">🔴 Đã ẩn</option>
                         </select>
                       </div>
                     </div>
@@ -529,20 +526,29 @@ const AdminEditModal: React.FC<AdminEditModalProps> = (props) => {
               </div>
             </div>
 
-            {/* VÙNG NÚT BẤM CỐ ĐỊNH (FIXED FOOTER) */}
-            <div className="px-6 py-4 border-t bg-white flex justify-end gap-3 shrink-0">
-              <Button variant="outline" onClick={() => setIsEditOpen(false)}>
+            {/* VÙNG NÚT BẤM CỐ ĐỊNH */}
+            <div className="px-6 py-4 border-t bg-white flex justify-end items-center gap-3 shrink-0">
+              <span className="text-[11px] text-slate-400 mr-auto italic font-sans">
+                * Lưu ý: Mọi thay đổi sẽ ảnh hưởng trực tiếp đến lịch chiếu hiện
+                tại.
+              </span>
+              <Button
+                variant="ghost"
+                onClick={() => setIsEditOpen(false)}
+                disabled={isSaving}
+                className="text-slate-500 hover:bg-slate-100"
+              >
                 Hủy bỏ
               </Button>
               <Button
                 disabled={isSaving}
-                className="bg-blue-600 hover:bg-blue-700 min-w-[120px]"
+                className="bg-blue-600 hover:bg-blue-700 min-w-[140px] rounded-xl shadow-lg shadow-blue-500/20 transition-all active:scale-95"
                 onClick={async () => {
-                  // Validation
+                  // --- VALIDATION LOGIC ---
                   if (!editData.title?.trim()) {
                     toast({
                       title: "Lỗi",
-                      description: "Tên phim là bắt buộc",
+                      description: "Vui lòng nhập tên phim",
                       variant: "destructive",
                     });
                     return;
@@ -550,15 +556,7 @@ const AdminEditModal: React.FC<AdminEditModalProps> = (props) => {
                   if (!editData.duration || Number(editData.duration) <= 0) {
                     toast({
                       title: "Lỗi",
-                      description: "Thời lượng không hợp lệ",
-                      variant: "destructive",
-                    });
-                    return;
-                  }
-                  if (!editData.release_date) {
-                    toast({
-                      title: "Lỗi",
-                      description: "Ngày phát hành là bắt buộc",
+                      description: "Thời lượng phim không hợp lệ",
                       variant: "destructive",
                     });
                     return;
@@ -597,7 +595,6 @@ const AdminEditModal: React.FC<AdminEditModalProps> = (props) => {
                       release_date: editData.release_date,
                     };
 
-                    // Dùng editData.id để quyết định Update hay Create
                     if (editData.id) {
                       await updateMovieApi(Number(editData.id), payload);
                     } else {
@@ -607,13 +604,15 @@ const AdminEditModal: React.FC<AdminEditModalProps> = (props) => {
                     await refetch("movie");
                     toast({
                       title: "Thành công",
-                      description: "Dữ liệu đã được lưu",
+                      description: editData.id
+                        ? "Đã cập nhật thông tin phim"
+                        : "Đã thêm phim mới",
                     });
                     setIsEditOpen(false);
                   } catch (err: any) {
                     toast({
-                      title: "Lỗi",
-                      description: err?.message || "Có lỗi xảy ra",
+                      title: "Lỗi hệ thống",
+                      description: err?.message || "Không thể lưu dữ liệu",
                       variant: "destructive",
                     });
                   } finally {
@@ -622,11 +621,12 @@ const AdminEditModal: React.FC<AdminEditModalProps> = (props) => {
                 }}
               >
                 {isSaving ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Đang lưu
-                  </>
+                  <div className="flex items-center gap-2">
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    <span>Đang xử lý</span>
+                  </div>
                 ) : (
-                  "Lưu thay đổi"
+                  <span>{editData.id ? "Lưu thay đổi" : "Tạo phim mới"}</span>
                 )}
               </Button>
             </div>

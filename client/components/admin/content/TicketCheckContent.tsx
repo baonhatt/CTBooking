@@ -1,9 +1,19 @@
-import React, { useEffect, useState } from "react";
+import React, { useState } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import {
   confirmBookingApi,
   getBookingByCodeApi,
@@ -19,6 +29,8 @@ import {
   Mail,
   Ticket,
   Info,
+  Loader2,
+  Clock,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
@@ -35,6 +47,7 @@ interface TicketInfo {
   created_at: string;
   paid_at: string | null;
   expiry_date: string | null;
+  checked_in_at: string | null;
   payment_method: string | null;
   userName: string;
   is_used: boolean;
@@ -54,12 +67,17 @@ export default function TicketCheckContent() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [useLoading, setUseLoading] = useState(false);
+
+  // States cho Alert Dialog
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [confirmType, setConfirmType] = useState<"checkin" | "payment">(
+    "checkin",
+  );
+
   const { toast } = useToast();
 
   const handleSearch = async () => {
     let searchCode = code.trim().toUpperCase();
-
-    // Tự động thêm ORDER nếu chỉ nhập số
     if (/^\d+$/.test(searchCode)) {
       searchCode = `ORDER${searchCode}`;
     }
@@ -82,45 +100,59 @@ export default function TicketCheckContent() {
     }
   };
 
-  const handleConfirmUse = async () => {
-    if (!ticketInfo?.booking_code) return;
+  const executeAction = async () => {
+    if (!ticketInfo) return;
+    setUseLoading(true); // Bật hiệu ứng loading trên button
+
     try {
-      setUseLoading(true);
-      const res = await useTicketApi(ticketInfo.booking_code);
-      if (res?.status === "success") {
-        toast({ title: "Thành công", description: "Đã xác nhận vào cổng" });
-        setTicketInfo({
-          ...ticketInfo,
-          is_used: true,
-          can_use: false,
-          valid: false,
-        });
+      if (confirmType === "checkin") {
+        // 1. Xử lý xác nhận vào cổng
+        const res = await useTicketApi(ticketInfo.booking_code);
+        if (res?.status === "success") {
+          toast({
+            title: "Thành công",
+            description: "Đã xác nhận cho khách vào cổng",
+          });
+
+          // Cập nhật giao diện ngay lập tức
+          setTicketInfo({
+            ...ticketInfo,
+            is_used: true,
+            can_use: false,
+            valid: false,
+            checked_in_at: new Date().toISOString(),
+          });
+
+          // CHỈ ĐÓNG MODAL KHI THÀNH CÔNG
+          setConfirmOpen(false);
+        }
+      } else {
+        // 2. Xử lý xác nhận thanh toán
+        const payload = {
+          user_id: ticketInfo.user_id,
+          payment_id: ticketInfo.id,
+          payment_status: "paid",
+          transaction_id: null,
+          paid_at: new Date().toISOString(),
+        };
+        const res = await confirmBookingApi(payload);
+        toast({ title: "Thành công", description: res.message });
+
+        // Load lại dữ liệu mới nhất từ server
+        await handleSearch();
+
+        // CHỈ ĐÓNG MODAL KHI THÀNH CÔNG
+        setConfirmOpen(false);
       }
     } catch (err: any) {
-      toast({ variant: "destructive", title: "Lỗi", description: err.message });
+      toast({
+        variant: "destructive",
+        title: "Lỗi hệ thống",
+        description: err.message || "Không thể thực hiện thao tác",
+      });
+      // Không đóng modal khi lỗi để nhân viên có thể xem thông báo lỗi
     } finally {
-      setUseLoading(false);
-    }
-  };
-
-  const handleConfirmPayment = async () => {
-    if (!ticketInfo) return;
-    try {
-      setUseLoading(true);
-      const payload = {
-        user_id: ticketInfo.user_id,
-        payment_id: ticketInfo.id,
-        payment_status: "paid",
-        transaction_id: null,
-        paid_at: new Date().toISOString(),
-      };
-      const res = await confirmBookingApi(payload);
-      toast({ title: "Thành công", description: res.message });
-      handleSearch();
-    } catch (err: any) {
-      toast({ variant: "destructive", title: "Lỗi", description: err.message });
-    } finally {
-      setUseLoading(false);
+      setUseLoading(false); // Tắt hiệu ứng loading
     }
   };
 
@@ -129,7 +161,6 @@ export default function TicketCheckContent() {
       ? new Date(str).toLocaleString("vi-VN", {
           hour: "2-digit",
           minute: "2-digit",
-          second: "2-digit",
           day: "2-digit",
           month: "2-digit",
           year: "numeric",
@@ -148,7 +179,7 @@ export default function TicketCheckContent() {
   return (
     <div className="max-w-8xl mx-auto space-y-8 pb-20">
       <div className="space-y-1">
-        <h1 className="text-4xl font-extrabold tracking-tight text-slate-900">
+        <h1 className="text-4xl font-extrabold tracking-tight text-slate-900 uppercase">
           HỆ THỐNG KIỂM SOÁT
         </h1>
         <p className="text-muted-foreground italic text-sm">
@@ -156,13 +187,13 @@ export default function TicketCheckContent() {
         </p>
       </div>
 
-      {/* Search & Instruction Section */}
+      {/* Search Section */}
       <div className="max-w-3xl space-y-4">
         <div className="flex gap-3">
           <div className="relative flex-1">
             <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-slate-400" />
             <Input
-              className="pl-12 h-14 text-lg shadow-sm border-slate-200 focus:ring-2"
+              className="pl-12 h-14 text-lg shadow-sm border-slate-200 focus:ring-2 focus:ring-blue-500"
               placeholder="Nhập mã vé hoặc ID (VD: 1766461)..."
               value={code}
               onChange={(e) => setCode(e.target.value)}
@@ -173,9 +204,9 @@ export default function TicketCheckContent() {
             onClick={handleSearch}
             disabled={isLoading}
             size="lg"
-            className="h-14 px-8 bg-slate-900 hover:bg-slate-800"
+            className="h-14 px-8 bg-slate-900 hover:bg-slate-800 transition-transform active:scale-95"
           >
-            {isLoading ? "Đang quét..." : "Kiểm tra"}
+            {isLoading ? <Loader2 className="animate-spin" /> : "Kiểm tra"}
           </Button>
         </div>
 
@@ -219,26 +250,27 @@ export default function TicketCheckContent() {
                   <div className="flex flex-col gap-1">
                     <div className="flex items-center gap-2 text-blue-600 font-bold">
                       <Ticket className="w-5 h-5" />
-                      <span>Gói: {ticketInfo.ticket_package_name}</span>
+                      <span className="text-lg">
+                        Gói: {ticketInfo.ticket_package_name}
+                      </span>
                     </div>
-                    {/* Hiển thị giá 1 vé */}
-                    <span className="text-[11px] font-bold text-blue-500 ml-7">
-                      GIÁ 1 VÉ:{" "}
-                      {Number(
-                        Number(ticketInfo.total_price) /
-                          ticketInfo.ticket_count,
-                      ).toLocaleString("vi-VN")}{" "}
-                      đ
-                    </span>
+                    <div className="flex items-center gap-3 ml-7">
+                      <span className="text-[11px] font-bold text-blue-500">
+                        GIÁ 1 VÉ:{" "}
+                        {Number(
+                          Number(ticketInfo.total_price) /
+                            ticketInfo.ticket_count,
+                        ).toLocaleString("vi-VN")}{" "}
+                        đ
+                      </span>
+                      <span className="text-[10px] font-mono font-bold text-slate-400 bg-slate-200/50 px-2 rounded">
+                        ID: #{ticketInfo.id}
+                      </span>
+                    </div>
                   </div>
-                  <div className="flex flex-col items-end gap-1">
-                    <span className="text-[10px] text-slate-400 font-bold uppercase">
-                      Số người vào:
-                    </span>
-                    <Badge className="bg-red-500 text-white px-4 py-1.5 flex gap-2 items-center border-none font-black text-sm shadow-sm">
-                      <User size={16} /> {ticketInfo.ticket_count} VÉ
-                    </Badge>
-                  </div>
+                  <Badge className="bg-red-500 text-white px-4 py-1.5 flex gap-2 items-center border-none font-black text-sm shadow-sm">
+                    <User size={16} /> {ticketInfo.ticket_count} VÉ
+                  </Badge>
                 </div>
 
                 <div className="p-8 space-y-8">
@@ -295,7 +327,6 @@ export default function TicketCheckContent() {
               </CardContent>
             </Card>
 
-            {/* Thông tin khách hàng Grid */}
             <div className="grid grid-cols-1 md:grid-cols-12 gap-4">
               <Card className="md:col-span-4 p-5 flex items-center gap-4 border-slate-100 bg-white shadow-sm">
                 <div className="p-2 bg-slate-50 rounded-lg text-slate-400">
@@ -327,7 +358,7 @@ export default function TicketCheckContent() {
                 </div>
                 <div className="min-w-0 w-full">
                   <p className="text-[10px] font-bold text-slate-400 uppercase">
-                    Email (Dùng để check tại quầy)
+                    Email đối soát
                   </p>
                   <p className="font-bold text-slate-700 break-all">
                     {ticketInfo.email}
@@ -337,28 +368,27 @@ export default function TicketCheckContent() {
             </div>
           </div>
 
-          {/* Right Sidebar: Status & Payment */}
           <div className="lg:col-span-4 space-y-6">
             <Card
-              className={`border-2 transition-all ${ticketInfo.valid ? "border-green-500 bg-green-50/10" : "border-slate-200 shadow-lg"} ${ticketInfo.is_used ? "bg-slate-50" : ""}`}
+              className={`border-2 transition-all shadow-xl ${ticketInfo.valid && !ticketInfo.is_used ? "border-green-500 bg-green-50/10" : "border-slate-200 bg-white"}`}
             >
               <CardContent className="p-8 text-center space-y-6">
                 <div className="space-y-2">
                   <h2
-                    className={`text-3xl font-black uppercase tracking-tighter ${ticketInfo.valid ? "text-green-600" : "text-slate-400"}`}
+                    className={`text-3xl font-black uppercase tracking-tighter ${ticketInfo.valid && !ticketInfo.is_used ? "text-green-600" : "text-slate-400"}`}
                   >
-                    {ticketInfo.valid
+                    {ticketInfo.valid && !ticketInfo.is_used
                       ? "VÉ HỢP LỆ"
                       : ticketInfo.is_used
                         ? "VÉ ĐÃ DÙNG"
-                        : "KHÔNG HỢP LỆ"}
+                        : "CHƯA THANH TOÁN"}
                   </h2>
                   <div className="flex flex-col items-center gap-1">
                     <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
                       Mã vé (Booking Code)
                     </span>
                     <span
-                      className={`text-4xl font-mono font-bold ${ticketInfo.is_used ? "text-slate-300 line-through decoration-slate-400/50" : "text-blue-600"}`}
+                      className={`text-5xl font-mono font-black ${ticketInfo.is_used ? "text-slate-300 line-through decoration-slate-400/50" : "text-blue-600"}`}
                     >
                       {ticketInfo.booking_code}
                     </span>
@@ -368,7 +398,10 @@ export default function TicketCheckContent() {
                 <div className="pt-4">
                   {ticketInfo.payment_status !== "paid" ? (
                     <Button
-                      onClick={handleConfirmPayment}
+                      onClick={() => {
+                        setConfirmType("payment");
+                        setConfirmOpen(true);
+                      }}
                       disabled={useLoading}
                       className="w-full h-16 bg-amber-500 hover:bg-amber-600 text-lg font-black uppercase shadow-lg shadow-amber-200"
                     >
@@ -376,21 +409,35 @@ export default function TicketCheckContent() {
                     </Button>
                   ) : ticketInfo.can_use && !ticketInfo.is_used ? (
                     <Button
-                      onClick={handleConfirmUse}
+                      onClick={() => {
+                        setConfirmType("checkin");
+                        setConfirmOpen(true);
+                      }}
                       disabled={useLoading}
                       className="w-full h-16 bg-green-600 hover:bg-green-700 text-lg font-black uppercase shadow-lg shadow-green-200"
                     >
                       Xác nhận cho vào cổng
                     </Button>
                   ) : (
-                    /* Trạng thái đã sử dụng màu đen mờ */
-                    <div className="py-5 px-6 rounded-2xl bg-black/5 text-slate-400 font-bold italic border border-black/5 flex flex-col gap-1">
-                      <span className="text-xl uppercase not-italic">
-                        Đã sử dụng vào cổng
-                      </span>
-                      <span className="text-[10px] font-medium opacity-60">
-                        Vé này đã quét check-in trước đó
-                      </span>
+                    <div className="space-y-4">
+                      <div className="py-5 px-6 rounded-2xl bg-slate-50 text-slate-400 font-bold border border-slate-100 flex flex-col gap-2">
+                        <div className="flex items-center justify-center gap-2 text-red-500">
+                          <AlertCircle size={24} />
+                          <span className="text-xl uppercase font-black">
+                            Đã sử dụng
+                          </span>
+                        </div>
+                        {ticketInfo.checked_in_at && (
+                          <div className="mt-2 py-3 px-4 bg-red-50 rounded-xl border border-red-100 text-red-600">
+                            <p className="text-[11px] uppercase tracking-wider font-bold opacity-70 flex items-center justify-center gap-1">
+                              <Clock size={12} /> Thời gian vào:
+                            </p>
+                            <p className="text-lg font-mono font-bold tracking-tight">
+                              {formatDate(ticketInfo.checked_in_at)}
+                            </p>
+                          </div>
+                        )}
+                      </div>
                     </div>
                   )}
                 </div>
@@ -398,9 +445,7 @@ export default function TicketCheckContent() {
             </Card>
 
             <Card className="bg-slate-900 text-white overflow-hidden relative shadow-xl">
-              <div className="absolute -top-4 -right-4 opacity-10">
-                <CheckCircle2 className="w-32 h-32" />
-              </div>
+              <CheckCircle2 className="absolute -top-4 -right-4 opacity-10 w-32 h-32" />
               <CardContent className="p-6 space-y-5 relative z-10">
                 <div className="flex justify-between items-center text-[10px] opacity-60 font-black uppercase tracking-widest">
                   <span>Phương thức</span>
@@ -422,6 +467,60 @@ export default function TicketCheckContent() {
           </div>
         </div>
       )}
+
+      {/* AlertDialog xác nhận hành động */}
+      <AlertDialog
+        open={confirmOpen}
+        onOpenChange={(open) => {
+          // Ngăn không cho người dùng tự đóng modal bằng phím Esc hoặc click ra ngoài khi đang loading
+          if (!useLoading) setConfirmOpen(open);
+        }}
+      >
+        <AlertDialogContent className="rounded-2xl border-none shadow-2xl p-8">
+          <AlertDialogHeader className="space-y-3">
+            <AlertDialogTitle className="text-2xl font-black text-slate-900 uppercase">
+              {confirmType === "checkin"
+                ? "⚠️ Xác nhận vào cổng?"
+                : "💰 Xác nhận thanh toán?"}
+            </AlertDialogTitle>
+            <AlertDialogDescription className="text-slate-500 text-base leading-relaxed">
+              {confirmType === "checkin"
+                ? `Bạn đang thực hiện cho ${ticketInfo?.ticket_count} khách vào cổng. Hành động này không thể hoàn tác.`
+                : `Bạn đã đối soát thành công số tiền ${Number(ticketInfo?.total_price).toLocaleString("vi-VN")}đ cho ID #${ticketInfo?.id}?`}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter className="gap-3 mt-6">
+            <AlertDialogCancel
+              disabled={useLoading}
+              className="h-12 px-6 rounded-xl font-bold"
+            >
+              Hủy
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={(e) => {
+                // e.preventDefault() để AlertDialog không tự đóng khi click
+                e.preventDefault();
+                executeAction();
+              }}
+              disabled={useLoading}
+              className={`h-12 px-8 rounded-xl font-black uppercase min-w-[160px] ${
+                confirmType === "checkin"
+                  ? "bg-green-600 hover:bg-green-700"
+                  : "bg-amber-500 hover:bg-amber-600"
+              }`}
+            >
+              {useLoading ? (
+                <>
+                  <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+                  Đang xử lý...
+                </>
+              ) : (
+                "Xác nhận ngay"
+              )}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

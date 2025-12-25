@@ -113,4 +113,17 @@ export async function getMovieById(id: number) {
   }>(`/api/movies-detail/${id}`);
 }
 
+// In client/lib/api/movies.ts
+
+export async function updateMovieStatus(id: number, isActive: boolean) {
+  return request<{
+    status: string;
+    message: string;
+    item: any;
+  }>(`/api/movies-status/${id}`, {
+    method: "PATCH",
+    body: JSON.stringify({ is_active: isActive }),
+  });
+}
+
 export type { Movie, MoviesResponse, ActiveMoviesTodayResponse };

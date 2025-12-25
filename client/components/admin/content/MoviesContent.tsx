@@ -83,11 +83,8 @@ interface Props {
   totalPages: number;
   currentPage: number;
   setPage: (p: number) => void;
-  movieStatus: Record<string, "active" | "inactive">;
-  onToggleStatus: (
-    id: string | number,
-    currentStatus: "active" | "inactive",
-  ) => void;
+  movieStatus: Record<string, string>; // Changed from "active" | "inactive" to string
+  onToggleStatus: (id: string | number, currentStatus: boolean) => void;
   onEdit: (type: "movie", data: any) => void;
   onCreate: () => void;
   moviesLength: number;
@@ -294,7 +291,7 @@ export default function MoviesContent({
                 </TableRow>
               ) : (
                 data.map((movie) => {
-                  const isActive = movieStatus[String(movie.id)] === "active";
+                  const isActive = movieStatus[movie.id] === "active";
                   return (
                     <TableRow
                       key={movie.id}
@@ -359,13 +356,12 @@ export default function MoviesContent({
                       </TableCell>
                       <TableCell>
                         <div className="flex items-center justify-center gap-4 py-2">
-                          {/* Bọc Switch vào một div có độ rộng cố định để không bị xê dịch */}
                           <div className="flex shrink-0 w-12 justify-center">
                             <AlertDialog>
                               <AlertDialogTrigger asChild>
                                 <Switch
                                   checked={isActive}
-                                  className="scale-100 transition-all border-2 border-transparent"
+                                  className="scale-100 transition-all border-2 border-transparent cursor-pointer"
                                   style={{
                                     opacity: 1,
                                     backgroundColor: isActive
@@ -375,18 +371,66 @@ export default function MoviesContent({
                                   }}
                                 />
                               </AlertDialogTrigger>
-                              {/* ... Giữ nguyên phần AlertDialogContent của bạn ... */}
+
+                              {/* Phần nội dung Alert không còn rỗng */}
                               <AlertDialogContent className="rounded-2xl font-sans bg-white">
-                                {/* Nội dung AlertDialog giữ nguyên */}
+                                <AlertDialogHeader>
+                                  <AlertDialogTitle className="text-slate-900">
+                                    Xác nhận thay đổi trạng thái
+                                  </AlertDialogTitle>
+                                  <AlertDialogDescription className="text-slate-500 text-sm">
+                                    {isActive ? (
+                                      <span>
+                                        Bạn có muốn <strong>ẩn</strong> phim này
+                                        không?
+                                        <br />
+                                        Hành động này sẽ khiến phim không xuất
+                                        hiện trên giao diện người dùng.
+                                      </span>
+                                    ) : (
+                                      <span>
+                                        Bạn có muốn <strong>kích hoạt</strong>{" "}
+                                        phim này không?
+                                        <br />
+                                        Phim sẽ bắt đầu hiển thị công khai trên
+                                        website.
+                                      </span>
+                                    )}
+                                  </AlertDialogDescription>
+                                </AlertDialogHeader>
+
+                                <AlertDialogFooter className="mt-4">
+                                  <AlertDialogCancel className="rounded-xl border-slate-200">
+                                    Hủy
+                                  </AlertDialogCancel>
+                                  <AlertDialogAction
+                                    onClick={() =>
+                                      onToggleStatus(movie.id, isActive)
+                                    }
+                                    className={`rounded-xl text-white ${
+                                      isActive
+                                        ? "bg-red-500 hover:bg-red-600"
+                                        : "bg-emerald-600 hover:bg-emerald-700"
+                                    }`}
+                                  >
+                                    {isActive
+                                      ? "Đồng ý ẩn"
+                                      : "Đồng ý kích hoạt"}
+                                  </AlertDialogAction>
+                                </AlertDialogFooter>
                               </AlertDialogContent>
                             </AlertDialog>
                           </div>
 
-                          {/* Bọc Badge vào một div có độ rộng cố định (ví dụ 80px) để căn lề luôn đều */}
+                          {/* Badge trạng thái */}
                           <div className="w-20 flex shrink-0">
                             <Badge
-                              className={`text-[9px] font-bold px-2 py-1 rounded-lg border-none whitespace-nowrap shadow-sm justify-center w-full
-                              ${isActive ? "bg-emerald-100 text-emerald-700" : "bg-slate-100 text-slate-500"}`}
+                              className={`text-[9px] font-bold px-2 py-1 rounded-lg border-none whitespace-nowrap shadow-sm justify-center w-full transition-all duration-200
+                              ${
+                                isActive
+                                  ? "bg-emerald-100 text-emerald-700 hover:bg-emerald-200/80"
+                                  : "bg-slate-100 text-slate-500 hover:bg-slate-200"
+                              }`}
                             >
                               {isActive ? "ĐANG CHIẾU" : "ĐÃ ẨN"}
                             </Badge>

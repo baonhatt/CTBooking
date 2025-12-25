@@ -14,6 +14,7 @@ import {
   updateMovieImpl,
   deleteMovieImpl,
   getMovieByIdImpl,
+  updateMovieStatusImpl,
 } from "./routes/admin/movies";
 import { loginImpl, registerImpl } from "./routes/user/auth";
 import {
@@ -244,7 +245,7 @@ export function createServer() {
       const id = Number(req.params.id);
       const r = await updateMovieImpl(
         db,
-        { movies: pgMovies },
+        { movies: pgMovies, ticket_packages: pgTicketPackages },
         id,
         req.body as any,
       );
@@ -270,6 +271,31 @@ export function createServer() {
           .status(404)
           .json({ status: "error", message: "Không tìm thấy" });
       res.status(200).json(r);
+    } catch (error: any) {
+      const errorMessage = error?.message || "Lỗi máy chủ nội bộ";
+      res.status(500).json({
+        status: "error",
+        message: errorMessage,
+      });
+    }
+  });
+  app.patch("/api/movies-status/:id", async (req, res) => {
+    try {
+      const id = Number(req.params.id);
+      const { is_active } = req.body;
+      const r = await updateMovieStatusImpl(
+        db,
+        { movies: pgMovies, ticket_packages: pgTicketPackages },
+        id,
+        is_active,
+      );
+      const status =
+        typeof (r as any).status === "number" ? (r as any).status : 200;
+      const payload = {
+        ...(r as any),
+        status: status >= 400 ? "error" : "success",
+      };
+      res.status(status).json(payload);
     } catch (error: any) {
       const errorMessage = error?.message || "Lỗi máy chủ nội bộ";
       res.status(500).json({
@@ -584,7 +610,7 @@ export function createServer() {
     try {
       const page = Number(req.query.page || 1);
       const pageSize = Number(req.query.pageSize || 20);
-      const email = String(req.query.email || "");
+      const searchText = String(req.query.searchText || "");
       const status = String(req.query.status || "all");
       const sort = String(req.query.sort || "created_at");
       const dir =
@@ -603,7 +629,17 @@ export function createServer() {
           movies: pgMovies,
           ticket_packages: pgTicketPackages,
         },
-        { page, pageSize, email, status, sort, dir, payment_method, from, to },
+        {
+          page,
+          pageSize,
+          searchText,
+          status,
+          sort,
+          dir,
+          payment_method,
+          from,
+          to,
+        },
       );
       res.status(200).json(r);
     } catch (error: any) {
