@@ -460,7 +460,7 @@ export default function TransactionsContent({
                         // Trường hợp 3: Đã thanh toán (Cần check thêm expired và is_used)
                         if (t.paymentStatus === "paid") {
                           // Ưu tiên check Hết hạn trước
-                          if (t.expired) {
+                          if (!t.is_used && t.expired) {
                             return {
                               text: "Đã Thanh Toán",
                               style:
@@ -772,14 +772,42 @@ export default function TransactionsContent({
                     title="Đối Soát & Trạng Thái"
                     icon={<CheckIcon size={14} />}
                   />
-                  <div className="bg-white rounded-xl border border-slate-200 shadow-sm divide-y divide-slate-100 overflow-hidden">
+                  <div
+                    className={`bg-white rounded-xl border shadow-sm divide-y divide-slate-100 overflow-hidden ${
+                      txDetails.payment_info?.expired
+                        ? "border-red-200"
+                        : "border-slate-200"
+                    }`}
+                  >
                     {/* Hàng 1: Trạng thái và Check-in */}
-                    <div className="flex justify-between p-4 bg-slate-50/50 items-center">
-                      <TicketStatusBadge
-                        paymentStatus={txDetails.payment_info?.payment_status}
-                        isUsed={txDetails.booking_details?.is_used}
-                      />
-                      {txDetails.booking_details?.is_used && (
+                    <div
+                      className={`flex justify-between p-4 items-center ${
+                        txDetails.payment_info?.expired
+                          ? "bg-red-50/30"
+                          : "bg-slate-50/50"
+                      }`}
+                    >
+                      <div className="flex items-center gap-3">
+                        {/* LOGIC MỚI: Ưu tiên hiển thị Đã quá hạn nếu expired = true và chưa dùng */}
+                        {txDetails.payment_info?.expired &&
+                        !txDetails.booking_details?.is_used ? (
+                          <Badge
+                            variant="destructive"
+                            className="bg-red-600 uppercase text-[10px] animate-pulse"
+                          >
+                            Đã quá hạn
+                          </Badge>
+                        ) : (
+                          <TicketStatusBadge
+                            paymentStatus={
+                              txDetails.payment_info?.payment_status
+                            }
+                            isUsed={txDetails.booking_details?.is_used}
+                          />
+                        )}
+                      </div>
+
+                      {txDetails.booking_details?.is_used ? (
                         <div className="text-right">
                           <p className="text-[10px] text-slate-400 uppercase font-bold">
                             Thời điểm sử dụng
@@ -790,10 +818,21 @@ export default function TransactionsContent({
                             )}
                           </p>
                         </div>
+                      ) : (
+                        txDetails.payment_info?.expired && (
+                          <div className="text-right text-red-600">
+                            <p className="text-[10px] uppercase font-bold opacity-70">
+                              Trạng thái vé
+                            </p>
+                            <p className="text-[11px] font-bold italic">
+                              Vô hiệu hóa do hết hạn
+                            </p>
+                          </div>
+                        )
                       )}
                     </div>
 
-                    {/* Hàng 2: Mã đặt chỗ & Mã QR (Đối soát) - Tách biệt rõ ràng */}
+                    {/* Hàng 2: Mã đặt chỗ & Đối soát */}
                     <div className="grid grid-cols-1 md:grid-cols-3 p-4 gap-6">
                       <div>
                         <p className="text-[10px] text-slate-400 uppercase font-bold mb-1">
@@ -804,12 +843,18 @@ export default function TransactionsContent({
                         </span>
                       </div>
 
-                      {/* Booking Code - Dùng để khách nhận vé */}
                       <div className="md:border-x md:px-6">
                         <p className="text-[10px] text-blue-500 uppercase font-bold mb-1 italic">
                           Mã đặt chỗ (Booking Code)
                         </p>
-                        <div className="flex items-center gap-2">
+                        <div
+                          className={`flex items-center gap-2 ${
+                            txDetails.payment_info?.expired &&
+                            !txDetails.booking_details?.is_used
+                              ? "opacity-40 grayscale pointer-events-none" // Làm mờ và chặn tương tác khi hết hạn
+                              : ""
+                          }`}
+                        >
                           {txDetails.booking_details?.booking_code && (
                             <CopyableText
                               text={txDetails.booking_details.booking_code}
@@ -819,7 +864,6 @@ export default function TransactionsContent({
                         </div>
                       </div>
 
-                      {/* QR Content - Dùng để đối soát ngân hàng */}
                       <div className="flex flex-col md:items-end">
                         <p className="text-[10px] text-slate-400 uppercase font-bold mb-1">
                           Nội dung chuyển khoản (Đối soát)
@@ -857,15 +901,18 @@ export default function TransactionsContent({
                       <InfoRow
                         label="Còn lại"
                         value={
-                          (txDetails.payment_info?.days_left ?? 0) < 0
+                          txDetails.payment_info?.expired
                             ? "Đã hết hạn sử dụng"
-                            : `${txDetails.payment_info?.days_left || 0} ngày`
+                            : txDetails.payment_info?.days_left === 0
+                              ? "Hết hạn hôm nay"
+                              : `${txDetails.payment_info?.days_left} ngày`
                         }
-                        // Đổi màu sang đỏ nếu đã hết hạn
                         color={
-                          (txDetails.payment_info?.days_left ?? 0) < 0
-                            ? "text-red-500"
-                            : "text-emerald-600"
+                          txDetails.payment_info?.expired
+                            ? "text-red-600 font-black"
+                            : (txDetails.payment_info?.days_left ?? 0) <= 2
+                              ? "text-orange-500"
+                              : "text-emerald-600"
                         }
                         bold
                       />

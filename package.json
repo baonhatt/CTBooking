@@ -14,7 +14,7 @@
     "dev": "vite",
     "dev:debug": "tsx --inspect=9229 --tsconfig tsconfig.json node_modules/vite/bin/vite.js",
     "build": "npm run build:client && npm run build:server",
-    "build:client": "vite build",
+    "build:client": "cross-env VITE_SERVER_BASE_URL=https://cinesphere.com.vn vite build",
     "build:client:preview": "cross-env VITE_SERVER_BASE_URL=https://cinema-worker-preview.baonhat20.workers.dev vite build --mode preview",
     "build:server": "vite build --config vite.config.server.ts",
     "start": "node dist/server/node-build.mjs",

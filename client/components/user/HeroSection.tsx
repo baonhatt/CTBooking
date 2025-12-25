@@ -1,6 +1,15 @@
 import { useMemo, useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Play, Pause, Sparkles, Waves, Clock, Star, Calendar, Ticket } from "lucide-react";
+import {
+  Play,
+  Pause,
+  Sparkles,
+  Waves,
+  Clock,
+  Star,
+  Calendar,
+  Ticket,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useQuery } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
@@ -40,10 +49,18 @@ export default function HeroSection() {
   });
   const { data: heroMedia } = useQuery({
     queryKey: ["siteMedia", "hero_section"],
-    queryFn: ({ signal }) => getSiteMediaApi({ section: "hero_section", type: "video", active: true, signal }),
+    queryFn: ({ signal }) =>
+      getSiteMediaApi({
+        section: "hero_section",
+        type: "video",
+        active: true,
+        signal,
+      }),
   });
-  const heroVideoSrc = optimizeCloudinaryUrl((heroMedia?.items?.[0]?.url as string), 1280);
-
+  const heroVideoSrc = optimizeCloudinaryUrl(
+    heroMedia?.items?.[0]?.url as string,
+    1280,
+  );
 
   // Use static images and map to movies from API
   const moviePosters = useMemo(() => {
@@ -77,7 +94,7 @@ export default function HeroSection() {
       video.currentTime = PREVIEW_TIME;
     };
 
-    video.addEventListener('loadedmetadata', handleLoadedMetadata);
+    video.addEventListener("loadedmetadata", handleLoadedMetadata);
 
     // Pause video when component mounts
     video.pause();
@@ -89,14 +106,14 @@ export default function HeroSection() {
     }
 
     return () => {
-      video.removeEventListener('loadedmetadata', handleLoadedMetadata);
+      video.removeEventListener("loadedmetadata", handleLoadedMetadata);
     };
   }, [heroVideoSrc]);
 
   // Intersection Observer for hero video - pause when scrolled out of viewport
   useEffect(() => {
     if (!videoRef.current || !videoContainerRef.current) return;
-    
+
     const observer = new IntersectionObserver(
       (entries) => {
         entries.forEach((entry) => {
@@ -109,11 +126,11 @@ export default function HeroSection() {
       },
       {
         threshold: 0.1, // Trigger when less than 10% visible
-      }
+      },
     );
-    
+
     observer.observe(videoContainerRef.current);
-    
+
     return () => {
       observer.disconnect();
     };
@@ -184,13 +201,16 @@ export default function HeroSection() {
     try {
       const movie = movies.find((m: any) => m.id === movieDetails.id);
       if (movie) {
-        localStorage.setItem("selectedFilm", JSON.stringify({
-          id: movie.id,
-          title: movie.title,
-          poster: movie.cover_image,
-        }));
+        localStorage.setItem(
+          "selectedFilm",
+          JSON.stringify({
+            id: movie.id,
+            title: movie.title,
+            poster: movie.cover_image,
+          }),
+        );
       }
-    } catch { }
+    } catch {}
     setIsModalOpen(false);
     navigate("/booking");
   };
@@ -228,8 +248,6 @@ export default function HeroSection() {
             transition={{ duration: 0.8, ease: "easeOut" }}
             className="max-w-3xl space-y-6"
           >
-
-
             <motion.h1
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
@@ -239,7 +257,9 @@ export default function HeroSection() {
               <span className="bg-gradient-to-r from-cyan-300 via-blue-400 to-fuchsia-400 bg-clip-text text-transparent drop-shadow-[0_10px_40px_rgba(56,189,248,0.5)] py-2">
                 CINESPHERE
               </span>
-              <span className="text-white text-3xl md:text-3xl lg:text-5xl">Huyễn cảnh không gian</span>
+              <span className="text-white text-3xl md:text-3xl lg:text-5xl">
+                Huyễn cảnh không gian
+              </span>
             </motion.h1>
 
             <motion.p
@@ -248,8 +268,9 @@ export default function HeroSection() {
               transition={{ delay: 0.4 }}
               className="text-lg md:text-xl text-gray-200 leading-relaxed max-w-2xl"
             >
-              Dùng không gian nhỏ mô phỏng thế giới vô biên. 
-              Mỗi suất chiếu là một hành trình nhập vai với độ phân giải 8K và âm thanh đa tầng bao quanh
+              Dùng không gian nhỏ mô phỏng thế giới vô biên. Mỗi suất chiếu là
+              một hành trình nhập vai với độ phân giải 8K và âm thanh đa tầng
+              bao quanh
             </motion.p>
 
             <motion.div
@@ -261,7 +282,7 @@ export default function HeroSection() {
               <Button
                 className="group rounded-2xl px-9 py-8 text-base md:text-lg font-semibold bg-gradient-to-r from-cyan-400 via-blue-600 to-fuchsia-500 hover:from-fuchsia-500 hover:via-cyan-400 hover:to-blue-600 text-white shadow-[0_0_40px_rgba(59,130,246,0.6)] transition-all duration-500 hover:shadow-[0_0_60px_rgba(236,72,153,0.8)] hover:scale-105"
                 onClick={() => {
-                  const bookingSection = document.getElementById("films");
+                  const bookingSection = document.getElementById("promotions");
                   bookingSection?.scrollIntoView({ behavior: "smooth" });
                 }}
               >
@@ -280,9 +301,21 @@ export default function HeroSection() {
               className="grid grid-cols-1 sm:grid-cols-3 gap-4 max-w-2xl pt-4"
             >
               {[
-                { icon: Waves, title: "Âm thanh đa tầng", desc: "Định vị 360° bao quanh" },
-                { icon: Sparkles, title: "Hiệu ứng vũ trụ", desc: "Hào quang, photon, nebula" },
-                { icon: Play, title: "Độ phân giải 8K", desc: "Màn hình đa chiều siêu nét" },
+                {
+                  icon: Waves,
+                  title: "Âm thanh đa tầng",
+                  desc: "Định vị 360° bao quanh",
+                },
+                {
+                  icon: Sparkles,
+                  title: "Hiệu ứng vũ trụ",
+                  desc: "Hào quang, photon, nebula",
+                },
+                {
+                  icon: Play,
+                  title: "Độ phân giải 8K",
+                  desc: "Màn hình đa chiều siêu nét",
+                },
               ].map(({ icon: Icon, title, desc }, idx) => (
                 <motion.div
                   key={title}
@@ -316,7 +349,7 @@ export default function HeroSection() {
             transition={{ duration: 0.8, delay: 0.3, ease: "easeOut" }}
             className="relative hidden lg:block z-40"
           >
-            <div 
+            <div
               ref={videoContainerRef}
               className="relative w-full max-w-md mx-auto aspect-[9/16] rounded-3xl overflow-hidden border-2 border-white/20 bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-xl shadow-2xl group"
             >
@@ -347,7 +380,7 @@ export default function HeroSection() {
                     initial={{ scale: 0.8, opacity: 0 }}
                     animate={{
                       scale: isVideoPlaying ? 0 : 1,
-                      opacity: isVideoPlaying ? 0 : 1
+                      opacity: isVideoPlaying ? 0 : 1,
                     }}
                     transition={{ duration: 0.2 }}
                     className="w-20 h-20 rounded-full bg-white/20 backdrop-blur-md flex items-center justify-center border-2 border-white/30 shadow-xl group-hover/play:scale-110 transition-transform"
@@ -373,7 +406,9 @@ export default function HeroSection() {
                       <Play className="h-4 w-4 text-white" />
                     </div>
                     <div>
-                      <p className="text-white font-semibold text-sm">Experience 8K</p>
+                      <p className="text-white font-semibold text-sm">
+                        Experience 8K
+                      </p>
                       <p className="text-gray-300 text-xs">Cinematic Quality</p>
                     </div>
                   </div>
@@ -432,7 +467,9 @@ export default function HeroSection() {
                           : typeof movieDetails.genres === "string"
                             ? JSON.parse(movieDetails.genres)
                             : [];
-                        return Array.isArray(genres) && genres.length > 0 ? genres.join(" • ") : "Chưa phân loại";
+                        return Array.isArray(genres) && genres.length > 0
+                          ? genres.join(" • ")
+                          : "Chưa phân loại";
                       } catch {
                         return "Chưa phân loại";
                       }
@@ -462,19 +499,21 @@ export default function HeroSection() {
                         Mô tả
                       </h3>
                       <p className="text-gray-300 leading-relaxed text-sm">
-                        {movieDetails.description || "Chưa có mô tả cho bộ phim này."}
+                        {movieDetails.description ||
+                          "Chưa có mô tả cho bộ phim này."}
                       </p>
                     </div>
 
                     <div className="grid grid-cols-2 gap-4 pt-4 border-t border-white/10">
-                      {movieDetails.rating !== null && movieDetails.rating !== undefined && (
-                        <div className="flex items-center gap-2 p-2 rounded-lg bg-white/5 border border-white/10">
-                          <Star className="h-4 w-4 text-yellow-400 fill-yellow-400" />
-                          <span className="text-white font-medium text-sm">
-                            {movieDetails.rating.toFixed(1)} / 10
-                          </span>
-                        </div>
-                      )}
+                      {movieDetails.rating !== null &&
+                        movieDetails.rating !== undefined && (
+                          <div className="flex items-center gap-2 p-2 rounded-lg bg-white/5 border border-white/10">
+                            <Star className="h-4 w-4 text-yellow-400 fill-yellow-400" />
+                            <span className="text-white font-medium text-sm">
+                              {movieDetails.rating.toFixed(1)} / 10
+                            </span>
+                          </div>
+                        )}
                       {movieDetails.duration_min && (
                         <div className="flex items-center gap-2 p-2 rounded-lg bg-white/5 border border-white/10">
                           <Clock className="h-4 w-4 text-cyan-400" />
@@ -487,7 +526,9 @@ export default function HeroSection() {
                         <div className="flex items-center gap-2 p-2 rounded-lg bg-white/5 border border-white/10">
                           <Calendar className="h-4 w-4 text-fuchsia-400" />
                           <span className="text-white font-medium text-sm">
-                            {new Date(movieDetails.release_date).toLocaleDateString("vi-VN")}
+                            {new Date(
+                              movieDetails.release_date,
+                            ).toLocaleDateString("vi-VN")}
                           </span>
                         </div>
                       )}
@@ -501,8 +542,12 @@ export default function HeroSection() {
                         </h4>
                         <div className="grid grid-cols-2 gap-3">
                           <div className="p-3 rounded-lg bg-white/5 border border-white/10">
-                            <div className="text-xs text-gray-400 mb-1">Vé đã bán</div>
-                            <div className="text-lg font-bold text-cyan-300">{movieDetails.stats.totalTicketsSold}</div>
+                            <div className="text-xs text-gray-400 mb-1">
+                              Vé đã bán
+                            </div>
+                            <div className="text-lg font-bold text-cyan-300">
+                              {movieDetails.stats.totalTicketsSold}
+                            </div>
                           </div>
                         </div>
                       </div>

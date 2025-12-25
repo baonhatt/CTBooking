@@ -5,7 +5,8 @@ const GMAIL_HOST = "sandbox.smtp.mailtrap.io";
 const GMAIL_PORT = 587;
 const GMAIL_USER = process.env.GMAIL_USER || "";
 const GMAIL_PASS = process.env.GMAIL_PASS || "";
-const GMAIL_SENDER_EMAIL = process.env.GMAIL_SENDER_EMAIL || GMAIL_USER || "no-reply@example.com";
+const GMAIL_SENDER_EMAIL =
+  process.env.GMAIL_SENDER_EMAIL || GMAIL_USER || "no-reply@example.com";
 const GMAIL_SENDER_NAME = process.env.GMAIL_SENDER_NAME || "CTBOOKING";
 
 const transporter =
