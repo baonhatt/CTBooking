@@ -27,9 +27,9 @@ export function UserMenu({
       <Tooltip>
         <TooltipTrigger asChild>
           <DropdownMenuTrigger asChild>
-            <button className="flex items-center gap-2.5 text-white font-medium hover:text-cyan-300 transition-colors duration-300">
-              <div className="w-10 h-10 rounded-full bg-white/10 backdrop-blur-sm border border-white/20 flex items-center justify-center hover:border-cyan-400 hover:bg-cyan-500/20 transition-all duration-300 shadow-lg">
-                <User className="h-5 w-5" />
+            <button className="flex items-center gap-2 text-white font-medium hover:text-cyan-300 transition-colors duration-300">
+              <div className="w-8 h-8 rounded-full bg-white/10 backdrop-blur-sm border border-white/15 flex items-center justify-center hover:border-cyan-400 hover:bg-cyan-500/10 transition-all duration-300">
+                <User className="h-4 w-4" />
               </div>
             </button>
           </DropdownMenuTrigger>

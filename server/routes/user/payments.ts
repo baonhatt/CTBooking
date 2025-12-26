@@ -481,35 +481,24 @@ export async function getBookingByIdImpl(
       paid_at: bookings.paid_at,
       payment_method: bookings.payment_method,
       // Movie fields
-      movie_title: movies.title,
-      movie_image: movies.cover_image,
-      duration_min: movies.duration_min,
+      movie_title: bookings.movie_title,
+      movie_image: bookings.movie_poster,
+      duration_min: bookings.movie_duration,
       // Package fields
-      ticket_package_name: ticket_packages.name,
+      ticket_package_name: bookings.ticket_package_name,
     })
     .from(bookings)
-    .leftJoin(movies, eq(bookings.movie_id, movies.id))
-    .leftJoin(
-      ticket_packages,
-      eq(bookings.ticket_package_id, ticket_packages.id),
-    )
     .where(eq(bookings.id, id))
     .limit(1);
 
   const booking = rows[0];
-
   if (!booking) {
     return { status: 404, message: "Không tìm thấy thông tin đặt vé" };
   }
 
   return {
     status: 200,
-    ...booking,
-    // Đảm bảo các giá trị mặc định nếu join bị null
-    movie_title: booking.movie_title ?? "",
-    movie_image: booking.movie_image ?? null,
-    duration_min: booking.duration_min ?? 0,
-    ticket_package_name: booking.ticket_package_name ?? "",
+    ...booking
   };
 }
 

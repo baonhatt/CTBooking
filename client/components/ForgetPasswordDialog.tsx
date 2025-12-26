@@ -10,7 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import icon from "@/assets/images/icon.svg";
-import { toast } from "@/components/ui/use-toast";
+import { toast } from "sonner";
 
 interface ForgetPasswordDialogProps {
   isOpen: boolean;
@@ -49,7 +49,7 @@ export function ForgetPasswordDialog({
       if (data?.status === "success") {
         onOpenChange(false);
         setEmail("");
-        toast({ title: "Đổi mật khẩu thành công!", description: data.message });
+        toast.success("Đổi mật khẩu thành công!", { description: data.message });
       }
     } catch (err: any) {
       setSubmitError(String(err?.message || "Yêu cầu thất bại"));

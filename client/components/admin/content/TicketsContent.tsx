@@ -28,7 +28,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
-import { useToast } from "@/hooks/use-toast";
+import { toast } from "sonner";
 import { createTicketApi, updateTicketApi } from "@/lib/api";
 import { getMoviesAdmin } from "@/lib/api/movies";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -67,7 +67,7 @@ interface Props {
 }
 
 export default function TicketsContent(props: Props) {
-  const { toast } = useToast();
+
   const {
     data,
     totalPages,
@@ -188,17 +188,13 @@ export default function TicketsContent(props: Props) {
                               setTickets((prev) =>
                                 prev.filter((x) => x.id !== t.id),
                               );
-                              toast({
-                                title: "Thành công",
+                              toast.success("Thành công", {
                                 description: "Xóa gói vé thành công",
-                                variant: "default",
                               });
                             } catch (error) {
-                              toast({
-                                title: "Lỗi",
+                              toast.error("Lỗi", {
                                 description:
                                   "Không thể xóa gói vé. Vui lòng thử lại sau.",
-                                variant: "destructive",
                               });
                             } finally {
                               setIsDeletingId(null);
@@ -551,8 +547,7 @@ export default function TicketsContent(props: Props) {
                     });
                   }
                   await onRefresh();
-                  toast({
-                    title: "Thành công",
+                  toast.success("Thành công", {
                     description: editData?.id
                       ? "Cập nhật gói vé thành công"
                       : "Thêm gói vé thành công",

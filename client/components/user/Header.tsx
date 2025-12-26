@@ -87,19 +87,18 @@ export default function Header({
             : "bg-gradient-to-b from-black/80 via-black/60 to-transparent border-b border-white/10",
       )}
     >
-      <div className="container mx-auto px-4 md:px-6 lg:px-8 py-3 md:py-4 flex items-center gap-4 md:gap-8">
-        {/* Logo */}
-        <div className="flex items-center gap-3 md:gap-4 animate-fade-in">
+      <div className="container mx-auto px-3 md:px-6 lg:px-10 py-1.5 md:py-3 lg:py-3 flex items-center justify-between relative">
+        <div className="flex items-center gap-8 md:gap-12">
           <img
             onClick={() => navigator('/')}
             src={icon}
-            className="cursor-pointer h-16 w-16 md:h-20 md:w-20 lg:h-24 lg:w-24 drop-shadow-[0_0_30px_rgba(59,130,246,0.6)] transition-transform duration-300 hover:scale-110"
+            className="cursor-pointer h-10 w-10 md:h-16 md:w-16 lg:h-20 lg:w-20 drop-shadow-[0_0_25px_rgba(59,130,246,0.5)] transition-all duration-300 hover:scale-105"
             alt="CINESPHERE logo"
           />
         </div>
 
         {/* Desktop Navigation */}
-        <nav className="hidden md:flex items-center gap-6 lg:gap-8 xl:gap-10 animate-fade-in delay-200 ml-auto">
+        <nav className="hidden md:flex items-center gap-6 lg:gap-8 animate-fade-in delay-200">
           {NAV_ITEMS.map((item) => (
             <NavItem
               key={item.target}
@@ -113,7 +112,7 @@ export default function Header({
         </nav>
 
         {/* Action Buttons */}
-        <div className="flex items-center gap-4 animate-fade-in delay-250 ml-auto md:ml-0">
+        <div className="flex items-center gap-4 animate-fade-in delay-250">
           {/* Mobile Menu */}
           <div className="md:hidden">
             <MobileMenu

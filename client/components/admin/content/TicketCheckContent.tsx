@@ -32,7 +32,7 @@ import {
   Loader2,
   Clock,
 } from "lucide-react";
-import { useToast } from "@/hooks/use-toast";
+import { toast } from "sonner";
 import { differenceInDays } from "date-fns";
 
 interface TicketInfo {
@@ -75,12 +75,12 @@ export default function TicketCheckContent() {
     "checkin",
   );
 
-  const { toast } = useToast();
+
 
   const handleSearch = async () => {
     let searchCode = code.trim().toUpperCase();
     if (/^\d+$/.test(searchCode)) {
-      searchCode = `ORDER${searchCode}`;
+      searchCode = `CINESPHERE${searchCode}`;
     }
 
     if (!searchCode) {
@@ -110,8 +110,7 @@ export default function TicketCheckContent() {
         // 1. Xử lý xác nhận vào cổng
         const res = await useTicketApi(ticketInfo.booking_code);
         if (res?.status === "success") {
-          toast({
-            title: "Thành công",
+          toast.success("Thành công", {
             description: "Đã xác nhận cho khách vào cổng",
           });
 
@@ -137,7 +136,7 @@ export default function TicketCheckContent() {
           paid_at: new Date().toISOString(),
         };
         const res = await confirmBookingApi(payload);
-        toast({ title: "Thành công", description: res.message });
+        toast.success("Thành công", { description: res.message });
 
         // Load lại dữ liệu mới nhất từ server
         await handleSearch();
@@ -146,9 +145,7 @@ export default function TicketCheckContent() {
         setConfirmOpen(false);
       }
     } catch (err: any) {
-      toast({
-        variant: "destructive",
-        title: "Lỗi hệ thống",
+      toast.error("Lỗi hệ thống", {
         description: err.message || "Không thể thực hiện thao tác",
       });
       // Không đóng modal khi lỗi để nhân viên có thể xem thông báo lỗi

@@ -1,8 +1,7 @@
 import "./global.css";
 
-import { Toaster } from "@/components/ui/toaster";
 import { createRoot } from "react-dom/client";
-import { Toaster as Sonner } from "@/components/ui/sonner";
+import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
@@ -29,8 +28,25 @@ const queryClient = new QueryClient({
 const App = () => (
   <QueryClientProvider client={queryClient}>
     <TooltipProvider>
-      <Toaster />
-      <Sonner richColors position="bottom-right" />
+      <Toaster 
+        position="top-center"
+          theme="dark"
+          expand={false}
+          richColors={false} // Tắt màu mặc định để tự tùy chỉnh theo tone Cinesphere
+          offset={80}
+          toastOptions={{
+            unstyled: true, // Tắt style mặc định để Tailwind kiểm soát hoàn toàn
+            classNames: {
+              toast: "flex items-center gap-3 w-full max-w-[350px] p-4 rounded-xl border shadow-2xl backdrop-blur-md",
+              // Màu cho Success: Nền xanh đen, viền xanh Emerald, chữ trắng sáng
+              success: "bg-[#0a1229]/90 border-emerald-500/50 text-white",
+              title: "text-sm font-bold text-emerald-400",
+              description: "text-xs text-gray-300",
+              icon: "text-emerald-400",
+            },
+            className: "border border-white/10 bg-[#050915]/90 backdrop-blur-md",
+          }}
+        />
       <BrowserRouter>
         <Routes>
           <Route path="/" element={<Index />} />

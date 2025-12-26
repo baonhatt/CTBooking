@@ -18,7 +18,7 @@ import {
   getToys,
   getMovieById,
 } from "@/lib/api";
-import { useToast } from "@/hooks/use-toast";
+import { toast } from "sonner";
 import { format } from "date-fns";
 
 interface AdminEditModalProps {
@@ -40,7 +40,7 @@ interface AdminEditModalProps {
 }
 
 const AdminEditModal: React.FC<AdminEditModalProps> = (props) => {
-  const { toast } = useToast();
+
   const [isSaving, setIsSaving] = useState(false);
   const {
     isEditOpen,
@@ -243,16 +243,13 @@ const AdminEditModal: React.FC<AdminEditModalProps> = (props) => {
                         u.id === editData.id ? { ...u, ...editData } : u,
                       ),
                     );
-                    toast({
-                      title: "Thành công",
+                    toast.success("Thành công", {
                       description: "Cập nhật người dùng thành công",
                     });
                     setIsEditOpen(false);
                   } catch (e: any) {
-                    toast({
-                      title: "Lỗi",
+                    toast.error("Lỗi", {
                       description: e?.message || "Có lỗi xảy ra",
-                      variant: "destructive",
                     });
                   } finally {
                     setIsSaving(false);
@@ -546,18 +543,14 @@ const AdminEditModal: React.FC<AdminEditModalProps> = (props) => {
                 onClick={async () => {
                   // --- VALIDATION LOGIC ---
                   if (!editData.title?.trim()) {
-                    toast({
-                      title: "Lỗi",
+                    toast.error("Lỗi", {
                       description: "Vui lòng nhập tên phim",
-                      variant: "destructive",
                     });
                     return;
                   }
                   if (!editData.duration || Number(editData.duration) <= 0) {
-                    toast({
-                      title: "Lỗi",
+                    toast.error("Lỗi", {
                       description: "Thời lượng phim không hợp lệ",
-                      variant: "destructive",
                     });
                     return;
                   }
@@ -602,18 +595,15 @@ const AdminEditModal: React.FC<AdminEditModalProps> = (props) => {
                     }
 
                     await refetch("movie");
-                    toast({
-                      title: "Thành công",
+                    toast.success("Thành công", {
                       description: editData.id
                         ? "Đã cập nhật thông tin phim"
                         : "Đã thêm phim mới",
                     });
                     setIsEditOpen(false);
                   } catch (err: any) {
-                    toast({
-                      title: "Lỗi hệ thống",
+                    toast.error("Lỗi hệ thống", {
                       description: err?.message || "Không thể lưu dữ liệu",
-                      variant: "destructive",
                     });
                   } finally {
                     setIsSaving(false);
@@ -787,8 +777,7 @@ const AdminEditModal: React.FC<AdminEditModalProps> = (props) => {
                       });
                     }
                     await refetch("toy");
-                    toast({
-                      title: "Thành công",
+                    toast.success("Thành công", {
                       description: editData.id
                         ? "Cập nhật đồ chơi thành công"
                         : "Thêm đồ chơi mới thành công",

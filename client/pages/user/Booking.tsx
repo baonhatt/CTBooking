@@ -12,7 +12,7 @@ import {
   SelectItem,
 } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
-import { toast } from "@/components/ui/use-toast";
+import { toast } from "sonner";
 import {
   getAllActiveMoviesToday,
   getActiveTickets,
@@ -41,6 +41,7 @@ export default function BookingPage() {
     "momo" | "vnpay" | "vietqr"
   >("vietqr");
   const [isProcessing, setIsProcessing] = useState(false);
+  const [showMovies, setShowMovies] = useState(false);
   const countdownRef = useRef<NodeJS.Timeout | null>(null);
   const [countdown, setCountdown] = useState(600);
   const [confirmChecked, setConfirmChecked] = useState(false);
@@ -248,29 +249,25 @@ export default function BookingPage() {
   const handleCreateAndPay = async () => {
     if (isProcessing) return;
     if (!confirmChecked) {
-      toast({
-        title: "Vui lòng xác nhận thông tin",
+      toast.error("Vui lòng xác nhận thông tin", {
         description: "Hãy tick vào ô xác nhận trước khi thanh toán",
       });
       return;
     }
     if (!selectedMovie) {
-      toast({
-        title: "Chưa chọn phim",
+      toast.error("Chưa chọn phim", {
         description: "Vui lòng chọn một bộ phim",
       });
       return;
     }
     if (!selectedPackage?.id) {
-      toast({
-        title: "Chưa chọn loại vé",
+      toast.error("Chưa chọn loại vé", {
         description: "Vui lòng chọn một loại vé trong danh sách",
       });
       return;
     }
     if (!name || !phone || !email) {
-      toast({
-        title: "Thiếu thông tin",
+      toast.error("Thiếu thông tin", {
         description: "Vui lòng nhập họ tên, số điện thoại và email",
       });
       return;
@@ -278,8 +275,7 @@ export default function BookingPage() {
 
     // Nếu đang dùng mock data, hiển thị thông báo demo
     if (!USE_MOCK_DATA) {
-      toast({
-        title: "Demo Mode",
+      toast.info("Demo Mode", {
         description:
           "Đang sử dụng mock data. Chức năng thanh toán sẽ hoạt động khi có API thật.",
       });
@@ -303,7 +299,7 @@ export default function BookingPage() {
         (value) => value?.id === selectedPackage?.id,
       );
       setIsProcessing(true);
-      const orderId = `ORDER${Date.now()}`;
+      const orderId = `CINESPHERE${Date.now()}`;
       const movieDetail = selectedMovie;
       const ticketPackageId = selectedPackage?.id || defaultTicket?.id;
 
@@ -388,6 +384,7 @@ export default function BookingPage() {
         );
 
         // Chuyển sang trang QR payment
+        localStorage.removeItem("qrPaymentEndTime");
         navigate("/qr-payment", {
           state: {
             bookingId: booking?.id,
@@ -477,8 +474,7 @@ export default function BookingPage() {
       }
     } catch (err: any) {
       setIsProcessing(false);
-      toast({
-        title: "Không thể tạo đặt vé",
+      toast.error("Không thể tạo đặt vé", {
         description: "Đã xảy ra lỗi, vui lòng thử lại sau",
       });
     } finally {
@@ -513,15 +509,15 @@ export default function BookingPage() {
           <div className="absolute inset-0 bg-gradient-to-b from-black/50 via-black/25 to-transparent" />
           <div className="absolute inset-0 neon-noise opacity-25" />
         </div>
-        <div className="relative z-10 max-w-6xl mx-auto p-4 pt-28">
-          <div className="text-sm py-9">
+        <div className="relative z-10 max-w-6xl mx-auto p-4 pt-20 sm:pt-24">
+          <div className="text-sm pb-6 pt-2 flex items-center gap-1.5 opacity-80">
             <button
-              className="text-blue-300 hover:text-blue-400 underline"
+              className="text-gray-400 hover:text-blue-400 transition-colors"
               onClick={() => navigate("/")}
             >
-              Home
+              Trang chủ
             </button>
-            <span className="mx-2 text-white/60">&gt;</span>
+            <span className="mx-1 text-white/30 text-[10px]">&gt;</span>
             <span className="text-white">Đặt vé</span>
           </div>
           {isLoadingPage && (
@@ -539,15 +535,18 @@ export default function BookingPage() {
           {!isLoadingPage && step === 0 && (
             <Card className="bg-white/5 backdrop-blur-md border border-white/15 text-white shadow-2xl overflow-hidden">
               <CardHeader className="bg-white/5 border-b border-white/10 pb-4">
-                <CardTitle className="text-2xl font-bold text-white flex items-center gap-2">
+                <CardTitle className="text-xl lg:text-2xl font-bold text-white flex items-center gap-2">
                   <span className="w-1.5 h-8 bg-blue-500 rounded-full"></span>
                   Đặt Vé Trải Nghiệm
                 </CardTitle>
               </CardHeader>
 
-              <CardContent className="p-6 space-y-8">
+              <CardContent className="p-0">
+                <div className="grid grid-cols-1 lg:grid-cols-12">
+                  {/* CỘT TRÁI: CHỌN VÉ & PHIM (7 columns) */}
+                  <div className="lg:col-span-7 p-6 space-y-6 border-b lg:border-b-0 lg:border-r border-white/10">
                 {/* PHẦN 1: CHỌN VÉ */}
-                <section className="space-y-4">
+                <section className="space-y-3">
                   <div className="flex items-center gap-2 text-sm font-semibold text-blue-400 uppercase tracking-wider">
                     <span className="p-1 rounded bg-blue-500/20">01</span>
                     Chọn Loại Vé
@@ -593,226 +592,304 @@ export default function BookingPage() {
                   </Select>
                 </section>
 
-                {/* PHẦN 2: DANH SÁCH PHIM - Fix 5 phim/hàng */}
+                {/* PHẦN 2: DANH SÁCH PHIM - Dạng thu gọn */}
                 {selectedPackage && (
-                  <section className="space-y-4 animate-in fade-in slide-in-from-top-2 duration-300">
-                    <div className="text-[13px] font-semibold text-blue-400 uppercase tracking-wider">
-                      Danh sách phim áp dụng
+                  <section className="space-y-3 animate-in fade-in slide-in-from-top-2 duration-300">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                       <div className="text-[13px] font-semibold text-blue-400 uppercase tracking-wider leading-relaxed">
+                        Danh sách phim áp dụng ({activeMoviesFull.length})
+                      </div>
+                      <Button
+                        variant="link"
+                        className="text-blue-400 h-auto p-0 text-[13px] hover:text-blue-300"
+                        onClick={() => setShowMovies(!showMovies)}
+                      >
+                        {showMovies ? "Thu gọn ▲" : "Xem danh sách ▼"}
+                      </Button>
                     </div>
 
-                    {activeMoviesFull && activeMoviesFull.length > 0 ? (
-                      /* Sử dụng grid-cols-2 cho mobile và grid-cols-5 cho desktop */
-                      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3">
-                        {activeMoviesFull.map((m: any) => (
-                          <div
-                            key={m.id}
-                            className="group relative rounded-lg overflow-hidden border border-white/10 bg-white/5 hover:border-blue-500/50 transition-all shadow-md"
-                          >
-                            <div className="aspect-[2/3] relative">
-                              {" "}
-                              {/* Tỉ lệ 2:3 chuẩn poster phim */}
-                              <img
-                                src={resolveImageUrl(m.cover_image)}
-                                alt={m.title}
-                                className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                              />
-                              <div className="absolute inset-0 bg-gradient-to-t from-black via-black/20 to-transparent opacity-90" />
-                              {/* Thông tin đè lên ảnh để tiết kiệm không gian */}
-                              <div className="absolute bottom-0 p-2 w-full">
-                                <div className="text-[12px] font-bold text-white leading-tight truncate mb-1">
-                                  {m.title}
-                                </div>
-                                <div className="flex items-center gap-1.5">
-                                  <span className="px-1 py-0.5 rounded bg-blue-600/80 text-[9px] text-white font-black">
-                                    {m.duration_min
-                                      ? `${m.duration_min}'`
-                                      : "--"}
-                                  </span>
-                                  <span className="text-[10px] text-gray-300 truncate font-light italic">
-                                    {m.description || "Phim đặc sắc"}
-                                  </span>
+                    {showMovies && (
+                      <div className="animate-in fade-in zoom-in-95 duration-200">
+                        {activeMoviesFull && activeMoviesFull.length > 0 ? (
+                          /* Sử dụng grid-cols-2 cho mobile và grid-cols-5 cho desktop */
+                          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-4">
+                            {activeMoviesFull.map((m: any) => (
+                              <div
+                                key={m.id}
+                                className="group relative rounded-xl overflow-hidden border border-white/10 bg-white/5 hover:border-blue-500/50 transition-all shadow-lg hover:shadow-blue-500/10"
+                              >
+                                <div className="aspect-[2/3] relative">
+                                  {/* Tỉ lệ 2:3 chuẩn poster phim */}
+                                  <img
+                                    src={resolveImageUrl(m.cover_image)}
+                                    alt={m.title}
+                                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                                  />
+                                  <div className="absolute inset-0 bg-gradient-to-t from-black via-black/40 to-transparent opacity-90" />
+                                  <div className="absolute bottom-0 p-2 w-full">
+                                    <div className="text-[11px] font-bold text-white leading-tight truncate mb-1">
+                                      {m.title}
+                                    </div>
+                                    <div className="flex items-center gap-1.5">
+                                      <span className="px-1 py-0.5 rounded bg-blue-600 text-[9px] text-white font-black">
+                                        {m.duration_min ? `${m.duration_min}'` : "--"}
+                                      </span>
+                                      <span className="text-[9px] text-gray-300/90 truncate font-light italic">
+                                        {m.description || "Phim đặc sắc"}
+                                      </span>
+                                    </div>
+                                  </div>
                                 </div>
                               </div>
-                            </div>
+                            ))}
                           </div>
-                        ))}
-                      </div>
-                    ) : (
-                      <div className="p-6 text-center border border-dashed border-white/10 rounded-xl text-gray-500 text-sm italic">
-                        Không có phim áp dụng cho loại vé này
+                        ) : (
+                          <div className="p-6 text-center border border-dashed border-white/10 rounded-xl text-gray-500 text-sm italic">
+                            Không có phim áp dụng cho loại vé này
+                          </div>
+                        )}
                       </div>
                     )}
                   </section>
                 )}
 
-                {/* PHẦN 3: THÔNG TIN KHÁCH HÀNG */}
-                <section className="space-y-4">
-                  <div className="flex items-center gap-2 text-sm font-semibold text-blue-400 uppercase tracking-wider">
-                    <span className="p-1 rounded bg-blue-500/20">02</span>
-                    Thông Tin Khách Hàng
-                  </div>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-5 bg-white/5 p-5 rounded-2xl border border-white/10">
-                    <div className="space-y-2">
-                      <Label className="text-sm font-medium text-gray-300 ml-1">
-                        Họ Và Tên
-                      </Label>
-                      <Input
-                        className="bg-white/5 border-white/15 focus:border-blue-500 focus:ring-blue-500/20 h-11 rounded-lg placeholder:text-gray-600"
-                        value={name}
-                        onChange={(e) => setName(e.target.value)}
-                        placeholder="Nhập họ và tên"
-                        minLength={2}
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label className="text-sm font-medium text-gray-300 ml-1">
-                        Số Điện Thoại
-                      </Label>
-                      <Input
-                        className={`bg-white/5 h-11 rounded-lg transition-colors ${phoneError ? "border-orange-500/50 focus:ring-orange-500/20" : "border-white/15 focus:border-blue-500"}`}
-                        value={phone}
-                        inputMode="numeric"
-                        maxLength={10}
-                        placeholder="VD: 0912345678"
-                        onChange={(e) => {
-                          const value = e.target.value;
-                          if (!/^\d*$/.test(value)) {
-                            setPhoneError("Chỉ cho phép nhập số 0-9");
-                            return;
-                          }
-                          setPhone(value);
-                          if (value && !value.startsWith("0")) {
-                            setPhoneError(
-                              "Số điện thoại phải bắt đầu bằng số 0",
-                            );
-                          } else {
-                            setPhoneError("");
-                          }
-                        }}
-                      />
-                      {phoneError && (
-                        <p className="text-orange-400 text-xs mt-1 animate-pulse">
-                          {phoneError}
-                        </p>
-                      )}
-                    </div>
-                    <div className="space-y-2">
-                      <Label className="text-sm font-medium text-gray-300 ml-1">
-                        Email Nhận Vé
-                      </Label>
-                      <Input
-                        className={`bg-white/5 h-11 rounded-lg ${emailError ? "border-orange-500/50" : "border-white/15"}`}
-                        value={email}
-                        type="email"
-                        placeholder="you@email.com"
-                        onChange={(e) => {
-                          const val = e.target.value;
-                          setEmail(val);
-                          if (val && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(val)) {
-                            setEmailError("Email không hợp lệ");
-                          } else {
-                            setEmailError("");
-                          }
-                        }}
-                      />
-                      {emailError && (
-                        <p className="text-orange-400 text-xs mt-1">
-                          {emailError}
-                        </p>
-                      )}
-                    </div>
-                    <div className="space-y-2">
-                      <Label className="text-sm font-medium text-gray-300 ml-1">
-                        Số Lượng Vé
-                      </Label>
-                      <div className="flex items-center gap-3">
-                        <Button
-                          type="button"
-                          variant="outline"
-                          className="bg-white/10 border-white/20 hover:bg-red-500/20 hover:text-red-400 h-11 w-11 rounded-lg transition-colors"
-                          onClick={() =>
-                            setTicketCount((c) => Math.max(MIN_TICKETS, c - 1))
-                          }
-                        >
-                          -
-                        </Button>
-                        <div className="flex-1 text-center font-bold bg-white/10 border border-white/20 rounded-lg h-11 flex items-center justify-center text-lg">
-                          {ticketCount}
+                {/* TÓM TẮT TẠM TÍNH (Chỉ hiện trên Desktop ở phía trái) */}
+                {selectedPackage && (
+                  <div className="mt-auto pt-6 hidden lg:block">
+                    <div className="overflow-hidden rounded-xl border border-blue-500/30 bg-blue-500/5 p-3 flex flex-col justify-between gap-2 animate-in fade-in slide-in-from-bottom-2 duration-400">
+                      <div className="flex justify-between items-start">
+                        <div>
+                          <h4 className="text-white font-bold text-base sm:text-lg">
+                            {selectedPackage.name}
+                          </h4>
+                          <p className="text-[13px] text-gray-400">
+                            {selectedPackage.description ||
+                              `Gói vé ${selectedPackage.type || "tiêu chuẩn"}`}
+                          </p>
                         </div>
-                        <Button
-                          type="button"
-                          variant="outline"
-                          className="bg-white/10 border-white/20 hover:bg-green-500/20 hover:text-green-400 h-11 w-11 rounded-lg transition-colors"
-                          onClick={() =>
-                            setTicketCount((c) => Math.min(MAX_TICKETS, c + 1))
-                          }
-                        >
-                          +
-                        </Button>
+                        <div className="text-right">
+                          <p className="text-[11px] text-gray-400 uppercase tracking-widest">
+                            Đơn giá
+                          </p>
+                          <p className="text-sm font-bold text-white">
+                            {unitPrice.toLocaleString("vi-VN")}₫
+                          </p>
+                        </div>
+                      </div>
+                      
+                      <div className="pt-3 border-t border-white/10 flex justify-between items-end">
+                        <div>
+                          <p className="text-[11px] text-gray-400 uppercase tracking-widest">
+                            Số lượng
+                          </p>
+                          <p className="text-lg font-bold text-white">x{ticketCount}</p>
+                        </div>
+                        <div className="text-right">
+                          <p className="text-[11px] text-gray-400 uppercase tracking-widest">
+                            Tổng cộng tạm tính
+                          </p>
+                          <p className="text-2xl font-black text-blue-400 drop-shadow-[0_0_10px_rgba(96,165,250,0.3)]">
+                            {totalPrice.toLocaleString("vi-VN")}₫
+                          </p>
+                        </div>
                       </div>
                     </div>
                   </div>
-                </section>
+                )}
+              </div>
 
-                {/* TÓM TẮT TẠM TÍNH (Nhìn sang trọng hơn) */}
-                {selectedPackage && (
-                  <div className="overflow-hidden rounded-2xl border border-blue-500/30 bg-blue-500/5 p-5 flex flex-col sm:flex-row justify-between items-center gap-4">
-                    <div>
-                      <h4 className="text-white font-bold text-lg">
-                        {selectedPackage.name}
-                      </h4>
-                      <p className="text-sm text-gray-400">
-                        {selectedPackage.description ||
-                          `Gói vé ${selectedPackage.type || "tiêu chuẩn"}`}
-                      </p>
-                    </div>
-                    <div className="text-center sm:text-right">
-                      <p className="text-xs text-gray-400 uppercase tracking-widest">
-                        Tổng cộng tạm tính
-                      </p>
-                      <p className="text-3xl font-black text-blue-400 drop-shadow-[0_0_10px_rgba(96,165,250,0.3)]">
-                        {totalPrice.toLocaleString("vi-VN")}₫
-                      </p>
+                  {/* CỘT PHẢI: THÔNG TIN KHÁCH HÀNG & TÓM TẮT (5 columns) */}
+                  <div className="lg:col-span-5 p-6 space-y-5 bg-black/10">
+                    {/* PHẦN 3: THÔNG TIN KHÁCH HÀNG */}
+                    <section className="space-y-3">
+                      <div className="flex items-center gap-2 text-sm font-semibold text-blue-400 uppercase tracking-wider">
+                        <span className="p-1 rounded bg-blue-500/20 text-[10px]">02</span>
+                        Thông Tin Khách Hàng
+                      </div>
+                      <div className="grid grid-cols-1 gap-3 bg-white/5 p-4 rounded-xl border border-white/10">
+                        <div className="space-y-1.5">
+                          <Label className="text-sm font-medium text-gray-400 ml-1">
+                            Họ Và Tên
+                          </Label>
+                          <Input
+                            className="bg-white/5 border-white/10 focus:border-blue-500/50 focus:ring-blue-500/10 h-10 rounded-lg placeholder:text-gray-600 text-sm"
+                            value={name}
+                            onChange={(e) => setName(e.target.value)}
+                            placeholder="Nhập họ và tên"
+                            minLength={2}
+                          />
+                        </div>
+                        <div className="space-y-1.5">
+                          <Label className="text-sm font-medium text-gray-400 ml-1">
+                            Số Điện Thoại
+                          </Label>
+                          <Input
+                            className={`bg-white/5 h-10 rounded-lg transition-colors text-sm ${phoneError ? "border-orange-500/50 focus:ring-orange-500/10" : "border-white/10 focus:border-blue-500/50"}`}
+                            value={phone}
+                            inputMode="numeric"
+                            maxLength={10}
+                            placeholder="VD: 0912345678"
+                            onChange={(e) => {
+                              const value = e.target.value;
+                              if (!/^\d*$/.test(value)) {
+                                setPhoneError("Chỉ cho phép nhập số 0-9");
+                                return;
+                              }
+                              setPhone(value);
+                              if (value && !value.startsWith("0")) {
+                                setPhoneError(
+                                  "Số điện thoại phải bắt đầu bằng số 0",
+                                );
+                              } else {
+                                setPhoneError("");
+                              }
+                            }}
+                          />
+                          {phoneError && (
+                            <p className="text-orange-400 text-[10px] mt-1 animate-pulse">
+                              {phoneError}
+                            </p>
+                          )}
+                        </div>
+                        <div className="space-y-1.5">
+                          <Label className="text-sm font-medium text-gray-400 ml-1">
+                            Email Nhận Vé
+                          </Label>
+                          <Input
+                            className={`bg-white/5 h-10 rounded-lg text-sm ${emailError ? "border-orange-500/50" : "border-white/10 focus:border-blue-500/50"}`}
+                            value={email}
+                            type="email"
+                            placeholder="you@email.com"
+                            onChange={(e) => {
+                              const val = e.target.value;
+                              setEmail(val);
+                              if (val && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(val)) {
+                                setEmailError("Email không hợp lệ");
+                              } else {
+                                setEmailError("");
+                              }
+                            }}
+                          />
+                          {emailError && (
+                            <p className="text-orange-400 text-[10px] mt-1">
+                              {emailError}
+                            </p>
+                          )}
+                        </div>
+                        <div className="space-y-1.5">
+                          <Label className="text-sm font-medium text-gray-400 ml-1">
+                            Số Lượng Vé
+                          </Label>
+                          <div className="flex items-center gap-2">
+                            <Button
+                              type="button"
+                              variant="outline"
+                              className="bg-white/5 border-white/10 hover:bg-red-500/20 hover:text-red-400 h-10 w-10 p-0 rounded-lg transition-colors"
+                              onClick={() =>
+                                setTicketCount((c) => Math.max(MIN_TICKETS, c - 1))
+                              }
+                            >
+                              -
+                            </Button>
+                            <div className="flex-1 text-center font-bold bg-white/5 border border-white/10 rounded-lg h-10 flex items-center justify-center text-sm">
+                              {ticketCount}
+                            </div>
+                            <Button
+                              type="button"
+                              variant="outline"
+                              className="bg-white/5 border-white/10 hover:bg-green-500/20 hover:text-green-400 h-10 w-10 p-0 rounded-lg transition-colors"
+                              onClick={() =>
+                                setTicketCount((c) => Math.min(MAX_TICKETS, c + 1))
+                              }
+                            >
+                              +
+                            </Button>
+                          </div>
+                        </div>
+                      </div>
+                    </section>
+
+                    {/* TÓM TẮT TẠM TÍNH (Chỉ hiện trên Mobile ở đây - phía dưới form thông tin) */}
+                    {selectedPackage && (
+                      <div className="lg:hidden mb-6">
+                        <div className="overflow-hidden rounded-xl border border-blue-500/30 bg-blue-500/5 p-4 flex flex-col justify-between gap-3 animate-in fade-in slide-in-from-bottom-2 duration-400">
+                          <div className="flex justify-between items-start">
+                            <div>
+                              <h4 className="text-white font-bold text-base sm:text-lg">
+                                {selectedPackage.name}
+                              </h4>
+                              <p className="text-[13px] text-gray-400 leading-relaxed">
+                                {selectedPackage.description ||
+                                  `Gói vé ${selectedPackage.type || "tiêu chuẩn"}`}
+                              </p>
+                            </div>
+                            <div className="text-right shrink-0">
+                              <p className="text-[11px] text-gray-400 uppercase tracking-widest mb-0.5">
+                                Đơn giá
+                              </p>
+                              <p className="text-sm font-bold text-white">
+                                {unitPrice.toLocaleString("vi-VN")}₫
+                              </p>
+                            </div>
+                          </div>
+                          
+                          <div className="pt-3 border-t border-white/10 flex justify-between items-end">
+                            <div>
+                              <p className="text-[11px] text-gray-400 uppercase tracking-widest mb-0.5">
+                                Số lượng
+                              </p>
+                              <p className="text-xl font-bold text-white">x{ticketCount}</p>
+                            </div>
+                            <div className="text-right">
+                              <p className="text-[11px] text-gray-400 uppercase tracking-widest mb-0.5">
+                                Tổng cộng tạm tính
+                              </p>
+                              <p className="text-2xl font-black text-blue-400 drop-shadow-[0_0_12px_rgba(96,165,250,0.4)]">
+                                {totalPrice.toLocaleString("vi-VN")}₫
+                              </p>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* FOOTER ACTIONS - Tối ưu chống tràn cho Mobile */}
+                    <div className="flex flex-col sm:items-end gap-3 pt-6 border-t border-white/10">
+                      <Button
+                        className="w-full sm:w-64 bg-gradient-to-r from-blue-600 to-blue-400 hover:from-blue-500 hover:to-blue-300 text-white font-bold h-12 rounded-xl shadow-lg shadow-blue-500/20 disabled:from-blue-900/40 disabled:to-blue-900/40 disabled:text-white/30 disabled:shadow-none transition-all duration-300 transform active:scale-[0.98] whitespace-nowrap text-[15px]"
+                        onClick={() => {
+                          if (
+                            window.confirm(
+                              "Lưu ý thông tin vé sẽ được gửi đến email: " + email,
+                            )
+                          ) {
+                            setStep(1);
+                          }
+                        }}
+                        disabled={
+                          !selectedPackage ||
+                          !name ||
+                          !phone ||
+                          !email ||
+                          isProcessing ||
+                          !!phoneError ||
+                          !!emailError ||
+                          phone.length !== 10
+                        }
+                      >
+                        Tiếp tục đặt vé
+                      </Button>
+
+                      <Button
+                        variant="ghost"
+                        className="w-full sm:w-64 px-8 text-gray-500 hover:text-white hover:bg-white/5 h-12 rounded-xl transition-all duration-300 text-[13px] font-medium"
+                        onClick={() => navigate("/")}
+                        disabled={isProcessing}
+                      >
+                        Hủy bỏ và quay lại
+                      </Button>
                     </div>
                   </div>
-                )}
-
-                {/* FOOTER ACTIONS - Tối ưu chống tràn cho Mobile */}
-                <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-4 border-t border-white/10">
-                  {/* Nút chính cho lên trên ở Mobile (order-1) để tiện thao tác */}
-                  <Button
-                    className="w-full sm:w-auto order-1 sm:order-2 bg-blue-600 hover:bg-blue-500 text-white font-bold px-10 h-12 rounded-xl shadow-[0_0_20px_rgba(37,99,235,0.4)] disabled:opacity-30 disabled:grayscale transition-all transform active:scale-95 whitespace-nowrap text-base sm:text-lg"
-                    onClick={() => {
-                      if (
-                        window.confirm(
-                          "Lưu ý thông tin vé sẽ được gửi đến email: " + email,
-                        )
-                      ) {
-                        setStep(1);
-                      }
-                    }}
-                    disabled={
-                      !selectedPackage ||
-                      !name ||
-                      !phone ||
-                      !email ||
-                      isProcessing ||
-                      !!phoneError ||
-                      !!emailError ||
-                      phone.length !== 10
-                    }
-                  >
-                    Tiếp tục đặt vé
-                  </Button>
-
-                  <Button
-                    variant="ghost"
-                    className="w-full sm:w-auto order-2 sm:order-1 text-gray-400 hover:text-white hover:bg-white/5 px-6 h-12 rounded-xl transition-colors"
-                    onClick={() => navigate("/")}
-                    disabled={isProcessing}
-                  >
-                    Hủy bỏ
-                  </Button>
                 </div>
               </CardContent>
             </Card>
@@ -955,7 +1032,7 @@ export default function BookingPage() {
                         />
                         <label
                           htmlFor="confirm-checkbox"
-                          className="text-[11px] leading-relaxed text-gray-400 group-hover:text-gray-200 transition-colors cursor-pointer"
+                          className="text-[13px] leading-relaxed text-gray-400 group-hover:text-gray-200 transition-colors cursor-pointer select-none"
                         >
                           Tôi đã kiểm tra kỹ thông tin và đồng ý với điều khoản
                           dịch vụ.
@@ -966,26 +1043,27 @@ export default function BookingPage() {
                 </CardContent>
               </Card>
 
-              <div className="flex flex-col sm:flex-row gap-3 pt-6">
-                {/* Nút chính đặt lên trước ở Mobile để ưu tiên, dùng order-1/2 để đảo vị trí trên Desktop */}
+              <div className="flex flex-col sm:flex-row items-center justify-center sm:justify-end gap-3 pt-6">
+                {/* Nút chính: Thêm gradient và hiệu ứng glow, cải thiện disabled state */}
                 <Button
-                  className="w-full sm:flex-[2] bg-blue-600 hover:bg-blue-500 text-white font-bold shadow-[0_0_20px_rgba(37,99,235,0.3)] disabled:opacity-30 h-12 rounded-xl transition-all text-base sm:text-lg order-1 sm:order-2 whitespace-nowrap"
+                  className="w-full sm:w-48 bg-gradient-to-r from-blue-600 to-blue-400 hover:from-blue-500 hover:to-blue-300 text-white font-bold h-12 rounded-xl shadow-lg shadow-blue-500/20 disabled:from-blue-900/40 disabled:to-blue-900/40 disabled:text-white/30 disabled:shadow-none transition-all duration-300 transform active:scale-[0.98] text-base order-1 sm:order-2 whitespace-nowrap"
                   disabled={!confirmChecked || isProcessing}
                   onClick={handleCreateAndPay}
                 >
                   {isProcessing ? (
                     <span className="flex items-center justify-center gap-2">
-                      <span className="animate-spin text-lg">◌</span> Đang xử
-                      lý...
+                      <span className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                      Đang xử lý...
                     </span>
                   ) : (
-                    "Xác nhận Thanh toán ngay"
+                    "Thanh toán ngay"
                   )}
                 </Button>
 
+                {/* Nút phụ: Cân đối lại với nút chính */}
                 <Button
                   variant="outline"
-                  className="w-full sm:flex-1 bg-transparent border-white/20 text-white hover:bg-white/10 h-12 rounded-xl transition-all order-2 sm:order-1"
+                  className="w-full sm:w-48 bg-white/5 border-white/10 text-gray-400 hover:text-white hover:bg-white/10 hover:border-white/20 h-12 rounded-xl transition-all duration-300 order-2 sm:order-1 font-medium text-[13px]"
                   onClick={() => setStep(0)}
                   disabled={isProcessing}
                 >

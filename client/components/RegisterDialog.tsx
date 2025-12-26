@@ -7,7 +7,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
-import { toast } from "@/components/ui/use-toast";
+import { toast } from "sonner";
 import { Loader2, Eye, EyeOff } from "lucide-react";
 import { cn } from "@/lib/utils";
 import icon from "@/assets/images/icon.svg";
@@ -110,7 +110,7 @@ export function RegisterDialog({
 
         setUserName(data.user.username);
         window.dispatchEvent(new Event("user-auth-changed"));
-        toast({ title: "Đăng ký thành công", description: data.user.email });
+        toast.success("Đăng ký thành công", { description: data.user.email });
         
         // Reset form
         onOpenChange(false);
