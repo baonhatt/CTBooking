@@ -13,7 +13,7 @@ import {
 } from "lucide-react";
 import { getAllActiveMoviesToday, getMovieById } from "@/lib/api";
 import { Button } from "@/components/ui/button";
-import { toast } from "@/components/ui/use-toast";
+
 import {
   Dialog,
   DialogContent,

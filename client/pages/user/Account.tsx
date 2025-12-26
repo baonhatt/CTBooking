@@ -23,7 +23,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Link, useNavigate } from "react-router-dom";
-import { toast } from "@/components/ui/use-toast";
+import { toast } from "sonner";
 import {
   updateUserProfileApi,
   changePasswordApi,
@@ -121,7 +121,7 @@ export default function Account() {
   useEffect(() => {
     const authRaw = localStorage.getItem("authUser");
     if (!authRaw) {
-      toast({ title: "Vui lòng đăng nhập trước!" });
+      toast.error("Vui lòng đăng nhập trước!");
       window.dispatchEvent(new Event("open-login"));
       navigate("/", { replace: true });
     }
@@ -400,15 +400,15 @@ export default function Account() {
         } catch {}
       }
       window.dispatchEvent(new Event("user-auth-changed"));
-      toast({ title: "Cập nhật thành công" });
+      toast.success("Cập nhật thành công");
     } catch (e: any) {
-      toast({ title: "Cập nhật thất bại", description: e?.message || "" });
+      toast.error("Cập nhật thất bại", { description: e?.message || "" });
     }
   };
 
   const handleUpdatePassword = async () => {
     if (!newPwd || newPwd !== confirmPwd) {
-      toast({ title: "Mật khẩu mới không khớp" });
+      toast.error("Mật khẩu mới không khớp");
       return;
     }
     try {
@@ -417,13 +417,13 @@ export default function Account() {
         oldPassword: oldPwd,
         newPassword: newPwd,
       });
-      toast({ title: "Đã cập nhật mật khẩu" });
+      toast.success("Đã cập nhật mật khẩu");
       setIsPwdOpen(false);
       setOldPwd("");
       setNewPwd("");
       setConfirmPwd("");
     } catch (e: any) {
-      toast({ title: "Đổi mật khẩu thất bại", description: e?.message || "" });
+      toast.error("Đổi mật khẩu thất bại", { description: e?.message || "" });
     }
   };
 
@@ -863,20 +863,34 @@ export default function Account() {
       </Dialog>
 
       <Dialog open={isDetailOpen} onOpenChange={setIsDetailOpen}>
-        <DialogContent className="bg-[#0b1426] border border-white/10 text-white max-w-md rounded-[2rem] p-0 overflow-hidden shadow-[0_25px_50px_-12px_rgba(0,0,0,0.8)] focus:outline-none">
+        <DialogContent className="bg-[#0b1426] border border-white/10 text-white w-[95vw] sm:max-w-md rounded-[2.5rem] p-[1px] overflow-hidden max-h-[92vh] shadow-[0_25px_50px_-12px_rgba(0,0,0,0.8)] focus:outline-none duration-500 animate-in fade-in zoom-in-95 slide-in-from-bottom-10">
+          <div className="overflow-y-auto max-h-[92vh] custom-scrollbar rounded-[2.5rem]">
           {/* 1. CSS Injection để đẩy nút X mặc định của thư viện ra xa */}
           <style
             dangerouslySetInnerHTML={{
               __html: `
     button[data-radix-collection-item] { 
-      top: 1.5rem !important; 
-      right: 1.5rem !important; 
-      opacity: 0.5;
+      top: 1.25rem !important; 
+      right: 1.25rem !important; 
+      opacity: 0.6;
       transition: all 0.2s;
     }
     button[data-radix-collection-item]:hover {
       opacity: 1;
       background: rgba(255,255,255,0.1) !important;
+    }
+    .custom-scrollbar::-webkit-scrollbar {
+      width: 6px;
+    }
+    .custom-scrollbar::-webkit-scrollbar-track {
+      background: transparent;
+    }
+    .custom-scrollbar::-webkit-scrollbar-thumb {
+      background: rgba(59, 130, 246, 0.3);
+      border-radius: 10px;
+    }
+    .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+      background: rgba(59, 130, 246, 0.5);
     }
   `,
             }}
@@ -888,13 +902,12 @@ export default function Account() {
               <div className="absolute top-0 left-1/2 -translate-x-1/2 w-64 h-64 bg-blue-600/10 blur-[100px] pointer-events-none" />
 
               {/* 2. Header đã được tinh chỉnh lại Padding và khoảng cách bên phải */}
-              <div className="p-8 pb-4 pr-16 relative">
-                {" "}
-                {/* pr-16 để chừa chỗ cho nút X */}
+              <div className="p-6 sm:p-8 pb-4 pr-16 sm:pr-20 relative">
+                {/* pr-20 (sm) để chừa chỗ cho nút X không đè content */}
                 <div className="flex justify-between items-center">
                   <div className="flex items-center gap-3">
                     <div className="w-2 h-8 bg-blue-500 rounded-full shadow-[0_0_15px_rgba(59,130,246,0.5)]" />
-                    <h2 className="text-2xl font-black text-white tracking-tighter italic uppercase">
+                    <h2 className="text-xl sm:text-2xl font-black text-white tracking-tighter italic uppercase">
                       Cinesphere{" "}
                       <span className="text-blue-500 font-light underline underline-offset-4 decoration-1 opacity-80">
                         Ticket
@@ -916,7 +929,7 @@ export default function Account() {
                   )}
                 </div>
               </div>
-              <div className="px-6 pb-8 space-y-6">
+              <div className="px-5 sm:px-8 pb-10 space-y-5 sm:space-y-6">
                 {/* KHỐI 1: VÉ VẬT LÝ (TICKET BOX) */}
                 <div className="relative">
                   {/* Hai nửa tròn khoét hai bên để tạo kiểu cuống vé */}
@@ -924,14 +937,14 @@ export default function Account() {
                   <div className="absolute top-1/2 -right-3 w-6 h-6 bg-[#0b1426] rounded-full -translate-y-1/2 z-10 border-l border-white/10" />
 
                   <div
-                    className={`bg-gradient-to-br from-white/10 to-white/[0.02] rounded-2xl p-6 border border-white/10 shadow-inner transition-all duration-500 ${selectedTx.is_used ? "grayscale opacity-50" : ""}`}
+                    className={`bg-gradient-to-br from-white/10 to-white/[0.02] rounded-2xl p-4 sm:p-6 border border-white/10 shadow-inner transition-all duration-500 ${selectedTx.is_used ? "grayscale opacity-50" : ""}`}
                   >
                     <div className="flex justify-between items-end mb-6">
                       <div>
                         <p className="text-[10px] text-blue-400 uppercase font-bold tracking-widest mb-1 opacity-70">
                           Gói dịch vụ
                         </p>
-                        <h3 className="text-xl font-black text-white">
+                        <h3 className="text-lg sm:text-xl font-black text-white">
                           {selectedTx.ticket_package || "Vé đơn"}
                         </h3>
                       </div>
@@ -939,7 +952,7 @@ export default function Account() {
                         <p className="text-[10px] text-gray-400 uppercase font-bold mb-1 opacity-70">
                           Số lượng
                         </p>
-                        <p className="text-xl font-black text-white leading-none">
+                        <p className="text-lg sm:text-xl font-black text-white leading-none">
                           × {selectedTx.quantity}
                         </p>
                       </div>
@@ -970,16 +983,17 @@ export default function Account() {
                     <p className="text-[10px] text-gray-500 font-bold uppercase tracking-tighter opacity-60">
                       Mã đơn hàng
                     </p>
-                    <div className="flex items-center gap-2">
-                      <span className="font-mono text-blue-300 font-bold tracking-tight italic">
+                    <div 
+                      onClick={() => handleCopy(selectedTx.pay_txt_code)}
+                      className="flex items-center gap-2 cursor-pointer group/order"
+                      title="Click to copy"
+                    >
+                      <span className="font-mono text-blue-300 font-bold tracking-tight italic whitespace-nowrap group-hover/order:text-blue-200 transition-colors">
                         {selectedTx.pay_txt_code}
                       </span>
-                      <button
-                        onClick={() => handleCopy(selectedTx.pay_txt_code)}
-                        className="p-1 hover:bg-white/10 rounded text-gray-500 hover:text-white transition-colors"
-                      >
+                      <div className="p-1 group-hover/order:bg-white/10 rounded text-gray-500 group-hover/order:text-white transition-colors">
                         <Copy size={12} />
-                      </button>
+                      </div>
                     </div>
                   </div>
 
@@ -1049,7 +1063,7 @@ export default function Account() {
                 {/* KHỐI 3: BOOKING CODE BOX */}
                 <div className="mt-4">
                   <div
-                    className={`rounded-[1.5rem] p-1 p-[1px] bg-gradient-to-b ${selectedTx.is_used ? "from-white/5 to-transparent" : "from-blue-500/40 to-transparent"}`}
+                    className={`rounded-[1.5rem] p-[1px] bg-gradient-to-b ${selectedTx.is_used ? "from-white/20 to-white/5" : "from-blue-500/50 to-blue-500/20"}`}
                   >
                     <div className="bg-[#0b1426] rounded-[1.4rem] p-6 text-center">
                       <p className="text-[10px] text-gray-500 uppercase font-bold mb-4 tracking-[0.3em]">
@@ -1064,7 +1078,13 @@ export default function Account() {
                         )}
 
                         <span
-                          className={`text-4xl font-mono font-black tracking-[0.2em] transition-all ${selectedTx.is_used ? "text-gray-800 line-through blur-[1px]" : "text-white text-glow-blue"}`}
+                          onClick={() => {
+                            if (selectedTx.payment_status === "paid" && !selectedTx.is_used) {
+                              handleCopy(getBookingCode(selectedTx));
+                            }
+                          }}
+                          className={`text-2xl sm:text-4xl font-mono font-black tracking-[0.2em] transition-all ${selectedTx.is_used ? "text-gray-800 line-through blur-[1px]" : "text-white text-glow-blue cursor-pointer hover:opacity-80"}`}
+                          title={selectedTx.payment_status === "paid" && !selectedTx.is_used ? "Click to copy" : ""}
                         >
                           {selectedTx.payment_status === "paid"
                             ? getBookingCode(selectedTx)
@@ -1102,6 +1122,7 @@ export default function Account() {
               </span>
             </div>
           )}
+          </div>
         </DialogContent>
       </Dialog>
     </UserLayout>

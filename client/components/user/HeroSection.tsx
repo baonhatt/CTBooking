@@ -26,7 +26,7 @@ import { movieStore } from "@/store/movieStore";
 import heroImage1 from "@/assets/images/1.PNG";
 // @ts-ignore
 import heroImage9 from "@/assets/images/9.PNG";
-import { toast } from "@/components/ui/use-toast";
+
 import { getSiteMediaApi } from "@/lib/api/uploads";
 import { optimizeCloudinaryUrl } from "@/lib/utils";
 

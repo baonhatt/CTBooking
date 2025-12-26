@@ -7,7 +7,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
-import { toast } from "@/components/ui/use-toast";
+import { toast } from "sonner";
 import { Loader2, Eye, EyeOff } from "lucide-react";
 import { cn } from "@/lib/utils";
 import icon from "@/assets/images/icon.svg";
@@ -101,7 +101,7 @@ export function LoginDialog({
         }
         setUserName(data.user.username);
         window.dispatchEvent(new Event("user-auth-changed"));
-        toast({ title: "Đăng nhập thành công", description: data.user.email });
+        toast.success("Đăng nhập thành công", { description: data.user.email });
 
         onOpenChange(false);
         setEmail("");

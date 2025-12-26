@@ -73,14 +73,15 @@ export const bookings = pgTable("bookings", {
 	paymentStatus: varchar("payment_status", { length: 50 }).default('pending'),
 	transactionId: varchar("transaction_id", { length: 255 }),
 	updatedAt: timestamp("updated_at", { precision: 3, mode: 'string' }).default(sql`CURRENT_TIMESTAMP`).notNull(),
-	name: varchar({ length: 200 }).default(').notNull(),
-	phone: varchar({ length: 20 }).default(').notNull(),
-	email: varchar({ length: 100 }).default(').notNull(),
+	name: varchar({ length: 200 }).default('').notNull(),
+	phone: varchar({ length: 20 }).default('').notNull(),
+	email: varchar({ length: 100 }).default('').notNull(),
 	bookingCode: varchar("booking_code", { length: 50 }),
 	isUsed: boolean("is_used").default(false),
 	movieId: integer("movie_id"),
 	ticketPackageId: integer("ticket_package_id"),
 	expiryDate: timestamp("expiry_date", { precision: 3, mode: 'string' }),
+	payTxtCode: varchar("pay_txt_code", { length: 50 }),
 }, (table) => [
 	uniqueIndex("bookings_booking_code_key").using("btree", table.bookingCode.asc().nullsLast().op("text_ops")),
 	foreignKey({

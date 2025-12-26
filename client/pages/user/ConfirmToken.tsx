@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { toast } from "@/components/ui/use-toast";
+import { toast } from "sonner";
 import { resetPasswordApi } from "@/lib/api/auth";
 
 export default function ConfirmToken() {
@@ -21,16 +21,14 @@ export default function ConfirmToken() {
     e.preventDefault();
     
     if (!validatePassword(newPassword)) {
-      toast({
-        title: "Mật khẩu không hợp lệ",
+      toast.error("Mật khẩu không hợp lệ", {
         description: "Mật khẩu phải có ít nhất 6 ký tự, bao gồm cả chữ cái và số",
       });
       return;
     }
     
     if (newPassword !== confirmPassword) {
-      toast({
-        title: "Mật khẩu không khớp",
+      toast.error("Mật khẩu không khớp", {
         description: "Vui lòng kiểm tra lại.",
       });
       return;
@@ -39,14 +37,12 @@ export default function ConfirmToken() {
     try {
       const response = await resetPasswordApi({ token, newPassword });
       if (response.status === "success") {
-        toast({ title: "Thông báo hệ thống!", description: response.message });
+        toast.success("Thông báo hệ thống!", { description: response.message });
         navigate("/");
       }
     } catch (err: any) {
-      toast({ 
-        title: "Lỗi đặt lại mật khẩu", 
+      toast.error("Lỗi đặt lại mật khẩu", { 
         description: err.message || "Đã xảy ra lỗi, vui lòng thử lại.",
-        variant: "destructive"
       });
     }
   };

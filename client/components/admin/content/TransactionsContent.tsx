@@ -905,7 +905,9 @@ export default function TransactionsContent({
                             ? "Đã hết hạn sử dụng"
                             : txDetails.payment_info?.days_left === 0
                               ? "Hết hạn hôm nay"
-                              : `${txDetails.payment_info?.days_left} ngày`
+                              : txDetails.payment_info?.days_left === null
+                                ? "---"
+                                : `${txDetails.payment_info?.days_left} ngày`
                         }
                         color={
                           txDetails.payment_info?.expired

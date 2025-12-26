@@ -20,6 +20,10 @@ import {
   ShoppingCart,
   ArrowLeft,
   Sparkles,
+  Calendar,
+  CreditCard,
+  Hash,
+  Phone,
 } from "lucide-react";
 import UserLayout from "@/user/layouts/UserLayout";
 import {
@@ -71,6 +75,18 @@ export default function Checkout() {
     const vnpResponseCode = params.get("vnp_ResponseCode");
     const vnpTxnRef = params.get("vnp_TxnRef");
     const vnpTransactionNo = params.get("vnp_TransactionNo");
+
+    // Handle SePay callback (if redirect happens, though usually SePay is purely background. 
+    // If SePay redirects to checkout with params, we can handle it. 
+    // Typical SePay pattern is user manually returns or auto-redirects if configured).
+    // Assuming SePay might not send specific params on redirect, or customization allowed.
+    // If SePay redirects to /checkout without params, the polling logic will handle it using 'pendingOrder'.
+    // If SePay sends params:
+    const sepayGateway = params.get("gateway");
+    const sepayTransactionDate = params.get("transactionDate");
+    const sepayAmount = params.get("transferAmount");
+    const sepayContent = params.get("transferContent");
+
 
     let pending: any = null;
     // Lấy pending data từ extraData (MoMo) hoặc localStorage
@@ -248,6 +264,17 @@ export default function Checkout() {
       localStorage.removeItem("pendingOrder");
     }
 
+    // SePay handling
+    if (sepayGateway && pending && pending.booking_id) {
+       // SePay usually confirms via webhook, but we can optimistically set loading or success if we trust the redirect
+       // However, we should just let the polling (below) check the status from DB.
+       // Or we can force a check.
+       setStatus("processing"); // Show processing while polling checks status
+       
+       // Optional: Notify backend we are here, though webhook handles the core logic.
+       // Just wait for poll to update status to "success"
+    }
+  
     const onAuthChanged = () =>
       setIsLoggedIn(!!localStorage.getItem("authUser"));
     window.addEventListener("user-auth-changed", onAuthChanged as any);
@@ -289,6 +316,7 @@ export default function Checkout() {
               (bookingData as any).ticket_package_name ||
               order.ticketPackageName,
             expiryDate: (bookingData as any).expiry_date || order.expiryDate,
+            paidAt: (bookingData as any).paid_at || order.paidAt,
           } as any;
           setOrder(merged);
           try {
@@ -440,205 +468,252 @@ export default function Checkout() {
     }
   };
 
+  // Parse movie list from JSON
+  const getMovieList = () => {
+    try {
+      if (!order?.movie) return [];
+      let list = [];
+      
+      if (typeof order.movie === 'string') {
+        const parsed = JSON.parse(order.movie);
+        list = Array.isArray(parsed) ? parsed : [{ title: order.movie }];
+      } else if (Array.isArray(order.movie)) {
+        list = order.movie;
+      } else {
+        list = [{ title: order.movie }];
+      }
+
+      // Normalize everything to objects
+      return list.map((item: any) => {
+        if (typeof item === 'string') return { title: item };
+        return { 
+          title: item.title || item.movie_title || '', 
+          duration: item.duration || item.duration_min 
+        };
+      });
+    } catch {
+      return [{ title: order?.movie || '' }];
+    }
+  };
+
+  const movies = order ? getMovieList() : [];
+  const isSuccess = status === "success" || order?.payment_status === "paid";
+  const isError = status === "failed" || order?.payment_status === "failed";
+
   return (
     <UserLayout
-      className="bg-gradient-dark"
+      className="bg-[#020617] border-none"
       headerProps={{ onBookClick: () => {}, forceDark: true }}
       hideFooter
     >
-      <section className="relative min-h-screen overflow-hidden">
-        <div className="absolute inset-0 pointer-events-none z-0">
-          <div className="absolute inset-0 bg-[radial-gradient(circle_at_20%_20%,rgba(59,130,246,0.4),transparent_30%),radial-gradient(circle_at_80%_30%,rgba(236,72,153,0.3),transparent_35%),radial-gradient(circle_at_50%_70%,rgba(34,211,238,0.35),transparent_30%)]" />
-          <div className="absolute inset-0 bg-gradient-to-b from-black/40 via-black/20 to-transparent" />
+      <section className="relative min-h-screen flex items-center justify-center pt-16 md:pt-20 lg:pt-24 pb-10 overflow-hidden">
+        {/* Animated Background Elements */}
+        <div className="absolute inset-0 pointer-events-none overflow-hidden">
+          <div className="absolute -top-[10%] -left-[10%] w-[40%] h-[40%] bg-blue-600/10 blur-[120px] rounded-full animate-pulse" />
+          <div className="absolute -bottom-[10%] -right-[10%] w-[40%] h-[40%] bg-purple-600/10 blur-[120px] rounded-full animate-pulse" />
         </div>
 
-        <div className="container mx-auto px-4 relative z-10 pt-32 md:pt-40 pb-8">
+        <div className="container mx-auto px-4 relative z-10">
           <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.6 }}
-            className="max-w-xl mx-auto"
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ duration: 0.5 }}
+            className="w-full max-w-md md:max-w-lg mx-auto relative"
           >
-            {/* Ticket Card */}
-            {order && (
-              <motion.div
-                initial={{ opacity: 0, scale: 0.95 }}
-                animate={{ opacity: 1, scale: 1 }}
-                transition={{ delay: 0.2, duration: 0.5 }}
-                className={`backdrop-blur-md text-white rounded-2xl overflow-hidden ${
-                  status === "success"
-                    ? "bg-gradient-to-b from-emerald-700/30 via-emerald-600/20 to-teal-700/20 border border-emerald-400/50 shadow-[0_0_40px_rgba(34,197,94,0.3)]"
-                    : "bg-white/5 border border-white/15 shadow-2xl"
-                }`}
-              >
-                {/* Status Badge */}
-                {status === "success" && (
-                  <div className="bg-gradient-to-r from-emerald-500 to-green-600 text-white px-6 py-4 flex items-center justify-center gap-2 shadow-[0_0_24px_rgba(34,197,94,0.35)]">
-                    <CheckCircle2 className="h-6 w-6" />
-                    <span className="font-semibold">Thanh toán thành công</span>
+            {/* Ticket Cutouts Shadows/Glow */}
+            <div className="absolute inset-0 bg-blue-500/5 blur-2xl rounded-3xl" />
+
+            {/* Main Ticket Box */}
+            <div className="relative bg-[#0f172a]/80 backdrop-blur-xl border border-white/10 rounded-3xl overflow-hidden shadow-[0_32px_64px_-16px_rgba(0,0,0,0.5)]">
+              
+              {/* Top Section: Status */}
+              <div className={`p-1 pt-1 ${isSuccess ? "bg-emerald-500/20" : isError ? "bg-rose-500/20" : "bg-slate-500/20"}`}>
+                <div className={`flex items-center justify-center gap-2 py-3 rounded-t-[1.4rem] ${isSuccess ? "bg-emerald-500" : isError ? "bg-rose-500" : "bg-slate-500"}`}>
+                  {isSuccess ? (
+                    <CheckCircle2 className="w-6 h-6 text-white animate-bounce" />
+                  ) : isError ? (
+                    <XCircle className="w-6 h-6 text-white animate-pulse" />
+                  ) : (
+                    <Sparkles className="w-6 h-6 text-white animate-spin" />
+                  )}
+                  <h1 className="text-white font-bold text-lg tracking-wide uppercase">
+                    {isSuccess ? "Thanh toán thành công" : isError ? "Thanh toán thất bại" : "Đang xử lý..."}
+                  </h1>
+                </div>
+              </div>
+
+              {/* Movie List Section */}
+              <div className="p-3 pb-1">
+                 <div className="flex items-center gap-2 mb-2">
+                  <div className="p-2 bg-blue-500/10 rounded-lg">
+                    <Film className="w-4 h-4 text-blue-400" />
                   </div>
-                )}
-                {status === "failed" && (
-                  <div className="bg-gradient-to-r from-rose-500 to-red-600 text-white px-6 py-3 flex items-center justify-center gap-2 shadow-[0_0_20px_rgba(244,63,94,0.25)]">
-                    <XCircle className="h-5 w-5" />
-                    <span className="font-semibold">Thanh toán thất bại</span>
-                  </div>
-                )}
-
-                <div className="flex flex-col md:flex-row">
-                  {/* Movie Poster - Left Side */}
-                  <div className="w-full md:w-1/3 relative bg-black/20">
-                    {order.poster ? (
-                      <img
-                        src={resolveImageUrl(order.poster)}
-                        alt={order.movie}
-                        className="w-full h-full object-cover aspect-[2/3]"
-                      />
-                    ) : (
-                      <div className="w-full aspect-[2/3] flex items-center justify-center text-white/20">
-                        <Film className="w-12 h-12" />
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Booking Details - Right Side */}
-                  <div className="w-full md:w-2/3 p-5 md:p-6 flex flex-col justify-between bg-black/10">
-                    <div>
-                      <h2 className="text-2xl md:text-3xl font-bold text-white mb-3">
-                        {order.movie}
-                      </h2>
-                      <div className="space-y-2 text-base text-white/90">
-                        {order.duration && (
-                          <p>Thời lượng: {order.duration} phút</p>
-                        )}
-                        {order.genres && <p>{getGenresText(order.genres)}</p>}
-                        {order.ticketPackageName && (
-                          <p className="text-emerald-400 font-semibold text-lg">
-                            Gói vé: {order.ticketPackageName}
-                          </p>
-                        )}
-                        {order.expiryDate && (
-                          <p className="text-yellow-400 font-medium">
-                            Hạn sử dụng:{" "}
-                            {new Date(order.expiryDate).toLocaleDateString(
-                              "vi-VN",
-                            )}
-                          </p>
-                        )}
-                      </div>
-
-                      <div className="h-px bg-white/10 my-5" />
-
-                      {/* Ticket Info */}
-                      <div className="space-y-4">
-                        <div className="flex items-center justify-between">
-                          <span className="text-white/80 text-base">
-                            Số lượng vé
+                  <h2 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Danh sách phim</h2>
+                </div>
+                <div className="space-y-2">
+                  {movies.map((m: any, i: number) => (
+                    <div key={i} className="flex items-start gap-3 group">
+                      <div className="mt-1.5 w-1.5 h-1.5 rounded-full bg-blue-500 shadow-[0_0_8px_rgba(59,130,246,0.6)]" />
+                      <div className="flex-1">
+                        <p className="text-slate-100 font-semibold leading-snug group-hover:text-blue-400 transition-colors">
+                          {m.title}
+                        </p>
+                        {m.duration && (
+                          <span className="text-[10px] text-slate-500 font-medium">
+                            {m.duration} phút
                           </span>
-                          <span className="font-bold text-white text-xl">
-                            {order.quantity}
-                          </span>
-                        </div>
-                        <div className="flex items-center justify-between">
-                          <span className="text-white/80 text-base">
-                            Tổng tiền
-                          </span>
-                          <span className="text-2xl font-extrabold bg-gradient-to-r from-blue-400 to-purple-400 bg-clip-text text-transparent">
-                            {formatMoney(order.amount)}₫
-                          </span>
-                        </div>
-                        <div className="flex items-center justify-between">
-                          <span className="text-white/80 text-base">
-                            Phương thức
-                          </span>
-                          <span className="font-medium text-white text-lg capitalize">
-                            {order.method === "momo"
-                              ? "Momo"
-                              : order.method === "vnpay"
-                                ? "VN Pay"
-                                : order.method}
-                          </span>
-                        </div>
-                      </div>
-
-                      <div className="h-px bg-white/10 my-5" />
-
-                      {/* Customer Info */}
-                      <div className="space-y-3 text-base">
-                        <div className="flex justify-between">
-                          <span className="text-white/70">Khách hàng</span>
-                          <span className="text-white font-medium">
-                            {order.name}
-                          </span>
-                        </div>
-                        <div className="flex justify-between">
-                          <span className="text-white/70">Email</span>
-                          <span className="text-white font-medium">
-                            {order.email}
-                          </span>
-                        </div>
-                        {order.phone && (
-                          <div className="flex justify-between">
-                            <span className="text-white/70">SĐT</span>
-                            <span className="text-white font-medium">
-                              {order.phone}
-                            </span>
-                          </div>
                         )}
                       </div>
                     </div>
+                  ))}
+                </div>
+              </div>
 
-                    {/* Messages */}
-                    <div className="mt-8">
-                      {status === "success" && (
-                        <div className="flex items-start gap-3 text-emerald-300 bg-emerald-500/10 p-4 rounded-lg border border-emerald-500/20">
-                          <Mail className="h-5 w-5 flex-shrink-0 mt-0.5" />
-                          <span className="font-bold text-base">
-                            Lưu ý: Vé đã được gửi tới email của bạn. Vui lòng
-                            kiểm tra hộp thư.
-                          </span>
-                        </div>
-                      )}
-                      {status === "failed" && (
-                        <div className="text-base font-bold text-rose-300 bg-rose-500/10 p-4 rounded-lg border border-rose-500/20">
-                          Thanh toán thất bại. Vui lòng thử lại.
-                        </div>
-                      )}
+              {/* Dashed Separator with Cutouts */}
+              <div className="relative h-2 flex items-center my-1">
+                <div className="absolute left-0 -translate-x-1/2 w-5 h-5 bg-[#020617] rounded-full border border-white/10" />
+                <div className="absolute right-0 translate-x-1/2 w-5 h-5 bg-[#020617] rounded-full border border-white/10" />
+                <div className="w-full border-t border-dashed border-white/20" />
+              </div>
+
+              {/* Booking & Ticket Details */}
+              <div className="p-3 pt-1 grid grid-cols-2 gap-x-6 gap-y-1">
+                {/* Package */}
+                <div className="space-y-1">
+                  <div className="flex items-center gap-1.5 text-slate-500">
+                    <Ticket className="w-3 h-3 md:w-4 md:h-4" />
+                    <span className="text-[10px] md:text-xs uppercase font-bold tracking-tighter">Gói vé</span>
+                  </div>
+                  <p className="text-sm md:text-base font-bold text-slate-200">
+                    {order?.ticketPackageName || "Vé đơn"}
+                  </p>
+                </div>
+
+                {/* Date/Expiry */}
+                {order?.expiryDate && (
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-1.5 text-slate-500">
+                      <Calendar className="w-3 h-3 md:w-4 md:h-4" />
+                      <span className="text-[10px] md:text-xs uppercase font-bold tracking-tighter">Hết hạn</span>
+                    </div>
+                    <p className="text-sm md:text-base font-bold text-amber-400">
+                      {new Date(order.expiryDate).toLocaleDateString("vi-VN")}
+                    </p>
+                  </div>
+                )}
+
+                {/* Unit Price */}
+                <div className="space-y-1">
+                  <div className="flex items-center gap-1.5 text-slate-500">
+                    <CreditCard className="w-3 h-3 md:w-4 md:h-4" />
+                    <span className="text-[10px] md:text-xs uppercase font-bold tracking-tighter">Giá đơn</span>
+                  </div>
+                  <p className="text-sm md:text-base font-medium text-slate-300">
+                    {formatMoney(order?.amount / (order?.quantity || 1))}₫
+                  </p>
+                </div>
+
+                {/* Quantity */}
+                <div className="space-y-1 text-right">
+                  <div className="flex items-center justify-end gap-1.5 text-slate-500">
+                    <span className="text-[10px] md:text-xs uppercase font-bold tracking-tighter">Số lượng</span>
+                  </div>
+                  <p className="text-xl md:text-2xl font-black text-white italic">
+                    x{order?.quantity || 1}
+                  </p>
+                </div>
+              </div>
+
+              {/* Customer Banner */}
+              <div className="mx-3 p-2 bg-white/[0.03] border border-white/5 rounded-2xl space-y-1">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <div className="w-8 h-8 md:w-10 md:h-10 rounded-full bg-gradient-to-br from-blue-500 to-purple-500 flex items-center justify-center">
+                      <User className="w-4 h-4 md:w-5 md:h-5 text-white" />
+                    </div>
+                    <div>
+                      <p className="text-[10px] md:text-xs text-slate-500 font-bold uppercase tracking-tight">Khách hàng</p>
+                      <p className="text-sm md:text-base font-bold text-slate-200 leading-none">{order?.name}</p>
                     </div>
                   </div>
                 </div>
+                
+                <div className="flex flex-wrap gap-x-4 gap-y-1 pt-1 border-t border-white/5">
+                   <div className="flex items-center gap-1.5">
+                    <Mail className="w-3 h-3 md:w-4 md:h-4 text-slate-500" />
+                    <span className="text-xs md:text-sm text-slate-400">{order?.email}</span>
+                  </div>
+                  {order?.phone && (
+                    <div className="flex items-center gap-1.5">
+                      <Phone className="w-3 h-3 md:w-4 md:h-4 text-slate-500" />
+                      <span className="text-xs md:text-sm text-slate-400">{order?.phone}</span>
+                    </div>
+                  )}
+                </div>
+              </div>
 
-                {/* Footer Button */}
-                <div className="p-4 bg-black/20 border-t border-white/10">
-                  <Button
-                    className="w-full bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white font-semibold py-6 rounded-xl shadow-lg transition-all hover:scale-[1.02]"
+              {/* Bottom Section: Total & Footer */}
+              <div className="p-3 pt-3 space-y-3">
+                 {/* Decorative Line */}
+                 <div className="w-full h-px bg-gradient-to-r from-transparent via-white/20 to-transparent" />
+
+                 <div className="flex items-end justify-between">
+                    <div>
+                    <p className="text-[10px] md:text-xs font-bold text-slate-500 uppercase tracking-widest mb-0.5">Tổng cộng</p>
+                      <div className="flex items-center gap-1.5">
+                        <ShoppingCart className="w-4 h-4 text-blue-400" />
+                        <span className="text-2xl md:text-3xl font-black text-white tracking-tighter">
+                          {formatMoney(order?.amount)}<span className="text-base md:text-lg ml-1 text-slate-400">₫</span>
+                        </span>
+                      </div>
+                    </div>
+                    
+                    <div className="text-right flex flex-col items-end gap-1">
+                       <span className={`px-2 py-0.5 rounded-full text-[9px] font-bold uppercase tracking-tighter ${
+                         isSuccess ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20" : "bg-rose-500/10 text-rose-400 border border-rose-500/20"
+                       }`}>
+                         {order?.method === 'momo' ? 'Momo Wallet' : order?.method === 'vnpay' ? 'VNPAY' : 'VietQR Payment'}
+                       </span>
+                       <p className="text-[9px] text-slate-500 font-medium">Thực hiện lúc: {order?.paidAt ? new Date(order.paidAt).toLocaleString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit' }) : new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })}</p>
+                    </div>
+                 </div>
+
+                 {status === "success" && (
+                   <motion.div 
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: 0.6 }}
+                    className="flex items-start gap-2 text-emerald-300 bg-emerald-500/5 p-3 rounded-xl border border-emerald-500/10 text-[11px] leading-relaxed"
+                   >
+                     <Sparkles className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
+                     <span>
+                       Hệ thống đã gửi thông tin vé chi tiết và **Mã đặt vé** tới <b>{order?.email}</b>. Quý khách vui lòng kiểm tra email (bao gồm cả thư rác).
+                     </span>
+                   </motion.div>
+                 )}
+
+                 <Button
+                    className="w-full bg-blue-600 hover:bg-blue-700 text-white font-black uppercase tracking-widest py-4 md:py-5 rounded-2xl shadow-[0_12px_24px_-8px_rgba(37,99,235,0.4)] transition-all hover:scale-[1.01] hover:-translate-y-0.5"
                     onClick={() => {
-                      try {
-                        localStorage.removeItem("pendingOrder");
-                        localStorage.removeItem("lastCheckoutOrder");
-                        localStorage.removeItem("lastVnpayBookingId");
-                      } catch {}
+                      localStorage.removeItem("pendingOrder");
+                      localStorage.removeItem("lastCheckoutOrder");
+                      localStorage.removeItem("lastVnpayBookingId");
                       navigate("/");
                     }}
                   >
-                    Về trang chủ
+                    <ArrowLeft className="w-4 h-4 mr-2" />
+                    Quay lại Trang Chủ
                   </Button>
-                </div>
-              </motion.div>
-            )}
-
-            {/* Loading State */}
-            {!order && (
-              <div className="bg-white/5 border border-white/10 text-white rounded-2xl shadow-2xl p-8">
-                <div className="space-y-4">
-                  <div className="h-64 bg-white/10 rounded-lg animate-pulse"></div>
-                  <div className="space-y-3">
-                    <div className="h-4 bg-white/10 rounded animate-pulse w-3/4"></div>
-                    <div className="h-4 bg-white/10 rounded animate-pulse w-1/2"></div>
-                  </div>
-                </div>
               </div>
-            )}
+
+              {/* Decorative Corner Elements */}
+               <div className="absolute top-0 right-0 w-16 h-16 bg-white/[0.02] -rotate-45 translate-x-1/2 -translate-y-1/2" />
+            </div>
+
+            {/* Footer Text */}
+            <p className="text-center mt-4 text-slate-500 text-[10px] uppercase font-bold tracking-[0.2em]">
+              CineSphere • Trải nghiệm điện ảnh đỉnh cao
+            </p>
           </motion.div>
         </div>
       </section>

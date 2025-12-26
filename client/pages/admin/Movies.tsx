@@ -3,7 +3,7 @@ import { getMoviesAdmin, updateMovieStatus } from "@/lib/api";
 import AdminLayout from "@/admin/layouts/AdminLayout";
 import MoviesContent from "@/components/admin/content/MoviesContent";
 import AdminEditModal from "@/components/admin/AdminEditModal";
-import { toast } from "@/hooks/use-toast";
+import { toast } from "sonner";
 
 export default function MoviesPage() {
   const [moviesLocal, setMoviesLocal] = useState<any[]>([]);
@@ -199,15 +199,12 @@ export default function MoviesPage() {
         [String(id)]: newStatus ? "active" : "inactive",
       }));
 
-      toast({
-        title: response.status == "success" ? "Thành công" : "Thất bại",
+      toast.success(response.status == "success" ? "Thành công" : "Thất bại", {
         description: response.message,
       });
     } catch (e: any) {
-      toast({
-        title: "Lỗi",
+      toast.error("Lỗi", {
         description: e?.message || "Có lỗi xảy ra",
-        variant: "destructive",
       });
     } finally {
     }

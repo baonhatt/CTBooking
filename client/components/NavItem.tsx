@@ -13,8 +13,8 @@ export function NavItem({ label, target, isActive, disabled, onClick }: NavItemP
     <button
       onClick={disabled ? undefined : onClick}
       className={cn(
-        "relative group inline-flex h-10 items-center text-white font-medium uppercase text-sm lg:text-[15px] whitespace-nowrap tracking-[0.08em] transition-all duration-300",
-        disabled ? "opacity-50 cursor-not-allowed" : "hover:text-cyan-300 hover:scale-[1.02]"
+        "relative group inline-flex h-10 items-center text-white font-bold uppercase text-[13px] tracking-[0.15em] transition-all duration-300",
+        disabled ? "opacity-50 cursor-not-allowed" : "hover:text-cyan-300"
       )}
     >
       <span

@@ -173,12 +173,14 @@ export default function TransactionsPage() {
           userId: t.user_id,
           email: t.email,
           userName: t.userName,
+          transactionId: t.transactionId,
           ticket_package_name: t.ticket_package_name,
           ticketCount: t.ticketCount,
           totalPrice: t.totalPrice,
           paymentMethod: t.paymentMethod,
           paymentStatus: t.paymentStatus,
           createdAt: new Date(t.createdAt),
+          is_used: t.is_used,
         })),
       );
       setTotalTransactions(total);

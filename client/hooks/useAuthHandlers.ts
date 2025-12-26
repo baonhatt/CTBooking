@@ -1,4 +1,4 @@
-import { toast } from "@/components/ui/use-toast";
+import { toast } from "sonner";
 import { useNavigate } from "react-router-dom";
 
 export function useAuthHandlers(setUserName: (name: string | null) => void) {
@@ -9,7 +9,7 @@ export function useAuthHandlers(setUserName: (name: string | null) => void) {
     setUserName(null);
     window.dispatchEvent(new Event("user-auth-changed"));
     navigator('/');
-    toast({ title: "Đã đăng xuất" });
+    toast.success("Đã đăng xuất");
   };
 
   return { handleLogout };

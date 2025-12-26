@@ -155,7 +155,7 @@ app.use(
       // Fallback: default to prod domain
       return "https://cinesphere.com.vn";
     },
-    allowMethods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    allowMethods: ["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],
     allowHeaders: [
       "Content-Type",
       "Authorization",
@@ -865,6 +865,43 @@ app.post("/api/confirm-booking", async (c) => {
   }
 });
 
+// SePay Webhook
+app.post("/api/sepay/webhook", async (c) => {
+  try {
+    const { handleSePayWebhookImpl } = await import(
+      "../../server/routes/webhook/sepay"
+    );
+    const db = drizzle(c.env.cinema_db, { schema });
+    const tables = getD1Tables(schema);
+    const body = await c.req.json().catch(() => ({}));
+
+    // Worker Mailer Injection
+    const mailer = async (to: string, sub: string, html: string) => {
+      const res = await sendMail(c.env, to, sub, html);
+      if (!res.ok) throw new Error(`Email failed: ${res.status} ${res.body}`);
+      return res;
+    };
+    const appBaseUrl =
+      c.env.VITE_CLIENT_BASE_URL || "https://cinesphere.com.vn";
+    const renderBooking = (data: any) =>
+      getBookingEmailTemplate(appBaseUrl, data);
+
+    const result = await handleSePayWebhookImpl(
+      db, 
+      tables, 
+      body, 
+      undefined, 
+      mailer, 
+      renderBooking, 
+      c.env.RUNTIME_ENV
+    );
+    
+    return c.json(result);
+  } catch (err: any) {
+    return c.json({ success: false, message: "Internal Error" });
+  }
+});
+
 app.get("/api/bookings/:id", async (c) => {
   try {
     const db = drizzle(c.env.cinema_db, { schema });
@@ -1102,7 +1139,7 @@ app.put("/api/movies/:id", async (c) => {
   }
 });
 
-app.get("/api/movies-status/:id", async (c) => {
+app.patch("/api/movies-status/:id", async (c) => {
   try {
     const id = Number(c.req.param("id"));
     const is_active = Boolean(c.req.param("is_active"));

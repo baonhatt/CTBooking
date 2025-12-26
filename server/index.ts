@@ -157,6 +157,15 @@ export function createServer() {
     };
   };
 
+  // --- SePay Webhook ---
+  app.post("/api/sepay/webhook", async (req, res) => {
+    const { handleSePayWebhookImpl } = await import("./routes/webhook/sepay");
+    const io = req.app.get("io");
+    // Server uses default mailer implementation (undefined args)
+    const result = await handleSePayWebhookImpl(db, pgTables, req.body, io);
+    res.json(result);
+  });
+
   app.get("/api/demo", handleDemo);
   //get list movies admin, không cần trả về status trong json, message - đã check
   app.get("/api/movies", async (req, res) => {

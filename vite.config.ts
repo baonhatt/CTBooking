@@ -30,7 +30,14 @@ function expressPlugin(): Plugin {
     apply: "serve",
     async configureServer(server) {
       const { createServer } = await import("./server");
+      const { initSocket } = await import("./server/socket");
       const app = createServer();
+      
+      // Initialize Socket.io with Vite's HTTP server
+      if (server.httpServer) {
+        initSocket(server.httpServer, app);
+      }
+      
       server.middlewares.use(app);
     },
   };

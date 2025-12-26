@@ -6,10 +6,10 @@ import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Progress } from "@/components/ui/progress";
 import { uploadAdminVideo, uploadDirectToCloudinary, createSiteMediaApi, getSiteMediaApi, updateSiteMediaApi, deleteSiteMediaApi } from "@/lib/api/uploads";
-import { useToast } from "@/hooks/use-toast";
+import { toast } from "sonner";
 
 export default function UploadsContent() {
-  const { toast } = useToast();
+
   const fileRef = useRef<HTMLInputElement | null>(null);
   const [files, setFiles] = useState<File[]>([]);
   const [openConfirm, setOpenConfirm] = useState(false);
@@ -355,7 +355,7 @@ export default function UploadsContent() {
                     setMediaItems(items);
                     setOpenMediaModal(true);
                   } catch (err: any) {
-                    toast({ title: "Lỗi tải danh sách", description: err?.message || "Không thể tải site media" });
+                    toast.error("Lỗi tải danh sách", { description: err?.message || "Không thể tải site media" });
                   }
                 }}
                 className="ml-auto text-white bg-white/10 hover:bg-white/20 border-white/20 h-10 px-5"
@@ -526,14 +526,14 @@ export default function UploadsContent() {
                               setMediaLoadingId(m.id);
                               const r = await deleteSiteMediaApi(Number(m.id));
                               if (r.ok) {
-                                toast({ title: "Đã xóa thành công", description: `Media #${m.id}` });
+                                toast.success("Đã xóa thành công", { description: `Media #${m.id}` });
                                 const { items } = await getSiteMediaApi({});
                                 setMediaItems(items);
                               } else {
                                 throw new Error("Xóa thất bại");
                               }
                             } catch (err: any) {
-                              toast({ title: "Xóa thất bại", description: err?.message || "Không thể xóa media", variant: "destructive" });
+                              toast.error("Xóa thất bại", { description: err?.message || "Không thể xóa media" });
                             } finally {
                               setMediaLoadingId(null);
                             }
