@@ -135,7 +135,7 @@ export function LoginDialog({
 
   return (
     <Dialog open={isOpen} onOpenChange={handleOpenChange}>
-      <DialogContent className="bg-gradient-to-br from-[#0b1226] via-[#0e1b3d] to-[#050915] border border-cyan-500/30 text-white shadow-[0_0_50px_rgba(59,130,246,0.3)]">
+      <DialogContent className="bg-gradient-to-br z-[9999] from-[#0b1226] via-[#0e1b3d] to-[#050915] border border-cyan-500/30 text-white shadow-[0_0_50px_rgba(59,130,246,0.3)]">
         <DialogHeader>
           <div className="flex justify-center mb-4">
             <img src={icon} alt="CINESPHERE" className="h-20 w-20" />
@@ -186,7 +186,7 @@ export function LoginDialog({
                 className={cn(
                   "bg-white/10 border-white/20 text-white placeholder:text-gray-400 focus-visible:ring-cyan-400 focus-visible:ring-offset-1 rounded-lg pr-10",
                   passwordError &&
-                    "border-yellow-500 focus-visible:ring-yellow-500",
+                  "border-yellow-500 focus-visible:ring-yellow-500",
                 )}
                 value={password}
                 onChange={(e) => {

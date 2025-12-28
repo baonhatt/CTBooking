@@ -13,6 +13,8 @@ import { cn } from "@/lib/utils";
 import icon from "@/assets/images/icon.svg";
 import { PASSWORD_PATTERN } from "./constants";
 import { useNavigate } from "react-router-dom";
+import { Checkbox } from "@/components/ui/checkbox";
+
 
 interface RegisterDialogProps {
   isOpen: boolean;
@@ -37,20 +39,20 @@ export function RegisterDialog({
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [termsAccepted, setTermsAccepted] = useState(false);
-  
+
   const [emailError, setEmailError] = useState("");
   const [nameError, setNameError] = useState("");
   const [passwordError, setPasswordError] = useState("");
   const [confirmError, setConfirmError] = useState("");
   const [termsError, setTermsError] = useState("");
   const [submitError, setSubmitError] = useState("");
-  
+
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const navigator = useNavigate();
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     // Reset errors
     setEmailError("");
     setNameError("");
@@ -94,24 +96,24 @@ export function RegisterDialog({
     try {
       setIsLoading(true);
       const data = await auth.register(email, password, name);
-      
+
       if (data?.status === "success") {
         localStorage.setItem("authUser", JSON.stringify({ user: data.user }));
-        
+
         try {
           const derivedName = data.user.username || (data.user.email || "").split("@")[0];
-          const profile = { 
-            email: data.user.email, 
-            name: derivedName, 
-            phone: (data.user as any)?.phone || "" 
+          const profile = {
+            email: data.user.email,
+            name: derivedName,
+            phone: (data.user as any)?.phone || ""
           };
           localStorage.setItem("userProfile", JSON.stringify(profile));
-        } catch {}
+        } catch { }
 
         setUserName(data.user.username);
         window.dispatchEvent(new Event("user-auth-changed"));
         toast.success("Đăng ký thành công", { description: data.user.email });
-        
+
         // Reset form
         onOpenChange(false);
         setEmail("");
@@ -119,7 +121,7 @@ export function RegisterDialog({
         setPassword("");
         setConfirmPassword("");
         setTermsAccepted(false);
-        
+
         // Open login dialog
         onLogin();
       }
@@ -155,7 +157,7 @@ export function RegisterDialog({
 
   return (
     <Dialog open={isOpen} onOpenChange={handleOpenChange}>
-      <DialogContent className="bg-gradient-to-br from-[#0b1226] via-[#0e1b3d] to-[#050915] border border-cyan-500/30 text-white shadow-[0_0_50px_rgba(59,130,246,0.3)]">
+      <DialogContent className="bg-gradient-to-br z-[9999] from-[#0b1226] via-[#0e1b3d] to-[#050915] border border-cyan-500/30 text-white shadow-[0_0_50px_rgba(59,130,246,0.3)]">
         <DialogHeader>
           <div className="flex justify-center mb-4">
             <img src={icon} alt="CINESPHERE" className="h-20 w-20" />
@@ -313,23 +315,22 @@ export function RegisterDialog({
           </div>
 
           {/* Terms Checkbox */}
-          <div className="flex items-center gap-2">
-            <input
-              type="checkbox"
+          <label className="flex items-center gap-2 cursor-pointer">
+            <Checkbox
               checked={termsAccepted}
-              onChange={(e) => {
-                const checked = e.target.checked;
-                setTermsAccepted(checked);
-                if (checked) setTermsError("");
+              onCheckedChange={(e) => {
+                setTermsAccepted(e === true);
+                if (e) setTermsError("");
               }}
               disabled={isLoading}
               required
-              className="h-4 w-4"
+              className="mt-0.5 sm:mt-1 border-white/40 data-[state=checked]:bg-blue-500 w-4 h-4 sm:w-5 sm:h-5"
             />
-            <span className="text-xs text-gray-300 leading-5">
+            <span className="text-[13px] leading-relaxed text-gray-400 group-hover:text-gray-200 transition-colors cursor-pointer select-none">
               Bằng việc đăng ký tài khoản, tôi đồng ý với Điều khoản dịch vụ và Chính sách bảo vệ của CTBooking.
             </span>
-          </div>
+          </label>
+
           {termsError && (
             <div className="mt-1 rounded-md bg-yellow-500/10 px-3 py-2 text-xs text-yellow-300">
               {termsError}
