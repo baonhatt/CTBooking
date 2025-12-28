@@ -93,10 +93,7 @@ export default function PromotionShowcase() {
                     <motion.div
                       initial={{ opacity: 0, y: 50 }}
                       whileInView={{ opacity: 1, y: 0 }}
-                      whileHover={{
-                        scale: 1.05,
-                        boxShadow: "0 20px 60px rgba(6, 182, 212, 0.2)",
-                      }}
+
                       viewport={{ once: true }}
                       transition={{
                         delay: index * 0.1,

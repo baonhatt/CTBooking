@@ -23,7 +23,7 @@ import {
   validateBookingApi,
 } from "@/lib/api";
 import UserLayout from "@/user/layouts/UserLayout";
-
+import styles from "@/pages/user/style/user.style.scss"
 export default function BookingPage() {
   // Đổi USE_MOCK_DATA = false khi đã có API thật
   const USE_MOCK_DATA = true;
@@ -131,7 +131,7 @@ export default function BookingPage() {
         }
         localStorage.removeItem("selectedFilm");
       }
-    } catch {}
+    } catch { }
   }, [activeMoviesFull]);
 
   useEffect(() => {
@@ -142,7 +142,7 @@ export default function BookingPage() {
         setSelectedPackage(pkg);
         localStorage.removeItem("selectedTicketPackage");
       }
-    } catch {}
+    } catch { }
   }, []);
 
   useEffect(() => {
@@ -220,7 +220,7 @@ export default function BookingPage() {
         if (!phone && p?.phone) setPhone(p.phone);
         return;
       }
-    } catch {}
+    } catch { }
     try {
       const raw = localStorage.getItem("authUser");
 
@@ -236,7 +236,7 @@ export default function BookingPage() {
         if (!name && authName) setName(authName);
         if (!phone && authPhone) setPhone(authPhone);
       }
-    } catch {}
+    } catch { }
   }, [email, name, phone]);
 
   const resolveImageUrl = (u: string | undefined | null) => {
@@ -484,7 +484,7 @@ export default function BookingPage() {
   return (
     <UserLayout
       className="bg-gradient-to-br from-[#050915] via-[#0b1226] to-[#0e1b3d]"
-      headerProps={{ onBookClick: () => {}, disableNav: true }}
+      headerProps={{ onBookClick: () => { }, disableNav: true }}
       hideFooter
       contentClassName="text-white"
     >
@@ -545,158 +545,158 @@ export default function BookingPage() {
                 <div className="grid grid-cols-1 lg:grid-cols-12">
                   {/* CỘT TRÁI: CHỌN VÉ & PHIM (7 columns) */}
                   <div className="lg:col-span-7 p-6 space-y-6 border-b lg:border-b-0 lg:border-r border-white/10">
-                {/* PHẦN 1: CHỌN VÉ */}
-                <section className="space-y-3">
-                  <div className="flex items-center gap-2 text-sm font-semibold text-blue-400 uppercase tracking-wider">
-                    <span className="p-1 rounded bg-blue-500/20">01</span>
-                    Chọn Loại Vé
-                  </div>
-                  <Select
-                    value={
-                      selectedPackage?.id ? String(selectedPackage.id) : ""
-                    }
-                    onValueChange={(v) => {
-                      const pkg = ticketPackages.find(
-                        (p: any) => String(p.id) === String(v),
-                      );
-                      setSelectedPackage(pkg || null);
-                      if (pkg?.movies) {
-                        setActiveMoviesFull([...pkg.movies]);
-                      } else {
-                        setActiveMoviesFull([]);
-                      }
-                      setMovie("");
-                    }}
-                  >
-                    <SelectTrigger className="w-full bg-white/10 border-white/20 hover:bg-white/15 h-12 rounded-xl transition-all">
-                      <span className="truncate font-medium">
-                        {selectedPackage?.name || "Chọn loại vé bạn muốn..."}
-                      </span>
-                    </SelectTrigger>
-                    <SelectContent className="bg-[#1a1f2e] text-white border-white/20 shadow-2xl">
-                      {ticketPackages.map((t: any) => (
-                        <SelectItem
-                          key={t.id}
-                          value={String(t.id)}
-                          className="focus:bg-blue-600 focus:text-white py-3"
-                        >
-                          <div className="flex items-center justify-between gap-8 w-full">
-                            <span className="font-medium">{t.name}</span>
-                            <span className="font-bold text-blue-400">
-                              {Number(t.price || 0).toLocaleString("vi-VN")}₫
-                            </span>
-                          </div>
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </section>
-
-                {/* PHẦN 2: DANH SÁCH PHIM - Dạng thu gọn */}
-                {selectedPackage && (
-                  <section className="space-y-3 animate-in fade-in slide-in-from-top-2 duration-300">
-                    <div className="flex flex-wrap items-center justify-between gap-2">
-                       <div className="text-[13px] font-semibold text-blue-400 uppercase tracking-wider leading-relaxed">
-                        Danh sách phim áp dụng ({activeMoviesFull.length})
+                    {/* PHẦN 1: CHỌN VÉ */}
+                    <section className="space-y-3">
+                      <div className="flex items-center gap-2 text-sm font-semibold text-blue-400 uppercase tracking-wider">
+                        <span className="p-1 rounded bg-blue-500/20">01</span>
+                        Chọn Loại Vé
                       </div>
-                      <Button
-                        variant="link"
-                        className="text-blue-400 h-auto p-0 text-[13px] hover:text-blue-300"
-                        onClick={() => setShowMovies(!showMovies)}
+                      <Select
+                        value={
+                          selectedPackage?.id ? String(selectedPackage.id) : ""
+                        }
+                        onValueChange={(v) => {
+                          const pkg = ticketPackages.find(
+                            (p: any) => String(p.id) === String(v),
+                          );
+                          setSelectedPackage(pkg || null);
+                          if (pkg?.movies) {
+                            setActiveMoviesFull([...pkg.movies]);
+                          } else {
+                            setActiveMoviesFull([]);
+                          }
+                          setMovie("");
+                        }}
                       >
-                        {showMovies ? "Thu gọn ▲" : "Xem danh sách ▼"}
-                      </Button>
-                    </div>
+                        <SelectTrigger className="w-full bg-white/10 border-white/20 hover:bg-white/15 h-10 sm:h-12 rounded-xl transition-all text-sm sm:text-base">
+                          <span className="truncate font-medium">
+                            {selectedPackage?.name || "Chọn loại vé bạn muốn..."}
+                          </span>
+                        </SelectTrigger>
+                        <SelectContent className="bg-[#1a1f2e] text-white border-white/20 shadow-2xl">
+                          {ticketPackages.map((t: any) => (
+                            <SelectItem
+                              key={t.id}
+                              value={String(t.id)}
+                              className="focus:bg-blue-600 focus:text-white py-3"
+                            >
+                              <div className="flex items-center justify-between gap-8 w-full">
+                                <span className="font-medium">{t.name}</span>
+                                <span className="font-bold text-blue-400">
+                                  {Number(t.price || 0).toLocaleString("vi-VN")}₫
+                                </span>
+                              </div>
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </section>
 
-                    {showMovies && (
-                      <div className="animate-in fade-in zoom-in-95 duration-200">
-                        {activeMoviesFull && activeMoviesFull.length > 0 ? (
-                          /* Sử dụng grid-cols-2 cho mobile và grid-cols-5 cho desktop */
-                          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-4">
-                            {activeMoviesFull.map((m: any) => (
-                              <div
-                                key={m.id}
-                                className="group relative rounded-xl overflow-hidden border border-white/10 bg-white/5 hover:border-blue-500/50 transition-all shadow-lg hover:shadow-blue-500/10"
-                              >
-                                <div className="aspect-[2/3] relative">
-                                  {/* Tỉ lệ 2:3 chuẩn poster phim */}
-                                  <img
-                                    src={resolveImageUrl(m.cover_image)}
-                                    alt={m.title}
-                                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-                                  />
-                                  <div className="absolute inset-0 bg-gradient-to-t from-black via-black/40 to-transparent opacity-90" />
-                                  <div className="absolute bottom-0 p-2 w-full">
-                                    <div className="text-[11px] font-bold text-white leading-tight truncate mb-1">
-                                      {m.title}
-                                    </div>
-                                    <div className="flex items-center gap-1.5">
-                                      <span className="px-1 py-0.5 rounded bg-blue-600 text-[9px] text-white font-black">
-                                        {m.duration_min ? `${m.duration_min}'` : "--"}
-                                      </span>
-                                      <span className="text-[9px] text-gray-300/90 truncate font-light italic">
-                                        {m.description || "Phim đặc sắc"}
-                                      </span>
+                    {/* PHẦN 2: DANH SÁCH PHIM - Dạng thu gọn */}
+                    {selectedPackage && (
+                      <section className="space-y-3 animate-in fade-in slide-in-from-top-2 duration-300">
+                        <div className="flex flex-wrap items-center justify-between gap-2">
+                          <div className="text-[13px] font-semibold text-blue-400 uppercase tracking-wider leading-relaxed">
+                            Danh sách phim áp dụng ({activeMoviesFull.length})
+                          </div>
+                          <Button
+                            variant="link"
+                            className="text-blue-400 h-auto p-0 text-[13px] hover:text-blue-300"
+                            onClick={() => setShowMovies(!showMovies)}
+                          >
+                            {showMovies ? "Thu gọn ▲" : "Xem danh sách ▼"}
+                          </Button>
+                        </div>
+
+                        {showMovies && (
+                          <div className="animate-in fade-in zoom-in-95 duration-200">
+                            {activeMoviesFull && activeMoviesFull.length > 0 ? (
+                              /* Sử dụng grid-cols-2 cho mobile và grid-cols-5 cho desktop */
+                              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-4">
+                                {activeMoviesFull.map((m: any) => (
+                                  <div
+                                    key={m.id}
+                                    className="group relative rounded-xl overflow-hidden border border-white/10 bg-white/5 hover:border-blue-500/50 transition-all shadow-lg hover:shadow-blue-500/10"
+                                  >
+                                    <div className="aspect-[2/3] relative">
+                                      {/* Tỉ lệ 2:3 chuẩn poster phim */}
+                                      <img
+                                        src={resolveImageUrl(m.cover_image)}
+                                        alt={m.title}
+                                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                                      />
+                                      <div className="absolute inset-0 bg-gradient-to-t from-black via-black/40 to-transparent opacity-90" />
+                                      <div className="absolute bottom-0 p-2 w-full">
+                                        <div className="text-[11px] font-bold text-white leading-tight truncate mb-1">
+                                          {m.title}
+                                        </div>
+                                        <div className="flex items-center gap-1.5">
+                                          <span className="px-1 py-0.5 rounded bg-blue-600 text-[9px] text-white font-black">
+                                            {m.duration_min ? `${m.duration_min}'` : "--"}
+                                          </span>
+                                          <span className="text-[9px] text-gray-300/90 truncate font-light italic">
+                                            {m.description || "Phim đặc sắc"}
+                                          </span>
+                                        </div>
+                                      </div>
                                     </div>
                                   </div>
-                                </div>
+                                ))}
                               </div>
-                            ))}
-                          </div>
-                        ) : (
-                          <div className="p-6 text-center border border-dashed border-white/10 rounded-xl text-gray-500 text-sm italic">
-                            Không có phim áp dụng cho loại vé này
+                            ) : (
+                              <div className="p-6 text-center border border-dashed border-white/10 rounded-xl text-gray-500 text-sm italic">
+                                Không có phim áp dụng cho loại vé này
+                              </div>
+                            )}
                           </div>
                         )}
+                      </section>
+                    )}
+
+                    {/* TÓM TẮT TẠM TÍNH (Chỉ hiện trên Desktop ở phía trái) */}
+                    {selectedPackage && (
+                      <div className="mt-auto pt-6 hidden lg:block">
+                        <div className="overflow-hidden rounded-xl border border-blue-500/30 bg-blue-500/5 p-3 flex flex-col justify-between gap-2 animate-in fade-in slide-in-from-bottom-2 duration-400">
+                          <div className="flex justify-between items-start">
+                            <div>
+                              <h4 className="text-white font-bold text-base sm:text-lg">
+                                {selectedPackage.name}
+                              </h4>
+                              <p className="text-[13px] text-gray-400">
+                                {selectedPackage.description ||
+                                  `Gói vé ${selectedPackage.type || "tiêu chuẩn"}`}
+                              </p>
+                            </div>
+                            <div className="text-right">
+                              <p className="text-[11px] text-gray-400 uppercase tracking-widest">
+                                Đơn giá
+                              </p>
+                              <p className="text-sm font-bold text-white">
+                                {unitPrice.toLocaleString("vi-VN")}₫
+                              </p>
+                            </div>
+                          </div>
+
+                          <div className="pt-3 border-t border-white/10 flex justify-between items-end">
+                            <div>
+                              <p className="text-[11px] text-gray-400 uppercase tracking-widest">
+                                Số lượng
+                              </p>
+                              <p className="text-lg font-bold text-white">x{ticketCount}</p>
+                            </div>
+                            <div className="text-right">
+                              <p className="text-[11px] text-gray-400 uppercase tracking-widest">
+                                Tổng cộng tạm tính
+                              </p>
+                              <p className="text-2xl font-black text-blue-400 drop-shadow-[0_0_10px_rgba(96,165,250,0.3)]">
+                                {totalPrice.toLocaleString("vi-VN")}₫
+                              </p>
+                            </div>
+                          </div>
+                        </div>
                       </div>
                     )}
-                  </section>
-                )}
-
-                {/* TÓM TẮT TẠM TÍNH (Chỉ hiện trên Desktop ở phía trái) */}
-                {selectedPackage && (
-                  <div className="mt-auto pt-6 hidden lg:block">
-                    <div className="overflow-hidden rounded-xl border border-blue-500/30 bg-blue-500/5 p-3 flex flex-col justify-between gap-2 animate-in fade-in slide-in-from-bottom-2 duration-400">
-                      <div className="flex justify-between items-start">
-                        <div>
-                          <h4 className="text-white font-bold text-base sm:text-lg">
-                            {selectedPackage.name}
-                          </h4>
-                          <p className="text-[13px] text-gray-400">
-                            {selectedPackage.description ||
-                              `Gói vé ${selectedPackage.type || "tiêu chuẩn"}`}
-                          </p>
-                        </div>
-                        <div className="text-right">
-                          <p className="text-[11px] text-gray-400 uppercase tracking-widest">
-                            Đơn giá
-                          </p>
-                          <p className="text-sm font-bold text-white">
-                            {unitPrice.toLocaleString("vi-VN")}₫
-                          </p>
-                        </div>
-                      </div>
-                      
-                      <div className="pt-3 border-t border-white/10 flex justify-between items-end">
-                        <div>
-                          <p className="text-[11px] text-gray-400 uppercase tracking-widest">
-                            Số lượng
-                          </p>
-                          <p className="text-lg font-bold text-white">x{ticketCount}</p>
-                        </div>
-                        <div className="text-right">
-                          <p className="text-[11px] text-gray-400 uppercase tracking-widest">
-                            Tổng cộng tạm tính
-                          </p>
-                          <p className="text-2xl font-black text-blue-400 drop-shadow-[0_0_10px_rgba(96,165,250,0.3)]">
-                            {totalPrice.toLocaleString("vi-VN")}₫
-                          </p>
-                        </div>
-                      </div>
-                    </div>
                   </div>
-                )}
-              </div>
 
                   {/* CỘT PHẢI: THÔNG TIN KHÁCH HÀNG & TÓM TẮT (5 columns) */}
                   <div className="lg:col-span-5 p-6 space-y-5 bg-black/10">
@@ -832,7 +832,7 @@ export default function BookingPage() {
                               </p>
                             </div>
                           </div>
-                          
+
                           <div className="pt-3 border-t border-white/10 flex justify-between items-end">
                             <div>
                               <p className="text-[11px] text-gray-400 uppercase tracking-widest mb-0.5">
@@ -854,7 +854,7 @@ export default function BookingPage() {
                     )}
 
                     {/* FOOTER ACTIONS - Tối ưu chống tràn cho Mobile */}
-                    <div className="flex flex-col sm:items-end gap-3 pt-6 border-t border-white/10">
+                    <div className="flex flex-col items-center gap-3 pt-6 border-t  border-white/10">
                       <Button
                         className="w-full sm:w-64 bg-gradient-to-r from-blue-600 to-blue-400 hover:from-blue-500 hover:to-blue-300 text-white font-bold h-12 rounded-xl shadow-lg shadow-blue-500/20 disabled:from-blue-900/40 disabled:to-blue-900/40 disabled:text-white/30 disabled:shadow-none transition-all duration-300 transform active:scale-[0.98] whitespace-nowrap text-[15px]"
                         onClick={() => {
@@ -882,7 +882,7 @@ export default function BookingPage() {
 
                       <Button
                         variant="ghost"
-                        className="w-full sm:w-64 px-8 text-gray-500 hover:text-white hover:bg-white/5 h-12 rounded-xl transition-all duration-300 text-[13px] font-medium"
+                        className="w-full sm:w-64 px-8 text-gray-500 hover:text-white  hover:bg-white/5 h-12 rounded-xl transition-all duration-300 text-[13px] font-medium"
                         onClick={() => navigate("/")}
                         disabled={isProcessing}
                       >
@@ -898,48 +898,48 @@ export default function BookingPage() {
           {step === 1 && (
             <>
               <Card className="bg-white/5 backdrop-blur-md border border-white/15 text-white shadow-xl overflow-hidden">
-                <CardHeader className="bg-white/5 border-b border-white/10">
-                  <CardTitle className="text-xl font-bold text-white flex items-center gap-2">
-                    <span className="w-1 h-6 bg-blue-500 rounded-full"></span>
+                <CardHeader className="bg-white/5 border-b border-white/10 p-4 sm:p-6">
+                  <CardTitle className="text-base sm:text-xl font-bold text-white flex items-center gap-2">
+                    <span className="w-1 h-5 sm:h-6 bg-blue-500 rounded-full"></span>
                     Xác nhận thông tin đặt vé
                   </CardTitle>
                 </CardHeader>
 
                 <CardContent className="grid grid-cols-1 md:grid-cols-3 gap-0 p-0">
                   {/* CỘT TRÁI: THÔNG TIN CHI TIẾT */}
-                  <div className="md:col-span-2 p-6 space-y-6 border-r border-white/10">
+                  <div className="md:col-span-2 p-4 sm:p-6 space-y-4 sm:space-y-6 md:border-r border-white/10">
                     <section>
-                      <h3 className="text-sm font-semibold text-blue-400 uppercase tracking-wider mb-4">
+                      <h3 className="text-xs sm:text-sm font-semibold text-blue-400 uppercase tracking-wider mb-3 sm:mb-4">
                         Thông tin khách hàng
                       </h3>
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 bg-white/5 p-4 rounded-xl border border-white/5">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4 bg-white/5 p-3 sm:p-4 rounded-xl border border-white/5">
                         <div>
-                          <p className="text-xs text-gray-400">Họ tên</p>
-                          <p className="font-medium">{name}</p>
+                          <p className="text-[10px] sm:text-xs text-gray-400">Họ tên</p>
+                          <p className="font-medium text-sm sm:text-base">{name}</p>
                         </div>
                         <div>
-                          <p className="text-xs text-gray-400">Số điện thoại</p>
-                          <p className="font-medium">{phone}</p>
+                          <p className="text-[10px] sm:text-xs text-gray-400">Số điện thoại</p>
+                          <p className="font-medium text-sm sm:text-base">{phone}</p>
                         </div>
                         <div className="sm:col-span-2">
-                          <p className="text-xs text-gray-400">Email nhận vé</p>
-                          <p className="font-medium text-blue-300">{email}</p>
+                          <p className="text-[10px] sm:text-xs text-gray-400">Email nhận vé</p>
+                          <p className="font-medium text-blue-300 text-sm sm:text-base break-all">{email}</p>
                         </div>
                       </div>
                     </section>
 
                     {activeMoviesFull && activeMoviesFull.length > 0 && (
                       <section>
-                        <h3 className="text-sm font-semibold text-blue-400 uppercase tracking-wider mb-3">
+                        <h3 className="text-xs sm:text-sm font-semibold text-blue-400 uppercase tracking-wider mb-2 sm:mb-3">
                           Danh sách phim trải nghiệm
                         </h3>
-                        <div className="flex flex-wrap gap-2">
+                        <div className="flex flex-wrap gap-1.5 sm:gap-2">
                           {activeMoviesFull.map((m: any) => (
                             <div
                               key={m.id}
-                              className="bg-blue-500/10 border border-blue-500/30 px-3 py-1.5 rounded-full text-sm flex items-center gap-2"
+                              className="bg-blue-500/10 border border-blue-500/30 px-2 sm:px-3 py-1 sm:py-1.5 rounded-full text-xs sm:text-sm flex items-center gap-1.5 sm:gap-2"
                             >
-                              <span className="w-1.5 h-1.5 bg-blue-500 rounded-full"></span>
+                              <span className="w-1 sm:w-1.5 h-1 sm:h-1.5 bg-blue-500 rounded-full"></span>
                               {m.title}
                             </div>
                           ))}
@@ -948,11 +948,11 @@ export default function BookingPage() {
                     )}
 
                     {/* LƯU Ý GỌN GÀNG HƠN */}
-                    <div className="p-4 rounded-xl border border-amber-500/20 bg-amber-500/5">
-                      <h4 className="text-amber-500 font-bold text-sm mb-2 flex items-center gap-2">
+                    <div className="p-3 sm:p-4 rounded-xl border border-amber-500/20 bg-amber-500/5">
+                      <h4 className="text-amber-500 font-bold text-xs sm:text-sm mb-2 flex items-center gap-2">
                         ⚠️ Một số lưu ý quan trọng:
                       </h4>
-                      <ul className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-1 text-[13px] text-gray-400 list-inside list-disc">
+                      <ul className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-1 text-[11px] sm:text-[13px] text-gray-400 list-inside list-disc">
                         <li>Trẻ em &gt;70cm. Dưới 1m4 cần người lớn.</li>
                         <li>Cân nhắc nếu có bệnh tim, sợ độ cao.</li>
                         <li>Vé không hoàn trả hoặc đổi ngày.</li>
@@ -962,31 +962,31 @@ export default function BookingPage() {
                   </div>
 
                   {/* CỘT PHẢI: THANH TOÁN & TÓM TẮT */}
-                  <div className="bg-black/20 p-6 flex flex-col justify-between">
-                    <div className="space-y-6">
+                  <div className="bg-black/20 p-4 sm:p-6 flex flex-col justify-between">
+                    <div className="space-y-4 sm:space-y-6">
                       <div>
-                        <h3 className="text-sm font-semibold text-gray-400 uppercase tracking-wider mb-4">
+                        <h3 className="text-xs sm:text-sm font-semibold text-gray-400 uppercase tracking-wider mb-3 sm:mb-4">
                           Thanh toán qua
                         </h3>
                         <button
                           type="button"
                           onClick={() => setPaymentMethod("vietqr")}
-                          className={`${paymentMethod === "vietqr" ? "border-red-500 bg-red-600/20" : "border-white/20 bg-white/10"} w-full cursor-pointer rounded-xl border p-3 flex items-center justify-center gap-3 transition-all hover:bg-white/15 h-12`}
+                          className={`${paymentMethod === "vietqr" ? "border-red-500 bg-red-600/20" : "border-white/20 bg-white/10"} w-full cursor-pointer rounded-xl border p-2.5 sm:p-3 flex items-center justify-center gap-2 sm:gap-3 transition-all hover:bg-white/15 h-10 sm:h-12`}
                         >
-                          <span className="w-7 h-7 rounded bg-red-600 text-white grid place-items-center text-[10px] font-extrabold shadow-lg">
+                          <span className="w-6 h-6 sm:w-7 sm:h-7 rounded bg-red-600 text-white grid place-items-center text-[9px] sm:text-[10px] font-extrabold shadow-lg">
                             VQ
                           </span>
-                          <span className="font-bold tracking-tight">
+                          <span className="font-bold tracking-tight text-xs sm:text-base">
                             VietQR (Ngân hàng)
                           </span>
                         </button>
                       </div>
 
-                      <div className="space-y-3">
-                        <h3 className="text-sm font-semibold text-gray-400 uppercase tracking-wider">
+                      <div className="space-y-2 sm:space-y-3">
+                        <h3 className="text-xs sm:text-sm font-semibold text-gray-400 uppercase tracking-wider">
                           Booking Summary
                         </h3>
-                        <div className="bg-white/5 rounded-xl p-4 border border-white/10 space-y-3 text-sm">
+                        <div className="bg-white/5 rounded-xl p-3 sm:p-4 border border-white/10 space-y-2 sm:space-y-3 text-xs sm:text-sm">
                           <div className="flex justify-between">
                             <span className="text-gray-400">Loại vé</span>
                             <span className="text-white font-medium">
@@ -1001,17 +1001,17 @@ export default function BookingPage() {
                               {unitPrice.toLocaleString("vi-VN")}₫
                             </span>
                           </div>
-                          <div className="flex justify-between pb-3 border-b border-white/10">
+                          <div className="flex justify-between pb-2 sm:pb-3 border-b border-white/10">
                             <span className="text-gray-400">Số lượng</span>
                             <span className="text-white font-medium">
                               x{ticketCount}
                             </span>
                           </div>
                           <div className="flex justify-between pt-1">
-                            <span className="text-white font-bold text-lg">
+                            <span className="text-white font-bold text-base sm:text-lg">
                               Tổng tiền
                             </span>
-                            <span className="text-blue-400 font-black text-xl">
+                            <span className="text-blue-400 font-black text-lg sm:text-xl">
                               {totalPrice.toLocaleString("vi-VN")}₫
                             </span>
                           </div>
@@ -1019,15 +1019,14 @@ export default function BookingPage() {
                       </div>
                     </div>
 
-                    <div className="mt-8 space-y-4">
+                    <div className="mt-4 sm:mt-8 space-y-3 sm:space-y-4">
                       <div
-                        className="flex items-start gap-3 group cursor-pointer"
-                        onClick={() => setConfirmChecked(!confirmChecked)}
+                        className="flex items-start gap-2 sm:gap-3 group cursor-pointer"
                       >
                         <Checkbox
                           checked={confirmChecked}
-                          onCheckedChange={(v) => setConfirmChecked(Boolean(v))}
-                          className="mt-1 border-white/40 data-[state=checked]:bg-blue-500"
+                          onCheckedChange={(checked) => setConfirmChecked(checked === true)}
+                          className="mt-0.5 sm:mt-1 border-white/40 data-[state=checked]:bg-blue-500 w-4 h-4 sm:w-5 sm:h-5"
                           id="confirm-checkbox"
                         />
                         <label

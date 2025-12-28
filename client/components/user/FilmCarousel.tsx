@@ -250,11 +250,10 @@ export default function FilmCarousel({ onSelectFilm }: FilmCarouselProps) {
                       />
                       <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/30 to-transparent" />
                       <div
-                        className={`absolute bottom-4 left-4 right-4 space-y-2 text-left opacity-0 transition-opacity duration-300 ${
-                          hoveredIndex === index
-                            ? "opacity-100"
-                            : "group-hover:opacity-100"
-                        }`}
+                        className={`absolute bottom-4 left-4 right-4 space-y-2 text-left opacity-0 transition-opacity duration-300 ${hoveredIndex === index
+                          ? "opacity-100"
+                          : "group-hover:opacity-100"
+                          }`}
                       >
                         <p className="text-xs uppercase tracking-[0.18em] text-cyan-200">
                           {film.genre}
@@ -292,7 +291,7 @@ export default function FilmCarousel({ onSelectFilm }: FilmCarouselProps) {
 
       {/* Movie Details Modal */}
       <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
-        <DialogContent className="max-w-3xl max-h-[90vh] flex flex-col bg-gradient-to-br from-[#0b1226] via-[#0e1b3d] to-[#050915] border border-cyan-500/30 text-white p-0 shadow-[0_0_50px_rgba(59,130,246,0.3)]">
+        <DialogContent className="max-w-3xl max-h-[90vh] flex  z-[9999] flex-col bg-gradient-to-br from-[#0b1226] via-[#0e1b3d] to-[#050915] border border-cyan-500/30 text-white p-0 shadow-[0_0_50px_rgba(59,130,246,0.3)]">
           <div className="overflow-y-auto scrollbar-neon flex-1 px-6 pt-6 pb-4">
             {isLoadingDetails || !movieDetails ? (
               <div className="flex items-center justify-center py-12">
@@ -379,7 +378,7 @@ export default function FilmCarousel({ onSelectFilm }: FilmCarouselProps) {
 
           {/* Fixed Footer with Buttons */}
           {movieDetails && (
-            <div className="flex justify-end gap-3 px-6 py-4 border-t border-white/10 bg-gradient-to-br from-[#0b1226] via-[#0e1b3d] to-[#050915] shrink-0">
+            <div className=" flex justify-end gap-3 px-6 py-4 border-t border-white/10 bg-gradient-to-br from-[#0b1226] via-[#0e1b3d] to-[#050915] shrink-0">
               <Button
                 variant="outline"
                 onClick={() => setIsModalOpen(false)}

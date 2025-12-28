@@ -22,17 +22,17 @@ import { LoginDialog } from "../LoginDialog";
 import { RegisterDialog } from "../RegisterDialog";
 import { ForgetPasswordDialog } from "../ForgetPasswordDialog";
 
-export default function Header({ 
-  onBookClick = () => {}, 
-  disableNav = false, 
-  tooltipPrefix, 
-  extraMenuOptions = [], 
-  forceDark = false 
+export default function Header({
+  onBookClick = () => { },
+  disableNav = false,
+  tooltipPrefix,
+  extraMenuOptions = [],
+  forceDark = false
 }: HeaderProps) {
   const auth = useAuth();
   const navigator = useNavigate();
   const location = useLocation();
-  
+
   // Custom hooks
   const isScrolled = useScrollDetect(50);
   const effectiveDisable = disableNav || location.pathname !== "/";
@@ -44,10 +44,10 @@ export default function Header({
   const [isLoginOpen, setIsLoginOpen] = useState(false);
   const [isRegisterOpen, setIsRegisterOpen] = useState(false);
   const [isForgetPassOpen, setIsForgetPassOpen] = useState(false);
-  const [errorModal, setErrorModal] = useState<ErrorModalState>({ 
-    open: false, 
-    title: "", 
-    message: "" 
+  const [errorModal, setErrorModal] = useState<ErrorModalState>({
+    open: false,
+    title: "",
+    message: ""
   });
 
   // Utilities
@@ -87,12 +87,13 @@ export default function Header({
             : "bg-gradient-to-b from-black/80 via-black/60 to-transparent border-b border-white/10",
       )}
     >
-      <div className="container mx-auto px-3 md:px-6 lg:px-10 py-1.5 md:py-3 lg:py-3 flex items-center justify-between relative">
-        <div className="flex items-center gap-8 md:gap-12">
+      <div className="container mx-auto px-4 md:px-6 lg:px-8 py-3 md:py-4 flex items-center gap-4 md:gap-8 justify-between">
+        {/* Logo */}
+        <div className="flex items-center gap-3 md:gap-4 animate-fade-in">
           <img
             onClick={() => navigator('/')}
             src={icon}
-            className="cursor-pointer h-10 w-10 md:h-16 md:w-16 lg:h-20 lg:w-20 drop-shadow-[0_0_25px_rgba(59,130,246,0.5)] transition-all duration-300 hover:scale-105"
+            className="cursor-pointer h-16 w-16 md:h-20 md:w-20 lg:h-24 lg:w-24 drop-shadow-[0_0_30px_rgba(59,130,246,0.6)] transition-transform duration-300 hover:scale-110"
             alt="CINESPHERE logo"
           />
         </div>
