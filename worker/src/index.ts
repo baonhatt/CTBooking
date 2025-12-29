@@ -86,6 +86,8 @@ import {
   hasCloudinary,
   cloudinarySignedParams,
   uploadCloudinaryImageDataURI,
+  deleteCloudinaryImage,
+  getPublicIdFromUrl,
   optimizeCloudinaryUrl,
   sendMail,
   getWelcomeEmailTemplate,
@@ -122,6 +124,17 @@ type Bindings = {
   VITE_RATE_LIMIT_BOOKING_CHECK_MAX: string;
   VITE_RATE_LIMIT_BOOKING_CHECK_WINDOWMS: string;
 };
+
+const getCloudHelpers = (env: Bindings) => ({
+  uploader: async (base64: string, folder: string) => {
+    const res = await uploadCloudinaryImageDataURI(env, base64, folder);
+    return { url: res.url };
+  },
+  deleter: async (url: string, type: "image" | "video" = "image") => {
+    const publicId = getPublicIdFromUrl(url);
+    if (publicId) await deleteCloudinaryImage(env, publicId, type);
+  },
+});
 
 const app = new Hono<{ Bindings: Bindings }>();
 
@@ -460,10 +473,21 @@ app.get("/api/admin/transactions/:id", async (c) => {
 app.get("/api/admin/dashboard/metrics", async (c) => {
   try {
     const db = drizzle(c.env.cinema_db, { schema });
+    const period = c.req.query("period") || "week";
+    const yearParam = c.req.query("year");
+    const year = yearParam ? parseInt(yearParam) : undefined;
     const r = await getDashboardMetricsImpl(
       db,
-      { movies: schema.movies, users: schema.users, bookings: schema.bookings },
+      { 
+        movies: schema.movies, 
+        users: schema.users, 
+        bookings: schema.bookings, 
+        ticket_packages: schema.ticket_packages,
+        toys: schema.toys 
+      },
       c.env.RUNTIME_ENV,
+      period,
+      year
     );
     return c.json(r);
   } catch (err: any) {
@@ -480,11 +504,13 @@ app.get("/api/admin/dashboard/revenue-date", async (c) => {
   try {
     const date = String(c.req.query("date") || "");
     const status = String(c.req.query("status") || "paid");
+    const yearParam = c.req.query("year");
+    const year = yearParam ? parseInt(yearParam) : undefined;
     const db = drizzle(c.env.cinema_db, { schema });
     const r = await getRevenueByDateImpl(
       db,
       { bookings: schema.bookings },
-      { date, status },
+      { date, status, year },
       c.env.RUNTIME_ENV,
     );
     return c.json(r);
@@ -500,11 +526,14 @@ app.get("/api/admin/dashboard/revenue-date", async (c) => {
 // GET /api/admin/dashboard/revenue-7days
 app.get("/api/admin/dashboard/revenue-7days", async (c) => {
   try {
+    const yearParam = c.req.query("year");
+    const year = yearParam ? parseInt(yearParam) : undefined;
     const db = drizzle(c.env.cinema_db, { schema });
     const r = await getRevenue7DaysImpl(
       db,
       { bookings: schema.bookings },
       c.env.RUNTIME_ENV,
+      year
     );
     return c.json(r);
   } catch (err: any) {
@@ -630,9 +659,14 @@ app.post("/api/admin/cloudinary/sign", async (c) => {
 // FormData: { file: File }
 app.post("/api/admin/uploads/video", async (c) => {
   try {
-    const form = await c.req.parseBody();
-    const file = form["file"] as File | null;
-    if (!file) return c.json({ message: "Thiếu tệp video" }, 400);
+    const formData = await c.req.formData();
+    const file = formData.get("file");
+    const folderParam = formData.get("folder");
+
+    // Compatibility check: if parseBody was used before, we switch to formData for consistency with file uploads
+    if (!file || !(file instanceof File)) {
+      return c.json({ message: "Thiếu tệp video" }, 400);
+    }
 
     const mime = String(file.type || "application/octet-stream").toLowerCase();
     if (!mime.startsWith("video/"))
@@ -643,7 +677,14 @@ app.post("/api/admin/uploads/video", async (c) => {
     if (hasCloudinary(env)) {
       const cloudName = String(env.CLOUDINARY_CLOUD_NAME || "");
       const timestamp = Math.floor(Date.now() / 1000);
-      const folder = String(env.CLOUDINARY_UPLOAD_FOLDER || "ctbooking/videos");
+      
+      // Determine folder with clean overwrite logic
+      let folder = String(env.CLOUDINARY_UPLOAD_FOLDER || "ctbooking/videos");
+      if (folderParam) {
+        const safeFolder = String(folderParam).replace(/[^a-zA-Z0-9._-]/g, "_");
+        folder = `ctbooking/videos/${safeFolder}`;
+      }
+
       const params = {
         timestamp,
         folder,
@@ -743,18 +784,18 @@ app.get("/api/getActiveMovies", async (c) => {
           }
         })(),
       }));
-      return new Response(JSON.stringify({ activeMovies: optimized }), {
-        status: 200,
-        headers: {
-          "Content-Type": "application/json",
-          "Cache-Control": "public, s-maxage=3600",
-          "Cloudflare-CDN-Cache-Control": "max-age=3600",
-          Vary: "Origin",
-        },
-      });
-    },
-    3600,
-  );
+        return new Response(JSON.stringify({ activeMovies: optimized }), {
+          status: 200,
+          headers: {
+            "Content-Type": "application/json",
+            "Cache-Control": "public, s-maxage=300",
+            "Cloudflare-CDN-Cache-Control": "max-age=300",
+            Vary: "Origin",
+          },
+        });
+      },
+      300,
+    );
 });
 
 // Schema tables for D1
@@ -1020,12 +1061,14 @@ app.post("/api/movies", async (c) => {
       CLOUDINARY_API_SECRET: c.env.CLOUDINARY_API_SECRET,
       CLOUDINARY_CLOUD_NAME: c.env.CLOUDINARY_CLOUD_NAME,
     };
+    const { uploader } = getCloudHelpers(c.env);
     const r = await createMovieImpl(
       db,
       { movies: schema.movies },
       body as any,
       config,
       c.env.RUNTIME_ENV,
+      uploader,
     );
     const status = (r as any)?.status === "error" ? 400 : 200;
     // --- LOGIC XÓA CACHE BẮT ĐẦU ---
@@ -1082,7 +1125,7 @@ app.get("/api/movies-detail/:id", async (c) => {
   const db = drizzle(c.env.cinema_db, { schema });
   const r = await getMovieByIdImpl(
     db,
-    { movies: schema.movies, bookings: schema.bookings },
+    { movies: schema.movies, bookings: schema.bookings, ticket_packages: schema.ticket_packages },
     id,
   );
   if (!r)
@@ -1103,6 +1146,7 @@ app.put("/api/movies/:id", async (c) => {
       CLOUDINARY_API_SECRET: c.env.CLOUDINARY_API_SECRET,
       CLOUDINARY_CLOUD_NAME: c.env.CLOUDINARY_CLOUD_NAME,
     };
+    const { uploader, deleter } = getCloudHelpers(c.env);
     const r = await updateMovieImpl(
       db,
       { movies: schema.movies, ticket_packages: schema.ticket_packages },
@@ -1110,6 +1154,8 @@ app.put("/api/movies/:id", async (c) => {
       body as any,
       config,
       c.env.RUNTIME_ENV,
+      uploader,
+      deleter,
     );
 
     // 1. Lấy Origin của chính Backend (Worker) đang chạy
@@ -1157,6 +1203,27 @@ app.patch("/api/movies-status/:id", async (c) => {
       ...(r as any),
       status: status >= 400 ? "error" : "success",
     };
+
+    // --- LOGIC XÓA CACHE BẮT ĐẦU ---
+    if (status === 200) {
+      const cache = (caches as any).default;
+      const frontendOrigin = c.req.header("Origin");
+      const backendOrigin = new URL(c.req.url).origin;
+      const moviesApiUrl = `${backendOrigin}/api/getActiveMovies`;
+
+      if (frontendOrigin) {
+        c.executionCtx.waitUntil(
+          cache.delete(
+            new Request(moviesApiUrl, {
+              headers: { Origin: frontendOrigin },
+            }),
+          ),
+        );
+      }
+      c.executionCtx.waitUntil(cache.delete(new Request(moviesApiUrl)));
+    }
+    // --- LOGIC XÓA CACHE KẾT THÚC ---
+
     return c.json(payload, status);
   } catch (err) {
     return new Response(
@@ -1171,8 +1238,29 @@ app.patch("/api/movies-status/:id", async (c) => {
 app.delete("/api/movies/:id", async (c) => {
   const id = Number(c.req.param("id"));
   const db = drizzle(c.env.cinema_db, { schema });
-  const r = await deleteMovieImpl(db, { movies: schema.movies }, id);
+  const { deleter } = getCloudHelpers(c.env);
+  const r = await deleteMovieImpl(db, { movies: schema.movies }, id, deleter);
   if (!r) return c.json({ status: "error", message: "Không tìm thấy" }, 404);
+  if (!r) return c.json({ status: "error", message: "Không tìm thấy" }, 404);
+
+  // --- LOGIC XÓA CACHE BẮT ĐẦU ---
+  const cache = (caches as any).default;
+  const frontendOrigin = c.req.header("Origin");
+  const backendOrigin = new URL(c.req.url).origin;
+  const moviesApiUrl = `${backendOrigin}/api/getActiveMovies`;
+
+  if (frontendOrigin) {
+    c.executionCtx.waitUntil(
+      cache.delete(
+        new Request(moviesApiUrl, {
+          headers: { Origin: frontendOrigin },
+        }),
+      ),
+    );
+  }
+  c.executionCtx.waitUntil(cache.delete(new Request(moviesApiUrl)));
+  // --- LOGIC XÓA CACHE KẾT THÚC ---
+
   return c.json(r);
 });
 
@@ -1359,12 +1447,13 @@ app.get("/api/toys-active", async (c) => {
         const db = drizzle(c.env.cinema_db, { schema });
         const r = await listActiveToys(db, { toys: schema.toys });
 
+        // Trả về Response kèm theo header để Cloudflare lưu trữ
         return new Response(JSON.stringify(r), {
           status: 200,
           headers: {
             "Content-Type": "application/json",
-            "Cache-Control": "public, s-maxage=3600",
-            "Cloudflare-CDN-Cache-Control": "max-age=3600",
+            "Cache-Control": "public, s-maxage=300",
+            "Cloudflare-CDN-Cache-Control": "max-age=300",
             Vary: "Origin",
           },
         });
@@ -1375,7 +1464,7 @@ app.get("/api/toys-active", async (c) => {
         );
       }
     },
-    3600,
+    300,
   );
 });
 
@@ -1400,11 +1489,13 @@ app.post("/api/toys", async (c) => {
   try {
     const db = drizzle(c.env.cinema_db, { schema });
     const body = await c.req.json().catch(() => ({}));
+    const { uploader } = getCloudHelpers(c.env);
     const r = await createToyImpl(
       db,
       { toys: schema.toys },
       body as any,
       c.env.RUNTIME_ENV,
+      uploader,
     );
     // --- LOGIC XÓA CACHE BẮT ĐẦU ---
     if (r) {
@@ -1443,12 +1534,15 @@ app.put("/api/toys/:id", async (c) => {
     const id = Number(c.req.param("id"));
     const db = drizzle(c.env.cinema_db, { schema });
     const body = await c.req.json().catch(() => ({}));
+    const { uploader, deleter } = getCloudHelpers(c.env);
     const r = await updateToyImpl(
       db,
       { toys: schema.toys },
       id,
       body as any,
       c.env.RUNTIME_ENV,
+      uploader,
+      deleter,
     );
     if (!r) return c.json({ message: "Không tìm thấy" }, 404);
     // --- LOGIC XÓA CACHE BẮT ĐẦU ---
@@ -1486,7 +1580,8 @@ app.delete("/api/toys/:id", async (c) => {
   try {
     const id = Number(c.req.param("id"));
     const db = drizzle(c.env.cinema_db, { schema });
-    const r = await deleteToyImpl(db, { toys: schema.toys }, id);
+    const { deleter } = getCloudHelpers(c.env);
+    const r = await deleteToyImpl(db, { toys: schema.toys }, id, deleter);
     if (!r) return c.json({ message: "Không tìm thấy" }, 404);
     // --- LOGIC XÓA CACHE BẮT ĐẦU ---
     if (r) {
@@ -1558,8 +1653,8 @@ app.get("/api/tickets-active", async (c) => {
           status: 200,
           headers: {
             "Content-Type": "application/json",
-            "Cache-Control": "public, s-maxage=3600",
-            "Cloudflare-CDN-Cache-Control": "max-age=3600",
+            "Cache-Control": "public, s-maxage=300",
+            "Cloudflare-CDN-Cache-Control": "max-age=300",
             Vary: "Origin",
           },
         });
@@ -1570,7 +1665,7 @@ app.get("/api/tickets-active", async (c) => {
         );
       }
     },
-    3600,
+    300,
   );
 });
 
@@ -1739,6 +1834,9 @@ app.post("/api/admin/site-media", async (c) => {
   }
 });
 
+// Upload Video (Worker Support) REMOVED DUPLICATE
+
+
 // Update site media
 // PUT /api/admin/site-media
 // Body: { type: string, url: string, ... }
@@ -1788,13 +1886,13 @@ app.get("/api/site-media", async (c) => {
         status: 200,
         headers: {
           "Content-Type": "application/json",
-          "Cache-Control": "public, s-maxage=3600",
-          "Cloudflare-CDN-Cache-Control": "max-age=3600",
+          "Cache-Control": "public, s-maxage=300",
+          "Cloudflare-CDN-Cache-Control": "max-age=300",
           Vary: "Origin",
         },
       });
     },
-    3600, // Thời gian cache là 3600 giây (1 tiếng)
+    300, // Thời gian cache là 300 giây (5 phút)
   );
 });
 
@@ -1804,10 +1902,12 @@ app.delete("/api/admin/site-media/:id", async (c) => {
   try {
     const id = Number(c.req.param("id"));
     const db = drizzle(c.env.cinema_db, { schema });
+    const { deleter } = getCloudHelpers(c.env);
     const r = await deleteSiteMediaImpl(
       db,
       { site_media: schema.site_media },
       id,
+      deleter,
     );
 
     // Manual deletion from cloud storage for Worker environment

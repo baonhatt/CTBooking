@@ -12,6 +12,7 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Switch } from "@/components/ui/switch";
 import {
   Pagination,
   PaginationContent,
@@ -34,8 +35,15 @@ import {
   TicketIcon,
   UserIcon,
   X,
+  Search,
+  RefreshCw,
+  SortAsc,
+  SortDesc,
+  FilterX
 } from "lucide-react";
 import { toast } from "sonner";
+import { formatDistanceToNow } from "date-fns";
+import { vi } from "date-fns/locale";
 
 interface Tx {
   id: string;
@@ -50,16 +58,8 @@ interface Tx {
   paymentStatus: string;
   is_used: boolean;
   createdAt: Date;
+  paidAt?: Date | null;
   expired: boolean;
-}
-interface Metrics {
-  totalUsers: number;
-  totalMovies: number;
-  revenueTotal: number;
-  revenueCount: number;
-  avgRevenuePerUser: number;
-  totalToys: number;
-  totalTransactions: number;
 }
 interface Props {
   data: Tx[];
@@ -68,7 +68,6 @@ interface Props {
   setPage: (p: number) => void;
   txQuery: string;
   setTxQuery: (q: string) => void;
-  metrics: Metrics;
   transactionsLength: number;
   onRefresh: () => void;
   txStatus?: "paid" | "all";
@@ -93,7 +92,6 @@ export default function TransactionsContent({
   setPage,
   txQuery,
   setTxQuery,
-  metrics,
   transactionsLength,
   onRefresh,
   txStatus = "paid",
@@ -241,187 +239,158 @@ export default function TransactionsContent({
   };
   return (
     <div className="space-y-6">
-      <Card className="shadow-md border-none">
-        <CardHeader className="border-b bg-gray-50/50">
-          <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-            <div>
-              <CardTitle className="text-xl font-bold flex items-center gap-2">
-                Lịch Sử Giao Dịch
-                <Badge variant="secondary" className="rounded-full">
-                  {transactionsLength}
-                </Badge>
-              </CardTitle>
-              <p className="text-sm text-muted-foreground mt-1">
-                Quản lý và đối soát thông tin đặt vé hệ thống.
-              </p>
-            </div>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={onRefresh}
-              className="flex items-center gap-2 bg-white hover:bg-blue-50 hover:text-blue-600 transition-all"
-            >
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                width="16"
-                height="16"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              >
-                <path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8" />
-                <path d="M21 3v5h-5" />
-                <path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16" />
-                <path d="M3 21v-5h5" />
-              </svg>
-              Làm Mới
-            </Button>
+      <div className="flex flex-col gap-4 bg-white p-6 rounded-2xl border shadow-sm">
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+          <div className="flex flex-col gap-1">
+            <h3 className="text-lg font-bold text-slate-900 flex items-center gap-2">
+              Lịch Sử Giao Dịch
+              <Badge variant="secondary" className="rounded-full bg-slate-100 text-slate-600 px-2 py-0 h-5 text-[10px] font-bold">
+                {transactionsLength}
+              </Badge>
+            </h3>
+            <p className="text-xs text-slate-500">Quản lý và đối soát thông tin đặt vé hệ thống.</p>
           </div>
-        </CardHeader>
+          <Button
+            variant="outline"
+            size="icon"
+            onClick={onRefresh}
+            className="rounded-xl shadow-sm hover:rotate-180 transition-transform duration-500 shrink-0 h-10 w-10"
+          >
+            <RefreshCw className={`w-4 h-4 ${isLoading ? "animate-spin" : ""}`} />
+          </Button>
+        </div>
 
-        <CardContent className="pt-6">
-          {/* Thanh công cụ Bộ lọc (Toolbar) */}
-          <div className="flex flex-wrap items-center gap-3 mb-6">
+        <div className="h-px bg-slate-100 my-2" />
+
+        {/* Toolbar Grid */}
+        <div className="space-y-4">
+          <div className="flex flex-wrap items-center gap-3">
             <div className="relative flex-1 min-w-[300px]">
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                className="absolute left-3 top-3 h-4 w-4 text-gray-400"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
-                />
-              </svg>
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 w-4 h-4" />
               <Input
                 placeholder="Tìm email hoặc mã giao dịch..."
                 value={txQuery}
                 onChange={(e) => setTxQuery(e.target.value)}
-                className="pl-9 h-10"
+                className="pl-10 h-11 bg-slate-50 border-transparent focus:bg-white focus:ring-2 focus:ring-blue-500 rounded-xl transition-all"
               />
             </div>
 
-            <select
-              value={txStatus}
-              onChange={(e) => setTxStatus?.(e.target.value as any)}
-              className="h-10 px-3 border rounded-md bg-white text-sm focus:ring-2 focus:ring-blue-500 outline-none w-40"
-            >
-              <option value="paid">Đã thanh toán</option>
-              <option value="all">Tất cả trạng thái</option>
-            </select>
+            <div className="flex flex-wrap items-center gap-2">
+              <div className="flex items-center gap-3 px-4 py-2 bg-slate-50 rounded-xl border border-slate-200 h-11">
+                <span className="text-[10px] font-black uppercase text-slate-500 whitespace-nowrap">
+                  Chỉ hiện đã thanh toán
+                </span>
+                <Switch
+                  checked={txStatus === "paid"}
+                  onCheckedChange={(val) => setTxStatus?.(val ? "paid" : "all")}
+                  className="scale-75 data-[state=checked]:bg-emerald-500 data-[state=unchecked]:bg-slate-300 cursor-pointer"
+                />
+              </div>
 
-            <select
-              value={paymentMethod}
-              onChange={(e) => setPaymentMethod?.(e.target.value)}
-              className="h-10 px-3 border rounded-md bg-white text-sm w-44"
-            >
-              <option value="">Tất cả phương thức</option>
-              <option value="cash">Tiền mặt</option>
-              <option value="momo">MoMo</option>
-              <option value="vnpay">VNPay</option>
-              <option value="vietqr">VietQR</option>
-            </select>
-
-            <select
-              value={sortKey}
-              onChange={(e) => setSortKey(e.target.value as any)}
-              className="h-10 px-3 border rounded-md bg-white text-sm w-48"
-            >
-              <option value="created_at">Thời gian tạo</option>
-              <option value="paid_at">Thời gian thanh toán</option>
-            </select>
-
-            <select
-              value={sortDir}
-              onChange={(e) => setSortDir(e.target.value as any)}
-              className="h-10 px-3 border rounded-md bg-white text-sm w-32"
-            >
-              <option value="desc">Giảm dần</option>
-              <option value="asc">Tăng dần</option>
-            </select>
-
-            <Button
-              variant="ghost"
-              size="sm"
-              className="text-gray-500 hover:text-red-600 hover:bg-red-50 h-10 px-3 flex items-center gap-2 border border-dashed border-gray-200"
-              onClick={() => {
-                setTxQuery("");
-                setTxStatus?.("paid");
-                setSortKey?.("created_at");
-                setSortDir?.("desc");
-                setPaymentMethod?.("");
-                setFromDate?.("");
-                setToDate?.("");
-                setPage(1);
-              }}
-            >
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                width="14"
-                height="14"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
+              <select
+                value={paymentMethod}
+                onChange={(e) => setPaymentMethod?.(e.target.value)}
+                className="h-11 px-3 bg-white border rounded-xl text-sm w-44 cursor-pointer shadow-sm"
               >
-                <path d="M3 6h18" />
-                <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6" />
-                <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2" />
-              </svg>
-              Xóa Bộ Lọc
-            </Button>
-          </div>
-
-          <div className="flex items-center gap-3 mb-6 p-3 bg-gray-50 rounded-lg border border-gray-100 w-fit">
-            <span className="text-xs font-bold uppercase text-gray-400">
-              Khoảng thời gian:
-            </span>
-            <div className="flex items-center gap-2">
-              <span className="text-sm text-gray-500 font-medium">Từ</span>
-              <Input
-                type="date"
-                value={fromDate}
-                onChange={(e) => setFromDate?.(e.target.value)}
-                className="w-40 h-9 bg-white"
-              />
-              <span className="text-sm text-gray-500 font-medium">Đến</span>
-              <Input
-                type="date"
-                value={toDate}
-                onChange={(e) => setToDate?.(e.target.value)}
-                className="w-40 h-9 bg-white"
-              />
+                <option value="">Tất cả phương thức</option>
+                <option value="cash">Tiền mặt</option>
+                <option value="momo">MoMo</option>
+                <option value="vnpay">VNPay</option>
+                <option value="vietqr">VietQR</option>
+              </select>
             </div>
           </div>
+
+          <div className="flex flex-wrap items-center justify-between gap-4">
+            <div className="flex flex-wrap items-center gap-3">
+              <div className="flex items-center gap-3 p-1.5 bg-slate-50 rounded-xl border border-slate-100">
+                <div className="flex items-center gap-2 px-3">
+                  <span className="text-[10px] font-black uppercase text-slate-400">Từ</span>
+                  <Input
+                    type="date"
+                    value={fromDate}
+                    onChange={(e) => setFromDate?.(e.target.value)}
+                    className="w-36 h-8 bg-white border-0 shadow-sm text-xs rounded-lg"
+                  />
+                </div>
+                <div className="w-px h-4 bg-slate-200" />
+                <div className="flex items-center gap-2 px-3">
+                  <span className="text-[10px] font-black uppercase text-slate-400">Đến</span>
+                  <Input
+                    type="date"
+                    value={toDate}
+                    onChange={(e) => setToDate?.(e.target.value)}
+                    className="w-36 h-8 bg-white border-0 shadow-sm text-xs rounded-lg"
+                  />
+                </div>
+              </div>
+
+              <select
+                value={sortKey}
+                onChange={(e) => setSortKey(e.target.value as any)}
+                className="h-11 px-3 bg-white border rounded-xl text-xs w-40 cursor-pointer shadow-sm focus:ring-2 focus:ring-blue-500 outline-none"
+              >
+                <option value="created_at">Thời gian tạo</option>
+                <option value="paid_at">Thời gian thanh toán</option>
+              </select>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="icon"
+                onClick={() => setSortDir?.(sortDir === "asc" ? "desc" : "asc")}
+                className="rounded-xl border-slate-200 hover:bg-slate-50 active:scale-95 transition-all shadow-sm w-10 h-10 shrink-0"
+                title={sortDir === "asc" ? "Tăng dần" : "Giảm dần"}
+              >
+                {sortDir === "desc" ? (
+                  <SortDesc className="w-4 h-4 text-slate-600" />
+                ) : (
+                  <SortAsc className="w-4 h-4 text-slate-600" />
+                )}
+              </Button>
+
+              <Button
+                variant="outline"
+                size="icon"
+                className="text-slate-400 hover:text-rose-600 hover:bg-rose-50 hover:border-rose-100 w-10 h-10 rounded-xl transition-all shadow-sm shrink-0"
+                title="Xóa bộ lọc"
+                onClick={() => {
+                  setTxQuery("");
+                  setTxStatus?.("paid");
+                  setSortKey?.("created_at");
+                  setSortDir?.("desc");
+                  setPaymentMethod?.("");
+                  setFromDate?.("");
+                  setToDate?.("");
+                  setPage(1);
+                  toast.info("Đã đặt lại bộ lọc");
+                }}
+              >
+                <FilterX size={16} />
+              </Button>
+            </div>
+          </div>
+        </div>
+      </div>
 
           {/* Bảng dữ liệu đã tối ưu cột */}
-          <div className="rounded-lg border border-gray-200 overflow-hidden shadow-sm">
-            <Table>
-              <TableHeader className="bg-gray-50">
-                <TableRow>
-                  <TableHead className="font-bold w-[80px]">ID</TableHead>
-                  <TableHead className="font-bold">Khách Hàng</TableHead>
-                  <TableHead className="font-bold">Vé</TableHead>
-                  <TableHead className="font-bold text-center">Số Vé</TableHead>
-                  <TableHead className="font-bold">Tổng Tiền</TableHead>
-                  <TableHead className="font-bold text-center">
-                    Thanh Toán
-                  </TableHead>
-                  <TableHead className="font-bold">Trạng Thái Vé</TableHead>
-                  <TableHead className="font-bold text-right">
-                    Hành Động
-                  </TableHead>
-                </TableRow>
-              </TableHeader>
+          <Card className="border-none shadow-xl shadow-slate-200/50 rounded-2xl overflow-hidden bg-white">
+            <CardContent className="p-0">
+              <Table>
+                <TableHeader className="bg-slate-50/80">
+                  <TableRow className="hover:bg-transparent border-none">
+                    <TableHead className="w-16 text-center text-[10px] uppercase font-bold text-slate-400 pr-0">ID</TableHead>
+                    <TableHead className="text-[10px] uppercase font-bold text-slate-500">Người dùng</TableHead>
+                    <TableHead className="text-[10px] uppercase font-bold text-slate-500">Sản phẩm</TableHead>
+                    <TableHead className="text-center text-[10px] uppercase font-bold text-slate-500">Số lượng</TableHead>
+                    <TableHead className="text-[10px] uppercase font-bold text-slate-500">Doanh thu</TableHead>
+                    <TableHead className="text-[10px] uppercase font-bold text-slate-500">Thanh toán</TableHead>
+                    <TableHead className="text-center text-[10px] uppercase font-bold text-slate-500">Phương thức</TableHead>
+                    <TableHead className="text-[10px] uppercase font-bold text-slate-500">Trạng Thái</TableHead>
+                    <TableHead className="text-right text-[10px] uppercase font-bold text-slate-500 pr-6">Thao tác</TableHead>
+                  </TableRow>
+                </TableHeader>
               <TableBody>
                 {isLoading
                   ? Array.from({ length: 5 }).map((_, idx) => (
@@ -521,6 +490,20 @@ export default function TransactionsContent({
                           <TableCell className="font-bold text-blue-700">
                             {t.totalPrice.toLocaleString("vi-VN")}đ
                           </TableCell>
+                          <TableCell className="text-[11px] text-slate-500 font-medium">
+                            {t.paidAt ? (
+                              <div className="flex flex-col">
+                                <span className="text-slate-900 font-bold">
+                                  {formatDistanceToNow(new Date(t.paidAt), { addSuffix: true, locale: vi })}
+                                </span>
+                                <span className="text-[10px] opacity-60">
+                                  {new Date(t.paidAt).toLocaleTimeString("vi-VN", { hour: '2-digit', minute: '2-digit' })}
+                                </span>
+                              </div>
+                            ) : (
+                              <span className="italic text-slate-400">Chưa rõ</span>
+                            )}
+                          </TableCell>
 
                           <TableCell className="text-center">
                             <div className="flex flex-col items-center gap-1">
@@ -559,7 +542,8 @@ export default function TransactionsContent({
                     })}
               </TableBody>
             </Table>
-          </div>
+          </CardContent>
+        </Card>
 
           <div className="mt-6 flex flex-col md:flex-row items-center justify-between gap-4">
             <p className="text-sm text-muted-foreground italic">
@@ -610,8 +594,6 @@ export default function TransactionsContent({
               </PaginationContent>
             </Pagination>
           </div>
-        </CardContent>
-      </Card>
 
       {/* --- MODAL CHI TIẾT GIAO DỊCH (TỐI ƯU TOÀN DIỆN) --- */}
       <Dialog open={isDetailsOpen} onOpenChange={setIsDetailsOpen}>

@@ -1,6 +1,5 @@
 import { eq, desc, and, inArray, sql, or } from "drizzle-orm";
 import { formatDateForDb } from "../../lib/date-utils";
-import { uploadCloudinaryImageDataURI } from "../../../worker/src/utils";
 
 export async function createMovieImpl(
   anyDb: any,
@@ -19,22 +18,22 @@ export async function createMovieImpl(
   },
   config?: any,
   RUNTIME_ENV?: string,
+  uploader?: (base64: string, folder: string) => Promise<{ url: string }>,
 ) {
   if (config) {
     process.env = config;
   }
   const now = new Date();
   let coverImageUrl = data.cover_image || null;
-  if (data.cover_image_base64) {
+  if (data.cover_image_base64 && uploader) {
     try {
-      const uploadResult = await uploadCloudinaryImageDataURI(
-        process.env, // Truyền env chứa thông tin Cloudinary
+      const uploadResult = await uploader(
         data.cover_image_base64,
-        "ctbooking/images/movies", // Thư mục lưu ảnh trên Cloudinary
+        "ctbooking/images/movies",
       );
       coverImageUrl = uploadResult.url;
     } catch (error) {
-      console.error("Lỗi khi upload ảnh lên Cloudinary:", error);
+      console.error("Lỗi khi upload ảnh:", error);
       // Có thể throw lỗi hoặc tiếp tục với ảnh mặc định
     }
   }
@@ -84,23 +83,28 @@ export async function updateMovieImpl(
   },
   config?: any,
   RUNTIME_ENV?: string,
+  uploader?: (base64: string, folder: string) => Promise<{ url: string }>,
+  deleter?: (url: string) => Promise<void>,
 ) {
   if (config) {
     process.env = config;
   }
   const now = new Date();
+  // Fetch old movie to check for image changes
+  const oldMovie = await anyDb.query.movies.findFirst({
+    where: eq(tables.movies.id, id),
+  });
   const payload: any = { updated_at: formatDateForDb(now, RUNTIME_ENV) };
   // Xử lý upload ảnh nếu có base64
-  if (data.cover_image_base64) {
+  if (data.cover_image_base64 && uploader) {
     try {
-      const uploadResult = await uploadCloudinaryImageDataURI(
-        process.env,
+      const uploadResult = await uploader(
         data.cover_image_base64,
         "ctbooking/movies",
       );
       payload.cover_image = uploadResult.url;
     } catch (error) {
-      console.error("Lỗi khi upload ảnh lên Cloudinary:", error);
+      console.error("Lỗi khi upload ảnh:", error);
       // Có thể throw lỗi hoặc bỏ qua
     }
   } else if (data.cover_image !== undefined) {
@@ -153,6 +157,19 @@ export async function updateMovieImpl(
 
     const movie = Array.isArray(updated) ? updated[0] : updated;
     if (!movie) throw new Error("Không tìm thấy phim để cập nhật");
+
+    // Clean up old Cloudinary image if changed
+    if (
+      oldMovie &&
+      payload.cover_image &&
+      oldMovie.cover_image &&
+      oldMovie.cover_image !== payload.cover_image &&
+      deleter
+    ) {
+      deleter(oldMovie.cover_image).catch((e) =>
+        console.error("Failed to delete old movie image:", e),
+      );
+    }
     return { movie };
   } catch (err: any) {
     throw err;
@@ -163,6 +180,7 @@ export async function deleteMovieImpl(
   anyDb: any,
   tables: { movies: any },
   id: number,
+  deleter?: (url: string) => Promise<void>,
 ) {
   // Check if movie exists before deleting
   const existing = await anyDb.query.movies.findFirst({
@@ -170,6 +188,13 @@ export async function deleteMovieImpl(
   });
 
   if (!existing) return null;
+
+  // Delete cover image
+  if (existing.cover_image && deleter) {
+    deleter(existing.cover_image).catch((e) =>
+      console.error("Failed to delete movie image:", e),
+    );
+  }
 
   await anyDb.delete(tables.movies).where(eq(tables.movies.id, id));
 
@@ -238,13 +263,14 @@ export async function updateMovieStatusImpl(
 
 export async function getMovieByIdImpl(
   anyDb: any,
-  tables: { movies: any; bookings: any },
+  tables: { movies: any; bookings: any; ticket_packages: any },
   movieId: number,
 ) {
   const movie = await anyDb.query.movies.findFirst({
     where: eq(tables.movies.id, movieId),
   });
   if (!movie) return null;
+
   const paid = await anyDb.query.bookings.findMany({
     where: and(
       eq(tables.bookings.movie_id, movieId),
@@ -252,6 +278,7 @@ export async function getMovieByIdImpl(
     ),
     columns: { ticket_count: true, total_price: true },
   });
+
   const totalTicketsSold = paid.reduce(
     (sum: number, booking: any) => sum + (Number(booking.ticket_count) || 0),
     0,
@@ -261,6 +288,22 @@ export async function getMovieByIdImpl(
     0,
   );
   const successfulBookings = paid.length;
+
+  // Lấy các gói vé có chứa phim này
+  const searchId = String(movieId);
+  const applicablePackages = await anyDb
+    .select()
+    .from(tables.ticket_packages)
+    .where(
+      and(
+        eq(tables.ticket_packages.is_active, true),
+        sql`CAST(${tables.ticket_packages.combo} AS TEXT) LIKE ${"%[" + searchId + "]%"} OR 
+            CAST(${tables.ticket_packages.combo} AS TEXT) LIKE ${"%[" + searchId + ",%"} OR 
+            CAST(${tables.ticket_packages.combo} AS TEXT) LIKE ${"%," + searchId + ",%"} OR 
+            CAST(${tables.ticket_packages.combo} AS TEXT) LIKE ${"%," + searchId + "]%"}`,
+      ),
+    );
+
   const mapped = {
     id: movie.id,
     title: movie.title,
@@ -274,6 +317,7 @@ export async function getMovieByIdImpl(
     created_at: movie.created_at,
     updated_at: movie.updated_at,
     stats: { totalTicketsSold, totalRevenue, successfulBookings },
+    applicable_packages: applicablePackages,
     detail_images: movie.detail_images || [],
   };
   return mapped;

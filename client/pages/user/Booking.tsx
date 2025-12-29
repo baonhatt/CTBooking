@@ -22,6 +22,7 @@ import {
   API_BASE_URL,
   validateBookingApi,
 } from "@/lib/api";
+import { optimizeCloudinaryUrl } from "@/lib/utils";
 import UserLayout from "@/user/layouts/UserLayout";
 import styles from "@/pages/user/style/user.style.scss"
 export default function BookingPage() {
@@ -493,7 +494,7 @@ export default function BookingPage() {
         <div className="absolute inset-0 pointer-events-none z-0">
           {selectedMovie?.cover_image && (
             <img
-              src={resolveImageUrl(selectedMovie.cover_image)}
+              src={optimizeCloudinaryUrl(selectedMovie.cover_image, 1280)}
               alt="Backdrop"
               className="w-full h-full object-cover opacity-40"
               style={{
@@ -621,8 +622,9 @@ export default function BookingPage() {
                                     <div className="aspect-[2/3] relative">
                                       {/* Tỉ lệ 2:3 chuẩn poster phim */}
                                       <img
-                                        src={resolveImageUrl(m.cover_image)}
+                                        src={optimizeCloudinaryUrl(m.cover_image, 200)}
                                         alt={m.title}
+                                        loading="lazy"
                                         className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
                                       />
                                       <div className="absolute inset-0 bg-gradient-to-t from-black via-black/40 to-transparent opacity-90" />

@@ -31,6 +31,7 @@ import {
   Info,
   Loader2,
   Clock,
+  RefreshCw,
 } from "lucide-react";
 import { toast } from "sonner";
 import { differenceInDays } from "date-fns";
@@ -175,23 +176,39 @@ export default function TicketCheckContent() {
   };
 
   return (
-    <div className="max-w-8xl mx-auto space-y-8 pb-20">
-      <div className="space-y-1">
-        <h1 className="text-4xl font-extrabold tracking-tight text-slate-900 uppercase">
-          HỆ THỐNG KIỂM SOÁT
-        </h1>
-        <p className="text-muted-foreground italic text-sm">
-          * Nhập mã đơn hàng hoặc mã vé để tra cứu thông tin phim và trạng thái.
-        </p>
+    <div className="max-w-7xl mx-auto space-y-8 pb-20 animate-in fade-in duration-500">
+      <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 bg-white p-6 rounded-2xl border shadow-sm">
+        <div className="flex flex-col gap-1">
+          <h1 className="text-2xl font-black text-slate-900 tracking-tight uppercase">
+            HỆ THỐNG KIỂM SOÁT
+          </h1>
+          <p className="text-xs text-slate-500 italic">
+            * Nhập mã đơn hàng hoặc mã vé để tra cứu thông tin phim và trạng thái.
+          </p>
+        </div>
+        <Button
+          variant="outline"
+          size="icon"
+          onClick={() => {
+            setCode("");
+            setTicketInfo(null);
+            setError(null);
+            toast.info("Đã làm mới dữ liệu");
+          }}
+          className="rounded-xl shadow-sm hover:rotate-180 transition-transform duration-500 shrink-0 h-10 w-10 flex items-center justify-center bg-white border-slate-200"
+          title="Làm mới"
+        >
+          <RefreshCw className="w-4 h-4" />
+        </Button>
       </div>
 
       {/* Search Section */}
       <div className="max-w-3xl space-y-4">
         <div className="flex gap-3">
-          <div className="relative flex-1">
-            <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-slate-400" />
+          <div className="relative flex-1 group">
+            <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-slate-400 group-focus-within:text-blue-500 transition-colors" />
             <Input
-              className="pl-12 h-14 text-lg shadow-sm border-slate-200 focus:ring-2 focus:ring-blue-500"
+              className="pl-12 h-14 text-lg shadow-xl shadow-slate-100/50 border-slate-200 focus:ring-4 focus:ring-blue-100 rounded-2xl transition-all"
               placeholder="Nhập mã vé hoặc ID (VD: 1766461)..."
               value={code}
               onChange={(e) => setCode(e.target.value)}
@@ -202,7 +219,7 @@ export default function TicketCheckContent() {
             onClick={handleSearch}
             disabled={isLoading}
             size="lg"
-            className="h-14 px-8 bg-slate-900 hover:bg-slate-800 transition-transform active:scale-95"
+            className="h-14 px-8 bg-slate-900 hover:bg-slate-800 transition-all active:scale-95 rounded-2xl shadow-lg border-0 shadow-slate-300 font-bold"
           >
             {isLoading ? <Loader2 className="animate-spin" /> : "Kiểm tra"}
           </Button>
@@ -219,7 +236,7 @@ export default function TicketCheckContent() {
             <p>
               Nếu khách thanh toán qua Ngân hàng, tìm nội dung có mã{" "}
               <span className="font-mono font-bold bg-amber-200 px-1 rounded text-orange-700">
-                ORDER
+                CINESPHERE
               </span>{" "}
               khớp với ID.
             </p>
@@ -238,10 +255,10 @@ export default function TicketCheckContent() {
       )}
 
       {ticketInfo && (
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
           <div className="lg:col-span-8 space-y-6">
             <Card
-              className={`overflow-hidden border-slate-200 shadow-sm transition-all ${ticketInfo.is_used ? "opacity-60 grayscale-[0.5]" : ""}`}
+              className={`overflow-hidden border-none shadow-2xl shadow-slate-200/50 rounded-2xl transition-all ${ticketInfo.is_used ? "opacity-60 grayscale-[0.5]" : ""}`}
             >
               <CardContent className="p-0">
                 <div className="bg-slate-50/50 p-6 border-b flex justify-between items-center">
@@ -334,8 +351,8 @@ export default function TicketCheckContent() {
             </Card>
 
             <div className="grid grid-cols-1 md:grid-cols-12 gap-4">
-              <Card className="md:col-span-4 p-5 flex items-center gap-4 border-slate-100 bg-white shadow-sm">
-                <div className="p-2 bg-slate-50 rounded-lg text-slate-400">
+              <Card className="md:col-span-4 p-5 flex items-center gap-4 border-none bg-white shadow-xl shadow-slate-100 rounded-2xl">
+                <div className="p-2 bg-blue-50 rounded-xl text-blue-400">
                   <User size={20} />
                 </div>
                 <div className="min-w-0">
@@ -347,8 +364,8 @@ export default function TicketCheckContent() {
                   </p>
                 </div>
               </Card>
-              <Card className="md:col-span-3 p-5 flex items-center gap-4 border-slate-100 bg-white shadow-sm">
-                <div className="p-2 bg-slate-50 rounded-lg text-slate-400">
+              <Card className="md:col-span-3 p-5 flex items-center gap-4 border-none bg-white shadow-xl shadow-slate-100 rounded-2xl">
+                <div className="p-2 bg-emerald-50 rounded-xl text-emerald-400">
                   <Phone size={20} />
                 </div>
                 <div className="min-w-0">
@@ -358,8 +375,8 @@ export default function TicketCheckContent() {
                   <p className="font-bold text-slate-700">{ticketInfo.phone}</p>
                 </div>
               </Card>
-              <Card className="md:col-span-5 p-5 flex items-center gap-4 border-slate-100 bg-white shadow-sm">
-                <div className="p-2 bg-slate-50 rounded-lg text-slate-400">
+              <Card className="md:col-span-5 p-5 flex items-center gap-4 border-none bg-white shadow-xl shadow-slate-100 rounded-2xl">
+                <div className="p-2 bg-violet-50 rounded-xl text-violet-400">
                   <Mail size={20} />
                 </div>
                 <div className="min-w-0 w-full">

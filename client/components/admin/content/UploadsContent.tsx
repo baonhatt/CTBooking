@@ -7,6 +7,24 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Progress } from "@/components/ui/progress";
 import { uploadAdminVideo, uploadDirectToCloudinary, createSiteMediaApi, getSiteMediaApi, updateSiteMediaApi, deleteSiteMediaApi } from "@/lib/api/uploads";
 import { toast } from "sonner";
+import { formatDistanceToNow } from "date-fns";
+import { vi } from "date-fns/locale";
+import { 
+  Upload, 
+  FileVideo, 
+  FileImage, 
+  X, 
+  CheckCircle2, 
+  AlertCircle, 
+  CloudUpload, 
+  Trash2, 
+  ExternalLink, 
+  Monitor, 
+  Layout, 
+  Grid3X3,
+  RefreshCw,
+  Info
+} from "lucide-react";
 
 export default function UploadsContent() {
 
@@ -44,6 +62,12 @@ export default function UploadsContent() {
   const onPickFile = (e: React.ChangeEvent<HTMLInputElement>) => {
     const arr = Array.from(e.target.files || []);
     setFiles(arr);
+    // Reset previous upload results when selecting new files
+    if (arr.length > 0) {
+      setUploads([]);
+      setStatusLines([]);
+      setStage("idle");
+    }
   };
 
   const isValidVideo = (f: File | null) =>
@@ -143,7 +167,7 @@ export default function UploadsContent() {
             setStage("uploading");
 
             const result = await (nextItem.isVideo
-              ? uploadAdminVideo(finalFile, (p) =>
+              ? uploadAdminVideo(finalFile, nextItem.section, (p) =>
                 setUploads((arr) => {
                   const cp = [...arr];
                   const i = cp.findIndex((x) => x.id === nextItem.id);
@@ -151,7 +175,7 @@ export default function UploadsContent() {
                   return cp;
                 })
               )
-              : uploadDirectToCloudinary(finalFile, (p) =>
+              : uploadDirectToCloudinary(finalFile, nextItem.section, (p) =>
                 setUploads((arr) => {
                   const cp = [...arr];
                   const i = cp.findIndex((x) => x.id === nextItem.id);
@@ -290,63 +314,128 @@ export default function UploadsContent() {
       </CardHeader>
       <CardContent className="space-y-6">
         {/* Upload Section */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
           {/* Left Column - Upload Controls */}
-          <div className="space-y-4">
-            <div className="space-y-2">
-              <Label className="text-sm font-medium text-gray-300">Chọn video hoặc ảnh</Label>
-              <div className="relative">
-                <Input
+          <div className="space-y-6">
+            <div className="space-y-3">
+              <Label className="text-sm font-semibold text-blue-200 flex items-center gap-2">
+                <CloudUpload className="w-4 h-4" />
+                Chọn video hoặc ảnh
+              </Label>
+              <div 
+                onClick={() => fileRef.current?.click()}
+                onDragOver={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                }}
+                className={`
+                  relative group cursor-pointer
+                  border-2 border-dashed border-white/20 
+                  hover:border-blue-500/50 hover:bg-blue-500/5 
+                  transition-all duration-300 rounded-2xl 
+                  p-8 flex flex-col items-center justify-center gap-3
+                  bg-white/5 backdrop-blur-sm
+                `}
+              >
+                <input
                   ref={fileRef}
                   type="file"
                   accept="video/*,image/*"
                   multiple
                   onChange={onPickFile}
-                  className="bg-white/5 border-white/20 text-white file:bg-blue-600 file:text-white file:border-0 file:rounded file:px-3 file:py-1 file:mr-3 file:cursor-pointer hover:file:bg-blue-700 h-11"
+                  className="hidden"
                 />
+                <div className="w-14 h-14 rounded-full bg-blue-500/10 flex items-center justify-center group-hover:scale-110 transition-transform duration-300">
+                  <Upload className="w-7 h-7 text-blue-400" />
+                </div>
+                <div className="text-center">
+                  <p className="text-white font-medium">Nhấn để chọn hoặc kéo thả files vào đây</p>
+                  <p className="text-gray-400 text-xs mt-1">Hỗ trợ Video (MP4, MOV) và Hình ảnh (JPG, PNG, WEBP)</p>
+                </div>
               </div>
+              
+              {files.length > 0 && (
+                <div className="flex items-center gap-2 px-3 py-2 bg-blue-500/10 border border-blue-500/20 rounded-lg animate-in fade-in slide-in-from-top-1">
+                  <CheckCircle2 className="w-4 h-4 text-blue-400" />
+                  <span className="text-xs text-blue-300 font-medium">
+                    Đã chọn {files.length} tệp ({formatSize(files.reduce((s, f) => s + f.size, 0))})
+                  </span>
+                  <button 
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setFiles([]);
+                      if (fileRef.current) fileRef.current.value = "";
+                    }}
+                    className="ml-auto p-1 hover:bg-white/10 rounded-full transition-colors"
+                  >
+                    <X className="w-4 h-4 text-gray-400" />
+                  </button>
+                </div>
+              )}
+
               {files.length === 1 && files[0] && !/^video\//.test(files[0].type) && !/^image\//.test(files[0].type) && (
-                <div className="text-xs text-red-400">Tệp đã chọn không phải video/ảnh hợp lệ</div>
+                <div className="flex items-center gap-2 text-xs text-red-400 bg-red-500/10 border border-red-500/20 p-2 rounded-lg">
+                  <AlertCircle className="w-4 h-4" />
+                  Tệp đã chọn không phải video/ảnh hợp lệ
+                </div>
               )}
             </div>
 
-            <div className="space-y-2">
-              <Label className="text-sm font-medium text-gray-300">Vị trí hiển thị</Label>
-              <select
-                className="w-full bg-[#1a2744] text-white border border-white/20 rounded-md px-3 py-2.5 h-11 focus:outline-none focus:ring-2 focus:ring-blue-500 [&>option]:bg-[#1a2744] [&>option]:text-white"
-                value={section}
-                onChange={(e) => setSection(e.target.value as any)}
-              >
-                <option value="hero_section">Hero Section</option>
-                <option value="technology_section1">Technology Section 1 (banner)</option>
-                <option value="technology_section2">Technology Section 2 (danh sách)</option>
-              </select>
-              <div className="text-xs text-gray-500">
-                Chọn nơi sẽ hiển thị media sau khi upload
+            <div className="space-y-3">
+              <Label className="text-sm font-semibold text-blue-200 flex items-center gap-2">
+                <Layout className="w-4 h-4" />
+                Vị trí hiển thị
+              </Label>
+              <div className="relative group">
+                <select
+                  className="w-full bg-[#1a2744] text-white border border-white/20 rounded-xl px-4 py-3 h-12 focus:outline-none focus:ring-2 focus:ring-blue-500/50 appearance-none cursor-pointer transition-all hover:border-white/30"
+                  value={section}
+                  onChange={(e) => setSection(e.target.value as any)}
+                >
+                  <option value="hero_section">Hero Section</option>
+                  <option value="technology_section1">Technology Section 1 (Banner)</option>
+                  <option value="technology_section2">Technology Section 2 (Danh sách)</option>
+                </select>
+                <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none text-gray-400">
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                  </svg>
+                </div>
+              </div>
+              <div className="flex items-start gap-2 text-xs text-gray-400 px-1">
+                <Info className="w-3.5 h-3.5 mt-0.5 text-blue-400/70" />
+                <span>Media sẽ được upload và áp dụng trực tiếp cho phần này trên website.</span>
               </div>
             </div>
 
-            <div className="flex flex-wrap gap-3 pt-2">
+            <div className="flex items-center gap-3 pt-4 border-t border-white/10">
               <Button
                 disabled={!files.length}
                 onClick={checkAndPrepareUpload}
-                className="bg-blue-600 hover:bg-blue-700 h-10 px-5"
+                className="bg-blue-600 hover:bg-blue-700 h-11 px-8 rounded-xl font-bold shadow-lg shadow-blue-900/20 active:scale-95 transition-all flex items-center gap-2"
               >
-                Upload
+                <CloudUpload className="w-5 h-5" />
+                Bắt đầu Upload
               </Button>
               <Button
-                variant="secondary"
+                variant="outline"
+                size="icon"
                 onClick={() => {
                   setFiles([]);
+                  setUploads([]);
                   if (fileRef.current) fileRef.current.value = "";
                   setPreviewUrl(null);
                   setStatusLines([]);
                   setStage("idle");
                 }}
-                className="bg-white/10 hover:bg-white/20 text-white border-white/20 h-10 px-5"
+                className="rounded-xl shadow-sm hover:rotate-180 transition-transform duration-500 shrink-0 h-11 w-11 flex items-center justify-center bg-white/5 border-white/20 text-white"
+                title="Làm mới"
               >
-                Reset
+                <RefreshCw className="w-5 h-5" />
               </Button>
+              
+              <div className="flex-1" />
+
               <Button
                 variant="outline"
                 onClick={async () => {
@@ -358,107 +447,182 @@ export default function UploadsContent() {
                     toast.error("Lỗi tải danh sách", { description: err?.message || "Không thể tải site media" });
                   }
                 }}
-                className="ml-auto text-white bg-white/10 hover:bg-white/20 border-white/20 h-10 px-5"
+                className="text-blue-400 bg-blue-500/10 hover:bg-blue-500/20 border-blue-500/20 h-11 px-6 rounded-xl transition-all flex items-center gap-2"
               >
-                Xem media
+                <Grid3X3 className="w-4 h-4" />
+                Thư viện Site Media
               </Button>
             </div>
           </div>
 
-          {/* Right Column - Preview */}
-          <div className="space-y-3">
+          {/* Right Column - Preview Card */}
+          <div className="relative group">
             {files.length === 1 && previewUrl ? (
-              <div className="rounded-xl border border-white/10 bg-white/5 p-4 space-y-4">
-                <div className="aspect-video rounded-lg overflow-hidden bg-black/30 flex items-center justify-center">
-                  {/^image\//.test(files[0].type) ? (
-                    <img
-                      src={previewUrl}
-                      alt={files[0].name}
-                      className="w-full h-full object-contain"
-                    />
-                  ) : (
-                    <video
-                      src={previewUrl}
-                      controls
-                      className="w-full h-full object-contain"
-                    />
-                  )}
+              <div className="h-full rounded-2xl border border-white/10 bg-black/40 backdrop-blur-md overflow-hidden flex flex-col shadow-2xl">
+                <div className="p-4 border-b border-white/5 flex items-center justify-between bg-white/5">
+                  <div className="flex items-center gap-2">
+                    {/^image\//.test(files[0].type) ? <FileImage className="w-4 h-4 text-emerald-400" /> : <FileVideo className="w-4 h-4 text-blue-400" />}
+                    <span className="text-sm font-semibold truncate max-w-[200px]">{files[0].name}</span>
+                  </div>
+                  <span className="text-[10px] uppercase tracking-wider font-bold text-gray-500 bg-white/5 px-2 py-0.5 rounded">Preview</span>
                 </div>
-                <div className="space-y-2">
-                  <div className="text-sm font-medium text-white">Thông tin tệp</div>
-                  <div className="grid grid-cols-[80px_1fr] gap-y-1 text-sm">
-                    <span className="text-gray-400">Tên:</span>
-                    <span className="text-white truncate">{files[0].name}</span>
-                    <span className="text-gray-400">Loại:</span>
-                    <span className="text-white">{files[0].type || "Không xác định"}</span>
-                    <span className="text-gray-400">Dung lượng:</span>
-                    <span className="text-white">{formatSize(files[0].size || 0)}</span>
+                
+                <div className="relative flex-1 bg-black/20 flex items-center justify-center p-6">
+                  <div className="w-full h-full rounded-lg overflow-hidden shadow-center-lg bg-gray-900 flex items-center justify-center border border-white/5">
+                    {/^image\//.test(files[0].type) ? (
+                      <img
+                        src={previewUrl}
+                        alt={files[0].name}
+                        className="w-full h-full object-contain animate-in zoom-in-95 duration-500"
+                      />
+                    ) : (
+                      <video
+                        src={previewUrl}
+                        controls
+                        className="w-full h-full object-contain"
+                      />
+                    )}
+                  </div>
+                </div>
+
+                <div className="p-5 bg-black/40 border-t border-white/10 mt-auto">
+                  <div className="grid grid-cols-2 gap-6">
+                    <div className="space-y-1">
+                      <p className="text-[10px] text-gray-500 font-bold uppercase tracking-tight">Kích thước</p>
+                      <p className="text-sm text-white font-medium">{formatSize(files[0].size || 0)}</p>
+                    </div>
+                    <div className="space-y-1">
+                      <p className="text-[10px] text-gray-500 font-bold uppercase tracking-tight">Định dạng</p>
+                      <p className="text-sm text-white font-medium truncate">{files[0].type || "N/A"}</p>
+                    </div>
                   </div>
                 </div>
               </div>
             ) : (
-              <div className="rounded-xl border border-dashed border-white/20 bg-white/5 p-8 flex flex-col items-center justify-center min-h-[200px]">
-                <div className="text-gray-500 text-sm text-center">
-                  <div>Preview file</div>
+              <div className="h-full min-h-[400px] rounded-2xl border-2 border-dashed border-white/10 bg-white/5 flex flex-col items-center justify-center text-center p-12 group-hover:bg-white/10 transition-all duration-500">
+                <div className="w-24 h-24 rounded-3xl bg-white/5 flex items-center justify-center mb-6 group-hover:rotate-12 transition-transform duration-500 border border-white/10">
+                  <Monitor className="w-10 h-10 text-gray-600 group-hover:text-blue-500/50 transition-colors" />
                 </div>
+                <h3 className="text-white font-semibold text-lg mb-2">Chưa có tệp nào được chọn</h3>
+                <p className="text-gray-500 text-sm max-w-[250px]">
+                  Chọn một tệp để xem trước chi tiết nội dung và thuộc tính trước khi tải lên.
+                </p>
               </div>
             )}
           </div>
         </div>
 
         {/* Progress Section */}
-        {(!!uploads.length || !!statusLines.length) && (
-          <div className="rounded-xl border border-white/10 bg-white/5 p-4 space-y-4">
+        {(!!uploads.length || !!statusLines.length || files.length > 0) && (
+          <div className="rounded-2xl border border-white/10 bg-white/5 p-6 space-y-6 shadow-xl backdrop-blur-sm animate-in fade-in slide-in-from-bottom-4 duration-500">
             {!!uploads.length && (
               <div className="space-y-4">
-                <div className="text-sm font-medium text-white">Tiến trình upload</div>
-                {uploads.map((u) => (
-                  <div key={u.id} className="rounded-lg bg-white/5 p-3 space-y-3">
-                    <div className="flex items-center justify-between">
-                      <div className="text-sm text-white font-medium truncate max-w-[60%]">{u.name}</div>
-                      <div className="flex items-center gap-2 text-xs">
-                        <span className="text-gray-400">{formatSize(u.size)}</span>
-                        <span className={`px-2 py-0.5 rounded text-xs ${
-                          u.status === "done" ? "bg-green-500/20 text-green-400" :
+                <div className="flex items-center justify-between">
+                  <h3 className="text-sm font-bold text-blue-200 uppercase tracking-wider flex items-center gap-2">
+                    <RefreshCw className={`w-4 h-4 ${stage === "uploading" ? "animate-spin" : ""}`} />
+                    Tiến trình trực tiếp
+                  </h3>
+                  <span className="text-[10px] text-gray-500 bg-white/5 px-2 py-0.5 rounded-full border border-white/10">
+                    {uploads.filter(u => u.status === "done").length}/{uploads.length} Hoàn thành
+                  </span>
+                </div>
+                
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {uploads.map((u) => (
+                    <div key={u.id} className="relative group rounded-xl bg-white/5 border border-white/10 p-4 transition-all hover:bg-white/10 overflow-hidden">
+                      <div className="flex items-start justify-between mb-3">
+                        <div className="flex items-center gap-3 overflow-hidden">
+                          <div className={`w-10 h-10 rounded-lg flex items-center justify-center shrink-0 ${
+                            u.status === "done" ? "bg-emerald-500/20 text-emerald-400" :
+                            u.status === "error" ? "bg-red-500/20 text-red-400" :
+                            "bg-blue-500/20 text-blue-400"
+                          }`}>
+                            {u.isImage ? <FileImage className="w-5 h-5" /> : <FileVideo className="w-5 h-5" />}
+                          </div>
+                          <div className="overflow-hidden">
+                            <div className="text-sm text-white font-semibold truncate">{u.name}</div>
+                            <div className="text-[10px] text-gray-500 font-medium">{formatSize(u.size)} • {u.type.split('/')[1]?.toUpperCase() || "N/A"}</div>
+                          </div>
+                        </div>
+                        <div className={`shrink-0 px-2 py-1 rounded-md text-[10px] font-bold uppercase tracking-tighter ${
+                          u.status === "done" ? "bg-emerald-500/20 text-emerald-400" :
                           u.status === "error" ? "bg-red-500/20 text-red-400" :
-                          u.status === "uploading" ? "bg-blue-500/20 text-blue-400" :
+                          u.status === "uploading" ? "bg-blue-500/20 text-blue-400 animate-pulse" :
                           "bg-gray-500/20 text-gray-400"
                         }`}>
-                          {u.status === "done" ? "Hoàn thành" :
+                          {u.status === "done" ? "Xong" :
                            u.status === "error" ? "Lỗi" :
-                           u.status === "uploading" ? "Đang upload" : "Chờ"}
-                        </span>
+                           u.status === "uploading" ? "Upload" : "Chờ"}
+                        </div>
+                      </div>
+
+                      <div className="space-y-3">
+                        {u.isImage && u.status !== "done" && u.status !== "error" && (
+                          <div className="space-y-1.5">
+                            <div className="flex justify-between text-[10px] font-bold text-gray-400">
+                              <span>Nén ảnh</span>
+                              <span>{u.compressProgress || 0}%</span>
+                            </div>
+                            <Progress value={u.compressProgress || 0} className="h-1 bg-white/5" />
+                          </div>
+                        )}
+                        
+                        {u.status !== "done" && u.status !== "error" && (
+                          <div className="space-y-1.5">
+                            <div className="flex justify-between text-[10px] font-bold text-gray-400">
+                              <span>Tải lên</span>
+                              <span>{u.uploadProgress}%</span>
+                            </div>
+                            <Progress value={u.uploadProgress} className="h-1 bg-white/5" />
+                          </div>
+                        )}
+
+                        {u.status === "done" && (
+                          <div className="flex items-center gap-2 text-[11px] text-emerald-400 font-medium py-1 animate-in fade-in">
+                            <CheckCircle2 className="w-3.5 h-3.5" />
+                            Upload thành công
+                          </div>
+                        )}
+
+                        {u.error && (
+                          <div className="flex items-center gap-2 text-[11px] text-red-400 font-medium py-1">
+                            <AlertCircle className="w-3.5 h-3.5" />
+                            {u.error}
+                          </div>
+                        )}
                       </div>
                     </div>
-                    {u.isImage && u.status !== "done" && (
-                      <div className="space-y-1">
-                        <div className="flex justify-between text-xs">
-                          <span className="text-gray-400">Nén ảnh</span>
-                          <span className="text-gray-300">{u.compressProgress || 0}%</span>
-                        </div>
-                        <Progress value={u.compressProgress || 0} className="h-1.5" />
-                      </div>
-                    )}
-                    {u.status !== "done" && (
-                      <div className="space-y-1">
-                        <div className="flex justify-between text-xs">
-                          <span className="text-gray-400">Upload</span>
-                          <span className="text-gray-300">{u.uploadProgress}%</span>
-                        </div>
-                        <Progress value={u.uploadProgress} className="h-1.5" />
-                      </div>
-                    )}
-                    {u.error && <div className="text-xs text-red-400">{u.error}</div>}
-                  </div>
-                ))}
+                  ))}
+                </div>
               </div>
             )}
+
+            {!uploads.length && files.length > 0 && (
+              <div className="rounded-xl bg-blue-500/5 border border-blue-500/20 p-5 flex items-center gap-4 animate-in fade-in slide-in-from-left-4">
+                <div className="w-12 h-12 rounded-full bg-blue-500/10 flex items-center justify-center shrink-0">
+                  <Info className="w-6 h-6 text-blue-400" />
+                </div>
+                <div>
+                  <h4 className="text-sm font-bold text-blue-300">Sẵn sàng tải lên</h4>
+                  <p className="text-xs text-blue-400/60 mt-0.5">
+                    Nhấn nút <span className="text-blue-300 font-bold">"Bắt đầu Upload"</span> để xử lý {files.length} tệp đã chọn.
+                  </p>
+                </div>
+              </div>
+            )}
+
             {!!statusLines.length && (
-              <div className="space-y-2">
-                <div className="text-sm font-medium text-white">Log</div>
-                <div className="rounded-lg bg-black/20 p-3 max-h-32 overflow-y-auto">
+              <div className="space-y-3">
+                <h3 className="text-xs font-bold text-gray-500 uppercase tracking-widest flex items-center gap-2">
+                  <div className="w-1.5 h-1.5 rounded-full bg-gray-600" />
+                  Hoạt động hệ thống
+                </h3>
+                <div className="rounded-xl bg-black/40 p-4 max-h-40 overflow-y-auto border border-white/5 font-mono">
                   {statusLines.map((ln, idx) => (
-                    <div key={idx} className="text-xs text-gray-400 py-0.5">{ln}</div>
+                    <div key={idx} className="text-[10px] text-gray-500 py-1 flex gap-2 border-b border-white/5 last:border-0">
+                      <span className="text-blue-500/50 shrink-0">[{new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}]</span>
+                      <span className="leading-relaxed">{ln}</span>
+                    </div>
                   ))}
                 </div>
               </div>
@@ -488,69 +652,138 @@ export default function UploadsContent() {
         </Dialog>
 
         <Dialog open={openMediaModal} onOpenChange={setOpenMediaModal}>
-          <DialogContent className="bg-white text-black border-gray-200 max-w-4xl w-[95vw]">
-            <DialogHeader>
-              <DialogTitle>Thư viện Site Media</DialogTitle>
+          <DialogContent className="bg-[#0b1224] text-white border-white/10 max-w-5xl w-[95vw] h-[85vh] flex flex-col p-0 overflow-hidden shadow-2xl [&>button]:hidden">
+            <DialogHeader className="p-6 border-b border-white/5 bg-white/5 flex flex-row items-center justify-between space-y-0">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-blue-500/10 flex items-center justify-center border border-blue-500/20">
+                  <Grid3X3 className="w-5 h-5 text-blue-400" />
+                </div>
+                <div>
+                  <DialogTitle className="text-xl font-bold">Thư viện Site Media</DialogTitle>
+                  <p className="text-xs text-gray-500 mt-0.5">Quản lý và xem trước nội dung đa phương tiện của trang web</p>
+                </div>
+              </div>
+              <Button 
+                variant="ghost" 
+                size="icon" 
+                onClick={() => setOpenMediaModal(false)}
+                className="hover:bg-white/10 text-gray-400"
+              >
+                <X className="w-5 h-5" />
+              </Button>
             </DialogHeader>
-            <div className="overflow-x-auto">
-              <table className="min-w-full text-sm">
-                <thead>
-                  <tr className="text-left">
-                    <th className="p-2">ID</th>
-                    <th className="p-2">Section</th>
-                    <th className="p-2">Type</th>
-                    <th className="p-2">URL</th>
-                    <th className="p-2">Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {mediaItems.map((m) => (
-                    <tr key={m.id} className="border-t border-gray-200">
-                      <td className="p-2">{m.id}</td>
-                      <td className="p-2">{m.section}</td>
-                      <td className="p-2">{m.type}</td>
-                      <td className="p-2">
-                        <div className="max-w-[300px] truncate" title={m.url}>
-                          {m.url}
+            
+            <div className="flex-1 overflow-y-auto p-6 custom-scrollbar bg-black/20">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+                {mediaItems.map((m) => (
+                  <div key={m.id} className="group relative rounded-2xl border border-white/10 bg-[#16213e] overflow-hidden flex flex-col transition-all hover:border-blue-500/50 hover:shadow-lg hover:shadow-blue-900/10 hover:-translate-y-1">
+                    {/* Media Preview Area */}
+                    <div className="aspect-video bg-black/40 relative flex items-center justify-center group-hover:bg-black/20 transition-colors">
+                      {m.type === "image" ? (
+                        <img 
+                          src={m.url} 
+                          alt={m.section} 
+                          className="w-full h-full object-cover opacity-80 group-hover:opacity-100 transition-opacity"
+                        />
+                      ) : (
+                        <div className="relative w-full h-full">
+                          <video 
+                            src={m.url} 
+                            className="w-full h-full object-cover opacity-60 group-hover:opacity-80"
+                          />
+                          <div className="absolute inset-0 flex items-center justify-center">
+                            <div className="w-10 h-10 rounded-full bg-white/10 backdrop-blur-md flex items-center justify-center text-white border border-white/20">
+                              <FileVideo className="w-5 h-5" />
+                            </div>
+                          </div>
                         </div>
-                      </td>
-                      <td className="p-2">
+                      )}
+                      
+                      {/* Section Badge */}
+                      <div className="absolute top-3 left-3 px-2 py-1 rounded-md bg-black/60 backdrop-blur-md border border-white/10 text-[10px] font-bold uppercase tracking-wider text-blue-300">
+                        {m.section.replace('_', ' ')}
+                      </div>
+
+                      {/* Overlays on Hover */}
+                      <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-3">
+                        <Button
+                          variant="secondary"
+                          size="sm"
+                          className="h-8 w-8 p-0 rounded-full bg-white/10 hover:bg-white/20 text-white backdrop-blur-md"
+                          onClick={() => window.open(m.url, '_blank')}
+                          title="Xem trực tiếp"
+                        >
+                          <ExternalLink className="w-4 h-4" />
+                        </Button>
                         <Button
                           variant="destructive"
                           size="sm"
+                          className="h-8 w-8 p-0 rounded-full bg-red-500/80 hover:bg-red-500 text-white backdrop-blur-md"
                           disabled={mediaLoadingId === m.id}
                           onClick={async () => {
-                            const ok = window.confirm("Bạn có chắc chắn muốn xóa media này?");
-                            if (!ok) return;
-                            try {
-                              setMediaLoadingId(m.id);
-                              const r = await deleteSiteMediaApi(Number(m.id));
-                              if (r.ok) {
-                                toast.success("Đã xóa thành công", { description: `Media #${m.id}` });
-                                const { items } = await getSiteMediaApi({});
-                                setMediaItems(items);
-                              } else {
-                                throw new Error("Xóa thất bại");
+                            if (window.confirm("Bạn có chắc chắn muốn xóa media này?")) {
+                              try {
+                                setMediaLoadingId(m.id);
+                                const r = await deleteSiteMediaApi(Number(m.id));
+                                if (r.ok) {
+                                  toast.success("Đã xóa media thành công");
+                                  const { items } = await getSiteMediaApi({});
+                                  setMediaItems(items);
+                                } else throw new Error();
+                              } catch {
+                                toast.error("Xóa thất bại");
+                              } finally {
+                                setMediaLoadingId(null);
                               }
-                            } catch (err: any) {
-                              toast.error("Xóa thất bại", { description: err?.message || "Không thể xóa media" });
-                            } finally {
-                              setMediaLoadingId(null);
                             }
                           }}
+                          title="Xóa media"
                         >
-                          {mediaLoadingId === m.id ? "Đang xóa..." : "Xóa"}
+                          <Trash2 className="w-4 h-4" />
                         </Button>
-                      </td>
-                    </tr>
-                  ))}
-                  {mediaItems.length === 0 && (
-                    <tr>
-                      <td className="p-4 text-center text-gray-500" colSpan={6}>Chưa có media</td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
+                      </div>
+                    </div>
+
+                    {/* Info Area */}
+                    <div className="p-4 flex-1 flex flex-col justify-between">
+                      <div className="space-y-2">
+                        <div className="flex items-center justify-between">
+                          <span className="text-[10px] font-mono text-gray-500 uppercase">ID: #{m.id}</span>
+                          <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase ${
+                            m.type === 'image' ? 'bg-emerald-500/10 text-emerald-400' : 'bg-blue-500/10 text-blue-400'
+                          }`}>
+                            {m.type}
+                          </span>
+                        </div>
+                        <div className="text-xs text-gray-400 break-all line-clamp-2 leading-relaxed opacity-60 group-hover:opacity-100 transition-opacity">
+                          {m.url}
+                        </div>
+                      </div>
+                      
+                      <div className="mt-4 pt-4 border-t border-white/5 flex items-center justify-between">
+                        <div className="flex items-center gap-1.5 text-[10px] text-gray-500 font-medium">
+                          <RefreshCw className="w-3 h-3" />
+                          {m.updated_at ? formatDistanceToNow(new Date(m.updated_at), { addSuffix: true, locale: vi }) : "N/A"}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {mediaItems.length === 0 && (
+                <div className="flex flex-col items-center justify-center py-24 text-gray-500">
+                  <div className="w-20 h-20 rounded-full bg-white/5 flex items-center justify-center mb-6">
+                    <Grid3X3 className="w-10 h-10 opacity-20" />
+                  </div>
+                  <h4 className="text-lg font-medium text-gray-400">Không có dữ liệu media</h4>
+                  <p className="text-sm opacity-50">Tải lên tệp đầu tiên để thấy chúng ở đây.</p>
+                </div>
+              )}
+            </div>
+
+            <div className="p-4 border-t border-white/5 bg-white/5 text-center">
+              <p className="text-[11px] text-gray-500">Hiển thị {mediaItems.length} mục media trong hệ thống</p>
             </div>
           </DialogContent>
         </Dialog>

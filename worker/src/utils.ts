@@ -576,6 +576,47 @@ export function optimizeCloudinaryUrl(url: string, width?: number) {
   return `${parts[0]}/upload/${transformString}/${parts[1]}`;
 }
 
+export function getPublicIdFromUrl(url: string) {
+  if (!url || typeof url !== "string" || !url.includes("cloudinary.com"))
+    return null;
+  try {
+    const parts = url.split("/upload/");
+    if (parts.length < 2) return null;
+    const rightPart = parts[1];
+    // Remove version (v1234567890/) if present
+    const versionRegex = /^v\d+\//;
+    let path = rightPart.replace(versionRegex, "");
+    // Remove extension
+    const lastDotIndex = path.lastIndexOf(".");
+    if (lastDotIndex !== -1) {
+      path = path.substring(0, lastDotIndex);
+    }
+    return path;
+  } catch (e) {
+    return null;
+  }
+}
+
+export function optimizeCloudinaryVideoUrl(
+  url: string,
+  width?: number,
+  quality: string = "auto",
+) {
+  if (!url || typeof url !== "string" || !url.includes("cloudinary.com"))
+    return url;
+  const parts = url.split("/upload/");
+  if (parts.length !== 2) return url;
+  const transformations = [
+    "f_auto",
+    `q_${quality}`,
+    "vc_auto",
+    "c_limit",
+    "br_3m",
+  ];
+  if (width) transformations.push(`w_${width}`);
+  return `${parts[0]}/upload/${transformations.join(",")}/${parts[1]}`;
+}
+
 export async function uploadCloudinaryImageDataURI(
   env: any,
   dataUri: string,
@@ -609,7 +650,28 @@ export async function uploadCloudinaryImageDataURI(
     throw new Error(String(json?.error?.message || `Cloudinary ${res.status}`));
   return {
     url: String(json.secure_url || json.url || ""),
-    width: Number(json.width || 0),
     height: Number(json.height || 0),
   };
+}
+
+export async function deleteCloudinaryImage(env: any, publicId: string, type: "image" | "video" = "image") {
+  const cloudName = String(env.CLOUDINARY_CLOUD_NAME || "");
+  const timestamp = Math.floor(Date.now() / 1000);
+  const paramsToSign = {
+    public_id: publicId,
+    timestamp,
+  };
+  const signed = await cloudinarySignedParams(env, paramsToSign);
+  
+  const form = new FormData();
+  form.append("public_id", publicId);
+  form.append("timestamp", String(timestamp));
+  form.append("api_key", signed.api_key);
+  form.append("signature", signed.signature);
+  
+  const endpoint = `https://api.cloudinary.com/v1_1/${cloudName}/${type}/destroy`;
+  const res = await fetch(endpoint, { method: "POST", body: form });
+  const json: any = await res.json().catch(() => ({}));
+  if (!res.ok) console.error("Cloudinary delete error:", json);
+  return json;
 }

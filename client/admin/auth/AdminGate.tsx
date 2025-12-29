@@ -13,6 +13,7 @@ import TransactionsPage from "@/pages/admin/Transactions";
 import TicketsPage from "@/pages/admin/Tickets";
 import TicketCheckPage from "@/pages/admin/TicketCheck";
 import UploadsPage from "@/pages/admin/Uploads";
+import SettingsPage from "@/pages/admin/Settings";
 // import { adminLoginApi } from "@/lib/api";
 
 const AdminLoginView = () => {
@@ -108,6 +109,7 @@ export const AdminGate = () => {
       <Route path="/transactions" element={<TransactionsPage />} />
       <Route path="/ticket-check" element={<TicketCheckPage />} />
       <Route path="/uploads" element={<UploadsPage />} />
+      <Route path="/settings" element={<SettingsPage />} />
       <Route path="*" element={<Navigate to="/admin/dashboard" replace />} />
     </Routes>
   );

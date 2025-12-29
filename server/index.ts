@@ -3,6 +3,7 @@ import express from "express";
 import fs from "fs";
 import path from "path";
 import cors from "cors";
+import multer from "multer";
 import { handleDemo } from "./routes/user/demo";
 import {
   getAllActiveMoviesToday,
@@ -98,8 +99,69 @@ export function createServer() {
   try {
     fs.mkdirSync(uploadDir, { recursive: true });
     fs.mkdirSync(uploadMoviesDir, { recursive: true });
+    fs.mkdirSync(path.join(uploadDir, "toys"), { recursive: true });
+  } catch {}
+  // --- Local Upload Logic ---
+  const uploadVideoDir = path.join(uploadDir, "videos");
+  try {
+    fs.mkdirSync(uploadDir, { recursive: true });
+    fs.mkdirSync(uploadMoviesDir, { recursive: true });
+    fs.mkdirSync(path.join(uploadDir, "toys"), { recursive: true });
+    fs.mkdirSync(uploadVideoDir, { recursive: true });
   } catch {}
   app.use("/uploads", express.static(uploadDir));
+
+  // --- Local Upload Logic ---
+  const localUploader = async (base64: string, folder: string) => {
+    // folder format: "ctbooking/images/movies" -> we map to local "uploads/movies"
+    // "ctbooking/toys" -> "uploads/toys"
+    
+    let localFolder = "others";
+    if (folder.includes("movies")) localFolder = "movies";
+    else if (folder.includes("toys")) localFolder = "toys";
+    
+    const targetDir = path.join(uploadDir, localFolder);
+    if (!fs.existsSync(targetDir)) fs.mkdirSync(targetDir, { recursive: true });
+    
+    const matches = base64.match(/^data:([A-Za-z-+\/]+);base64,(.+)$/);
+    if (!matches || matches.length !== 3) throw new Error("Invalid base64 string");
+    
+    const type = matches[1];
+    const buffer = Buffer.from(matches[2], "base64");
+    const ext = type.split("/")[1] || "bin";
+    const filename = `${Date.now()}_${Math.random().toString(36).substring(7)}.${ext}`;
+    const filePath = path.join(targetDir, filename);
+    
+    fs.writeFileSync(filePath, buffer);
+    
+    // Return relative URL
+    // Server runs at localhost:8080 (or proxy via Vite). 
+    // We already serve /uploads via express.static
+    return { url: `/uploads/${localFolder}/${filename}` };
+  };
+
+  const localDeleter = async (url: string) => {
+    if (!url || typeof url !== "string") return;
+    // URL format: /uploads/movies/filename.jpg or http://.../uploads/movies/filename.jpg
+    // We strictly handle relative paths starting with /uploads/ or full URLs pointing to this server
+    
+    let relativePath = url;
+    if (url.startsWith("http")) {
+      try {
+        const u = new URL(url);
+        relativePath = u.pathname;
+      } catch { return; }
+    }
+    
+    if (relativePath.startsWith("/uploads/")) {
+       const filePath = path.join(process.cwd(), relativePath.slice(1)); // Remove leading /
+       if (fs.existsSync(filePath)) {
+         try { fs.unlinkSync(filePath); } catch (e) {
+            console.error("Failed to delete local file:", filePath, e);
+         }
+       }
+    }
+  };
 
   // Example API routes
   app.get("/api/ping", (_req, res) => {
@@ -217,7 +279,11 @@ export function createServer() {
       const id = Number(req.params.id);
       const r = await getMovieByIdImpl(
         db,
-        { movies: pgMovies, bookings: pgBookings },
+        {
+          movies: pgMovies,
+          bookings: pgBookings,
+          ticket_packages: pgTicketPackages,
+        },
         id,
       );
       if (!r)
@@ -239,6 +305,9 @@ export function createServer() {
         db,
         { movies: pgMovies },
         req.body as any,
+        undefined,
+        undefined,
+        localUploader
       );
       res.status(201).json(r);
     } catch (error: any) {
@@ -257,6 +326,10 @@ export function createServer() {
         { movies: pgMovies, ticket_packages: pgTicketPackages },
         id,
         req.body as any,
+        undefined,
+        undefined,
+        localUploader,
+        localDeleter
       );
       if (!r)
         return res
@@ -274,7 +347,7 @@ export function createServer() {
   app.delete("/api/movies/:id", async (req, res) => {
     try {
       const id = Number(req.params.id);
-      const r = await deleteMovieImpl(db, { movies: pgMovies }, id);
+      const r = await deleteMovieImpl(db, { movies: pgMovies }, id, localDeleter);
       if (!r)
         return res
           .status(404)
@@ -729,7 +802,7 @@ export function createServer() {
   });
   app.post("/api/toys", async (req, res) => {
     try {
-      const r = await createToyImpl(db, { toys: pgToys }, req.body as any);
+      const r = await createToyImpl(db, { toys: pgToys }, req.body as any, undefined, localUploader);
       res.status(201).json(r);
     } catch (error: any) {
       const errorMessage = error?.message || "Lỗi máy chủ nội bộ";
@@ -742,7 +815,7 @@ export function createServer() {
   app.put("/api/toys/:id", async (req, res) => {
     try {
       const id = Number(req.params.id);
-      const r = await updateToyImpl(db, { toys: pgToys }, id, req.body as any);
+      const r = await updateToyImpl(db, { toys: pgToys }, id, req.body as any, undefined, localUploader, localDeleter);
       if (!r) return res.status(404).json({ message: "Không tìm thấy" });
       res.status(200).json(r);
     } catch (error: any) {
@@ -756,7 +829,7 @@ export function createServer() {
   app.delete("/api/toys/:id", async (req, res) => {
     try {
       const id = Number(req.params.id);
-      const r = await deleteToyImpl(db, { toys: pgToys }, id);
+      const r = await deleteToyImpl(db, { toys: pgToys }, id, localDeleter);
       if (!r) return res.status(404).json({ message: "Không tìm thấy" });
       res.status(200).json(r);
     } catch (error: any) {
@@ -767,14 +840,17 @@ export function createServer() {
       });
     }
   });
-  app.get("/api/admin/dashboard/metrics", async (_req, res) => {
+  app.get("/api/admin/dashboard/metrics", async (req, res) => {
     try {
+      const period = String(req.query.period || "week");
+      const year = req.query.year ? parseInt(String(req.query.year)) : undefined;
       const r = await getDashboardMetricsImpl(db, {
         movies: pgMovies,
         toys: pgToys,
         users: pgUsers,
         bookings: pgBookings,
-      });
+        ticket_packages: pgTicketPackages,
+      }, undefined, period, year);
       res.status(200).json(r);
     } catch (error: any) {
       const errorMessage = error?.message || "Lỗi máy chủ nội bộ";
@@ -788,10 +864,11 @@ export function createServer() {
     try {
       const date = String(req.query.date || "");
       const status = String(req.query.status || "paid");
+      const year = req.query.year ? parseInt(String(req.query.year)) : undefined;
       const r = await getRevenueByDateImpl(
         db,
         { bookings: pgBookings },
-        { date, status },
+        { date, status, year },
       );
       res.status(200).json(r);
     } catch (error: any) {
@@ -802,9 +879,11 @@ export function createServer() {
       });
     }
   });
-  app.get("/api/admin/dashboard/revenue-7days", async (_req, res) => {
+
+  app.get("/api/admin/dashboard/revenue-7days", async (req, res) => {
     try {
-      const r = await getRevenue7DaysImpl(db, { bookings: pgBookings });
+      const year = req.query.year ? parseInt(String(req.query.year)) : undefined;
+      const r = await getRevenue7DaysImpl(db, { bookings: pgBookings }, undefined, year);
       res.status(200).json(r);
     } catch (error: any) {
       const errorMessage = error?.message || "Lỗi máy chủ nội bộ";
@@ -1014,10 +1093,11 @@ export function createServer() {
       const page = Number(req.query.page || 1);
       const pageSize = Number(req.query.pageSize || 20);
       const q = String(req.query.q || "");
+      const includeInactive = req.query.includeInactive === "true";
       const r = await listTicketPackagesImpl(
         db,
         { ticket_packages: pgTicketPackages, movies: pgMovies },
-        { page, pageSize, q },
+        { page, pageSize, q, includeInactive },
       );
       res.status(200).json(r);
     } catch (error: any) {
@@ -1117,7 +1197,58 @@ export function createServer() {
       });
     }
   });
-  app.post("/api/admin/uploads/video", uploadAdminVideo);
+  // app.post("/api/admin/uploads/video", uploadAdminVideo);
+  // Override: Use local upload logic for video if running locally
+  app.post("/api/admin/uploads/video", (req, res, next) => {
+      // Local implementation
+      const storage = multer.diskStorage({
+        destination: (req: any, _file: any, cb: any) => {
+           // Get folder from body (must be sent before file in FormData) or query
+           const folderParam = req.body.folder || req.query.folder || "general";
+           // Sanitize folder name
+           const safeFolder = folderParam.replace(/[^a-zA-Z0-9._-]/g, "_");
+           const targetDir = path.join(uploadVideoDir, safeFolder);
+           if (!fs.existsSync(targetDir)) fs.mkdirSync(targetDir, { recursive: true });
+           cb(null, targetDir);
+        },
+        filename: (_req: any, file: any, cb: any) => {
+           const safe = file.originalname.replace(/[^a-zA-Z0-9._-]/g, "_");
+           // Removed timestamp to allow overwrite
+           cb(null, safe);
+        },
+      });
+      const upload = multer({ 
+          storage,
+          limits: { fileSize: 1024 * 1024 * 2048 }, 
+          fileFilter: (_req: any, file: any, cb: any) => {
+             if (!file.mimetype.startsWith("video/")) return cb(new Error("Chỉ chấp nhận video"));
+             cb(null, true);
+          }
+      }).single("file");
+
+      upload(req, res, (err: any) => {
+          if (err) return res.status(400).json({ message: err.message });
+          const file = (req as any).file;
+          if (!file) return res.status(400).json({ message: "Thiếu tệp video" });
+          
+          // Determine relative path based on where we saved it
+          // file.destination gives absolute path, we need relative to root for URL
+          // We know we saved to uploadVideoDir / safeFolder
+          const folderParam = req.body.folder || req.query.folder || "general";
+          const safeFolder = folderParam.replace(/[^a-zA-Z0-9._-]/g, "_");
+
+          res.status(200).json({
+              public_id: file.filename, 
+              // Construct URL: /uploads/videos/folder/filename
+              url: `/uploads/videos/${safeFolder}/${file.filename}`,
+              bytes: file.size,
+              duration: 0, 
+              format: file.mimetype.split("/")[1] || "mp4",
+              width: 0, 
+              height: 0 
+          });
+      });
+  });
   app.post("/api/admin/cloudinary/sign", generateCloudinarySignature);
   app.post("/api/admin/site-media", async (req, res) => {
     try {
@@ -1156,13 +1287,14 @@ export function createServer() {
     try {
       const id = Number(req.params.id);
       const { deleteSiteMediaImpl } = await import("./routes/admin/site-media");
-      const r = await deleteSiteMediaImpl(db, { site_media: pgSiteMedia }, id);
+      const r = await deleteSiteMediaImpl(db, { site_media: pgSiteMedia }, id, localDeleter);
       const status = r.ok ? 200 : 404;
       res.status(status).json(r);
     } catch (err: any) {
       res.status(500).json({ message: err?.message || "Lỗi máy chủ nội bộ" });
     }
   });
+  // app.post("/api/admin/site-media/sync", ... ) -> Removed as user requested "Overwrite" logic instead of "Delete All"
   app.get("/api/site-media", async (req, res) => {
     try {
       const section = String(req.query.section || "");

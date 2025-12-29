@@ -4,6 +4,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { ArrowRight } from "lucide-react";
 import { getActiveToys } from "@/lib/api";
+import { optimizeCloudinaryUrl } from "@/lib/utils";
 
 export default function ProductSection() {
   const [products, setProducts] = useState<any[]>([]);
@@ -88,8 +89,9 @@ export default function ProductSection() {
               <Card className="bg-white/5 backdrop-blur-md border border-white/10 hover:border-cyan-300/50 transition-all duration-300 overflow-hidden h-full shadow-lg hover:shadow-2xl">
                 <div className="relative h-64 overflow-hidden">
                   <motion.img
-                    src={product.image}
+                    src={optimizeCloudinaryUrl(product.image, 400)}
                     alt={product.name}
+                    loading="lazy"
                     className="w-full h-full object-cover"
                     whileHover={{ scale: 1.15 }}
                     transition={{ duration: 0.5 }}
