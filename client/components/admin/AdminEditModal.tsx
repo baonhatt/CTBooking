@@ -5,7 +5,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Calendar, Eye, Loader2, Lock, Plus } from "lucide-react";
+import { Calendar, Eye, Loader2, Lock, Plus, X } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import React, { useEffect, useState } from "react";
@@ -173,7 +173,7 @@ const AdminEditModal: React.FC<AdminEditModalProps> = (props) => {
 
   return (
     <Dialog open={isEditOpen} onOpenChange={setIsEditOpen}>
-      <DialogContent className="max-h-[90vh] w-[90vw] max-w-[900px] overflow-y-auto">
+      <DialogContent className="max-h-[90vh] w-[90vw] max-w-[900px] overflow-y-auto [&>button]:hidden">
         <DialogHeader className="flex flex-row items-center gap-3 space-y-0 pb-4 border-b">
           <DialogTitle className="text-lg font-bold text-slate-800">
             {editType === "user"
@@ -197,6 +197,16 @@ const AdminEditModal: React.FC<AdminEditModalProps> = (props) => {
               </span>
             </Button>
           )}
+
+          <div className="flex-1" />
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => setIsEditOpen(false)}
+            className="h-8 w-8 rounded-full hover:bg-slate-100 text-slate-400 transition-colors"
+          >
+            <X className="w-5 h-5" />
+          </Button>
         </DialogHeader>
 
         {editType === "user" && (

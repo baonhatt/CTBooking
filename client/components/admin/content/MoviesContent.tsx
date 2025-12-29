@@ -598,6 +598,15 @@ export default function MoviesContent({
                     </div>
                   </div>
                 </div>
+
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => setIsDetailsOpen(false)}
+                  className="h-8 w-8 text-slate-400 hover:text-white hover:bg-white/10 rounded-full transition-colors mr-2"
+                >
+                  <X size={20} />
+                </Button>
               </div>
 
               {/* BODY SECTION */}

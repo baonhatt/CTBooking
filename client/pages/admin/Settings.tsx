@@ -70,9 +70,6 @@ export default function SettingsPage() {
                  <p className="text-xs text-slate-400 font-bold uppercase tracking-[0.2em]">Tùy chỉnh không gian làm việc của bạn</p>
               </div>
            </div>
-           <Badge variant="outline" className="border-slate-200 text-slate-500 font-bold py-1.5 px-4 rounded-xl self-start md:self-center">
-              V1.2.0 - Stable
-           </Badge>
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
