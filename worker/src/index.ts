@@ -788,13 +788,13 @@ app.get("/api/getActiveMovies", async (c) => {
           status: 200,
           headers: {
             "Content-Type": "application/json",
-            "Cache-Control": "public, s-maxage=300",
-            "Cloudflare-CDN-Cache-Control": "max-age=300",
+            "Cache-Control": "public, max-age=0, must-revalidate, s-maxage=3600",
+            "Cloudflare-CDN-Cache-Control": "max-age=3600",
             Vary: "Origin",
           },
         });
       },
-      300,
+      3600,
     );
 });
 
@@ -1185,10 +1185,11 @@ app.put("/api/movies/:id", async (c) => {
   }
 });
 
-app.patch("/api/movies-status/:id", async (c) => {
+app.post("/api/movies-status/:id", async (c) => {
   try {
     const id = Number(c.req.param("id"));
-    const is_active = Boolean(c.req.param("is_active"));
+    const body: any = await c.req.json().catch(() => ({}));
+    const is_active = body.is_active !== undefined ? body.is_active : false;
     const db = drizzle(c.env.cinema_db, { schema });
     const r = await updateMovieStatusImpl(
       db,
@@ -1210,17 +1211,18 @@ app.patch("/api/movies-status/:id", async (c) => {
       const frontendOrigin = c.req.header("Origin");
       const backendOrigin = new URL(c.req.url).origin;
       const moviesApiUrl = `${backendOrigin}/api/getActiveMovies`;
-
+      
+      const targets = [
+          new Request(moviesApiUrl), // No headers (same-origin GET)
+          new Request(moviesApiUrl, { headers: { Origin: "https://cinesphere.com.vn" } }),
+          new Request(moviesApiUrl, { headers: { Origin: "https://www.cinesphere.com.vn" } }),
+      ];
+      
       if (frontendOrigin) {
-        c.executionCtx.waitUntil(
-          cache.delete(
-            new Request(moviesApiUrl, {
-              headers: { Origin: frontendOrigin },
-            }),
-          ),
-        );
+         targets.push(new Request(moviesApiUrl, { headers: { Origin: frontendOrigin } }));
       }
-      c.executionCtx.waitUntil(cache.delete(new Request(moviesApiUrl)));
+      
+      c.executionCtx.waitUntil(Promise.all(targets.map(req => cache.delete(req))));
     }
     // --- LOGIC XÓA CACHE KẾT THÚC ---
 

@@ -43,3 +43,15 @@ export function optimizeCloudinaryVideoUrl(
 
   return `${parts[0]}/upload/${transformations.join(",")}/${parts[1]}`;
 }
+
+export function getCloudinaryThumbnail(url: string) {
+  if (!url) return url;
+  if (!url.includes("cloudinary.com")) return url;
+  
+  const parts = url.split("/upload/");
+  if (parts.length !== 2) return url;
+  
+  // Replace extension with .jpg and add so_0 to get start frame
+  const videoPath = parts[1].replace(/\.[^/.]+$/, ".jpg");
+  return `${parts[0]}/upload/f_auto,q_auto,so_0/${videoPath}`;
+}

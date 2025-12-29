@@ -152,6 +152,15 @@ export function createServer() {
         relativePath = u.pathname;
       } catch { return; }
     }
+    const safeDate = (dateVal: any) => {
+      if (!dateVal) return null;
+      if (typeof dateVal === "string" && !dateVal.includes("T") && dateVal.includes(" ")) {
+        // Convert "2025-12-15 02:15:31" to "2025-12-15T02:15:31"
+        dateVal = dateVal.replace(" ", "T");
+      }
+      const d = new Date(dateVal);
+      return isNaN(d.getTime()) ? null : d.toISOString();
+    };
     
     if (relativePath.startsWith("/uploads/")) {
        const filePath = path.join(process.cwd(), relativePath.slice(1)); // Remove leading /
@@ -361,15 +370,24 @@ export function createServer() {
       });
     }
   });
-  app.patch("/api/movies-status/:id", async (req, res) => {
+  app.post("/api/movies-status/:id", async (req, res) => {
     try {
-      const id = Number(req.params.id);
-      const { is_active } = req.body;
+      const id = parseInt(req.params.id);
+      // Log body to debug on Worker
+      console.log(`[Status Update] ID: ${id}, Body:`, req.body);
+
+      const is_active = req.body.is_active !== undefined ? req.body.is_active : req.body.isActive;
+      
+      if (typeof is_active === "undefined") {
+        return res.status(400).json({ status: "error", message: "Missing is_active field" });
+      }
+
       const r = await updateMovieStatusImpl(
         db,
         { movies: pgMovies, ticket_packages: pgTicketPackages },
         id,
         is_active,
+        process.env.RUNTIME_ENV,
       );
       const status =
         typeof (r as any).status === "number" ? (r as any).status : 200;

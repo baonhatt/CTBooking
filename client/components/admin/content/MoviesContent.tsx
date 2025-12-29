@@ -586,15 +586,19 @@ export default function MoviesContent({
                       </Button>
                     </div>
                     {/* THỂ LOẠI: Hiển thị rõ ràng dạng Tag */}
-                    <div className="flex gap-1.5 mt-2.5">
-                      {movieDetails.genres?.map((genre: string) => (
-                        <span
-                          key={genre}
-                          className="text-[9px] font-bold px-2 py-0.5 bg-slate-800 text-slate-400 rounded border border-slate-700 uppercase tracking-wider"
-                        >
-                          {genre}
-                        </span>
-                      ))}
+                    <div className="flex flex-wrap gap-1.5 mt-2.5">
+                      {Array.isArray(movieDetails.genres) ? (
+                        movieDetails.genres.map((genre: string) => (
+                          <span
+                            key={genre}
+                            className="text-[9px] font-bold px-2 py-0.5 bg-slate-800 text-slate-400 rounded border border-slate-700 uppercase tracking-wider"
+                          >
+                            {genre}
+                          </span>
+                        ))
+                      ) : (
+                        <span className="text-[9px] text-slate-500 italic">Chưa có thể loại</span>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -671,7 +675,7 @@ export default function MoviesContent({
                         </Button>
                       </div>
                     <div className="p-4 flex flex-wrap gap-3">
-                      {movieDetails.applicable_packages &&
+                      {Array.isArray(movieDetails.applicable_packages) &&
                       movieDetails.applicable_packages.length > 0 ? (
                         movieDetails.applicable_packages.map(
                           (pkg: any, index: number) => {
@@ -680,7 +684,7 @@ export default function MoviesContent({
                               pkg.name?.toLowerCase().includes("vip");
                             return (
                               <div
-                                key={pkg.id}
+                                key={pkg.id || index}
                                 className={`flex items-center gap-2.5 px-3 py-2 rounded-lg border ${
                                   isVip
                                     ? "bg-indigo-50 border-indigo-100"
@@ -699,7 +703,7 @@ export default function MoviesContent({
                                     isVip ? "text-indigo-700" : "text-emerald-700"
                                   }`}
                                 >
-                                  {pkg.name} ({Number(pkg.price).toLocaleString()}
+                                  {pkg.name} ({Number(pkg.price || 0).toLocaleString()}
                                   đ)
                                 </span>
                               </div>
