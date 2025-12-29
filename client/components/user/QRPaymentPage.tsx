@@ -28,10 +28,10 @@ export default function QRPaymentPage() {
   const [showExpiredDialog, setShowExpiredDialog] = useState(false);
 
   const BANK_INFO = {
-    bankName: "Ngân Hàng MB Bank",
-    accountNumber: "0935071405",
+    bankName: "Ngân Hàng OCB",
+    accountNumber: "596310",
     accountName: "CONG TY TNHH CONG NGHE VR VIET NAM",
-    bankCode: "MB",
+    bankCode: "OCB",
   };
 
   // Init Data & Timer
