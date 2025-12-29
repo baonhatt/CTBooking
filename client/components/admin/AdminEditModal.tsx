@@ -5,7 +5,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Calendar, Loader2, Lock, Plus } from "lucide-react";
+import { Calendar, Eye, Loader2, Lock, Plus } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import React, { useEffect, useState } from "react";
@@ -37,6 +37,8 @@ interface AdminEditModalProps {
     React.SetStateAction<Record<string, "active" | "inactive">>
   >;
   setToys: React.Dispatch<React.SetStateAction<any[]>>;
+  onViewDetails?: (id: number) => void;
+  onRefresh?: () => Promise<void>;
 }
 
 const AdminEditModal: React.FC<AdminEditModalProps> = (props) => {
@@ -128,25 +130,9 @@ const AdminEditModal: React.FC<AdminEditModalProps> = (props) => {
 
   async function refetch(type: "movie" | "toy") {
     if (type === "movie") {
-      const { items } = await getMoviesAdmin({ page: currentPage, pageSize });
-      const mapped = items.map((m: any) => ({
-        id: String(m.id),
-        title: m.title,
-        year: new Date(m.release_date || Date.now()).getFullYear(),
-        duration: m?.duration_min ? `${Number(m.duration_min)}` : "",
-        genres: Array.isArray(m.genres) ? m.genres : [],
-        posterUrl: m.cover_image || "",
-        release_date: m.release_date || null,
-        rating: m.rating ?? null,
-        is_active: m.is_active !== false,
-      }));
-      setMoviesLocal(mapped);
-      setMovieStatus((prev) => ({
-        ...prev,
-        ...Object.fromEntries(
-          mapped.map((x: any) => [x.id, x.is_active ? "active" : "inactive"]),
-        ),
-      }));
+      if (props.onRefresh) {
+        await props.onRefresh();
+      }
     }
     if (type === "toy") {
       const { items } = await getToys({ page: currentPage, pageSize });
@@ -188,8 +174,8 @@ const AdminEditModal: React.FC<AdminEditModalProps> = (props) => {
   return (
     <Dialog open={isEditOpen} onOpenChange={setIsEditOpen}>
       <DialogContent className="max-h-[90vh] w-[90vw] max-w-[900px] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle>
+        <DialogHeader className="flex flex-row items-center gap-3 space-y-0 pb-4 border-b">
+          <DialogTitle className="text-lg font-bold text-slate-800">
             {editType === "user"
               ? "Chỉnh sửa người dùng"
               : editType === "movie"
@@ -198,6 +184,19 @@ const AdminEditModal: React.FC<AdminEditModalProps> = (props) => {
                   ? "Chỉnh sửa đồ chơi"
                   : ""}
           </DialogTitle>
+          {editType === "movie" && editData?.id && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => props.onViewDetails?.(Number(editData.id))}
+              className="h-7 rounded-full gap-1.5 border-slate-200 hover:bg-blue-50 hover:text-blue-600 group transition-all px-3"
+            >
+              <Eye className="w-3.5 h-3.5 text-slate-400 group-hover:text-blue-500" />
+              <span className="text-[10px] font-bold uppercase tracking-wider">
+                Xem chi tiết
+              </span>
+            </Button>
+          )}
         </DialogHeader>
 
         {editType === "user" && (

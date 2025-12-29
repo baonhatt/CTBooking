@@ -414,37 +414,18 @@ export async function deleteTicketPackageImpl(
     // Nếu không tìm thấy gói vé, trả về null
     if (!existing) return null;
   
-    // 2. Kiểm tra xem có đơn đặt vé nào liên quan đến gói vé này không
-    const hasBookings = await anyDb.query.bookings.findFirst({
-      where: eq(tables.bookings.ticket_package_id, id),
-    });
-    // 3. Nếu có đơn đặt vé, thực hiện soft delete
-    if (hasBookings) {
-      // Cập nhật trạng thái is_active = false thay vì xóa
-      await anyDb
-        .update(tables.ticket_packages)
-        .set({ 
-          is_active: false,  // Đánh dấu không hoạt động
-          updated_at: new Date()  // Cập nhật thời gian chỉnh sửa
-        })
-        .where(eq(tables.ticket_packages.id, id));
-      
-      // Thông báo đã vô hiệu hóa thay vì xóa
-      return { 
-        status: 200, 
-        message: 'Gói vé đã được đánh dấu là không hoạt động do có đơn đặt vé liên quan',
-      };
-    }
-  
-    // 4. Nếu không có đơn đặt vé nào, thực hiện xóa hoàn toàn
+    // 2. Thực hiện soft delete (update is_active = false)
     await anyDb
-      .delete(tables.ticket_packages)
+      .update(tables.ticket_packages)
+      .set({ 
+        is_active: false,
+        updated_at: new Date()
+      })
       .where(eq(tables.ticket_packages.id, id));
   
-    // Trả về thông báo xóa thành công
     return { 
       status: 200, 
-      message: 'Gói vé đã được xóa thành công',
+      message: 'Gói vé đã được chuyển sang trạng thái Ngừng hoạt động thành công',
     };
   } catch (err: any) {
     // Bắt và ném lại lỗi nếu có

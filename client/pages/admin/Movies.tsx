@@ -6,37 +6,37 @@ import AdminEditModal from "@/components/admin/AdminEditModal";
 import { toast } from "sonner";
 
 export default function MoviesPage() {
+  const getInitialFilters = () => {
+    try {
+      const raw = localStorage.getItem("admin_movies_filters");
+      if (raw) return JSON.parse(raw);
+    } catch {}
+    return {};
+  };
+
+  const initialFilters = getInitialFilters();
+
   const [moviesLocal, setMoviesLocal] = useState<any[]>([]);
   const [movieStatus, setMovieStatus] = useState<
     Record<string, "active" | "inactive">
   >({});
   const [totalMovies, setTotalMovies] = useState(0);
   const [moviesPage, setMoviesPage] = useState(1);
-  const [searchQuery, setSearchQuery] = useState("");
+  const [searchQuery, setSearchQuery] = useState<string>(initialFilters.searchQuery ?? "");
   const [sortKey, setSortKey] = useState<
     "updated_at" | "release_date" | "title" | "rating"
-  >("updated_at");
-  const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
+  >(initialFilters.sortKey ?? "updated_at");
+  const [sortDir, setSortDir] = useState<"asc" | "desc">(initialFilters.sortDir ?? "desc");
   const pageSize = 10;
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [editType, setEditType] = useState<"movie" | null>(null);
   const [editData, setEditData] = useState<any>({});
   const [isLoading, setIsLoading] = useState(false);
-  const [showActiveOnly, setShowActiveOnly] = useState(false);
+  const [showActiveOnly, setShowActiveOnly] = useState<boolean>(initialFilters.showActiveOnly ?? false);
 
-  useEffect(() => {
-    try {
-      const raw = localStorage.getItem("admin_movies_filters");
-      if (raw) {
-        const s = JSON.parse(raw);
-        if (typeof s.searchQuery === "string") setSearchQuery(s.searchQuery);
-        if (typeof s.sortKey === "string") setSortKey(s.sortKey);
-        if (typeof s.sortDir === "string") setSortDir(s.sortDir);
-        if (typeof s.showActiveOnly === "boolean")
-          setShowActiveOnly(s.showActiveOnly);
-      }
-    } catch {}
-  }, []);
+  const [isDetailsOpen, setIsDetailsOpen] = useState(false);
+  const [selectedMovieId, setSelectedMovieId] = useState<number | null>(null);
+
 
   useEffect(() => {
     (async () => {
@@ -131,6 +131,7 @@ export default function MoviesPage() {
   const handleOpenEdit = (_type: "movie", data: any) => {
     setEditType("movie");
     setEditData(data);
+    setIsDetailsOpen(false); // Đóng modal chi tiết nếu đang mở
     setIsEditOpen(true);
   };
   const handleOpenCreate = () => {
@@ -145,6 +146,12 @@ export default function MoviesPage() {
       price: 0,
     });
     setIsEditOpen(true);
+  };
+
+  const handleViewDetails = (id: number) => {
+    setSelectedMovieId(id);
+    setIsEditOpen(false);
+    setIsDetailsOpen(true);
   };
 
   const handleRefresh = async () => {
@@ -169,6 +176,7 @@ export default function MoviesPage() {
         : null,
       rating: m.rating ?? null,
       price: Number(m.price || 0),
+      is_active: m.is_active,
       updated_at: m.updated_at ? new Date(m.updated_at).toISOString() : null,
     }));
     setMoviesLocal(mapped);
@@ -244,6 +252,10 @@ export default function MoviesPage() {
         isLoading={isLoading}
         showActiveOnly={showActiveOnly}
         setShowActiveOnly={setShowActiveOnly}
+        isDetailsOpen={isDetailsOpen}
+        setIsDetailsOpen={setIsDetailsOpen}
+        selectedMovieId={selectedMovieId}
+        setSelectedMovieId={setSelectedMovieId}
       />
       <AdminEditModal
         isEditOpen={isEditOpen}
@@ -259,6 +271,8 @@ export default function MoviesPage() {
         setMoviesLocal={setMoviesLocal}
         setMovieStatus={setMovieStatus}
         setToys={() => {}}
+        onViewDetails={handleViewDetails}
+        onRefresh={handleRefresh}
       />
     </AdminLayout>
   );

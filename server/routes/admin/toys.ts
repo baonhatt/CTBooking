@@ -18,20 +18,18 @@ export async function getToyImpl(anyDb: any, tables: { toys: any }, id: number) 
   return toy || null;
 }
 
-export async function createToyImpl(anyDb: any, tables: { toys: any }, args: { name: string; category?: string; price: number; stock?: number; status?: string; image_url?: string; image_base64?: string }, RUNTIME_ENV?: string) {
+export async function createToyImpl(anyDb: any, tables: { toys: any }, args: { name: string; category?: string; price: number; stock?: number; status?: string; image_url?: string; image_base64?: string }, RUNTIME_ENV?: string, uploader?: (base64: string, folder: string) => Promise<{ url: string }>) {
   const { name, category, price, stock, status, image_url, image_base64 } = args as any;
   const priceNum = Number(price);
   let savedImage = image_url as string | undefined;
-  
-  // Note: File system operations are not supported in Cloudflare Workers / D1 environment.
-  // Please use an external storage service (like Cloudinary or R2) and pass the URL.
-  /*
-  if (image_base64 && typeof image_base64 === "string") {
+  if (image_base64 && typeof image_base64 === "string" && uploader) {
     try {
-      // ...fs logic removed for D1 compatibility...
-    } catch { }
+      const uploadResult = await uploader(image_base64, "ctbooking/toys");
+      savedImage = uploadResult.url;
+    } catch (e) {
+      console.error("Upload toy image failed", e);
+    }
   }
-  */
 
   const nowIso = new Date();
   // Try to use .returning() to fetch created toy when supported; fallback for D1/SQLite
@@ -55,10 +53,13 @@ export async function createToyImpl(anyDb: any, tables: { toys: any }, args: { n
   return { toy };
 }
 
-export async function updateToyImpl(anyDb: any, tables: { toys: any }, id: number, args: { name?: string; category?: string; price?: number; stock?: number; status?: string; image_url?: string; image_base64?: string }, RUNTIME_ENV?: string) {
+export async function updateToyImpl(anyDb: any, tables: { toys: any }, id: number, args: { name?: string; category?: string; price?: number; stock?: number; status?: string; image_url?: string; image_base64?: string }, RUNTIME_ENV?: string, uploader?: (base64: string, folder: string) => Promise<{ url: string }>, deleter?: (url: string) => Promise<void>) {
   const { name, category, price, stock, status, image_url, image_base64 } = args as any;
   const priceNum = price === undefined ? undefined : Number(price);
   const now = new Date();
+  const oldToy = await anyDb.query.toys.findFirst({
+    where: eq(tables.toys.id, id),
+  });
   const data: any = { updated_at: formatDateForDb(now, RUNTIME_ENV) };
   if (name !== undefined) data.name = name;
   if (category !== undefined) data.category = category;
@@ -67,27 +68,48 @@ export async function updateToyImpl(anyDb: any, tables: { toys: any }, id: numbe
   if (status !== undefined) data.status = status;
   if (image_url !== undefined) data.image_url = image_url;
   
-  /*
-  if (image_base64 && typeof image_base64 === "string") {
-     // ...fs logic removed for D1 compatibility...
+  if (image_base64 && typeof image_base64 === "string" && uploader) {
+    try {
+      const uploadResult = await uploader(image_base64, "ctbooking/toys");
+      data.image_url = uploadResult.url;
+    } catch (e) { 
+      console.error("Upload toy image failed", e);
+    }
   }
-  */
 
   // Try to use .returning() for update, fallback to query
   const updatedRes = await anyDb.update(tables.toys).set(data).where(eq(tables.toys.id, id)).returning();
   let toy: any = Array.isArray(updatedRes) ? updatedRes[0] : updatedRes;
   // if (!toy) toy = await anyDb.query.toys.findFirst({ where: eq(tables.toys.id, id) });
 
+  if (
+    oldToy &&
+    data.image_url &&
+    oldToy.image_url &&
+    oldToy.image_url !== data.image_url &&
+    deleter
+  ) {
+    deleter(oldToy.image_url).catch((e) =>
+      console.error("Failed to delete old toy image:", e),
+    );
+  }
+
   return toy || null;
 }
 
-export async function deleteToyImpl(anyDb: any, tables: { toys: any }, id: number) {
+export async function deleteToyImpl(anyDb: any, tables: { toys: any }, id: number, deleter?: (url: string) => Promise<void>) {
   // Check if toy exists before deleting
   const existing = await anyDb.query.toys.findFirst({
     where: eq(tables.toys.id, id),
   });
 
   if (!existing) return null;
+
+  if (existing.image_url && deleter) {
+    deleter(existing.image_url).catch((e) =>
+      console.error("Failed to delete toy image:", e),
+    );
+  }
 
   // Delete toy (tương thích với D1/SQLite không hỗ trợ .returning())
   await anyDb.delete(tables.toys).where(eq(tables.toys.id, id));

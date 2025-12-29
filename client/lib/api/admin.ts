@@ -58,34 +58,45 @@ export async function getTransactions(options?: {
   }>(path, { signal: options?.signal });
 }
 
-export async function getDashboardMetrics() {
+export async function getDashboardMetrics(period: string = "week", year?: number) {
+  const params = new URLSearchParams();
+  params.append("period", period);
+  if (year) params.append("year", String(year));
   return request<{
     totalMovies: number;
     totalToys: number;
     totalUsers: number;
     totalTransactions: number;
     revenueTotal: number;
-    revenueByMethod: { cash: number; momo: number; vnpay: number };
-    topMoviesWeek: Array<{ id: number; title: string; revenue: number }>;
-  }>("/api/admin/dashboard/metrics");
+    revenueByMethod: { cash: number; momo: number; vnpay: number; vietqr: number };
+    topTicketsWeek: Array<{ id: number; title: string; revenue: number; count: number }>;
+    paymentStats: Array<{ method: string; revenue: number; count: number }>;
+    topVipUsers: Array<{ userId: number; email: string; totalSpent: number; bookingCount: number }>;
+    ticketUsage: { used: number; total: number };
+    paymentHealth: { paid: number; pending: number; failed: number };
+    bookingHours: number[];
+  }>(`/api/admin/dashboard/metrics?${params.toString()}`);
 }
 
-export async function getRevenueByDate(date?: string, status?: "all" | "paid") {
+export async function getRevenueByDate(date?: string, status?: "all" | "paid", year?: number) {
   const params = new URLSearchParams();
   if (date) params.append("date", date);
   if (status) params.append("status", status);
+  if (year) params.append("year", String(year));
   return request<{
     date: string;
     total: number;
     count: number;
-    revenueByMethod: { cash: number; momo: number; vnpay: number };
+    revenueByMethod: { cash: number; momo: number; vnpay: number; vietqr: number };
   }>(`/api/admin/dashboard/revenue-date?${params.toString()}`);
 }
 
-export async function getRevenue7Days() {
+export async function getRevenue7Days(year?: number) {
+  const params = new URLSearchParams();
+  if (year) params.append("year", String(year));
   return request<{
     data: Array<{ day: string; revenue: number }>;
-  }>("/api/admin/dashboard/revenue-7days");
+  }>(`/api/admin/dashboard/revenue-7days?${params.toString()}`);
 }
 
 export async function getRevenueByMonth(
@@ -102,7 +113,7 @@ export async function getRevenueByMonth(
     return request<{
       total: number;
       count: number;
-      revenueByMethod: { cash: number; momo: number; vnpay: number };
+      revenueByMethod: { cash: number; momo: number; vnpay: number; vietqr: number };
     }>(`/api/admin/dashboard/revenue-month?${params.toString()}`);
   }
 

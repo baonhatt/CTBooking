@@ -1,7 +1,7 @@
 import { motion } from "framer-motion";
 import { Play, Pause, ChevronLeft, ChevronRight } from "lucide-react";
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
-import { cn, optimizeCloudinaryUrl } from "@/lib/utils";
+import { cn, optimizeCloudinaryUrl, optimizeCloudinaryVideoUrl } from "@/lib/utils";
 import { useQuery } from "@tanstack/react-query";
 import { getSiteMediaApi } from "@/lib/api/uploads";
 import useEmblaCarousel from "embla-carousel-react";
@@ -56,11 +56,11 @@ export default function TechnologyBanner() {
   });
   const mainVisual = {
     type: "video" as const,
-    src: optimizeCloudinaryUrl((techMain?.items?.[0]?.url as string) || mainVisualDefault.src, 1280),
+    src: optimizeCloudinaryVideoUrl((techMain?.items?.[0]?.url as string) || mainVisualDefault.src, 1280, "auto:good"),
   };
   const videoPreviewsDb = Array.isArray(techList?.items)
     ? techList!.items.map((it: any) => ({
-        src: optimizeCloudinaryUrl(it.url as string, 640),
+        src: optimizeCloudinaryVideoUrl(it.url as string, 640, "auto:good"),
         title: it.title || "Video",
         description: it.description || "",
       }))
@@ -81,9 +81,13 @@ export default function TechnologyBanner() {
   useEffect(() => {
     const n = videoPreviewsMerged.length || videoPreviews.length;
     setDurations(Array(n).fill(0));
+    setDurations(Array(n).fill(0));
     setProgresses(Array(n).fill(0));
     setPlayingArr(Array(n).fill(false));
+    setLoadedVideos(Array(n).fill(false));
   }, [videoPreviewsMerged.length]);
+  const [loadedVideos, setLoadedVideos] = useState<boolean[]>([]);
+  const [mainVideoLoaded, setMainVideoLoaded] = useState(false);
   const [canScrollPrev, setCanScrollPrev] = useState(false);
   const [canScrollNext, setCanScrollNext] = useState(false);
   
@@ -168,7 +172,15 @@ export default function TechnologyBanner() {
       const observer = new IntersectionObserver(
         (entries) => {
           entries.forEach((entry) => {
-            if (!entry.isIntersecting) {
+          entries.forEach((entry) => {
+            if (entry.isIntersecting) {
+               // Video is in viewport, load it
+               setLoadedVideos((prev) => {
+                 const arr = [...prev];
+                 if (!arr[i]) arr[i] = true;
+                 return arr;
+               });
+            } else {
               // Video is out of viewport, pause it
               el.pause();
               setPlayingArr((prev) => {
@@ -177,6 +189,7 @@ export default function TechnologyBanner() {
                 return arr;
               });
             }
+          });
           });
         },
         {
@@ -200,11 +213,15 @@ export default function TechnologyBanner() {
     const observer = new IntersectionObserver(
       (entries) => {
         entries.forEach((entry) => {
-          if (!entry.isIntersecting) {
+        entries.forEach((entry) => {
+          if (entry.isIntersecting) {
+            setMainVideoLoaded(true);
+          } else {
             // Main video is out of viewport, pause it
             mainVideoRef.current?.pause();
             setIsMainVideoPlaying(false);
           }
+        });
         });
       },
       {
@@ -491,7 +508,7 @@ export default function TechnologyBanner() {
               >
                 <video
                   ref={mainVideoRef}
-                  src={mainVisual.src as any}
+                  src={mainVideoLoaded ? (mainVisual.src as any) : undefined}
                   className="w-full h-full object-cover"
                   playsInline
                   preload="metadata"
@@ -606,7 +623,7 @@ export default function TechnologyBanner() {
                           ref={(el) => {
                             if (el) videoRefs.current[gi] = el;
                           }}
-                          src={item.src as any}
+                          src={loadedVideos[gi] ? (item.src as any) : undefined}
                           className="w-full h-full object-cover"
                           playsInline
                           preload={"metadata"}

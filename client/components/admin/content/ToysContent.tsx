@@ -10,6 +10,7 @@ import {
 } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Search, RefreshCw, Edit3, Trash2, Plus, Package } from "lucide-react";
 import {
   Pagination,
   PaginationContent,
@@ -69,38 +70,52 @@ export default function ToysContent({
   };
   return (
     <div className="space-y-6">
-      <div className="flex justify-between items-center gap-4">
-        <div className="flex-1">
-          <input
-            type="text"
-            placeholder="Tìm kiếm đồ chơi theo tên hoặc danh mục..."
-            value={searchQuery}
-            onChange={(e) => onSearchChange(e.target.value)}
-            className="w-full px-4 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-          />
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-white p-4 rounded-2xl border shadow-sm">
+        <div className="flex flex-col gap-1">
+          <h3 className="text-lg font-bold text-slate-900">Quản lý đồ chơi</h3>
+          <p className="text-xs text-slate-500">Tổng cộng {toysLength} sản phẩm trong kho</p>
         </div>
-        <h3 className="text-lg font-semibold whitespace-nowrap">
-          Tổng: {toysLength}
-        </h3>
-        <div className="flex gap-2">
-          <Button onClick={onRefresh} variant="outline">
-            ↻ Refresh
-          </Button>
-          <Button onClick={onCreate}>+ Thêm đồ chơi</Button>
+        <div className="flex flex-1 w-full md:max-w-xl gap-2 ml-auto">
+          <div className="relative flex-1">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 w-4 h-4" />
+            <input
+              type="text"
+              placeholder="Tìm kiếm đồ chơi theo tên hoặc danh mục..."
+              value={searchQuery}
+              onChange={(e) => onSearchChange(e.target.value)}
+              className="w-full pl-10 pr-4 py-2 bg-slate-50 border-transparent focus:bg-white focus:ring-2 focus:ring-blue-500 rounded-xl transition-all outline-none text-sm border"
+            />
+          </div>
+          <div className="flex gap-2">
+            <Button
+              variant="outline"
+              size="icon"
+              onClick={onRefresh}
+              className="rounded-xl shadow-sm hover:rotate-180 transition-transform duration-500 shrink-0 h-10 w-10 flex items-center justify-center bg-white border-slate-200"
+            >
+              <RefreshCw className={`w-4 h-4 ${isLoading ? "animate-spin" : ""}`} />
+            </Button>
+            <Button 
+              onClick={onCreate}
+              className="bg-blue-600 hover:bg-blue-700 rounded-xl shadow-lg shadow-blue-200 gap-2 text-white font-bold h-10 px-4"
+            >
+              <Plus className="w-4 h-4" /> Thêm mới
+            </Button>
+          </div>
         </div>
       </div>
-      <Card>
+      <Card className="border-none shadow-xl shadow-slate-200/50 rounded-2xl overflow-hidden bg-white">
         <CardContent className="p-0">
           <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>ID</TableHead>
-                <TableHead>Tên</TableHead>
-                <TableHead>Danh Mục</TableHead>
-                <TableHead>Giá</TableHead>
-                <TableHead>Tồn Kho</TableHead>
-                <TableHead>Trạng Thái</TableHead>
-                <TableHead className="text-right">Hành Động</TableHead>
+            <TableHeader className="bg-slate-50/80">
+              <TableRow className="hover:bg-transparent border-none">
+                <TableHead className="w-16 text-center text-[10px] uppercase font-bold text-slate-400">ID</TableHead>
+                <TableHead className="text-[10px] uppercase font-bold text-slate-500">Sản phẩm</TableHead>
+                <TableHead className="text-[10px] uppercase font-bold text-slate-500">Phân loại</TableHead>
+                <TableHead className="text-[10px] uppercase font-bold text-slate-500 text-center">Đơn giá</TableHead>
+                <TableHead className="text-[10px] uppercase font-bold text-slate-500 text-center">Tồn kho</TableHead>
+                <TableHead className="text-[10px] uppercase font-bold text-slate-500 text-center">Trạng Thái</TableHead>
+                <TableHead className="text-right text-[10px] uppercase font-bold text-slate-500 pr-6">Thao tác</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>

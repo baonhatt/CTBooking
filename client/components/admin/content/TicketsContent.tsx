@@ -1,5 +1,8 @@
 import React, { useState } from "react";
-import { Loader2 } from "lucide-react";
+import { Clock, History, Loader2, RefreshCw, Edit3, Trash2, Info, Ticket as TicketIcon } from "lucide-react";
+import { format, formatDistanceToNow } from "date-fns";
+import { vi } from "date-fns/locale";
+import { Switch } from "@/components/ui/switch";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import {
@@ -47,6 +50,7 @@ interface TicketPackage {
   is_member_only?: boolean;
   is_active?: boolean;
   display_order?: number;
+  updated_at?: string;
 }
 
 interface Props {
@@ -64,6 +68,8 @@ interface Props {
   onRefresh: () => Promise<void>;
   deleteTicketApi: (id: number) => Promise<any>;
   isLoading?: boolean;
+  showActiveOnly: boolean;
+  setShowActiveOnly: (v: boolean) => void;
 }
 
 export default function TicketsContent(props: Props) {
@@ -82,6 +88,8 @@ export default function TicketsContent(props: Props) {
     setEditData,
     onRefresh,
     deleteTicketApi,
+    showActiveOnly,
+    setShowActiveOnly,
   } = props;
   const { isLoading = false } = props as any;
 
@@ -98,27 +106,49 @@ export default function TicketsContent(props: Props) {
   }, [isEditOpen]);
 
   return (
-    <div className="space-y-4">
-      <Card>
-        <CardHeader className="flex items-center justify-between">
-          <CardTitle>Gói vé</CardTitle>
-          <div className="flex gap-2">
-            <Button onClick={onCreate}>Thêm gói vé</Button>
-            <Button variant="outline" onClick={onRefresh}>
-              Làm mới
-            </Button>
+    <div className="space-y-6">
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-white p-4 rounded-2xl border shadow-sm">
+        <div className="flex flex-col gap-1">
+          <h3 className="text-lg font-bold text-slate-900">Quản lý gói vé</h3>
+          <div className="flex items-center gap-2 px-3 py-1 bg-slate-50 rounded-lg border border-slate-200 w-fit">
+            <span className="text-[10px] font-black text-slate-500 uppercase tracking-tighter">
+              Chỉ hiện khả dụng
+            </span>
+            <Switch
+              checked={showActiveOnly}
+              onCheckedChange={setShowActiveOnly}
+              className="scale-75 data-[state=checked]:bg-emerald-500 data-[state=unchecked]:bg-slate-300 cursor-pointer"
+            />
           </div>
-        </CardHeader>
-        <CardContent>
+        </div>
+        <div className="flex gap-2 ml-auto">
+          <Button 
+            onClick={onCreate} 
+            className="h-10 px-6 rounded-xl text-sm font-bold bg-blue-600 hover:bg-blue-700 shadow-lg shadow-blue-200"
+          >
+            + Thêm gói vé
+          </Button>
+          <Button 
+            variant="outline" 
+            size="icon"
+            onClick={onRefresh}
+            className="h-10 w-10 rounded-xl shadow-sm hover:rotate-180 transition-transform duration-500 shrink-0"
+          >
+            <RefreshCw className={`w-4 h-4 ${isLoading ? "animate-spin" : ""}`} />
+          </Button>
+        </div>
+      </div>
+      <Card className="border-none shadow-xl shadow-slate-200/50 rounded-2xl overflow-hidden bg-white font-sans">
+        <CardContent className="p-0">
           <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Tên</TableHead>
-                <TableHead>Loại</TableHead>
-                <TableHead>Giá</TableHead>
-                <TableHead>Thứ Tự</TableHead>
-                <TableHead>Trạng Thái</TableHead>
-                <TableHead className="text-right">Hành Động</TableHead>
+            <TableHeader className="bg-slate-50/80">
+              <TableRow className="hover:bg-transparent border-none">
+                <TableHead className="text-[10px] uppercase font-bold text-slate-500">Tên gói</TableHead>
+                <TableHead className="text-[10px] uppercase font-bold text-slate-500">Phân loại</TableHead>
+                <TableHead className="text-[10px] uppercase font-bold text-slate-500">Giá niêm yết</TableHead>
+                <TableHead className="text-[10px] uppercase font-bold text-slate-500">Cập nhật</TableHead>
+                <TableHead className="text-center text-[10px] uppercase font-bold text-slate-500">Trạng Thái</TableHead>
+                <TableHead className="text-right text-[10px] uppercase font-bold text-slate-500 pr-6">Thao tác</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -138,6 +168,9 @@ export default function TicketsContent(props: Props) {
                         <Skeleton className="h-4 w-16" />
                       </TableCell>
                       <TableCell>
+                        <Skeleton className="h-4 w-24" />
+                      </TableCell>
+                      <TableCell>
                         <Skeleton className="h-5 w-20" />
                       </TableCell>
                       <TableCell className="text-right">
@@ -146,62 +179,79 @@ export default function TicketsContent(props: Props) {
                     </TableRow>
                   ))
                 : data.map((t) => (
-                    <TableRow key={t.id}>
-                      <TableCell className="font-medium">{t.name}</TableCell>
-                      <TableCell>{t.type || ""}</TableCell>
-                      <TableCell>
-                        {Number(t.price).toLocaleString("vi-VN")} đ
+                    <TableRow key={t.id} className="group hover:bg-slate-50/80 transition-colors border-b last:border-0">
+                      <TableCell className="py-4">
+                        <div className="flex flex-col gap-0.5">
+                          <span className="font-bold text-slate-900">{t.name}</span>
+                          <span className="text-[10px] text-slate-400 font-mono">CODE: {t.code || "N/A"}</span>
+                        </div>
                       </TableCell>
-                      <TableCell>{t.display_order ?? 0}</TableCell>
                       <TableCell>
-                        <Badge
-                          className={
-                            t.is_active
-                              ? "bg-green-100 text-green-800 hover:bg-green-100"
-                              : "bg-gray-100 text-gray-800 hover:bg-gray-100"
-                          }
-                        >
-                          {t.is_active ? "Hoạt động" : "Đã ẩn"}
+                        <Badge variant="outline" className="text-[10px] font-bold border-slate-200 text-slate-600 bg-white">
+                          TYPE-{t.type || "0"}
                         </Badge>
                       </TableCell>
-                      <TableCell className="text-right space-x-2">
+                      <TableCell className="font-black text-slate-700">
+                        {Number(t.price).toLocaleString("vi-VN")} đ
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex flex-col text-[10px]">
+                          <span className="text-slate-600 font-bold flex items-center gap-1">
+                            <History size={10} className="text-slate-400" />
+                            {t.updated_at ? format(new Date(t.updated_at), "HH:mm") : "-"}
+                          </span>
+                          <span className="text-slate-400 italic">
+                            {t.updated_at ? formatDistanceToNow(new Date(t.updated_at), { addSuffix: true, locale: vi }) : ""}
+                          </span>
+                        </div>
+                      </TableCell>
+                      <TableCell className="text-center">
+                        <Badge
+                          className={`text-[10px] font-bold px-2 py-0.5 rounded-lg border-none shadow-sm ${
+                            t.is_active
+                              ? "bg-emerald-100 text-emerald-700"
+                              : "bg-slate-100 text-slate-500"
+                          }`}
+                        >
+                          {t.is_active ? "HOẠT ĐỘNG" : "ĐÃ ẨN"}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="text-right pr-6 space-x-1">
                         <Button
-                          variant="outline"
-                          size="sm"
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8 rounded-full hover:bg-orange-50 text-orange-600"
                           onClick={() => onEdit(t)}
                         >
-                          Sửa
+                          <Edit3 size={16} />
                         </Button>
                         <Button
-                          variant="destructive"
-                          size="sm"
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8 rounded-full hover:bg-red-50 text-red-600"
                           disabled={isDeletingId === t.id}
                           onClick={async () => {
-                            // Thêm xác nhận trước khi xóa
                             const confirmDelete = window.confirm(
-                              "Bạn có chắc chắn muốn xóa gói vé này?",
+                              "Bạn có chắc chắn muốn ngừng hoạt động gói vé này?",
                             );
                             if (!confirmDelete) return;
                             try {
                               setIsDeletingId(t.id);
                               await deleteTicketApi(t.id);
-                              setTickets((prev) =>
-                                prev.filter((x) => x.id !== t.id),
-                              );
+                              await onRefresh();
                               toast.success("Thành công", {
-                                description: "Xóa gói vé thành công",
+                                description: "Gói vé đã được ngừng hoạt động",
                               });
-                            } catch (error) {
+                            } catch (error: any) {
                               toast.error("Lỗi", {
-                                description:
-                                  "Không thể xóa gói vé. Vui lòng thử lại sau.",
+                                description: error.message || "Không thể thực hiện thao tác",
                               });
                             } finally {
                               setIsDeletingId(null);
                             }
                           }}
                         >
-                          Xóa
+                          <Trash2 size={16} />
                         </Button>
                       </TableCell>
                     </TableRow>
@@ -257,18 +307,23 @@ export default function TicketsContent(props: Props) {
         </CardContent>
       </Card>
       <Dialog open={isEditOpen} onOpenChange={setIsEditOpen}>
-        <DialogContent className="max-w-2xl max-h-[90vh] flex flex-col p-0">
-          <DialogHeader className="px-6 pt-6 pb-4 border-b">
-            <DialogTitle>
-              {editData?.id ? "Chỉnh sửa gói vé" : "Thêm gói vé"}
-            </DialogTitle>
+        <DialogContent className="max-w-2xl max-h-[90vh] flex flex-col p-0 border-none shadow-2xl rounded-2xl overflow-hidden font-sans bg-slate-50">
+          <DialogHeader className="px-6 py-5 bg-slate-900 text-white shrink-0">
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-blue-500/20 rounded-xl border border-blue-500/30">
+                <TicketIcon size={20} className="text-blue-400" />
+              </div>
+              <DialogTitle className="text-xl font-bold text-white">
+                {editData?.id ? "Chỉnh sửa gói vé" : "Thêm gói vé"}
+              </DialogTitle>
+            </div>
           </DialogHeader>
-          <div className="overflow-y-auto px-6 py-4 flex-1">
+          <div className="overflow-y-auto px-6 py-6 flex-1 space-y-8">
             <div className="space-y-6">
               {/* Thông tin cơ bản */}
-              <div className="space-y-4">
-                <h3 className="text-sm font-semibold text-gray-700 border-b pb-2">
-                  Thông tin cơ bản
+              <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm space-y-5">
+                <h3 className="text-[11px] font-black text-slate-400 uppercase tracking-widest border-b pb-2 flex items-center gap-2">
+                  <Info size={14} className="text-blue-500" /> Thông tin cơ bản
                 </h3>
                 <div className="grid grid-cols-2 gap-4">
                   <div>

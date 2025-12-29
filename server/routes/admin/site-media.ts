@@ -1,10 +1,28 @@
 import { eq, and, asc, desc } from "drizzle-orm";
-import { cloudinary, cloudinaryEnvOk } from "../../cloudinary";
 import { formatDateForDb } from "../../lib/date-utils";
 
 export async function createSiteMediaImpl(anyDb: any, tables: { site_media: any }, args: { section: string; type: string; title?: string; description?: string; public_id?: string; url: string; format?: string; width?: number; height?: number; duration?: string | number; display_order?: number; is_active?: boolean }, RUNTIME_ENV?: string) {
   const { section, type, title, description, public_id, url, format, width, height, duration, display_order, is_active } = args;
-  // Try .returning() to fetch created item when supported; fallback for D1/SQLite
+
+  // 1. Check for existing item with same section + public_id (or url)
+  const conditions: any[] = [eq(tables.site_media.section, String(section))];
+  if (public_id) conditions.push(eq(tables.site_media.public_id, String(public_id)));
+  else conditions.push(eq(tables.site_media.url, String(url)));
+
+  const existing = await anyDb.query.site_media.findFirst({
+    where: and(...conditions),
+  });
+
+  if (existing) {
+    // Upsert: Update existing
+    return updateSiteMediaImpl(anyDb, tables, {
+      ...args,
+      id: existing.id,
+      duration: args.duration !== undefined ? Number(args.duration) : undefined,
+    }, RUNTIME_ENV);
+  }
+
+  // 2. Insert new
   const nowIso = new Date();
   const inserted = await anyDb.insert(tables.site_media).values({
     section: String(section),
@@ -105,15 +123,14 @@ export async function updateSiteMediaImpl(
   return { item, success: Boolean(item) };
 }
 
-export async function deleteSiteMediaImpl(anyDb: any, tables: { site_media: any }, id: number) {
+export async function deleteSiteMediaImpl(anyDb: any, tables: { site_media: any }, id: number, deleter?: (url: string, type?: string) => Promise<void>) {
   const existing = await anyDb.query.site_media.findFirst({ where: eq(tables.site_media.id, Number(id)) });
   if (!existing) return { ok: false, message: "Không tìm thấy media" };
   try {
-    if (cloudinaryEnvOk && existing.public_id) {
+    if (existing.url && deleter) {
       const resourceType = existing.type === "video" ? "video" : "image";
-      try {
-        await cloudinary.uploader.destroy(existing.public_id, { resource_type: resourceType });
-      } catch { }
+      // We pass the URL here, letting the deleter decide how to handle it
+      deleter(existing.url, resourceType).catch((e) => {});
     }
     // Delete site media (tương thích với D1/SQLite không hỗ trợ .returning())
     await anyDb.delete(tables.site_media).where(eq(tables.site_media.id, Number(id)));
@@ -122,3 +139,6 @@ export async function deleteSiteMediaImpl(anyDb: any, tables: { site_media: any 
     return { ok: false, message: err?.message || "Xóa media thất bại" };
   }
 }
+// Replace all media for a section: Delete all existing -> Insert new
+// REMOVED as redundant
+

@@ -4,12 +4,14 @@ export async function getTickets(options?: {
   page?: number;
   pageSize?: number;
   q?: string;
+  includeInactive?: boolean;
   signal?: AbortSignal;
 }) {
   const params = new URLSearchParams();
   if (options?.page) params.set("page", String(options.page));
   if (options?.pageSize) params.set("pageSize", String(options.pageSize));
   if (options?.q) params.set("q", options.q);
+  if (options?.includeInactive) params.set("includeInactive", "true");
   const path = `/api/tickets${params.toString() ? `?${params.toString()}` : ""}`;
   return request<{
     items: any[];

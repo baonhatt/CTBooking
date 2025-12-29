@@ -28,7 +28,7 @@ import heroImage1 from "@/assets/images/1.PNG";
 import heroImage9 from "@/assets/images/9.PNG";
 
 import { getSiteMediaApi } from "@/lib/api/uploads";
-import { optimizeCloudinaryUrl } from "@/lib/utils";
+import { optimizeCloudinaryUrl, optimizeCloudinaryVideoUrl } from "@/lib/utils";
 
 export default function HeroSection() {
   const [pointer, setPointer] = useState({ x: 0, y: 0 });
@@ -57,9 +57,11 @@ export default function HeroSection() {
         signal,
       }),
   });
-  const heroVideoSrc = optimizeCloudinaryUrl(
+  // Optimize video: limit width to 720p, quality auto, max bitrate 3mbps
+  const heroVideoSrc = optimizeCloudinaryVideoUrl(
     heroMedia?.items?.[0]?.url as string,
-    1280,
+    720,
+    "auto:good",
   );
 
   // Use static images and map to movies from API
@@ -361,7 +363,7 @@ export default function HeroSection() {
                   className="w-full h-full object-cover"
                   loop
                   playsInline
-                  preload="auto"
+                  preload="metadata"
                   muted={false}
                   onPlay={() => setIsVideoPlaying(true)}
                   onPause={() => setIsVideoPlaying(false)}
@@ -482,7 +484,7 @@ export default function HeroSection() {
                   <div className="relative rounded-xl overflow-hidden border border-cyan-500/30 aspect-[2/3] shadow-[0_0_30px_rgba(59,130,246,0.2)]">
                     <img
                       src={
-                        movieDetails.cover_image ||
+                        optimizeCloudinaryUrl(movieDetails.cover_image, 800) ||
                         "https://images.unsplash.com/photo-1464375117522-1311d6a5b81f?auto=format&fit=crop&w=900&q=80"
                       }
                       alt={movieDetails.title}

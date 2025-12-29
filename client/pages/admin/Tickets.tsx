@@ -16,6 +16,7 @@ interface TicketPackage {
   is_member_only?: boolean;
   is_active?: boolean;
   display_order?: number;
+  updated_at?: string;
 }
 
 export default function TicketsPage() {
@@ -28,10 +29,15 @@ export default function TicketsPage() {
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [editData, setEditData] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [showActiveOnly, setShowActiveOnly] = useState(true);
 
   const handleRefresh = async () => {
     setIsLoading(true);
-    const { items, total } = await getTickets({ page, pageSize });
+    const { items, total } = await getTickets({ 
+      page, 
+      pageSize,
+      includeInactive: !showActiveOnly 
+    });
     setTickets(
       items.map((t: any) => ({
         id: t.id,
@@ -48,6 +54,7 @@ export default function TicketsPage() {
         is_member_only: !!t.is_member_only,
         is_active: t.is_active ?? true,
         display_order: t.display_order ?? 0,
+        updated_at: t.updated_at ? new Date(t.updated_at).toISOString() : undefined,
       })),
     );
     setTotal(total);
@@ -56,7 +63,7 @@ export default function TicketsPage() {
 
   useEffect(() => {
     handleRefresh();
-  }, [page]);
+  }, [page, showActiveOnly]);
 
   const openCreate = () => {
     setEditData({ id: 0, name: "", price: 0, is_active: true, features: [] });
@@ -95,6 +102,8 @@ export default function TicketsPage() {
         onRefresh={handleRefresh}
         deleteTicketApi={deleteTicketApi as any}
         isLoading={isLoading}
+        showActiveOnly={showActiveOnly}
+        setShowActiveOnly={setShowActiveOnly}
       />
     </AdminLayout>
   );

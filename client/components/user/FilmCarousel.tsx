@@ -12,6 +12,7 @@ import {
   Ticket,
 } from "lucide-react";
 import { getAllActiveMoviesToday, getMovieById } from "@/lib/api";
+import { optimizeCloudinaryUrl } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 
 import {
@@ -83,7 +84,7 @@ export default function FilmCarousel({ onSelectFilm }: FilmCarouselProps) {
             }
           })(),
           poster:
-            m.cover_image ||
+            optimizeCloudinaryUrl(m.cover_image, 400) ||
             "https://images.unsplash.com/photo-1464375117522-1311d6a5b81f?auto=format&fit=crop&w=900&q=80",
         })) || [];
 
@@ -246,6 +247,7 @@ export default function FilmCarousel({ onSelectFilm }: FilmCarouselProps) {
                       <img
                         src={film.poster}
                         alt={film.title}
+                        loading="lazy"
                         className="absolute object-cover inset-0 w-full h-full  transition-transform duration-500 group-hover:scale-110"
                       />
                       <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/30 to-transparent" />
@@ -329,7 +331,7 @@ export default function FilmCarousel({ onSelectFilm }: FilmCarouselProps) {
                   <div className="relative rounded-xl overflow-hidden border border-cyan-500/30 aspect-[2/3] shadow-[0_0_30px_rgba(59,130,246,0.2)]">
                     <img
                       src={
-                        movieDetails.cover_image ||
+                        optimizeCloudinaryUrl(movieDetails.cover_image, 800) ||
                         "https://images.unsplash.com/photo-1464375117522-1311d6a5b81f?auto=format&fit=crop&w=900&q=80"
                       }
                       alt={movieDetails.title}

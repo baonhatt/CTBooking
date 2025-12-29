@@ -1,54 +1,34 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { getAdminRevenue, getTransactions } from "@/lib/api";
+import { getTransactions } from "@/lib/api";
 import AdminLayout from "@/admin/layouts/AdminLayout";
 import TransactionsContent from "@/components/admin/content/TransactionsContent";
 
 export default function TransactionsPage() {
+  const getInitialFilters = () => {
+    try {
+      const raw = localStorage.getItem("admin_transactions_filters");
+      if (raw) return JSON.parse(raw);
+    } catch {}
+    return {};
+  };
+
+  const initialFilters = getInitialFilters();
+
   const [transactions, setTransactions] = useState<any[]>([]);
   const [totalTransactions, setTotalTransactions] = useState(0);
   const [txPage, setTxPage] = useState(1);
   const pageSize = 10;
-  const [txQuery, setTxQuery] = useState("");
-  const [revenueTotal, setRevenueTotal] = useState(0);
-  const [revenueCount, setRevenueCount] = useState(0);
-  const [txStatus, setTxStatus] = useState<"paid" | "all">("paid");
+  const [txQuery, setTxQuery] = useState(initialFilters.txQuery ?? "");
+  const [txStatus, setTxStatus] = useState<"paid" | "all">(initialFilters.txStatus ?? "paid");
   const [sortKey, setSortKey] = useState<"created_at" | "paid_at">(
-    "created_at",
+    initialFilters.sortKey ?? "created_at",
   );
-  const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
-  const [paymentMethod, setPaymentMethod] = useState<string>("");
-  const [fromDate, setFromDate] = useState<string>("");
-  const [toDate, setToDate] = useState<string>("");
+  const [sortDir, setSortDir] = useState<"asc" | "desc">(initialFilters.sortDir ?? "desc");
+  const [paymentMethod, setPaymentMethod] = useState<string>(initialFilters.paymentMethod ?? "");
+  const [fromDate, setFromDate] = useState<string>(initialFilters.fromDate ?? "");
+  const [toDate, setToDate] = useState<string>(initialFilters.toDate ?? "");
   const [isLoading, setIsLoading] = useState(false);
 
-  useEffect(() => {
-    try {
-      const raw = localStorage.getItem("admin_transactions_filters");
-      if (raw) {
-        const s = JSON.parse(raw);
-        if (typeof s.txQuery === "string") setTxQuery(s.txQuery);
-        if (
-          typeof s.txStatus === "string" &&
-          (s.txStatus === "paid" || s.txStatus === "all")
-        )
-          setTxStatus(s.txStatus);
-        if (
-          typeof s.sortKey === "string" &&
-          (s.sortKey === "created_at" || s.sortKey === "paid_at")
-        )
-          setSortKey(s.sortKey);
-        if (
-          typeof s.sortDir === "string" &&
-          (s.sortDir === "asc" || s.sortDir === "desc")
-        )
-          setSortDir(s.sortDir);
-        if (typeof s.paymentMethod === "string")
-          setPaymentMethod(s.paymentMethod);
-        if (typeof s.fromDate === "string") setFromDate(s.fromDate);
-        if (typeof s.toDate === "string") setToDate(s.toDate);
-      }
-    } catch {}
-  }, []);
 
   useEffect(() => {
     try {
@@ -95,6 +75,7 @@ export default function TransactionsPage() {
             is_used: t.is_used,
             expired: t.expired,
             createdAt: new Date(t.createdAt),
+            paidAt: t.paidAt ? new Date(t.paidAt) : null,
           })),
         );
         setTotalTransactions(total);
@@ -116,41 +97,10 @@ export default function TransactionsPage() {
     toDate,
   ]);
 
-  useEffect(() => {
-    (async () => {
-      try {
-        const todayStart = new Date();
-        todayStart.setHours(0, 0, 0, 0);
-        const todayEnd = new Date();
-        todayEnd.setHours(23, 59, 59, 999);
-        const { total, count } = await getAdminRevenue({
-          from: todayStart.toISOString(),
-          to: todayEnd.toISOString(),
-          status: "paid",
-        });
-        setRevenueTotal(total);
-        setRevenueCount(count);
-      } catch (error) {
-        console.error("Lỗi load doanh thu:", error);
-      }
-    })();
-  }, []);
 
   const txTotalPages = useMemo(
     () => Math.max(1, Math.ceil(totalTransactions / pageSize)),
     [totalTransactions],
-  );
-  const metrics = useMemo(
-    () => ({
-      totalUsers: 0,
-      totalMovies: 0,
-      revenueTotal,
-      revenueCount,
-      avgRevenuePerUser: 0,
-      totalToys: 0,
-      totalTransactions,
-    }),
-    [revenueTotal, revenueCount, totalTransactions],
   );
 
   const handleRefresh = async () => {
@@ -180,21 +130,11 @@ export default function TransactionsPage() {
           paymentMethod: t.paymentMethod,
           paymentStatus: t.paymentStatus,
           createdAt: new Date(t.createdAt),
+          paidAt: t.paid_at ? new Date(t.paid_at) : null,
           is_used: t.is_used,
         })),
       );
       setTotalTransactions(total);
-      const todayStart = new Date();
-      todayStart.setHours(0, 0, 0, 0);
-      const todayEnd = new Date();
-      todayEnd.setHours(23, 59, 59, 999);
-      const { total: revTotal, count: revCount } = await getAdminRevenue({
-        from: todayStart.toISOString(),
-        to: todayEnd.toISOString(),
-        status: "all",
-      });
-      setRevenueTotal(revTotal);
-      setRevenueCount(revCount);
     } catch (error) {
       console.error("Lỗi refresh giao dịch:", error);
     } finally {
@@ -221,7 +161,6 @@ export default function TransactionsPage() {
         setPage={setTxPage}
         txQuery={txQuery}
         setTxQuery={setTxQuery}
-        metrics={metrics}
         transactionsLength={totalTransactions}
         onRefresh={handleRefresh}
         txStatus={txStatus}

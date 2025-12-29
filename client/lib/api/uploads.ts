@@ -10,6 +10,7 @@ export interface UploadResult {
 
 export function uploadAdminVideo(
   file: File,
+  folder?: string,
   onProgress?: (percent: number) => void,
 ): Promise<UploadResult> {
   return new Promise((resolve, reject) => {
@@ -35,6 +36,7 @@ export function uploadAdminVideo(
       }
     };
     const form = new FormData();
+    if (folder) form.append("folder", folder);
     form.append("file", file);
     xhr.send(form);
   });
@@ -42,6 +44,7 @@ export function uploadAdminVideo(
 
 export function uploadDirectToCloudinary(
   file: File,
+  folderArg?: string,
   onProgress?: (percent: number) => void,
 ): Promise<UploadResult> {
   return new Promise((resolve, reject) => {
@@ -55,7 +58,19 @@ export function uploadDirectToCloudinary(
     const isImage = /^image\//.test(file.type);
     const uploadPreset = isVideo ? presetVideo : presetImage;
     const endpoint = `https://api.cloudinary.com/v1_1/${cloudName}/${isVideo ? "video" : "image"}/upload`;
-    const folder = isVideo ? "ctbooking/videos" : "ctbooking/images";
+    
+    // Logic: If folderArg is provided, prepend "ctbooking/videos/" or similar if desired, 
+    // OR just use it as is if it's a full path. 
+    // The user wants 'videos/hero' etc.
+    // Let's assume folderArg is just the subfolder name like "hero_section".
+    // We construct the full path: "ctbooking/videos/<folderArg>" or "ctbooking/images/<folderArg>"
+    let folder = isVideo ? "ctbooking/videos" : "ctbooking/images";
+    if (folderArg) {
+      // sanitize
+      const safe = folderArg.replace(/[^a-zA-Z0-9._-]/g, "_");
+      folder = `${folder}/${safe}`;
+    }
+    
     const resourceType = isVideo ? "video" : "image";
     const form = new FormData();
     form.append("file", file);
