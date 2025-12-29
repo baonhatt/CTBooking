@@ -1,7 +1,7 @@
 import { motion } from "framer-motion";
 import { Play, Pause, ChevronLeft, ChevronRight } from "lucide-react";
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
-import { cn, optimizeCloudinaryUrl, optimizeCloudinaryVideoUrl } from "@/lib/utils";
+import { cn, optimizeCloudinaryUrl, optimizeCloudinaryVideoUrl, getCloudinaryThumbnail } from "@/lib/utils";
 import { useQuery } from "@tanstack/react-query";
 import { getSiteMediaApi } from "@/lib/api/uploads";
 import useEmblaCarousel from "embla-carousel-react";
@@ -61,6 +61,7 @@ export default function TechnologyBanner() {
   const videoPreviewsDb = Array.isArray(techList?.items)
     ? techList!.items.map((it: any) => ({
         src: optimizeCloudinaryVideoUrl(it.url as string, 640, "auto:good"),
+        thumbnail: getCloudinaryThumbnail(it.url as string),
         title: it.title || "Video",
         description: it.description || "",
       }))
@@ -271,25 +272,26 @@ export default function TechnologyBanner() {
   };
 
   const togglePlay = (i: number) => {
-    const el = videoRefs.current[i];
-    if (!el) return;
-    if (el.paused) {
-      videoRefs.current.forEach((v, k) => {
-        if (v && k !== i) v.pause();
-      });
-      el.muted = false;
-      el.play().catch(() => {});
-      {
-        const n = videoPreviewsMerged.length || videoPreviews.length;
-        setPlayingArr(Array(n).fill(false).map((_, idx) => idx === i));
-      }
-    } else {
-      el.pause();
+    const isCurrentlyActive = playingArr[i];
+    
+    // Nếu chưa ở trạng thái "Active" (đang hiện thumbnail), thì bật nó lên để render video tag
+    if (!isCurrentlyActive) {
       setPlayingArr((prev) => {
-        const arr = [...prev];
-        arr[i] = false;
+        const arr = Array(prev.length).fill(false);
+        arr[i] = true;
         return arr;
       });
+      return;
+    }
+
+    const el = videoRefs.current[i];
+    if (!el) return;
+    
+    if (el.paused) {
+      el.play().catch(() => {});
+    } else {
+      el.pause();
+      // Tùy chọn: có thể reset về thumbnail khi pause hoặc giữ nguyên
     }
   };
 
@@ -619,30 +621,45 @@ export default function TechnologyBanner() {
                         transition={{ duration: 0.3 }}
                         className="relative w-full h-full rounded-xl overflow-hidden border border-white/10 bg-black/20 group"
                       >
-                        <video
-                          ref={(el) => {
-                            if (el) videoRefs.current[gi] = el;
-                          }}
-                          src={loadedVideos[gi] ? (item.src as any) : undefined}
-                          className="w-full h-full object-cover"
-                          playsInline
-                          preload={"metadata"}
-                          loop
-                          onPlay={() => {
-                            setPlayingArr((prev) => {
-                              const arr = [...prev];
-                              arr[gi] = true;
-                              return arr;
-                            });
-                          }}
-                          onPause={() => {
-                            setPlayingArr((prev) => {
-                              const arr = [...prev];
-                              arr[gi] = false;
-                              return arr;
-                            });
-                          }}
-                        />
+                        {playingArr[gi] ? (
+                          <video
+                            ref={(el) => {
+                              if (el) videoRefs.current[gi] = el;
+                            }}
+                            src={item.src as any}
+                            className="w-full h-full object-cover"
+                            playsInline
+                            autoPlay
+                            loop
+                            onPlay={() => {
+                              setPlayingArr((prev) => {
+                                const arr = [...prev];
+                                arr[gi] = true;
+                                return arr;
+                              });
+                            }}
+                            onPause={() => {
+                              setPlayingArr((prev) => {
+                                const arr = [...prev];
+                                arr[gi] = false;
+                                return arr;
+                              });
+                            }}
+                          />
+                        ) : (item.thumbnail?.includes("cloudinary.com") || !item.thumbnail?.match(/\.(mp4|webm|mov|ogg)$/i)) ? (
+                          <img 
+                            src={item.thumbnail} 
+                            alt={item.title}
+                            loading="lazy"
+                            className="w-full h-full object-cover opacity-60 group-hover:opacity-80 transition-opacity"
+                          />
+                        ) : (
+                          <video 
+                            src={item.thumbnail}
+                            preload="metadata"
+                            className="w-full h-full object-cover opacity-60 group-hover:opacity-80 transition-opacity"
+                          />
+                        )}
                         <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/40 to-transparent pointer-events-none" />
                         <button
                           onClick={() => togglePlay(gi)}

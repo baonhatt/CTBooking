@@ -28,7 +28,7 @@ import heroImage1 from "@/assets/images/1.PNG";
 import heroImage9 from "@/assets/images/9.PNG";
 
 import { getSiteMediaApi } from "@/lib/api/uploads";
-import { optimizeCloudinaryUrl, optimizeCloudinaryVideoUrl } from "@/lib/utils";
+import { optimizeCloudinaryUrl, optimizeCloudinaryVideoUrl, getCloudinaryThumbnail } from "@/lib/utils";
 
 export default function HeroSection() {
   const [pointer, setPointer] = useState({ x: 0, y: 0 });
@@ -57,12 +57,13 @@ export default function HeroSection() {
         signal,
       }),
   });
-  // Optimize video: limit width to 720p, quality auto, max bitrate 3mbps
   const heroVideoSrc = optimizeCloudinaryVideoUrl(
     heroMedia?.items?.[0]?.url as string,
     720,
     "auto:good",
   );
+  const heroVideoThumbnail = getCloudinaryThumbnail(heroMedia?.items?.[0]?.url as string);
+  const [hasStarted, setHasStarted] = useState(false);
 
   // Use static images and map to movies from API
   const moviePosters = useMemo(() => {
@@ -140,6 +141,12 @@ export default function HeroSection() {
 
   // Toggle play/pause function
   const toggleVideoPlayback = async () => {
+    if (!hasStarted) {
+      setHasStarted(true);
+      setIsVideoPlaying(true);
+      return;
+    }
+    
     const video = videoRef.current;
     if (!video) return;
 
@@ -357,17 +364,31 @@ export default function HeroSection() {
             >
               {/* Video Container */}
               <div className="absolute inset-0">
-                <video
-                  ref={videoRef}
-                  src={heroVideoSrc}
-                  className="w-full h-full object-cover"
-                  loop
-                  playsInline
-                  preload="metadata"
-                  muted={false}
-                  onPlay={() => setIsVideoPlaying(true)}
-                  onPause={() => setIsVideoPlaying(false)}
-                />
+                {hasStarted ? (
+                  <video
+                    ref={videoRef}
+                    src={heroVideoSrc}
+                    className="w-full h-full object-cover"
+                    loop
+                    playsInline
+                    autoPlay
+                    muted={false}
+                    onPlay={() => setIsVideoPlaying(true)}
+                    onPause={() => setIsVideoPlaying(false)}
+                  />
+                ) : (heroVideoThumbnail?.includes("cloudinary.com") || !heroVideoThumbnail?.match(/\.(mp4|webm|mov|ogg)$/i)) ? (
+                  <img 
+                    src={heroVideoThumbnail}
+                    alt="Hero Preview"
+                    className="w-full h-full object-cover"
+                  />
+                ) : (
+                  <video 
+                    src={heroVideoThumbnail}
+                    preload="metadata"
+                    className="w-full h-full object-cover"
+                  />
+                )}
                 {/* Video overlay gradient */}
                 <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-80" />
                 <div className="absolute inset-0 bg-gradient-to-b from-transparent via-transparent to-black/40" />

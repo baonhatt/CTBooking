@@ -9,6 +9,7 @@ import { uploadAdminVideo, uploadDirectToCloudinary, createSiteMediaApi, getSite
 import { toast } from "sonner";
 import { formatDistanceToNow } from "date-fns";
 import { vi } from "date-fns/locale";
+import { optimizeCloudinaryUrl, getCloudinaryThumbnail } from "@/lib/utils";
 import { 
   Upload, 
   FileVideo, 
@@ -58,6 +59,15 @@ export default function UploadsContent() {
   const [openMediaModal, setOpenMediaModal] = useState(false);
   const [mediaItems, setMediaItems] = useState<any[]>([]);
   const [mediaLoadingId, setMediaLoadingId] = useState<number | null>(null);
+  const [playingVideoId, setPlayingVideoId] = useState<number | null>(null);
+
+  const getThumbnail = (url: string, type: string) => {
+    if (type === "image") return url;
+    if (url.includes("cloudinary.com") || url.includes("res.cloudinary.com")) {
+      return getCloudinaryThumbnail(url);
+    }
+    return null;
+  };
 
   const onPickFile = (e: React.ChangeEvent<HTMLInputElement>) => {
     const arr = Array.from(e.target.files || []);
@@ -651,7 +661,10 @@ export default function UploadsContent() {
           </DialogContent>
         </Dialog>
 
-        <Dialog open={openMediaModal} onOpenChange={setOpenMediaModal}>
+        <Dialog open={openMediaModal} onOpenChange={(val) => {
+          setOpenMediaModal(val);
+          if (!val) setPlayingVideoId(null);
+        }}>
           <DialogContent className="bg-[#0b1224] text-white border-white/10 max-w-5xl w-[95vw] h-[85vh] flex flex-col p-0 overflow-hidden shadow-2xl [&>button]:hidden">
             <DialogHeader className="p-6 border-b border-white/5 bg-white/5 flex flex-row items-center justify-between space-y-0">
               <div className="flex items-center gap-3">
@@ -683,19 +696,54 @@ export default function UploadsContent() {
                         <img 
                           src={m.url} 
                           alt={m.section} 
+                          loading="lazy"
                           className="w-full h-full object-cover opacity-80 group-hover:opacity-100 transition-opacity"
                         />
                       ) : (
-                        <div className="relative w-full h-full">
-                          <video 
-                            src={m.url} 
-                            className="w-full h-full object-cover opacity-60 group-hover:opacity-80"
-                          />
-                          <div className="absolute inset-0 flex items-center justify-center">
-                            <div className="w-10 h-10 rounded-full bg-white/10 backdrop-blur-md flex items-center justify-center text-white border border-white/20">
-                              <FileVideo className="w-5 h-5" />
-                            </div>
-                          </div>
+                        <div 
+                          className="relative w-full h-full cursor-pointer group/vid"
+                          onClick={() => setPlayingVideoId(m.id)}
+                        >
+                          {playingVideoId === m.id ? (
+                            <video 
+                              src={m.url} 
+                              autoPlay
+                              controls
+                              className="w-full h-full object-cover"
+                            />
+                          ) : (
+                            <>
+                              {getThumbnail(m.url, m.type) ? (
+                                <img 
+                                  src={getThumbnail(m.url, m.type)!} 
+                                  alt={m.section}
+                                  loading="lazy"
+                                  className="w-full h-full object-cover opacity-60 group-hover:opacity-80 transition-opacity"
+                                />
+                              ) : m.type === "video" ? (
+                                <video 
+                                  src={m.url}
+                                  preload="metadata"
+                                  className="w-full h-full object-cover opacity-60 group-hover:opacity-80 transition-opacity"
+                                />
+                              ) : (
+                                <div className="w-full h-full bg-slate-900 flex items-center justify-center">
+                                  <FileVideo className="w-12 h-12 text-blue-500/20" />
+                                </div>
+                              )}
+                              
+                              <div className="absolute inset-0 flex items-center justify-center">
+                                <div className="w-12 h-12 rounded-full bg-blue-600/20 backdrop-blur-md flex items-center justify-center text-white border border-white/20 group-hover/vid:scale-110 group-hover/vid:bg-blue-600/40 transition-all duration-300">
+                                  <FileVideo className="w-6 h-6" />
+                                </div>
+                              </div>
+                              
+                              {/* Click to Play hint */}
+                              <div className="absolute bottom-2 right-2 px-2 py-1 rounded bg-black/60 text-[8px] font-bold text-white uppercase tracking-wider opacity-0 group-hover/vid:opacity-100 transition-opacity">
+                                Click to Play
+                              </div>
+                            </>
+                          )}
                         </div>
                       )}
                       

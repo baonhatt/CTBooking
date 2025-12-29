@@ -237,14 +237,18 @@ export async function updateMovieStatusImpl(
         };
       }
     }
-    const [updatedMovie] = await anyDb
+    const payload: any = {
+      is_active: isActive,
+      updated_at: formatDateForDb(new Date(), RUNTIME_ENV),
+    };
+
+    const result = await anyDb
       .update(tables.movies)
-      .set({
-        is_active: isActive,
-        updated_at: formatDateForDb(new Date(), RUNTIME_ENV),
-      })
+      .set(payload)
       .where(eq(tables.movies.id, id))
       .returning();
+
+    const updatedMovie = Array.isArray(result) ? result[0] : result;
 
     if (!updatedMovie) {
       throw new Error("Movie not found");
@@ -266,6 +270,28 @@ export async function getMovieByIdImpl(
   tables: { movies: any; bookings: any; ticket_packages: any },
   movieId: number,
 ) {
+  // Helper to safely parse JSON strings from D1/SQLite
+  const safeParseJson = (val: any) => {
+    if (!val || val === "null" || val === "undefined") return [];
+    if (typeof val === "string") {
+      try {
+        const parsed = JSON.parse(val);
+        return Array.isArray(parsed) ? parsed : [];
+      } catch (e) {
+        // Nếu không parse được JSON nhưng nãy đã check !val, 
+        // có thể val là string đơn thuần, convert sang array
+        return val ? [val] : [];
+      }
+    }
+    return Array.isArray(val) ? val : [];
+  };
+
+  const safeDate = (dateVal: any) => {
+    if (!dateVal) return null;
+    const d = new Date(dateVal);
+    return isNaN(d.getTime()) ? null : d.toISOString();
+  };
+
   const movie = await anyDb.query.movies.findFirst({
     where: eq(tables.movies.id, movieId),
   });
@@ -279,15 +305,15 @@ export async function getMovieByIdImpl(
     columns: { ticket_count: true, total_price: true },
   });
 
-  const totalTicketsSold = paid.reduce(
+  const totalTicketsSold = (paid || []).reduce(
     (sum: number, booking: any) => sum + (Number(booking.ticket_count) || 0),
     0,
   );
-  const totalRevenue = paid.reduce(
+  const totalRevenue = (paid || []).reduce(
     (sum: number, booking: any) => sum + Number(booking.total_price || 0),
     0,
   );
-  const successfulBookings = paid.length;
+  const successfulBookings = (paid || []).length;
 
   // Lấy các gói vé có chứa phim này
   const searchId = String(movieId);
@@ -297,6 +323,7 @@ export async function getMovieByIdImpl(
     .where(
       and(
         eq(tables.ticket_packages.is_active, true),
+        // SQLite: combo is stored as a stringified JSON array
         sql`CAST(${tables.ticket_packages.combo} AS TEXT) LIKE ${"%[" + searchId + "]%"} OR 
             CAST(${tables.ticket_packages.combo} AS TEXT) LIKE ${"%[" + searchId + ",%"} OR 
             CAST(${tables.ticket_packages.combo} AS TEXT) LIKE ${"%," + searchId + ",%"} OR 
@@ -304,21 +331,20 @@ export async function getMovieByIdImpl(
       ),
     );
 
-  const mapped = {
+  return {
     id: movie.id,
     title: movie.title,
     description: movie.description || "Không có mô tả",
     cover_image: movie.cover_image,
-    genres: movie.genres || [],
+    genres: safeParseJson(movie.genres),
     rating: Number(movie.rating || 0),
     duration_min: movie.duration_min || 0,
     is_active: movie.is_active,
-    release_date: movie.release_date,
-    created_at: movie.created_at,
-    updated_at: movie.updated_at,
+    release_date: safeDate(movie.release_date),
+    created_at: safeDate(movie.created_at),
+    updated_at: safeDate(movie.updated_at),
     stats: { totalTicketsSold, totalRevenue, successfulBookings },
-    applicable_packages: applicablePackages,
-    detail_images: movie.detail_images || [],
+    applicable_packages: applicablePackages || [],
+    detail_images: safeParseJson(movie.detail_images),
   };
-  return mapped;
 }
