@@ -225,6 +225,7 @@ export async function listTransactionsImpl(
       transactionId: tx.transaction_id,
       createdAt: tx.created_at,
       paidAt: tx.paid_at,
+      updatedAt: tx.updated_at,
       expiryDate: tx.expiry_date || null,
       expired,
       daysLeft,

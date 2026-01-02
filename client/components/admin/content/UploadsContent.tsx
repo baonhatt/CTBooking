@@ -809,7 +809,10 @@ export default function UploadsContent() {
                       </div>
                       
                       <div className="mt-4 pt-4 border-t border-white/5 flex items-center justify-between">
-                        <div className="flex items-center gap-1.5 text-[10px] text-gray-500 font-medium">
+                        <div 
+                          className="flex items-center gap-1.5 text-[10px] text-gray-500 font-medium cursor-help"
+                          title={m.updated_at ? new Date(m.updated_at).toLocaleString("vi-VN") : ""}
+                        >
                           <RefreshCw className="w-3 h-3" />
                           {m.updated_at ? formatDistanceToNow(new Date(m.updated_at), { addSuffix: true, locale: vi }) : "N/A"}
                         </div>

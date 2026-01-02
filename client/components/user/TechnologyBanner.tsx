@@ -1,4 +1,4 @@
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import { Play, Pause, ChevronLeft, ChevronRight } from "lucide-react";
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { cn, optimizeCloudinaryUrl, optimizeCloudinaryVideoUrl, getCloudinaryThumbnail } from "@/lib/utils";
@@ -19,55 +19,51 @@ const spaceElements = [
   { id: 8, size: "w-32 h-32", position: "top-80 right-6", delay: 1.2, duration: 9 },
 ];
 
-const preview1 = "";
-const preview2 = "";
-const preview3 = "";
-const preview4 = "";
-const preview5 = "";
-
-const videoPreviews = [];
-
-// Video/Hình ảnh chính bên trái
-const mainVisualDefault = {
+// Main video placeholder logic
+const mainVisualPlaceholder = {
   type: "video" as const,
-  src: preview5,
+  src: "",
+  thumbnail: "",
 };
 
 export default function TechnologyBanner() {
-  const { data: techMain } = useQuery({
-    queryKey: ["siteMedia", "technology_section1"],
+  // Consolidated query for all technology media
+  const { data: siteMediaData, isLoading } = useQuery({
+    queryKey: ["siteMedia", "all_active_videos"],
     queryFn: ({ signal }) =>
       getSiteMediaApi({
-        section: "technology_section1",
-        type: "video",
         active: true,
+        type: "video",
         signal,
       }),
+    staleTime: 600000,
   });
-  const { data: techList } = useQuery({
-    queryKey: ["siteMedia", "technology_section2"],
-    queryFn: ({ signal }) =>
-      getSiteMediaApi({
-        section: "technology_section2",
-        type: "video",
-        active: true,
-        signal,
-      }),
-  });
-  const mainVisual = {
+
+  const mainItem = useMemo(() => 
+    siteMediaData?.items?.find((it: any) => it.section === "technology_section1"),
+    [siteMediaData]
+  );
+
+  const listItemsData = useMemo(() => 
+    siteMediaData?.items?.filter((it: any) => it.section === "technology_section2") || [],
+    [siteMediaData]
+  );
+
+  const mainVideoUrl = mainItem?.url;
+  const mainVisual = useMemo(() => ({
     type: "video" as const,
-    src: optimizeCloudinaryVideoUrl((techMain?.items?.[0]?.url as string) || mainVisualDefault.src, 1280, "auto:good"),
-  };
-  const videoPreviewsDb = Array.isArray(techList?.items)
-    ? techList!.items.map((it: any) => ({
-        src: optimizeCloudinaryVideoUrl(it.url as string, 640, "auto:good"),
-        thumbnail: getCloudinaryThumbnail(it.url as string),
-        title: it.title || "Video",
-        description: it.description || "",
-      }))
-    : [];
-  const videoPreviewsMerged =
-    videoPreviewsDb.length > 0 ? videoPreviewsDb : videoPreviews;
+    src: mainVideoUrl ? optimizeCloudinaryVideoUrl(mainVideoUrl, 1080) : "",
+    thumbnail: mainVideoUrl ? getCloudinaryThumbnail(mainVideoUrl, 480) : "",
+  }), [mainVideoUrl]);
+
+  const videoPreviewsMerged = useMemo(() => {
+    return listItemsData.map((it: any) => ({
+      src: optimizeCloudinaryVideoUrl(it.url as string, 480),
+      thumbnail: getCloudinaryThumbnail(it.url as string, 300),
+      title: it.title || "Công nghệ Cinesphere",
+      description: it.description || "Trải nghiệm đỉnh cao",
+    }));
+  }, [listItemsData]);
   const [playingVideo, setPlayingVideo] = useState<string | null>(null);
   const videoRefs = useRef<HTMLVideoElement[]>([]);
   const mainVideoRef = useRef<HTMLVideoElement | null>(null);
@@ -78,9 +74,8 @@ export default function TechnologyBanner() {
   const [progresses, setProgresses] = useState<number[]>([]);
   const [playingArr, setPlayingArr] = useState<boolean[]>([]);
   
-  // Initialize arrays based on videoPreviewsMerged length
   useEffect(() => {
-    const n = videoPreviewsMerged.length || videoPreviews.length;
+    const n = videoPreviewsMerged.length;
     setDurations(Array(n).fill(0));
     setDurations(Array(n).fill(0));
     setProgresses(Array(n).fill(0));
@@ -89,8 +84,12 @@ export default function TechnologyBanner() {
   }, [videoPreviewsMerged.length]);
   const [loadedVideos, setLoadedVideos] = useState<boolean[]>([]);
   const [mainVideoLoaded, setMainVideoLoaded] = useState(false);
+  const [isVideoBuffering, setIsVideoBuffering] = useState(false);
+  const [galleryBuffering, setGalleryBuffering] = useState<boolean[]>([]);
   const [canScrollPrev, setCanScrollPrev] = useState(false);
   const [canScrollNext, setCanScrollNext] = useState(false);
+  
+  const isGalleryLoading = isLoading;
   
   const formatTime = (s: number) => {
     if (!isFinite(s) || s <= 0) return "0:00";
@@ -173,7 +172,6 @@ export default function TechnologyBanner() {
       const observer = new IntersectionObserver(
         (entries) => {
           entries.forEach((entry) => {
-          entries.forEach((entry) => {
             if (entry.isIntersecting) {
                // Video is in viewport, load it
                setLoadedVideos((prev) => {
@@ -191,11 +189,8 @@ export default function TechnologyBanner() {
               });
             }
           });
-          });
         },
-        {
-          threshold: 0.1, // Trigger when less than 10% visible
-        }
+        { threshold: 0.1 }
       );
       
       observer.observe(el);
@@ -214,7 +209,6 @@ export default function TechnologyBanner() {
     const observer = new IntersectionObserver(
       (entries) => {
         entries.forEach((entry) => {
-        entries.forEach((entry) => {
           if (entry.isIntersecting) {
             setMainVideoLoaded(true);
           } else {
@@ -223,11 +217,8 @@ export default function TechnologyBanner() {
             setIsMainVideoPlaying(false);
           }
         });
-        });
       },
-      {
-        threshold: 0.1, // Trigger when less than 10% visible
-      }
+      { threshold: 0.1 }
     );
     
     observer.observe(mainVideoContainerRef.current);
@@ -260,38 +251,31 @@ export default function TechnologyBanner() {
   }, [mainVisual.src]);
 
   const toggleMainVideo = () => {
-    const el = mainVideoRef.current;
-    if (!el) return;
-    if (el.paused) {
-      el.play().catch(() => {});
+    if (!isMainVideoPlaying) {
       setIsMainVideoPlaying(true);
+      setMainVideoLoaded(true);
     } else {
-      el.pause();
-      setIsMainVideoPlaying(false);
+      const el = mainVideoRef.current;
+      if (el) {
+        if (el.paused) el.play().catch(() => {});
+        else el.pause();
+      }
     }
   };
 
   const togglePlay = (i: number) => {
-    const isCurrentlyActive = playingArr[i];
-    
-    // Nếu chưa ở trạng thái "Active" (đang hiện thumbnail), thì bật nó lên để render video tag
-    if (!isCurrentlyActive) {
+    if (!playingArr[i]) {
       setPlayingArr((prev) => {
-        const arr = Array(prev.length).fill(false);
+        const arr = [...prev];
         arr[i] = true;
         return arr;
       });
-      return;
-    }
-
-    const el = videoRefs.current[i];
-    if (!el) return;
-    
-    if (el.paused) {
-      el.play().catch(() => {});
     } else {
-      el.pause();
-      // Tùy chọn: có thể reset về thumbnail khi pause hoặc giữ nguyên
+      const el = videoRefs.current[i];
+      if (el) {
+        if (el.paused) el.play().catch(() => {});
+        else el.pause();
+      }
     }
   };
 
@@ -502,58 +486,125 @@ export default function TechnologyBanner() {
           className="max-w-6xl mx-auto mb-16"
         >
           <div className="flex flex-col md:flex-row items-start md:items-center gap-8">
-            <div className="w-full md:basis-7/12 lg:basis-7/12 md:max-w-[640px] lg:max-w-[780px]">
-              <div
-                ref={mainVideoContainerRef}
-                className="relative w-full rounded-2xl overflow-hidden border border-white/10 bg-white/5 shadow-xl group"
-                style={{ aspectRatio: mainAspect ? String(mainAspect) : "16/9", maxHeight: "85vh" }}
-              >
-                <video
-                  ref={mainVideoRef}
-                  src={mainVideoLoaded ? (mainVisual.src as any) : undefined}
-                  className="w-full h-full object-cover"
-                  playsInline
-                  preload="metadata"
-                  loop
-                  onLoadedMetadata={onMainLoadedMetadata}
-                  onPlay={() => setIsMainVideoPlaying(true)}
-                  onPause={() => setIsMainVideoPlaying(false)}
-                />
-                <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/40 to-transparent pointer-events-none" />
-                <button
-                  onClick={toggleMainVideo}
-                  className="absolute inset-0 flex items-center justify-center bg-black/30 hover:bg-black/20 transition-colors z-10 group/play"
-                  aria-label={isMainVideoPlaying ? "Pause video" : "Play video"}
+            <div className="w-full md:basis-5/12 lg:basis-5/12 xl:max-w-[480px]">
+                <div
+                  ref={mainVideoContainerRef}
+                  className="relative w-full aspect-[9/13] rounded-3xl overflow-hidden border border-white/10 bg-slate-900 shadow-2xl group cursor-pointer"
+                  onClick={!isMainVideoPlaying ? toggleMainVideo : undefined}
                 >
-                  <motion.div
-                    animate={{
-                      scale: isMainVideoPlaying ? 0.8 : 1,
-                      opacity: isMainVideoPlaying ? 0 : 1
-                    }}
-                    transition={{ duration: 0.2 }}
-                    className={`w-16 h-16 sm:w-20 sm:h-20 rounded-full bg-white/25 backdrop-blur-md flex items-center justify-center border-2 border-white/40 shadow-2xl group-hover/play:scale-110 group-hover/play:bg-white/35 transition-all ${
-                      isMainVideoPlaying ? "pointer-events-none" : ""
-                    }`}
-                  >
-                    {isMainVideoPlaying ? (
-                      <Pause className="h-8 w-8 sm:h-10 sm:w-10 text-white" fill="white" />
+                  <AnimatePresence>
+                    {!isMainVideoPlaying ? (
+                      <motion.div
+                        key="main-placeholder"
+                        initial={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        className="absolute inset-0 z-10"
+                      >
+                        <img
+                          src={mainVisual.thumbnail || "/placeholder-video.jpg"}
+                          alt="Cinesphere Technology Experience"
+                          width={480}
+                          height={693}
+                          className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
+                          loading="lazy"
+                        />
+                        <div className="absolute inset-0 bg-gradient-to-t from-black/95 via-black/20 to-transparent pointer-events-none" />
+                        <div className="absolute inset-0 flex items-center justify-center bg-black/20 group-hover:bg-black/10 transition-colors">
+                          <div className="w-24 h-24 rounded-full bg-white/10 backdrop-blur-md flex items-center justify-center border-2 border-white/30 shadow-2xl group-hover:scale-110 transition-transform">
+                            <Play className="h-12 w-12 text-white ml-2" fill="white" />
+                          </div>
+                        </div>
+                      </motion.div>
                     ) : (
-                      <Play className="h-8 w-8 sm:h-10 sm:w-10 text-white ml-0.5" fill="white" />
+                      <motion.div
+                        key="main-video"
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        className="absolute inset-0 z-0 bg-black flex items-center justify-center"
+                      >
+                        {/* Loading Spinner for Video - Always visible when buffering */}
+                        <AnimatePresence>
+                          {isVideoBuffering && (
+                            <motion.div 
+                              initial={{ opacity: 0 }}
+                              animate={{ opacity: 1 }}
+                              exit={{ opacity: 0 }}
+                              className="absolute inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-[2px]"
+                            >
+                              <div className="flex flex-col items-center gap-4">
+                                <div className="w-14 h-14 border-4 border-cyan-500/20 border-t-cyan-500 rounded-full animate-spin" />
+                                <span className="text-cyan-400 text-sm font-medium tracking-widest uppercase animate-pulse text-center px-4">Đang kết nối...</span>
+                              </div>
+                            </motion.div>
+                          )}
+                        </AnimatePresence>
+
+                        {mainVisual.src ? (
+                          <video
+                            ref={mainVideoRef}
+                            src={mainVisual.src}
+                            className="w-full h-full object-cover"
+                            playsInline
+                            preload="auto"
+                            loop
+                            onWaiting={() => setIsVideoBuffering(true)}
+                            onPlaying={() => setIsVideoBuffering(false)}
+                            onCanPlay={() => setIsVideoBuffering(false)}
+                            onLoadedData={() => setIsVideoBuffering(false)}
+                            onPlay={() => setIsMainVideoPlaying(true)}
+                            onPause={() => setIsMainVideoPlaying(false)}
+                            autoPlay
+                          />
+                        ) : (
+                          <div className="w-full h-full bg-slate-900/40 flex items-center justify-center">
+                            {isLoading ? (
+                              <div className="w-12 h-12 border-4 border-cyan-500/20 border-t-cyan-500 rounded-full animate-spin" />
+                            ) : (
+                              <p className="text-gray-500 font-medium italic">Sẽ sớm cập nhật</p>
+                            )}
+                          </div>
+                        )}
+                        <div 
+                          className="absolute inset-0 z-10"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            toggleMainVideo();
+                          }}
+                        >
+                          <button
+                            className="absolute inset-0 flex items-center justify-center"
+                            aria-label={isMainVideoPlaying ? "Pause video" : "Play video"}
+                          >
+                            {!isMainVideoPlaying && (
+                              <motion.div
+                                initial={{ opacity: 0, scale: 0.5 }}
+                                animate={{ opacity: 1, scale: 1 }}
+                                className="w-20 h-20 rounded-full bg-black/40 backdrop-blur-sm flex items-center justify-center border border-white/20"
+                              >
+                                <Play className="h-10 w-10 text-white ml-1.5" fill="white" />
+                              </motion.div>
+                            )}
+                          </button>
+                        </div>
+                      </motion.div>
                     )}
-                  </motion.div>
-                </button>
-                {isMainVideoPlaying && (
-                  <button
-                    onClick={toggleMainVideo}
-                    className="absolute top-4 right-4 w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-black/60 backdrop-blur-md flex items-center justify-center border border-white/30 hover:bg-black/80 hover:border-white/50 transition-all z-20"
-                    aria-label="Pause video"
-                  >
-                    <Pause className="h-5 w-5 sm:h-6 sm:w-6 text-white" fill="white" />
-                  </button>
-                )}
-              </div>
+                  </AnimatePresence>
+                  
+                  {isMainVideoPlaying && !isVideoBuffering && (
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        toggleMainVideo();
+                      }}
+                      className="absolute top-6 right-6 w-12 h-12 rounded-full bg-black/60 backdrop-blur-md flex items-center justify-center border border-white/30 hover:bg-black/80 hover:border-white/50 transition-all z-20"
+                      aria-label="Pause video"
+                    >
+                      <Pause className="h-6 w-6 text-white" fill="white" />
+                    </button>
+                  )}
+                </div>
             </div>
-            <div className="w-full md:basis-5/12 lg:basis-5/12 space-y-4">
+            <div className="w-full md:basis-7/12 lg:basis-7/12 space-y-8">
               <h3 className="text-3xl md:text-4xl font-bold text-white">
                 ✨ Tại sao bạn không nên bỏ lỡ?
               </h3>
@@ -584,140 +635,184 @@ export default function TechnologyBanner() {
             <h3 className="text-3xl md:text-3xl font-bold text-white text-center md:text-left">
               Khám phá không gian CineSphere
             </h3>
-            <div className="hidden md:flex items-center justify-center gap-3">
-              <button
-                onClick={scrollPrev}
-                disabled={!canScrollPrev}
-                className="rounded-full w-10 h-10 md:w-12 md:h-12 bg-black/60 backdrop-blur-md border border-white/20 flex items-center justify-center hover:bg-black/80 hover:border-cyan-400 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-300 shadow-lg"
-                aria-label="Previous slide"
-              >
-                <ChevronLeft className="h-5 w-5 md:h-6 md:w-6 text-white" />
-              </button>
-              <button
-                onClick={scrollNext}
-                disabled={!canScrollNext}
-                className="rounded-full w-10 h-10 md:w-12 md:h-12 bg-black/60 backdrop-blur-md border border-white/20 flex items-center justify-center hover:bg-black/80 hover:border-cyan-400 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-300 shadow-lg"
-                aria-label="Next slide"
-              >
-                <ChevronRight className="h-5 w-5 md:h-6 md:w-6 text-white" />
-              </button>
-            </div>
+            {videoPreviewsMerged.length > 1 && (
+              <div className="hidden md:flex items-center justify-center gap-3">
+                <button
+                  onClick={scrollPrev}
+                  disabled={!canScrollPrev}
+                  className="rounded-full w-10 h-10 md:w-12 md:h-12 bg-black/60 backdrop-blur-md border border-white/20 flex items-center justify-center hover:bg-black/80 hover:border-cyan-400 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-300 shadow-lg"
+                  aria-label="Xem video trước đó"
+                >
+                  <ChevronLeft className="h-5 w-5 md:h-6 md:w-6 text-white" />
+                </button>
+                <button
+                  onClick={scrollNext}
+                  disabled={!canScrollNext}
+                  className="rounded-full w-10 h-10 md:w-12 md:h-12 bg-black/60 backdrop-blur-md border border-white/20 flex items-center justify-center hover:bg-black/80 hover:border-cyan-400 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-300 shadow-lg"
+                  aria-label="Xem video tiếp theo"
+                >
+                  <ChevronRight className="h-5 w-5 md:h-6 md:w-6 text-white" />
+                </button>
+              </div>
+            )}
           </div>
           
           <div className="relative">
             {/* Carousel Container */}
             <div ref={emblaRef} className="overflow-hidden rounded-2xl">
               <div className="flex gap-3 md:gap-4">
-                {videoPreviewsMerged.map((item, gi) => {
-                  return (
-                    <div
-                      key={`${item.title}-${gi}`}
-                      className="flex-[0_0_auto] w-[180px] sm:w-[220px] md:w-[260px] lg:w-[280px]"
-                    >
-                      <motion.div
-                        initial={{ opacity: 0, scale: 0.95 }}
-                        whileInView={{ opacity: 1, scale: 1 }}
-                        viewport={{ once: true }}
-                        transition={{ duration: 0.3 }}
-                        className="relative w-full h-full rounded-xl overflow-hidden border border-white/10 bg-black/20 group"
+                {isGalleryLoading ? (
+                  // Skeleton Loading State
+                  [...Array(4)].map((_, i) => (
+                    <div key={`skeleton-${i}`} className="flex-[0_0_auto] w-[180px] sm:w-[220px] md:w-[260px] lg:w-[300px]">
+                      <div className="w-full aspect-[10/16] rounded-2xl bg-white/5 animate-pulse border border-white/10 flex items-center justify-center">
+                        <div className="w-12 h-12 rounded-full bg-white/5 border-2 border-white/10" />
+                      </div>
+                    </div>
+                  ))
+                ) : videoPreviewsMerged.length === 0 ? (
+                  <div className="w-full min-w-[300px] py-16 flex flex-col items-center justify-center bg-white/5 rounded-2xl border border-dashed border-white/10">
+                    <p className="text-gray-500 italic">Thư viện video đang được cập nhật</p>
+                  </div>
+                ) : (
+                  videoPreviewsMerged.map((item, gi) => {
+                    return (
+                      <div
+                        key={`${item.title}-${gi}`}
+                        className="flex-[0_0_auto] w-[180px] sm:w-[220px] md:w-[260px] lg:w-[300px]"
                       >
-                        {playingArr[gi] ? (
-                          <video
-                            ref={(el) => {
-                              if (el) videoRefs.current[gi] = el;
-                            }}
-                            src={item.src as any}
-                            className="w-full h-full object-cover"
-                            playsInline
-                            autoPlay
-                            loop
-                            onPlay={() => {
-                              setPlayingArr((prev) => {
-                                const arr = [...prev];
-                                arr[gi] = true;
-                                return arr;
-                              });
-                            }}
-                            onPause={() => {
-                              setPlayingArr((prev) => {
-                                const arr = [...prev];
-                                arr[gi] = false;
-                                return arr;
-                              });
-                            }}
-                          />
-                        ) : (item.thumbnail?.includes("cloudinary.com") || !item.thumbnail?.match(/\.(mp4|webm|mov|ogg)$/i)) ? (
-                          <img 
-                            src={item.thumbnail} 
-                            alt={item.title}
-                            loading="lazy"
-                            className="w-full h-full object-cover opacity-60 group-hover:opacity-80 transition-opacity"
-                          />
-                        ) : (
-                          <video 
-                            src={item.thumbnail}
-                            preload="metadata"
-                            className="w-full h-full object-cover opacity-60 group-hover:opacity-80 transition-opacity"
-                          />
-                        )}
-                        <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/40 to-transparent pointer-events-none" />
+                        <motion.div
+                          initial={{ opacity: 0, scale: 0.95 }}
+                          whileInView={{ opacity: 1, scale: 1 }}
+                          viewport={{ once: true }}
+                          transition={{ duration: 0.3 }}
+                          className="relative w-full aspect-[10/16] rounded-2xl overflow-hidden border border-white/10 bg-black/20 group cursor-pointer shadow-lg"
+                        >
+                        <AnimatePresence>
+                          {!playingArr[gi] ? (
+                            <motion.div
+                              key="thumbnail"
+                              initial={{ opacity: 1 }}
+                              exit={{ opacity: 0 }}
+                              className="absolute inset-0 z-10"
+                              onClick={() => togglePlay(gi)}
+                            >
+                              {(item.thumbnail?.includes("cloudinary.com") || !item.thumbnail?.match(/\.(mp4|webm|mov|ogg)$/i)) ? (
+                                <img 
+                                  src={item.thumbnail} 
+                                  alt={item.title}
+                                  width={300}
+                                  height={480}
+                                  loading="lazy"
+                                  className="w-full h-full object-cover opacity-70 group-hover:opacity-100 transition-all duration-500 group-hover:scale-105"
+                                />
+                              ) : (
+                                <video 
+                                  src={item.thumbnail}
+                                  preload="metadata"
+                                  className="w-full h-full object-cover opacity-70 group-hover:opacity-100 transition-opacity"
+                                />
+                              )}
+                              <div className="absolute inset-0 bg-gradient-to-t from-black/95 via-transparent to-transparent pointer-events-none" />
+                              <div className="absolute inset-0 flex items-center justify-center">
+                                <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-full bg-white/10 backdrop-blur-md flex items-center justify-center border-2 border-white/30 shadow-2xl group-hover:scale-110 transition-all duration-300">
+                                  <Play className="h-7 w-7 sm:h-8 sm:w-8 text-white ml-1" fill="white" />
+                                </div>
+                              </div>
+                            </motion.div>
+                          ) : (
+                            <motion.div
+                              key="video"
+                              initial={{ opacity: 0 }}
+                              animate={{ opacity: 1 }}
+                              className="absolute inset-0 z-0 bg-black"
+                            >
+                              {/* Loading Spinner for Gallery Video */}
+                              <AnimatePresence>
+                                {galleryBuffering[gi] && (
+                                  <motion.div 
+                                    initial={{ opacity: 0 }}
+                                    animate={{ opacity: 1 }}
+                                    exit={{ opacity: 0 }}
+                                    className="absolute inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-[2px]"
+                                  >
+                                    <div className="flex flex-col items-center gap-2">
+                                      <div className="w-10 h-10 border-3 border-cyan-500/20 border-t-cyan-500 rounded-full animate-spin" />
+                                    </div>
+                                  </motion.div>
+                                )}
+                              </AnimatePresence>
+
+                              <video
+                                ref={(el) => {
+                                  if (el) videoRefs.current[gi] = el;
+                                }}
+                                src={item.src as any}
+                                className="w-full h-full object-cover"
+                                playsInline
+                                autoPlay
+                                loop
+                                onWaiting={() => setGalleryBuffering(prev => {
+                                  const arr = [...prev];
+                                  arr[gi] = true;
+                                  return arr;
+                                })}
+                                onPlaying={() => setGalleryBuffering(prev => {
+                                  const arr = [...prev];
+                                  arr[gi] = false;
+                                  return arr;
+                                })}
+                                onCanPlay={() => setGalleryBuffering(prev => {
+                                  const arr = [...prev];
+                                  arr[gi] = false;
+                                  return arr;
+                                })}
+                              />
+                            </motion.div>
+                          )}
+                        </AnimatePresence>
+                        
                         <button
                           onClick={() => togglePlay(gi)}
-                          className="absolute inset-0 flex items-center justify-center bg-black/30 hover:bg-black/20 transition-colors z-10 group/play"
+                          className="absolute inset-0 z-20 group/play"
                           aria-label={playingArr[gi] ? "Pause video" : "Play video"}
                         >
-                          <motion.div
-                            animate={{
-                              scale: playingArr[gi] ? 0.8 : 1,
-                              opacity: playingArr[gi] ? 0 : 1
-                            }}
-                            transition={{ duration: 0.2 }}
-                            className={`w-12 h-12 sm:w-14 sm:h-14 rounded-full bg-white/25 backdrop-blur-md flex items-center justify-center border-2 border-white/40 shadow-2xl group-hover/play:scale-110 group-hover/play:bg-white/35 transition-all ${
-                              playingArr[gi] ? "pointer-events-none" : ""
-                            }`}
-                          >
-                            {playingArr[gi] ? (
-                              <Pause className="h-6 w-6 sm:h-7 sm:w-7 text-white" fill="white" />
-                            ) : (
-                              <Play className="h-6 w-6 sm:h-7 sm:w-7 text-white ml-0.5" fill="white" />
-                            )}
-                          </motion.div>
+                          {playingArr[gi] && (
+                            <div className="absolute top-2 right-2 w-8 h-8 sm:w-9 sm:h-9 rounded-full bg-black/60 backdrop-blur-md flex items-center justify-center border border-white/30 hover:bg-black/80 hover:border-white/50 transition-all">
+                              <Pause className="h-4 w-4 sm:h-5 sm:w-5 text-white" fill="white" />
+                            </div>
+                          )}
                         </button>
-                        {playingArr[gi] && (
-                          <button
-                            onClick={() => togglePlay(gi)}
-                            className="absolute top-2 right-2 w-8 h-8 sm:w-9 sm:h-9 rounded-full bg-black/60 backdrop-blur-md flex items-center justify-center border border-white/30 hover:bg-black/80 hover:border-white/50 transition-all z-20"
-                            aria-label="Pause video"
-                          >
-                            <Pause className="h-4 w-4 sm:h-5 sm:w-5 text-white" fill="white" />
-                          </button>
-                        )}
                       </motion.div>
                     </div>
                   );
-                })}
+                  })
+                )}
+
               </div>
             </div>
             
-            {/* Mobile navigation buttons - shown below carousel on small screens */}
-            <div className="flex md:hidden items-center justify-center gap-3 mt-12">
-              <button
-                onClick={scrollPrev}
-                disabled={!canScrollPrev}
-                className="rounded-full w-10 h-10 bg-black/60 backdrop-blur-md border border-white/20 flex items-center justify-center hover:bg-black/80 hover:border-cyan-400 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-300 shadow-lg"
-                aria-label="Previous slide"
-              >
-                <ChevronLeft className="h-5 w-5 text-white" />
-              </button>
-              <button
-                onClick={scrollNext}
-                disabled={!canScrollNext}
-                className="rounded-full w-10 h-10 bg-black/60 backdrop-blur-md border border-white/20 flex items-center justify-center hover:bg-black/80 hover:border-cyan-400 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-300 shadow-lg"
-                aria-label="Next slide"
-              >
-                <ChevronRight className="h-5 w-5 text-white" />
-              </button>
-            </div>
+            {/* Mobile navigation buttons - Only if has data */}
+            {videoPreviewsMerged.length > 1 && (
+              <div className="flex md:hidden items-center justify-center gap-3 mt-12">
+                <button
+                  onClick={scrollPrev}
+                  disabled={!canScrollPrev}
+                  className="rounded-full w-10 h-10 bg-black/60 backdrop-blur-md border border-white/20 flex items-center justify-center hover:bg-black/80 hover:border-cyan-400 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-300 shadow-lg"
+                  aria-label="Xem video trước đó"
+                >
+                  <ChevronLeft className="h-5 w-5 text-white" />
+                </button>
+                <button
+                  onClick={scrollNext}
+                  disabled={!canScrollNext}
+                  className="rounded-full w-10 h-10 bg-black/60 backdrop-blur-md border border-white/20 flex items-center justify-center hover:bg-black/80 hover:border-cyan-400 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-300 shadow-lg"
+                  aria-label="Xem video tiếp theo"
+                >
+                  <ChevronRight className="h-5 w-5 text-white" />
+                </button>
+              </div>
+            )}
           </div>
         </motion.div>
       </div>

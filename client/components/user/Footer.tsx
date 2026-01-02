@@ -62,6 +62,7 @@ export default function Footer() {
                 whileHover={{ scale: 1.1, y: -5 }}
                 whileTap={{ scale: 0.95 }}
                 className="w-12 h-12 rounded-full bg-white/5 backdrop-blur-md border border-white/20 flex items-center justify-center hover:border-cyan-400 hover:bg-cyan-500/20 transition-all duration-300"
+                aria-label="Theo dõi chúng tôi trên Facebook"
               >
                 <Facebook className="h-5 w-5 text-white" />
               </motion.a>
@@ -70,6 +71,7 @@ export default function Footer() {
                 whileHover={{ scale: 1.1, y: -5 }}
                 whileTap={{ scale: 0.95 }}
                 className="w-12 h-12 rounded-full bg-white/5 backdrop-blur-md border border-white/20 flex items-center justify-center hover:border-pink-400 hover:bg-pink-500/20 transition-all duration-300"
+                aria-label="Theo dõi chúng tôi trên Instagram"
               >
                 <Instagram className="h-5 w-5 text-white" />
               </motion.a>
@@ -78,6 +80,7 @@ export default function Footer() {
                 whileHover={{ scale: 1.1, y: -5 }}
                 whileTap={{ scale: 0.95 }}
                 className="w-12 h-12 rounded-full bg-white/5 backdrop-blur-md border border-white/20 flex items-center justify-center hover:border-red-400 hover:bg-red-500/20 transition-all duration-300"
+                aria-label="Theo dõi chúng tôi trên Youtube"
               >
                 <Youtube className="h-5 w-5 text-white" />
               </motion.a>

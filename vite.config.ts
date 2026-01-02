@@ -14,6 +14,37 @@ export default defineConfig(({ mode }) => ({
   },
   build: {
     outDir: "dist/spa",
+    rollupOptions: {
+      output: {
+          manualChunks: {
+            'react-vendor': ['react', 'react-dom', 'react-router-dom'],
+            'motion-vendor': ['framer-motion'],
+            'lucide-vendor': ['lucide-react'],
+            'antd-vendor': ['antd', '@ant-design/icons'],
+            'query-vendor': ['@tanstack/react-query'],
+            'three-vendor': ['three', '@react-three/fiber', '@react-three/drei'],
+            'form-vendor': ['react-hook-form', 'zod'],
+            'embla-vendor': ['embla-carousel-react'],
+            'radix-vendor': [
+              '@radix-ui/react-dialog',
+              '@radix-ui/react-dropdown-menu',
+              '@radix-ui/react-select',
+              '@radix-ui/react-toast',
+              '@radix-ui/react-tooltip',
+              '@radix-ui/react-slot',
+            ],
+            'ui-utils': ['clsx', 'tailwind-merge'],
+          },
+        // Optimize chunk file names
+        chunkFileNames: 'assets/js/[name]-[hash].js',
+        entryFileNames: 'assets/js/[name]-[hash].js',
+        assetFileNames: 'assets/[ext]/[name]-[hash].[ext]',
+      },
+    },
+    // Increase chunk size warning limit (but aim to stay under)
+    chunkSizeWarningLimit: 1000,
+    // Use esbuild for faster minification (default)
+    minify: 'esbuild',
   },
   plugins: [react(), expressPlugin()],
   resolve: {
@@ -21,6 +52,11 @@ export default defineConfig(({ mode }) => ({
       "@": path.resolve(__dirname, "./client"),
       "@shared": path.resolve(__dirname, "./shared"),
     },
+  },
+  // Optimize dependencies
+  optimizeDeps: {
+    include: ['react', 'react-dom', 'react-router-dom', '@tanstack/react-query'],
+    exclude: ['@react-three/fiber', '@react-three/drei'], // Lazy load these
   },
 }));
 
@@ -30,13 +66,7 @@ function expressPlugin(): Plugin {
     apply: "serve",
     async configureServer(server) {
       const { createServer } = await import("./server");
-      const { initSocket } = await import("./server/socket");
       const app = createServer();
-      
-      // Initialize Socket.io with Vite's HTTP server
-      if (server.httpServer) {
-        initSocket(server.httpServer, app);
-      }
       
       server.middlewares.use(app);
     },

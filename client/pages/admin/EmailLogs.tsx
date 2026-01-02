@@ -1,9 +1,11 @@
 import React, { useState } from "react";
 import AdminLayout from "@/admin/layouts/AdminLayout";
-import TicketCheckContent from "@/components/admin/content/TicketCheckContent";
+import EmailLogsContent from "@/components/admin/content/EmailLogsContent";
 
-export default function TicketCheckPage() {
-        const [active, setActive] = useState<"dashboard" | "users" | "movies" | "toys" | "transactions" | "tickets" | "ticket-check" | "uploads" | "email-logs" | "settings">("ticket-check");
+export default function EmailLogsPage() {
+        const [active, setActive] = useState<
+                "dashboard" | "users" | "movies" | "toys" | "transactions" | "tickets" | "ticket-check" | "uploads" | "email-logs" | "settings"
+        >("email-logs");
 
         const handleLogout = () => {
                 localStorage.removeItem("adminToken");
@@ -16,12 +18,12 @@ export default function TicketCheckPage() {
 
         return (
                 <AdminLayout
-                        active={active}
-                        setActive={setActive}
+                        active={active as any}
+                        setActive={setActive as any}
                         adminEmailState={adminEmail}
                         handleLogout={handleLogout}
                 >
-                        <TicketCheckContent />
+                        <EmailLogsContent />
                 </AdminLayout>
         );
 }

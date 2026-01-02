@@ -1,5 +1,5 @@
 import { useMemo, useState, useEffect, useRef } from "react";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion, AnimatePresence, useMotionValue, useSpring, useTransform } from "framer-motion";
 import {
   Play,
   Pause,
@@ -23,15 +23,63 @@ import {
 } from "@/components/ui/dialog";
 import { movieStore } from "@/store/movieStore";
 // @ts-ignore
-import heroImage1 from "@/assets/images/1.PNG";
+import heroImage1 from "@/assets/images/1.webp";
 // @ts-ignore
-import heroImage9 from "@/assets/images/9.PNG";
+import heroImage9 from "@/assets/images/9.webp";
 
 import { getSiteMediaApi } from "@/lib/api/uploads";
 import { optimizeCloudinaryUrl, optimizeCloudinaryVideoUrl, getCloudinaryThumbnail } from "@/lib/utils";
 
 export default function HeroSection() {
-  const [pointer, setPointer] = useState({ x: 0, y: 0 });
+  /* Use MotionValue for high-performance mouse tracking without re-renders */
+  const pointerX = useMotionValue(0);
+  const pointerY = useMotionValue(0);
+
+  // Smooth out the motion using useSpring
+  const springConfig = { damping: 20, stiffness: 50 };
+  const springX = useSpring(pointerX, springConfig);
+  const springY = useSpring(pointerY, springConfig);
+
+  // Transforms for background blobs
+  const blobX = useTransform(springX, (val) => val * -0.5);
+  const blobY = useTransform(springY, (val) => val * -0.5);
+  
+  // Transforms for cards - smaller parallax effect
+  const cardX = useTransform(springX, (val) => val * 0.08);
+  const cardY = useTransform(springY, (val) => val * 0.08);
+
+  // Cache the container rect to avoid getBoundingClientRect() reflows
+  const rectRef = useRef<DOMRect | null>(null);
+
+  const onMouseEnter = (e: React.MouseEvent<HTMLDivElement, MouseEvent>) => {
+    rectRef.current = e.currentTarget.getBoundingClientRect();
+  };
+
+  // Throttle mouse movement to reduce forced reflows
+  const lastMoveTime = useRef(0);
+  const THROTTLE_MS = 16; // ~60fps max
+
+  const onMove = (e: React.MouseEvent<HTMLDivElement, MouseEvent>) => {
+    const now = Date.now();
+    if (now - lastMoveTime.current < THROTTLE_MS) return;
+    lastMoveTime.current = now;
+
+    if (!rectRef.current) {
+      rectRef.current = e.currentTarget.getBoundingClientRect();
+    }
+
+    const { clientX, clientY } = e;
+    const rect = rectRef.current;
+    
+    // Calculate normalized coordinates (-1 to 1) based on cached rect
+    const x = ((clientX - rect.left) / rect.width - 0.5) * 20;
+    const y = ((clientY - rect.top) / rect.height - 0.5) * 20;
+    
+    pointerX.set(x);
+    pointerY.set(y);
+  };
+ 
+  /* State & Hooks */
   const [currentPosterIndex, setCurrentPosterIndex] = useState(0);
   const videoRef = useRef<HTMLVideoElement>(null);
   const videoContainerRef = useRef<HTMLDivElement>(null);
@@ -47,22 +95,28 @@ export default function HeroSection() {
     queryFn: ({ signal }) => getAllActiveMoviesToday({ signal }),
     staleTime: 60000,
   });
-  const { data: heroMedia } = useQuery({
-    queryKey: ["siteMedia", "hero_section"],
+  const { data: siteMedia } = useQuery({
+    queryKey: ["siteMedia", "all_active_videos"],
     queryFn: ({ signal }) =>
       getSiteMediaApi({
-        section: "hero_section",
         type: "video",
         active: true,
         signal,
       }),
+    staleTime: 600000,
   });
-  const heroVideoSrc = optimizeCloudinaryVideoUrl(
-    heroMedia?.items?.[0]?.url as string,
-    720,
-    "auto:good",
+
+  const heroItem = useMemo(() => 
+    siteMedia?.items?.find((it: any) => it.section === "hero_section"),
+    [siteMedia]
   );
-  const heroVideoThumbnail = getCloudinaryThumbnail(heroMedia?.items?.[0]?.url as string);
+
+  const heroVideoSrc = optimizeCloudinaryVideoUrl(
+    heroItem?.url as string,
+    720,
+    "auto:low",
+  );
+  const heroVideoThumbnail = getCloudinaryThumbnail(heroItem?.url as string, 448);
   const [hasStarted, setHasStarted] = useState(false);
 
   // Use static images and map to movies from API
@@ -75,7 +129,7 @@ export default function HeroSection() {
     return (data?.activeMovies || []) as any[];
   }, [data]);
 
-  // Auto-rotate posters every 5 seconds
+  // Auto-rotate posters every 5 seconds - optimized
   useEffect(() => {
     if (moviePosters.length <= 1) return;
 
@@ -85,6 +139,14 @@ export default function HeroSection() {
 
     return () => clearInterval(interval);
   }, [moviePosters.length]);
+
+  // Preload images to prevent flashing
+  useEffect(() => {
+    moviePosters.forEach((src) => {
+      const img = new Image();
+      img.src = src;
+    });
+  }, [moviePosters]);
 
   // Pause video on mount and set preview frame
   useEffect(() => {
@@ -166,14 +228,6 @@ export default function HeroSection() {
   const currentPoster = moviePosters[currentPosterIndex];
   const currentMovie = movies[currentPosterIndex] || null;
 
-  const onMove = (e: React.MouseEvent<HTMLDivElement, MouseEvent>) => {
-    const { clientX, clientY, currentTarget } = e;
-    const rect = currentTarget.getBoundingClientRect();
-    const x = ((clientX - rect.left) / rect.width - 0.5) * 20;
-    const y = ((clientY - rect.top) / rect.height - 0.5) * 20;
-    setPointer({ x, y });
-  };
-
   const handlePosterClick = async (index: number) => {
     const movie = movies[index];
     if (!movie || !movie.id) return;
@@ -229,23 +283,23 @@ export default function HeroSection() {
       id="hero"
       className="relative min-h-screen overflow-hidden bg-gradient-to-br from-[#050915] via-[#0b1226] to-[#0e1b3d] text-white pt-24"
       onMouseMove={onMove}
+      onMouseEnter={onMouseEnter}
     >
       {/* Gradient overlays */}
-      <div className="absolute inset-0">
+      <div className="absolute inset-0 bg-black"> {/* Added dark base */}
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_20%_20%,rgba(59,130,246,0.4),transparent_30%),radial-gradient(circle_at_80%_30%,rgba(236,72,153,0.3),transparent_35%),radial-gradient(circle_at_50%_70%,rgba(34,211,238,0.35),transparent_30%)]" />
         <div className="absolute inset-0 bg-gradient-to-b from-black/80 via-black/50 to-[#050915]/95" />
-        <div className="absolute inset-0 neon-noise opacity-30" />
       </div>
 
-      {/* Animated background blobs */}
-      <div className="absolute -left-24 top-10 w-[520px] h-[520px] rounded-full bg-cyan-500/15 blur-[120px] animate-pulse" />
+      {/* Animated background blobs - Optimized with hardware acceleration */}
+      <div className="absolute -left-24 top-10 w-[520px] h-[520px] rounded-full bg-cyan-500/15 blur-[120px] animate-pulse pointer-events-none" />
       <motion.div
-        className="absolute -right-16 top-32 w-[420px] h-[420px] rounded-full bg-fuchsia-500/15 blur-[120px]"
-        animate={{
-          x: pointer.x * -0.5,
-          y: pointer.y * -0.5,
+        className="absolute -right-16 top-32 w-[420px] h-[420px] rounded-full bg-fuchsia-500/15 blur-[120px] pointer-events-none"
+        style={{
+          x: blobX,
+          y: blobY,
+          translateZ: 0, // Force GPU backend
         }}
-        transition={{ type: "spring", stiffness: 50, damping: 20 }}
       />
 
       <div className="container mx-auto px-4 relative z-10 min-h-[calc(100vh-6rem)] flex flex-col justify-center py-20">
@@ -334,7 +388,9 @@ export default function HeroSection() {
                   whileHover={{ scale: 1.05, y: -5 }}
                   className="glass-tile rounded-2xl p-5 border border-white/15 bg-white/10 backdrop-blur-md hover:border-cyan-300/50 transition-all duration-300 cursor-pointer"
                   style={{
-                    transform: `translate(${pointer.x * 0.08}px, ${pointer.y * 0.08}px)`,
+                    x: cardX,
+                    y: cardY,
+                    translateZ: 0, // Force GPU backend for each card
                   }}
                 >
                   <div className="flex flex-col gap-3">
@@ -351,7 +407,7 @@ export default function HeroSection() {
             </motion.div>
           </motion.div>
 
-          {/* Right Video Section */}
+          {/* Right Video Section - Optimized with Click-to-Play */}
           <motion.div
             initial={{ opacity: 0, x: 30 }}
             animate={{ opacity: 1, x: 0 }}
@@ -360,107 +416,93 @@ export default function HeroSection() {
           >
             <div
               ref={videoContainerRef}
-              className="relative w-full max-w-md mx-auto aspect-[9/16] rounded-3xl overflow-hidden border-2 border-white/20 bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-xl shadow-2xl group"
+              className="relative w-full max-w-md mx-auto aspect-[9/16] rounded-3xl overflow-hidden border-2 border-white/20 bg-black backdrop-blur-xl shadow-2xl group cursor-pointer"
+              onClick={!hasStarted ? toggleVideoPlayback : undefined}
             >
-              {/* Video Container */}
-              <div className="absolute inset-0">
-                {hasStarted ? (
-                  <video
-                    ref={videoRef}
-                    src={heroVideoSrc}
-                    className="w-full h-full object-cover"
-                    loop
-                    playsInline
-                    autoPlay
-                    muted={false}
-                    onPlay={() => setIsVideoPlaying(true)}
-                    onPause={() => setIsVideoPlaying(false)}
-                  />
-                ) : (heroVideoThumbnail?.includes("cloudinary.com") || !heroVideoThumbnail?.match(/\.(mp4|webm|mov|ogg)$/i)) ? (
-                  <img 
-                    src={heroVideoThumbnail}
-                    alt="Hero Preview"
-                    className="w-full h-full object-cover"
-                  />
-                ) : (
-                  <video 
-                    src={heroVideoThumbnail}
-                    preload="metadata"
-                    className="w-full h-full object-cover"
-                  />
-                )}
-                {/* Video overlay gradient */}
-                <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-80" />
-                <div className="absolute inset-0 bg-gradient-to-b from-transparent via-transparent to-black/40" />
-
-                {/* Play/Pause button overlay */}
-                <button
-                  onClick={toggleVideoPlayback}
-                  className="absolute inset-0 flex items-center justify-center bg-black/20 hover:bg-black/10 transition-colors z-20 group/play"
-                  aria-label={isVideoPlaying ? "Pause video" : "Play video"}
-                >
+              <AnimatePresence mode="wait">
+                {!hasStarted ? (
+                  /* Placeholder Image - HIGH PRIORITY FOR LCP */
                   <motion.div
-                    initial={{ scale: 0.8, opacity: 0 }}
-                    animate={{
-                      scale: isVideoPlaying ? 0 : 1,
-                      opacity: isVideoPlaying ? 0 : 1,
-                    }}
-                    transition={{ duration: 0.2 }}
-                    className="w-20 h-20 rounded-full bg-white/20 backdrop-blur-md flex items-center justify-center border-2 border-white/30 shadow-xl group-hover/play:scale-110 transition-transform"
+                    key="placeholder"
+                    initial={{ opacity: 1 }}
+                    exit={{ opacity: 0 }}
+                    className="absolute inset-0 z-10"
                   >
-                    <Play className="h-10 w-10 text-white ml-1" fill="white" />
+                    <img
+                      src={heroVideoThumbnail}
+                      alt="Cinesphere Cinematic Experience"
+                      width={448}
+                      height={796}
+                      {...({ fetchPriority: "high" } as any)} // Priority hint for LCP
+                      className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
+                      loading="eager"
+                    />
+                    {/* Play Button Overlay */}
+                    <div className="absolute inset-0 flex items-center justify-center bg-black/20 group-hover:bg-black/10 transition-colors">
+                      <div className="w-20 h-20 rounded-full bg-white/20 backdrop-blur-md flex items-center justify-center border-2 border-white/30 shadow-2xl group-hover:scale-110 transition-transform">
+                        <Play className="h-10 w-10 text-white ml-1" fill="white" />
+                      </div>
+                    </div>
                   </motion.div>
-                </button>
-              </div>
+                ) : (
+                  /* Video - Only rendered after click */
+                  <motion.div
+                    key="video"
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    className="absolute inset-0 z-0"
+                  >
+                    <video
+                      ref={videoRef}
+                      src={heroVideoSrc}
+                      className="w-full h-full object-cover bg-black"
+                      loop
+                      playsInline
+                      autoPlay
+                      onPlay={() => setIsVideoPlaying(true)}
+                      onPause={() => setIsVideoPlaying(false)}
+                    />
+                    {/* Controls overlay when playing */}
+                    <div 
+                      className="absolute inset-0 z-10"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        toggleVideoPlayback();
+                      }}
+                    >
+                      <button
+                        className="absolute inset-0 flex items-center justify-center"
+                        aria-label={isVideoPlaying ? "Pause video" : "Play video"}
+                      >
+                        <motion.div
+                          animate={{
+                            scale: isVideoPlaying ? 0 : 1,
+                            opacity: isVideoPlaying ? 0 : 1,
+                          }}
+                          className="w-16 h-16 rounded-full bg-black/40 backdrop-blur-sm flex items-center justify-center border border-white/20"
+                        >
+                          <Play className="h-8 w-8 text-white ml-1" fill="white" />
+                        </motion.div>
+                      </button>
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
 
-              {/* Decorative elements */}
-              <div className="absolute top-4 left-4 right-4 flex items-center justify-between z-30">
+              {/* Status Indicators */}
+              <div className="absolute top-4 left-4 right-4 flex items-center justify-between z-30 pointer-events-none">
                 <div className="w-2 h-2 rounded-full bg-green-400 shadow-[0_0_10px_rgba(34,197,94,0.8)] animate-pulse" />
                 <div className="px-3 py-1 rounded-full bg-black/40 backdrop-blur-md border border-white/20">
-                  <span className="text-xs text-white font-medium">LIVE</span>
+                  <span className="text-xs text-white font-medium">8K VISION</span>
                 </div>
               </div>
 
               {/* Bottom info */}
-              <div className="absolute bottom-0 left-0 right-0 p-6 bg-gradient-to-tto-transparent z-30">
-                <div className="flex items-center justify-between mb-2">
-                  <div className="flex items-center gap-2">
-                    <div className="w-8 h-8 rounded-full bg-gradient-to-br flex items-center justify-center">
-                      <Play className="h-4 w-4 text-white" />
-                    </div>
-                    <div>
-                      <p className="text-white font-semibold text-sm">
-                        Experience 8K
-                      </p>
-                      <p className="text-gray-300 text-xs">Cinematic Quality</p>
-                    </div>
-                  </div>
-                </div>
+              <div className="absolute bottom-0 left-0 right-0 p-6 bg-gradient-to-t from-black/80 to-transparent z-30 pointer-events-none">
+                <p className="text-white font-semibold text-sm">Experience the Future</p>
+                <p className="text-gray-300 text-xs">Phòng chiếu 360° Đa Chiều</p>
               </div>
-
-              {/* Glow effect on hover */}
-              <div className="absolute inset-0 bg-gradient-to-r from-cyan-500/0 via-fuchsia-500/0 to-cyan-500/0 group-hover:from-cyan-500/20 group-hover:via-fuchsia-500/20 group-hover:to-cyan-500/20 transition-all duration-500 pointer-events-none" />
             </div>
-
-            {/* Poster indicators */}
-            {/* {moviePosters.length > 1 && (
-              <div className="flex justify-center gap-2 mt-6">
-                {moviePosters.map((_, index) => (
-                  <button
-                    key={index}
-                    onClick={() => {
-                      setCurrentPosterIndex(index);
-                      handlePosterClick(index);
-                    }}
-                    className={`h-2 rounded-full transition-all duration-300 cursor-pointer ${index === currentPosterIndex
-                      ? "w-8 bg-cyan-400 shadow-[0_0_10px_rgba(34,211,238,0.8)]"
-                      : "w-2 bg-white/30 hover:bg-white/50"
-                      }`}
-                    aria-label={`Go to poster ${index + 1}`}
-                  />
-                ))}
-              </div>
-            )} */}
           </motion.div>
         </div>
       </div>
@@ -509,6 +551,8 @@ export default function HeroSection() {
                         "https://images.unsplash.com/photo-1464375117522-1311d6a5b81f?auto=format&fit=crop&w=900&q=80"
                       }
                       alt={movieDetails.title}
+                      width={400}
+                      height={600}
                       className="w-full h-full object-cover"
                     />
                     <div className="absolute inset-0 bg-gradient-to-t from-black/40 to-transparent pointer-events-none" />

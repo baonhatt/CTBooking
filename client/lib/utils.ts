@@ -5,53 +5,86 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
-export function optimizeCloudinaryUrl(url: string, width?: number) {
+// Helper to ensure valid quality values
+function getAutoQuality(q: string) {
+  if (q && q.startsWith("auto")) return q;
+  return "auto:eco";
+}
+
+export function optimizeCloudinaryUrl(url: string, width?: number, quality: string = "auto:eco") {
   if (!url || !url.includes("cloudinary.com")) return url;
 
-  // Split at /upload/
   const parts = url.split("/upload/");
   if (parts.length !== 2) return url;
 
-  const transformations = ["f_auto", "q_auto"];
+  const pathSegments = parts[1].split("/");
+  const versionIndex = pathSegments.findIndex(seg => seg.match(/^v\d+$/));
+  
+  const cleanPath = versionIndex !== -1 
+    ? pathSegments.slice(versionIndex).join("/")
+    : pathSegments.length > 1 && pathSegments[0].includes(",") 
+      ? pathSegments.slice(1).join("/")
+      : parts[1];
+
+  const transformations = [
+    "f_auto", 
+    `q_${getAutoQuality(quality)}`, 
+    "c_limit",
+  ];
+  
   if (width) {
     transformations.push(`w_${width}`);
   }
 
-  const transformString = transformations.join(",");
+  return `${parts[0]}/upload/${transformations.join(",")}/${cleanPath}`;
+}
 
-  return `${parts[0]}/upload/${transformString}/${parts[1]}`;
+export function generateCloudinarySrcSet(url: string, sizes: number[] = [400, 800, 1200, 1600]) {
+  if (!url || !url.includes("cloudinary.com")) return undefined;
+  
+  return sizes
+    .map(size => `${optimizeCloudinaryUrl(url, size)} ${size}w`)
+    .join(", ");
 }
 
 export function optimizeCloudinaryVideoUrl(
   url: string,
   width?: number,
-  quality: string = "auto",
+  quality: string = "auto:eco",
 ) {
   if (!url || !url.includes("cloudinary.com")) return url;
   const parts = url.split("/upload/");
   if (parts.length !== 2) return url;
-  // f_auto: auto format (usually webm/mp4), q_{quality}, vc_auto: video codec auto
-  // br_3m: limit bitrate to 3mbps to avoid huge files
+
+  const pathSegments = parts[1].split("/");
+  const versionIndex = pathSegments.findIndex(seg => seg.match(/^v\d+$/));
+  const cleanPath = versionIndex !== -1 
+    ? pathSegments.slice(versionIndex).join("/")
+    : pathSegments.length > 1 && pathSegments[0].includes(",") 
+      ? pathSegments.slice(1).join("/")
+      : parts[1];
+
   const transformations = [
     "f_auto",
-    `q_${quality}`,
-    "vc_auto",
+    `q_${getAutoQuality(quality)}`,
     "c_limit",
-    "br_3m",
+    "br_2m",
   ];
   if (width) transformations.push(`w_${width}`);
 
-  return `${parts[0]}/upload/${transformations.join(",")}/${parts[1]}`;
+  return `${parts[0]}/upload/${transformations.join(",")}/${cleanPath}`;
 }
 
-export function getCloudinaryThumbnail(url: string) {
-  if (!url) return url;
-  if (!url.includes("cloudinary.com")) return url;
+export function getCloudinaryThumbnail(url: string, width?: number, quality: string = "auto:eco") {
+  if (!url || !url.includes("cloudinary.com")) return url;
   
-  const parts = url.split("/upload/");
-  if (parts.length !== 2) return url;
+  const transformations = ["f_auto", `q_${getAutoQuality(quality)}`, "so_2"];
+  if (width) transformations.push(`w_${width}`, "c_limit");
   
-  // Replace extension with .jpg and add so_0 to get start frame
-  const videoPath = parts[1].replace(/\.[^/.]+$/, ".jpg");
-  return `${parts[0]}/upload/f_auto,q_auto,so_0/${videoPath}`;
+  // Replace existing transformations or inject new ones
+  // Video thumbnail URLs might look like .../video/upload/v123...
+  return url
+    .replace(/\.(mp4|webm|mov|ogg)$/i, ".jpg")
+    .replace(/\/upload\/([^\/]+\/)?/, `/upload/${transformations.join(",")}/`);
 }
+
