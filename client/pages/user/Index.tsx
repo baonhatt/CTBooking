@@ -1,65 +1,19 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, lazy, Suspense } from "react";
 import HeroSection from "@/components/user/HeroSection";
-import FilmCarousel from "@/components/user/FilmCarousel";
-import PromotionShowcase from "@/components/user/PromotionShowcase";
-import ProductSection from "@/components/user/ProductSection";
-import TechnologyBanner from "@/components/user/TechnologyBanner";
+const FilmCarousel = lazy(() => import("@/components/user/FilmCarousel"));
+const PromotionShowcase = lazy(() => import("@/components/user/PromotionShowcase"));
+const ProductSection = lazy(() => import("@/components/user/ProductSection"));
+const TechnologyBanner = lazy(() => import("@/components/user/TechnologyBanner"));
 import UserLayout from "@/user/layouts/UserLayout";
 import { ConfigProvider } from "antd";
-import { motion } from "framer-motion";
-import { ArrowUp } from "lucide-react";
-import { useQuery } from "@tanstack/react-query";
-import { getAllActiveMoviesToday, getActiveTickets } from "@/lib/api";
+import { useNavigate } from "react-router-dom";
 
 export default function Index() {
-  const [showBackToTop, setShowBackToTop] = useState(false);
-  const [isBookingModalOpen, setIsBookingModalOpen] = useState(false);
-  const [movie, setMovie] = useState<string>("");
-  const [selectedPackage, setSelectedPackage] = useState<any | null>(null);
-
-  const { data: activeData } = useQuery({
-    queryKey: ["activeMovies"],
-    queryFn: ({ signal }) => getAllActiveMoviesToday({ signal }),
-    staleTime: 60000,
-  });
-  const { data: ticketsData } = useQuery({
-    queryKey: ["activeTickets"],
-    queryFn: ({ signal }) => getActiveTickets({ signal }),
-    staleTime: 60000,
-  });
-
-  const activeMoviesFull = activeData?.activeMovies || [];
-  const ticketPackages = useMemo(() => (ticketsData?.items || []).map((t: any) => ({
-    id: t.id,
-    name: t.name,
-    description: t.description || "",
-    price: Number(t.price || 0),
-    type: t.type || "",
-    display_order: t.display_order || 0,
-  })), [ticketsData]);
+  const navigate = useNavigate();
 
   const handleBookClick = () => {
-    setIsBookingModalOpen(true);
+    navigate("/booking");
   };
-
-  useEffect(() => {
-    const onScroll = () => setShowBackToTop(window.scrollY > 200);
-    window.addEventListener("scroll", onScroll);
-    onScroll();
-    return () => window.removeEventListener("scroll", onScroll);
-  }, []);
-
-  useEffect(() => {
-    try {
-      if (!movie && Array.isArray(activeMoviesFull) && activeMoviesFull.length > 0) {
-        setMovie(activeMoviesFull[0].title);
-      }
-      if (!selectedPackage && Array.isArray(ticketPackages) && ticketPackages.length > 0) {
-        const sorted = [...ticketPackages].sort((a, b) => (a.display_order ?? 0) - (b.display_order ?? 0));
-        setSelectedPackage(sorted[0] || null);
-      }
-    } catch { }
-  }, [activeMoviesFull, ticketPackages]);
 
   useEffect(() => {
     try {
@@ -68,11 +22,6 @@ export default function Index() {
       localStorage.removeItem("lastVnpayBookingId");
     } catch { }
   }, []);
-
-  const scrollToTop = () => {
-    setShowBackToTop(false);
-    window.scrollTo({ top: 0, behavior: "smooth" });
-  };
 
   return (
     <ConfigProvider
@@ -104,21 +53,13 @@ export default function Index() {
       >
         <main>
           <HeroSection />
-          <FilmCarousel onSelectFilm={handleBookClick} />
-          <PromotionShowcase />
-          <TechnologyBanner />
-          <ProductSection />
+          <Suspense fallback={<div className="min-h-[200px]" />}>
+            <FilmCarousel />
+            <PromotionShowcase />
+            <TechnologyBanner />
+            <ProductSection />
+          </Suspense>
         </main>
-        {showBackToTop && (
-          <motion.button
-            onClick={scrollToTop}
-            whileHover={{ scale: 1.1, y: -5 }}
-            whileTap={{ scale: 0.95 }}
-            className="fixed bottom-8 right-8 w-12 h-12 rounded-full bg-black border border-white/20 flex items-center justify-center hover:border-blue-400 transition-colors z-50"
-          >
-            <ArrowUp className="h-5 w-5 text-blue-400" />
-          </motion.button>
-        )}
       </UserLayout>
     </ConfigProvider>
   );

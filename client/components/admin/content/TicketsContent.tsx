@@ -200,7 +200,10 @@ export default function TicketsContent(props: Props) {
                             <History size={10} className="text-slate-400" />
                             {t.updated_at ? format(new Date(t.updated_at), "HH:mm") : "-"}
                           </span>
-                          <span className="text-slate-400 italic">
+                          <span 
+                            className="text-slate-400 italic cursor-help"
+                            title={t.updated_at ? new Date(t.updated_at).toLocaleString("vi-VN") : ""}
+                          >
                             {t.updated_at ? formatDistanceToNow(new Date(t.updated_at), { addSuffix: true, locale: vi }) : ""}
                           </span>
                         </div>

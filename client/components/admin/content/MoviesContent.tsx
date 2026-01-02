@@ -352,7 +352,10 @@ export default function MoviesContent({
                               ? format(new Date(movie.updated_at), "HH:mm")
                               : "-"}
                           </span>
-                          <span className="text-slate-400 italic">
+                          <span 
+                            className="text-slate-400 italic cursor-help"
+                            title={movie.updated_at ? new Date(movie.updated_at).toLocaleString("vi-VN") : ""}
+                          >
                             {movie.updated_at
                               ? formatDistanceToNow(
                                   new Date(movie.updated_at),

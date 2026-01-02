@@ -1,5 +1,11 @@
-/** @import must precede all other statements */
-@import url("https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap");
+/** Self-hosted Fonts - Reduced Critical Path Latency */
+@font-face {
+  font-family: 'Inter';
+  src: url('/fonts/InterVariable.woff2') format('woff2');
+  font-weight: 100 900;
+  font-display: swap;
+  font-style: normal;
+}
 
 @tailwind base;
 @tailwind components;
@@ -99,15 +105,24 @@
 }
 
 @layer base {
+  html {
+    background-color: #050915;
+    scroll-behavior: smooth;
+  }
+
   * {
     @apply border-border;
   }
 
   body {
     @apply bg-background text-foreground;
+    background-color: #050915;
     font-family: "Inter", -apple-system, BlinkMacSystemFont, "system-ui",
       "sans-serif", "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol",
       "Noto Color Emoji";
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
   }
 
   :where(p, span, li, h1, h2, h3, h4, h5, h6, a, button, label, td, th) {
@@ -315,7 +330,8 @@
 
   .glass-tile {
     box-shadow: 0 10px 40px rgba(15, 23, 42, 0.45);
-    backdrop-filter: blur(14px);
+    backdrop-filter: blur(10px); /* Giảm từ 14px xuống 10px để mượt hơn */
+    will-change: transform, opacity; /* Ép chạy bằng phần cứng */
   }
 
   .neon-border {

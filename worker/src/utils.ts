@@ -5,245 +5,261 @@ export const RL_WINDOW_MS = 60_000;
 export const attempts = new Map<string, number[]>();
 
 export async function withCache(
-  request: Request,
-  env: any,
-  ctx: any, // Thêm tham số ctx (đó chính là c.executionCtx)
-  handler: () => Promise<Response>,
-  ttl = 3600,
+        request: Request,
+        env: any,
+        ctx: any, // Thêm tham số ctx (đó chính là c.executionCtx)
+        handler: () => Promise<Response>,
+        ttl = 900,
 ) {
-  const cache = typeof caches !== "undefined" ? (caches as any).default : null;
+        const cache = typeof caches !== "undefined" ? (caches as any).default : null;
 
-  if (!cache || request.method !== "GET") {
-    return await handler();
-  }
+        if (!cache || request.method !== "GET") {
+                return await handler();
+        }
 
-  const cacheKey = new Request(request.url, request);
-  let response = await cache.match(cacheKey);
+        const cacheKey = new Request(request.url, request);
+        let response = await cache.match(cacheKey);
 
-  if (!response) {
-    const originalResponse = await handler();
+        if (!response) {
+                const originalResponse = await handler();
 
-    if (originalResponse.status === 200) {
-      response = new Response(originalResponse.body, originalResponse);
-      response.headers.set("Cache-Control", `public, max-age=${ttl}`);
+                if (originalResponse.status === 200) {
+                        response = new Response(originalResponse.body, originalResponse);
+                        response.headers.set(
+                                "Cache-Control",
+                                `public, no-cache, s-maxage=${ttl}, must-revalidate`,
+                        );
 
-      // SỬ DỤNG ctx.waitUntil Ở ĐÂY:
-      // Việc ghi vào cache sẽ không làm chậm request của khách
-      ctx.waitUntil(cache.put(cacheKey, response.clone()));
-    } else {
-      return originalResponse;
-    }
-  } else {
-    response = new Response(response.body, response);
-    response.headers.set("X-Cache", "HIT");
-  }
+                        // SỬ DỤNG ctx.waitUntil Ở ĐÂY:
+                        // Việc ghi vào cache sẽ không làm chậm request của khách
+                        ctx.waitUntil(cache.put(cacheKey, response.clone()));
+                } else {
+                        return originalResponse;
+                }
+        } else {
+                response = new Response(response.body, response);
+                response.headers.set("X-Cache", "HIT");
+        }
 
-  return response;
+        return response;
+}
+
+export async function deleteCache(env: any, fullUrl: string) {
+        const cache = typeof caches !== "undefined" ? (caches as any).default : null;
+        if (!cache || !fullUrl) return;
+        // Xóa cache cho URL cụ thể
+        try {
+                await cache.delete(fullUrl);
+        } catch (e) {
+                console.error("Cache clean error:", e);
+        }
 }
 
 export async function hmacHex(
-  algo: "SHA-256" | "SHA-512",
-  key: string,
-  message: string,
+        algo: "SHA-256" | "SHA-512",
+        key: string,
+        message: string,
 ): Promise<string> {
-  const enc = new TextEncoder();
-  const cryptoKey = await crypto.subtle.importKey(
-    "raw",
-    enc.encode(key),
-    { name: "HMAC", hash: algo },
-    false,
-    ["sign"],
-  );
-  const signature = await crypto.subtle.sign(
-    "HMAC",
-    cryptoKey,
-    enc.encode(message),
-  );
-  const bytes = new Uint8Array(signature as ArrayBuffer);
-  return Array.from(bytes)
-    .map((b) => b.toString(16).padStart(2, "0"))
-    .join("");
+        const enc = new TextEncoder();
+        const cryptoKey = await crypto.subtle.importKey(
+                "raw",
+                enc.encode(key),
+                { name: "HMAC", hash: algo },
+                false,
+                ["sign"],
+        );
+        const signature = await crypto.subtle.sign(
+                "HMAC",
+                cryptoKey,
+                enc.encode(message),
+        );
+        const bytes = new Uint8Array(signature as ArrayBuffer);
+        return Array.from(bytes)
+                .map((b) => b.toString(16).padStart(2, "0"))
+                .join("");
 }
 
 export function logSystemError(context: string, error: any, payload?: any) {
-  const timestamp = new Date().toISOString();
-  const errorMsg = error?.message || String(error);
-  const stack = error?.stack || "No stack trace";
-  const safePayload = payload ? { ...payload } : "No payload";
+        const timestamp = new Date().toISOString();
+        const errorMsg = error?.message || String(error);
+        const stack = error?.stack || "No stack trace";
+        const safePayload = payload ? { ...payload } : "No payload";
 
-  // Mask sensitive fields
-  if (typeof safePayload === "object" && safePayload !== null) {
-    if ("password" in safePayload) safePayload.password = "***";
-    if ("token" in safePayload) safePayload.token = "***";
-  }
+        // Mask sensitive fields
+        if (typeof safePayload === "object" && safePayload !== null) {
+                if ("password" in safePayload) safePayload.password = "***";
+                if ("token" in safePayload) safePayload.token = "***";
+        }
 
-  console.error(`[${timestamp}] [ERROR] [${context}]`);
-  console.error(`Message: ${errorMsg}`);
-  console.error(`Stack: ${stack}`);
-  console.error(`Payload:`, JSON.stringify(safePayload, null, 2));
+        console.error(`[${timestamp}] [ERROR] [${context}]`);
+        console.error(`Message: ${errorMsg}`);
+        console.error(`Stack: ${stack}`);
+        console.error(`Payload:`, JSON.stringify(safePayload, null, 2));
 }
 
 export async function sendMail(
-  env: any,
-  toEmail: string,
-  subject: string,
-  html: string,
+        env: any,
+        toEmail: string,
+        subject: string,
+        html: string,
 ): Promise<{
-  ok: boolean;
-  status: number;
-  body: string;
-  provider: string;
-  missing: string[];
+        ok: boolean;
+        status: number;
+        body: string;
+        provider: string;
+        missing: string[];
 }> {
-  // Check for Preview/Review environment
-  if (env.IS_PREVIEW === "true") {
-    const token = String(env.MAILTRAP_API_TOKEN || "");
-    const inboxId = String(env.MAILTRAP_INBOX_ID || "");
+        // Check for Preview/Review environment
+        if (env.IS_PREVIEW === "true") {
+                const token = String(env.MAILTRAP_API_TOKEN || "");
+                const inboxId = String(env.MAILTRAP_INBOX_ID || "");
 
-    if (token && inboxId) {
-      const senderEmail = String(
-        env.GMAIL_SENDER_EMAIL || "no-reply@cinesphere.com.vn",
-      );
-      const senderName = String(env.GMAIL_SENDER_NAME || "CINESPHERE");
+                if (token && inboxId) {
+                        const senderEmail = String(
+                                env.GMAIL_SENDER_EMAIL || "no-reply@cinesphere.com.vn",
+                        );
+                        const senderName = String(env.GMAIL_SENDER_NAME || "CINESPHERE");
 
-      const payload = {
-        to: [{ email: toEmail }],
-        from: { email: senderEmail, name: senderName },
-        subject,
-        html,
-        category: "Review Worker Test",
-      };
+                        const payload = {
+                                to: [{ email: toEmail }],
+                                from: { email: senderEmail, name: senderName },
+                                subject,
+                                html,
+                                category: "Review Worker Test",
+                        };
 
-      const res = await fetch(
-        `https://sandbox.api.mailtrap.io/api/send/${inboxId}`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
-          },
-          body: JSON.stringify(payload),
-        },
-      );
+                        const res = await fetch(
+                                `https://sandbox.api.mailtrap.io/api/send/${inboxId}`,
+                                {
+                                        method: "POST",
+                                        headers: {
+                                                "Content-Type": "application/json",
+                                                Authorization: `Bearer ${token}`,
+                                        },
+                                        body: JSON.stringify(payload),
+                                },
+                        );
 
-      const bodyText = await res.text().catch(() => "");
-      return {
-        ok: res.ok,
-        status: res.status,
-        body: bodyText,
-        provider: "mailtrap-sandbox",
-        missing: [],
-      };
-    }
+                        const bodyText = await res.text().catch(() => "");
+                        return {
+                                ok: res.ok,
+                                status: res.status,
+                                body: bodyText,
+                                provider: "mailtrap-sandbox",
+                                missing: [],
+                        };
+                }
 
-    return {
-      ok: false,
-      status: 500,
-      body: "Mailtrap provider is not configured for preview",
-      provider: "mailtrap-sandbox",
-      missing: ["MAILTRAP_API_TOKEN", "MAILTRAP_INBOX_ID"],
-    };
-  }
+                return {
+                        ok: false,
+                        status: 500,
+                        body: "Mailtrap provider is not configured for preview",
+                        provider: "mailtrap-sandbox",
+                        missing: ["MAILTRAP_API_TOKEN", "MAILTRAP_INBOX_ID"],
+                };
+        }
 
-  const brevoKey = String(env.BREVO_API_KEY || "");
-  const useBrevo = Boolean(brevoKey);
-  if (useBrevo) {
-    const senderEmailBrevo = String(env.BREVO_SENDER_EMAIL || "");
-    const senderNameBrevo = String(env.BREVO_SENDER_NAME || "");
-    const senderEmailFallback = String(
-      env.GMAIL_SENDER_EMAIL || "no-reply@example.com",
-    );
-    const senderNameFallback = String(env.GMAIL_SENDER_NAME || "CTBOOKING");
-    const missing: string[] = [];
-    if (!brevoKey) missing.push("BREVO_API_KEY");
-    if (!senderEmailBrevo) missing.push("BREVO_SENDER_EMAIL");
-    if (!senderNameBrevo) missing.push("BREVO_SENDER_NAME");
-    const senderEmail = senderEmailBrevo || senderEmailFallback;
-    const senderName = senderNameBrevo || senderNameFallback;
-    const payload = {
-      sender: { email: senderEmail, name: senderName },
-      to: [{ email: toEmail }],
-      subject,
-      htmlContent: html,
-    };
-    const res = await fetch("https://api.brevo.com/v3/smtp/email", {
-      method: "POST",
-      headers: { "Content-Type": "application/json", "api-key": brevoKey },
-      body: JSON.stringify(payload),
-    });
-    const bodyText = await res.text().catch(() => "");
-    return {
-      ok: res.ok,
-      status: res.status,
-      body: bodyText,
-      provider: "brevo",
-      missing,
-    };
-  } else {
-    const fromEmail = String(
-      env.GMAIL_SENDER_EMAIL || env.GMAIL_USER || "no-reply@example.com",
-    );
-    const fromName = String(env.GMAIL_SENDER_NAME || "CTBOOKING");
-    const missing: string[] = [];
-    if (!String(env.GMAIL_SENDER_EMAIL || env.GMAIL_USER || ""))
-      missing.push("GMAIL_SENDER_EMAIL");
-    if (!String(env.GMAIL_SENDER_NAME || "")) missing.push("GMAIL_SENDER_NAME");
-    const payload = {
-      personalizations: [{ to: [{ email: toEmail }] }],
-      from: { email: fromEmail, name: fromName },
-      subject,
-      content: [{ type: "text/html", value: html }],
-    };
-    const res = await fetch("https://api.mailchannels.net/tx/v1/send", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
-    });
-    const bodyText = await res.text().catch(() => "");
-    return {
-      ok: res.ok,
-      status: res.status,
-      body: bodyText,
-      provider: "mailchannels",
-      missing,
-    };
-  }
+
+
+        const brevoKey = String(env.BREVO_API_KEY || "");
+        const useBrevo = Boolean(brevoKey);
+        if (useBrevo) {
+                const senderEmailBrevo = String(env.BREVO_SENDER_EMAIL || "");
+                const senderNameBrevo = String(env.BREVO_SENDER_NAME || "");
+                const senderEmailFallback = String(
+                        env.GMAIL_SENDER_EMAIL || "no-reply@example.com",
+                );
+                const senderNameFallback = String(env.GMAIL_SENDER_NAME || "CTBOOKING");
+                const missing: string[] = [];
+                if (!brevoKey) missing.push("BREVO_API_KEY");
+                if (!senderEmailBrevo) missing.push("BREVO_SENDER_EMAIL");
+                if (!senderNameBrevo) missing.push("BREVO_SENDER_NAME");
+                const senderEmail = senderEmailBrevo || senderEmailFallback;
+                const senderName = senderNameBrevo || senderNameFallback;
+                const payload = {
+                        sender: { email: senderEmail, name: senderName },
+                        to: [{ email: toEmail }],
+                        subject,
+                        htmlContent: html,
+                };
+                const res = await fetch("https://api.brevo.com/v3/smtp/email", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json", "api-key": brevoKey },
+                        body: JSON.stringify(payload),
+                });
+                const bodyText = await res.text().catch(() => "");
+                return {
+                        ok: res.ok,
+                        status: res.status,
+                        body: bodyText,
+                        provider: "brevo",
+                        missing,
+                };
+        } else {
+                const fromEmail = String(
+                        env.GMAIL_SENDER_EMAIL || env.GMAIL_USER || "no-reply@example.com",
+                );
+                const fromName = String(env.GMAIL_SENDER_NAME || "CTBOOKING");
+                const missing: string[] = [];
+                if (!String(env.GMAIL_SENDER_EMAIL || env.GMAIL_USER || ""))
+                        missing.push("GMAIL_SENDER_EMAIL");
+                if (!String(env.GMAIL_SENDER_NAME || "")) missing.push("GMAIL_SENDER_NAME");
+                const payload = {
+                        personalizations: [{ to: [{ email: toEmail }] }],
+                        from: { email: fromEmail, name: fromName },
+                        subject,
+                        content: [{ type: "text/html", value: html }],
+                };
+                const res = await fetch("https://api.mailchannels.net/tx/v1/send", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify(payload),
+                });
+                const bodyText = await res.text().catch(() => "");
+                return {
+                        ok: res.ok,
+                        status: res.status,
+                        body: bodyText,
+                        provider: "mailchannels",
+                        missing,
+                };
+        }
 }
 
 export function formatCurrencyVi(amount: number): string {
-  return `${Number(amount || 0).toLocaleString("vi-VN")}đ`;
+        return `${Number(amount || 0).toLocaleString("vi-VN")}đ`;
 }
 
 export function getBookingEmailTemplate(
-  baseUrl: string,
-  data: {
-    bookingCode: string;
-    customerName: string;
-    movieTitle: string; // Nhận chuỗi JSON: "["Phim A","Phim B"]"
-    ticketCount: number;
-    totalPrice: string;
-    movieImage?: string;
-    durationMin?: number | string; // Nhận chuỗi JSON: "[10, 12]"
-    ticketPackageName?: string;
-    expiryDate?: string | Date | null;
-  },
+        baseUrl: string,
+        data: {
+                bookingCode: string;
+                customerName: string;
+                movieTitle: string; // Nhận chuỗi JSON: "["Phim A","Phim B"]"
+                ticketCount: number;
+                totalPrice: string;
+                movieImage?: string;
+                durationMin?: number | string; // Nhận chuỗi JSON: "[10, 12]"
+                ticketPackageName?: string;
+                expiryDate?: string | Date | null;
+        },
 ): string {
-  // 1. XỬ LÝ PARSE JSON CHO DANH SÁCH PHIM
-  let movieTitles: string[] = [];
-  let durations: string[] = [];
+        // 1. XỬ LÝ PARSE JSON CHO DANH SÁCH PHIM
+        let movieTitles: string[] = [];
+        let durations: string[] = [];
 
-  try {
-    movieTitles = JSON.parse(data.movieTitle || "[]");
-    durations = JSON.parse(String(data.durationMin) || "[]");
-  } catch (e) {
-    movieTitles = data.movieTitle ? [data.movieTitle] : [];
-    durations = data.durationMin ? [String(data.durationMin)] : [];
-  }
+        try {
+                movieTitles = JSON.parse(data.movieTitle || "[]");
+                durations = JSON.parse(String(data.durationMin) || "[]");
+        } catch (e) {
+                movieTitles = data.movieTitle ? [data.movieTitle] : [];
+                durations = data.durationMin ? [String(data.durationMin)] : [];
+        }
 
-  // 2. TẠO HTML DANH SÁCH PHIM (Đồng bộ giao diện Admin)
-  const moviesListHtml = movieTitles
-    .map(
-      (title, index) => `
+        // 2. TẠO HTML DANH SÁCH PHIM (Đồng bộ giao diện Admin)
+        const moviesListHtml = movieTitles
+                .map(
+                        (title, index) => `
     <div style="display: flex; justify-content: space-between; align-items: center; padding: 10px 12px; margin-bottom: 6px; background-color: #f8f9fa; border-radius: 6px; border: 1px solid #edf2f7;">
         <span style="font-weight: 600; color: #2d3748; font-size: 14px;">🎬 ${title}</span>
         <span style="font-size: 11px; color: #a0aec0; font-weight: bold; background: #fff; padding: 2px 6px; border-radius: 4px; border: 1px solid #e2e8f0;">
@@ -251,41 +267,44 @@ export function getBookingEmailTemplate(
         </span>
     </div>
   `,
-    )
-    .join("");
+                )
+                .join("");
 
-  // 3. XỬ LÝ CÁC THÀNH PHẦN KHÁC
-  const pkgHtml = data.ticketPackageName
-    ? `
+        // 3. XỬ LÝ CÁC THÀNH PHẦN KHÁC
+        const pkgHtml = data.ticketPackageName
+                ? `
     <div class="detail-row">
         <span class="detail-label">Loại vé:</span>
         <span class="detail-value" style="color: #4a5568;">${data.ticketPackageName}</span>
     </div>`
-    : ``;
+                : ``;
 
-  const expiryHtml = data.expiryDate
-    ? `
+        const expiryHtml = data.expiryDate
+                ? `
     <div class="detail-row">
         <span class="detail-label">Ngày hết hạn:</span>
         <span class="detail-value" style="color: #e53e3e;">${(() => {
-          try {
-            const d = new Date(String(data.expiryDate));
-            return (
-              d.toLocaleDateString("vi-VN") +
-              " " +
-              d.toLocaleTimeString("vi-VN", {
-                hour: "2-digit",
-                minute: "2-digit",
-              })
-            );
-          } catch {
-            return String(data.expiryDate);
-          }
-        })()}</span>
+                        try {
+                                const d = new Date(String(data.expiryDate));
+                                return (
+                                        d.toLocaleDateString("vi-VN", {
+                                                timeZone: "Asia/Ho_Chi_Minh",
+                                        }) +
+                                        " " +
+                                        d.toLocaleTimeString("vi-VN", {
+                                                hour: "2-digit",
+                                                minute: "2-digit",
+                                                timeZone: "Asia/Ho_Chi_Minh",
+                                        })
+                                );
+                        } catch {
+                                return String(data.expiryDate);
+                        }
+                })()}</span>
     </div>`
-    : ``;
+                : ``;
 
-  return `
+        return `
 <!DOCTYPE html>
 <html lang="vi">
 <head>
@@ -355,11 +374,11 @@ export function getBookingEmailTemplate(
 }
 
 export function getWelcomeEmailTemplate(
-  baseUrl: string,
-  data: { customerName: string; email: string },
+        baseUrl: string,
+        data: { customerName: string; email: string },
 ): string {
-  const homeUrl = `${baseUrl}/`;
-  return `
+        const homeUrl = `${baseUrl}/`;
+        return `
 <!DOCTYPE html>
 <html lang="vi">
 <head>
@@ -419,10 +438,10 @@ export function getWelcomeEmailTemplate(
 }
 
 export function getResetPasswordEmailTemplate(
-  baseUrl: string,
-  link: string,
+        baseUrl: string,
+        link: string,
 ): string {
-  return `
+        return `
 <!DOCTYPE html>
 <html lang="vi">
 <head>
@@ -538,140 +557,140 @@ export function getResetPasswordEmailTemplate(
 }
 
 export async function sha1Hex(input: string): Promise<string> {
-  const enc = new TextEncoder();
-  const buf = await crypto.subtle.digest("SHA-1", enc.encode(input));
-  const bytes = new Uint8Array(buf as ArrayBuffer);
-  return Array.from(bytes)
-    .map((b) => b.toString(16).padStart(2, "0"))
-    .join("");
+        const enc = new TextEncoder();
+        const buf = await crypto.subtle.digest("SHA-1", enc.encode(input));
+        const bytes = new Uint8Array(buf as ArrayBuffer);
+        return Array.from(bytes)
+                .map((b) => b.toString(16).padStart(2, "0"))
+                .join("");
 }
 
 export function hasCloudinary(env: any) {
-  const cloudName = String(env.CLOUDINARY_CLOUD_NAME || "");
-  const apiKey = String(env.CLOUDINARY_API_KEY || "");
-  const apiSecret = String(env.CLOUDINARY_API_SECRET || "");
-  return Boolean(cloudName && apiKey && apiSecret);
+        const cloudName = String(env.CLOUDINARY_CLOUD_NAME || "");
+        const apiKey = String(env.CLOUDINARY_API_KEY || "");
+        const apiSecret = String(env.CLOUDINARY_API_SECRET || "");
+        return Boolean(cloudName && apiKey && apiSecret);
 }
 
 export async function cloudinarySignedParams(
-  env: any,
-  params: Record<string, string | number>,
+        env: any,
+        params: Record<string, string | number>,
 ) {
-  const apiKey = String(env.CLOUDINARY_API_KEY || "");
-  const apiSecret = String(env.CLOUDINARY_API_SECRET || "");
-  const keys = Object.keys(params).sort();
-  const toSign = keys.map((k) => `${k}=${params[k]}`).join("&") + apiSecret;
-  const signature = await sha1Hex(toSign);
-  return { signature, api_key: apiKey };
+        const apiKey = String(env.CLOUDINARY_API_KEY || "");
+        const apiSecret = String(env.CLOUDINARY_API_SECRET || "");
+        const keys = Object.keys(params).sort();
+        const toSign = keys.map((k) => `${k}=${params[k]}`).join("&") + apiSecret;
+        const signature = await sha1Hex(toSign);
+        return { signature, api_key: apiKey };
 }
 
 export function optimizeCloudinaryUrl(url: string, width?: number) {
-  if (!url || typeof url !== "string" || !url.includes("cloudinary.com"))
-    return url;
-  const parts = url.split("/upload/");
-  if (parts.length !== 2) return url;
-  const transformations = ["f_auto", "q_auto"];
-  if (width) transformations.push(`w_${width}`);
-  const transformString = transformations.join(",");
-  return `${parts[0]}/upload/${transformString}/${parts[1]}`;
+        if (!url || typeof url !== "string" || !url.includes("cloudinary.com"))
+                return url;
+        const parts = url.split("/upload/");
+        if (parts.length !== 2) return url;
+        const transformations = ["f_auto", "q_auto"];
+        if (width) transformations.push(`w_${width}`);
+        const transformString = transformations.join(",");
+        return `${parts[0]}/upload/${transformString}/${parts[1]}`;
 }
 
 export function getPublicIdFromUrl(url: string) {
-  if (!url || typeof url !== "string" || !url.includes("cloudinary.com"))
-    return null;
-  try {
-    const parts = url.split("/upload/");
-    if (parts.length < 2) return null;
-    const rightPart = parts[1];
-    // Remove version (v1234567890/) if present
-    const versionRegex = /^v\d+\//;
-    let path = rightPart.replace(versionRegex, "");
-    // Remove extension
-    const lastDotIndex = path.lastIndexOf(".");
-    if (lastDotIndex !== -1) {
-      path = path.substring(0, lastDotIndex);
-    }
-    return path;
-  } catch (e) {
-    return null;
-  }
+        if (!url || typeof url !== "string" || !url.includes("cloudinary.com"))
+                return null;
+        try {
+                const parts = url.split("/upload/");
+                if (parts.length < 2) return null;
+                const rightPart = parts[1];
+                // Remove version (v1234567890/) if present
+                const versionRegex = /^v\d+\//;
+                let path = rightPart.replace(versionRegex, "");
+                // Remove extension
+                const lastDotIndex = path.lastIndexOf(".");
+                if (lastDotIndex !== -1) {
+                        path = path.substring(0, lastDotIndex);
+                }
+                return path;
+        } catch (e) {
+                return null;
+        }
 }
 
 export function optimizeCloudinaryVideoUrl(
-  url: string,
-  width?: number,
-  quality: string = "auto",
+        url: string,
+        width?: number,
+        quality: string = "auto",
 ) {
-  if (!url || typeof url !== "string" || !url.includes("cloudinary.com"))
-    return url;
-  const parts = url.split("/upload/");
-  if (parts.length !== 2) return url;
-  const transformations = [
-    "f_auto",
-    `q_${quality}`,
-    "vc_auto",
-    "c_limit",
-    "br_3m",
-  ];
-  if (width) transformations.push(`w_${width}`);
-  return `${parts[0]}/upload/${transformations.join(",")}/${parts[1]}`;
+        if (!url || typeof url !== "string" || !url.includes("cloudinary.com"))
+                return url;
+        const parts = url.split("/upload/");
+        if (parts.length !== 2) return url;
+        const transformations = [
+                "f_auto",
+                `q_${quality}`,
+                "vc_auto",
+                "c_limit",
+                "br_3m",
+        ];
+        if (width) transformations.push(`w_${width}`);
+        return `${parts[0]}/upload/${transformations.join(",")}/${parts[1]}`;
 }
 
 export async function uploadCloudinaryImageDataURI(
-  env: any,
-  dataUri: string,
-  folder: string,
+        env: any,
+        dataUri: string,
+        folder: string,
 ) {
-  const cloudName = String(env.CLOUDINARY_CLOUD_NAME || "");
-  const timestamp = Math.floor(Date.now() / 1000);
-  const params = {
-    timestamp,
-    folder,
-    use_filename: "true",
-    unique_filename: "false",
-    overwrite: "true",
-    transformation: "q_auto,f_webp,w_1280,c_limit",
-  };
-  const signed = await cloudinarySignedParams(env, params);
-  const form = new FormData();
-  form.append("file", dataUri);
-  form.append("folder", folder);
-  form.append("use_filename", "true");
-  form.append("unique_filename", "false");
-  form.append("overwrite", "true");
-  form.append("timestamp", String(timestamp));
-  form.append("api_key", signed.api_key);
-  form.append("signature", signed.signature);
-  form.append("transformation", "q_auto,f_webp,w_1280,c_limit");
-  const endpoint = `https://api.cloudinary.com/v1_1/${cloudName}/image/upload`;
-  const res = await fetch(endpoint, { method: "POST", body: form });
-  const json: any = await res.json().catch(() => ({}));
-  if (!res.ok)
-    throw new Error(String(json?.error?.message || `Cloudinary ${res.status}`));
-  return {
-    url: String(json.secure_url || json.url || ""),
-    height: Number(json.height || 0),
-  };
+        const cloudName = String(env.CLOUDINARY_CLOUD_NAME || "");
+        const timestamp = Math.floor(Date.now() / 1000);
+        const params = {
+                timestamp,
+                folder,
+                use_filename: "true",
+                unique_filename: "false",
+                overwrite: "true",
+                transformation: "q_auto,f_webp,w_1280,c_limit",
+        };
+        const signed = await cloudinarySignedParams(env, params);
+        const form = new FormData();
+        form.append("file", dataUri);
+        form.append("folder", folder);
+        form.append("use_filename", "true");
+        form.append("unique_filename", "false");
+        form.append("overwrite", "true");
+        form.append("timestamp", String(timestamp));
+        form.append("api_key", signed.api_key);
+        form.append("signature", signed.signature);
+        form.append("transformation", "q_auto,f_webp,w_1280,c_limit");
+        const endpoint = `https://api.cloudinary.com/v1_1/${cloudName}/image/upload`;
+        const res = await fetch(endpoint, { method: "POST", body: form });
+        const json: any = await res.json().catch(() => ({}));
+        if (!res.ok)
+                throw new Error(String(json?.error?.message || `Cloudinary ${res.status}`));
+        return {
+                url: String(json.secure_url || json.url || ""),
+                height: Number(json.height || 0),
+        };
 }
 
 export async function deleteCloudinaryImage(env: any, publicId: string, type: "image" | "video" = "image") {
-  const cloudName = String(env.CLOUDINARY_CLOUD_NAME || "");
-  const timestamp = Math.floor(Date.now() / 1000);
-  const paramsToSign = {
-    public_id: publicId,
-    timestamp,
-  };
-  const signed = await cloudinarySignedParams(env, paramsToSign);
-  
-  const form = new FormData();
-  form.append("public_id", publicId);
-  form.append("timestamp", String(timestamp));
-  form.append("api_key", signed.api_key);
-  form.append("signature", signed.signature);
-  
-  const endpoint = `https://api.cloudinary.com/v1_1/${cloudName}/${type}/destroy`;
-  const res = await fetch(endpoint, { method: "POST", body: form });
-  const json: any = await res.json().catch(() => ({}));
-  if (!res.ok) console.error("Cloudinary delete error:", json);
-  return json;
+        const cloudName = String(env.CLOUDINARY_CLOUD_NAME || "");
+        const timestamp = Math.floor(Date.now() / 1000);
+        const paramsToSign = {
+                public_id: publicId,
+                timestamp,
+        };
+        const signed = await cloudinarySignedParams(env, paramsToSign);
+
+        const form = new FormData();
+        form.append("public_id", publicId);
+        form.append("timestamp", String(timestamp));
+        form.append("api_key", signed.api_key);
+        form.append("signature", signed.signature);
+
+        const endpoint = `https://api.cloudinary.com/v1_1/${cloudName}/${type}/destroy`;
+        const res = await fetch(endpoint, { method: "POST", body: form });
+        const json: any = await res.json().catch(() => ({}));
+        if (!res.ok) console.error("Cloudinary delete error:", json);
+        return json;
 }

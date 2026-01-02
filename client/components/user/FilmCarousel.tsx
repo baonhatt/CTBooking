@@ -12,7 +12,7 @@ import {
   Ticket,
 } from "lucide-react";
 import { getAllActiveMoviesToday, getMovieById } from "@/lib/api";
-import { optimizeCloudinaryUrl } from "@/lib/utils";
+import { optimizeCloudinaryUrl, generateCloudinarySrcSet } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 
 import {
@@ -83,9 +83,7 @@ export default function FilmCarousel({ onSelectFilm }: FilmCarouselProps) {
               return "Sci‑Fi";
             }
           })(),
-          poster:
-            optimizeCloudinaryUrl(m.cover_image, 400) ||
-            "https://images.unsplash.com/photo-1464375117522-1311d6a5b81f?auto=format&fit=crop&w=900&q=80",
+          poster: m.cover_image || "https://images.unsplash.com/photo-1464375117522-1311d6a5b81f?auto=format&fit=crop&w=900&q=80",
         })) || [];
 
     return fetched;
@@ -163,11 +161,15 @@ export default function FilmCarousel({ onSelectFilm }: FilmCarouselProps) {
     // Close the modal
     setIsModalOpen(false);
 
-    // Scroll to promotions section
-    const promotionsSection = document.getElementById("promotions");
-    if (promotionsSection) {
-      promotionsSection.scrollIntoView({ behavior: "smooth" });
+    // Save selected movie to localStorage for Booking page to pick up
+    if (movieDetails) {
+       localStorage.setItem("selectedFilm", JSON.stringify({
+           id: movieDetails.id,
+           title: movieDetails.title,
+           cover_image: movieDetails.cover_image
+       }));
     }
+    navigate("/booking");
   };
 
   return (
@@ -199,6 +201,7 @@ export default function FilmCarousel({ onSelectFilm }: FilmCarouselProps) {
               className="rounded-full border border-white/15 text-white hover:border-cyan-300 disabled:opacity-50 disabled:cursor-not-allowed"
               onClick={scrollPrev}
               disabled={!canScrollPrev}
+              aria-label="Xem phim trước đó"
             >
               <ChevronLeft className="h-5 w-5" />
             </Button>
@@ -207,6 +210,7 @@ export default function FilmCarousel({ onSelectFilm }: FilmCarouselProps) {
               className="rounded-full border border-white/15 text-white hover:border-cyan-300 disabled:opacity-50 disabled:cursor-not-allowed"
               onClick={scrollNext}
               disabled={!canScrollNext}
+              aria-label="Xem phim tiếp theo"
             >
               <ChevronRight className="h-5 w-5" />
             </Button>
@@ -237,18 +241,22 @@ export default function FilmCarousel({ onSelectFilm }: FilmCarouselProps) {
                     onClick={() => {
                       handleOpen(film);
                     }}
-                    className="group relative w-full rounded-3xl overflow-hidden border border-white/10 bg-white/5 backdrop-blur-lg shadow-[0_0_30px_rgba(59,130,246,0.2)] hover:shadow-[0_0_40px_rgba(236,72,153,0.25)] transition-all duration-300"
+                    className="group relative w-full rounded-3xl overflow-hidden border border-white/10 bg-slate-900 backdrop-blur-lg shadow-[0_0_30px_rgba(59,130,246,0.2)] hover:shadow-[0_0_40px_rgba(236,72,153,0.25)] transition-all duration-300"
                   >
-                    <div className="relative h-80 w-full overflow-hidden">
+                    <div className="relative h-80 w-full overflow-hidden will-change-transform">
                       <div
-                        className="absolute inset-0 bg-center bg-cover blur-md object-cover scale-110"
-                        style={{ backgroundImage: `url(${film.poster})` }}
+                        className="absolute inset-0 bg-center bg-cover blur-md object-cover scale-110 opacity-30"
+                        style={{ backgroundImage: `url(${optimizeCloudinaryUrl(film.poster, 100, "auto:low")})` }}
                       />
                       <img
-                        src={film.poster}
+                        src={optimizeCloudinaryUrl(film.poster, 400)}
+                        srcSet={generateCloudinarySrcSet(film.poster, [300, 400, 600])}
+                        sizes="(max-width: 768px) 280px, 400px"
                         alt={film.title}
+                        width={280}
+                        height={320}
                         loading="lazy"
-                        className="absolute object-cover inset-0 w-full h-full  transition-transform duration-500 group-hover:scale-110"
+                        className="absolute object-cover inset-0 w-full h-full transition-transform duration-500 group-hover:scale-105"
                       />
                       <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/30 to-transparent" />
                       <div
@@ -335,6 +343,8 @@ export default function FilmCarousel({ onSelectFilm }: FilmCarouselProps) {
                         "https://images.unsplash.com/photo-1464375117522-1311d6a5b81f?auto=format&fit=crop&w=900&q=80"
                       }
                       alt={movieDetails.title}
+                      width={400}
+                      height={600}
                       className="w-full h-full object-cover"
                     />
                     <div className="absolute inset-0 bg-gradient-to-t from-black/40 to-transparent pointer-events-none" />

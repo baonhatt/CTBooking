@@ -4,7 +4,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { ArrowRight } from "lucide-react";
 import { getActiveToys } from "@/lib/api";
-import { optimizeCloudinaryUrl } from "@/lib/utils";
+import { optimizeCloudinaryUrl, generateCloudinarySrcSet } from "@/lib/utils";
 
 export default function ProductSection() {
   const [products, setProducts] = useState<any[]>([]);
@@ -90,7 +90,11 @@ export default function ProductSection() {
                 <div className="relative h-64 overflow-hidden">
                   <motion.img
                     src={optimizeCloudinaryUrl(product.image, 400)}
+                    srcSet={generateCloudinarySrcSet(product.image, [300, 400, 600])}
+                    sizes="(max-width: 768px) 300px, 400px"
                     alt={product.name}
+                    width={300}
+                    height={256}
                     loading="lazy"
                     className="w-full h-full object-cover"
                     whileHover={{ scale: 1.15 }}

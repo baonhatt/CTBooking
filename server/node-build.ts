@@ -17,15 +17,12 @@ app.get(/^(?!\/api\/|\/health).*$/, (req, res) => {
   res.sendFile(path.join(distPath, "index.html"));
 });
 
-import { initSocket } from "./socket";
 
-const server = app.listen(port, () => {
+
+app.listen(port, () => {
   console.log(`🚀 Fusion Starter server running on port ${port}`);
   console.log(`📱 Frontend: http://localhost:${port}`);
   console.log(`🔧 API: http://localhost:${port}/api`);
-  
-  // Initialize Socket.io
-  initSocket(server, app);
 });
 
 // Graceful shutdown
