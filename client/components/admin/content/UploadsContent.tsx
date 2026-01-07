@@ -10,18 +10,18 @@ import { toast } from "sonner";
 import { formatDistanceToNow } from "date-fns";
 import { vi } from "date-fns/locale";
 import { optimizeCloudinaryUrl, getCloudinaryThumbnail } from "@/lib/utils";
-import { 
-  Upload, 
-  FileVideo, 
-  FileImage, 
-  X, 
-  CheckCircle2, 
-  AlertCircle, 
-  CloudUpload, 
-  Trash2, 
-  ExternalLink, 
-  Monitor, 
-  Layout, 
+import {
+  Upload,
+  FileVideo,
+  FileImage,
+  X,
+  CheckCircle2,
+  AlertCircle,
+  CloudUpload,
+  Trash2,
+  ExternalLink,
+  Monitor,
+  Layout,
   Grid3X3,
   RefreshCw,
   Info
@@ -72,12 +72,28 @@ export default function UploadsContent() {
   const onPickFile = (e: React.ChangeEvent<HTMLInputElement>) => {
     const arr = Array.from(e.target.files || []);
     setFiles(arr);
-    // Reset previous upload results when selecting new files
-    if (arr.length > 0) {
-      setUploads([]);
-      setStatusLines([]);
-      setStage("idle");
+
+    // Only reset if we are essentially idle (no active uploads)
+    // blocking interactions prevents adding to queue while uploading, which we want to avoid.
+    // However, if we blindly keep uploads, we might keep "done" ones forever.
+    // Let's decided: If there are ANY pending/uploading items, we DO NOT reset.
+    // If all are done/error, we CAN reset (or maybe user wants to clear manually).
+    // The user complaint is they CANNOT select. The previous code forced a reset.
+
+    const hasActive = uploads.some(u => u.status === "pending" || u.status === "uploading");
+    if (!hasActive && arr.length > 0) {
+      // If mixed done/error and we pick new files, maybe we should just keep them until manual clear?
+      // But to be safe and consistent with previous "refresh" behavior on new batch:
+      if (uploads.length > 0) {
+        // Auto-clear old finished tasks if user picks new ones?
+        // Or just append? 
+        // User interaction implies "Add more". 
+        // Let's NOT clear automatically. Let the user use the "Refresh" button to clear.
+      }
     }
+    // We remove the auto-reset logic entirely. User must clear manually if they want.
+    // EXCEPT: if files was empty and we pick new, we might want to reset stage if it was "done".
+    // But stage is derivative.
   };
 
   const isValidVideo = (f: File | null) =>
@@ -140,10 +156,16 @@ export default function UploadsContent() {
   useEffect(() => {
     const maxConcurrent = 4;
     const activeCount = uploads.filter((u) => u.status === "uploading").length;
+    const pendingItem = uploads.find((u) => u.status === "pending");
+
+    // Auto-update stage to "done" if nothing is running or pending
+    if (activeCount === 0 && !pendingItem && uploads.length > 0 && stage === "uploading") {
+      setStage("done");
+    }
 
     // If we have slots and pending items
-    if (activeCount < maxConcurrent) {
-      const nextItem = uploads.find((u) => u.status === "pending");
+    if (activeCount < maxConcurrent && pendingItem) {
+      const nextItem = pendingItem;
       if (nextItem) {
         // Mark as uploading immediately to prevent double processing in next render
         setUploads((prev) =>
@@ -332,7 +354,7 @@ export default function UploadsContent() {
                 <CloudUpload className="w-4 h-4" />
                 Chọn video hoặc ảnh
               </Label>
-              <div 
+              <div
                 onClick={() => fileRef.current?.click()}
                 onDragOver={(e) => {
                   e.preventDefault();
@@ -363,14 +385,14 @@ export default function UploadsContent() {
                   <p className="text-gray-400 text-xs mt-1">Hỗ trợ Video (MP4, MOV) và Hình ảnh (JPG, PNG, WEBP)</p>
                 </div>
               </div>
-              
+
               {files.length > 0 && (
                 <div className="flex items-center gap-2 px-3 py-2 bg-blue-500/10 border border-blue-500/20 rounded-lg animate-in fade-in slide-in-from-top-1">
                   <CheckCircle2 className="w-4 h-4 text-blue-400" />
                   <span className="text-xs text-blue-300 font-medium">
                     Đã chọn {files.length} tệp ({formatSize(files.reduce((s, f) => s + f.size, 0))})
                   </span>
-                  <button 
+                  <button
                     onClick={(e) => {
                       e.stopPropagation();
                       setFiles([]);
@@ -420,16 +442,17 @@ export default function UploadsContent() {
 
             <div className="flex items-center gap-3 pt-4 border-t border-white/10">
               <Button
-                disabled={!files.length}
+                disabled={!files.length || uploads.some(u => u.status === "uploading" || u.status === "pending")}
                 onClick={checkAndPrepareUpload}
-                className="bg-blue-600 hover:bg-blue-700 h-11 px-8 rounded-xl font-bold shadow-lg shadow-blue-900/20 active:scale-95 transition-all flex items-center gap-2"
+                className="bg-blue-600 hover:bg-blue-700 h-11 px-8 rounded-xl font-bold shadow-lg shadow-blue-900/20 active:scale-95 transition-all flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 <CloudUpload className="w-5 h-5" />
-                Bắt đầu Upload
+                {uploads.some(u => u.status === "uploading" || u.status === "pending") ? "Đang xử lý..." : "Bắt đầu Upload"}
               </Button>
               <Button
                 variant="outline"
                 size="icon"
+                disabled={uploads.some(u => u.status === "uploading" || u.status === "pending")}
                 onClick={() => {
                   setFiles([]);
                   setUploads([]);
@@ -438,12 +461,12 @@ export default function UploadsContent() {
                   setStatusLines([]);
                   setStage("idle");
                 }}
-                className="rounded-xl shadow-sm hover:rotate-180 transition-transform duration-500 shrink-0 h-11 w-11 flex items-center justify-center bg-white/5 border-white/20 text-white"
+                className="rounded-xl shadow-sm hover:rotate-180 transition-transform duration-500 shrink-0 h-11 w-11 flex items-center justify-center bg-white/5 border-white/20 text-white disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:rotate-0"
                 title="Làm mới"
               >
                 <RefreshCw className="w-5 h-5" />
               </Button>
-              
+
               <div className="flex-1" />
 
               <Button
@@ -476,20 +499,20 @@ export default function UploadsContent() {
                   </div>
                   <span className="text-[10px] uppercase tracking-wider font-bold text-gray-500 bg-white/5 px-2 py-0.5 rounded">Preview</span>
                 </div>
-                
+
                 <div className="relative flex-1 bg-black/20 flex items-center justify-center p-6">
                   <div className="w-full h-full rounded-lg overflow-hidden shadow-center-lg bg-gray-900 flex items-center justify-center border border-white/5">
                     {/^image\//.test(files[0].type) ? (
                       <img
                         src={previewUrl}
                         alt={files[0].name}
-                        className="w-full h-full object-contain animate-in zoom-in-95 duration-500"
+                        className="w-full h-full object-contain max-h-[400px] animate-in zoom-in-95 duration-500"
                       />
                     ) : (
                       <video
                         src={previewUrl}
                         controls
-                        className="w-full h-full object-contain"
+                        className="w-full h-full object-contain max-h-[400px]"
                       />
                     )}
                   </div>
@@ -536,17 +559,16 @@ export default function UploadsContent() {
                     {uploads.filter(u => u.status === "done").length}/{uploads.length} Hoàn thành
                   </span>
                 </div>
-                
+
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   {uploads.map((u) => (
                     <div key={u.id} className="relative group rounded-xl bg-white/5 border border-white/10 p-4 transition-all hover:bg-white/10 overflow-hidden">
                       <div className="flex items-start justify-between mb-3">
                         <div className="flex items-center gap-3 overflow-hidden">
-                          <div className={`w-10 h-10 rounded-lg flex items-center justify-center shrink-0 ${
-                            u.status === "done" ? "bg-emerald-500/20 text-emerald-400" :
+                          <div className={`w-10 h-10 rounded-lg flex items-center justify-center shrink-0 ${u.status === "done" ? "bg-emerald-500/20 text-emerald-400" :
                             u.status === "error" ? "bg-red-500/20 text-red-400" :
-                            "bg-blue-500/20 text-blue-400"
-                          }`}>
+                              "bg-blue-500/20 text-blue-400"
+                            }`}>
                             {u.isImage ? <FileImage className="w-5 h-5" /> : <FileVideo className="w-5 h-5" />}
                           </div>
                           <div className="overflow-hidden">
@@ -554,15 +576,14 @@ export default function UploadsContent() {
                             <div className="text-[10px] text-gray-500 font-medium">{formatSize(u.size)} • {u.type.split('/')[1]?.toUpperCase() || "N/A"}</div>
                           </div>
                         </div>
-                        <div className={`shrink-0 px-2 py-1 rounded-md text-[10px] font-bold uppercase tracking-tighter ${
-                          u.status === "done" ? "bg-emerald-500/20 text-emerald-400" :
+                        <div className={`shrink-0 px-2 py-1 rounded-md text-[10px] font-bold uppercase tracking-tighter ${u.status === "done" ? "bg-emerald-500/20 text-emerald-400" :
                           u.status === "error" ? "bg-red-500/20 text-red-400" :
-                          u.status === "uploading" ? "bg-blue-500/20 text-blue-400 animate-pulse" :
-                          "bg-gray-500/20 text-gray-400"
-                        }`}>
+                            u.status === "uploading" ? "bg-blue-500/20 text-blue-400 animate-pulse" :
+                              "bg-gray-500/20 text-gray-400"
+                          }`}>
                           {u.status === "done" ? "Xong" :
-                           u.status === "error" ? "Lỗi" :
-                           u.status === "uploading" ? "Upload" : "Chờ"}
+                            u.status === "error" ? "Lỗi" :
+                              u.status === "uploading" ? "Upload" : "Chờ"}
                         </div>
                       </div>
 
@@ -576,7 +597,7 @@ export default function UploadsContent() {
                             <Progress value={u.compressProgress || 0} className="h-1 bg-white/5" />
                           </div>
                         )}
-                        
+
                         {u.status !== "done" && u.status !== "error" && (
                           <div className="space-y-1.5">
                             <div className="flex justify-between text-[10px] font-bold text-gray-400">
@@ -601,6 +622,18 @@ export default function UploadsContent() {
                           </div>
                         )}
                       </div>
+
+                      {/* Cancel/Remove Button */}
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setUploads((prev) => prev.filter((x) => x.id !== u.id));
+                        }}
+                        className="absolute top-2 right-2 p-1.5 rounded-full hover:bg-white/10 text-gray-500 hover:text-white transition-colors"
+                        title="Hủy / Xóa"
+                      >
+                        <X className="w-3.5 h-3.5" />
+                      </button>
                     </div>
                   ))}
                 </div>
@@ -676,16 +709,16 @@ export default function UploadsContent() {
                   <p className="text-xs text-gray-500 mt-0.5">Quản lý và xem trước nội dung đa phương tiện của trang web</p>
                 </div>
               </div>
-              <Button 
-                variant="ghost" 
-                size="icon" 
+              <Button
+                variant="ghost"
+                size="icon"
                 onClick={() => setOpenMediaModal(false)}
                 className="hover:bg-white/10 text-gray-400"
               >
                 <X className="w-5 h-5" />
               </Button>
             </DialogHeader>
-            
+
             <div className="flex-1 overflow-y-auto p-6 custom-scrollbar bg-black/20">
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
                 {mediaItems.map((m) => (
@@ -693,20 +726,20 @@ export default function UploadsContent() {
                     {/* Media Preview Area */}
                     <div className="aspect-video bg-black/40 relative flex items-center justify-center group-hover:bg-black/20 transition-colors">
                       {m.type === "image" ? (
-                        <img 
-                          src={m.url} 
-                          alt={m.section} 
+                        <img
+                          src={m.url}
+                          alt={m.section}
                           loading="lazy"
                           className="w-full h-full object-cover opacity-80 group-hover:opacity-100 transition-opacity"
                         />
                       ) : (
-                        <div 
+                        <div
                           className="relative w-full h-full cursor-pointer group/vid"
                           onClick={() => setPlayingVideoId(m.id)}
                         >
                           {playingVideoId === m.id ? (
-                            <video 
-                              src={m.url} 
+                            <video
+                              src={m.url}
                               autoPlay
                               controls
                               className="w-full h-full object-cover"
@@ -714,14 +747,14 @@ export default function UploadsContent() {
                           ) : (
                             <>
                               {getThumbnail(m.url, m.type) ? (
-                                <img 
-                                  src={getThumbnail(m.url, m.type)!} 
+                                <img
+                                  src={getThumbnail(m.url, m.type)!}
                                   alt={m.section}
                                   loading="lazy"
                                   className="w-full h-full object-cover opacity-60 group-hover:opacity-80 transition-opacity"
                                 />
                               ) : m.type === "video" ? (
-                                <video 
+                                <video
                                   src={m.url}
                                   preload="metadata"
                                   className="w-full h-full object-cover opacity-60 group-hover:opacity-80 transition-opacity"
@@ -731,13 +764,13 @@ export default function UploadsContent() {
                                   <FileVideo className="w-12 h-12 text-blue-500/20" />
                                 </div>
                               )}
-                              
+
                               <div className="absolute inset-0 flex items-center justify-center">
                                 <div className="w-12 h-12 rounded-full bg-blue-600/20 backdrop-blur-md flex items-center justify-center text-white border border-white/20 group-hover/vid:scale-110 group-hover/vid:bg-blue-600/40 transition-all duration-300">
                                   <FileVideo className="w-6 h-6" />
                                 </div>
                               </div>
-                              
+
                               {/* Click to Play hint */}
                               <div className="absolute bottom-2 right-2 px-2 py-1 rounded bg-black/60 text-[8px] font-bold text-white uppercase tracking-wider opacity-0 group-hover/vid:opacity-100 transition-opacity">
                                 Click to Play
@@ -746,7 +779,7 @@ export default function UploadsContent() {
                           )}
                         </div>
                       )}
-                      
+
                       {/* Section Badge */}
                       <div className="absolute top-3 left-3 px-2 py-1 rounded-md bg-black/60 backdrop-blur-md border border-white/10 text-[10px] font-bold uppercase tracking-wider text-blue-300">
                         {m.section.replace('_', ' ')}
@@ -797,9 +830,8 @@ export default function UploadsContent() {
                       <div className="space-y-2">
                         <div className="flex items-center justify-between">
                           <span className="text-[10px] font-mono text-gray-500 uppercase">ID: #{m.id}</span>
-                          <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase ${
-                            m.type === 'image' ? 'bg-emerald-500/10 text-emerald-400' : 'bg-blue-500/10 text-blue-400'
-                          }`}>
+                          <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase ${m.type === 'image' ? 'bg-emerald-500/10 text-emerald-400' : 'bg-blue-500/10 text-blue-400'
+                            }`}>
                             {m.type}
                           </span>
                         </div>
@@ -807,9 +839,9 @@ export default function UploadsContent() {
                           {m.url}
                         </div>
                       </div>
-                      
+
                       <div className="mt-4 pt-4 border-t border-white/5 flex items-center justify-between">
-                        <div 
+                        <div
                           className="flex items-center gap-1.5 text-[10px] text-gray-500 font-medium cursor-help"
                           title={m.updated_at ? new Date(m.updated_at).toLocaleString("vi-VN") : ""}
                         >

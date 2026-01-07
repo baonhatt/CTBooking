@@ -39,12 +39,12 @@ export default function TechnologyBanner() {
     staleTime: 600000,
   });
 
-  const mainItem = useMemo(() => 
+  const mainItem = useMemo(() =>
     siteMediaData?.items?.find((it: any) => it.section === "technology_section1"),
     [siteMediaData]
   );
 
-  const listItemsData = useMemo(() => 
+  const listItemsData = useMemo(() =>
     siteMediaData?.items?.filter((it: any) => it.section === "technology_section2") || [],
     [siteMediaData]
   );
@@ -66,6 +66,7 @@ export default function TechnologyBanner() {
   }, [listItemsData]);
   const [playingVideo, setPlayingVideo] = useState<string | null>(null);
   const videoRefs = useRef<HTMLVideoElement[]>([]);
+  const carouselItemRefs = useRef<(HTMLDivElement | null)[]>([]);
   const mainVideoRef = useRef<HTMLVideoElement | null>(null);
   const mainVideoContainerRef = useRef<HTMLDivElement | null>(null);
   const [mainAspect, setMainAspect] = useState<number | null>(null);
@@ -73,13 +74,14 @@ export default function TechnologyBanner() {
   const [durations, setDurations] = useState<number[]>([]);
   const [progresses, setProgresses] = useState<number[]>([]);
   const [playingArr, setPlayingArr] = useState<boolean[]>([]);
-  
+
   useEffect(() => {
     const n = videoPreviewsMerged.length;
     setDurations(Array(n).fill(0));
     setDurations(Array(n).fill(0));
     setProgresses(Array(n).fill(0));
     setPlayingArr(Array(n).fill(false));
+    carouselItemRefs.current = Array(n).fill(null);
     setLoadedVideos(Array(n).fill(false));
   }, [videoPreviewsMerged.length]);
   const [loadedVideos, setLoadedVideos] = useState<boolean[]>([]);
@@ -88,16 +90,17 @@ export default function TechnologyBanner() {
   const [galleryBuffering, setGalleryBuffering] = useState<boolean[]>([]);
   const [canScrollPrev, setCanScrollPrev] = useState(false);
   const [canScrollNext, setCanScrollNext] = useState(false);
-  
+  const SECTION_ID = "tech-section";
+
   const isGalleryLoading = isLoading;
-  
+
   const formatTime = (s: number) => {
     if (!isFinite(s) || s <= 0) return "0:00";
     const m = Math.floor(s / 60);
     const sec = Math.floor(s % 60);
     return `${m}:${sec < 10 ? "0" : ""}${sec}`;
   };
-  
+
   // Embla Carousel setup with optimized options for mobile
   const [emblaRef, emblaApi] = useEmblaCarousel(
     {
@@ -124,11 +127,11 @@ export default function TechnologyBanner() {
   // Setup Embla event listeners
   useEffect(() => {
     if (!emblaApi) return;
-    
+
     onSelect(emblaApi);
     emblaApi.on("reInit", onSelect);
     emblaApi.on("select", onSelect);
-    
+
     return () => {
       emblaApi.off("select", onSelect);
     };
@@ -146,9 +149,9 @@ export default function TechnologyBanner() {
   // Pause videos that are not visible in carousel
   useEffect(() => {
     if (!emblaApi) return;
-    
+
     const slidesInView = emblaApi.slidesInView();
-    
+
     videoRefs.current.forEach((el, i) => {
       if (!el) return;
       if (!slidesInView.includes(i)) {
@@ -162,78 +165,125 @@ export default function TechnologyBanner() {
     });
   }, [emblaApi]);
 
+  // Global video exclusion logic
+  useEffect(() => {
+    const handleGlobalPlay = (e: any) => {
+      const playId = e.detail?.id;
+      if (!playId) return;
+
+      // Pause everything here if the play signal is from outside OR a different sub-id within here
+      // 1. Check main video
+      const mainId = `${SECTION_ID}-main`;
+      if (playId !== mainId) {
+        if (mainVideoRef.current && !mainVideoRef.current.paused) {
+          mainVideoRef.current.pause();
+          setIsMainVideoPlaying(false);
+        }
+      }
+
+      // 2. Check carousel videos
+      videoRefs.current.forEach((v, idx) => {
+        const carouselId = `${SECTION_ID}-carousel-${idx}`;
+        if (playId !== carouselId) {
+          if (v && !v.paused) {
+            v.pause();
+            setPlayingArr((prev) => {
+              const arr = [...prev];
+              arr[idx] = false;
+              return arr;
+            });
+          }
+        }
+      });
+    };
+
+    window.addEventListener("cinesphere-video-play", handleGlobalPlay);
+    return () => window.removeEventListener("cinesphere-video-play", handleGlobalPlay);
+  }, []);
+
+  const notifyGlobalPlay = useCallback((subId?: string) => {
+    const id = subId ? `${SECTION_ID}-${subId}` : SECTION_ID;
+    window.dispatchEvent(new CustomEvent("cinesphere-video-play", {
+      detail: { id }
+    }));
+  }, []);
+
   // Intersection Observer for carousel videos - pause when scrolled out of viewport
   useEffect(() => {
-    const observers: IntersectionObserver[] = [];
-    
-    videoRefs.current.forEach((el, i) => {
+    const currentObservers: IntersectionObserver[] = [];
+
+    carouselItemRefs.current.forEach((el, i) => {
       if (!el) return;
-      
+
       const observer = new IntersectionObserver(
         (entries) => {
           entries.forEach((entry) => {
             if (entry.isIntersecting) {
-               // Video is in viewport, load it
-               setLoadedVideos((prev) => {
-                 const arr = [...prev];
-                 if (!arr[i]) arr[i] = true;
-                 return arr;
-               });
-            } else {
-              // Video is out of viewport, pause it
-              el.pause();
-              setPlayingArr((prev) => {
+              setLoadedVideos((prev) => {
                 const arr = [...prev];
-                arr[i] = false;
+                if (!arr[i]) arr[i] = true;
                 return arr;
               });
+            } else {
+              // Video is out of viewport (any part), pause it immediately
+              const video = videoRefs.current[i];
+              if (video && !video.paused) {
+                video.pause();
+                setPlayingArr((prev) => {
+                  const arr = [...prev];
+                  arr[i] = false;
+                  return arr;
+                });
+              }
             }
           });
         },
-        { threshold: 0.1 }
+        { threshold: 0 } // Trigger as soon as even 1px is hidden
       );
-      
+
       observer.observe(el);
-      observers.push(observer);
+      currentObservers.push(observer);
     });
-    
+
     return () => {
-      observers.forEach((observer) => observer.disconnect());
+      currentObservers.forEach((obs) => obs.disconnect());
     };
-  }, [videoPreviewsMerged.length]);
+  }, [videoPreviewsMerged.length]); // Observe all containers in the carousel
 
   // Intersection Observer for main video - pause when scrolled out of viewport
   useEffect(() => {
-    if (!mainVideoRef.current || !mainVideoContainerRef.current) return;
-    
+    if (!mainVideoContainerRef.current) return;
+
     const observer = new IntersectionObserver(
       (entries) => {
         entries.forEach((entry) => {
           if (entry.isIntersecting) {
             setMainVideoLoaded(true);
           } else {
-            // Main video is out of viewport, pause it
-            mainVideoRef.current?.pause();
-            setIsMainVideoPlaying(false);
+            // Main video is out of viewport, pause it immediately
+            if (mainVideoRef.current && !mainVideoRef.current.paused) {
+              mainVideoRef.current.pause();
+              setIsMainVideoPlaying(false);
+            }
           }
         });
       },
-      { threshold: 0.1 }
+      { threshold: 0 } // Trigger as soon as even 1px is hidden
     );
-    
+
     observer.observe(mainVideoContainerRef.current);
-    
+
     return () => {
       observer.disconnect();
     };
-  }, []);
+  }, []); // Observe container unconditionally from mount
 
   useEffect(() => {
     if (playingVideo === "main") {
-      mainVideoRef.current?.play().catch(() => {});
+      mainVideoRef.current?.play().catch(() => { });
     }
   }, [playingVideo]);
-  
+
   const onMainLoadedMetadata = () => {
     const el = mainVideoRef.current;
     if (!el) return;
@@ -254,10 +304,14 @@ export default function TechnologyBanner() {
     if (!isMainVideoPlaying) {
       setIsMainVideoPlaying(true);
       setMainVideoLoaded(true);
+      notifyGlobalPlay("main");
     } else {
       const el = mainVideoRef.current;
       if (el) {
-        if (el.paused) el.play().catch(() => {});
+        if (el.paused) {
+          el.play().catch(() => { });
+          notifyGlobalPlay("main");
+        }
         else el.pause();
       }
     }
@@ -270,10 +324,14 @@ export default function TechnologyBanner() {
         arr[i] = true;
         return arr;
       });
+      notifyGlobalPlay(`carousel-${i}`);
     } else {
       const el = videoRefs.current[i];
       if (el) {
-        if (el.paused) el.play().catch(() => {});
+        if (el.paused) {
+          el.play().catch(() => { });
+          notifyGlobalPlay(`carousel-${i}`);
+        }
         else el.pause();
       }
     }
@@ -487,122 +545,122 @@ export default function TechnologyBanner() {
         >
           <div className="flex flex-col md:flex-row items-start md:items-center gap-8">
             <div className="w-full md:basis-5/12 lg:basis-5/12 xl:max-w-[480px]">
-                <div
-                  ref={mainVideoContainerRef}
-                  className="relative w-full aspect-[9/13] rounded-3xl overflow-hidden border border-white/10 bg-slate-900 shadow-2xl group cursor-pointer"
-                  onClick={!isMainVideoPlaying ? toggleMainVideo : undefined}
-                >
-                  <AnimatePresence>
-                    {!isMainVideoPlaying ? (
-                      <motion.div
-                        key="main-placeholder"
-                        initial={{ opacity: 1 }}
-                        exit={{ opacity: 0 }}
-                        className="absolute inset-0 z-10"
-                      >
-                        <img
-                          src={mainVisual.thumbnail || "/placeholder-video.jpg"}
-                          alt="Cinesphere Technology Experience"
-                          width={480}
-                          height={693}
-                          className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
-                          loading="lazy"
-                        />
-                        <div className="absolute inset-0 bg-gradient-to-t from-black/95 via-black/20 to-transparent pointer-events-none" />
-                        <div className="absolute inset-0 flex items-center justify-center bg-black/20 group-hover:bg-black/10 transition-colors">
-                          <div className="w-24 h-24 rounded-full bg-white/10 backdrop-blur-md flex items-center justify-center border-2 border-white/30 shadow-2xl group-hover:scale-110 transition-transform">
-                            <Play className="h-12 w-12 text-white ml-2" fill="white" />
-                          </div>
+              <div
+                ref={mainVideoContainerRef}
+                className="relative w-full aspect-[9/13] rounded-3xl overflow-hidden border border-white/10 bg-slate-900 shadow-2xl group cursor-pointer"
+                onClick={!isMainVideoPlaying ? toggleMainVideo : undefined}
+              >
+                <AnimatePresence>
+                  {!isMainVideoPlaying ? (
+                    <motion.div
+                      key="main-placeholder"
+                      initial={{ opacity: 1 }}
+                      exit={{ opacity: 0 }}
+                      className="absolute inset-0 z-10"
+                    >
+                      <img
+                        src={mainVisual.thumbnail || "/placeholder-video.jpg"}
+                        alt="Cinesphere Technology Experience"
+                        width={480}
+                        height={693}
+                        className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
+                        loading="lazy"
+                      />
+                      <div className="absolute inset-0 bg-gradient-to-t from-black/95 via-black/20 to-transparent pointer-events-none" />
+                      <div className="absolute inset-0 flex items-center justify-center bg-black/20 group-hover:bg-black/10 transition-colors">
+                        <div className="w-24 h-24 rounded-full bg-white/10 backdrop-blur-md flex items-center justify-center border-2 border-white/30 shadow-2xl group-hover:scale-110 transition-transform">
+                          <Play className="h-12 w-12 text-white ml-2" fill="white" />
                         </div>
-                      </motion.div>
-                    ) : (
-                      <motion.div
-                        key="main-video"
-                        initial={{ opacity: 0 }}
-                        animate={{ opacity: 1 }}
-                        className="absolute inset-0 z-0 bg-black flex items-center justify-center"
+                      </div>
+                    </motion.div>
+                  ) : (
+                    <motion.div
+                      key="main-video"
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      className="absolute inset-0 z-0 bg-black flex items-center justify-center"
+                    >
+                      {/* Loading Spinner for Video - Always visible when buffering */}
+                      <AnimatePresence>
+                        {isVideoBuffering && (
+                          <motion.div
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            exit={{ opacity: 0 }}
+                            className="absolute inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-[2px]"
+                          >
+                            <div className="flex flex-col items-center gap-4">
+                              <div className="w-14 h-14 border-4 border-cyan-500/20 border-t-cyan-500 rounded-full animate-spin" />
+                              <span className="text-cyan-400 text-sm font-medium tracking-widest uppercase animate-pulse text-center px-4">Đang kết nối...</span>
+                            </div>
+                          </motion.div>
+                        )}
+                      </AnimatePresence>
+
+                      {mainVisual.src ? (
+                        <video
+                          ref={mainVideoRef}
+                          src={mainVisual.src}
+                          className="w-full h-full object-cover"
+                          playsInline
+                          preload="auto"
+                          loop
+                          onWaiting={() => setIsVideoBuffering(true)}
+                          onPlaying={() => setIsVideoBuffering(false)}
+                          onCanPlay={() => setIsVideoBuffering(false)}
+                          onLoadedData={() => setIsVideoBuffering(false)}
+                          onPlay={() => setIsMainVideoPlaying(true)}
+                          onPause={() => setIsMainVideoPlaying(false)}
+                          autoPlay
+                        />
+                      ) : (
+                        <div className="w-full h-full bg-slate-900/40 flex items-center justify-center">
+                          {isLoading ? (
+                            <div className="w-12 h-12 border-4 border-cyan-500/20 border-t-cyan-500 rounded-full animate-spin" />
+                          ) : (
+                            <p className="text-gray-500 font-medium italic">Sẽ sớm cập nhật</p>
+                          )}
+                        </div>
+                      )}
+                      <div
+                        className="absolute inset-0 z-10"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          toggleMainVideo();
+                        }}
                       >
-                        {/* Loading Spinner for Video - Always visible when buffering */}
-                        <AnimatePresence>
-                          {isVideoBuffering && (
-                            <motion.div 
-                              initial={{ opacity: 0 }}
-                              animate={{ opacity: 1 }}
-                              exit={{ opacity: 0 }}
-                              className="absolute inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-[2px]"
+                        <button
+                          className="absolute inset-0 flex items-center justify-center"
+                          aria-label={isMainVideoPlaying ? "Pause video" : "Play video"}
+                        >
+                          {!isMainVideoPlaying && (
+                            <motion.div
+                              initial={{ opacity: 0, scale: 0.5 }}
+                              animate={{ opacity: 1, scale: 1 }}
+                              className="w-20 h-20 rounded-full bg-black/40 backdrop-blur-sm flex items-center justify-center border border-white/20"
                             >
-                              <div className="flex flex-col items-center gap-4">
-                                <div className="w-14 h-14 border-4 border-cyan-500/20 border-t-cyan-500 rounded-full animate-spin" />
-                                <span className="text-cyan-400 text-sm font-medium tracking-widest uppercase animate-pulse text-center px-4">Đang kết nối...</span>
-                              </div>
+                              <Play className="h-10 w-10 text-white ml-1.5" fill="white" />
                             </motion.div>
                           )}
-                        </AnimatePresence>
-
-                        {mainVisual.src ? (
-                          <video
-                            ref={mainVideoRef}
-                            src={mainVisual.src}
-                            className="w-full h-full object-cover"
-                            playsInline
-                            preload="auto"
-                            loop
-                            onWaiting={() => setIsVideoBuffering(true)}
-                            onPlaying={() => setIsVideoBuffering(false)}
-                            onCanPlay={() => setIsVideoBuffering(false)}
-                            onLoadedData={() => setIsVideoBuffering(false)}
-                            onPlay={() => setIsMainVideoPlaying(true)}
-                            onPause={() => setIsMainVideoPlaying(false)}
-                            autoPlay
-                          />
-                        ) : (
-                          <div className="w-full h-full bg-slate-900/40 flex items-center justify-center">
-                            {isLoading ? (
-                              <div className="w-12 h-12 border-4 border-cyan-500/20 border-t-cyan-500 rounded-full animate-spin" />
-                            ) : (
-                              <p className="text-gray-500 font-medium italic">Sẽ sớm cập nhật</p>
-                            )}
-                          </div>
-                        )}
-                        <div 
-                          className="absolute inset-0 z-10"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            toggleMainVideo();
-                          }}
-                        >
-                          <button
-                            className="absolute inset-0 flex items-center justify-center"
-                            aria-label={isMainVideoPlaying ? "Pause video" : "Play video"}
-                          >
-                            {!isMainVideoPlaying && (
-                              <motion.div
-                                initial={{ opacity: 0, scale: 0.5 }}
-                                animate={{ opacity: 1, scale: 1 }}
-                                className="w-20 h-20 rounded-full bg-black/40 backdrop-blur-sm flex items-center justify-center border border-white/20"
-                              >
-                                <Play className="h-10 w-10 text-white ml-1.5" fill="white" />
-                              </motion.div>
-                            )}
-                          </button>
-                        </div>
-                      </motion.div>
-                    )}
-                  </AnimatePresence>
-                  
-                  {isMainVideoPlaying && !isVideoBuffering && (
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        toggleMainVideo();
-                      }}
-                      className="absolute top-6 right-6 w-12 h-12 rounded-full bg-black/60 backdrop-blur-md flex items-center justify-center border border-white/30 hover:bg-black/80 hover:border-white/50 transition-all z-20"
-                      aria-label="Pause video"
-                    >
-                      <Pause className="h-6 w-6 text-white" fill="white" />
-                    </button>
+                        </button>
+                      </div>
+                    </motion.div>
                   )}
-                </div>
+                </AnimatePresence>
+
+                {isMainVideoPlaying && !isVideoBuffering && (
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      toggleMainVideo();
+                    }}
+                    className="absolute top-6 right-6 w-12 h-12 rounded-full bg-black/60 backdrop-blur-md flex items-center justify-center border border-white/30 hover:bg-black/80 hover:border-white/50 transition-all z-20"
+                    aria-label="Pause video"
+                  >
+                    <Pause className="h-6 w-6 text-white" fill="white" />
+                  </button>
+                )}
+              </div>
             </div>
             <div className="w-full md:basis-7/12 lg:basis-7/12 space-y-8">
               <h3 className="text-3xl md:text-4xl font-bold text-white">
@@ -656,7 +714,7 @@ export default function TechnologyBanner() {
               </div>
             )}
           </div>
-          
+
           <div className="relative">
             {/* Carousel Container */}
             <div ref={emblaRef} className="overflow-hidden rounded-2xl">
@@ -679,6 +737,7 @@ export default function TechnologyBanner() {
                     return (
                       <div
                         key={`${item.title}-${gi}`}
+                        ref={(el) => (carouselItemRefs.current[gi] = el)}
                         className="flex-[0_0_auto] w-[180px] sm:w-[220px] md:w-[260px] lg:w-[300px]"
                       >
                         <motion.div
@@ -688,110 +747,110 @@ export default function TechnologyBanner() {
                           transition={{ duration: 0.3 }}
                           className="relative w-full aspect-[10/16] rounded-2xl overflow-hidden border border-white/10 bg-black/20 group cursor-pointer shadow-lg"
                         >
-                        <AnimatePresence>
-                          {!playingArr[gi] ? (
-                            <motion.div
-                              key="thumbnail"
-                              initial={{ opacity: 1 }}
-                              exit={{ opacity: 0 }}
-                              className="absolute inset-0 z-10"
-                              onClick={() => togglePlay(gi)}
-                            >
-                              {(item.thumbnail?.includes("cloudinary.com") || !item.thumbnail?.match(/\.(mp4|webm|mov|ogg)$/i)) ? (
-                                <img 
-                                  src={item.thumbnail} 
-                                  alt={item.title}
-                                  width={300}
-                                  height={480}
-                                  loading="lazy"
-                                  className="w-full h-full object-cover opacity-70 group-hover:opacity-100 transition-all duration-500 group-hover:scale-105"
-                                />
-                              ) : (
-                                <video 
-                                  src={item.thumbnail}
-                                  preload="metadata"
-                                  className="w-full h-full object-cover opacity-70 group-hover:opacity-100 transition-opacity"
-                                />
-                              )}
-                              <div className="absolute inset-0 bg-gradient-to-t from-black/95 via-transparent to-transparent pointer-events-none" />
-                              <div className="absolute inset-0 flex items-center justify-center">
-                                <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-full bg-white/10 backdrop-blur-md flex items-center justify-center border-2 border-white/30 shadow-2xl group-hover:scale-110 transition-all duration-300">
-                                  <Play className="h-7 w-7 sm:h-8 sm:w-8 text-white ml-1" fill="white" />
-                                </div>
-                              </div>
-                            </motion.div>
-                          ) : (
-                            <motion.div
-                              key="video"
-                              initial={{ opacity: 0 }}
-                              animate={{ opacity: 1 }}
-                              className="absolute inset-0 z-0 bg-black"
-                            >
-                              {/* Loading Spinner for Gallery Video */}
-                              <AnimatePresence>
-                                {galleryBuffering[gi] && (
-                                  <motion.div 
-                                    initial={{ opacity: 0 }}
-                                    animate={{ opacity: 1 }}
-                                    exit={{ opacity: 0 }}
-                                    className="absolute inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-[2px]"
-                                  >
-                                    <div className="flex flex-col items-center gap-2">
-                                      <div className="w-10 h-10 border-3 border-cyan-500/20 border-t-cyan-500 rounded-full animate-spin" />
-                                    </div>
-                                  </motion.div>
+                          <AnimatePresence>
+                            {!playingArr[gi] ? (
+                              <motion.div
+                                key="thumbnail"
+                                initial={{ opacity: 1 }}
+                                exit={{ opacity: 0 }}
+                                className="absolute inset-0 z-10"
+                                onClick={() => togglePlay(gi)}
+                              >
+                                {(item.thumbnail?.includes("cloudinary.com") || !item.thumbnail?.match(/\.(mp4|webm|mov|ogg)$/i)) ? (
+                                  <img
+                                    src={item.thumbnail}
+                                    alt={item.title}
+                                    width={300}
+                                    height={480}
+                                    loading="lazy"
+                                    className="w-full h-full object-cover opacity-70 group-hover:opacity-100 transition-all duration-500 group-hover:scale-105"
+                                  />
+                                ) : (
+                                  <video
+                                    src={item.thumbnail}
+                                    preload="metadata"
+                                    className="w-full h-full object-cover opacity-70 group-hover:opacity-100 transition-opacity"
+                                  />
                                 )}
-                              </AnimatePresence>
+                                <div className="absolute inset-0 bg-gradient-to-t from-black/95 via-transparent to-transparent pointer-events-none" />
+                                <div className="absolute inset-0 flex items-center justify-center">
+                                  <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-full bg-white/10 backdrop-blur-md flex items-center justify-center border-2 border-white/30 shadow-2xl group-hover:scale-110 transition-all duration-300">
+                                    <Play className="h-7 w-7 sm:h-8 sm:w-8 text-white ml-1" fill="white" />
+                                  </div>
+                                </div>
+                              </motion.div>
+                            ) : (
+                              <motion.div
+                                key="video"
+                                initial={{ opacity: 0 }}
+                                animate={{ opacity: 1 }}
+                                className="absolute inset-0 z-0 bg-black"
+                              >
+                                {/* Loading Spinner for Gallery Video */}
+                                <AnimatePresence>
+                                  {galleryBuffering[gi] && (
+                                    <motion.div
+                                      initial={{ opacity: 0 }}
+                                      animate={{ opacity: 1 }}
+                                      exit={{ opacity: 0 }}
+                                      className="absolute inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-[2px]"
+                                    >
+                                      <div className="flex flex-col items-center gap-2">
+                                        <div className="w-10 h-10 border-3 border-cyan-500/20 border-t-cyan-500 rounded-full animate-spin" />
+                                      </div>
+                                    </motion.div>
+                                  )}
+                                </AnimatePresence>
 
-                              <video
-                                ref={(el) => {
-                                  if (el) videoRefs.current[gi] = el;
-                                }}
-                                src={item.src as any}
-                                className="w-full h-full object-cover"
-                                playsInline
-                                autoPlay
-                                loop
-                                onWaiting={() => setGalleryBuffering(prev => {
-                                  const arr = [...prev];
-                                  arr[gi] = true;
-                                  return arr;
-                                })}
-                                onPlaying={() => setGalleryBuffering(prev => {
-                                  const arr = [...prev];
-                                  arr[gi] = false;
-                                  return arr;
-                                })}
-                                onCanPlay={() => setGalleryBuffering(prev => {
-                                  const arr = [...prev];
-                                  arr[gi] = false;
-                                  return arr;
-                                })}
-                              />
-                            </motion.div>
-                          )}
-                        </AnimatePresence>
-                        
-                        <button
-                          onClick={() => togglePlay(gi)}
-                          className="absolute inset-0 z-20 group/play"
-                          aria-label={playingArr[gi] ? "Pause video" : "Play video"}
-                        >
-                          {playingArr[gi] && (
-                            <div className="absolute top-2 right-2 w-8 h-8 sm:w-9 sm:h-9 rounded-full bg-black/60 backdrop-blur-md flex items-center justify-center border border-white/30 hover:bg-black/80 hover:border-white/50 transition-all">
-                              <Pause className="h-4 w-4 sm:h-5 sm:w-5 text-white" fill="white" />
-                            </div>
-                          )}
-                        </button>
-                      </motion.div>
-                    </div>
-                  );
+                                <video
+                                  ref={(el) => {
+                                    if (el) videoRefs.current[gi] = el;
+                                  }}
+                                  src={item.src as any}
+                                  className="w-full h-full object-cover"
+                                  playsInline
+                                  autoPlay
+                                  loop
+                                  onWaiting={() => setGalleryBuffering(prev => {
+                                    const arr = [...prev];
+                                    arr[gi] = true;
+                                    return arr;
+                                  })}
+                                  onPlaying={() => setGalleryBuffering(prev => {
+                                    const arr = [...prev];
+                                    arr[gi] = false;
+                                    return arr;
+                                  })}
+                                  onCanPlay={() => setGalleryBuffering(prev => {
+                                    const arr = [...prev];
+                                    arr[gi] = false;
+                                    return arr;
+                                  })}
+                                />
+                              </motion.div>
+                            )}
+                          </AnimatePresence>
+
+                          <button
+                            onClick={() => togglePlay(gi)}
+                            className="absolute inset-0 z-20 group/play"
+                            aria-label={playingArr[gi] ? "Pause video" : "Play video"}
+                          >
+                            {playingArr[gi] && (
+                              <div className="absolute top-2 right-2 w-8 h-8 sm:w-9 sm:h-9 rounded-full bg-black/60 backdrop-blur-md flex items-center justify-center border border-white/30 hover:bg-black/80 hover:border-white/50 transition-all">
+                                <Pause className="h-4 w-4 sm:h-5 sm:w-5 text-white" fill="white" />
+                              </div>
+                            )}
+                          </button>
+                        </motion.div>
+                      </div>
+                    );
                   })
                 )}
 
               </div>
             </div>
-            
+
             {/* Mobile navigation buttons - Only if has data */}
             {videoPreviewsMerged.length > 1 && (
               <div className="flex md:hidden items-center justify-center gap-3 mt-12">

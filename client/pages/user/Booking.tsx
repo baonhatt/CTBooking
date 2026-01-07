@@ -6,6 +6,16 @@ import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import {
   Select,
   SelectTrigger,
   SelectContent,
@@ -25,6 +35,7 @@ import {
 import { optimizeCloudinaryUrl } from "@/lib/utils";
 import UserLayout from "@/user/layouts/UserLayout";
 import styles from "@/pages/user/style/user.style.scss"
+import { ArrowLeft, ArrowRight, CreditCard, ChevronRight, X, Loader2 } from "lucide-react";
 export default function BookingPage() {
   // Đổi USE_MOCK_DATA = false khi đã có API thật
   const USE_MOCK_DATA = true;
@@ -46,6 +57,8 @@ export default function BookingPage() {
   const countdownRef = useRef<NodeJS.Timeout | null>(null);
   const [countdown, setCountdown] = useState(600);
   const [confirmChecked, setConfirmChecked] = useState(false);
+  const [showEmailConfirmDialog, setShowEmailConfirmDialog] = useState(false);
+  const [showPaymentConfirmDialog, setShowPaymentConfirmDialog] = useState(false);
   const backdropConfig = {
     base: Number((import.meta as any).env?.VITE_BACKDROP_DARK_BASE ?? 0.5),
     min: Number((import.meta as any).env?.VITE_BACKDROP_DARK_MIN ?? 0.4),
@@ -290,10 +303,10 @@ export default function BookingPage() {
       return;
     }
 
-    const confirmed = window.confirm(
-      "Xác nhận đặt vé và chuyển sang thanh toán?",
-    );
-    if (!confirmed) return;
+    setShowPaymentConfirmDialog(true);
+  };
+
+  const performBooking = async () => {
 
     try {
       const comboData = ticketsData?.items.find(
@@ -510,7 +523,7 @@ export default function BookingPage() {
           <div className="absolute inset-0 bg-gradient-to-b from-black/50 via-black/25 to-transparent" />
           <div className="absolute inset-0 neon-noise opacity-25" />
         </div>
-        <div className="relative z-10 max-w-6xl mx-auto p-4 pt-20 sm:pt-24">
+        <div className="relative z-10 max-w-6xl mx-auto p-4 pt-20 sm:pt-24 pb-24 lg:pb-0">
           <div className="text-sm pb-6 pt-2 flex items-center gap-1.5 opacity-80">
             <button
               className="text-gray-400 hover:text-blue-400 transition-colors"
@@ -569,7 +582,7 @@ export default function BookingPage() {
                           setMovie("");
                         }}
                       >
-                        <SelectTrigger className="w-full bg-white/10 border-white/20 hover:bg-white/15 h-10 sm:h-12 rounded-xl transition-all text-sm sm:text-base">
+                        <SelectTrigger className="w-full bg-white/10 border-white/20 hover:bg-white/15 h-12 rounded-xl transition-all text-sm sm:text-base">
                           <span className="truncate font-medium">
                             {selectedPackage?.name || "Chọn loại vé bạn muốn..."}
                           </span>
@@ -613,7 +626,7 @@ export default function BookingPage() {
                           <div className="animate-in fade-in zoom-in-95 duration-200">
                             {activeMoviesFull && activeMoviesFull.length > 0 ? (
                               /* Sử dụng grid-cols-2 cho mobile và grid-cols-5 cho desktop */
-                              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-4">
+                              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3 sm:gap-4">
                                 {activeMoviesFull.map((m: any) => (
                                   <div
                                     key={m.id}
@@ -714,7 +727,7 @@ export default function BookingPage() {
                             Họ Và Tên
                           </Label>
                           <Input
-                            className="bg-white/5 border-white/10 focus:border-blue-500/50 focus:ring-blue-500/10 h-10 rounded-lg placeholder:text-gray-600 text-sm"
+                            className="bg-white/5 border-white/10 focus:border-blue-500/50 focus:ring-blue-500/10 h-12 rounded-lg placeholder:text-gray-600 text-sm"
                             value={name}
                             onChange={(e) => setName(e.target.value)}
                             placeholder="Nhập họ và tên"
@@ -726,7 +739,7 @@ export default function BookingPage() {
                             Số Điện Thoại
                           </Label>
                           <Input
-                            className={`bg-white/5 h-10 rounded-lg transition-colors text-sm ${phoneError ? "border-orange-500/50 focus:ring-orange-500/10" : "border-white/10 focus:border-blue-500/50"}`}
+                            className={`bg-white/5 h-12 rounded-lg transition-colors text-sm ${phoneError ? "border-orange-500/50 focus:ring-orange-500/10" : "border-white/10 focus:border-blue-500/50"}`}
                             value={phone}
                             inputMode="numeric"
                             maxLength={10}
@@ -758,7 +771,7 @@ export default function BookingPage() {
                             Email Nhận Vé
                           </Label>
                           <Input
-                            className={`bg-white/5 h-10 rounded-lg text-sm ${emailError ? "border-orange-500/50" : "border-white/10 focus:border-blue-500/50"}`}
+                            className={`bg-white/5 h-12 rounded-lg text-sm ${emailError ? "border-orange-500/50" : "border-white/10 focus:border-blue-500/50"}`}
                             value={email}
                             type="email"
                             placeholder="you@email.com"
@@ -855,18 +868,22 @@ export default function BookingPage() {
                       </div>
                     )}
 
-                    {/* FOOTER ACTIONS - Tối ưu chống tràn cho Mobile */}
-                    <div className="flex flex-col items-center gap-3 pt-6 border-t  border-white/10">
+                    {/* Action Bar for Desktop (hidden on mobile) */}
+                    <div className="hidden lg:flex items-center justify-end gap-3 pt-4 border-t border-white/10">
                       <Button
-                        className="w-full sm:w-64 bg-gradient-to-r from-blue-600 to-blue-400 hover:from-blue-500 hover:to-blue-300 text-white font-bold h-12 rounded-xl shadow-lg shadow-blue-500/20 disabled:from-blue-900/40 disabled:to-blue-900/40 disabled:text-white/30 disabled:shadow-none transition-all duration-300 transform active:scale-[0.98] whitespace-nowrap text-[15px]"
+                        variant="ghost"
+                        className="w-auto px-6 h-14 bg-white/5 border border-white/10 text-gray-400 hover:bg-white/10 hover:text-gray-200 rounded-2xl flex items-center justify-center shrink-0 transition-all active:scale-95 shadow-none"
+                        onClick={() => navigate("/")}
+                        disabled={isProcessing}
+                      >
+                        <ArrowLeft className="w-5 h-5 mr-2" />
+                        <span className="font-bold text-sm">Quay lại</span>
+                      </Button>
+
+                      <Button
+                        className="w-full lg:w-48 bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-500 hover:to-blue-400 text-white font-bold h-14 rounded-2xl shadow-lg shadow-blue-500/10 disabled:opacity-50 transition-all duration-300 transform active:scale-[0.98] whitespace-nowrap text-base"
                         onClick={() => {
-                          if (
-                            window.confirm(
-                              "Lưu ý thông tin vé sẽ được gửi đến email: " + email,
-                            )
-                          ) {
-                            setStep(1);
-                          }
+                          setShowEmailConfirmDialog(true);
                         }}
                         disabled={
                           !selectedPackage ||
@@ -879,16 +896,9 @@ export default function BookingPage() {
                           phone.length !== 10
                         }
                       >
-                        Tiếp tục đặt vé
-                      </Button>
-
-                      <Button
-                        variant="ghost"
-                        className="w-full sm:w-64 px-8 text-gray-500 hover:text-white  hover:bg-white/5 h-12 rounded-xl transition-all duration-300 text-[13px] font-medium"
-                        onClick={() => navigate("/")}
-                        disabled={isProcessing}
-                      >
-                        Hủy bỏ và quay lại
+                        <span className="flex items-center justify-center gap-2">
+                          Tiếp tục <ArrowRight className="w-5 h-5" />
+                        </span>
                       </Button>
                     </div>
                   </div>
@@ -1044,31 +1054,33 @@ export default function BookingPage() {
                 </CardContent>
               </Card>
 
-              <div className="flex flex-col sm:flex-row items-center justify-center sm:justify-end gap-3 pt-6">
-                {/* Nút chính: Thêm gradient và hiệu ứng glow, cải thiện disabled state */}
+              {/* Action Bar for Desktop (hidden on mobile) */}
+              <div className="hidden lg:flex items-center justify-end gap-3 pt-4 border-t border-white/10 mt-6">
                 <Button
-                  className="w-full sm:w-48 bg-gradient-to-r from-blue-600 to-blue-400 hover:from-blue-500 hover:to-blue-300 text-white font-bold h-12 rounded-xl shadow-lg shadow-blue-500/20 disabled:from-blue-900/40 disabled:to-blue-900/40 disabled:text-white/30 disabled:shadow-none transition-all duration-300 transform active:scale-[0.98] text-base order-1 sm:order-2 whitespace-nowrap"
+                  variant="ghost"
+                  className="w-auto px-6 h-14 bg-white/5 border border-white/10 text-gray-400 hover:bg-white/10 hover:text-gray-200 rounded-2xl transition-all flex items-center justify-center shrink-0 active:scale-95 shadow-none"
+                  onClick={() => setStep(0)}
+                  disabled={isProcessing}
+                >
+                  <ArrowLeft className="w-5 h-5 mr-2" />
+                  <span className="font-bold text-sm">Quay lại</span>
+                </Button>
+
+                <Button
+                  className="w-full lg:w-auto lg:min-w-[200px] lg:px-8 bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-500 hover:to-blue-400 text-white font-bold h-14 rounded-2xl shadow-lg shadow-blue-500/10 transition-all duration-300 transform active:scale-[0.98] text-base whitespace-nowrap disabled:opacity-50"
                   disabled={!confirmChecked || isProcessing}
                   onClick={handleCreateAndPay}
                 >
                   {isProcessing ? (
                     <span className="flex items-center justify-center gap-2">
-                      <span className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                      Đang xử lý...
+                      <Loader2 className="w-5 h-5 animate-spin" />
+                      <span>Xử lý...</span>
                     </span>
                   ) : (
-                    "Thanh toán ngay"
+                    <span className="flex items-center justify-center gap-2">
+                      Thanh toán <CreditCard className="w-5 h-5" />
+                    </span>
                   )}
-                </Button>
-
-                {/* Nút phụ: Cân đối lại với nút chính */}
-                <Button
-                  variant="outline"
-                  className="w-full sm:w-48 bg-white/5 border-white/10 text-gray-400 hover:text-white hover:bg-white/10 hover:border-white/20 h-12 rounded-xl transition-all duration-300 order-2 sm:order-1 font-medium text-[13px]"
-                  onClick={() => setStep(0)}
-                  disabled={isProcessing}
-                >
-                  Quay lại
                 </Button>
               </div>
             </>
@@ -1083,6 +1095,120 @@ export default function BookingPage() {
             Vui lòng không đóng hoặc rời khỏi trang cho đến khi chuyển sang cổng
             thanh toán.
           </div>
+        </div>
+      )}
+      <AlertDialog open={showEmailConfirmDialog} onOpenChange={setShowEmailConfirmDialog}>
+        <AlertDialogContent className="bg-[#0f172a] border-white/10 text-white">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="text-xl font-bold text-white">
+              Xác nhận thông tin
+            </AlertDialogTitle>
+            <AlertDialogDescription className="text-gray-300 text-base leading-relaxed">
+              Lưu ý thông tin vé sẽ được gửi đến email: <span className="font-bold text-blue-400">{email}</span>.
+              <br />
+              Vui lòng kiểm tra kỹ email trước khi tiếp tục.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel className="bg-white/5 border-white/10 text-gray-300 hover:bg-white/10 hover:text-white">
+              Kiểm tra lại
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                setShowEmailConfirmDialog(false);
+                setStep(1);
+              }}
+              className="bg-blue-600 hover:bg-blue-700 text-white"
+            >
+              Đồng ý
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+      <AlertDialog open={showPaymentConfirmDialog} onOpenChange={setShowPaymentConfirmDialog}>
+        <AlertDialogContent className="bg-[#0f172a] border-white/10 text-white">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="text-xl font-bold text-white">
+              Xác nhận thanh toán
+            </AlertDialogTitle>
+            <AlertDialogDescription className="text-gray-300">
+              Bạn có chắc chắn muốn đặt vé và chuyển sang trang thanh toán không?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel className="bg-white/5 border-white/10 text-gray-300 hover:bg-white/10 hover:text-white">
+              Hủy bỏ
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                setShowPaymentConfirmDialog(false);
+                performBooking();
+              }}
+              className="bg-blue-600 hover:bg-blue-700 text-white"
+            >
+              Đồng ý
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+      {/* FIXED FOOTER ACTIONS - Moved to ROOT LEVEL for absolute viewport sticky */}
+      {step === 0 ? (
+        <div className="lg:hidden fixed bottom-0 left-0 right-0 px-4 py-4 pb-7 bg-[#0b1226] border-t border-white/10 z-[60] flex items-center gap-3 shadow-[0_-10px_40px_rgba(0,0,0,0.4)]">
+          <Button
+            className="w-14 h-14 bg-white/5 border border-white/10 text-gray-400 hover:text-white rounded-2xl flex items-center justify-center shrink-0 transition-all active:scale-95 shadow-none"
+            onClick={() => navigate("/")}
+            disabled={isProcessing}
+          >
+            <ArrowLeft className="w-6 h-6" />
+          </Button>
+
+          <Button
+            className="flex-1 bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-500 hover:to-blue-400 text-white font-bold h-14 rounded-2xl shadow-none disabled:opacity-50 transition-all duration-300 transform active:scale-[0.98] whitespace-nowrap text-base"
+            onClick={() => {
+              setShowEmailConfirmDialog(true);
+            }}
+            disabled={
+              !selectedPackage ||
+              !name ||
+              !phone ||
+              !email ||
+              isProcessing ||
+              !!phoneError ||
+              !!emailError ||
+              phone.length !== 10
+            }
+          >
+            <span className="flex items-center justify-center gap-2">
+              Tiếp tục <ArrowRight className="w-5 h-5" />
+            </span>
+          </Button>
+        </div>
+      ) : (
+        <div className="lg:hidden fixed bottom-0 left-0 right-0 px-4 py-4 pb-7 bg-[#0b1226] border-t border-white/10 z-[60] flex items-center gap-3 shadow-[0_-10px_40px_rgba(0,0,0,0.4)]">
+          <Button
+            className="w-14 h-14 bg-white/5 border border-white/10 text-gray-400 hover:text-white rounded-2xl transition-all duration-300 flex items-center justify-center shrink-0 active:scale-95 shadow-none"
+            onClick={() => setStep(0)}
+            disabled={isProcessing}
+          >
+            <ArrowLeft className="w-6 h-6" />
+          </Button>
+
+          <Button
+            className="flex-1 bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-500 hover:to-blue-400 text-white font-bold h-14 rounded-2xl shadow-none transition-all duration-300 transform active:scale-[0.98] text-base whitespace-nowrap disabled:opacity-50"
+            disabled={!confirmChecked || isProcessing}
+            onClick={handleCreateAndPay}
+          >
+            {isProcessing ? (
+              <span className="flex items-center justify-center gap-2">
+                <Loader2 className="w-6 h-6 animate-spin" />
+                <span>Xử lý...</span>
+              </span>
+            ) : (
+              <span className="flex items-center justify-center gap-2">
+                Thanh toán <CreditCard className="w-5 h-5" />
+              </span>
+            )}
+          </Button>
         </div>
       )}
     </UserLayout>

@@ -14,8 +14,9 @@ export function uploadAdminVideo(
   onProgress?: (percent: number) => void,
 ): Promise<UploadResult> {
   return new Promise((resolve, reject) => {
+    const baseUrl = (import.meta as any).env?.VITE_SERVER_BASE_URL || "";
     const xhr = new XMLHttpRequest();
-    xhr.open("POST", "/api/admin/uploads/video");
+    xhr.open("POST", `${baseUrl}/api/admin/uploads/video`);
     xhr.responseType = "json";
     xhr.upload.onprogress = (e) => {
       if (e.lengthComputable && onProgress) {
@@ -50,15 +51,15 @@ export function uploadDirectToCloudinary(
   return new Promise((resolve, reject) => {
     const env = (import.meta as any).env || {};
     const cloudName = env.VITE_CLOUDINARY_CLOUD_NAME || "";
-    const presetVideo = env.VITE_CLOUDINARY_UPLOAD_PRESET_VIDEO || "";
-    const presetImage = env.VITE_CLOUDINARY_UPLOAD_PRESET_IMAGE || "";
+    const presetVideo = env.VITE_CLOUDINARY_UPLOAD_PRESET_VIDEO || "ctbooking_videos_unsigned";
+    const presetImage = env.VITE_CLOUDINARY_UPLOAD_PRESET_IMAGE || "ctbooking_images_unsigned";
     if (!cloudName)
       return reject(new Error("Thiếu VITE_CLOUDINARY_CLOUD_NAME"));
     const isVideo = /^video\//.test(file.type);
     const isImage = /^image\//.test(file.type);
     const uploadPreset = isVideo ? presetVideo : presetImage;
     const endpoint = `https://api.cloudinary.com/v1_1/${cloudName}/${isVideo ? "video" : "image"}/upload`;
-    
+
     // Logic: If folderArg is provided, prepend "ctbooking/videos/" or similar if desired, 
     // OR just use it as is if it's a full path. 
     // The user wants 'videos/hero' etc.
@@ -70,7 +71,7 @@ export function uploadDirectToCloudinary(
       const safe = folderArg.replace(/[^a-zA-Z0-9._-]/g, "_");
       folder = `${folder}/${safe}`;
     }
-    
+
     const resourceType = isVideo ? "video" : "image";
     const form = new FormData();
     form.append("file", file);
@@ -81,7 +82,8 @@ export function uploadDirectToCloudinary(
 
     const trySigned = async () => {
       try {
-        const resp = await fetch("/api/admin/cloudinary/sign", {
+        const baseUrl = (import.meta as any).env?.VITE_SERVER_BASE_URL || "";
+        const resp = await fetch(`${baseUrl}/api/admin/cloudinary/sign`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ folder, resource_type: resourceType }),
@@ -127,24 +129,26 @@ export function uploadDirectToCloudinary(
       }
     };
     (async () => {
-      const signed = await trySigned();
-      if (signed) {
-        // Signed upload: do NOT include upload_preset
-        form.delete("upload_preset");
-        form.append("api_key", signed.api_key);
-        form.append("timestamp", String(signed.timestamp));
-        form.append("signature", signed.signature);
-      } else if (uploadPreset) {
-        // Fallback unsigned upload when no signature available
+      // Prioritize unsigned preset if provided (for caching)
+      if (uploadPreset) {
         form.append("upload_preset", uploadPreset);
       } else {
-        // Neither signature nor preset available
-        reject(
-          new Error(
-            "Thiếu cấu hình upload: cần VITE_CLOUDINARY_UPLOAD_PRESET_* hoặc bật ký server",
-          ),
-        );
-        return;
+        const signed = await trySigned();
+        if (signed) {
+          // Signed upload: do NOT include upload_preset
+          form.delete("upload_preset");
+          form.append("api_key", signed.api_key);
+          form.append("timestamp", String(signed.timestamp));
+          form.append("signature", signed.signature);
+        } else {
+          // Neither signature nor preset available
+          reject(
+            new Error(
+              "Thiếu cấu hình upload: cần VITE_CLOUDINARY_UPLOAD_PRESET_* hoặc bật ký server",
+            ),
+          );
+          return;
+        }
       }
       xhr.send(form);
     })();
@@ -165,7 +169,8 @@ export async function createSiteMediaApi(body: {
   display_order?: number;
   is_active?: boolean;
 }) {
-  const res = await fetch("/api/admin/site-media", {
+  const baseUrl = (import.meta as any).env?.VITE_SERVER_BASE_URL || "";
+  const res = await fetch(`${baseUrl}/api/admin/site-media`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
@@ -192,7 +197,8 @@ export async function updateSiteMediaApi(body: {
   display_order?: number;
   is_active?: boolean;
 }) {
-  const res = await fetch("/api/admin/site-media", {
+  const baseUrl = (import.meta as any).env?.VITE_SERVER_BASE_URL || "";
+  const res = await fetch(`${baseUrl}/api/admin/site-media`, {
     method: "PUT",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
@@ -226,7 +232,8 @@ export async function getSiteMediaApi(options?: {
 }
 
 export async function deleteSiteMediaApi(id: number) {
-  const res = await fetch(`/api/admin/site-media/${id}`, { method: "DELETE" });
+  const baseUrl = (import.meta as any).env?.VITE_SERVER_BASE_URL || "";
+  const res = await fetch(`${baseUrl}/api/admin/site-media/${id}`, { method: "DELETE" });
   const data = await res.json().catch(() => ({}));
   if (!res.ok) {
     throw new Error(data?.message || `HTTP ${res.status}`);

@@ -6,6 +6,8 @@ import {
   SheetContent,
   SheetTrigger,
   SheetClose,
+  SheetTitle,
+  SheetDescription,
 } from "@/components/ui/sheet";
 import icon from "@/assets/images/icon.svg";
 
@@ -42,6 +44,10 @@ export function MobileMenu({
         side="top"
         className="w-full h-[100dvh] bg-[#050915] border-none text-white p-0 [&>button]:hidden z-[60]"
       >
+        <SheetTitle className="sr-only">Menu di động</SheetTitle>
+        <SheetDescription className="sr-only">
+          Điều hướng nhanh các mục trong Cinesphere
+        </SheetDescription>
         <div className="flex flex-col h-full p-6 sm:p-8">
           {/* Header panel */}
           <div className="flex items-center justify-between mb-6">

@@ -1,4 +1,4 @@
-import { useMemo, useState, useEffect, useRef } from "react";
+import { useMemo, useState, useEffect, useRef, useCallback } from "react";
 import { motion, AnimatePresence, useMotionValue, useSpring, useTransform } from "framer-motion";
 import {
   Play,
@@ -43,7 +43,7 @@ export default function HeroSection() {
   // Transforms for background blobs
   const blobX = useTransform(springX, (val) => val * -0.5);
   const blobY = useTransform(springY, (val) => val * -0.5);
-  
+
   // Transforms for cards - smaller parallax effect
   const cardX = useTransform(springX, (val) => val * 0.08);
   const cardY = useTransform(springY, (val) => val * 0.08);
@@ -70,15 +70,15 @@ export default function HeroSection() {
 
     const { clientX, clientY } = e;
     const rect = rectRef.current;
-    
+
     // Calculate normalized coordinates (-1 to 1) based on cached rect
     const x = ((clientX - rect.left) / rect.width - 0.5) * 20;
     const y = ((clientY - rect.top) / rect.height - 0.5) * 20;
-    
+
     pointerX.set(x);
     pointerY.set(y);
   };
- 
+
   /* State & Hooks */
   const [currentPosterIndex, setCurrentPosterIndex] = useState(0);
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -89,6 +89,7 @@ export default function HeroSection() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isLoadingDetails, setIsLoadingDetails] = useState(false);
   const [storeUpdateTrigger, setStoreUpdateTrigger] = useState(0);
+  const SECTION_ID = "hero-main";
 
   const { data } = useQuery({
     queryKey: ["activeMovies"],
@@ -106,7 +107,7 @@ export default function HeroSection() {
     staleTime: 600000,
   });
 
-  const heroItem = useMemo(() => 
+  const heroItem = useMemo(() =>
     siteMedia?.items?.find((it: any) => it.section === "hero_section"),
     [siteMedia]
   );
@@ -175,17 +176,40 @@ export default function HeroSection() {
     };
   }, [heroVideoSrc]);
 
+  // Global video exclusion logic
+  useEffect(() => {
+    const handleGlobalPlay = (e: any) => {
+      if (e.detail?.id !== SECTION_ID) {
+        if (videoRef.current && !videoRef.current.paused) {
+          videoRef.current.pause();
+          setIsVideoPlaying(false);
+        }
+      }
+    };
+
+    window.addEventListener("cinesphere-video-play", handleGlobalPlay);
+    return () => window.removeEventListener("cinesphere-video-play", handleGlobalPlay);
+  }, []);
+
+  const notifyGlobalPlay = useCallback(() => {
+    window.dispatchEvent(new CustomEvent("cinesphere-video-play", {
+      detail: { id: SECTION_ID }
+    }));
+  }, []);
+
   // Intersection Observer for hero video - pause when scrolled out of viewport
   useEffect(() => {
-    if (!videoRef.current || !videoContainerRef.current) return;
+    if (!videoContainerRef.current) return;
 
     const observer = new IntersectionObserver(
       (entries) => {
         entries.forEach((entry) => {
           if (!entry.isIntersecting) {
-            // Video is out of viewport, pause it
-            videoRef.current?.pause();
-            setIsVideoPlaying(false);
+            // Video is out of viewport, pause it if it exists
+            if (videoRef.current && !videoRef.current.paused) {
+              videoRef.current.pause();
+              setIsVideoPlaying(false);
+            }
           }
         });
       },
@@ -199,16 +223,17 @@ export default function HeroSection() {
     return () => {
       observer.disconnect();
     };
-  }, []);
+  }, []); // Run once on mount to establish the observer on the container
 
   // Toggle play/pause function
   const toggleVideoPlayback = async () => {
     if (!hasStarted) {
       setHasStarted(true);
       setIsVideoPlaying(true);
+      notifyGlobalPlay();
       return;
     }
-    
+
     const video = videoRef.current;
     if (!video) return;
 
@@ -216,6 +241,7 @@ export default function HeroSection() {
       if (video.paused) {
         await video.play();
         setIsVideoPlaying(true);
+        notifyGlobalPlay();
       } else {
         video.pause();
         setIsVideoPlaying(false);
@@ -273,7 +299,7 @@ export default function HeroSection() {
           }),
         );
       }
-    } catch {}
+    } catch { }
     setIsModalOpen(false);
     navigate("/booking");
   };
@@ -433,7 +459,7 @@ export default function HeroSection() {
                       alt="Cinesphere Cinematic Experience"
                       width={448}
                       height={796}
-                      {...({ fetchPriority: "high" } as any)} // Priority hint for LCP
+
                       className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
                       loading="eager"
                     />
@@ -463,7 +489,7 @@ export default function HeroSection() {
                       onPause={() => setIsVideoPlaying(false)}
                     />
                     {/* Controls overlay when playing */}
-                    <div 
+                    <div
                       className="absolute inset-0 z-10"
                       onClick={(e) => {
                         e.stopPropagation();
@@ -509,7 +535,11 @@ export default function HeroSection() {
 
       {/* Movie Details Modal */}
       <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
-        <DialogContent className="max-w-3xl max-h-[90vh] flex flex-col bg-gradient-to-br from-[#0b1226] via-[#0e1b3d] to-[#050915] border border-cyan-500/30 text-white p-0 shadow-[0_0_50px_rgba(59,130,246,0.3)]">
+        <DialogContent className="max-w-3xl max-h-[90vh] flex flex-col bg-gradient-to-br from-[#0b1226] via-[#0e1b3d] to-[#050915] border border-cyan-500/30 text-white p-0 shadow-[0_0_50_rgba(59,130,246,0.3)]">
+          <DialogHeader className="sr-only">
+            <DialogTitle>Chi tiết phim</DialogTitle>
+            <DialogDescription>Thông tin chi tiết về bộ phim bạn đã chọn</DialogDescription>
+          </DialogHeader>
           <div className="overflow-y-auto scrollbar-neon flex-1 px-6 pt-6 pb-4">
             {!movieDetails ? (
               <div className="flex items-center justify-center py-12">

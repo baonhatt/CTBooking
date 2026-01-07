@@ -12,7 +12,7 @@ import {
   Ticket,
 } from "lucide-react";
 import { getAllActiveMoviesToday, getMovieById } from "@/lib/api";
-import { optimizeCloudinaryUrl, generateCloudinarySrcSet } from "@/lib/utils";
+import { optimizeCloudinaryUrl, generateCloudinarySrcSet, cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 
 import {
@@ -163,11 +163,11 @@ export default function FilmCarousel({ onSelectFilm }: FilmCarouselProps) {
 
     // Save selected movie to localStorage for Booking page to pick up
     if (movieDetails) {
-       localStorage.setItem("selectedFilm", JSON.stringify({
-           id: movieDetails.id,
-           title: movieDetails.title,
-           cover_image: movieDetails.cover_image
-       }));
+      localStorage.setItem("selectedFilm", JSON.stringify({
+        id: movieDetails.id,
+        title: movieDetails.title,
+        cover_image: movieDetails.cover_image
+      }));
     }
     navigate("/booking");
   };
@@ -303,38 +303,45 @@ export default function FilmCarousel({ onSelectFilm }: FilmCarouselProps) {
       <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
         <DialogContent className="max-w-3xl max-h-[90vh] flex  z-[9999] flex-col bg-gradient-to-br from-[#0b1226] via-[#0e1b3d] to-[#050915] border border-cyan-500/30 text-white p-0 shadow-[0_0_50px_rgba(59,130,246,0.3)]">
           <div className="overflow-y-auto scrollbar-neon flex-1 px-6 pt-6 pb-4">
-            {isLoadingDetails || !movieDetails ? (
-              <div className="flex items-center justify-center py-12">
-                <div className="text-center">
-                  <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-cyan-400 mx-auto mb-4"></div>
-                  <p className="text-gray-400">Đang tải thông tin phim...</p>
-                </div>
-              </div>
-            ) : (
-              <>
-                <DialogHeader className="mb-4">
-                  <DialogTitle className="text-3xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-cyan-300 via-blue-400 to-fuchsia-400 mb-2">
-                    {movieDetails.title}
-                  </DialogTitle>
-                  <DialogDescription className="text-gray-300 text-sm">
-                    {(() => {
-                      try {
-                        const genres = Array.isArray(movieDetails.genres)
-                          ? movieDetails.genres
-                          : typeof movieDetails.genres === "string"
-                            ? JSON.parse(movieDetails.genres)
-                            : [];
-                        return Array.isArray(genres) && genres.length > 0
-                          ? genres.join(" • ")
-                          : "Chưa phân loại";
-                      } catch {
-                        return "Chưa phân loại";
-                      }
-                    })()}
-                  </DialogDescription>
-                </DialogHeader>
+            <DialogHeader className="mb-4">
+              <DialogTitle className={cn(
+                "text-3xl font-bold mb-2",
+                !movieDetails && "sr-only",
+                movieDetails && "text-transparent bg-clip-text bg-gradient-to-r from-cyan-300 via-blue-400 to-fuchsia-400"
+              )}>
+                {movieDetails?.title || "Chi tiết phim"}
+              </DialogTitle>
+              <DialogDescription className={cn(
+                "text-gray-300 text-sm",
+                !movieDetails && "sr-only"
+              )}>
+                {movieDetails ? (() => {
+                  try {
+                    const genres = Array.isArray(movieDetails.genres)
+                      ? movieDetails.genres
+                      : typeof movieDetails.genres === "string"
+                        ? JSON.parse(movieDetails.genres)
+                        : [];
+                    return Array.isArray(genres) && genres.length > 0
+                      ? genres.join(" • ")
+                      : "Chưa phân loại";
+                  } catch {
+                    return "Chưa phân loại";
+                  }
+                })() : "Thông tin chi tiết về bộ phim"}
+              </DialogDescription>
+            </DialogHeader>
 
-                <div className="grid md:grid-cols-2 gap-6">
+            <div className="grid md:grid-cols-2 gap-6">
+              {isLoadingDetails || !movieDetails ? (
+                <div className="col-span-full flex items-center justify-center py-12">
+                  <div className="text-center">
+                    <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-cyan-400 mx-auto mb-4"></div>
+                    <p className="text-gray-400">Đang tải thông tin phim...</p>
+                  </div>
+                </div>
+              ) : (
+                <>
                   {/* Movie Poster */}
                   <div className="relative rounded-xl overflow-hidden border border-cyan-500/30 aspect-[2/3] shadow-[0_0_30px_rgba(59,130,246,0.2)]">
                     <img
@@ -383,9 +390,9 @@ export default function FilmCarousel({ onSelectFilm }: FilmCarouselProps) {
                       )}
                     </div>
                   </div>
-                </div>
-              </>
-            )}
+                </>
+              )}
+            </div>
           </div>
 
           {/* Fixed Footer with Buttons */}
