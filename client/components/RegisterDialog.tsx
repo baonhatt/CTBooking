@@ -3,6 +3,7 @@ import { Button } from "@/components/ui/button";
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
@@ -165,6 +166,9 @@ export function RegisterDialog({
           <DialogTitle className="text-transparent bg-clip-text bg-gradient-to-r from-cyan-300 via-blue-400 to-fuchsia-400 text-center">
             Đăng Ký Tài Khoản
           </DialogTitle>
+          <DialogDescription className="sr-only">
+            Đăng ký tài khoản để trải nghiệm đặt vé phim đa chiều tại CTBooking.
+          </DialogDescription>
         </DialogHeader>
 
         <form className="space-y-4" onSubmit={handleSubmit}>

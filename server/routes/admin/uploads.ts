@@ -5,7 +5,7 @@ import path from "path";
 import { cloudinary } from "../../cloudinary";
 
 const tmpDir = path.join(process.cwd(), "tmp_uploads");
-try { fs.mkdirSync(tmpDir, { recursive: true }); } catch {}
+try { fs.mkdirSync(tmpDir, { recursive: true }); } catch { }
 
 const storage = multer.diskStorage({
   destination: (_req, _file, cb) => cb(null, tmpDir),
@@ -42,9 +42,11 @@ export function uploadAdminVideo(req: Request, res: Response) {
       path: file.path,
     });
 
+    const folder = req.body.folder || req.query.folder || "ctbooking/videos";
+
     const options = {
       resource_type: "video" as const,
-      folder: process.env.CLOUDINARY_UPLOAD_FOLDER || "ctbooking/videos",
+      folder: folder,
       use_filename: true,
       unique_filename: false,
       overwrite: true,
@@ -52,6 +54,9 @@ export function uploadAdminVideo(req: Request, res: Response) {
         { quality: "auto", width: 1280, height: 720, crop: "limit", video_codec: "h264", fetch_format: "mp4" },
       ],
       eager_async: true,
+      transformation: [
+        { quality: "auto:good", fetch_format: "auto" }
+      ]
     };
 
     const isLarge = Number(file.size || 0) > 100 * 1024 * 1024;
@@ -83,7 +88,7 @@ export function uploadAdminVideo(req: Request, res: Response) {
       });
       res.status(500).json({ message: error?.message || "Cloudinary error", http_code: error?.http_code });
     } finally {
-      try { fs.unlinkSync(file.path); } catch {}
+      try { fs.unlinkSync(file.path); } catch { }
     }
   });
 }
