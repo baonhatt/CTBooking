@@ -306,7 +306,7 @@ export default function QRPaymentPage() {
           </div>
 
           {/* Countdown Display - Sticky & Sleeker Design */}
-          <div className="sticky top-[64px] lg:top-[115px] z-50 mb-6 -mx-1 px-1">
+          <div className="sticky top-[85px] lg:top-[115px] z-50 mb-6 -mx-1 px-1">
             <div className="flex items-center justify-between gap-3 bg-[#050915]/80 backdrop-blur-xl border border-white/10 px-4 md:px-6 py-2 rounded-2xl shadow-[0_8px_32px_rgba(0,0,0,0.5)] animate-in fade-in slide-in-from-top-2 duration-500">
               <div className="flex items-center gap-3">
                 <div className="flex items-center justify-center relative">

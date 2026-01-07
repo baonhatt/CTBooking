@@ -99,7 +99,7 @@ export default function Header({
             : "bg-gradient-to-b from-black/80 via-black/60 to-transparent border-b border-white/10",
       )}
     >
-      <div className="container mx-auto px-3 md:px-6 lg:px-8 py-[6px] md:py-[10px] flex items-center gap-3 md:gap-8 justify-between">
+      <div className="container mx-auto px-3 md:px-6 lg:px-8 py-4 md:py-[10px] flex items-center gap-3 md:gap-8 justify-between">
         {/* Logo */}
         <div className="flex items-center gap-3 md:gap-4 animate-fade-in">
           <img
