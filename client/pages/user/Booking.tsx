@@ -523,7 +523,7 @@ export default function BookingPage() {
           <div className="absolute inset-0 bg-gradient-to-b from-black/50 via-black/25 to-transparent" />
           <div className="absolute inset-0 neon-noise opacity-25" />
         </div>
-        <div className="relative z-10 max-w-6xl mx-auto p-4 pt-20 sm:pt-24 pb-24 lg:pb-0">
+        <div className="relative z-10 max-w-6xl mx-auto p-4 pt-[104px] sm:pt-24 pb-24 lg:pb-0">
           <div className="text-sm pb-6 pt-2 flex items-center gap-1.5 opacity-80">
             <button
               className="text-gray-400 hover:text-blue-400 transition-colors"
