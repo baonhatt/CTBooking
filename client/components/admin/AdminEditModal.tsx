@@ -94,7 +94,7 @@ const AdminEditModal: React.FC<AdminEditModalProps> = (props) => {
             is_active: editData?.is_active ?? m.is_active ?? true,
           });
         }
-      } catch {}
+      } catch { }
     };
     run();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -472,9 +472,9 @@ const AdminEditModal: React.FC<AdminEditModalProps> = (props) => {
                             value={
                               editData?.release_date
                                 ? format(
-                                    new Date(editData.release_date),
-                                    "yyyy-MM-dd'T'HH:mm",
-                                  )
+                                  new Date(editData.release_date),
+                                  "yyyy-MM-dd'T'HH:mm",
+                                )
                                 : ""
                             }
                             onChange={(e) =>
@@ -491,9 +491,9 @@ const AdminEditModal: React.FC<AdminEditModalProps> = (props) => {
                             <span className="text-sm truncate">
                               {editData?.release_date
                                 ? format(
-                                    new Date(editData.release_date),
-                                    "dd/MM/yyyy HH:mm",
-                                  )
+                                  new Date(editData.release_date),
+                                  "dd/MM/yyyy HH:mm",
+                                )
                                 : "Chọn ngày"}
                             </span>
                             <Calendar
@@ -691,12 +691,10 @@ const AdminEditModal: React.FC<AdminEditModalProps> = (props) => {
                       : ""
                   }
                   onChange={(e) => {
-                    let numericValue =
-                      e.target.value === "" ? 0 : Number(e.target.value);
-                    if (numericValue < 0) numericValue = 0;
+                    const val = e.target.value;
                     setEditData({
                       ...editData,
-                      price: numericValue,
+                      price: val === "" ? "" : Number(val),
                     });
                   }}
                 />
@@ -713,12 +711,10 @@ const AdminEditModal: React.FC<AdminEditModalProps> = (props) => {
                       : ""
                   }
                   onChange={(e) => {
-                    let numericValue =
-                      e.target.value === "" ? 0 : Number(e.target.value);
-                    if (numericValue < 0) numericValue = 0;
+                    const val = e.target.value;
                     setEditData({
                       ...editData,
-                      stock: numericValue,
+                      stock: val === "" ? "" : Number(val),
                     });
                   }}
                 />

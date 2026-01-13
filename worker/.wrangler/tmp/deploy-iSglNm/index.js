@@ -2106,10 +2106,10 @@ var init_subquery = __esm({
         __name(this, "Subquery");
       }
       static [entityKind] = "Subquery";
-      constructor(sql6, fields, alias, isWith = false, usedTables = []) {
+      constructor(sql7, fields, alias, isWith = false, usedTables = []) {
         this._ = {
           brand: "Subquery",
-          sql: sql6,
+          sql: sql7,
           selectedFields: fields,
           alias,
           isWith,
@@ -9466,8 +9466,8 @@ var init_db = __esm({
 });
 
 // ../node_modules/drizzle-orm/cache/core/cache.js
-async function hashQuery(sql6, params) {
-  const dataToHash = `${sql6}-${JSON.stringify(params)}`;
+async function hashQuery(sql7, params) {
+  const dataToHash = `${sql7}-${JSON.stringify(params)}`;
   const encoder = new TextEncoder();
   const data = encoder.encode(dataToHash);
   const hashBuffer = await crypto.subtle.digest("SHA-256", data);
@@ -9712,8 +9712,8 @@ var init_session = __esm({
       values(query) {
         return this.prepareOneTimeQuery(this.dialect.sqlToQuery(query), void 0, "run", false).values();
       }
-      async count(sql6) {
-        const result = await this.values(sql6);
+      async count(sql7) {
+        const result = await this.values(sql7);
         return result[0][0];
       }
       /** @internal */
@@ -13673,10 +13673,10 @@ var init_raw2 = __esm({
       static {
         __name(this, "PgRaw");
       }
-      constructor(execute, sql6, query, mapBatchResult) {
+      constructor(execute, sql7, query, mapBatchResult) {
         super();
         this.execute = execute;
-        this.sql = sql6;
+        this.sql = sql7;
         this.query = query;
         this.mapBatchResult = mapBatchResult;
       }
@@ -31781,7 +31781,7 @@ init_virtual_unenv_global_polyfill_cloudflare_unenv_preset_node_console();
 init_performance2();
 init_drizzle_orm();
 init_date_utils();
-async function createMovieImpl(anyDb, tables, data, config2, RUNTIME_ENV, uploader) {
+async function createMovieImpl(anyDb, tables, data, config2, RUN_ENV, uploader) {
   if (config2) {
     process.env = config2;
   }
@@ -31807,21 +31807,24 @@ async function createMovieImpl(anyDb, tables, data, config2, RUNTIME_ENV, upload
     rating: data.rating ?? null,
     duration_min: data.duration_min,
     is_active: data.is_active === void 0 ? true : Boolean(data.is_active),
-    release_date: data.release_date ? formatDateForDb(data.release_date, RUNTIME_ENV) : null,
-    created_at: formatDateForDb(now, RUNTIME_ENV),
-    updated_at: formatDateForDb(now, RUNTIME_ENV)
+    release_date: data.release_date ? formatDateForDb(data.release_date, RUN_ENV?.RUNTIME_ENV) : null,
+    created_at: formatDateForDb(now, RUN_ENV?.RUNTIME_ENV),
+    updated_at: formatDateForDb(now, RUN_ENV?.RUNTIME_ENV)
   };
   try {
     const movieInsert = await anyDb.insert(tables.movies).values(baseData).returning();
     let movie = Array.isArray(movieInsert) ? movieInsert[0] : movieInsert;
     if (!movie) throw new Error("Kh\xF4ng th\u1EC3 t\u1EA1o phim");
+    if (RUN_ENV && RUN_ENV.KV_BINDING) {
+      await RUN_ENV.KV_BINDING.delete("active_movies_v2");
+    }
     return { movie };
   } catch (err) {
     throw err;
   }
 }
 __name(createMovieImpl, "createMovieImpl");
-async function updateMovieImpl(anyDb, tables, id, data, config2, RUNTIME_ENV, uploader, deleter) {
+async function updateMovieImpl(anyDb, tables, id, data, config2, RUN_ENV, uploader, deleter) {
   if (config2) {
     process.env = config2;
   }
@@ -31829,7 +31832,7 @@ async function updateMovieImpl(anyDb, tables, id, data, config2, RUNTIME_ENV, up
   const oldMovie = await anyDb.query.movies.findFirst({
     where: eq(tables.movies.id, id)
   });
-  const payload = { updated_at: formatDateForDb(now, RUNTIME_ENV) };
+  const payload = { updated_at: formatDateForDb(now, RUN_ENV?.RUNTIME_ENV) };
   if (data.cover_image_base64 && uploader) {
     try {
       const uploadResult = await uploader(
@@ -31852,22 +31855,22 @@ async function updateMovieImpl(anyDb, tables, id, data, config2, RUNTIME_ENV, up
   if (data.duration_min !== void 0) payload.duration_min = data.duration_min;
   if (data.is_active !== void 0) payload.is_active = data.is_active;
   if (data.release_date !== void 0) {
-    payload.release_date = data.release_date ? formatDateForDb(data.release_date, RUNTIME_ENV) : null;
+    payload.release_date = data.release_date ? formatDateForDb(data.release_date, RUN_ENV?.RUNTIME_ENV) : null;
   }
   if (data.is_active === false) {
     const searchId = String(id);
-    const activePackages = await anyDb.select({ name: tables.ticket_packages.name }).from(tables.ticket_packages).where(
-      and(
-        eq(tables.ticket_packages.is_active, true),
-        // Sử dụng CAST để đưa về dạng chuỗi trước khi LIKE
-        sql`CAST(${tables.ticket_packages.combo} AS TEXT) LIKE ${"%[" + searchId + "]%"} OR 
-            CAST(${tables.ticket_packages.combo} AS TEXT) LIKE ${"%[" + searchId + ",%"} OR 
-            CAST(${tables.ticket_packages.combo} AS TEXT) LIKE ${"%," + searchId + ",%"} OR 
-            CAST(${tables.ticket_packages.combo} AS TEXT) LIKE ${"%," + searchId + "]%"}`
-      )
-    );
-    if (activePackages.length > 0) {
-      const packageNames = activePackages.map((p) => p.name).join(", ");
+    const activePackages = await anyDb.select({ name: tables.ticket_packages.name, combo: tables.ticket_packages.combo }).from(tables.ticket_packages).where(eq(tables.ticket_packages.is_active, true));
+    const conflictPackages = activePackages.filter((p) => {
+      let comboArr = [];
+      try {
+        comboArr = typeof p.combo === "string" ? JSON.parse(p.combo) : p.combo;
+      } catch (e) {
+        console.error("Error parsing combo for package check:", e);
+      }
+      return Array.isArray(comboArr) && comboArr.map(String).includes(searchId);
+    });
+    if (conflictPackages.length > 0) {
+      const packageNames = conflictPackages.map((p) => p.name).join(", ");
       throw new Error(
         `Kh\xF4ng th\u1EC3 \u1EA9n phim v\xEC phim \u0111ang \u0111\u01B0\u1EE3c s\u1EED d\u1EE5ng trong c\xE1c g\xF3i: ${packageNames}`
       );
@@ -31888,7 +31891,7 @@ async function updateMovieImpl(anyDb, tables, id, data, config2, RUNTIME_ENV, up
   }
 }
 __name(updateMovieImpl, "updateMovieImpl");
-async function deleteMovieImpl(anyDb, tables, id, deleter) {
+async function deleteMovieImpl(anyDb, tables, id, RUN_ENV, deleter) {
   const existing = await anyDb.query.movies.findFirst({
     where: eq(tables.movies.id, id)
   });
@@ -31899,28 +31902,31 @@ async function deleteMovieImpl(anyDb, tables, id, deleter) {
     );
   }
   await anyDb.delete(tables.movies).where(eq(tables.movies.id, id));
+  if (RUN_ENV && RUN_ENV.KV_BINDING) {
+    await RUN_ENV.KV_BINDING.delete("active_movies_v2");
+  }
   return { ok: true };
 }
 __name(deleteMovieImpl, "deleteMovieImpl");
-async function updateMovieStatusImpl(anyDb, tables, id, isActive, RUNTIME_ENV) {
+async function updateMovieStatusImpl(anyDb, tables, id, isActive, RUN_ENV) {
   try {
     if (typeof isActive !== "boolean") {
       throw new Error("isActive must be a boolean");
     }
     if (isActive === false) {
       const searchId = String(id);
-      const activePackages = await anyDb.select({ name: tables.ticket_packages.name }).from(tables.ticket_packages).where(
-        and(
-          eq(tables.ticket_packages.is_active, true),
-          // Sử dụng CAST để đưa về dạng chuỗi trước khi LIKE
-          sql`CAST(${tables.ticket_packages.combo} AS TEXT) LIKE ${"%[" + searchId + "]%"} OR 
-            CAST(${tables.ticket_packages.combo} AS TEXT) LIKE ${"%[" + searchId + ",%"} OR 
-            CAST(${tables.ticket_packages.combo} AS TEXT) LIKE ${"%," + searchId + ",%"} OR 
-            CAST(${tables.ticket_packages.combo} AS TEXT) LIKE ${"%," + searchId + "]%"}`
-        )
-      );
-      if (activePackages.length > 0) {
-        const packageNames = activePackages.map((p) => p.name).join(", ");
+      const activePackages = await anyDb.select({ name: tables.ticket_packages.name, combo: tables.ticket_packages.combo }).from(tables.ticket_packages).where(eq(tables.ticket_packages.is_active, true));
+      const conflictPackages = activePackages.filter((p) => {
+        let comboArr = [];
+        try {
+          comboArr = typeof p.combo === "string" ? JSON.parse(p.combo) : p.combo;
+        } catch (e) {
+          console.error("Error parsing combo for status check:", e);
+        }
+        return Array.isArray(comboArr) && comboArr.map(String).includes(searchId);
+      });
+      if (conflictPackages.length > 0) {
+        const packageNames = conflictPackages.map((p) => p.name).join(", ");
         return {
           status: 400,
           message: `Kh\xF4ng th\u1EC3 \u1EA9n phim v\xEC phim \u0111ang \u0111\u01B0\u1EE3c s\u1EED d\u1EE5ng trong c\xE1c g\xF3i: ${packageNames}`
@@ -31929,7 +31935,7 @@ async function updateMovieStatusImpl(anyDb, tables, id, isActive, RUNTIME_ENV) {
     }
     const payload = {
       is_active: isActive,
-      updated_at: formatDateForDb(/* @__PURE__ */ new Date(), RUNTIME_ENV)
+      updated_at: formatDateForDb(/* @__PURE__ */ new Date(), RUN_ENV?.RUNTIME_ENV)
     };
     const result = await anyDb.update(tables.movies).set(payload).where(eq(tables.movies.id, id)).returning();
     const updatedMovie = Array.isArray(result) ? result[0] : result;
@@ -31944,6 +31950,10 @@ async function updateMovieStatusImpl(anyDb, tables, id, isActive, RUNTIME_ENV) {
   } catch (error3) {
     console.error("Error updating movie status:", error3);
     throw error3;
+  } finally {
+    if (RUN_ENV && RUN_ENV.KV_BINDING) {
+      await RUN_ENV.KV_BINDING.delete("active_movies_v2");
+    }
   }
 }
 __name(updateMovieStatusImpl, "updateMovieStatusImpl");
@@ -31986,16 +31996,25 @@ async function getMovieByIdImpl(anyDb, tables, movieId) {
   );
   const successfulBookings = (paid || []).length;
   const searchId = String(movieId);
-  const applicablePackages = await anyDb.select().from(tables.ticket_packages).where(
-    and(
-      eq(tables.ticket_packages.is_active, true),
-      // SQLite: combo is stored as a stringified JSON array
-      sql`CAST(${tables.ticket_packages.combo} AS TEXT) LIKE ${"%[" + searchId + "]%"} OR 
-            CAST(${tables.ticket_packages.combo} AS TEXT) LIKE ${"%[" + searchId + ",%"} OR 
-            CAST(${tables.ticket_packages.combo} AS TEXT) LIKE ${"%," + searchId + ",%"} OR 
-            CAST(${tables.ticket_packages.combo} AS TEXT) LIKE ${"%," + searchId + "]%"}`
-    )
-  );
+  const activePackages = await anyDb.select({
+    id: tables.ticket_packages.id,
+    name: tables.ticket_packages.name,
+    combo: tables.ticket_packages.combo,
+    price: tables.ticket_packages.price,
+    is_active: tables.ticket_packages.is_active,
+    type: tables.ticket_packages.type,
+    description: tables.ticket_packages.description,
+    features: tables.ticket_packages.features
+  }).from(tables.ticket_packages).where(eq(tables.ticket_packages.is_active, true));
+  const applicablePackages = activePackages.filter((p) => {
+    let comboArr = [];
+    try {
+      comboArr = typeof p.combo === "string" ? JSON.parse(p.combo) : p.combo;
+    } catch (e) {
+      console.error("Error parsing combo for detail view:", e);
+    }
+    return Array.isArray(comboArr) && comboArr.map(String).includes(searchId);
+  });
   return {
     id: movie.id,
     title: movie.title,
@@ -32110,13 +32129,15 @@ async function listTransactionsImpl(anyDb, tables, args, RUNTIME_ENV) {
   }
   if (searchText) {
     const isNumber = /^\d+$/.test(searchText);
+    const lowerSearchText = searchText.toLowerCase();
     if (isNumber) {
       whereCondition.push(eq(tables.bookings.id, Number(searchText)));
     } else {
       whereCondition.push(
         or(
-          ilike(tables.bookings.email, `%${searchText}%`),
-          ilike(tables.bookings.booking_code, `%${searchText}%`)
+          ilike(tables.bookings.email, `%${lowerSearchText}%`),
+          ilike(tables.bookings.booking_code, `%${lowerSearchText}%`),
+          ilike(tables.bookings.pay_txt_code, `%${lowerSearchText}%`)
         )
       );
     }
@@ -32219,7 +32240,8 @@ async function getTransactionByIdImpl(anyDb, tables, id) {
       booking_code: booking?.booking_code,
       checked_in_at: booking?.checked_in_at,
       is_used: booking?.is_used,
-      created_at: booking.created_at
+      created_at: booking.created_at,
+      updated_at: booking.updated_at
     },
     payment_info: {
       payment_method: booking.payment_method,
@@ -34635,11 +34657,15 @@ init_performance2();
 init_drizzle_orm();
 init_date_utils();
 async function listToysImpl(anyDb, tables, args) {
-  const { page, pageSize, q } = args;
-  let whereCondition = void 0;
+  const { page, pageSize, q, status } = args;
+  const conditions = [];
   if (q) {
-    whereCondition = or(ilike(tables.toys.name, `%${q}%`), ilike(tables.toys.category, `%${q}%`), ilike(tables.toys.status, `%${q}%`));
+    conditions.push(or(ilike(tables.toys.name, `%${q}%`), ilike(tables.toys.category, `%${q}%`)));
   }
+  if (status && status !== "all") {
+    conditions.push(eq(tables.toys.status, status));
+  }
+  const whereCondition = conditions.length > 0 ? and(...conditions) : void 0;
   const [totalRes] = await anyDb.select({ count: count3() }).from(tables.toys).where(whereCondition);
   const total = totalRes?.count || 0;
   const items = await anyDb.query.toys.findMany({ where: whereCondition, orderBy: [desc(tables.toys.created_at)], limit: pageSize, offset: (page - 1) * pageSize });
@@ -34651,7 +34677,7 @@ async function getToyImpl(anyDb, tables, id) {
   return toy || null;
 }
 __name(getToyImpl, "getToyImpl");
-async function createToyImpl(anyDb, tables, args, RUNTIME_ENV, uploader) {
+async function createToyImpl(anyDb, tables, args, RUN_ENV, uploader) {
   const { name, category, price, stock, status, image_url, image_base64 } = args;
   const priceNum = Number(price);
   let savedImage = image_url;
@@ -34671,22 +34697,25 @@ async function createToyImpl(anyDb, tables, args, RUNTIME_ENV, uploader) {
     stock: Number(stock ?? 0),
     status: status ?? "active",
     image_url: savedImage,
-    created_at: formatDateForDb(nowIso, RUNTIME_ENV),
-    updated_at: formatDateForDb(nowIso, RUNTIME_ENV)
+    created_at: formatDateForDb(nowIso, RUN_ENV?.RUNTIME_ENV),
+    updated_at: formatDateForDb(nowIso, RUN_ENV?.RUNTIME_ENV)
   }).returning();
   let toy = Array.isArray(inserted) ? inserted[0] : inserted;
   if (!toy) throw new Error("Kh\xF4ng th\u1EC3 t\u1EA1o \u0111\u1ED3 ch\u01A1i");
+  if (RUN_ENV && RUN_ENV.KV_BINDING) {
+    await RUN_ENV.KV_BINDING.delete("activeToys");
+  }
   return { toy };
 }
 __name(createToyImpl, "createToyImpl");
-async function updateToyImpl(anyDb, tables, id, args, RUNTIME_ENV, uploader, deleter) {
+async function updateToyImpl(anyDb, tables, id, args, RUN_ENV, uploader, deleter) {
   const { name, category, price, stock, status, image_url, image_base64 } = args;
   const priceNum = price === void 0 ? void 0 : Number(price);
   const now = /* @__PURE__ */ new Date();
   const oldToy = await anyDb.query.toys.findFirst({
     where: eq(tables.toys.id, id)
   });
-  const data = { updated_at: formatDateForDb(now, RUNTIME_ENV) };
+  const data = { updated_at: formatDateForDb(now, RUN_ENV?.RUNTIME_ENV) };
   if (name !== void 0) data.name = name;
   if (category !== void 0) data.category = category;
   if (priceNum !== void 0) data.price = String(priceNum);
@@ -34708,10 +34737,13 @@ async function updateToyImpl(anyDb, tables, id, args, RUNTIME_ENV, uploader, del
       (e) => console.error("Failed to delete old toy image:", e)
     );
   }
+  if (RUN_ENV && RUN_ENV.KV_BINDING) {
+    await RUN_ENV.KV_BINDING.delete("activeToys");
+  }
   return toy || null;
 }
 __name(updateToyImpl, "updateToyImpl");
-async function deleteToyImpl(anyDb, tables, id, deleter) {
+async function deleteToyImpl(anyDb, tables, id, RUN_ENV, deleter) {
   const existing = await anyDb.query.toys.findFirst({
     where: eq(tables.toys.id, id)
   });
@@ -34722,6 +34754,9 @@ async function deleteToyImpl(anyDb, tables, id, deleter) {
     );
   }
   await anyDb.delete(tables.toys).where(eq(tables.toys.id, id));
+  if (RUN_ENV && RUN_ENV.KV_BINDING) {
+    await RUN_ENV.KV_BINDING.delete("activeToys");
+  }
   return { ok: true };
 }
 __name(deleteToyImpl, "deleteToyImpl");
@@ -34774,7 +34809,7 @@ async function getTicketPackageImpl(anyDb, tables, id) {
   return item || null;
 }
 __name(getTicketPackageImpl, "getTicketPackageImpl");
-async function createTicketPackageImpl(anyDb, tables, args, RUNTIME_ENV) {
+async function createTicketPackageImpl(anyDb, tables, args, RUN_ENV) {
   const {
     name,
     code,
@@ -34790,7 +34825,7 @@ async function createTicketPackageImpl(anyDb, tables, args, RUNTIME_ENV) {
     display_order
   } = args;
   const now = /* @__PURE__ */ new Date();
-  const formattedNow = formatDateForDb(now, RUNTIME_ENV);
+  const formattedNow = formatDateForDb(now, RUN_ENV?.RUNTIME_ENV);
   let processedFeatures = void 0;
   if (features2) {
     processedFeatures = Array.isArray(features2) ? features2 : String(features2).split(",").map((x) => x.trim()).filter(Boolean);
@@ -34843,10 +34878,14 @@ async function createTicketPackageImpl(anyDb, tables, args, RUNTIME_ENV) {
   }).returning();
   const item = Array.isArray(inserted) ? inserted[0] : inserted;
   if (!item) throw new Error("Kh\xF4ng th\u1EC3 t\u1EA1o g\xF3i v\xE9");
+  const origin = "https://cinesphere.com.vn";
+  if (RUN_ENV && RUN_ENV.KV_BINDING) {
+    await RUN_ENV.KV_BINDING.delete("activeTicketPackages");
+  }
   return { item };
 }
 __name(createTicketPackageImpl, "createTicketPackageImpl");
-async function updateTicketPackageImpl(anyDb, tables, id, args, RUNTIME_ENV) {
+async function updateTicketPackageImpl(anyDb, tables, id, args, RUN_ENV) {
   const {
     name,
     code,
@@ -34862,7 +34901,7 @@ async function updateTicketPackageImpl(anyDb, tables, id, args, RUNTIME_ENV) {
     display_order
   } = args;
   const now = /* @__PURE__ */ new Date();
-  const data = { updated_at: formatDateForDb(now, RUNTIME_ENV) };
+  const data = { updated_at: formatDateForDb(now, RUN_ENV?.RUNTIME_ENV) };
   if (name !== void 0) data.name = name;
   if (code !== void 0) data.code = code;
   if (description !== void 0) data.description = description;
@@ -34899,10 +34938,13 @@ async function updateTicketPackageImpl(anyDb, tables, id, args, RUNTIME_ENV) {
   }
   const updatedRes = await anyDb.update(tables.ticket_packages).set(data).where(eq(tables.ticket_packages.id, id)).returning();
   const item = Array.isArray(updatedRes) ? updatedRes[0] : updatedRes;
+  if (RUN_ENV && RUN_ENV.KV_BINDING) {
+    await RUN_ENV.KV_BINDING.delete("activeTicketPackages");
+  }
   return item || null;
 }
 __name(updateTicketPackageImpl, "updateTicketPackageImpl");
-async function deleteTicketPackageImpl(anyDb, tables, id) {
+async function deleteTicketPackageImpl(anyDb, tables, id, RUN_ENV) {
   try {
     const existing = await anyDb.query.ticket_packages.findFirst({
       where: eq(tables.ticket_packages.id, id)
@@ -34912,6 +34954,9 @@ async function deleteTicketPackageImpl(anyDb, tables, id) {
       is_active: false,
       updated_at: /* @__PURE__ */ new Date()
     }).where(eq(tables.ticket_packages.id, id));
+    if (RUN_ENV && RUN_ENV.KV_BINDING) {
+      await RUN_ENV.KV_BINDING.delete("activeTicketPackages");
+    }
     return {
       status: 200,
       message: "G\xF3i v\xE9 \u0111\xE3 \u0111\u01B0\u1EE3c chuy\u1EC3n sang tr\u1EA1ng th\xE1i Ng\u1EEBng ho\u1EA1t \u0111\u1ED9ng th\xE0nh c\xF4ng"
@@ -35135,6 +35180,24 @@ async function deleteSiteMediaImpl(anyDb, tables, id, deleter) {
   }
 }
 __name(deleteSiteMediaImpl, "deleteSiteMediaImpl");
+
+// ../server/routes/admin/settings.ts
+init_virtual_unenv_global_polyfill_cloudflare_unenv_preset_node_process();
+init_virtual_unenv_global_polyfill_cloudflare_unenv_preset_node_console();
+init_performance2();
+var ADMIN_SETTINGS_KEY = "admin_sidebar_settings";
+async function getAdminSettingsImpl(kv) {
+  if (!kv) return { settings: null, message: "KV not configured" };
+  const stored = await kv.get(ADMIN_SETTINGS_KEY);
+  return { settings: stored ? JSON.parse(stored) : null };
+}
+__name(getAdminSettingsImpl, "getAdminSettingsImpl");
+async function updateAdminSettingsImpl(kv, settings) {
+  if (!kv) throw new Error("KV not configured");
+  await kv.put(ADMIN_SETTINGS_KEY, JSON.stringify(settings));
+  return { success: true };
+}
+__name(updateAdminSettingsImpl, "updateAdminSettingsImpl");
 
 // ../server/routes/user/momo.ts
 init_virtual_unenv_global_polyfill_cloudflare_unenv_preset_node_process();
@@ -35502,7 +35565,23 @@ __name(listUserTransactionsImpl, "listUserTransactionsImpl");
 init_virtual_unenv_global_polyfill_cloudflare_unenv_preset_node_process();
 init_virtual_unenv_global_polyfill_cloudflare_unenv_preset_node_console();
 init_performance2();
-var attempts = /* @__PURE__ */ new Map();
+var RL_MAX = 100;
+var RL_WINDOW_MS = 6e4;
+async function checkRateLimitKV(env2, ip) {
+  if (!env2.KV_BINDING) return true;
+  const key = `rate_limit:${ip}`;
+  const now = Date.now();
+  const historyStr = await env2.KV_BINDING.get(key);
+  let history = historyStr ? JSON.parse(historyStr) : [];
+  history = history.filter((ts) => now - ts < RL_WINDOW_MS);
+  if (history.length >= RL_MAX) {
+    return false;
+  }
+  history.push(now);
+  await env2.KV_BINDING.put(key, JSON.stringify(history), { expirationTtl: 60 });
+  return true;
+}
+__name(checkRateLimitKV, "checkRateLimitKV");
 async function withCache(request3, env2, ctx, handler, ttl = 900) {
   const cache = typeof caches !== "undefined" ? caches.default : null;
   if (!cache || request3.method !== "GET") {
@@ -36101,7 +36180,7 @@ app.use(
       "Referer",
       "Access-Control-Request-Headers"
     ],
-    exposeHeaders: ["Content-Type", "Authorization"],
+    exposeHeaders: ["Content-Type", "Authorization", "X-KV-Cache"],
     maxAge: 86400,
     credentials: true
   })
@@ -36148,7 +36227,7 @@ app.post("/api/register", async (c) => {
       if (!res.ok) throw new Error(`Email failed: ${res.status} ${res.body}`);
       return res;
     }, "mailer");
-    const appBaseUrl = c.env.VITE_CLIENT_BASE_URL || "https://cinesphere.com.vn";
+    const appBaseUrl = "https://cinesphere.com.vn";
     const renderWelcome = /* @__PURE__ */ __name((data) => getWelcomeEmailTemplate2(appBaseUrl, data), "renderWelcome");
     const r = await registerImpl(
       db,
@@ -36450,6 +36529,23 @@ app.get("/api/admin/users", async (c) => {
     );
   }
 });
+app.get("/api/admin/settings", async (c) => {
+  try {
+    const r = await getAdminSettingsImpl(c.env.KV_BINDING);
+    return c.json(r);
+  } catch (err) {
+    return c.json({ message: String(err?.message || "Internal error") }, 500);
+  }
+});
+app.post("/api/admin/settings", async (c) => {
+  try {
+    const body = await c.req.json().catch(() => ({}));
+    const r = await updateAdminSettingsImpl(c.env.KV_BINDING, body);
+    return c.json(r);
+  } catch (err) {
+    return c.json({ message: String(err?.message || "Internal error") }, 500);
+  }
+});
 app.get("/api/admin/users/:id", async (c) => {
   try {
     const id = Number(c.req.param("id"));
@@ -36593,46 +36689,70 @@ app.post("/api/admin/uploads/video", async (c) => {
   }
 });
 app.get("/api/getActiveMovies", async (c) => {
-  return await withCache(
-    c.req.raw,
-    // Đối tượng Request gốc
-    c.env,
-    c.executionCtx,
-    async () => {
-      const db = drizzle(c.env.cinema_db, { schema: schema_exports });
-      const { activeMovies } = await getAllActiveMoviesToday(db, {
-        movies
-      });
-      const optimized = activeMovies.map((m) => ({
-        ...m,
-        cover_image: optimizeCloudinaryUrl(m.cover_image ?? ""),
-        detail_images: (() => {
-          const v = m.detail_images;
-          if (v === null || v === void 0) return "[]";
-          try {
-            const parsed = typeof v === "string" ? JSON.parse(v) : v;
-            if (Array.isArray(parsed)) {
-              const opt = parsed.map((u) => optimizeCloudinaryUrl(u));
-              return JSON.stringify(opt);
-            }
-            return typeof v === "string" ? v : JSON.stringify(v);
-          } catch {
-            return "[]";
+  try {
+    if (c.env.KV_BINDING) {
+      const cached = await c.env.KV_BINDING.get("active_movies_v2");
+      if (cached) {
+        return new Response(cached, {
+          headers: {
+            "Content-Type": "application/json",
+            "X-KV-Cache": "HIT"
           }
-        })()
-      }));
-      return new Response(JSON.stringify({ activeMovies: optimized }), {
-        status: 200,
-        headers: {
-          "Content-Type": "application/json",
-          "Cache-Control": "public, max-age=900, must-revalidate, s-maxage=900",
-          "Cloudflare-CDN-Cache-Control": "max-age=900",
-          Vary: "Origin"
+        });
+      }
+    }
+    const db = drizzle(c.env.cinema_db, { schema: schema_exports });
+    const ip = c.req.header("CF-Connecting-IP") || "unknown";
+    const allowed = await checkRateLimitKV(c.env, ip);
+    if (!allowed) {
+      return c.json(
+        {
+          message: "B\u1EA1n \u0111ang thao t\xE1c qu\xE1 nhanh. Vui l\xF2ng \u0111\u1EE3i m\u1ED9t l\xE1t r\u1ED3i th\u1EED l\u1EA1i."
+        },
+        429
+      );
+    }
+    const { activeMovies } = await getAllActiveMoviesToday(db, {
+      movies
+    });
+    const optimized = activeMovies.map((m) => ({
+      ...m,
+      cover_image: optimizeCloudinaryUrl(m.cover_image ?? ""),
+      detail_images: (() => {
+        const v = m.detail_images;
+        if (v === null || v === void 0) return "[]";
+        try {
+          const parsed = typeof v === "string" ? JSON.parse(v) : v;
+          if (Array.isArray(parsed)) {
+            const opt = parsed.map((u) => optimizeCloudinaryUrl(u));
+            return JSON.stringify(opt);
+          }
+          return typeof v === "string" ? v : JSON.stringify(v);
+        } catch {
+          return "[]";
         }
-      });
-    },
-    900
-  );
+      })()
+    }));
+    const responseBody = JSON.stringify({ activeMovies: optimized });
+    if (c.env.KV_BINDING) {
+      c.executionCtx.waitUntil(c.env.KV_BINDING.put("active_movies_v2", responseBody, { expirationTtl: 3600 }));
+    }
+    return new Response(responseBody, {
+      status: 200,
+      headers: {
+        "Content-Type": "application/json",
+        "Cache-Control": "public, max-age=900, must-revalidate, s-maxage=900",
+        "Cloudflare-CDN-Cache-Control": "max-age=900",
+        Vary: "Origin",
+        "X-KV-Cache": "MISS"
+      }
+    });
+  } catch (err) {
+    return c.json(
+      { status: "error", message: String(err?.message || "Internal error") },
+      500
+    );
+  }
 });
 var getD1Tables = /* @__PURE__ */ __name((schema) => ({
   bookings: schema.bookings,
@@ -36772,8 +36892,7 @@ app.get("/api/bookings-code/:code", async (c) => {
   const windowMs = Number(c.env.VITE_RATE_LIMIT_BOOKING_CHECK_WINDOWMS) || 6e4;
   const ip = c.req.header("CF-Connecting-IP") || "unknown";
   const now = Date.now();
-  const list = attempts.get(ip) ?? [];
-  const filtered = list.filter((ts) => now - ts < windowMs);
+  const filtered = [];
   if (filtered.length >= max) {
     const oldest = filtered[0];
     const retryMs = Math.max(0, windowMs - (now - oldest));
@@ -36792,7 +36911,6 @@ app.get("/api/bookings-code/:code", async (c) => {
   }
   const remaining = Math.max(0, max - (filtered.length + 1));
   filtered.push(now);
-  attempts.set(ip, filtered);
   c.header("X-RateLimit-Limit", String(max));
   c.header("X-RateLimit-Remaining", String(remaining));
   c.header("X-RateLimit-WindowMS", String(windowMs));
@@ -36854,7 +36972,7 @@ app.post("/api/movies", async (c) => {
       { movies },
       body,
       void 0,
-      c.env.RUNTIME_ENV,
+      c.env,
       localUploader
     );
     const origin = new URL(c.req.url).origin;
@@ -36932,7 +37050,7 @@ app.put("/api/movies/:id", async (c) => {
       id,
       body,
       void 0,
-      c.env.RUNTIME_ENV,
+      c.env,
       localUploader,
       localDeleter
     );
@@ -36957,7 +37075,7 @@ app.post("/api/movies-status/:id", async (c) => {
       { movies, ticket_packages },
       id,
       is_active,
-      c.env.RUNTIME_ENV
+      c.env
     );
     const status = typeof r.status === "number" ? r.status : 200;
     const payload = {
@@ -36980,7 +37098,7 @@ app.delete("/api/movies/:id", async (c) => {
     const id = Number(c.req.param("id"));
     const db = drizzle(c.env.cinema_db, { schema: schema_exports });
     const { deleter: localDeleter } = getCloudHelpers(c.env);
-    const r = await deleteMovieImpl(db, { movies }, id, localDeleter);
+    const r = await deleteMovieImpl(db, { movies }, id, c.env, localDeleter);
     if (!r) return c.json({ status: "error", message: "Kh\xF4ng t\xECm th\u1EA5y" }, 404);
     const origin = new URL(c.req.url).origin;
     await deleteCache(c.env, `${origin}/api/getActiveMovies`);
@@ -37144,11 +37262,12 @@ app.get("/api/toys", async (c) => {
     const page = Number(c.req.query("page") || 1);
     const pageSize = Number(c.req.query("pageSize") || 20);
     const q = String(c.req.query("q") || "");
+    const status = String(c.req.query("status") || "all");
     const db = drizzle(c.env.cinema_db, { schema: schema_exports });
     const r = await listToysImpl(
       db,
       { toys },
-      { page, pageSize, q }
+      { page, pageSize, q, status }
     );
     return c.json(r, 200);
   } catch {
@@ -37156,32 +37275,40 @@ app.get("/api/toys", async (c) => {
   }
 });
 app.get("/api/toys-active", async (c) => {
-  return await withCache(
-    c.req.raw,
-    c.env,
-    c.executionCtx,
-    async () => {
-      try {
-        const db = drizzle(c.env.cinema_db, { schema: schema_exports });
-        const r = await listActiveToys(db, { toys });
-        return new Response(JSON.stringify(r), {
-          status: 200,
+  try {
+    if (c.env.KV_BINDING) {
+      const cached = await c.env.KV_BINDING.get("activeToys");
+      if (cached) {
+        return new Response(cached, {
           headers: {
             "Content-Type": "application/json",
-            "Cache-Control": "public, s-maxage=300",
-            "Cloudflare-CDN-Cache-Control": "max-age=300",
-            Vary: "Origin"
+            "X-KV-Cache": "HIT"
           }
         });
-      } catch (err) {
-        return new Response(
-          JSON.stringify({ status: "error", message: "L\u1ED7i m\xE1y ch\u1EE7 n\u1ED9i b\u1ED9" }),
-          { status: 500, headers: { "Content-Type": "application/json" } }
-        );
       }
-    },
-    900
-  );
+    }
+    const db = drizzle(c.env.cinema_db, { schema: schema_exports });
+    const r = await listActiveToys(db, { toys });
+    const responseBody = JSON.stringify(r);
+    if (c.env.KV_BINDING) {
+      c.executionCtx.waitUntil(c.env.KV_BINDING.put("activeToys", responseBody, { expirationTtl: 3600 }));
+    }
+    return new Response(responseBody, {
+      status: 200,
+      headers: {
+        "Content-Type": "application/json",
+        "Cache-Control": "public, s-maxage=300",
+        "Cloudflare-CDN-Cache-Control": "max-age=300",
+        Vary: "Origin",
+        "X-KV-Cache": "MISS"
+      }
+    });
+  } catch (err) {
+    return c.json(
+      { status: "error", message: String(err?.message || "Internal error") },
+      500
+    );
+  }
 });
 app.get("/api/toys/:id", async (c) => {
   try {
@@ -37203,7 +37330,7 @@ app.post("/api/toys", async (c) => {
       db,
       { toys },
       body,
-      c.env.RUNTIME_ENV,
+      c.env,
       uploader
     );
     if (r) {
@@ -37238,7 +37365,7 @@ app.put("/api/toys/:id", async (c) => {
       { toys },
       id,
       body,
-      c.env.RUNTIME_ENV,
+      c.env,
       uploader,
       deleter
     );
@@ -37269,7 +37396,7 @@ app.delete("/api/toys/:id", async (c) => {
     const id = Number(c.req.param("id"));
     const db = drizzle(c.env.cinema_db, { schema: schema_exports });
     const { deleter } = getCloudHelpers(c.env);
-    const r = await deleteToyImpl(db, { toys }, id, deleter);
+    const r = await deleteToyImpl(db, { toys }, id, c.env, deleter);
     if (!r) return c.json({ message: "Kh\xF4ng t\xECm th\u1EA5y" }, 404);
     if (r) {
       const cache = caches.default;
@@ -37312,36 +37439,43 @@ app.get("/api/tickets", async (c) => {
   }
 });
 app.get("/api/tickets-active", async (c) => {
-  return await withCache(
-    c.req.raw,
-    // Đối tượng Request gốc để làm Cache Key
-    c.env,
-    c.executionCtx,
-    async () => {
-      try {
-        const db = drizzle(c.env.cinema_db, { schema: schema_exports });
-        const r = await listActiveTicketPackages(db, {
-          ticket_packages,
-          movies
-        });
-        return new Response(JSON.stringify(r), {
-          status: 200,
+  try {
+    if (c.env.KV_BINDING) {
+      const cached = await c.env.KV_BINDING.get("activeTicketPackages");
+      if (cached) {
+        return new Response(cached, {
           headers: {
             "Content-Type": "application/json",
-            "Cache-Control": "public, s-maxage=900",
-            "Cloudflare-CDN-Cache-Control": "max-age=900",
-            Vary: "Origin"
+            "X-KV-Cache": "HIT"
           }
         });
-      } catch (err) {
-        return new Response(
-          JSON.stringify({ status: "error", message: "L\u1ED7i m\xE1y ch\u1EE7 n\u1ED9i b\u1ED9" }),
-          { status: 500, headers: { "Content-Type": "application/json" } }
-        );
       }
-    },
-    900
-  );
+    }
+    const db = drizzle(c.env.cinema_db, { schema: schema_exports });
+    const r = await listActiveTicketPackages(db, {
+      ticket_packages,
+      movies
+    });
+    const responseBody = JSON.stringify(r);
+    if (c.env.KV_BINDING) {
+      c.executionCtx.waitUntil(c.env.KV_BINDING.put("activeTicketPackages", responseBody, { expirationTtl: 3600 }));
+    }
+    return new Response(responseBody, {
+      status: 200,
+      headers: {
+        "Content-Type": "application/json",
+        "Cache-Control": "public, s-maxage=300",
+        "Cloudflare-CDN-Cache-Control": "max-age=300",
+        Vary: "Origin",
+        "X-KV-Cache": "MISS"
+      }
+    });
+  } catch (err) {
+    return c.json(
+      { status: "error", message: String(err?.message || "Internal error") },
+      500
+    );
+  }
 });
 app.get("/api/tickets/:id", async (c) => {
   try {
@@ -37366,7 +37500,7 @@ app.post("/api/tickets", async (c) => {
       db,
       { ticket_packages, movies },
       body,
-      c.env.RUNTIME_ENV
+      c.env
     );
     const origin = new URL(c.req.url).origin;
     await deleteCache(c.env, `${origin}/api/tickets-active`);
@@ -37385,7 +37519,7 @@ app.put("/api/tickets/:id", async (c) => {
       { ticket_packages, movies },
       id,
       body,
-      c.env.RUNTIME_ENV
+      c.env
     );
     if (!r) return c.json({ status: "error", message: "Kh\xF4ng t\xECm th\u1EA5y" }, 404);
     const origin = new URL(c.req.url).origin;
@@ -37402,7 +37536,8 @@ app.delete("/api/tickets/:id", async (c) => {
     const r = await deleteTicketPackageImpl(
       db,
       { ticket_packages, bookings },
-      id
+      id,
+      c.env
     );
     if (!r) return c.json({ status: "error", message: "Kh\xF4ng t\xECm th\u1EA5y" }, 404);
     const origin = new URL(c.req.url).origin;
