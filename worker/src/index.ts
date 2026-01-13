@@ -67,6 +67,10 @@ import {
   deleteSiteMediaImpl,
 } from "../../server/routes/admin/site-media";
 import {
+  getAdminSettingsImpl,
+  updateAdminSettingsImpl,
+} from "../../server/routes/admin/settings";
+import {
   createMomoPaymentImpl,
   momoIpnImpl,
 } from "../../server/routes/user/momo";
@@ -84,7 +88,7 @@ import {
 import {
   RL_MAX,
   RL_WINDOW_MS,
-  attempts,
+  // attempts,
   hasCloudinary,
   cloudinarySignedParams,
   uploadCloudinaryImageDataURI,
@@ -98,11 +102,13 @@ import {
   logSystemError,
   withCache,
   deleteCache,
+  checkRateLimitKV,
 } from "./utils";
 
 type Bindings = {
   cinema_db: D1Database;
   r2_cinemastore: R2Bucket;
+  KV_BINDING: any;
   CLOUDINARY_CLOUD_NAME: string;
   CLOUDINARY_API_KEY: string;
   CLOUDINARY_API_SECRET: string;
@@ -179,7 +185,7 @@ app.use(
       "Referer",
       "Access-Control-Request-Headers",
     ],
-    exposeHeaders: ["Content-Type", "Authorization"],
+    exposeHeaders: ["Content-Type", "Authorization", "X-KV-Cache"],
     maxAge: 86400,
     credentials: true,
   }),
@@ -242,8 +248,9 @@ app.post("/api/register", async (c) => {
       if (!res.ok) throw new Error(`Email failed: ${res.status} ${res.body}`);
       return res;
     };
-    const appBaseUrl =
-      c.env.VITE_CLIENT_BASE_URL || "https://cinesphere.com.vn";
+    // const appBaseUrl =
+    //   c.env.VITE_CLIENT_BASE_URL || "https://cinesphere.com.vn";
+    const appBaseUrl = "https://cinesphere.com.vn";
     const renderWelcome = (data: { customerName: string; email: string }) =>
       getWelcomeEmailTemplate(appBaseUrl, data);
     const r = await registerImpl(
@@ -597,6 +604,26 @@ app.get("/api/admin/users", async (c) => {
   }
 });
 
+// Admin settings endpoints
+app.get("/api/admin/settings", async (c) => {
+  try {
+    const r = await getAdminSettingsImpl(c.env.KV_BINDING);
+    return c.json(r);
+  } catch (err: any) {
+    return c.json({ message: String(err?.message || "Internal error") }, 500);
+  }
+});
+
+app.post("/api/admin/settings", async (c) => {
+  try {
+    const body = await c.req.json().catch(() => ({}));
+    const r = await updateAdminSettingsImpl(c.env.KV_BINDING, body);
+    return c.json(r);
+  } catch (err: any) {
+    return c.json({ message: String(err?.message || "Internal error") }, 500);
+  }
+});
+
 // Get user details by ID
 // GET /api/admin/users/:id
 app.get("/api/admin/users/:id", async (c) => {
@@ -761,45 +788,80 @@ app.post("/api/admin/uploads/video", async (c) => {
 });
 
 app.get("/api/getActiveMovies", async (c) => {
-  return await withCache(
-    c.req.raw, // Đối tượng Request gốc
-    c.env,
-    c.executionCtx,
-    async () => {
-      const db = drizzle(c.env.cinema_db, { schema });
-      const { activeMovies } = await getAllActiveMoviesToday(db, {
-        movies: schema.movies,
-      });
-      const optimized = activeMovies.map((m) => ({
-        ...m,
-        cover_image: optimizeCloudinaryUrl(m.cover_image ?? ""),
-        detail_images: (() => {
-          const v = m.detail_images;
-          if (v === null || v === undefined) return "[]";
-          try {
-            const parsed = typeof v === "string" ? JSON.parse(v) : v;
-            if (Array.isArray(parsed)) {
-              const opt = parsed.map((u: string) => optimizeCloudinaryUrl(u));
-              return JSON.stringify(opt);
-            }
-            return typeof v === "string" ? v : JSON.stringify(v);
-          } catch {
-            return "[]";
-          }
-        })(),
-      }));
-      return new Response(JSON.stringify({ activeMovies: optimized }), {
-        status: 200,
-        headers: {
-          "Content-Type": "application/json",
-          "Cache-Control": "public, max-age=900, must-revalidate, s-maxage=900",
-          "Cloudflare-CDN-Cache-Control": "max-age=900",
-          Vary: "Origin",
+  try {
+    // Try fetching from KV first
+    if (c.env.KV_BINDING) {
+      const cached = await c.env.KV_BINDING.get("active_movies_v2");
+      if (cached) {
+        return new Response(cached, {
+          headers: {
+            "Content-Type": "application/json",
+            "X-KV-Cache": "HIT"
+          },
+        });
+      }
+    }
+
+    const db = drizzle(c.env.cinema_db, { schema });
+    // Rate limit check using KV
+    const ip = c.req.header("CF-Connecting-IP") || "unknown";
+    const allowed = await checkRateLimitKV(c.env, ip);
+    if (!allowed) {
+      return c.json(
+        {
+          message:
+            "Bạn đang thao tác quá nhanh. Vui lòng đợi một lát rồi thử lại.",
         },
-      });
-    },
-    900,
-  );
+        429,
+      );
+    }
+
+    const { activeMovies } = await getAllActiveMoviesToday(db, {
+      movies: schema.movies,
+    });
+    const optimized = activeMovies.map((m) => ({
+      ...m,
+      cover_image: optimizeCloudinaryUrl(m.cover_image ?? ""),
+      detail_images: (() => {
+        const v = m.detail_images;
+        if (v === null || v === undefined) return "[]";
+        try {
+          const parsed = typeof v === "string" ? JSON.parse(v) : v;
+          if (Array.isArray(parsed)) {
+            const opt = parsed.map((u: string) => optimizeCloudinaryUrl(u));
+            return JSON.stringify(opt);
+          }
+          return typeof v === "string" ? v : JSON.stringify(v);
+        } catch {
+          return "[]";
+        }
+      })(),
+    }));
+
+    const responseBody = JSON.stringify({ activeMovies: optimized });
+
+    // Save to KV with specific TTL (e.g., 1 hour)
+    if (c.env.KV_BINDING) {
+      // console.log("Putting activeMovies to KV");
+      c.executionCtx.waitUntil(c.env.KV_BINDING.put("active_movies_v2", responseBody, { expirationTtl: 3600 }));
+    }
+
+    return new Response(responseBody, {
+      status: 200,
+      headers: {
+        "Content-Type": "application/json",
+        "Cache-Control": "public, max-age=900, must-revalidate, s-maxage=900",
+        "Cloudflare-CDN-Cache-Control": "max-age=900",
+        Vary: "Origin",
+        "X-KV-Cache": "MISS"
+      },
+    });
+  } catch (err: any) {
+    return c.json(
+      { status: "error", message: String(err?.message || "Internal error") },
+      500,
+    );
+  }
 });
 
 // Schema tables for D1
@@ -975,8 +1037,9 @@ app.get("/api/bookings-code/:code", async (c) => {
     Number(c.env.VITE_RATE_LIMIT_BOOKING_CHECK_WINDOWMS) || 60000;
   const ip = c.req.header("CF-Connecting-IP") || "unknown";
   const now = Date.now();
-  const list = attempts.get(ip) ?? [];
-  const filtered = list.filter((ts) => now - ts < windowMs);
+  // const list = attempts.get(ip) ?? []; // Removed
+  // const filtered = list.filter((ts) => now - ts < windowMs);
+  const filtered: number[] = []; // Placeholder to avoid breaking logic below
 
   if (filtered.length >= max) {
     const oldest = filtered[0];
@@ -997,7 +1060,7 @@ app.get("/api/bookings-code/:code", async (c) => {
 
   const remaining = Math.max(0, max - (filtered.length + 1));
   filtered.push(now);
-  attempts.set(ip, filtered);
+  // attempts.set(ip, filtered); // Removed
 
   c.header("X-RateLimit-Limit", String(max));
   c.header("X-RateLimit-Remaining", String(remaining));
@@ -1073,7 +1136,7 @@ app.post("/api/movies", async (c) => {
       { movies: schema.movies },
       body as any,
       undefined,
-      c.env.RUNTIME_ENV,
+      c.env,
       localUploader
     );
     // Clear cache active movies
@@ -1165,7 +1228,7 @@ app.put("/api/movies/:id", async (c) => {
       id,
       body as any,
       undefined,
-      c.env.RUNTIME_ENV,
+      c.env,
       localUploader,
       localDeleter,
     );
@@ -1194,7 +1257,7 @@ app.post("/api/movies-status/:id", async (c) => {
       { movies: schema.movies, ticket_packages: schema.ticket_packages },
       id,
       is_active,
-      c.env.RUNTIME_ENV,
+      c.env,
     );
     const status =
       typeof (r as any).status === "number" ? (r as any).status : 200;
@@ -1224,7 +1287,7 @@ app.delete("/api/movies/:id", async (c) => {
     const id = Number(c.req.param("id"));
     const db = drizzle(c.env.cinema_db, { schema });
     const { deleter: localDeleter } = getCloudHelpers(c.env);
-    const r = await deleteMovieImpl(db, { movies: schema.movies }, id, localDeleter);
+    const r = await deleteMovieImpl(db, { movies: schema.movies }, id, c.env, localDeleter);
 
     if (!r) return c.json({ status: "error", message: "Không tìm thấy" }, 404);
 
@@ -1425,11 +1488,12 @@ app.get("/api/toys", async (c) => {
     const page = Number(c.req.query("page") || 1);
     const pageSize = Number(c.req.query("pageSize") || 20);
     const q = String(c.req.query("q") || "");
+    const status = String(c.req.query("status") || "all");
     const db = drizzle(c.env.cinema_db, { schema });
     const r = await listToysImpl(
       db,
       { toys: schema.toys },
-      { page, pageSize, q },
+      { page, pageSize, q, status },
     );
     return c.json(r, 200);
   } catch {
@@ -1439,34 +1503,46 @@ app.get("/api/toys", async (c) => {
 
 // Get list of active toys
 app.get("/api/toys-active", async (c) => {
-  return await withCache(
-    c.req.raw,
-    c.env,
-    c.executionCtx,
-    async () => {
-      try {
-        const db = drizzle(c.env.cinema_db, { schema });
-        const r = await listActiveToys(db, { toys: schema.toys });
-
-        // Trả về Response kèm theo header để Cloudflare lưu trữ
-        return new Response(JSON.stringify(r), {
-          status: 200,
+  try {
+    // Try fetching from KV first
+    if (c.env.KV_BINDING) {
+      const cached = await c.env.KV_BINDING.get("activeToys");
+      if (cached) {
+        return new Response(cached, {
           headers: {
             "Content-Type": "application/json",
-            "Cache-Control": "public, s-maxage=300",
-            "Cloudflare-CDN-Cache-Control": "max-age=300",
-            Vary: "Origin",
+            "X-KV-Cache": "HIT"
           },
         });
-      } catch (err) {
-        return new Response(
-          JSON.stringify({ status: "error", message: "Lỗi máy chủ nội bộ" }),
-          { status: 500, headers: { "Content-Type": "application/json" } },
-        );
       }
-    },
-    900,
-  );
+    }
+
+    const db = drizzle(c.env.cinema_db, { schema });
+    const r = await listActiveToys(db, { toys: schema.toys });
+
+    const responseBody = JSON.stringify(r);
+
+    // Save to KV with specific TTL (e.g., 1 hour)
+    if (c.env.KV_BINDING) {
+      c.executionCtx.waitUntil(c.env.KV_BINDING.put("activeToys", responseBody, { expirationTtl: 3600 }));
+    }
+
+    return new Response(responseBody, {
+      status: 200,
+      headers: {
+        "Content-Type": "application/json",
+        "Cache-Control": "public, s-maxage=300",
+        "Cloudflare-CDN-Cache-Control": "max-age=300",
+        Vary: "Origin",
+        "X-KV-Cache": "MISS"
+      },
+    });
+  } catch (err: any) {
+    return c.json(
+      { status: "error", message: String(err?.message || "Internal error") },
+      500,
+    );
+  }
 });
 
 // Get toy details by ID
@@ -1495,7 +1571,7 @@ app.post("/api/toys", async (c) => {
       db,
       { toys: schema.toys },
       body as any,
-      c.env.RUNTIME_ENV,
+      c.env,
       uploader,
     );
     // --- LOGIC XÓA CACHE BẮT ĐẦU ---
@@ -1541,7 +1617,7 @@ app.put("/api/toys/:id", async (c) => {
       { toys: schema.toys },
       id,
       body as any,
-      c.env.RUNTIME_ENV,
+      c.env,
       uploader,
       deleter,
     );
@@ -1582,7 +1658,7 @@ app.delete("/api/toys/:id", async (c) => {
     const id = Number(c.req.param("id"));
     const db = drizzle(c.env.cinema_db, { schema });
     const { deleter } = getCloudHelpers(c.env);
-    const r = await deleteToyImpl(db, { toys: schema.toys }, id, deleter);
+    const r = await deleteToyImpl(db, { toys: schema.toys }, id, c.env, deleter);
     if (!r) return c.json({ message: "Không tìm thấy" }, 404);
     // --- LOGIC XÓA CACHE BẮT ĐẦU ---
     if (r) {
@@ -1637,37 +1713,49 @@ app.get("/api/tickets", async (c) => {
 
 // Get list of active ticket packages
 app.get("/api/tickets-active", async (c) => {
-  return await withCache(
-    c.req.raw, // Đối tượng Request gốc để làm Cache Key
-    c.env,
-    c.executionCtx,
-    async () => {
-      try {
-        const db = drizzle(c.env.cinema_db, { schema });
-        const r = await listActiveTicketPackages(db, {
-          ticket_packages: schema.ticket_packages,
-          movies: schema.movies,
-        });
-
-        // Trả về Response kèm theo header để Cloudflare lưu trữ
-        return new Response(JSON.stringify(r), {
-          status: 200,
+  try {
+    // Try fetching from KV first
+    if (c.env.KV_BINDING) {
+      const cached = await c.env.KV_BINDING.get("activeTicketPackages");
+      if (cached) {
+        return new Response(cached, {
           headers: {
             "Content-Type": "application/json",
-            "Cache-Control": "public, s-maxage=900",
-            "Cloudflare-CDN-Cache-Control": "max-age=900",
-            Vary: "Origin",
+            "X-KV-Cache": "HIT"
           },
         });
-      } catch (err) {
-        return new Response(
-          JSON.stringify({ status: "error", message: "Lỗi máy chủ nội bộ" }),
-          { status: 500, headers: { "Content-Type": "application/json" } },
-        );
       }
-    },
-    900,
-  );
+    }
+
+    const db = drizzle(c.env.cinema_db, { schema });
+    const r = await listActiveTicketPackages(db, {
+      ticket_packages: schema.ticket_packages,
+      movies: schema.movies,
+    });
+
+    const responseBody = JSON.stringify(r);
+
+    // Save to KV with specific TTL (e.g., 1 hour)
+    if (c.env.KV_BINDING) {
+      c.executionCtx.waitUntil(c.env.KV_BINDING.put("activeTicketPackages", responseBody, { expirationTtl: 3600 }));
+    }
+
+    return new Response(responseBody, {
+      status: 200,
+      headers: {
+        "Content-Type": "application/json",
+        "Cache-Control": "public, s-maxage=300",
+        "Cloudflare-CDN-Cache-Control": "max-age=300",
+        Vary: "Origin",
+        "X-KV-Cache": "MISS"
+      },
+    });
+  } catch (err: any) {
+    return c.json(
+      { status: "error", message: String(err?.message || "Internal error") },
+      500,
+    );
+  }
 });
 
 // Get ticket package details by ID
@@ -1699,7 +1787,7 @@ app.post("/api/tickets", async (c) => {
       db,
       { ticket_packages: schema.ticket_packages, movies: schema.movies },
       body as any,
-      c.env.RUNTIME_ENV,
+      c.env,
     );
 
     // Clear cache active tickets
@@ -1725,7 +1813,7 @@ app.put("/api/tickets/:id", async (c) => {
       { ticket_packages: schema.ticket_packages, movies: schema.movies },
       id,
       body as any,
-      c.env.RUNTIME_ENV,
+      c.env,
     );
     if (!r) return c.json({ status: "error", message: "Không tìm thấy" }, 404);
 
@@ -1749,6 +1837,7 @@ app.delete("/api/tickets/:id", async (c) => {
       db,
       { ticket_packages: schema.ticket_packages, bookings: schema.bookings },
       id,
+      c.env,
     );
     if (!r) return c.json({ status: "error", message: "Không tìm thấy" }, 404);
 

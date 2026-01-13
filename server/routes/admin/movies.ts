@@ -17,7 +17,7 @@ export async function createMovieImpl(
     release_date: string | Date | null;
   },
   config?: any,
-  RUNTIME_ENV?: string,
+  RUN_ENV?: any,
   uploader?: (base64: string, folder: string) => Promise<{ url: string }>,
 ) {
   if (config) {
@@ -47,10 +47,10 @@ export async function createMovieImpl(
     duration_min: data.duration_min,
     is_active: data.is_active === undefined ? true : Boolean(data.is_active),
     release_date: data.release_date
-      ? formatDateForDb(data.release_date, RUNTIME_ENV)
+      ? formatDateForDb(data.release_date, RUN_ENV?.RUNTIME_ENV)
       : null,
-    created_at: formatDateForDb(now, RUNTIME_ENV),
-    updated_at: formatDateForDb(now, RUNTIME_ENV),
+    created_at: formatDateForDb(now, RUN_ENV?.RUNTIME_ENV),
+    updated_at: formatDateForDb(now, RUN_ENV?.RUNTIME_ENV),
   };
   try {
     const movieInsert = await anyDb
@@ -59,6 +59,11 @@ export async function createMovieImpl(
       .returning();
     let movie: any = Array.isArray(movieInsert) ? movieInsert[0] : movieInsert;
     if (!movie) throw new Error("Không thể tạo phim");
+
+    if (RUN_ENV && RUN_ENV.KV_BINDING) {
+      await RUN_ENV.KV_BINDING.delete("active_movies_v2");
+    }
+
     return { movie };
   } catch (err: any) {
     throw err;
@@ -82,7 +87,7 @@ export async function updateMovieImpl(
     release_date?: string | Date | null;
   },
   config?: any,
-  RUNTIME_ENV?: string,
+  RUN_ENV?: any,
   uploader?: (base64: string, folder: string) => Promise<{ url: string }>,
   deleter?: (url: string) => Promise<void>,
 ) {
@@ -94,7 +99,7 @@ export async function updateMovieImpl(
   const oldMovie = await anyDb.query.movies.findFirst({
     where: eq(tables.movies.id, id),
   });
-  const payload: any = { updated_at: formatDateForDb(now, RUNTIME_ENV) };
+  const payload: any = { updated_at: formatDateForDb(now, RUN_ENV?.RUNTIME_ENV) };
   // Xử lý upload ảnh nếu có base64
   if (data.cover_image_base64 && uploader) {
     try {
@@ -121,28 +126,28 @@ export async function updateMovieImpl(
   if (data.is_active !== undefined) payload.is_active = data.is_active;
   if (data.release_date !== undefined) {
     payload.release_date = data.release_date
-      ? formatDateForDb(data.release_date, RUNTIME_ENV)
+      ? formatDateForDb(data.release_date, RUN_ENV?.RUNTIME_ENV)
       : null;
   }
   if (data.is_active === false) {
     const searchId = String(id);
-
     const activePackages = await anyDb
-      .select({ name: tables.ticket_packages.name })
+      .select({ name: tables.ticket_packages.name, combo: tables.ticket_packages.combo })
       .from(tables.ticket_packages)
-      .where(
-        and(
-          eq(tables.ticket_packages.is_active, true),
-          // Sử dụng CAST để đưa về dạng chuỗi trước khi LIKE
-          sql`CAST(${tables.ticket_packages.combo} AS TEXT) LIKE ${"%[" + searchId + "]%"} OR 
-            CAST(${tables.ticket_packages.combo} AS TEXT) LIKE ${"%[" + searchId + ",%"} OR 
-            CAST(${tables.ticket_packages.combo} AS TEXT) LIKE ${"%," + searchId + ",%"} OR 
-            CAST(${tables.ticket_packages.combo} AS TEXT) LIKE ${"%," + searchId + "]%"}`,
-        ),
-      );
+      .where(eq(tables.ticket_packages.is_active, true));
 
-    if (activePackages.length > 0) {
-      const packageNames = activePackages.map((p: any) => p.name).join(", ");
+    const conflictPackages = activePackages.filter((p: any) => {
+      let comboArr: any[] = [];
+      try {
+        comboArr = typeof p.combo === "string" ? JSON.parse(p.combo) : p.combo;
+      } catch (e) {
+        console.error("Error parsing combo for package check:", e);
+      }
+      return Array.isArray(comboArr) && comboArr.map(String).includes(searchId);
+    });
+
+    if (conflictPackages.length > 0) {
+      const packageNames = conflictPackages.map((p: any) => p.name).join(", ");
       throw new Error(
         `Không thể ẩn phim vì phim đang được sử dụng trong các gói: ${packageNames}`,
       );
@@ -180,6 +185,7 @@ export async function deleteMovieImpl(
   anyDb: any,
   tables: { movies: any },
   id: number,
+  RUN_ENV: any,
   deleter?: (url: string) => Promise<void>,
 ) {
   // Check if movie exists before deleting
@@ -198,6 +204,10 @@ export async function deleteMovieImpl(
 
   await anyDb.delete(tables.movies).where(eq(tables.movies.id, id));
 
+  if (RUN_ENV && RUN_ENV.KV_BINDING) {
+    await RUN_ENV.KV_BINDING.delete("active_movies_v2");
+  }
+
   return { ok: true };
 }
 
@@ -206,7 +216,7 @@ export async function updateMovieStatusImpl(
   tables: { movies: any; ticket_packages: any },
   id: number,
   isActive: boolean,
-  RUNTIME_ENV?: string,
+  RUN_ENV?: any,
 ) {
   try {
     if (typeof isActive !== "boolean") {
@@ -214,23 +224,23 @@ export async function updateMovieStatusImpl(
     }
     if (isActive === false) {
       const searchId = String(id);
-
       const activePackages = await anyDb
-        .select({ name: tables.ticket_packages.name })
+        .select({ name: tables.ticket_packages.name, combo: tables.ticket_packages.combo })
         .from(tables.ticket_packages)
-        .where(
-          and(
-            eq(tables.ticket_packages.is_active, true),
-            // Sử dụng CAST để đưa về dạng chuỗi trước khi LIKE
-            sql`CAST(${tables.ticket_packages.combo} AS TEXT) LIKE ${"%[" + searchId + "]%"} OR 
-            CAST(${tables.ticket_packages.combo} AS TEXT) LIKE ${"%[" + searchId + ",%"} OR 
-            CAST(${tables.ticket_packages.combo} AS TEXT) LIKE ${"%," + searchId + ",%"} OR 
-            CAST(${tables.ticket_packages.combo} AS TEXT) LIKE ${"%," + searchId + "]%"}`,
-          ),
-        );
+        .where(eq(tables.ticket_packages.is_active, true));
 
-      if (activePackages.length > 0) {
-        const packageNames = activePackages.map((p: any) => p.name).join(", ");
+      const conflictPackages = activePackages.filter((p: any) => {
+        let comboArr: any[] = [];
+        try {
+          comboArr = typeof p.combo === "string" ? JSON.parse(p.combo) : p.combo;
+        } catch (e) {
+          console.error("Error parsing combo for status check:", e);
+        }
+        return Array.isArray(comboArr) && comboArr.map(String).includes(searchId);
+      });
+
+      if (conflictPackages.length > 0) {
+        const packageNames = conflictPackages.map((p: any) => p.name).join(", ");
         return {
           status: 400,
           message: `Không thể ẩn phim vì phim đang được sử dụng trong các gói: ${packageNames}`,
@@ -239,7 +249,7 @@ export async function updateMovieStatusImpl(
     }
     const payload: any = {
       is_active: isActive,
-      updated_at: formatDateForDb(new Date(), RUNTIME_ENV),
+      updated_at: formatDateForDb(new Date(), RUN_ENV?.RUNTIME_ENV),
     };
 
     const result = await anyDb
@@ -262,6 +272,10 @@ export async function updateMovieStatusImpl(
   } catch (error) {
     console.error("Error updating movie status:", error);
     throw error;
+  } finally {
+    if (RUN_ENV && RUN_ENV.KV_BINDING) {
+      await RUN_ENV.KV_BINDING.delete("active_movies_v2");
+    }
   }
 }
 
@@ -317,19 +331,29 @@ export async function getMovieByIdImpl(
 
   // Lấy các gói vé có chứa phim này
   const searchId = String(movieId);
-  const applicablePackages = await anyDb
-    .select()
+  const activePackages = await anyDb
+    .select({
+      id: tables.ticket_packages.id,
+      name: tables.ticket_packages.name,
+      combo: tables.ticket_packages.combo,
+      price: tables.ticket_packages.price,
+      is_active: tables.ticket_packages.is_active,
+      type: tables.ticket_packages.type,
+      description: tables.ticket_packages.description,
+      features: tables.ticket_packages.features
+    })
     .from(tables.ticket_packages)
-    .where(
-      and(
-        eq(tables.ticket_packages.is_active, true),
-        // SQLite: combo is stored as a stringified JSON array
-        sql`CAST(${tables.ticket_packages.combo} AS TEXT) LIKE ${"%[" + searchId + "]%"} OR 
-            CAST(${tables.ticket_packages.combo} AS TEXT) LIKE ${"%[" + searchId + ",%"} OR 
-            CAST(${tables.ticket_packages.combo} AS TEXT) LIKE ${"%," + searchId + ",%"} OR 
-            CAST(${tables.ticket_packages.combo} AS TEXT) LIKE ${"%," + searchId + "]%"}`,
-      ),
-    );
+    .where(eq(tables.ticket_packages.is_active, true));
+
+  const applicablePackages = activePackages.filter((p: any) => {
+    let comboArr: any[] = [];
+    try {
+      comboArr = typeof p.combo === "string" ? JSON.parse(p.combo) : p.combo;
+    } catch (e) {
+      console.error("Error parsing combo for detail view:", e);
+    }
+    return Array.isArray(comboArr) && comboArr.map(String).includes(searchId);
+  });
 
   return {
     id: movie.id,

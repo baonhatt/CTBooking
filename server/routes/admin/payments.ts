@@ -143,16 +143,18 @@ export async function listTransactionsImpl(
   // --- CẬP NHẬT PHẦN SEARCH TẠI ĐÂY ---
   if (searchText) {
     const isNumber = /^\d+$/.test(searchText); // Kiểm tra nếu chỉ toàn là số
+    const lowerSearchText = searchText.toLowerCase(); // Chuyển về lowercase cho SQLite
 
     if (isNumber) {
       // Nếu là số: CHỈ tìm đích danh theo ID của booking
       whereCondition.push(eq(tables.bookings.id, Number(searchText)));
     } else {
-      // Nếu có chứa ký tự chữ: Tìm theo Email booking HOẶC Booking Code
+      // Nếu có chứa ký tự chữ: Tìm theo Email, Booking Code, Pay Txt Code
       whereCondition.push(
         or(
-          ilike(tables.bookings.email, `%${searchText}%`),
-          ilike(tables.bookings.booking_code, `%${searchText}%`),
+          ilike(tables.bookings.email, `%${lowerSearchText}%`),
+          ilike(tables.bookings.booking_code, `%${lowerSearchText}%`),
+          ilike(tables.bookings.pay_txt_code, `%${lowerSearchText}%`),
         ),
       );
     }
@@ -321,6 +323,7 @@ export async function getTransactionByIdImpl(
       checked_in_at: booking?.checked_in_at,
       is_used: booking?.is_used,
       created_at: booking.created_at,
+      updated_at: booking.updated_at,
     },
     payment_info: {
       payment_method: booking.payment_method,

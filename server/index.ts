@@ -784,7 +784,8 @@ export function createServer() {
       const page = Number(req.query.page || 1);
       const pageSize = Number(req.query.pageSize || 20);
       const q = String(req.query.q || "");
-      const r = await listToysImpl(db, { toys: pgToys }, { page, pageSize, q });
+      const status = String(req.query.status || "all");
+      const r = await listToysImpl(db, { toys: pgToys }, { page, pageSize, q, status });
       res.status(200).json(r);
     } catch (error: any) {
       const errorMessage = error?.message || "Lỗi máy chủ nội bộ";
@@ -1190,6 +1191,7 @@ export function createServer() {
         db,
         { ticket_packages: pgTicketPackages, movies: pgMovies },
         req.body as any,
+        process.env,
       );
       res.status(201).json(r);
     } catch (error: any) {
@@ -1208,6 +1210,7 @@ export function createServer() {
         { ticket_packages: pgTicketPackages, movies: pgMovies },
         id,
         req.body as any,
+        process.env,
       );
       if (!r)
         return res
@@ -1229,6 +1232,7 @@ export function createServer() {
         db,
         { ticket_packages: pgTicketPackages, bookings: pgBookings },
         id,
+        process.env,
       );
       if (!r) return res.status(404).json({ message: "Không tìm thấy" });
       res.status(200).json(r);

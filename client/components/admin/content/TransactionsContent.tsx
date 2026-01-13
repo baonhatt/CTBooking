@@ -895,29 +895,7 @@ export default function TransactionsContent({
                         })()}
                       </div>
 
-                      {txDetails.booking_details?.is_used ? (
-                        <div className="text-right">
-                          <p className="text-[10px] text-slate-400 uppercase font-bold">
-                            Thời điểm sử dụng
-                          </p>
-                          <p className="text-[12px] font-bold text-blue-600 italic">
-                            {formatDate(
-                              txDetails.booking_details.checked_in_at,
-                            )}
-                          </p>
-                        </div>
-                      ) : (
-                        txDetails.payment_info?.expired && (
-                          <div className="text-right text-red-600">
-                            <p className="text-[10px] uppercase font-bold opacity-70">
-                              Trạng thái vé
-                            </p>
-                            <p className="text-[11px] font-bold italic">
-                              Vô hiệu hóa do hết hạn
-                            </p>
-                          </div>
-                        )
-                      )}
+
                     </div>
 
                     {/* Hàng 2: Mã đặt chỗ & Đối soát */}
@@ -969,48 +947,111 @@ export default function TransactionsContent({
                     </div>
 
                     {/* Hàng 3: Timeline */}
-                    <div className="grid grid-cols-4 p-4 gap-2 bg-slate-50/30 text-center">
-                      <InfoRow
-                        label="Ngày tạo"
-                        value={formatDate(
-                          txDetails.booking_details?.created_at,
-                        )}
-                      />
-                      <InfoRow
-                        label="Thanh toán"
-                        value={formatDate(txDetails.payment_info?.paid_at)}
-                      />
-                      <InfoRow
-                        label="Hạn dùng"
-                        value={formatDate(txDetails.payment_info?.expiry_date)}
-                        color="text-red-500"
-                      />
-                      <InfoRow
-                        label="Còn lại"
-                        value={
-                          txDetails.payment_info?.expired
-                            ? "Đã hết hạn sử dụng"
-                            : txDetails.payment_info?.days_left === 0
-                              ? "Hết hạn hôm nay"
-                              : txDetails.payment_info?.days_left === null
-                                ? "---"
-                                : `${txDetails.payment_info?.days_left} ngày`
-                        }
-                        color={
-                          txDetails.payment_info?.expired
-                            ? "text-red-600 font-black"
-                            : (txDetails.payment_info?.days_left ?? 0) <= 2
-                              ? "text-orange-500"
-                              : "text-emerald-600"
-                        }
-                        bold
-                        tooltip={
-                          txDetails.payment_info?.expiry_date && !txDetails.payment_info?.expired
-                            ? `Hết hạn: ${formatDate(txDetails.payment_info.expiry_date)}`
-                            : ""
-                        }
-                      />
-                    </div>
+                    {(() => {
+                      const paymentStatus = txDetails.payment_info?.payment_status;
+                      const isUsed = txDetails.booking_details?.is_used;
+                      const isExpired = txDetails.payment_info?.expired;
+
+                      // 1. Pending: Chỉ hiện ngày tạo
+                      if (paymentStatus === "pending") {
+                        return (
+                          <div className="grid grid-cols-1 p-4 gap-2 bg-slate-50/30 text-center">
+                            <InfoRow
+                              label="Ngày tạo"
+                              value={formatDate(txDetails.booking_details?.created_at)}
+                            />
+                          </div>
+                        );
+                      }
+
+                      // 2. Cancelled: Hiện ngày tạo và ngày hủy (updatedAt)
+                      if (paymentStatus === "failed") {
+                        return (
+                          <div className="grid grid-cols-2 p-4 gap-2 bg-slate-50/30 text-center">
+                            <InfoRow
+                              label="Ngày tạo"
+                              value={formatDate(txDetails.booking_details?.created_at)}
+                            />
+                            <InfoRow
+                              label="Ngày hủy"
+                              value={formatDate(txDetails.updatedAt || txDetails.booking_details?.updated_at)}
+                              color="text-red-600"
+                            />
+                          </div>
+                        );
+                      }
+
+                      // 3. Used: Hiện Ngày tạo, Thanh toán, Hạn dùng, Thời điểm sử dụng
+                      if (isUsed) {
+                        return (
+                          <div className="grid grid-cols-4 p-4 gap-2 bg-slate-50/30 text-center">
+                            <InfoRow
+                              label="Ngày tạo"
+                              value={formatDate(txDetails.booking_details?.created_at)}
+                            />
+                            <InfoRow
+                              label="Thanh toán"
+                              value={formatDate(txDetails.payment_info?.paid_at)}
+                            />
+                            <InfoRow
+                              label="Hạn dùng"
+                              value={formatDate(txDetails.payment_info?.expiry_date)}
+                              color="text-red-500"
+                            />
+                            <InfoRow
+                              label="Thời điểm sử dụng"
+                              value={formatDate(txDetails.booking_details?.checked_in_at)}
+                              color="text-blue-600"
+                              bold
+                            />
+                          </div>
+                        );
+                      }
+
+                      // 4. Default (Paid / Expired / Others): Hiện Ngày tạo, Thanh toán, Hạn dùng, Còn lại
+                      return (
+                        <div className="grid grid-cols-4 p-4 gap-2 bg-slate-50/30 text-center">
+                          <InfoRow
+                            label="Ngày tạo"
+                            value={formatDate(txDetails.booking_details?.created_at)}
+                          />
+                          <InfoRow
+                            label="Thanh toán"
+                            value={formatDate(txDetails.payment_info?.paid_at)}
+                          />
+                          <InfoRow
+                            label="Hạn dùng"
+                            value={formatDate(txDetails.payment_info?.expiry_date)}
+                            color="text-red-500"
+                          />
+                          <InfoRow
+                            label="Còn lại"
+                            value={
+                              txDetails.payment_info?.expired
+                                ? "Đã hết hạn sử dụng"
+                                : txDetails.payment_info?.days_left === 0
+                                  ? "Hết hạn hôm nay"
+                                  : txDetails.payment_info?.days_left === null
+                                    ? "---"
+                                    : `${txDetails.payment_info?.days_left} ngày`
+                            }
+                            color={
+                              txDetails.payment_info?.expired
+                                ? "text-red-600 font-black"
+                                : (txDetails.payment_info?.days_left ?? 0) <= 2
+                                  ? "text-orange-500"
+                                  : "text-emerald-600"
+                            }
+                            bold
+                            tooltip={
+                              txDetails.payment_info?.expiry_date && !txDetails.payment_info?.expired
+                                ? `Hết hạn: ${formatDate(txDetails.payment_info.expiry_date)}`
+                                : ""
+                            }
+                          />
+                        </div>
+                      );
+                    })()}
                   </div>
                 </div>
               </div>
@@ -1029,6 +1070,6 @@ export default function TransactionsContent({
           </div>
         </DialogContent>
       </Dialog>
-    </div>
+    </div >
   );
 }

@@ -604,7 +604,7 @@ export default function QRPaymentPage() {
 
       {/* Unpaid Dialog */}
       <AlertDialog open={showUnpaidDialog} onOpenChange={setShowUnpaidDialog}>
-        <AlertDialogContent className="bg-[#0f172a] border-white/10 text-white">
+        <AlertDialogContent className="bg-[#0f172a] border-white/10 text-white max-w-[400px]">
           <AlertDialogHeader>
             <AlertDialogTitle className="text-xl font-bold text-amber-400 text-center">
               Chưa nhận được thanh toán
@@ -639,7 +639,7 @@ export default function QRPaymentPage() {
 
       {/* Expired Dialog */}
       <AlertDialog open={showExpiredDialog} onOpenChange={() => { }}>
-        <AlertDialogContent className="bg-[#0f172a] border-white/10 text-white">
+        <AlertDialogContent className="bg-[#0f172a] border-white/10 text-white max-w-[400px]">
           <AlertDialogHeader>
             <AlertDialogTitle className="text-xl font-bold text-red-400 text-center">
               Hết thời gian thanh toán
@@ -667,7 +667,7 @@ export default function QRPaymentPage() {
       </AlertDialog>
 
       <AlertDialog open={showCancelDialog} onOpenChange={setShowCancelDialog}>
-        <AlertDialogContent className="bg-[#0f172a] border-white/10 text-white">
+        <AlertDialogContent className="bg-[#0f172a] border-white/10 text-white max-w-[400px]">
           <AlertDialogHeader>
             <AlertDialogTitle className="text-xl font-bold text-white text-center">
               Hủy thanh toán?

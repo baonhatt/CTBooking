@@ -1,12 +1,20 @@
-import { eq, desc, or, ilike, count } from "drizzle-orm";
+import { eq, desc, or, ilike, count, and } from "drizzle-orm";
 import { formatDateForDb } from "../../lib/date-utils";
 
-export async function listToysImpl(anyDb: any, tables: { toys: any }, args: { page: number; pageSize: number; q: string }) {
-  const { page, pageSize, q } = args;
-  let whereCondition = undefined as any;
+export async function listToysImpl(anyDb: any, tables: { toys: any }, args: { page: number; pageSize: number; q: string; status?: string }) {
+  const { page, pageSize, q, status } = args;
+  const conditions = [] as any[];
+
   if (q) {
-    whereCondition = or(ilike(tables.toys.name, `%${q}%`), ilike(tables.toys.category, `%${q}%`), ilike(tables.toys.status, `%${q}%`));
+    conditions.push(or(ilike(tables.toys.name, `%${q}%`), ilike(tables.toys.category, `%${q}%`)));
   }
+
+  if (status && status !== "all") {
+    conditions.push(eq(tables.toys.status, status));
+  }
+
+  const whereCondition = conditions.length > 0 ? and(...conditions) : undefined;
+
   const [totalRes] = await anyDb.select({ count: count() }).from(tables.toys).where(whereCondition);
   const total = totalRes?.count || 0;
   const items = await anyDb.query.toys.findMany({ where: whereCondition, orderBy: [desc(tables.toys.created_at)], limit: pageSize, offset: (page - 1) * pageSize });
@@ -18,7 +26,7 @@ export async function getToyImpl(anyDb: any, tables: { toys: any }, id: number) 
   return toy || null;
 }
 
-export async function createToyImpl(anyDb: any, tables: { toys: any }, args: { name: string; category?: string; price: number; stock?: number; status?: string; image_url?: string; image_base64?: string }, RUNTIME_ENV?: string, uploader?: (base64: string, folder: string) => Promise<{ url: string }>) {
+export async function createToyImpl(anyDb: any, tables: { toys: any }, args: { name: string; category?: string; price: number; stock?: number; status?: string; image_url?: string; image_base64?: string }, RUN_ENV?: any, uploader?: (base64: string, folder: string) => Promise<{ url: string }>) {
   const { name, category, price, stock, status, image_url, image_base64 } = args as any;
   const priceNum = Number(price);
   let savedImage = image_url as string | undefined;
@@ -40,8 +48,8 @@ export async function createToyImpl(anyDb: any, tables: { toys: any }, args: { n
     stock: Number(stock ?? 0),
     status: status ?? "active",
     image_url: savedImage,
-    created_at: formatDateForDb(nowIso, RUNTIME_ENV),
-    updated_at: formatDateForDb(nowIso, RUNTIME_ENV),
+    created_at: formatDateForDb(nowIso, RUN_ENV?.RUNTIME_ENV),
+    updated_at: formatDateForDb(nowIso, RUN_ENV?.RUNTIME_ENV),
   }).returning();
 
   let toy: any = Array.isArray(inserted) ? inserted[0] : inserted;
@@ -50,29 +58,34 @@ export async function createToyImpl(anyDb: any, tables: { toys: any }, args: { n
   // }
 
   if (!toy) throw new Error("Không thể tạo đồ chơi");
+
+  if (RUN_ENV && RUN_ENV.KV_BINDING) {
+    await RUN_ENV.KV_BINDING.delete("activeToys");
+  }
+
   return { toy };
 }
 
-export async function updateToyImpl(anyDb: any, tables: { toys: any }, id: number, args: { name?: string; category?: string; price?: number; stock?: number; status?: string; image_url?: string; image_base64?: string }, RUNTIME_ENV?: string, uploader?: (base64: string, folder: string) => Promise<{ url: string }>, deleter?: (url: string) => Promise<void>) {
+export async function updateToyImpl(anyDb: any, tables: { toys: any }, id: number, args: { name?: string; category?: string; price?: number; stock?: number; status?: string; image_url?: string; image_base64?: string }, RUN_ENV?: any, uploader?: (base64: string, folder: string) => Promise<{ url: string }>, deleter?: (url: string) => Promise<void>) {
   const { name, category, price, stock, status, image_url, image_base64 } = args as any;
   const priceNum = price === undefined ? undefined : Number(price);
   const now = new Date();
   const oldToy = await anyDb.query.toys.findFirst({
     where: eq(tables.toys.id, id),
   });
-  const data: any = { updated_at: formatDateForDb(now, RUNTIME_ENV) };
+  const data: any = { updated_at: formatDateForDb(now, RUN_ENV?.RUNTIME_ENV) };
   if (name !== undefined) data.name = name;
   if (category !== undefined) data.category = category;
   if (priceNum !== undefined) data.price = String(priceNum);
   if (stock !== undefined) data.stock = stock;
   if (status !== undefined) data.status = status;
   if (image_url !== undefined) data.image_url = image_url;
-  
+
   if (image_base64 && typeof image_base64 === "string" && uploader) {
     try {
       const uploadResult = await uploader(image_base64, "ctbooking/toys");
       data.image_url = uploadResult.url;
-    } catch (e) { 
+    } catch (e) {
       console.error("Upload toy image failed", e);
     }
   }
@@ -94,10 +107,14 @@ export async function updateToyImpl(anyDb: any, tables: { toys: any }, id: numbe
     );
   }
 
+  if (RUN_ENV && RUN_ENV.KV_BINDING) {
+    await RUN_ENV.KV_BINDING.delete("activeToys");
+  }
+
   return toy || null;
 }
 
-export async function deleteToyImpl(anyDb: any, tables: { toys: any }, id: number, deleter?: (url: string) => Promise<void>) {
+export async function deleteToyImpl(anyDb: any, tables: { toys: any }, id: number, RUN_ENV: any, deleter?: (url: string) => Promise<void>) {
   // Check if toy exists before deleting
   const existing = await anyDb.query.toys.findFirst({
     where: eq(tables.toys.id, id),
@@ -113,6 +130,10 @@ export async function deleteToyImpl(anyDb: any, tables: { toys: any }, id: numbe
 
   // Delete toy (tương thích với D1/SQLite không hỗ trợ .returning())
   await anyDb.delete(tables.toys).where(eq(tables.toys.id, id));
+
+  if (RUN_ENV && RUN_ENV.KV_BINDING) {
+    await RUN_ENV.KV_BINDING.delete("activeToys");
+  }
 
   return { ok: true };
 }

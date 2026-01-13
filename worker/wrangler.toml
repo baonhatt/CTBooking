@@ -29,6 +29,10 @@ binding = "cinema_db"
 database_name = "cinema-db"
 database_id = "9bae4fb3-570a-4ded-9a75-922ce4d6ef81"
 
+[[kv_namespaces]]
+binding = "KV_BINDING"
+id = "e2a5a9184efb40afb73b7a17a41c9328"
+
 [env.preview]
 
 [env.preview.placement]
@@ -38,6 +42,7 @@ mode = "smart"
 IS_PREVIEW = "true"
 RUNTIME_ENV = "cloudflare-worker"
 VITE_SERVER_BASE_URL = "https://cinema-worker-preview.baonhat20.workers.dev"
+VITE_CLIENT_BASE_URL = "https://cinesphere.com.vn"
 
 VITE_MOMO_REDIRECT_URL = "/checkout"
 VITE_MOMO_IPN_URL = "/api/momo/ipn"
@@ -63,30 +68,11 @@ binding = "cinema_db"
 database_name = "cinema-db-preview"
 database_id = "fd9274ae-d1a3-42e2-b83d-2fc1bdc71caf"
 
+[[env.preview.kv_namespaces]]
+binding = "KV_BINDING"
+id = "e2a5a9184efb40afb73b7a17a41c9328"
+
 [env.production]
-[env.production.vars]
-VITE_SERVER_BASE_URL = "https://cinesphere.com.vn"
-VITE_MOMO_ENDPOINT = "https://test-payment.momo.vn/v2/gateway/api/create"
-VITE_MOMO_REDIRECT_URL = "/checkout"
-VITE_MOMO_IPN_URL = "/api/momo/ipn"
-VITE_VNPAY_RETURN_URL = "/checkout"
-VITE_VNPAY_GATEWAY = "https://sandbox.vnpayment.vn/paymentv2/vpcpay.html"
-GMAIL_SENDER_EMAIL = "no-reply@cinesphere.com.vn"
-GMAIL_SENDER_NAME = "CINESPHERE"
-BREVO_SENDER_EMAIL = "no-reply@cinesphere.com.vn"
-BREVO_SENDER_NAME = "CINESPHERE"
-VITE_RATE_LIMIT_BOOKING_CHECK_MAX = "10"
-VITE_RATE_LIMIT_BOOKING_CHECK_WINDOWMS = "60000"
-
-[[env.production.d1_databases]]
-binding = "cinema_db"
-database_name = "cinema-db"
-database_id = "9bae4fb3-570a-4ded-9a75-922ce4d6ef81"
-
-[[env.production.r2_buckets]]
-binding = "r2_cinemastore"
-bucket_name = "cinemastore"
-
 routes = [
   { pattern = "cinesphere.com.vn/api/*", zone_name = "cinesphere.com.vn" },
   { pattern = "cinesphere.com.vn/uploads/*", zone_name = "cinesphere.com.vn" }
