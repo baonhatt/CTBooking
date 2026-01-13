@@ -1,4 +1,4 @@
-import { eq, desc, or, ilike, count, and } from "drizzle-orm";
+import { eq, desc, or, count, and, sql } from "drizzle-orm";
 import { formatDateForDb } from "../../lib/date-utils";
 
 export async function listToysImpl(anyDb: any, tables: { toys: any }, args: { page: number; pageSize: number; q: string; status?: string }) {
@@ -6,7 +6,11 @@ export async function listToysImpl(anyDb: any, tables: { toys: any }, args: { pa
   const conditions = [] as any[];
 
   if (q) {
-    conditions.push(or(ilike(tables.toys.name, `%${q}%`), ilike(tables.toys.category, `%${q}%`)));
+    const lowerQ = q.toLowerCase();
+    conditions.push(or(
+      sql`LOWER(${tables.toys.name}) LIKE ${`%${lowerQ}%`}`,
+      sql`LOWER(${tables.toys.category}) LIKE ${`%${lowerQ}%`}`
+    ));
   }
 
   if (status && status !== "all") {
