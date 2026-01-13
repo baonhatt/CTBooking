@@ -9,7 +9,7 @@ import {
   asc,
   sum,
   count,
-  ilike,
+  sql,
 } from "drizzle-orm";
 import { formatDateForDb } from "../../../server/lib/date-utils";
 
@@ -143,18 +143,19 @@ export async function listTransactionsImpl(
   // --- CẬP NHẬT PHẦN SEARCH TẠI ĐÂY ---
   if (searchText) {
     const isNumber = /^\d+$/.test(searchText); // Kiểm tra nếu chỉ toàn là số
-    const lowerSearchText = searchText.toLowerCase(); // Chuyển về lowercase cho SQLite
+    const lowerSearchText = searchText.toLowerCase(); // Chuyển về lowercase
 
     if (isNumber) {
       // Nếu là số: CHỈ tìm đích danh theo ID của booking
       whereCondition.push(eq(tables.bookings.id, Number(searchText)));
     } else {
       // Nếu có chứa ký tự chữ: Tìm theo Email, Booking Code, Pay Txt Code
+      // Sử dụng LOWER() để tương thích với cả PostgreSQL và SQLite/D1
       whereCondition.push(
         or(
-          ilike(tables.bookings.email, `%${lowerSearchText}%`),
-          ilike(tables.bookings.booking_code, `%${lowerSearchText}%`),
-          ilike(tables.bookings.pay_txt_code, `%${lowerSearchText}%`),
+          sql`LOWER(${tables.bookings.email}) LIKE ${`%${lowerSearchText}%`}`,
+          sql`LOWER(${tables.bookings.booking_code}) LIKE ${`%${lowerSearchText}%`}`,
+          sql`LOWER(${tables.bookings.pay_txt_code}) LIKE ${`%${lowerSearchText}%`}`,
         ),
       );
     }

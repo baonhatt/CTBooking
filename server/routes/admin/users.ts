@@ -1,4 +1,4 @@
-import { eq, ilike, or, desc, count, sql, and } from "drizzle-orm";
+import { eq, or, desc, count, sql, and } from "drizzle-orm";
 
 export async function getUsersImpl(
   anyDb: any,
@@ -17,10 +17,11 @@ export async function getUsersImpl(
     .as("booking_counts");
   let whereCondition = undefined as any;
   if (q) {
+    const lowerQ = q.toLowerCase();
     whereCondition = or(
-      ilike(tables.users.fullname, `%${q}%`),
-      ilike(tables.accounts.email, `%${q}%`),
-      ilike(tables.users.phone, `%${q}%`),
+      sql`LOWER(${tables.users.fullname}) LIKE ${`%${lowerQ}%`}`,
+      sql`LOWER(${tables.accounts.email}) LIKE ${`%${lowerQ}%`}`,
+      sql`LOWER(${tables.users.phone}) LIKE ${`%${lowerQ}%`}`,
     );
   }
   const itemsQuery = anyDb

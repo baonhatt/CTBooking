@@ -1,5 +1,5 @@
 // Import các hàm cần thiết từ thư viện
-import { eq, or, ilike, desc, asc, count, inArray, and, sql } from "drizzle-orm";
+import { eq, or, desc, asc, count, inArray, and, sql } from "drizzle-orm";
 import { formatDateForDb } from "../../lib/date-utils";
 import { deleteCache } from "../../../worker/src/utils";
 
@@ -63,11 +63,11 @@ export async function listTicketPackagesImpl(
     : eq(tables.ticket_packages.is_active, true);
 
   if (q) {
-    const searchTerm = `%${q}%`;
+    const lowerSearch = q.toLowerCase();
     const searchCondition = or(
-      ilike(tables.ticket_packages.name, searchTerm),
-      ilike(tables.ticket_packages.description, searchTerm),
-      ilike(tables.ticket_packages.type, searchTerm)
+      sql`LOWER(${tables.ticket_packages.name}) LIKE ${`%${lowerSearch}%`}`,
+      sql`LOWER(${tables.ticket_packages.description}) LIKE ${`%${lowerSearch}%`}`,
+      sql`LOWER(${tables.ticket_packages.type}) LIKE ${`%${lowerSearch}%`}`
     );
 
     whereCondition = whereCondition
