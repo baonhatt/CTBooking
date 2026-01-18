@@ -778,8 +778,12 @@ export default function BookingPage() {
                             onChange={(e) => {
                               const val = e.target.value;
                               setEmail(val);
-                              if (val && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(val)) {
+                              if (!val) {
+                                setEmailError("");
+                              } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(val)) {
                                 setEmailError("Email không hợp lệ");
+                              } else if (!/@(gmail\.com|outlook\.com|hotmail\.com|yahoo\.com|icloud\.com)$/i.test(val)) {
+                                setEmailError("Vui lòng dùng Gmail, Outlook, Yahoo hoặc iCloud");
                               } else {
                                 setEmailError("");
                               }
