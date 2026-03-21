@@ -50,8 +50,8 @@ export default function QRPaymentPage() {
 
   const BANK_INFO = {
     bankName: "Ngân Hàng OCB",
-    accountNumber: "SEPPTH15806",
-    accountName: "TRAN THI THUY DUONG",
+    accountNumber: "596310",
+    accountName: "CONG TY TNHH CONG NGHE VR VIET NAM",
     bankCode: "OCB",
   };
 
