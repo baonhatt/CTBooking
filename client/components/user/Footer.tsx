@@ -3,8 +3,6 @@ import {
   Phone,
   Mail,
   Facebook,
-  Instagram,
-  Youtube,
   ArrowUp,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
@@ -67,22 +65,27 @@ export default function Footer() {
                 <Facebook className="h-5 w-5 text-white" />
               </motion.a>
               <motion.a
-                href="#"
+                href="https://www.tiktok.com/@cinesphere.vn"
                 whileHover={{ scale: 1.1, y: -5 }}
+                target="_blank"
                 whileTap={{ scale: 0.95 }}
-                className="w-12 h-12 rounded-full bg-white/5 backdrop-blur-md border border-white/20 flex items-center justify-center hover:border-pink-400 hover:bg-pink-500/20 transition-all duration-300"
-                aria-label="Theo dõi chúng tôi trên Instagram"
+                className="w-12 h-12 rounded-full bg-white/5 backdrop-blur-md border border-white/20 flex items-center justify-center hover:border-cyan-400 hover:bg-cyan-500/20 transition-all duration-300"
+                aria-label="Theo dõi chúng tôi trên TikTok"
               >
-                <Instagram className="h-5 w-5 text-white" />
-              </motion.a>
-              <motion.a
-                href="#"
-                whileHover={{ scale: 1.1, y: -5 }}
-                whileTap={{ scale: 0.95 }}
-                className="w-12 h-12 rounded-full bg-white/5 backdrop-blur-md border border-white/20 flex items-center justify-center hover:border-red-400 hover:bg-red-500/20 transition-all duration-300"
-                aria-label="Theo dõi chúng tôi trên Youtube"
-              >
-                <Youtube className="h-5 w-5 text-white" />
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  width="24"
+                  height="24"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  className="h-5 w-5 text-white"
+                >
+                  <path d="M9 12a4 4 0 1 0 4 4V4a5 5 0 0 0 5 5" />
+                </svg>
               </motion.a>
             </div>
           </motion.div>
