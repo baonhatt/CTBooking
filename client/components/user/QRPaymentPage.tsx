@@ -436,19 +436,45 @@ export default function QRPaymentPage() {
                           <div className="text-[13px] text-white font-bold leading-relaxed space-y-1">
                             {(() => {
                               try {
-                                const titleRaw = bookingDetails?.movie_title || "";
-                                const parsed = JSON.parse(titleRaw);
-                                if (Array.isArray(parsed)) {
-                                  return parsed.map((title: string, idx: number) => (
+                                const titleRaw = bookingDetails?.movie_title || paymentData?.movieTitle || "";
+                                if (!titleRaw) return "Đang tải...";
+                                
+                                // Nếu là JSON array
+                                if (titleRaw.startsWith('[')) {
+                                  const parsed = JSON.parse(titleRaw);
+                                  if (Array.isArray(parsed)) {
+                                    return parsed.map((title: string, idx: number) => (
+                                      <div key={idx} className="flex items-start gap-2">
+                                        <span className="text-cyan-500 mt-1">•</span>
+                                        <span>{title}</span>
+                                      </div>
+                                    ));
+                                  }
+                                }
+                                
+                                // Nếu là chuỗi phân tách bởi " & "
+                                if (titleRaw.includes(" & ")) {
+                                  return titleRaw.split(" & ").map((title: string, idx: number) => (
                                     <div key={idx} className="flex items-start gap-2">
                                       <span className="text-cyan-500 mt-1">•</span>
-                                      <span>{title}</span>
+                                      <span>{title.trim()}</span>
                                     </div>
                                   ));
                                 }
-                                return titleRaw;
+
+                                return (
+                                  <div className="flex items-start gap-2">
+                                    <span className="text-cyan-500 mt-1">•</span>
+                                    <span>{titleRaw}</span>
+                                  </div>
+                                );
                               } catch {
-                                return bookingDetails?.movie_title || "Đang tải...";
+                                return (
+                                  <div className="flex items-start gap-2">
+                                    <span className="text-cyan-500 mt-1">•</span>
+                                    <span>{bookingDetails?.movie_title || paymentData?.movieTitle || "Đang tải..."}</span>
+                                  </div>
+                                );
                               }
                             })()}
                           </div>
