@@ -77,7 +77,9 @@ export default function BookingPage() {
   const isLoadingPage = isLoadingTickets;
 
   const [activeMoviesFull, setActiveMoviesFull] = useState<any[]>([]);
-  const selectedMovie = activeMoviesFull[0]; // Just use the first movie if available
+  const [selectedMovieIds, setSelectedMovieIds] = useState<number[]>([]);
+  const selectedMovie = activeMoviesFull.find(m => selectedMovieIds.includes(m.id)) || activeMoviesFull[0];
+  const selectedMovies = activeMoviesFull.filter(m => selectedMovieIds.includes(m.id));
   const ticketPackages = (ticketsData?.items || []).map((t: any) => ({
     id: t.id,
     name: t.name,
@@ -122,7 +124,8 @@ export default function BookingPage() {
           setSelectedPackage(canonical);
           // Update activeMoviesFull when package changes
           setActiveMoviesFull(canonical.movies || []);
-          // Clear selected movie when package changes
+          // Clear selected movies when package changes
+          setSelectedMovieIds([]);
           setMovie("");
         }
       }
@@ -316,6 +319,7 @@ export default function BookingPage() {
       const orderId = `CINESPHERE${Date.now()}`;
       const movieDetail = selectedMovie;
       const ticketPackageId = selectedPackage?.id || defaultTicket?.id;
+      const finalCombo = selectedMovieIds.length > 0 ? selectedMovieIds : comboData.combo;
 
       const validation = await validateBookingApi({
         email,
@@ -325,7 +329,7 @@ export default function BookingPage() {
         movieId: selectedMovie?.id,
         ticketCount,
         ticketPackageId: selectedPackage?.id,
-        combo: comboData.combo,
+        combo: finalCombo,
       });
 
       if (!validation?.status) {
@@ -370,7 +374,7 @@ export default function BookingPage() {
         totalPrice: canonicalTotal,
         ticketPackageId: selectedPackage?.id,
         pay_txt_code: orderId,
-        combo: comboData.combo,
+        combo: finalCombo,
       });
 
       localStorage.setItem(
@@ -381,7 +385,10 @@ export default function BookingPage() {
           user_id: booking?.user_id,
         }),
       );
-      let orderInfoText = `${selectedMovie?.title || "Movie"} | ${ticketCount} vé`;
+      const movieTitles = selectedMovies.length > 0 
+        ? selectedMovies.map(m => m.title).join(" & ")
+        : (selectedMovie?.title || "Movie");
+      let orderInfoText = `${movieTitles} | ${ticketCount} vé`;
 
       if (paymentMethod === "vietqr") {
         // Lưu thông tin booking để hiển thị trên màn QR
@@ -392,7 +399,7 @@ export default function BookingPage() {
             booking_id: booking?.id,
             user_id: booking?.user_id,
             totalAmount: canonicalTotal,
-            movieTitle: selectedMovie?.title,
+            movieTitle: selectedMovies.length > 0 ? selectedMovies.map(m => m.title).join(" & ") : selectedMovie?.title,
             ticketType: selectedPackage?.name,
           }),
         );
@@ -630,7 +637,20 @@ export default function BookingPage() {
                                 {activeMoviesFull.map((m: any) => (
                                   <div
                                     key={m.id}
-                                    className="group relative rounded-xl overflow-hidden border border-white/10 bg-white/5 hover:border-blue-500/50 transition-all shadow-lg hover:shadow-blue-500/10"
+                                    onClick={() => {
+                                      setSelectedMovieIds(prev => {
+                                        if (prev.includes(m.id)) return prev.filter(id => id !== m.id);
+                                        if (prev.length >= 2) {
+                                          return [prev[1], m.id];
+                                        }
+                                        return [...prev, m.id];
+                                      });
+                                    }}
+                                    className={`group relative rounded-xl overflow-hidden cursor-pointer transition-all shadow-lg hover:shadow-blue-500/10 ${
+                                      selectedMovieIds.includes(m.id)
+                                        ? "border-2 border-blue-500 ring-2 ring-blue-500/30 bg-blue-500/10"
+                                        : "border border-white/10 bg-white/5 hover:border-blue-500/50"
+                                    }`}
                                   >
                                     <div className="aspect-[2/3] relative">
                                       {/* Tỉ lệ 2:3 chuẩn poster phim */}
@@ -640,6 +660,13 @@ export default function BookingPage() {
                                         loading="lazy"
                                         className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
                                       />
+                                      {selectedMovieIds.includes(m.id) && (
+                                        <div className="absolute top-2 right-2 z-10 w-6 h-6 bg-blue-600 rounded-full flex items-center justify-center border-2 border-white shadow-lg">
+                                          <div className="text-[10px] font-bold text-white">
+                                            {selectedMovieIds.indexOf(m.id) + 1}
+                                          </div>
+                                        </div>
+                                      )}
                                       <div className="absolute inset-0 bg-gradient-to-t from-black via-black/40 to-transparent opacity-90" />
                                       <div className="absolute bottom-0 p-2 w-full">
                                         <div className="text-[11px] font-bold text-white leading-tight truncate mb-1">
@@ -944,13 +971,13 @@ export default function BookingPage() {
                       </div>
                     </section>
 
-                    {activeMoviesFull && activeMoviesFull.length > 0 && (
+                    {selectedMovies.length > 0 && (
                       <section>
                         <h3 className="text-xs sm:text-sm font-semibold text-blue-400 uppercase tracking-wider mb-2 sm:mb-3">
-                          Danh sách phim trải nghiệm
+                          Danh sách phim trải nghiệm ({selectedMovies.length})
                         </h3>
                         <div className="flex flex-wrap gap-1.5 sm:gap-2">
-                          {activeMoviesFull.map((m: any) => (
+                          {selectedMovies.map((m: any) => (
                             <div
                               key={m.id}
                               className="bg-blue-500/10 border border-blue-500/30 px-2 sm:px-3 py-1 sm:py-1.5 rounded-full text-xs sm:text-sm flex items-center gap-1.5 sm:gap-2"
