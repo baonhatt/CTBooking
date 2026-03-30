@@ -129,6 +129,7 @@ type Bindings = {
   BREVO_SENDER_EMAIL: string;
   BREVO_SENDER_NAME: string;
   RUNTIME_ENV: string;
+  IS_PREVIEW?: string;
   VITE_RATE_LIMIT_BOOKING_CHECK_MAX: string;
   VITE_RATE_LIMIT_BOOKING_CHECK_WINDOWMS: string;
 };
@@ -151,6 +152,9 @@ app.use(
   cors({
     origin: (origin) => {
       if (!origin) return "https://cinesphere.com.vn";
+
+      // // Allow localhost for development
+      // if (origin.startsWith("http://localhost:")) return origin;
 
       const allowedExact = new Set([
         "https://cinesphere.com.vn",
@@ -190,6 +194,16 @@ app.use(
     credentials: true,
   }),
 );
+
+// Global Error Handler for debugging preview issues
+app.onError((err, c) => {
+  console.error(`[Worker Error] ${err.message}`, err);
+  return c.json({
+    status: "error",
+    message: err.message || "Internal Server Error",
+    stack: c.env.RUNTIME_ENV === "development" || c.env.IS_PREVIEW === "true" ? err.stack : undefined
+  }, 500);
+});
 
 app.use("*", async (c, next) => {
   await next();
