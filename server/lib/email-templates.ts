@@ -12,12 +12,12 @@ export function getBookingEmailTemplate(data: {
   let movieTitles: string[] = [];
   let durations: string[] = [];
   try {
-    movieTitles = JSON.parse(data.movieTitle || "[]");
-    durations = JSON.parse(data.durationMin || "[]");
+    movieTitles = JSON.parse(data.movieTitle || '[]');
+    durations = JSON.parse(data.durationMin || '[]');
   } catch (e) {
     // Fallback nếu không phải JSON
-    movieTitles = data.movieTitle ? [data.movieTitle] : ["Chưa xác định"];
-    durations = data.durationMin ? [data.durationMin] : ["--"];
+    movieTitles = data.movieTitle ? [data.movieTitle] : ['Chưa xác định'];
+    durations = data.durationMin ? [data.durationMin] : ['--'];
   }
 
   // 2. TẠO LIST PHIM THEO LAYOUT MỚI
@@ -26,11 +26,11 @@ export function getBookingEmailTemplate(data: {
       (title, i) => `
     <div style="padding: 12px 0; border-bottom: 1px dashed #eee; display: flex; justify-content: space-between; align-items: center;">
       <span style="color: #333; font-weight: 600;">🎬 ${title}</span>
-      <span style="color: #666; font-size: 12px; background: #f5f5f5; padding: 2px 8px; border-radius: 4px;">${durations[i] || "--"} ph</span>
+      <span style="color: #666; font-size: 12px; background: #f5f5f5; padding: 2px 8px; border-radius: 4px;">${durations[i] || '--'} ph</span>
     </div>
-  `,
+  `
     )
-    .join("");
+    .join('');
 
   return `
 <!DOCTYPE html>
@@ -83,7 +83,7 @@ export function getBookingEmailTemplate(data: {
             </div>
             <div class="row">
                 <span class="label">Loại vé:</span>
-                <span class="value">${data.ticketPackageName || "Vé đơn"}</span>
+                <span class="value">${data.ticketPackageName || 'Vé đơn'}</span>
             </div>
             <div class="row">
                 <span class="label">Tổng tiền:</span>
@@ -95,15 +95,15 @@ export function getBookingEmailTemplate(data: {
                   try {
                     const d = new Date(String(data.expiryDate));
                     return (
-                      d.getDate().toString().padStart(2, "0") +
-                      "/" +
-                      (d.getMonth() + 1).toString().padStart(2, "0") +
-                      "/" +
+                      d.getDate().toString().padStart(2, '0') +
+                      '/' +
+                      (d.getMonth() + 1).toString().padStart(2, '0') +
+                      '/' +
                       d.getFullYear() +
-                      " " +
-                      d.getHours().toString().padStart(2, "0") +
-                      ":" +
-                      d.getMinutes().toString().padStart(2, "0")
+                      ' ' +
+                      d.getHours().toString().padStart(2, '0') +
+                      ':' +
+                      d.getMinutes().toString().padStart(2, '0')
                     );
                   } catch {
                     return String(data.expiryDate);
@@ -248,14 +248,14 @@ export function getWelcomeEmailTemplate(
     customerName: string;
     email: string;
   },
-  baseUrlStr?: string,
+  baseUrlStr?: string
 ): string {
   // Use provided baseUrl or fallback to env or default
   let baseUrl = baseUrlStr;
-  if (!baseUrl && typeof process !== "undefined" && process.env) {
+  if (!baseUrl && typeof process !== 'undefined' && process.env) {
     baseUrl = process.env.VITE_SERVER_BASE_URL;
   }
-  if (!baseUrl) baseUrl = "https://cinesphere.com.vn";
+  if (!baseUrl) baseUrl = 'https://cinesphere.com.vn';
 
   const homeUrl = `${baseUrl}/`;
   return `

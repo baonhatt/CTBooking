@@ -1,19 +1,13 @@
-import { useState, useEffect } from "react";
-import { Button } from "@/components/ui/button";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
-import { toast } from "sonner";
-import { Loader2, Eye, EyeOff } from "lucide-react";
-import { cn } from "@/lib/utils";
-import icon from "@/assets/images/icon.svg";
-import { PASSWORD_PATTERN } from "./constants";
-import { useNavigate } from "react-router-dom";
+import { useState, useEffect } from 'react';
+import { Button } from '@/components/ui/button';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
+import { toast } from 'sonner';
+import { Loader2, Eye, EyeOff } from 'lucide-react';
+import { cn } from '@/lib/utils';
+import icon from '@/assets/images/icon.svg';
+import { PASSWORD_PATTERN } from './constants';
+import { useNavigate } from 'react-router-dom';
 
 interface LoginDialogProps {
   isOpen: boolean;
@@ -22,11 +16,7 @@ interface LoginDialogProps {
   onForgetPassword: () => void;
   auth: any;
   setUserName: (name: string) => void;
-  setErrorModal: (modal: {
-    open: boolean;
-    title: string;
-    message: string;
-  }) => void;
+  setErrorModal: (modal: { open: boolean; title: string; message: string }) => void;
 }
 
 export function LoginDialog({
@@ -36,14 +26,14 @@ export function LoginDialog({
   onForgetPassword,
   auth,
   setUserName,
-  setErrorModal,
+  setErrorModal
 }: LoginDialogProps) {
   const [isLoading, setIsLoading] = useState(false);
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [emailError, setEmailError] = useState("");
-  const [passwordError, setPasswordError] = useState("");
-  const [submitError, setSubmitError] = useState("");
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [emailError, setEmailError] = useState('');
+  const [passwordError, setPasswordError] = useState('');
+  const [submitError, setSubmitError] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [isEmailFocused, setIsEmailFocused] = useState(false);
   const [isPasswordFocused, setIsPasswordFocused] = useState(false);
@@ -55,11 +45,11 @@ export function LoginDialog({
     if (isOpen) {
       setIsEmailFocused(false);
       setIsPasswordFocused(false);
-      setEmail("");
-      setPassword("");
-      setEmailError("");
-      setPasswordError("");
-      setSubmitError("");
+      setEmail('');
+      setPassword('');
+      setEmailError('');
+      setPasswordError('');
+      setSubmitError('');
       setShowPassword(false);
     }
   }, [isOpen]);
@@ -74,21 +64,21 @@ export function LoginDialog({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setEmailError("");
-    setPasswordError("");
-    setSubmitError("");
+    setEmailError('');
+    setPasswordError('');
+    setSubmitError('');
 
     // Validate email
     const emailOk = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
     if (!emailOk) {
-      setEmailError("Vui lòng nhập email hợp lệ");
+      setEmailError('Vui lòng nhập email hợp lệ');
       return;
     }
 
     // Validate password
     const passOk = PASSWORD_PATTERN.test(password);
     if (!passOk) {
-      setPasswordError("Mật khẩu ít nhất 6 ký tự gồm chữ và số");
+      setPasswordError('Mật khẩu ít nhất 6 ký tự gồm chữ và số');
       return;
     }
 
@@ -96,50 +86,42 @@ export function LoginDialog({
       setIsLoading(true);
       const data = await auth.login(email, password);
 
-      if (data?.status === "success") {
-        localStorage.setItem("authUser", JSON.stringify({ user: data.user }));
+      if (data?.status === 'success') {
+        localStorage.setItem('authUser', JSON.stringify({ user: data.user }));
 
         try {
-          const derivedName =
-            data.user.username || (data.user.email || "").split("@")[0];
+          const derivedName = data.user.username || (data.user.email || '').split('@')[0];
           const profile = {
             email: data.user.email,
             name: derivedName,
-            phone: (data.user as any)?.phone || "",
+            phone: (data.user as any)?.phone || ''
           };
-          localStorage.setItem("userProfile", JSON.stringify(profile));
+          localStorage.setItem('userProfile', JSON.stringify(profile));
         } catch {
         } finally {
-          navigator("/");
+          navigator('/');
         }
         setUserName(data.user.username);
-        window.dispatchEvent(new Event("user-auth-changed"));
-        toast.success("Đăng nhập thành công", { description: data.user.email });
+        window.dispatchEvent(new Event('user-auth-changed'));
+        toast.success('Đăng nhập thành công', { description: data.user.email });
 
         onOpenChange(false);
-        setEmail("");
-        setPassword("");
+        setEmail('');
+        setPassword('');
       } else {
-        const msg = data?.message || "Đăng nhập thất bại";
-        if (msg.toLowerCase().includes("email")) {
+        const msg = data?.message || 'Đăng nhập thất bại';
+        if (msg.toLowerCase().includes('email')) {
           setEmailError(msg);
-        } else if (
-          msg.toLowerCase().includes("mật khẩu") ||
-          msg.toLowerCase().includes("password")
-        ) {
+        } else if (msg.toLowerCase().includes('mật khẩu') || msg.toLowerCase().includes('password')) {
           setPasswordError(msg);
         }
         setSubmitError(msg);
       }
     } catch (err: any) {
-      const msg = String(err?.message || "Đăng nhập thất bại");
-      if (msg.toLowerCase().includes("email")) {
+      const msg = String(err?.message || 'Đăng nhập thất bại');
+      if (msg.toLowerCase().includes('email')) {
         setEmailError(msg);
-      } else if (
-        msg.toLowerCase().includes("mật khẩu") ||
-        msg.toLowerCase().includes("password")
-      )
-        setSubmitError(msg);
+      } else if (msg.toLowerCase().includes('mật khẩu') || msg.toLowerCase().includes('password')) setSubmitError(msg);
       toast.error(msg);
     } finally {
       setIsLoading(false);
@@ -162,7 +144,7 @@ export function LoginDialog({
         </DialogHeader>
 
         <form
-          key={isOpen ? "login-dialog-active" : "login-dialog-inactive"}
+          key={isOpen ? 'login-dialog-active' : 'login-dialog-inactive'}
           className="space-y-4"
           onSubmit={handleSubmit}
         >
@@ -175,30 +157,27 @@ export function LoginDialog({
             <Input
               type="email"
               className={cn(
-                "bg-white/10 border-white/20 text-white placeholder:text-gray-400 focus-visible:ring-cyan-400 focus-visible:ring-offset-1 rounded-lg",
-                emailError && "border-yellow-500 focus-visible:ring-yellow-500",
+                'bg-white/10 border-white/20 text-white placeholder:text-gray-400 focus-visible:ring-cyan-400 focus-visible:ring-offset-1 rounded-lg',
+                emailError && 'border-yellow-500 focus-visible:ring-yellow-500'
               )}
               value={email}
               onChange={(e) => {
                 const val = e.target.value;
                 setEmail(val);
                 const ok = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(val);
-                if (ok) setEmailError("");
-                else if (val.length > 0)
-                  setEmailError("Vui lòng nhập email hợp lệ");
-                if (submitError) setSubmitError("");
+                if (ok) setEmailError('');
+                else if (val.length > 0) setEmailError('Vui lòng nhập email hợp lệ');
+                if (submitError) setSubmitError('');
               }}
               maxLength={50}
-              autoComplete={isEmailFocused ? "email" : "new-password"}
+              autoComplete={isEmailFocused ? 'email' : 'new-password'}
               onFocus={() => setIsEmailFocused(true)}
               readOnly={!isEmailFocused}
               disabled={isLoading}
               required
             />
             {emailError && (
-              <div className="mt-1 rounded-md bg-yellow-500/10 px-3 py-2 text-xs text-yellow-300">
-                {emailError}
-              </div>
+              <div className="mt-1 rounded-md bg-yellow-500/10 px-3 py-2 text-xs text-yellow-300">{emailError}</div>
             )}
           </div>
 
@@ -207,24 +186,22 @@ export function LoginDialog({
             <label className="text-sm text-gray-300 mb-1 block">Mật khẩu</label>
             <div className="relative">
               <Input
-                type={showPassword ? "text" : "password"}
+                type={showPassword ? 'text' : 'password'}
                 className={cn(
-                  "bg-white/10 border-white/20 text-white placeholder:text-gray-400 focus-visible:ring-cyan-400 focus-visible:ring-offset-1 rounded-lg pr-10",
-                  passwordError &&
-                  "border-yellow-500 focus-visible:ring-yellow-500",
+                  'bg-white/10 border-white/20 text-white placeholder:text-gray-400 focus-visible:ring-cyan-400 focus-visible:ring-offset-1 rounded-lg pr-10',
+                  passwordError && 'border-yellow-500 focus-visible:ring-yellow-500'
                 )}
                 value={password}
                 onChange={(e) => {
                   const val = e.target.value;
                   setPassword(val);
                   const ok = PASSWORD_PATTERN.test(val);
-                  if (ok) setPasswordError("");
-                  else if (val.length > 0)
-                    setPasswordError("Mật khẩu ít nhất 6 ký tự gồm chữ và số");
-                  if (submitError) setSubmitError("");
+                  if (ok) setPasswordError('');
+                  else if (val.length > 0) setPasswordError('Mật khẩu ít nhất 6 ký tự gồm chữ và số');
+                  if (submitError) setSubmitError('');
                 }}
                 maxLength={50}
-                autoComplete={isPasswordFocused ? "current-password" : "new-password"}
+                autoComplete={isPasswordFocused ? 'current-password' : 'new-password'}
                 onFocus={() => setIsPasswordFocused(true)}
                 readOnly={!isPasswordFocused}
                 disabled={isLoading}
@@ -234,19 +211,13 @@ export function LoginDialog({
                 type="button"
                 className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-white"
                 onClick={() => setShowPassword((v) => !v)}
-                aria-label={showPassword ? "Ẩn mật khẩu" : "Hiển thị mật khẩu"}
+                aria-label={showPassword ? 'Ẩn mật khẩu' : 'Hiển thị mật khẩu'}
               >
-                {showPassword ? (
-                  <EyeOff className="w-4 h-4" />
-                ) : (
-                  <Eye className="w-4 h-4" />
-                )}
+                {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
               </button>
             </div>
             {passwordError && (
-              <div className="mt-1 rounded-md bg-yellow-500/10 px-3 py-2 text-xs text-yellow-300">
-                {passwordError}
-              </div>
+              <div className="mt-1 rounded-md bg-yellow-500/10 px-3 py-2 text-xs text-yellow-300">{passwordError}</div>
             )}
           </div>
 
@@ -262,7 +233,7 @@ export function LoginDialog({
                 Đang đăng nhập...
               </span>
             ) : (
-              "ĐĂNG NHẬP"
+              'ĐĂNG NHẬP'
             )}
           </Button>
 

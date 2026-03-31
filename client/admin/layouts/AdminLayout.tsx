@@ -1,107 +1,104 @@
-import React from "react";
-import { Button } from "@/components/ui/button";
-import { useNavigate } from "react-router-dom";
-import iconCine from "@/assets/images/iconCine.svg";
+import React from 'react';
+import { Button } from '@/components/ui/button';
+import { useNavigate } from 'react-router-dom';
+import iconCine from '@/assets/images/iconCine.svg';
 import {
   LayoutDashboard,
   Users as UsersIcon,
   Clapperboard,
   Package,
+  FileText,
   Ticket as TicketIcon,
   CreditCard,
   ScanLine,
   LogOut,
   Settings,
-  Mail,
-} from "lucide-react";
-import { buildUrl } from "@/lib/api/http";
+  Mail
+} from 'lucide-react';
+import { buildUrl } from '@/lib/api/http';
 
 interface Props {
   active:
-  | "dashboard"
-  | "users"
-  | "movies"
-  | "toys"
-  | "transactions"
-  | "tickets"
-  | "ticket-check"
-  | "uploads"
-  | "email-logs"
-  | "settings";
-  setActive: (x: Props["active"]) => void;
+    | 'dashboard'
+    | 'users'
+    | 'movies'
+    | 'toys'
+    | 'posts'
+    | 'transactions'
+    | 'tickets'
+    | 'ticket-check'
+    | 'uploads'
+    | 'email-logs'
+    | 'settings';
+  setActive: (x: Props['active']) => void;
   adminEmailState: string;
   handleLogout: () => void;
   children: React.ReactNode;
 }
 
-export default function AdminLayout({
-  active,
-  setActive,
-  adminEmailState,
-  handleLogout,
-  children,
-}: Props) {
+export default function AdminLayout({ active, setActive, adminEmailState, handleLogout, children }: Props) {
   const navigate = useNavigate();
-  function go(tab: Props["active"]) {
+  function go(tab: Props['active']) {
     setActive(tab);
-    if (tab === "ticket-check") {
-      navigate("/admin/ticket-check");
+    if (tab === 'ticket-check') {
+      navigate('/admin/ticket-check');
     } else {
-      navigate(`/admin/${tab === "dashboard" ? "dashboard" : tab}`);
+      navigate(`/admin/${tab === 'dashboard' ? 'dashboard' : tab}`);
     }
   }
   const itemClass = (isActive: boolean) =>
-    `w-full justify-start gap-2 rounded-md ${isActive ? "bg-white/10 text-white" : "text-white/90"} hover:bg-white/10`;
+    `w-full justify-start gap-2 rounded-md ${isActive ? 'bg-white/10 text-white' : 'text-white/90'} hover:bg-white/10`;
 
   const [hiddenTabs, setHiddenTabs] = React.useState<string[]>(() => {
-    const stored = localStorage.getItem("admin_sidebar_hidden_tabs");
+    const stored = localStorage.getItem('admin_sidebar_hidden_tabs');
     return stored ? JSON.parse(stored) : [];
   });
 
   // Listen for storage changes to update sidebar visibility in real-time if needed
   React.useEffect(() => {
     const handleStorageChange = () => {
-      const stored = localStorage.getItem("admin_sidebar_hidden_tabs");
+      const stored = localStorage.getItem('admin_sidebar_hidden_tabs');
       setHiddenTabs(stored ? JSON.parse(stored) : []);
     };
-    window.addEventListener("storage", handleStorageChange);
+    window.addEventListener('storage', handleStorageChange);
     // Custom event for same-window updates
-    window.addEventListener("admin_sidebar_update", handleStorageChange);
+    window.addEventListener('admin_sidebar_update', handleStorageChange);
 
     // Initial sync from server if in production
-    const isProd = window.location.hostname !== "localhost";
+    const isProd = window.location.hostname !== 'localhost';
     if (isProd) {
-      fetch(buildUrl("/api/admin/settings"))
-        .then(res => res.json())
-        .then(data => {
+      fetch(buildUrl('/api/admin/settings'))
+        .then((res) => res.json())
+        .then((data) => {
           if (data && data.settings) {
             const settingsStr = JSON.stringify(data.settings);
-            if (localStorage.getItem("admin_sidebar_hidden_tabs") !== settingsStr) {
-              localStorage.setItem("admin_sidebar_hidden_tabs", settingsStr);
+            if (localStorage.getItem('admin_sidebar_hidden_tabs') !== settingsStr) {
+              localStorage.setItem('admin_sidebar_hidden_tabs', settingsStr);
               setHiddenTabs(data.settings);
             }
           }
         })
-        .catch(err => console.error("Failed to sync settings from server:", err));
+        .catch((err) => console.error('Failed to sync settings from server:', err));
     }
 
     return () => {
-      window.removeEventListener("storage", handleStorageChange);
-      window.removeEventListener("admin_sidebar_update", handleStorageChange);
+      window.removeEventListener('storage', handleStorageChange);
+      window.removeEventListener('admin_sidebar_update', handleStorageChange);
     };
   }, []);
 
   const menu = [
-    { key: "dashboard" as const, label: "Bảng điều khiển", icon: <LayoutDashboard className="h-4 w-4" /> },
-    { key: "users" as const, label: "Người dùng", icon: <UsersIcon className="h-4 w-4" /> },
-    { key: "movies" as const, label: "Phim", icon: <Clapperboard className="h-4 w-4" /> },
-    { key: "toys" as const, label: "Đồ chơi", icon: <Package className="h-4 w-4" /> },
-    { key: "tickets" as const, label: "Gói vé", icon: <TicketIcon className="h-4 w-4" /> },
-    { key: "transactions" as const, label: "Giao dịch", icon: <CreditCard className="h-4 w-4" /> },
-    { key: "ticket-check" as const, label: "Kiểm Tra Vé", icon: <ScanLine className="h-4 w-4" /> },
-    { key: "uploads" as const, label: "Uploads", icon: <Clapperboard className="h-4 w-4" /> },
-    { key: "email-logs" as const, label: "Email Logs", icon: <Mail className="h-4 w-4" /> },
-  ].filter(item => !hiddenTabs.includes(item.key));
+    { key: 'dashboard' as const, label: 'Bảng điều khiển', icon: <LayoutDashboard className="h-4 w-4" /> },
+    { key: 'users' as const, label: 'Người dùng', icon: <UsersIcon className="h-4 w-4" /> },
+    { key: 'movies' as const, label: 'Phim', icon: <Clapperboard className="h-4 w-4" /> },
+    { key: 'toys' as const, label: 'Đồ chơi', icon: <Package className="h-4 w-4" /> },
+    { key: 'posts' as const, label: 'Bài viết', icon: <FileText className="h-4 w-4" /> },
+    { key: 'tickets' as const, label: 'Gói vé', icon: <TicketIcon className="h-4 w-4" /> },
+    { key: 'transactions' as const, label: 'Giao dịch', icon: <CreditCard className="h-4 w-4" /> },
+    { key: 'ticket-check' as const, label: 'Kiểm Tra Vé', icon: <ScanLine className="h-4 w-4" /> },
+    { key: 'uploads' as const, label: 'Uploads', icon: <Clapperboard className="h-4 w-4" /> },
+    { key: 'email-logs' as const, label: 'Email Logs', icon: <Mail className="h-4 w-4" /> }
+  ].filter((item) => !hiddenTabs.includes(item.key));
 
   return (
     <div className="min-h-screen grid grid-cols-[260px_1fr]">
@@ -111,7 +108,9 @@ export default function AdminLayout({
             <img src={iconCine} alt="CINESPHERE" className="h-10 w-auto" />
             <div className="font-bold tracking-widest text-sm">CINESPHERE ADMIN</div>
           </div>
-          <div className="text-[10px] font-bold uppercase tracking-widest text-white/40 mb-6 px-1">{adminEmailState}</div>
+          <div className="text-[10px] font-bold uppercase tracking-widest text-white/40 mb-6 px-1">
+            {adminEmailState}
+          </div>
 
           <div className="space-y-1">
             {menu.map((item) => (
@@ -128,11 +127,7 @@ export default function AdminLayout({
         </div>
 
         <div className="space-y-2 mt-auto pt-8 border-t border-white/5">
-          <Button
-            variant="ghost"
-            onClick={() => go("settings")}
-            className={itemClass(active === "settings")}
-          >
+          <Button variant="ghost" onClick={() => go('settings')} className={itemClass(active === 'settings')}>
             <Settings className="h-4 w-4" /> Cấu hình
           </Button>
           <Button
@@ -148,4 +143,3 @@ export default function AdminLayout({
     </div>
   );
 }
-

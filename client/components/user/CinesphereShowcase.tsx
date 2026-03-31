@@ -1,54 +1,52 @@
-import { motion } from "framer-motion";
-import { Film, Sparkles, Smartphone, FastForward } from "lucide-react";
+import { motion } from 'framer-motion';
+import { Film, Sparkles, Smartphone, FastForward } from 'lucide-react';
 
 const highlights = [
   {
     icon: Sparkles,
-    title: "Đắm chìm 360° không giới hạn",
+    title: 'Đắm chìm 360° không giới hạn',
     description:
-      "Màn hình bao quanh, ánh sáng và chiều sâu tái hiện vũ trụ, đại dương, thành phố tương lai ngay trước mắt.",
+      'Màn hình bao quanh, ánh sáng và chiều sâu tái hiện vũ trụ, đại dương, thành phố tương lai ngay trước mắt.'
   },
   {
     icon: Film,
-    title: "Siêu định dạng 8K + 8K",
-    description:
-      "Khung hình siêu phân giải nổi khối, màu sắc chuẩn điện ảnh – hoàn toàn không cần đeo kính hỗ trợ.",
+    title: 'Siêu định dạng 8K + 8K',
+    description: 'Khung hình siêu phân giải nổi khối, màu sắc chuẩn điện ảnh – hoàn toàn không cần đeo kính hỗ trợ.'
   },
   {
     icon: FastForward,
-    title: "Xuyên không trong chớp mắt",
+    title: 'Xuyên không trong chớp mắt',
     description:
-      "Chạm nhẹ để đổi bối cảnh tức thì, mượt mà từ rừng nguyên sinh sang dải ngân hà với cảm giác chân thực.",
+      'Chạm nhẹ để đổi bối cảnh tức thì, mượt mà từ rừng nguyên sinh sang dải ngân hà với cảm giác chân thực.'
   },
   {
     icon: Smartphone,
-    title: "Thánh địa check-in nghệ thuật",
-    description:
-      "Mỗi góc đều là khung phim điện ảnh, sẵn sàng cho vlog, TikTok triệu view và bộ ảnh ảo diệu của bạn.",
-  },
+    title: 'Thánh địa check-in nghệ thuật',
+    description: 'Mỗi góc đều là khung phim điện ảnh, sẵn sàng cho vlog, TikTok triệu view và bộ ảnh ảo diệu của bạn.'
+  }
 ];
 
 const gallery = [
   {
-    src: "https://images.unsplash.com/photo-1521737604893-d14cc237f11d?auto=format&fit=crop&w=1600&q=80",
-    title: "Không gian sci-fi CineSphere",
-    description: "Hành lang ánh sáng và màn hình tương tác đa chiều.",
+    src: 'https://images.unsplash.com/photo-1521737604893-d14cc237f11d?auto=format&fit=crop&w=1600&q=80',
+    title: 'Không gian sci-fi CineSphere',
+    description: 'Hành lang ánh sáng và màn hình tương tác đa chiều.'
   },
   {
-    src: "https://images.unsplash.com/photo-1505685296765-3a2736de412f?auto=format&fit=crop&w=1600&q=80",
-    title: "Khán giả giữa đại dương ánh sáng",
-    description: "Đắm chìm trong bối cảnh biển sâu và sinh vật ảo diệu.",
+    src: 'https://images.unsplash.com/photo-1505685296765-3a2736de412f?auto=format&fit=crop&w=1600&q=80',
+    title: 'Khán giả giữa đại dương ánh sáng',
+    description: 'Đắm chìm trong bối cảnh biển sâu và sinh vật ảo diệu.'
   },
   {
-    src: "https://images.unsplash.com/photo-1489515217757-5fd1be406fef?auto=format&fit=crop&w=1600&q=80",
-    title: "Khủng long sát cạnh",
-    description: "Cảnh rừng nguyên sinh, quy mô lớn như chạm tay tới.",
+    src: 'https://images.unsplash.com/photo-1489515217757-5fd1be406fef?auto=format&fit=crop&w=1600&q=80',
+    title: 'Khủng long sát cạnh',
+    description: 'Cảnh rừng nguyên sinh, quy mô lớn như chạm tay tới.'
   },
   {
-    src: "https://images.unsplash.com/photo-1509228627152-72ae9ae6848d?auto=format&fit=crop&w=1600&q=80",
-    title: "Phòng chiếu toàn cảnh",
-    description: "Khán giả ngồi giữa khung hình 8K bao phủ trọn không gian.",
-  },
+    src: 'https://images.unsplash.com/photo-1509228627152-72ae9ae6848d?auto=format&fit=crop&w=1600&q=80',
+    title: 'Phòng chiếu toàn cảnh',
+    description: 'Khán giả ngồi giữa khung hình 8K bao phủ trọn không gian.'
+  }
 ];
 
 export default function CinesphereShowcase() {
@@ -70,16 +68,13 @@ export default function CinesphereShowcase() {
             transition={{ duration: 0.4 }}
             className="space-y-4 md:space-y-5"
           >
-            <p className="text-xs sm:text-sm uppercase tracking-[0.28em] text-cyan-200">
-              CineSphere Experience
-            </p>
+            <p className="text-xs sm:text-sm uppercase tracking-[0.28em] text-cyan-200">CineSphere Experience</p>
             <h2 className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-extrabold bg-gradient-to-r from-cyan-300 via-blue-400 to-fuchsia-400 bg-clip-text text-transparent leading-tight">
               Chạm tới Vô Cực cùng Vũ Trụ Đa Chiều 8K
             </h2>
             <p className="text-base sm:text-lg text-gray-200 leading-relaxed">
-              Bước vào Huyễn Cảnh Không Gian, bạn đứng giữa những khung hình sống
-              động: đại dương phát sáng, rừng khủng long, hành lang tàu điện ngầm hay
-              thành phố tương lai. Đây không chỉ là phòng chiếu, mà là “cánh cửa đa
+              Bước vào Huyễn Cảnh Không Gian, bạn đứng giữa những khung hình sống động: đại dương phát sáng, rừng khủng
+              long, hành lang tàu điện ngầm hay thành phố tương lai. Đây không chỉ là phòng chiếu, mà là “cánh cửa đa
               chiều” mở ra thế giới mà mắt thường chưa từng thấy.
             </p>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
@@ -100,9 +95,7 @@ export default function CinesphereShowcase() {
                       </div>
                       <p className="text-white font-semibold text-sm sm:text-base">{item.title}</p>
                     </div>
-                    <p className="text-xs sm:text-sm text-gray-300 leading-relaxed">
-                      {item.description}
-                    </p>
+                    <p className="text-xs sm:text-sm text-gray-300 leading-relaxed">{item.description}</p>
                   </motion.div>
                 );
               })}
@@ -144,4 +137,3 @@ export default function CinesphereShowcase() {
     </section>
   );
 }
-

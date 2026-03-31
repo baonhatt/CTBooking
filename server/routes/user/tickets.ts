@@ -1,9 +1,9 @@
-import { eq, asc, inArray } from "drizzle-orm";
+import { eq, asc, inArray } from 'drizzle-orm';
 
-export async function listActiveTicketPackages(anyDb: any, tables: { ticket_packages: any, movies: any }) {
+export async function listActiveTicketPackages(anyDb: any, tables: { ticket_packages: any; movies: any }) {
   const items = await anyDb.query.ticket_packages.findMany({
     where: eq(tables.ticket_packages.is_active, true),
-    orderBy: [asc(tables.ticket_packages.display_order), asc(tables.ticket_packages.price)],
+    orderBy: [asc(tables.ticket_packages.display_order), asc(tables.ticket_packages.price)]
   });
 
   const allMovieIds = new Set<number>();
@@ -15,11 +15,11 @@ export async function listActiveTicketPackages(anyDb: any, tables: { ticket_pack
       try {
         // Nếu DB trả về string thì parse, nếu đã là object/array thì dùng luôn
         const parsed = typeof pkg.combo === 'string' ? JSON.parse(pkg.combo) : pkg.combo;
-        
+
         if (Array.isArray(parsed)) {
           // Vì dữ liệu thực tế là [3, 5, 6, 1], ta đưa về Number để đồng bộ
-          comboIds = parsed.map((id: any) => Number(id)).filter(id => !isNaN(id));
-          comboIds.forEach(id => allMovieIds.add(id));
+          comboIds = parsed.map((id: any) => Number(id)).filter((id) => !isNaN(id));
+          comboIds.forEach((id) => allMovieIds.add(id));
         }
       } catch (e) {
         console.error('Lỗi parse combo cho package', pkg.id, e);
@@ -48,9 +48,7 @@ export async function listActiveTicketPackages(anyDb: any, tables: { ticket_pack
   // BƯỚC 3: Map thông tin phim vào từng package
   const processedItems = parsedItems.map((pkg: any) => {
     // Duyệt qua mảng ID trong combo để lấy object movie tương ứng từ Map
-    const movieDetails = pkg.combo
-      .map((id: number) => moviesMap.get(id))
-      .filter(Boolean); // Loại bỏ các giá trị undefined nếu không tìm thấy phim trong DB
+    const movieDetails = pkg.combo.map((id: number) => moviesMap.get(id)).filter(Boolean); // Loại bỏ các giá trị undefined nếu không tìm thấy phim trong DB
 
     return {
       ...pkg,
@@ -60,4 +58,3 @@ export async function listActiveTicketPackages(anyDb: any, tables: { ticket_pack
 
   return { items: processedItems };
 }
-

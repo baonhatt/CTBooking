@@ -1,15 +1,8 @@
-import { Button } from "@/components/ui/button";
-import { Menu, X } from "lucide-react";
-import { cn } from "@/lib/utils";
-import {
-  Sheet,
-  SheetContent,
-  SheetTrigger,
-  SheetClose,
-  SheetTitle,
-  SheetDescription,
-} from "@/components/ui/sheet";
-import icon from "@/assets/images/icon.svg";
+import { Button } from '@/components/ui/button';
+import { Menu, X } from 'lucide-react';
+import { cn } from '@/lib/utils';
+import { Sheet, SheetContent, SheetTrigger, SheetClose, SheetTitle, SheetDescription } from '@/components/ui/sheet';
+import icon from '@/assets/images/icon.svg';
 
 interface MobileMenuProps {
   navItems: Array<{ label: string; target: string }>;
@@ -30,7 +23,7 @@ export function MobileMenu({
   onNavigate,
   onLogout,
   onLogin,
-  onRegister,
+  onRegister
 }: MobileMenuProps) {
   return (
     <Sheet>
@@ -45,13 +38,11 @@ export function MobileMenu({
         className="w-full h-[100dvh] bg-[#050915] border-none text-white p-0 [&>button]:hidden z-[60]"
       >
         <SheetTitle className="sr-only">Menu di động</SheetTitle>
-        <SheetDescription className="sr-only">
-          Điều hướng nhanh các mục trong Cinesphere
-        </SheetDescription>
+        <SheetDescription className="sr-only">Điều hướng nhanh các mục trong Cinesphere</SheetDescription>
         <div className="flex flex-col h-full p-6 sm:p-8">
           {/* Header panel */}
           <div className="flex items-center justify-between mb-6">
-            <div className="flex items-center gap-3" onClick={() => onNavigate("/")}>
+            <div className="flex items-center gap-3" onClick={() => onNavigate('/')}>
               <img
                 src={icon}
                 alt="CINESPHERE"
@@ -71,10 +62,8 @@ export function MobileMenu({
               <SheetClose key={item.target} asChild>
                 <button
                   className={cn(
-                    "text-left font-medium text-lg tracking-wide transition-colors duration-300 py-3 border-b border-white/5",
-                    effectiveDisable
-                      ? "opacity-50 cursor-not-allowed text-gray-400"
-                      : "text-white hover:text-cyan-300"
+                    'text-left font-medium text-lg tracking-wide transition-colors duration-300 py-3 border-b border-white/5',
+                    effectiveDisable ? 'opacity-50 cursor-not-allowed text-gray-400' : 'text-white hover:text-cyan-300'
                   )}
                   disabled={effectiveDisable}
                   onClick={() => {
@@ -92,7 +81,7 @@ export function MobileMenu({
               <SheetClose asChild>
                 <button
                   className="text-left font-medium text-lg tracking-wide transition-colors duration-300 py-3 border-b border-white/5 text-white hover:text-cyan-300"
-                  onClick={() => onNavigate("/account")}
+                  onClick={() => onNavigate('/account')}
                 >
                   Tài khoản ({userName})
                 </button>

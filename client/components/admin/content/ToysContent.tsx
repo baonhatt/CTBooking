@@ -1,25 +1,18 @@
-import React from "react";
-import { Card, CardContent } from "@/components/ui/card";
-import {
-  Table,
-  TableHeader,
-  TableRow,
-  TableHead,
-  TableBody,
-  TableCell,
-} from "@/components/ui/table";
-import { Button } from "@/components/ui/button";
-import { Skeleton } from "@/components/ui/skeleton";
-import { Switch } from "@/components/ui/switch";
-import { Search, RefreshCw, Edit3, Trash2, Plus, Package } from "lucide-react";
+import React from 'react';
+import { Card, CardContent } from '@/components/ui/card';
+import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from '@/components/ui/table';
+import { Button } from '@/components/ui/button';
+import { Skeleton } from '@/components/ui/skeleton';
+import { Switch } from '@/components/ui/switch';
+import { Search, RefreshCw, Edit3, Trash2, Plus, Package } from 'lucide-react';
 import {
   Pagination,
   PaginationContent,
   PaginationItem,
   PaginationLink,
   PaginationNext,
-  PaginationPrevious,
-} from "@/components/ui/pagination";
+  PaginationPrevious
+} from '@/components/ui/pagination';
 
 interface ToyData {
   id: number;
@@ -35,7 +28,7 @@ interface Props {
   totalPages: number;
   currentPage: number;
   setPage: React.Dispatch<React.SetStateAction<number>>;
-  onEdit: (type: "toy", data: any) => void;
+  onEdit: (type: 'toy', data: any) => void;
   onCreate: () => void;
   toysLength: number;
   deleteToyApi: (id: number) => Promise<any>;
@@ -59,28 +52,26 @@ export default function ToysContent({
   deleteToyApi,
   setToys,
   onRefresh,
-  searchQuery = "",
-  onSearchChange = () => { },
+  searchQuery = '',
+  onSearchChange = () => {},
   isLoading = false,
   showActiveOnly = false,
-  setShowActiveOnly = () => { },
+  setShowActiveOnly = () => {}
 }: Props) {
   const handleDelete = async (id: number) => {
     try {
       // Soft delete: update status to inactive instead of deleting
       const response = await fetch(`/api/toys/${id}`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ status: "inactive" }),
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: 'inactive' })
       });
-      if (!response.ok) throw new Error("Failed to update toy status");
+      if (!response.ok) throw new Error('Failed to update toy status');
 
       // Update local state
-      setToys((prev) => prev.map((toy) =>
-        toy.id === id ? { ...toy, status: "inactive" } : toy
-      ));
+      setToys((prev) => prev.map((toy) => (toy.id === id ? { ...toy, status: 'inactive' } : toy)));
     } catch (e: any) {
-      alert(e?.message || "Lỗi cập nhật trạng thái đồ chơi");
+      alert(e?.message || 'Lỗi cập nhật trạng thái đồ chơi');
     }
   };
   return (
@@ -118,7 +109,7 @@ export default function ToysContent({
               onClick={onRefresh}
               className="rounded-xl shadow-sm hover:rotate-180 transition-transform duration-500 shrink-0 h-10 w-10 flex items-center justify-center bg-white border-slate-200"
             >
-              <RefreshCw className={`w-4 h-4 ${isLoading ? "animate-spin" : ""}`} />
+              <RefreshCw className={`w-4 h-4 ${isLoading ? 'animate-spin' : ''}`} />
             </Button>
             <Button
               onClick={onCreate}
@@ -141,29 +132,44 @@ export default function ToysContent({
                 <TableHead className="text-[10px] uppercase font-bold text-slate-500 text-center">Đơn giá</TableHead>
                 <TableHead className="text-[10px] uppercase font-bold text-slate-500 text-center">Tồn kho</TableHead>
                 <TableHead className="text-[10px] uppercase font-bold text-slate-500 text-center">Trạng Thái</TableHead>
-                <TableHead className="text-right text-[10px] uppercase font-bold text-slate-500 pr-6">Thao tác</TableHead>
+                <TableHead className="text-right text-[10px] uppercase font-bold text-slate-500 pr-6">
+                  Thao tác
+                </TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {isLoading ? (
                 Array.from({ length: 5 }).map((_, idx) => (
                   <TableRow key={`sk-${idx}`}>
-                    <TableCell><Skeleton className="h-4 w-8 mx-auto" /></TableCell>
-                    <TableCell><Skeleton className="h-10 w-10 rounded-lg" /></TableCell>
-                    <TableCell><Skeleton className="h-4 w-32" /></TableCell>
-                    <TableCell><Skeleton className="h-4 w-24" /></TableCell>
-                    <TableCell><Skeleton className="h-4 w-16 mx-auto" /></TableCell>
-                    <TableCell><Skeleton className="h-4 w-16 mx-auto" /></TableCell>
-                    <TableCell><Skeleton className="h-5 w-20 mx-auto" /></TableCell>
-                    <TableCell className="text-right"><Skeleton className="h-8 w-24 ml-auto" /></TableCell>
+                    <TableCell>
+                      <Skeleton className="h-4 w-8 mx-auto" />
+                    </TableCell>
+                    <TableCell>
+                      <Skeleton className="h-10 w-10 rounded-lg" />
+                    </TableCell>
+                    <TableCell>
+                      <Skeleton className="h-4 w-32" />
+                    </TableCell>
+                    <TableCell>
+                      <Skeleton className="h-4 w-24" />
+                    </TableCell>
+                    <TableCell>
+                      <Skeleton className="h-4 w-16 mx-auto" />
+                    </TableCell>
+                    <TableCell>
+                      <Skeleton className="h-4 w-16 mx-auto" />
+                    </TableCell>
+                    <TableCell>
+                      <Skeleton className="h-5 w-20 mx-auto" />
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <Skeleton className="h-8 w-24 ml-auto" />
+                    </TableCell>
                   </TableRow>
                 ))
               ) : data.length === 0 ? (
                 <TableRow>
-                  <TableCell
-                    colSpan={8}
-                    className="text-center h-32 text-muted-foreground italic"
-                  >
+                  <TableCell colSpan={8} className="text-center h-32 text-muted-foreground italic">
                     <div className="flex flex-col items-center gap-2">
                       <Package size={32} className="opacity-20" />
                       <span>Không có đồ chơi nào trong kho</span>
@@ -173,9 +179,7 @@ export default function ToysContent({
               ) : (
                 data.map((x) => (
                   <TableRow key={x.id} className="hover:bg-slate-50/50 transition-colors">
-                    <TableCell className="text-center font-mono text-xs text-slate-500">
-                      #{x.id}
-                    </TableCell>
+                    <TableCell className="text-center font-mono text-xs text-slate-500">#{x.id}</TableCell>
                     <TableCell>
                       <div className="w-10 h-10 rounded-lg bg-slate-100 border border-slate-200 overflow-hidden flex items-center justify-center">
                         {x.image_url ? (
@@ -196,15 +200,15 @@ export default function ToysContent({
                       )}
                     </TableCell>
                     <TableCell className="text-center font-bold text-blue-600">
-                      {x.price.toLocaleString("vi-VN")}đ
+                      {x.price.toLocaleString('vi-VN')}đ
                     </TableCell>
                     <TableCell className="text-center">
-                      <span className={`font-bold ${x.stock === 0 ? "text-red-500" : "text-slate-700"}`}>
+                      <span className={`font-bold ${x.stock === 0 ? 'text-red-500' : 'text-slate-700'}`}>
                         {x.stock}
                       </span>
                     </TableCell>
                     <TableCell className="text-center">
-                      {x.status === "active" ? (
+                      {x.status === 'active' ? (
                         <span className="inline-flex items-center gap-1 bg-emerald-100 text-emerald-700 border border-emerald-200 px-2 py-0.5 rounded-full text-[10px] font-bold uppercase">
                           <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
                           Hoạt động
@@ -219,7 +223,7 @@ export default function ToysContent({
                       <Button
                         variant="ghost"
                         size="icon"
-                        onClick={() => onEdit("toy", x)}
+                        onClick={() => onEdit('toy', x)}
                         className="h-8 w-8 text-blue-600 hover:text-blue-700 hover:bg-blue-50 rounded-lg transition-colors"
                         title="Chỉnh sửa"
                       >
@@ -252,9 +256,7 @@ export default function ToysContent({
                 setPage(Math.max(1, currentPage - 1));
               }}
               aria-disabled={currentPage === 1}
-              className={
-                currentPage === 1 ? "pointer-events-none opacity-50" : ""
-              }
+              className={currentPage === 1 ? 'pointer-events-none opacity-50' : ''}
             />
           </PaginationItem>
           {Array.from({ length: totalPages }).map((_, i) => (
@@ -279,11 +281,7 @@ export default function ToysContent({
                 setPage(Math.min(totalPages, currentPage + 1));
               }}
               aria-disabled={currentPage === totalPages}
-              className={
-                currentPage === totalPages
-                  ? "pointer-events-none opacity-50"
-                  : ""
-              }
+              className={currentPage === totalPages ? 'pointer-events-none opacity-50' : ''}
             />
           </PaginationItem>
         </PaginationContent>

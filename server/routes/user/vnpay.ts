@@ -1,21 +1,15 @@
 // import crypto from "crypto";
-import { formatDateForDb } from "../../../server/lib/date-utils"
+import { formatDateForDb } from '../../../server/lib/date-utils';
 
 async function hmacSHA512(key: string, data: string) {
-    const encoder = new TextEncoder();
-    const keyData = encoder.encode(key);
-    const msgData = encoder.encode(data);
-    const cryptoKey = await crypto.subtle.importKey(
-        "raw",
-        keyData,
-        { name: "HMAC", hash: "SHA-512" },
-        false,
-        ["sign"]
-    );
-    const signature = await crypto.subtle.sign("HMAC", cryptoKey, msgData);
-    return Array.from(new Uint8Array(signature))
-        .map(b => b.toString(16).padStart(2, "0"))
-        .join("");
+  const encoder = new TextEncoder();
+  const keyData = encoder.encode(key);
+  const msgData = encoder.encode(data);
+  const cryptoKey = await crypto.subtle.importKey('raw', keyData, { name: 'HMAC', hash: 'SHA-512' }, false, ['sign']);
+  const signature = await crypto.subtle.sign('HMAC', cryptoKey, msgData);
+  return Array.from(new Uint8Array(signature))
+    .map((b) => b.toString(16).padStart(2, '0'))
+    .join('');
 }
 
 function sortObject(obj: Record<string, any>) {
@@ -37,42 +31,55 @@ function formatVnpayDate(date: Date): string {
   );
 }
 
-const VNP_TMNCODE = process.env.VITE_VNPAY_TMN_CODE || "";
-const VNP_HASH_SECRET = process.env.VITE_VNPAY_HASH_SECRET || "";
-const VNP_GATEWAY = process.env.VITE_VNPAY_GATEWAY || "";
-const VNP_RETURN_URL = "";
+const VNP_TMNCODE = process.env.VITE_VNPAY_TMN_CODE || '';
+const VNP_HASH_SECRET = process.env.VITE_VNPAY_HASH_SECRET || '';
+const VNP_GATEWAY = process.env.VITE_VNPAY_GATEWAY || '';
+const VNP_RETURN_URL = '';
 
-export async function createVnpayPaymentImpl(payload: { amount: number; orderId: string; orderInfo: string; locale?: string; tmnCode?: string; hashSecret?: string; returnUrl?: string; ip?: string; gateway?: string }, RUNTIME_ENV?: string) {
-  const { amount, orderId, orderInfo, locale = "vn" } = payload;
+export async function createVnpayPaymentImpl(
+  payload: {
+    amount: number;
+    orderId: string;
+    orderInfo: string;
+    locale?: string;
+    tmnCode?: string;
+    hashSecret?: string;
+    returnUrl?: string;
+    ip?: string;
+    gateway?: string;
+  },
+  RUNTIME_ENV?: string
+) {
+  const { amount, orderId, orderInfo, locale = 'vn' } = payload;
   if (!amount || !orderId || !orderInfo) {
-    return { status: 400, message: "Invalid payload" };
+    return { status: 400, message: 'Invalid payload' };
   }
-  const tmnCode = payload.tmnCode || VNP_TMNCODE || "";
-  const hashSecret = payload.hashSecret || VNP_HASH_SECRET || "";
-  const returnUrl = payload.returnUrl || VNP_RETURN_URL || "";
-  const gateway = payload.gateway || VNP_GATEWAY || "";
+  const tmnCode = payload.tmnCode || VNP_TMNCODE || '';
+  const hashSecret = payload.hashSecret || VNP_HASH_SECRET || '';
+  const returnUrl = payload.returnUrl || VNP_RETURN_URL || '';
+  const gateway = payload.gateway || VNP_GATEWAY || '';
   if (!tmnCode || !hashSecret || !returnUrl || !gateway) {
-    return { status: 500, message: "VNPay configuration missing" };
+    return { status: 500, message: 'VNPay configuration missing' };
   }
   const vnp_TxnRef = orderId;
-  const vnp_Version = "2.1.0";
-  const vnp_Command = "pay";
+  const vnp_Version = '2.1.0';
+  const vnp_Command = 'pay';
   const vnp_CreateDate = new Date();
-  const vnp_IpAddr = payload.ip || "127.0.0.1";
+  const vnp_IpAddr = payload.ip || '127.0.0.1';
   const vnp_Amount = amount * 100;
   const params: Record<string, any> = {
     vnp_Version,
     vnp_Command,
     vnp_TmnCode: tmnCode,
     vnp_Locale: locale,
-    vnp_CurrCode: "VND",
+    vnp_CurrCode: 'VND',
     vnp_TxnRef,
     vnp_OrderInfo: orderInfo,
-    vnp_OrderType: "other",
+    vnp_OrderType: 'other',
     vnp_Amount,
     vnp_ReturnUrl: returnUrl,
     vnp_IpAddr,
-    vnp_CreateDate: formatVnpayDate(vnp_CreateDate),
+    vnp_CreateDate: formatVnpayDate(vnp_CreateDate)
   };
   const sorted = sortObject(params);
   const signData = new URLSearchParams(sorted).toString();
@@ -87,4 +94,3 @@ export async function createVnpayPaymentImpl(payload: { amount: number; orderId:
 export async function vnpayIpnImpl() {
   return { result: true };
 }
-

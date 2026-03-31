@@ -1,4 +1,4 @@
-import { eq, desc, and, sql, count } from "drizzle-orm";
+import { eq, desc, and, sql, count } from 'drizzle-orm';
 
 export async function getEmailLogsImpl(
   anyDb: any,
@@ -18,11 +18,11 @@ export async function getEmailLogsImpl(
 
     const whereConditions = [];
 
-    if (query.status && query.status !== "all") {
+    if (query.status && query.status !== 'all') {
       whereConditions.push(eq(tables.email_logs.status, query.status));
     }
 
-    if (query.email_type && query.email_type !== "all") {
+    if (query.email_type && query.email_type !== 'all') {
       whereConditions.push(eq(tables.email_logs.email_type, query.email_type));
     }
 
@@ -34,10 +34,7 @@ export async function getEmailLogsImpl(
     const whereClause = whereConditions.length > 0 ? and(...whereConditions) : undefined;
 
     // Get total count
-    const [totalRes] = await anyDb
-      .select({ count: count() })
-      .from(tables.email_logs)
-      .where(whereClause);
+    const [totalRes] = await anyDb.select({ count: count() }).from(tables.email_logs).where(whereClause);
 
     // Get logs joined with user or booking names if available
     const logs = await anyDb
@@ -54,7 +51,7 @@ export async function getEmailLogsImpl(
         metadata: tables.email_logs.metadata,
         sent_at: tables.email_logs.sent_at,
         created_at: tables.email_logs.created_at,
-        updated_at: tables.email_logs.updated_at,
+        updated_at: tables.email_logs.updated_at
       })
       .from(tables.email_logs)
       .where(whereClause)
@@ -69,11 +66,11 @@ export async function getEmailLogsImpl(
         total: Number(totalRes?.count || 0),
         page,
         limit,
-        totalPages: Math.ceil(Number(totalRes?.count || 0) / limit),
-      },
+        totalPages: Math.ceil(Number(totalRes?.count || 0) / limit)
+      }
     };
   } catch (err: any) {
-    console.error("[getEmailLogsImpl] Error:", err);
-    return { status: 500, message: err?.message || "Internal error" };
+    console.error('[getEmailLogsImpl] Error:', err);
+    return { status: 500, message: err?.message || 'Internal error' };
   }
 }

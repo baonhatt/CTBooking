@@ -1,4 +1,4 @@
-import { request } from "./http";
+import { request } from './http';
 
 export async function getTickets(options?: {
   page?: number;
@@ -8,11 +8,11 @@ export async function getTickets(options?: {
   signal?: AbortSignal;
 }) {
   const params = new URLSearchParams();
-  if (options?.page) params.set("page", String(options.page));
-  if (options?.pageSize) params.set("pageSize", String(options.pageSize));
-  if (options?.q) params.set("q", options.q);
-  if (options?.includeInactive) params.set("includeInactive", "true");
-  const path = `/api/tickets${params.toString() ? `?${params.toString()}` : ""}`;
+  if (options?.page) params.set('page', String(options.page));
+  if (options?.pageSize) params.set('pageSize', String(options.pageSize));
+  if (options?.q) params.set('q', options.q);
+  if (options?.includeInactive) params.set('includeInactive', 'true');
+  const path = `/api/tickets${params.toString() ? `?${params.toString()}` : ''}`;
   return request<{
     items: any[];
     page: number;
@@ -23,7 +23,7 @@ export async function getTickets(options?: {
 
 export async function getActiveTickets(options?: { signal?: AbortSignal }) {
   return request<{ items: any[] }>(`/api/tickets-active`, {
-    signal: options?.signal,
+    signal: options?.signal
   });
 }
 
@@ -46,8 +46,8 @@ export async function createTicketApi(body: {
   display_order?: number;
 }) {
   return request<{ item: any }>(`/api/tickets`, {
-    method: "POST",
-    body: JSON.stringify(body),
+    method: 'POST',
+    body: JSON.stringify(body)
   });
 }
 
@@ -66,15 +66,14 @@ export async function updateTicketApi(
     is_member_only?: boolean;
     is_active?: boolean;
     display_order?: number;
-  },
+  }
 ) {
   return request<{ item: any }>(`/api/tickets/${id}`, {
-    method: "PUT",
-    body: JSON.stringify(body),
+    method: 'PUT',
+    body: JSON.stringify(body)
   });
 }
 
 export async function deleteTicketApi(id: number) {
-  return request<{ ok: boolean }>(`/api/tickets/${id}`, { method: "DELETE" });
+  return request<{ ok: boolean }>(`/api/tickets/${id}`, { method: 'DELETE' });
 }
-

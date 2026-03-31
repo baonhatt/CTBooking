@@ -1,18 +1,18 @@
-import React, { useEffect, useMemo, useState } from "react";
-import { getToys, deleteToyApi } from "@/lib/api";
-import AdminLayout from "@/admin/layouts/AdminLayout";
-import ToysContent from "@/components/admin/content/ToysContent";
-import AdminEditModal from "@/components/admin/AdminEditModal";
+import React, { useEffect, useMemo, useState } from 'react';
+import { getToys, deleteToyApi } from '@/lib/api';
+import AdminLayout from '@/admin/layouts/AdminLayout';
+import ToysContent from '@/components/admin/content/ToysContent';
+import AdminEditModal from '@/components/admin/AdminEditModal';
 
 export default function ToysPage() {
   const [toys, setToys] = useState<any[]>([]);
   const [totalToys, setTotalToys] = useState(0);
   const [toysPage, setToysPage] = useState(1);
   const pageSize = 10;
-  const [searchQuery, setSearchQuery] = useState("");
+  const [searchQuery, setSearchQuery] = useState('');
   const [showActiveOnly, setShowActiveOnly] = useState(false);
   const [isEditOpen, setIsEditOpen] = useState(false);
-  const [editType, setEditType] = useState<"toy" | null>(null);
+  const [editType, setEditType] = useState<'toy' | null>(null);
   const [editData, setEditData] = useState<any>({});
   const [isLoading, setIsLoading] = useState(false);
 
@@ -23,7 +23,7 @@ export default function ToysPage() {
         page: toysPage,
         pageSize,
         q: searchQuery,
-        status: showActiveOnly ? "active" : "all",
+        status: showActiveOnly ? 'active' : 'all'
       });
       setToys(
         items.map((t: any) => ({
@@ -33,34 +33,31 @@ export default function ToysPage() {
           price: Number(t.price),
           stock: t.stock,
           status: t.status,
-          image_url: t.image_url,
-        })),
+          image_url: t.image_url
+        }))
       );
       setTotalToys(total);
       setIsLoading(false);
     })();
   }, [toysPage, pageSize, searchQuery, showActiveOnly]);
 
-  const toysTotalPages = useMemo(
-    () => Math.max(1, Math.ceil(totalToys / pageSize)),
-    [totalToys],
-  );
+  const toysTotalPages = useMemo(() => Math.max(1, Math.ceil(totalToys / pageSize)), [totalToys]);
 
-  const handleOpenEdit = (_type: "toy", data: any) => {
-    setEditType("toy");
+  const handleOpenEdit = (_type: 'toy', data: any) => {
+    setEditType('toy');
     setEditData(data);
     setIsEditOpen(true);
   };
   const handleOpenCreate = () => {
-    setEditType("toy");
+    setEditType('toy');
     setEditData({
       id: 0,
-      name: "",
-      category: "",
+      name: '',
+      category: '',
       price: 0,
       stock: 0,
-      status: "active",
-      image_url: "",
+      status: 'active',
+      image_url: ''
     });
     setIsEditOpen(true);
   };
@@ -71,7 +68,7 @@ export default function ToysPage() {
       page: toysPage,
       pageSize,
       q: searchQuery,
-      status: showActiveOnly ? "active" : "all"
+      status: showActiveOnly ? 'active' : 'all'
     });
     setToys(
       items.map((t: any) => ({
@@ -81,8 +78,8 @@ export default function ToysPage() {
         price: Number(t.price),
         stock: t.stock,
         status: t.status,
-        image_url: t.image_url,
-      })),
+        image_url: t.image_url
+      }))
     );
     setTotalToys(total);
     setIsLoading(false);
@@ -90,14 +87,14 @@ export default function ToysPage() {
 
   return (
     <AdminLayout
-      active={"toys" as any}
-      setActive={(() => { }) as any}
-      adminEmailState={localStorage.getItem("adminEmail") || "admin@email.com"}
+      active={'toys' as any}
+      setActive={(() => {}) as any}
+      adminEmailState={localStorage.getItem('adminEmail') || 'admin@email.com'}
       handleLogout={() => {
-        localStorage.removeItem("adminToken");
-        localStorage.removeItem("adminEmail");
-        window.dispatchEvent(new Event("admin-auth-changed"));
-        window.location.href = "/admin";
+        localStorage.removeItem('adminToken');
+        localStorage.removeItem('adminEmail');
+        window.dispatchEvent(new Event('admin-auth-changed'));
+        window.location.href = '/admin';
       }}
     >
       <ToysContent
@@ -126,13 +123,13 @@ export default function ToysPage() {
         editType={editType as any}
         editData={editData}
         setEditData={setEditData}
-        setUsers={() => { }}
+        setUsers={() => {}}
         moviesLocal={[]}
         toLocalDateTimeString={(d: Date) => d.toISOString().slice(0, 16)}
         pageSize={pageSize}
         currentPage={toysPage}
-        setMoviesLocal={() => { }}
-        setMovieStatus={() => { }}
+        setMoviesLocal={() => {}}
+        setMovieStatus={() => {}}
         setToys={setToys}
       />
     </AdminLayout>
