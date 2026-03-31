@@ -803,7 +803,7 @@ app.post("/api/admin/uploads/video", async (c) => {
 
 app.get("/api/getActiveMovies", async (c) => {
   try {
-    // Try fetching from KV first
+    /* TẠM THỜI VÔ HIỆU HÓA CACHE ĐỂ FIX LỖI KHÔNG CẬP NHẬT 
     if (c.env.KV_BINDING) {
       const cached = await c.env.KV_BINDING.get("active_movies_v2");
       if (cached) {
@@ -815,6 +815,7 @@ app.get("/api/getActiveMovies", async (c) => {
         });
       }
     }
+    */
 
     const db = drizzle(c.env.cinema_db, { schema });
     // Rate limit check using KV
@@ -854,20 +855,24 @@ app.get("/api/getActiveMovies", async (c) => {
 
     const responseBody = JSON.stringify({ activeMovies: optimized });
 
-    // Save to KV with specific TTL (e.g., 1 hour)
+    // Save to KV with specific TTL (e.g., 1 hour) - TEMPORARILY DISABLED
+    /*
     if (c.env.KV_BINDING) {
       // console.log("Putting activeMovies to KV");
       c.executionCtx.waitUntil(c.env.KV_BINDING.put("active_movies_v2", responseBody, { expirationTtl: 3600 }));
     }
+    */
 
     return new Response(responseBody, {
       status: 200,
       headers: {
         "Content-Type": "application/json",
-        "Cache-Control": "public, max-age=900, must-revalidate, s-maxage=900",
-        "Cloudflare-CDN-Cache-Control": "max-age=900",
+        "Cache-Control": "no-cache, no-store, must-revalidate, max-age=0",
+        "Cloudflare-CDN-Cache-Control": "no-cache, no-store, must-revalidate, max-age=0",
+        "Pragma": "no-cache",
+        "Expires": "0",
         Vary: "Origin",
-        "X-KV-Cache": "MISS"
+        "X-KV-Cache": "DISABLED"
       },
     });
   } catch (err: any) {
@@ -1182,44 +1187,32 @@ app.get("/api/movies/:id", async (c) => {
   }
 });
 
-// Get movie details by ID (detailed)
-// GET /api/movies-detail/:id
 app.get("/api/movies-detail/:id", async (c) => {
-  return await withCache(
-    c.req.raw,
-    c.env,
-    c.executionCtx,
-    async () => {
-      const id = Number(c.req.param("id"));
-      const db = drizzle(c.env.cinema_db, { schema });
-      const r = await getMovieByIdImpl(
-        db,
-        {
-          movies: schema.movies,
-          bookings: schema.bookings,
-          ticket_packages: schema.ticket_packages,
-        },
-        id,
-      );
-      if (!r)
-        return new Response(
-          JSON.stringify({ status: "error", message: "Không tìm thấy phim" }),
-          { status: 404, headers: { "Content-Type": "application/json" } },
-        );
-
-      return new Response(JSON.stringify(r), {
-        status: 200,
-        headers: {
-          "Content-Type": "application/json",
-          "Cache-Control":
-            "public, max-age=900, must-revalidate, s-maxage=900",
-          "Cloudflare-CDN-Cache-Control": "max-age=900",
-          Vary: "Origin",
-        },
-      });
+  const id = Number(c.req.param("id"));
+  const db = drizzle(c.env.cinema_db, { schema });
+  const r = await getMovieByIdImpl(
+    db,
+    {
+      movies: schema.movies,
+      bookings: schema.bookings,
+      ticket_packages: schema.ticket_packages,
     },
-    900,
+    id,
   );
+  if (!r)
+    return c.json({ status: "error", message: "Không tìm thấy phim" }, 404);
+
+  return new Response(JSON.stringify(r), {
+    status: 200,
+    headers: {
+      "Content-Type": "application/json",
+      "Cache-Control": "no-cache, no-store, must-revalidate, max-age=0",
+      "Cloudflare-CDN-Cache-Control": "no-cache, no-store, must-revalidate, max-age=0",
+      "Pragma": "no-cache",
+      "Expires": "0",
+      Vary: "Origin",
+    },
+  });
 });
 
 // Update a movie
@@ -1518,7 +1511,7 @@ app.get("/api/toys", async (c) => {
 // Get list of active toys
 app.get("/api/toys-active", async (c) => {
   try {
-    // Try fetching from KV first
+    /* TẠM THỜI VÔ HIỆU HÓA CACHE
     if (c.env.KV_BINDING) {
       const cached = await c.env.KV_BINDING.get("activeToys");
       if (cached) {
@@ -1530,25 +1523,30 @@ app.get("/api/toys-active", async (c) => {
         });
       }
     }
+    */
 
     const db = drizzle(c.env.cinema_db, { schema });
     const r = await listActiveToys(db, { toys: schema.toys });
 
     const responseBody = JSON.stringify(r);
 
-    // Save to KV with specific TTL (e.g., 1 hour)
+    // Save to KV with specific TTL (e.g., 1 hour) - TEMPORARILY DISABLED
+    /*
     if (c.env.KV_BINDING) {
       c.executionCtx.waitUntil(c.env.KV_BINDING.put("activeToys", responseBody, { expirationTtl: 3600 }));
     }
+    */
 
     return new Response(responseBody, {
       status: 200,
       headers: {
         "Content-Type": "application/json",
-        "Cache-Control": "public, s-maxage=300",
-        "Cloudflare-CDN-Cache-Control": "max-age=300",
+        "Cache-Control": "no-cache, no-store, must-revalidate, max-age=0",
+        "Cloudflare-CDN-Cache-Control": "no-cache, no-store, must-revalidate, max-age=0",
+        "Pragma": "no-cache",
+        "Expires": "0",
         Vary: "Origin",
-        "X-KV-Cache": "MISS"
+        "X-KV-Cache": "DISABLED"
       },
     });
   } catch (err: any) {
@@ -1728,7 +1726,7 @@ app.get("/api/tickets", async (c) => {
 // Get list of active ticket packages
 app.get("/api/tickets-active", async (c) => {
   try {
-    // Try fetching from KV first
+    /* TẠM THỜI VÔ HIỆU HÓA CACHE
     if (c.env.KV_BINDING) {
       const cached = await c.env.KV_BINDING.get("activeTicketPackages");
       if (cached) {
@@ -1740,6 +1738,7 @@ app.get("/api/tickets-active", async (c) => {
         });
       }
     }
+    */
 
     const db = drizzle(c.env.cinema_db, { schema });
     const r = await listActiveTicketPackages(db, {
@@ -1749,19 +1748,23 @@ app.get("/api/tickets-active", async (c) => {
 
     const responseBody = JSON.stringify(r);
 
-    // Save to KV with specific TTL (e.g., 1 hour)
+    // Save to KV with specific TTL (e.g., 1 hour) - TEMPORARILY DISABLED
+    /*
     if (c.env.KV_BINDING) {
       c.executionCtx.waitUntil(c.env.KV_BINDING.put("activeTicketPackages", responseBody, { expirationTtl: 3600 }));
     }
+    */
 
     return new Response(responseBody, {
       status: 200,
       headers: {
         "Content-Type": "application/json",
-        "Cache-Control": "public, s-maxage=300",
-        "Cloudflare-CDN-Cache-Control": "max-age=300",
+        "Cache-Control": "no-cache, no-store, must-revalidate, max-age=0",
+        "Cloudflare-CDN-Cache-Control": "no-cache, no-store, must-revalidate, max-age=0",
+        "Pragma": "no-cache",
+        "Expires": "0",
         Vary: "Origin",
-        "X-KV-Cache": "MISS"
+        "X-KV-Cache": "DISABLED"
       },
     });
   } catch (err: any) {
