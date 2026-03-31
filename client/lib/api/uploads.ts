@@ -1,3 +1,5 @@
+import { SERVER_BASE_URL } from "./http";
+
 export interface UploadResult {
   url: string;
   public_id: string;
@@ -14,7 +16,7 @@ export function uploadAdminVideo(
   onProgress?: (percent: number) => void,
 ): Promise<UploadResult> {
   return new Promise((resolve, reject) => {
-    const baseUrl = (import.meta as any).env?.VITE_SERVER_BASE_URL || "";
+    const baseUrl = SERVER_BASE_URL || "";
     const xhr = new XMLHttpRequest();
     xhr.open("POST", `${baseUrl}/api/admin/uploads/video`);
     xhr.responseType = "json";
@@ -82,7 +84,7 @@ export function uploadDirectToCloudinary(
 
     const trySigned = async () => {
       try {
-        const baseUrl = (import.meta as any).env?.VITE_SERVER_BASE_URL || "";
+        const baseUrl = SERVER_BASE_URL || "";
         const resp = await fetch(`${baseUrl}/api/admin/cloudinary/sign`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -169,7 +171,7 @@ export async function createSiteMediaApi(body: {
   display_order?: number;
   is_active?: boolean;
 }) {
-  const baseUrl = (import.meta as any).env?.VITE_SERVER_BASE_URL || "";
+  const baseUrl = SERVER_BASE_URL || "";
   const res = await fetch(`${baseUrl}/api/admin/site-media`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -197,7 +199,7 @@ export async function updateSiteMediaApi(body: {
   display_order?: number;
   is_active?: boolean;
 }) {
-  const baseUrl = (import.meta as any).env?.VITE_SERVER_BASE_URL || "";
+  const baseUrl = SERVER_BASE_URL || "";
   const res = await fetch(`${baseUrl}/api/admin/site-media`, {
     method: "PUT",
     headers: { "Content-Type": "application/json" },
@@ -221,7 +223,7 @@ export async function getSiteMediaApi(options?: {
   if (options?.type) params.set("type", options.type);
   if (typeof options?.active === "boolean")
     params.set("active", String(options.active));
-  const baseUrl = (import.meta as any).env?.VITE_SERVER_BASE_URL || "";
+  const baseUrl = SERVER_BASE_URL || "";
   const path = `${baseUrl}/api/site-media${params.toString() ? `?${params.toString()}` : ""}`;
   const res = await fetch(path, { signal: options?.signal });
   if (!res.ok) {
@@ -232,7 +234,7 @@ export async function getSiteMediaApi(options?: {
 }
 
 export async function deleteSiteMediaApi(id: number) {
-  const baseUrl = (import.meta as any).env?.VITE_SERVER_BASE_URL || "";
+  const baseUrl = SERVER_BASE_URL || "";
   const res = await fetch(`${baseUrl}/api/admin/site-media/${id}`, { method: "DELETE" });
   const data = await res.json().catch(() => ({}));
   if (!res.ok) {

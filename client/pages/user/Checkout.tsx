@@ -29,6 +29,7 @@ import UserLayout from "@/user/layouts/UserLayout";
 import {
   createMomoPaymentApi,
   API_BASE_URL,
+  SERVER_BASE_URL,
   confirmBookingApi,
   getBookingByIdApi,
 } from "@/lib/api";
@@ -404,7 +405,7 @@ export default function Checkout() {
       // - redirectUrl: URL user sẽ được chuyển về (Client URL)
       // - ipnUrl: URL MoMo gọi server (Server API URL)
       const serverBase =
-        (import.meta as any).env?.VITE_SERVER_BASE_URL || clientBase;
+        SERVER_BASE_URL || clientBase;
       const ipnUrl = `${serverBase}${ipnPath}`;
       const accessKey = (import.meta as any).env?.VITE_MOMO_ACCESS_KEY || "";
       const secretKey = (import.meta as any).env?.VITE_MOMO_SECRET_KEY || "";

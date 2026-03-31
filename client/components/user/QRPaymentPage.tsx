@@ -18,6 +18,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import UserLayout from "@/user/layouts/UserLayout";
+import { SERVER_BASE_URL } from "@/lib/api";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -76,7 +77,7 @@ export default function QRPaymentPage() {
       const bId = data?.bookingId || data?.booking_id;
       if (bId) {
         try {
-          const baseUrl = (import.meta as any).env?.VITE_SERVER_BASE_URL || "";
+          const baseUrl = SERVER_BASE_URL || "";
           const res = await fetch(`${baseUrl}/api/bookings/${bId}`);
           if (res.ok) {
             const json = await res.json();
@@ -130,7 +131,7 @@ export default function QRPaymentPage() {
 
     if (bId) {
       try {
-        const baseUrl = (import.meta as any).env?.VITE_SERVER_BASE_URL || "";
+        const baseUrl = SERVER_BASE_URL || "";
         const res = await fetch(`${baseUrl}/api/confirm-booking`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -203,7 +204,7 @@ export default function QRPaymentPage() {
     setIsChecking(true);
     try {
       // Use backend base URL from environment variable
-      const baseUrl = (import.meta as any).env?.VITE_SERVER_BASE_URL || "";
+      const baseUrl = SERVER_BASE_URL || "";
       const res = await fetch(`${baseUrl}/api/bookings/${bId}`, { cache: "no-store" });
       if (res.ok) {
         const booking = await res.json();
@@ -235,7 +236,7 @@ export default function QRPaymentPage() {
 
     if (bId) {
       try {
-        const baseUrl = (import.meta as any).env?.VITE_SERVER_BASE_URL || "";
+        const baseUrl = SERVER_BASE_URL || "";
         const res = await fetch(`${baseUrl}/api/confirm-booking`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
