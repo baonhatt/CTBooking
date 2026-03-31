@@ -30,6 +30,7 @@ import {
   createMomoPaymentApi,
   createVnpayPaymentApi,
   API_BASE_URL,
+  SERVER_BASE_URL,
   validateBookingApi,
 } from "@/lib/api";
 import { optimizeCloudinaryUrl } from "@/lib/utils";
@@ -438,7 +439,7 @@ export default function BookingPage() {
           (import.meta as any).env?.VITE_CLIENT_BASE_URL ||
           window.location.origin;
         const serverBase =
-          (import.meta as any).env?.VITE_SERVER_BASE_URL || clientBase;
+          SERVER_BASE_URL || clientBase;
         const redirectPath =
           (import.meta as any).env?.VITE_MOMO_REDIRECT_URL || "/checkout";
         const ipnPath =

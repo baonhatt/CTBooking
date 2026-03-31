@@ -3,9 +3,38 @@ export const API_BASE_URL = (() => {
   const base = env?.VITE_API_BASE_URL || env?.VITE_API_URL || "";
   if (typeof window !== "undefined") {
     const h = window.location.hostname || "";
+    
     if (h === "localhost" || h === "127.0.0.1") return "";
-    if (h === "cinesphere.com.vn" || h === "www.cinesphere.com.vn") return "";
-    if (h.endsWith("pages.dev")) return base;
+    
+    if (h.endsWith("pages.dev") && h !== "cinema-pages.pages.dev") {
+      return "https://cinema-worker-preview.baonhat20.workers.dev";
+    }
+    
+    if (h === "cinesphere.com.vn" || h === "www.cinesphere.com.vn" || h === "cinema-pages.pages.dev") {
+      return "";
+    }
+    
+    return base;
+  }
+  return base;
+})();
+
+export const SERVER_BASE_URL = (() => {
+  const env = (import.meta as any).env || {};
+  const base = env?.VITE_SERVER_BASE_URL || "";
+  if (typeof window !== "undefined") {
+    const h = window.location.hostname || "";
+    
+    if (h === "localhost" || h === "127.0.0.1") return base;
+    
+    if (h.endsWith("pages.dev") && h !== "cinema-pages.pages.dev") {
+      return "https://cinema-worker-preview.baonhat20.workers.dev";
+    }
+    
+    if (h === "cinesphere.com.vn" || h === "www.cinesphere.com.vn" || h === "cinema-pages.pages.dev") {
+      return "https://cinesphere.com.vn";
+    }
+    
     return base;
   }
   return base;
