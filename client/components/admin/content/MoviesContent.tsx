@@ -1,32 +1,25 @@
-import React, { useState, useEffect } from "react";
-import { Card, CardContent } from "@/components/ui/card";
-import {
-  Table,
-  TableHeader,
-  TableRow,
-  TableHead,
-  TableBody,
-  TableCell,
-} from "@/components/ui/table";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { Skeleton } from "@/components/ui/skeleton";
-import { Switch } from "@/components/ui/switch";
+import React, { useState, useEffect } from 'react';
+import { Card, CardContent } from '@/components/ui/card';
+import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from '@/components/ui/table';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { Skeleton } from '@/components/ui/skeleton';
+import { Switch } from '@/components/ui/switch';
 import {
   Pagination,
   PaginationContent,
   PaginationItem,
   PaginationNext,
-  PaginationPrevious,
-} from "@/components/ui/pagination";
-import { Dialog, DialogContent } from "@/components/ui/dialog";
+  PaginationPrevious
+} from '@/components/ui/pagination';
+import { Dialog, DialogContent } from '@/components/ui/dialog';
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
+  DropdownMenuTrigger
+} from '@/components/ui/dropdown-menu';
 import {
   MoreHorizontal,
   Eye,
@@ -49,11 +42,11 @@ import {
   Ticket,
   AlertCircle,
   SortDesc,
-  SortAsc,
-} from "lucide-react";
-import { format, formatDistanceToNow } from "date-fns";
-import { vi } from "date-fns/locale";
-import { getMovieById } from "@/lib/api";
+  SortAsc
+} from 'lucide-react';
+import { format, formatDistanceToNow } from 'date-fns';
+import { vi } from 'date-fns/locale';
+import { getMovieById } from '@/lib/api';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -63,9 +56,9 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-  AlertDialogTrigger,
-} from "@/components/ui/alert-dialog";
-import { optimizeCloudinaryUrl } from "@/lib/utils";
+  AlertDialogTrigger
+} from '@/components/ui/alert-dialog';
+import { optimizeCloudinaryUrl } from '@/lib/utils';
 
 interface MovieData {
   id: string | number;
@@ -86,16 +79,16 @@ interface Props {
   setPage: (p: number) => void;
   movieStatus: Record<string, string>; // Changed from "active" | "inactive" to string
   onToggleStatus: (id: string | number, currentStatus: boolean) => void;
-  onEdit: (type: "movie", data: any) => void;
+  onEdit: (type: 'movie', data: any) => void;
   onCreate: () => void;
   moviesLength: number;
   onRefresh: () => void;
   searchQuery?: string;
   onSearchChange?: (query: string) => void;
   sortKey?: string;
-  sortDir?: "asc" | "desc";
+  sortDir?: 'asc' | 'desc';
   setSortKey?: (k: any) => void;
-  setSortDir?: (d: "asc" | "desc") => void;
+  setSortDir?: (d: 'asc' | 'desc') => void;
   isLoading?: boolean;
   showActiveOnly?: boolean;
   setShowActiveOnly?: (v: boolean) => void;
@@ -116,11 +109,11 @@ export default function MoviesContent({
   onCreate,
   moviesLength,
   onRefresh,
-  searchQuery = "",
+  searchQuery = '',
   onSearchChange = () => {},
-  sortKey = "updated_at",
+  sortKey = 'updated_at',
   setSortKey = () => {},
-  sortDir = "desc",
+  sortDir = 'desc',
   setSortDir = () => {},
   isLoading = false,
   showActiveOnly = false,
@@ -128,21 +121,13 @@ export default function MoviesContent({
   isDetailsOpen,
   setIsDetailsOpen,
   selectedMovieId,
-  setSelectedMovieId,
+  setSelectedMovieId
 }: Props) {
   console.log(data);
   const [movieDetails, setMovieDetails] = useState<any>(null);
   const [isLoadingDetails, setIsLoadingDetails] = useState(false);
 
-  const InfoRow = ({
-    label,
-    value,
-    icon,
-  }: {
-    label: string;
-    value: string;
-    icon?: React.ReactNode;
-  }) => (
+  const InfoRow = ({ label, value, icon }: { label: string; value: string; icon?: React.ReactNode }) => (
     <div className="flex justify-between items-center">
       <span className="text-[11px] font-medium text-slate-500 flex items-center gap-1.5">
         {icon} {label}
@@ -160,7 +145,7 @@ export default function MoviesContent({
           setMovieDetails(details);
           console.log(movieDetails);
         } catch (err) {
-          console.error("Lỗi load chi tiết:", err);
+          console.error('Lỗi load chi tiết:', err);
         } finally {
           setIsLoadingDetails(false);
         }
@@ -191,17 +176,13 @@ export default function MoviesContent({
             onClick={onRefresh}
             className="rounded-xl shadow-sm hover:rotate-180 transition-transform duration-500"
           >
-            <RefreshCw
-              className={`w-4 h-4 ${isLoading ? "animate-spin" : ""}`}
-            />
+            <RefreshCw className={`w-4 h-4 ${isLoading ? 'animate-spin' : ''}`} />
           </Button>
         </div>
 
         <div className="flex flex-wrap items-center gap-3 w-full xl:w-auto font-sans">
           <div className="flex items-center gap-2 px-3 py-1.5 bg-slate-50 rounded-xl border border-slate-200">
-            <span className="text-[10px] font-bold text-slate-500 uppercase">
-              Chỉ hiện đang chiếu
-            </span>
+            <span className="text-[10px] font-bold text-slate-500 uppercase">Chỉ hiện đang chiếu</span>
             <Switch
               checked={showActiveOnly}
               onCheckedChange={setShowActiveOnly}
@@ -222,11 +203,11 @@ export default function MoviesContent({
           <Button
             variant="outline"
             size="icon"
-            onClick={() => setSortDir?.(sortDir === "asc" ? "desc" : "asc")}
+            onClick={() => setSortDir?.(sortDir === 'asc' ? 'desc' : 'asc')}
             className="rounded-xl border-slate-200 hover:bg-slate-50 active:scale-95 transition-all shadow-sm"
-            title={sortDir === "asc" ? "Tăng dần" : "Giảm dần"}
+            title={sortDir === 'asc' ? 'Tăng dần' : 'Giảm dần'}
           >
-            {sortDir === "desc" ? (
+            {sortDir === 'desc' ? (
               <SortDesc className="w-4 h-4 text-slate-600" />
             ) : (
               <SortAsc className="w-4 h-4 text-slate-600" />
@@ -249,21 +230,13 @@ export default function MoviesContent({
           <Table>
             <TableHeader className="bg-slate-50/80">
               <TableRow className="hover:bg-transparent border-none">
-                <TableHead className="w-16 text-center text-[10px] uppercase font-bold text-slate-400">
-                  ID
-                </TableHead>
+                <TableHead className="w-16 text-center text-[10px] uppercase font-bold text-slate-400">ID</TableHead>
                 <TableHead className="min-w-[300px] text-[10px] uppercase font-bold text-slate-500">
                   Phim & Thể loại
                 </TableHead>
-                <TableHead className="text-[10px] uppercase font-bold text-slate-500 text-center">
-                  Đánh giá
-                </TableHead>
-                <TableHead className="text-[10px] uppercase font-bold text-slate-500">
-                  Cập nhật
-                </TableHead>
-                <TableHead className="text-center text-[10px] uppercase font-bold text-slate-500">
-                  Trạng thái
-                </TableHead>
+                <TableHead className="text-[10px] uppercase font-bold text-slate-500 text-center">Đánh giá</TableHead>
+                <TableHead className="text-[10px] uppercase font-bold text-slate-500">Cập nhật</TableHead>
+                <TableHead className="text-center text-[10px] uppercase font-bold text-slate-500">Trạng thái</TableHead>
                 <TableHead className="text-right text-[10px] uppercase font-bold text-slate-500 pr-8">
                   Thao tác
                 </TableHead>
@@ -283,14 +256,8 @@ export default function MoviesContent({
                   <TableCell colSpan={6} className="h-64 text-center">
                     <div className="flex flex-col items-center justify-center text-slate-400 gap-2">
                       <FilterX size={48} className="opacity-20 mb-2" />
-                      <p className="text-sm font-medium text-slate-500">
-                        Không tìm thấy bộ phim nào phù hợp
-                      </p>
-                      <Button
-                        variant="link"
-                        onClick={onRefresh}
-                        className="text-blue-500 text-xs"
-                      >
+                      <p className="text-sm font-medium text-slate-500">Không tìm thấy bộ phim nào phù hợp</p>
+                      <Button variant="link" onClick={onRefresh} className="text-blue-500 text-xs">
                         Xóa bộ lọc & Thử lại
                       </Button>
                     </div>
@@ -298,22 +265,20 @@ export default function MoviesContent({
                 </TableRow>
               ) : (
                 data.map((movie) => {
-                  const isActive = movieStatus[movie.id] === "active";
+                  const isActive = movieStatus[movie.id] === 'active';
                   return (
                     <TableRow
                       key={movie.id}
                       className="group hover:bg-slate-50/80 transition-colors border-b last:border-0"
                     >
-                      <TableCell className="text-center font-mono text-[11px] text-slate-400">
-                        {movie.id}
-                      </TableCell>
+                      <TableCell className="text-center font-mono text-[11px] text-slate-400">{movie.id}</TableCell>
                       <TableCell>
                         <div className="flex items-center gap-4 py-2">
                           <div className="relative shrink-0 transition-transform group-hover:scale-105">
                             <img
                               src={
                                 optimizeCloudinaryUrl(movie.posterUrl, 200) ||
-                                "https://placehold.co/400x600?text=No+Poster"
+                                'https://placehold.co/400x600?text=No+Poster'
                               }
                               loading="lazy"
                               className="w-12 h-16 object-cover rounded-lg shadow-sm border border-slate-100"
@@ -324,44 +289,30 @@ export default function MoviesContent({
                             </div>
                           </div>
                           <div className="flex flex-col gap-0.5 min-w-0">
-                            <h4 className="font-bold text-slate-900 leading-tight line-clamp-1">
-                              {movie.title}
-                            </h4>
-                            <p className="text-[11px] text-slate-500 line-clamp-1">
-                              {movie.genres.join(" • ")}
-                            </p>
+                            <h4 className="font-bold text-slate-900 leading-tight line-clamp-1">{movie.title}</h4>
+                            <p className="text-[11px] text-slate-500 line-clamp-1">{movie.genres.join(' • ')}</p>
                           </div>
                         </div>
                       </TableCell>
                       <TableCell className="text-center">
                         <div className="inline-flex items-center gap-1 bg-yellow-50 px-2 py-0.5 rounded-md border border-yellow-100">
-                          <Star
-                            size={10}
-                            className="fill-yellow-500 text-yellow-500"
-                          />
-                          <span className="text-xs font-black text-yellow-700">
-                            {movie.rating || "0"}
-                          </span>
+                          <Star size={10} className="fill-yellow-500 text-yellow-500" />
+                          <span className="text-xs font-black text-yellow-700">{movie.rating || '0'}</span>
                         </div>
                       </TableCell>
                       <TableCell>
                         <div className="flex flex-col text-[11px]">
                           <span className="text-slate-600 font-medium flex items-center gap-1">
                             <History size={10} className="text-slate-400" />
-                            {movie.updated_at
-                              ? format(new Date(movie.updated_at), "HH:mm")
-                              : "-"}
+                            {movie.updated_at ? format(new Date(movie.updated_at), 'HH:mm') : '-'}
                           </span>
-                          <span 
+                          <span
                             className="text-slate-400 italic cursor-help"
-                            title={movie.updated_at ? new Date(movie.updated_at).toLocaleString("vi-VN") : ""}
+                            title={movie.updated_at ? new Date(movie.updated_at).toLocaleString('vi-VN') : ''}
                           >
                             {movie.updated_at
-                              ? formatDistanceToNow(
-                                  new Date(movie.updated_at),
-                                  { addSuffix: true, locale: vi },
-                                )
-                              : ""}
+                              ? formatDistanceToNow(new Date(movie.updated_at), { addSuffix: true, locale: vi })
+                              : ''}
                           </span>
                         </div>
                       </TableCell>
@@ -375,10 +326,8 @@ export default function MoviesContent({
                                   className="scale-100 transition-all border-2 border-transparent cursor-pointer"
                                   style={{
                                     opacity: 1,
-                                    backgroundColor: isActive
-                                      ? "#10b981"
-                                      : "#64748b",
-                                    boxShadow: "none",
+                                    backgroundColor: isActive ? '#10b981' : '#64748b',
+                                    boxShadow: 'none'
                                   }}
                                 />
                               </AlertDialogTrigger>
@@ -392,41 +341,29 @@ export default function MoviesContent({
                                   <AlertDialogDescription className="text-slate-500 text-sm">
                                     {isActive ? (
                                       <span>
-                                        Bạn có muốn <strong>ẩn</strong> phim này
-                                        không?
+                                        Bạn có muốn <strong>ẩn</strong> phim này không?
                                         <br />
-                                        Hành động này sẽ khiến phim không xuất
-                                        hiện trên giao diện người dùng.
+                                        Hành động này sẽ khiến phim không xuất hiện trên giao diện người dùng.
                                       </span>
                                     ) : (
                                       <span>
-                                        Bạn có muốn <strong>kích hoạt</strong>{" "}
-                                        phim này không?
+                                        Bạn có muốn <strong>kích hoạt</strong> phim này không?
                                         <br />
-                                        Phim sẽ bắt đầu hiển thị công khai trên
-                                        website.
+                                        Phim sẽ bắt đầu hiển thị công khai trên website.
                                       </span>
                                     )}
                                   </AlertDialogDescription>
                                 </AlertDialogHeader>
 
                                 <AlertDialogFooter className="mt-4">
-                                  <AlertDialogCancel className="rounded-xl border-slate-200">
-                                    Hủy
-                                  </AlertDialogCancel>
+                                  <AlertDialogCancel className="rounded-xl border-slate-200">Hủy</AlertDialogCancel>
                                   <AlertDialogAction
-                                    onClick={() =>
-                                      onToggleStatus(movie.id, isActive)
-                                    }
+                                    onClick={() => onToggleStatus(movie.id, isActive)}
                                     className={`rounded-xl text-white ${
-                                      isActive
-                                        ? "bg-red-500 hover:bg-red-600"
-                                        : "bg-emerald-600 hover:bg-emerald-700"
+                                      isActive ? 'bg-red-500 hover:bg-red-600' : 'bg-emerald-600 hover:bg-emerald-700'
                                     }`}
                                   >
-                                    {isActive
-                                      ? "Đồng ý ẩn"
-                                      : "Đồng ý kích hoạt"}
+                                    {isActive ? 'Đồng ý ẩn' : 'Đồng ý kích hoạt'}
                                   </AlertDialogAction>
                                 </AlertDialogFooter>
                               </AlertDialogContent>
@@ -439,11 +376,11 @@ export default function MoviesContent({
                               className={`text-[9px] font-bold px-2 py-1 rounded-lg border-none whitespace-nowrap shadow-sm justify-center w-full transition-all duration-200
                               ${
                                 isActive
-                                  ? "bg-emerald-100 text-emerald-700 hover:bg-emerald-200/80"
-                                  : "bg-slate-100 text-slate-500 hover:bg-slate-200"
+                                  ? 'bg-emerald-100 text-emerald-700 hover:bg-emerald-200/80'
+                                  : 'bg-slate-100 text-slate-500 hover:bg-slate-200'
                               }`}
                             >
-                              {isActive ? "ĐANG CHIẾU" : "ĐÃ ẨN"}
+                              {isActive ? 'ĐANG CHIẾU' : 'ĐÃ ẨN'}
                             </Badge>
                           </div>
                         </div>
@@ -452,17 +389,11 @@ export default function MoviesContent({
                       <TableCell className="text-right pr-6">
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild>
-                            <Button
-                              variant="ghost"
-                              className="h-8 w-8 p-0 rounded-full hover:bg-slate-100"
-                            >
+                            <Button variant="ghost" className="h-8 w-8 p-0 rounded-full hover:bg-slate-100">
                               <MoreHorizontal className="h-4 w-4 text-slate-400" />
                             </Button>
                           </DropdownMenuTrigger>
-                          <DropdownMenuContent
-                            align="end"
-                            className="w-48 rounded-xl shadow-2xl border-slate-100"
-                          >
+                          <DropdownMenuContent align="end" className="w-48 rounded-xl shadow-2xl border-slate-100">
                             <DropdownMenuItem
                               onClick={() => {
                                 setSelectedMovieId(Number(movie.id));
@@ -470,15 +401,10 @@ export default function MoviesContent({
                               }}
                               className="cursor-pointer"
                             >
-                              <Eye className="mr-2 h-4 w-4 text-blue-500" /> Xem
-                              chi tiết
+                              <Eye className="mr-2 h-4 w-4 text-blue-500" /> Xem chi tiết
                             </DropdownMenuItem>
-                            <DropdownMenuItem
-                              onClick={() => onEdit("movie", movie)}
-                              className="cursor-pointer"
-                            >
-                              <Edit3 className="mr-2 h-4 w-4 text-orange-500" />{" "}
-                              Chỉnh sửa
+                            <DropdownMenuItem onClick={() => onEdit('movie', movie)} className="cursor-pointer">
+                              <Edit3 className="mr-2 h-4 w-4 text-orange-500" /> Chỉnh sửa
                             </DropdownMenuItem>
                           </DropdownMenuContent>
                         </DropdownMenu>
@@ -507,9 +433,7 @@ export default function MoviesContent({
                   setPage(Math.max(1, currentPage - 1));
                 }}
                 className={
-                  currentPage === 1
-                    ? "opacity-30 pointer-events-none"
-                    : "cursor-pointer rounded-lg border shadow-sm"
+                  currentPage === 1 ? 'opacity-30 pointer-events-none' : 'cursor-pointer rounded-lg border shadow-sm'
                 }
               />
             </PaginationItem>
@@ -527,8 +451,8 @@ export default function MoviesContent({
                 }}
                 className={
                   currentPage === totalPages
-                    ? "opacity-30 pointer-events-none"
-                    : "cursor-pointer rounded-lg border shadow-sm"
+                    ? 'opacity-30 pointer-events-none'
+                    : 'cursor-pointer rounded-lg border shadow-sm'
                 }
               />
             </PaginationItem>
@@ -542,9 +466,7 @@ export default function MoviesContent({
           {isLoadingDetails ? (
             <div className="py-20 flex flex-col items-center gap-3">
               <div className="w-8 h-8 border-2 border-blue-600 border-t-transparent rounded-full animate-spin" />
-              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
-                Đang tải dữ liệu...
-              </p>
+              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Đang tải dữ liệu...</p>
             </div>
           ) : movieDetails ? (
             <div className="flex flex-col">
@@ -570,7 +492,7 @@ export default function MoviesContent({
                         variant="ghost"
                         size="icon"
                         onClick={() =>
-                          onEdit("movie", {
+                          onEdit('movie', {
                             id: movieDetails.id,
                             title: movieDetails.title,
                             description: movieDetails.description,
@@ -579,7 +501,7 @@ export default function MoviesContent({
                             duration: movieDetails.duration_min,
                             posterUrl: movieDetails.cover_image,
                             is_active: movieDetails.is_active,
-                            release_date: movieDetails.release_date,
+                            release_date: movieDetails.release_date
                           })
                         }
                         className="h-7 w-7 text-slate-400 hover:text-orange-400 hover:bg-orange-500/10 rounded-full transition-colors ml-1"
@@ -626,38 +548,23 @@ export default function MoviesContent({
                     <div className="grid grid-cols-4 gap-4">
                       {[
                         {
-                          label: "Đánh giá",
+                          label: 'Đánh giá',
                           val: `${movieDetails.rating}/10`,
                           icon: <Star size={12} />,
-                          color: "text-blue-600",
+                          color: 'text-blue-600'
                         },
                         {
-                          label: "Trạng thái",
-                          val:
-                            movieDetails.is_active === true
-                              ? "Đang chiếu"
-                              : "Đã ẩn",
-                          color:
-                            movieDetails.is_active === true
-                              ? "text-emerald-600"
-                              : "text-slate-400",
-                        },
+                          label: 'Trạng thái',
+                          val: movieDetails.is_active === true ? 'Đang chiếu' : 'Đã ẩn',
+                          color: movieDetails.is_active === true ? 'text-emerald-600' : 'text-slate-400'
+                        }
                       ].map((stat, i) => (
-                        <div
-                          key={i}
-                          className="bg-white p-3 rounded-xl border border-slate-200 shadow-sm"
-                        >
+                        <div key={i} className="bg-white p-3 rounded-xl border border-slate-200 shadow-sm">
                           <div className="flex items-center gap-1.5 mb-1">
                             <span className="text-slate-400">{stat.icon}</span>
-                            <p className="text-[9px] text-slate-400 uppercase font-black">
-                              {stat.label}
-                            </p>
+                            <p className="text-[9px] text-slate-400 uppercase font-black">{stat.label}</p>
                           </div>
-                          <p
-                            className={`text-lg font-bold ${stat.color || "text-slate-700"}`}
-                          >
-                            {stat.val}
-                          </p>
+                          <p className={`text-lg font-bold ${stat.color || 'text-slate-700'}`}>{stat.val}</p>
                         </div>
                       ))}
                     </div>
@@ -666,62 +573,48 @@ export default function MoviesContent({
                     <section className="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-sm">
                       <div className="bg-slate-50 px-4 py-2.5 border-b border-slate-200 flex items-center justify-between">
                         <h3 className="text-[11px] font-bold text-slate-600 uppercase flex items-center gap-2 tracking-tight">
-                          <Ticket size={14} className="text-indigo-500" /> Phân
-                          loại gói vé áp dụng
+                          <Ticket size={14} className="text-indigo-500" /> Phân loại gói vé áp dụng
                         </h3>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="h-6 text-[10px] text-blue-600 hover:bg-blue-50"
-                        >
+                        <Button variant="ghost" size="sm" className="h-6 text-[10px] text-blue-600 hover:bg-blue-50">
                           Cấu hình
                         </Button>
                       </div>
-                    <div className="p-4 flex flex-wrap gap-3">
-                      {Array.isArray(movieDetails.applicable_packages) &&
-                      movieDetails.applicable_packages.length > 0 ? (
-                        movieDetails.applicable_packages.map(
-                          (pkg: any, index: number) => {
+                      <div className="p-4 flex flex-wrap gap-3">
+                        {Array.isArray(movieDetails.applicable_packages) &&
+                        movieDetails.applicable_packages.length > 0 ? (
+                          movieDetails.applicable_packages.map((pkg: any, index: number) => {
                             const isVip =
-                              pkg.code?.toLowerCase().includes("vip") ||
-                              pkg.name?.toLowerCase().includes("vip");
+                              pkg.code?.toLowerCase().includes('vip') || pkg.name?.toLowerCase().includes('vip');
                             return (
                               <div
                                 key={pkg.id || index}
                                 className={`flex items-center gap-2.5 px-3 py-2 rounded-lg border ${
-                                  isVip
-                                    ? "bg-indigo-50 border-indigo-100"
-                                    : "bg-emerald-50 border-emerald-100"
+                                  isVip ? 'bg-indigo-50 border-indigo-100' : 'bg-emerald-50 border-emerald-100'
                                 }`}
                               >
                                 <div
                                   className={`w-2 h-2 rounded-full ${
-                                    isVip
-                                      ? "bg-indigo-500 animate-pulse"
-                                      : "bg-emerald-500"
+                                    isVip ? 'bg-indigo-500 animate-pulse' : 'bg-emerald-500'
                                   }`}
                                 />
                                 <span
-                                  className={`text-xs font-semibold ${
-                                    isVip ? "text-indigo-700" : "text-emerald-700"
-                                  }`}
+                                  className={`text-xs font-semibold ${isVip ? 'text-indigo-700' : 'text-emerald-700'}`}
                                 >
                                   {pkg.name} ({Number(pkg.price || 0).toLocaleString()}
                                   đ)
                                 </span>
                               </div>
                             );
-                          },
-                        )
-                      ) : (
-                        <div className="text-xs text-slate-400 italic py-2">
-                          Chưa có gói vé nào được áp dụng cho phim này
-                        </div>
-                      )}
-                      <button className="px-4 py-2 border border-dashed border-slate-300 rounded-lg text-slate-400 text-xs hover:bg-slate-50 hover:border-slate-400 transition-all">
-                        + Gán gói mới
-                      </button>
-                    </div>
+                          })
+                        ) : (
+                          <div className="text-xs text-slate-400 italic py-2">
+                            Chưa có gói vé nào được áp dụng cho phim này
+                          </div>
+                        )}
+                        <button className="px-4 py-2 border border-dashed border-slate-300 rounded-lg text-slate-400 text-xs hover:bg-slate-50 hover:border-slate-400 transition-all">
+                          + Gán gói mới
+                        </button>
+                      </div>
                     </section>
                   </div>
 
@@ -734,21 +627,14 @@ export default function MoviesContent({
                       <div className="space-y-3.5">
                         <div className="flex justify-between text-xs">
                           <span className="text-slate-400">Thời lượng:</span>
-                          <span className="font-bold text-slate-700">
-                            {movieDetails.duration_min} phút
-                          </span>
+                          <span className="font-bold text-slate-700">{movieDetails.duration_min} phút</span>
                         </div>
                         <div className="flex justify-between text-xs">
-                          <span className="text-slate-400">
-                            Ngày phát hành:
-                          </span>
+                          <span className="text-slate-400">Ngày phát hành:</span>
                           <span className="font-bold text-slate-700 px-1.5 py-0.5 bg-slate-100 rounded text-[10px]">
                             {movieDetails.release_date
-                              ? format(
-                                  new Date(movieDetails.release_date),
-                                  "dd/MM/yyyy HH:mm",
-                                )
-                              : "-"}
+                              ? format(new Date(movieDetails.release_date), 'dd/MM/yyyy HH:mm')
+                              : '-'}
                           </span>
                         </div>
                       </div>
@@ -760,11 +646,8 @@ export default function MoviesContent({
                           </span>
                           <span className="font-mono text-slate-600">
                             {movieDetails.created_at
-                              ? format(
-                                  new Date(movieDetails.created_at),
-                                  "dd/MM/yyyy HH:mm",
-                                )
-                              : "-"}
+                              ? format(new Date(movieDetails.created_at), 'dd/MM/yyyy HH:mm')
+                              : '-'}
                           </span>
                         </div>
                         <div className="flex items-center justify-between text-[11px]">
@@ -773,11 +656,8 @@ export default function MoviesContent({
                           </span>
                           <span className="font-mono text-slate-600">
                             {movieDetails.updated_at
-                              ? format(
-                                  new Date(movieDetails.updated_at),
-                                  "dd/MM/yyyy HH:mm",
-                                )
-                              : "-"}
+                              ? format(new Date(movieDetails.updated_at), 'dd/MM/yyyy HH:mm')
+                              : '-'}
                           </span>
                         </div>
                       </div>
@@ -791,13 +671,11 @@ export default function MoviesContent({
                     <section className="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-sm h-full">
                       <div className="bg-slate-50 px-4 py-2 border-b border-slate-200">
                         <h3 className="text-[11px] font-bold text-slate-500 uppercase tracking-widest flex items-center gap-2">
-                          <FileText size={14} className="text-blue-500" /> Mô tả
-                          hệ thống
+                          <FileText size={14} className="text-blue-500" /> Mô tả hệ thống
                         </h3>
                       </div>
                       <div className="p-5 text-[13px] text-slate-600 leading-relaxed min-h-[140px]">
-                        {movieDetails.description ||
-                          "Chưa có mô tả nội dung cho phim này."}
+                        {movieDetails.description || 'Chưa có mô tả nội dung cho phim này.'}
                       </div>
                     </section>
                   </div>
@@ -809,9 +687,8 @@ export default function MoviesContent({
                         <AlertCircle size={14} /> Ghi chú quản trị
                       </div>
                       <p className="text-[11px] text-amber-800 leading-snug">
-                        Phim đang được đặt ở trạng thái{" "}
-                        <strong>Ưu tiên Slider</strong>. Hệ thống sẽ tự động cập
-                        nhật Cache sau 5 phút.
+                        Phim đang được đặt ở trạng thái <strong>Ưu tiên Slider</strong>. Hệ thống sẽ tự động cập nhật
+                        Cache sau 5 phút.
                       </p>
                     </div>
                   </div>

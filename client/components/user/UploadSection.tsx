@@ -1,13 +1,7 @@
-import { UploadCloud } from "lucide-react";
-import { motion } from "framer-motion";
+import { UploadCloud } from 'lucide-react';
+import { motion } from 'framer-motion';
 
-const UploadCard = ({
-  title,
-  description,
-}: {
-  title: string;
-  description: string;
-}) => (
+const UploadCard = ({ title, description }: { title: string; description: string }) => (
   <label className="group relative flex-1 cursor-pointer min-h-[180px] rounded-3xl border border-dashed border-cyan-300/40 bg-white/5 backdrop-blur-lg p-6 transition-all duration-300 hover:border-fuchsia-400 hover:-translate-y-1 hover:shadow-[0_10px_40px_rgba(236,72,153,0.25)]">
     <input type="file" className="hidden" />
     <div className="absolute inset-0 bg-gradient-to-br from-cyan-500/10 to-fuchsia-500/10 opacity-0 group-hover:opacity-100 transition-opacity duration-300 rounded-3xl" />
@@ -19,9 +13,7 @@ const UploadCard = ({
         <p className="text-white font-semibold text-lg">{title}</p>
         <p className="text-sm text-gray-200">{description}</p>
       </div>
-      <span className="text-xs text-cyan-200 uppercase tracking-[0.18em]">
-        Click để tải lên
-      </span>
+      <span className="text-xs text-cyan-200 uppercase tracking-[0.18em]">Click để tải lên</span>
     </div>
   </label>
 );
@@ -38,22 +30,15 @@ export default function UploadSection() {
 
       <div className="container mx-auto px-4 relative z-10">
         <div className="text-center max-w-3xl mx-auto mb-10">
-          <p className="text-sm uppercase tracking-[0.22em] text-cyan-200">
-            Cá nhân hoá
-          </p>
-          <h2 className="text-3xl md:text-4xl font-bold text-white mt-2">
-            Ghép hình vũ trụ & nhân vật của bạn
-          </h2>
+          <p className="text-sm uppercase tracking-[0.22em] text-cyan-200">Cá nhân hoá</p>
+          <h2 className="text-3xl md:text-4xl font-bold text-white mt-2">Ghép hình vũ trụ & nhân vật của bạn</h2>
           <p className="text-gray-300 mt-3">
             Tải lên hình nền vũ trụ hoặc hình người để xem trước trong mô hình VR của CINESPHERE.
           </p>
         </div>
 
         <div className="flex flex-col md:flex-row gap-6 mb-10">
-          <UploadCard
-            title="Chọn hình ảnh vũ trụ"
-            description="Nebula, hành tinh mờ, photon particles..."
-          />
+          <UploadCard title="Chọn hình ảnh vũ trụ" description="Nebula, hành tinh mờ, photon particles..." />
           <UploadCard
             title="Chèn hình ảnh người ngồi trong mô hình"
             description="Xem trước trải nghiệm nhập vai cùng bạn bè."
@@ -78,4 +63,3 @@ export default function UploadSection() {
     </section>
   );
 }
-

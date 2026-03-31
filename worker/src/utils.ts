@@ -1,4 +1,4 @@
-import { Context } from "hono";
+import { Context } from 'hono';
 
 export const RL_MAX = 100;
 export const RL_WINDOW_MS = 60_000;
@@ -13,7 +13,7 @@ export async function checkRateLimitKV(env: any, ip: string): Promise<boolean> {
   let history: number[] = historyStr ? JSON.parse(historyStr) : [];
 
   // Filter old requests
-  history = history.filter(ts => now - ts < RL_WINDOW_MS);
+  history = history.filter((ts) => now - ts < RL_WINDOW_MS);
 
   if (history.length >= RL_MAX) {
     return false;
@@ -31,11 +31,11 @@ export async function withCache(
   env: any,
   ctx: any, // Thêm tham số ctx (đó chính là c.executionCtx)
   handler: () => Promise<Response>,
-  ttl = 900,
+  ttl = 900
 ) {
-  const cache = typeof caches !== "undefined" ? (caches as any).default : null;
+  const cache = typeof caches !== 'undefined' ? (caches as any).default : null;
 
-  if (!cache || request.method !== "GET") {
+  if (!cache || request.method !== 'GET') {
     return await handler();
   }
 
@@ -47,10 +47,7 @@ export async function withCache(
 
     if (originalResponse.status === 200) {
       response = new Response(originalResponse.body, originalResponse);
-      response.headers.set(
-        "Cache-Control",
-        `public, no-cache, s-maxage=${ttl}, must-revalidate`,
-      );
+      response.headers.set('Cache-Control', `public, no-cache, s-maxage=${ttl}, must-revalidate`);
 
       // SỬ DỤNG ctx.waitUntil Ở ĐÂY:
       // Việc ghi vào cache sẽ không làm chậm request của khách
@@ -60,57 +57,45 @@ export async function withCache(
     }
   } else {
     response = new Response(response.body, response);
-    response.headers.set("X-Cache", "HIT");
+    response.headers.set('X-Cache', 'HIT');
   }
 
   return response;
 }
 
 export async function deleteCache(env: any, fullUrl: string) {
-  const cache = typeof caches !== "undefined" ? (caches as any).default : null;
+  const cache = typeof caches !== 'undefined' ? (caches as any).default : null;
   if (!cache || !fullUrl) return;
   // Xóa cache cho URL cụ thể
   try {
     await cache.delete(fullUrl);
   } catch (e) {
-    console.error("Cache clean error:", e);
+    console.error('Cache clean error:', e);
   }
 }
 
-export async function hmacHex(
-  algo: "SHA-256" | "SHA-512",
-  key: string,
-  message: string,
-): Promise<string> {
+export async function hmacHex(algo: 'SHA-256' | 'SHA-512', key: string, message: string): Promise<string> {
   const enc = new TextEncoder();
-  const cryptoKey = await crypto.subtle.importKey(
-    "raw",
-    enc.encode(key),
-    { name: "HMAC", hash: algo },
-    false,
-    ["sign"],
-  );
-  const signature = await crypto.subtle.sign(
-    "HMAC",
-    cryptoKey,
-    enc.encode(message),
-  );
+  const cryptoKey = await crypto.subtle.importKey('raw', enc.encode(key), { name: 'HMAC', hash: algo }, false, [
+    'sign'
+  ]);
+  const signature = await crypto.subtle.sign('HMAC', cryptoKey, enc.encode(message));
   const bytes = new Uint8Array(signature as ArrayBuffer);
   return Array.from(bytes)
-    .map((b) => b.toString(16).padStart(2, "0"))
-    .join("");
+    .map((b) => b.toString(16).padStart(2, '0'))
+    .join('');
 }
 
 export function logSystemError(context: string, error: any, payload?: any) {
   const timestamp = new Date().toISOString();
   const errorMsg = error?.message || String(error);
-  const stack = error?.stack || "No stack trace";
-  const safePayload = payload ? { ...payload } : "No payload";
+  const stack = error?.stack || 'No stack trace';
+  const safePayload = payload ? { ...payload } : 'No payload';
 
   // Mask sensitive fields
-  if (typeof safePayload === "object" && safePayload !== null) {
-    if ("password" in safePayload) safePayload.password = "***";
-    if ("token" in safePayload) safePayload.token = "***";
+  if (typeof safePayload === 'object' && safePayload !== null) {
+    if ('password' in safePayload) safePayload.password = '***';
+    if ('token' in safePayload) safePayload.token = '***';
   }
 
   console.error(`[${timestamp}] [ERROR] [${context}]`);
@@ -123,7 +108,7 @@ export async function sendMail(
   env: any,
   toEmail: string,
   subject: string,
-  html: string,
+  html: string
 ): Promise<{
   ok: boolean;
   status: number;
@@ -132,124 +117,112 @@ export async function sendMail(
   missing: string[];
 }> {
   // Check for Preview/Review environment
-  if (env.IS_PREVIEW === "true") {
-    const token = String(env.MAILTRAP_API_TOKEN || "");
-    const inboxId = String(env.MAILTRAP_INBOX_ID || "");
+  if (env.IS_PREVIEW === 'true') {
+    const token = String(env.MAILTRAP_API_TOKEN || '');
+    const inboxId = String(env.MAILTRAP_INBOX_ID || '');
 
     if (token && inboxId) {
-      const senderEmail = String(
-        env.GMAIL_SENDER_EMAIL || "no-reply@cinesphere.com.vn",
-      );
-      const senderName = String(env.GMAIL_SENDER_NAME || "CINESPHERE");
+      const senderEmail = String(env.GMAIL_SENDER_EMAIL || 'no-reply@cinesphere.com.vn');
+      const senderName = String(env.GMAIL_SENDER_NAME || 'CINESPHERE');
 
       const payload = {
         to: [{ email: toEmail }],
         from: { email: senderEmail, name: senderName },
         subject,
         html,
-        category: "Review Worker Test",
+        category: 'Review Worker Test'
       };
 
-      const res = await fetch(
-        `https://sandbox.api.mailtrap.io/api/send/${inboxId}`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
-          },
-          body: JSON.stringify(payload),
+      const res = await fetch(`https://sandbox.api.mailtrap.io/api/send/${inboxId}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`
         },
-      );
+        body: JSON.stringify(payload)
+      });
 
-      const bodyText = await res.text().catch(() => "");
+      const bodyText = await res.text().catch(() => '');
       return {
         ok: res.ok,
         status: res.status,
         body: bodyText,
-        provider: "mailtrap-sandbox",
-        missing: [],
+        provider: 'mailtrap-sandbox',
+        missing: []
       };
     }
 
     return {
       ok: false,
       status: 500,
-      body: "Mailtrap provider is not configured for preview",
-      provider: "mailtrap-sandbox",
-      missing: ["MAILTRAP_API_TOKEN", "MAILTRAP_INBOX_ID"],
+      body: 'Mailtrap provider is not configured for preview',
+      provider: 'mailtrap-sandbox',
+      missing: ['MAILTRAP_API_TOKEN', 'MAILTRAP_INBOX_ID']
     };
   }
 
-
-
-  const brevoKey = String(env.BREVO_API_KEY || "");
+  const brevoKey = String(env.BREVO_API_KEY || '');
   const useBrevo = Boolean(brevoKey);
   if (useBrevo) {
-    const senderEmailBrevo = String(env.BREVO_SENDER_EMAIL || "");
-    const senderNameBrevo = String(env.BREVO_SENDER_NAME || "");
-    const senderEmailFallback = String(
-      env.GMAIL_SENDER_EMAIL || "no-reply@example.com",
-    );
-    const senderNameFallback = String(env.GMAIL_SENDER_NAME || "CTBOOKING");
+    const senderEmailBrevo = String(env.BREVO_SENDER_EMAIL || '');
+    const senderNameBrevo = String(env.BREVO_SENDER_NAME || '');
+    const senderEmailFallback = String(env.GMAIL_SENDER_EMAIL || 'no-reply@example.com');
+    const senderNameFallback = String(env.GMAIL_SENDER_NAME || 'CTBOOKING');
     const missing: string[] = [];
-    if (!brevoKey) missing.push("BREVO_API_KEY");
-    if (!senderEmailBrevo) missing.push("BREVO_SENDER_EMAIL");
-    if (!senderNameBrevo) missing.push("BREVO_SENDER_NAME");
+    if (!brevoKey) missing.push('BREVO_API_KEY');
+    if (!senderEmailBrevo) missing.push('BREVO_SENDER_EMAIL');
+    if (!senderNameBrevo) missing.push('BREVO_SENDER_NAME');
     const senderEmail = senderEmailBrevo || senderEmailFallback;
     const senderName = senderNameBrevo || senderNameFallback;
     const payload = {
       sender: { email: senderEmail, name: senderName },
       to: [{ email: toEmail }],
       subject,
-      htmlContent: html,
+      htmlContent: html
     };
-    const res = await fetch("https://api.brevo.com/v3/smtp/email", {
-      method: "POST",
-      headers: { "Content-Type": "application/json", "api-key": brevoKey },
-      body: JSON.stringify(payload),
+    const res = await fetch('https://api.brevo.com/v3/smtp/email', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'api-key': brevoKey },
+      body: JSON.stringify(payload)
     });
-    const bodyText = await res.text().catch(() => "");
+    const bodyText = await res.text().catch(() => '');
     return {
       ok: res.ok,
       status: res.status,
       body: bodyText,
-      provider: "brevo",
-      missing,
+      provider: 'brevo',
+      missing
     };
   } else {
-    const fromEmail = String(
-      env.GMAIL_SENDER_EMAIL || env.GMAIL_USER || "no-reply@example.com",
-    );
-    const fromName = String(env.GMAIL_SENDER_NAME || "CTBOOKING");
+    const fromEmail = String(env.GMAIL_SENDER_EMAIL || env.GMAIL_USER || 'no-reply@example.com');
+    const fromName = String(env.GMAIL_SENDER_NAME || 'CTBOOKING');
     const missing: string[] = [];
-    if (!String(env.GMAIL_SENDER_EMAIL || env.GMAIL_USER || ""))
-      missing.push("GMAIL_SENDER_EMAIL");
-    if (!String(env.GMAIL_SENDER_NAME || "")) missing.push("GMAIL_SENDER_NAME");
+    if (!String(env.GMAIL_SENDER_EMAIL || env.GMAIL_USER || '')) missing.push('GMAIL_SENDER_EMAIL');
+    if (!String(env.GMAIL_SENDER_NAME || '')) missing.push('GMAIL_SENDER_NAME');
     const payload = {
       personalizations: [{ to: [{ email: toEmail }] }],
       from: { email: fromEmail, name: fromName },
       subject,
-      content: [{ type: "text/html", value: html }],
+      content: [{ type: 'text/html', value: html }]
     };
-    const res = await fetch("https://api.mailchannels.net/tx/v1/send", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
+    const res = await fetch('https://api.mailchannels.net/tx/v1/send', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
     });
-    const bodyText = await res.text().catch(() => "");
+    const bodyText = await res.text().catch(() => '');
     return {
       ok: res.ok,
       status: res.status,
       body: bodyText,
-      provider: "mailchannels",
-      missing,
+      provider: 'mailchannels',
+      missing
     };
   }
 }
 
 export function formatCurrencyVi(amount: number): string {
-  return `${Number(amount || 0).toLocaleString("vi-VN")}đ`;
+  return `${Number(amount || 0).toLocaleString('vi-VN')}đ`;
 }
 
 export function getBookingEmailTemplate(
@@ -264,15 +237,15 @@ export function getBookingEmailTemplate(
     durationMin?: number | string; // Nhận chuỗi JSON: "[10, 12]"
     ticketPackageName?: string;
     expiryDate?: string | Date | null;
-  },
+  }
 ): string {
   // 1. XỬ LÝ PARSE JSON CHO DANH SÁCH PHIM
   let movieTitles: string[] = [];
   let durations: string[] = [];
 
   try {
-    movieTitles = JSON.parse(data.movieTitle || "[]");
-    durations = JSON.parse(String(data.durationMin) || "[]");
+    movieTitles = JSON.parse(data.movieTitle || '[]');
+    durations = JSON.parse(String(data.durationMin) || '[]');
   } catch (e) {
     movieTitles = data.movieTitle ? [data.movieTitle] : [];
     durations = data.durationMin ? [String(data.durationMin)] : [];
@@ -285,12 +258,12 @@ export function getBookingEmailTemplate(
     <div style="display: flex; justify-content: space-between; align-items: center; padding: 10px 12px; margin-bottom: 6px; background-color: #f8f9fa; border-radius: 6px; border: 1px solid #edf2f7;">
         <span style="font-weight: 600; color: #2d3748; font-size: 14px;">🎬 ${title}</span>
         <span style="font-size: 11px; color: #a0aec0; font-weight: bold; background: #fff; padding: 2px 6px; border-radius: 4px; border: 1px solid #e2e8f0;">
-          ${durations[index] || "--"} ph
+          ${durations[index] || '--'} ph
         </span>
     </div>
-  `,
+  `
     )
-    .join("");
+    .join('');
 
   // 3. XỬ LÝ CÁC THÀNH PHẦN KHÁC
   const pkgHtml = data.ticketPackageName
@@ -306,23 +279,23 @@ export function getBookingEmailTemplate(
     <div class="detail-row">
         <span class="detail-label">Ngày hết hạn:</span>
         <span class="detail-value" style="color: #e53e3e;">${(() => {
-      try {
-        const d = new Date(String(data.expiryDate));
-        return (
-          d.toLocaleDateString("vi-VN", {
-            timeZone: "Asia/Ho_Chi_Minh",
-          }) +
-          " " +
-          d.toLocaleTimeString("vi-VN", {
-            hour: "2-digit",
-            minute: "2-digit",
-            timeZone: "Asia/Ho_Chi_Minh",
-          })
-        );
-      } catch {
-        return String(data.expiryDate);
-      }
-    })()}</span>
+          try {
+            const d = new Date(String(data.expiryDate));
+            return (
+              d.toLocaleDateString('vi-VN', {
+                timeZone: 'Asia/Ho_Chi_Minh'
+              }) +
+              ' ' +
+              d.toLocaleTimeString('vi-VN', {
+                hour: '2-digit',
+                minute: '2-digit',
+                timeZone: 'Asia/Ho_Chi_Minh'
+              })
+            );
+          } catch {
+            return String(data.expiryDate);
+          }
+        })()}</span>
     </div>`
     : ``;
 
@@ -395,10 +368,7 @@ export function getBookingEmailTemplate(
 </html>`;
 }
 
-export function getWelcomeEmailTemplate(
-  baseUrl: string,
-  data: { customerName: string; email: string },
-): string {
+export function getWelcomeEmailTemplate(baseUrl: string, data: { customerName: string; email: string }): string {
   const homeUrl = `${baseUrl}/`;
   return `
 <!DOCTYPE html>
@@ -459,10 +429,7 @@ export function getWelcomeEmailTemplate(
   `;
 }
 
-export function getResetPasswordEmailTemplate(
-  baseUrl: string,
-  link: string,
-): string {
+export function getResetPasswordEmailTemplate(baseUrl: string, link: string): string {
   return `
 <!DOCTYPE html>
 <html lang="vi">
@@ -580,55 +547,50 @@ export function getResetPasswordEmailTemplate(
 
 export async function sha1Hex(input: string): Promise<string> {
   const enc = new TextEncoder();
-  const buf = await crypto.subtle.digest("SHA-1", enc.encode(input));
+  const buf = await crypto.subtle.digest('SHA-1', enc.encode(input));
   const bytes = new Uint8Array(buf as ArrayBuffer);
   return Array.from(bytes)
-    .map((b) => b.toString(16).padStart(2, "0"))
-    .join("");
+    .map((b) => b.toString(16).padStart(2, '0'))
+    .join('');
 }
 
 export function hasCloudinary(env: any) {
-  const cloudName = String(env.CLOUDINARY_CLOUD_NAME || "");
-  const apiKey = String(env.CLOUDINARY_API_KEY || "");
-  const apiSecret = String(env.CLOUDINARY_API_SECRET || "");
+  const cloudName = String(env.CLOUDINARY_CLOUD_NAME || '');
+  const apiKey = String(env.CLOUDINARY_API_KEY || '');
+  const apiSecret = String(env.CLOUDINARY_API_SECRET || '');
   return Boolean(cloudName && apiKey && apiSecret);
 }
 
-export async function cloudinarySignedParams(
-  env: any,
-  params: Record<string, string | number>,
-) {
-  const apiKey = String(env.CLOUDINARY_API_KEY || "");
-  const apiSecret = String(env.CLOUDINARY_API_SECRET || "");
+export async function cloudinarySignedParams(env: any, params: Record<string, string | number>) {
+  const apiKey = String(env.CLOUDINARY_API_KEY || '');
+  const apiSecret = String(env.CLOUDINARY_API_SECRET || '');
   const keys = Object.keys(params).sort();
-  const toSign = keys.map((k) => `${k}=${params[k]}`).join("&") + apiSecret;
+  const toSign = keys.map((k) => `${k}=${params[k]}`).join('&') + apiSecret;
   const signature = await sha1Hex(toSign);
   return { signature, api_key: apiKey };
 }
 
 export function optimizeCloudinaryUrl(url: string, width?: number) {
-  if (!url || typeof url !== "string" || !url.includes("cloudinary.com"))
-    return url;
-  const parts = url.split("/upload/");
+  if (!url || typeof url !== 'string' || !url.includes('cloudinary.com')) return url;
+  const parts = url.split('/upload/');
   if (parts.length !== 2) return url;
-  const transformations = ["f_auto", "q_auto"];
+  const transformations = ['f_auto', 'q_auto'];
   if (width) transformations.push(`w_${width}`);
-  const transformString = transformations.join(",");
+  const transformString = transformations.join(',');
   return `${parts[0]}/upload/${transformString}/${parts[1]}`;
 }
 
 export function getPublicIdFromUrl(url: string) {
-  if (!url || typeof url !== "string" || !url.includes("cloudinary.com"))
-    return null;
+  if (!url || typeof url !== 'string' || !url.includes('cloudinary.com')) return null;
   try {
-    const parts = url.split("/upload/");
+    const parts = url.split('/upload/');
     if (parts.length < 2) return null;
     const rightPart = parts[1];
     // Remove version (v1234567890/) if present
     const versionRegex = /^v\d+\//;
-    let path = rightPart.replace(versionRegex, "");
+    let path = rightPart.replace(versionRegex, '');
     // Remove extension
-    const lastDotIndex = path.lastIndexOf(".");
+    const lastDotIndex = path.lastIndexOf('.');
     if (lastDotIndex !== -1) {
       path = path.substring(0, lastDotIndex);
     }
@@ -638,81 +600,65 @@ export function getPublicIdFromUrl(url: string) {
   }
 }
 
-export function optimizeCloudinaryVideoUrl(
-  url: string,
-  width?: number,
-  quality: string = "auto",
-) {
-  if (!url || typeof url !== "string" || !url.includes("cloudinary.com"))
-    return url;
-  const parts = url.split("/upload/");
+export function optimizeCloudinaryVideoUrl(url: string, width?: number, quality: string = 'auto') {
+  if (!url || typeof url !== 'string' || !url.includes('cloudinary.com')) return url;
+  const parts = url.split('/upload/');
   if (parts.length !== 2) return url;
-  const transformations = [
-    "f_auto",
-    `q_${quality}`,
-    "vc_auto",
-    "c_limit",
-    "br_3m",
-  ];
+  const transformations = ['f_auto', `q_${quality}`, 'vc_auto', 'c_limit', 'br_3m'];
   if (width) transformations.push(`w_${width}`);
-  return `${parts[0]}/upload/${transformations.join(",")}/${parts[1]}`;
+  return `${parts[0]}/upload/${transformations.join(',')}/${parts[1]}`;
 }
 
-export async function uploadCloudinaryImageDataURI(
-  env: any,
-  dataUri: string,
-  folder: string,
-) {
-  const cloudName = String(env.CLOUDINARY_CLOUD_NAME || "");
+export async function uploadCloudinaryImageDataURI(env: any, dataUri: string, folder: string) {
+  const cloudName = String(env.CLOUDINARY_CLOUD_NAME || '');
   const timestamp = Math.floor(Date.now() / 1000);
   const params = {
     timestamp,
     folder,
-    use_filename: "true",
-    unique_filename: "false",
-    overwrite: "true",
-    transformation: "q_auto,f_webp,w_1280,c_limit",
+    use_filename: 'true',
+    unique_filename: 'false',
+    overwrite: 'true',
+    transformation: 'q_auto,f_webp,w_1280,c_limit'
   };
   const signed = await cloudinarySignedParams(env, params);
   const form = new FormData();
-  form.append("file", dataUri);
-  form.append("folder", folder);
-  form.append("use_filename", "true");
-  form.append("unique_filename", "false");
-  form.append("overwrite", "true");
-  form.append("timestamp", String(timestamp));
-  form.append("api_key", signed.api_key);
-  form.append("signature", signed.signature);
-  form.append("transformation", "q_auto,f_webp,w_1280,c_limit");
+  form.append('file', dataUri);
+  form.append('folder', folder);
+  form.append('use_filename', 'true');
+  form.append('unique_filename', 'false');
+  form.append('overwrite', 'true');
+  form.append('timestamp', String(timestamp));
+  form.append('api_key', signed.api_key);
+  form.append('signature', signed.signature);
+  form.append('transformation', 'q_auto,f_webp,w_1280,c_limit');
   const endpoint = `https://api.cloudinary.com/v1_1/${cloudName}/image/upload`;
-  const res = await fetch(endpoint, { method: "POST", body: form });
+  const res = await fetch(endpoint, { method: 'POST', body: form });
   const json: any = await res.json().catch(() => ({}));
-  if (!res.ok)
-    throw new Error(String(json?.error?.message || `Cloudinary ${res.status}`));
+  if (!res.ok) throw new Error(String(json?.error?.message || `Cloudinary ${res.status}`));
   return {
-    url: String(json.secure_url || json.url || ""),
-    height: Number(json.height || 0),
+    url: String(json.secure_url || json.url || ''),
+    height: Number(json.height || 0)
   };
 }
 
-export async function deleteCloudinaryImage(env: any, publicId: string, type: "image" | "video" = "image") {
-  const cloudName = String(env.CLOUDINARY_CLOUD_NAME || "");
+export async function deleteCloudinaryImage(env: any, publicId: string, type: 'image' | 'video' = 'image') {
+  const cloudName = String(env.CLOUDINARY_CLOUD_NAME || '');
   const timestamp = Math.floor(Date.now() / 1000);
   const paramsToSign = {
     public_id: publicId,
-    timestamp,
+    timestamp
   };
   const signed = await cloudinarySignedParams(env, paramsToSign);
 
   const form = new FormData();
-  form.append("public_id", publicId);
-  form.append("timestamp", String(timestamp));
-  form.append("api_key", signed.api_key);
-  form.append("signature", signed.signature);
+  form.append('public_id', publicId);
+  form.append('timestamp', String(timestamp));
+  form.append('api_key', signed.api_key);
+  form.append('signature', signed.signature);
 
   const endpoint = `https://api.cloudinary.com/v1_1/${cloudName}/${type}/destroy`;
-  const res = await fetch(endpoint, { method: "POST", body: form });
+  const res = await fetch(endpoint, { method: 'POST', body: form });
   const json: any = await res.json().catch(() => ({}));
-  if (!res.ok) console.error("Cloudinary delete error:", json);
+  if (!res.ok) console.error('Cloudinary delete error:', json);
   return json;
 }

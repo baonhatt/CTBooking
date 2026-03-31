@@ -15,25 +15,22 @@ async function runMigration() {
     connectionString: process.env.DATABASE_URL,
     ssl: {
       rejectUnauthorized: true,
-      ca: fs.readFileSync(path.join(__dirname, '../../ca.pem')).toString(),
-    },
+      ca: fs.readFileSync(path.join(__dirname, '../../ca.pem')).toString()
+    }
   });
 
   try {
     console.log('🔄 Connecting to database...');
     const client = await pool.connect();
-    
+
     console.log('📄 Reading migration file...');
-    const migrationSQL = fs.readFileSync(
-      path.join(__dirname, '0002_add_email_logs.sql'),
-      'utf8'
-    );
+    const migrationSQL = fs.readFileSync(path.join(__dirname, '0002_add_email_logs.sql'), 'utf8');
 
     console.log('🚀 Running migration...');
     await client.query(migrationSQL);
-    
+
     console.log('✅ Migration completed successfully!');
-    
+
     // Verify table was created
     const result = await client.query(`
       SELECT column_name, data_type 
@@ -41,10 +38,10 @@ async function runMigration() {
       WHERE table_name = 'email_logs'
       ORDER BY ordinal_position;
     `);
-    
+
     console.log('\n📊 Table structure:');
     console.table(result.rows);
-    
+
     client.release();
   } catch (error) {
     console.error('❌ Migration failed:', error.message);

@@ -1,7 +1,7 @@
-import { bookings } from "../db/schema";
-import { eq } from "drizzle-orm";
-import "dotenv/config";
-export * from "./email-templates";
+import { bookings } from '../db/schema';
+import { eq } from 'drizzle-orm';
+import 'dotenv/config';
+export * from './email-templates';
 
 /**
  * Generate unique booking code (8 random alphanumeric characters)
@@ -9,20 +9,20 @@ export * from "./email-templates";
  * Format: XXXXXXXX (e.g., A7K9M2B5)
  */
 export async function generateBookingCode(anyDb: any): Promise<string> {
-  const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
   let isUnique = false;
-  let bookingCode = "";
+  let bookingCode = '';
 
   while (!isUnique) {
     // Generate random string (8 chars)
-    bookingCode = "";
+    bookingCode = '';
     for (let i = 0; i < 8; i++) {
       bookingCode += chars.charAt(Math.floor(Math.random() * chars.length));
     }
 
     // Check if code already exists in database
     const existing = await anyDb.query.bookings.findFirst({
-      where: eq(bookings.booking_code, bookingCode),
+      where: eq(bookings.booking_code, bookingCode)
     });
 
     if (!existing) {

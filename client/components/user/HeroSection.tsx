@@ -1,34 +1,19 @@
-import { useMemo, useState, useEffect, useRef, useCallback } from "react";
-import { motion, AnimatePresence, useMotionValue, useSpring, useTransform } from "framer-motion";
-import {
-  Play,
-  Pause,
-  Sparkles,
-  Waves,
-  Clock,
-  Star,
-  Calendar,
-  Ticket,
-} from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { useQuery } from "@tanstack/react-query";
-import { useNavigate } from "react-router-dom";
-import { getAllActiveMoviesToday, getMovieById } from "@/lib/api";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import { movieStore } from "@/store/movieStore";
+import { useMemo, useState, useEffect, useRef, useCallback } from 'react';
+import { motion, AnimatePresence, useMotionValue, useSpring, useTransform } from 'framer-motion';
+import { Play, Pause, Sparkles, Waves, Clock, Star, Calendar, Ticket } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { useQuery } from '@tanstack/react-query';
+import { useNavigate } from 'react-router-dom';
+import { getAllActiveMoviesToday, getMovieById } from '@/lib/api';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { movieStore } from '@/store/movieStore';
 // @ts-ignore
-import heroImage1 from "@/assets/images/1.webp";
+import heroImage1 from '@/assets/images/1.webp';
 // @ts-ignore
-import heroImage9 from "@/assets/images/9.webp";
+import heroImage9 from '@/assets/images/9.webp';
 
-import { getSiteMediaApi } from "@/lib/api/uploads";
-import { optimizeCloudinaryUrl, optimizeCloudinaryVideoUrl, getCloudinaryThumbnail } from "@/lib/utils";
+import { getSiteMediaApi } from '@/lib/api/uploads';
+import { optimizeCloudinaryUrl, optimizeCloudinaryVideoUrl, getCloudinaryThumbnail } from '@/lib/utils';
 
 export default function HeroSection() {
   /* Use MotionValue for high-performance mouse tracking without re-renders */
@@ -89,34 +74,27 @@ export default function HeroSection() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isLoadingDetails, setIsLoadingDetails] = useState(false);
   const [storeUpdateTrigger, setStoreUpdateTrigger] = useState(0);
-  const SECTION_ID = "hero-main";
+  const SECTION_ID = 'hero-main';
 
   const { data } = useQuery({
-    queryKey: ["activeMovies"],
+    queryKey: ['activeMovies'],
     queryFn: ({ signal }) => getAllActiveMoviesToday({ signal }),
-    staleTime: 60000,
+    staleTime: 60000
   });
   const { data: siteMedia } = useQuery({
-    queryKey: ["siteMedia", "all_active_videos"],
+    queryKey: ['siteMedia', 'all_active_videos'],
     queryFn: ({ signal }) =>
       getSiteMediaApi({
-        type: "video",
+        type: 'video',
         active: true,
-        signal,
+        signal
       }),
-    staleTime: 600000,
+    staleTime: 600000
   });
 
-  const heroItem = useMemo(() =>
-    siteMedia?.items?.find((it: any) => it.section === "hero_section"),
-    [siteMedia]
-  );
+  const heroItem = useMemo(() => siteMedia?.items?.find((it: any) => it.section === 'hero_section'), [siteMedia]);
 
-  const heroVideoSrc = optimizeCloudinaryVideoUrl(
-    heroItem?.url as string,
-    720,
-    "auto:low",
-  );
+  const heroVideoSrc = optimizeCloudinaryVideoUrl(heroItem?.url as string, 720, 'auto:low');
   const heroVideoThumbnail = getCloudinaryThumbnail(heroItem?.url as string, 448);
   const [hasStarted, setHasStarted] = useState(false);
 
@@ -160,7 +138,7 @@ export default function HeroSection() {
       video.currentTime = PREVIEW_TIME;
     };
 
-    video.addEventListener("loadedmetadata", handleLoadedMetadata);
+    video.addEventListener('loadedmetadata', handleLoadedMetadata);
 
     // Pause video when component mounts
     video.pause();
@@ -172,7 +150,7 @@ export default function HeroSection() {
     }
 
     return () => {
-      video.removeEventListener("loadedmetadata", handleLoadedMetadata);
+      video.removeEventListener('loadedmetadata', handleLoadedMetadata);
     };
   }, [heroVideoSrc]);
 
@@ -187,14 +165,16 @@ export default function HeroSection() {
       }
     };
 
-    window.addEventListener("cinesphere-video-play", handleGlobalPlay);
-    return () => window.removeEventListener("cinesphere-video-play", handleGlobalPlay);
+    window.addEventListener('cinesphere-video-play', handleGlobalPlay);
+    return () => window.removeEventListener('cinesphere-video-play', handleGlobalPlay);
   }, []);
 
   const notifyGlobalPlay = useCallback(() => {
-    window.dispatchEvent(new CustomEvent("cinesphere-video-play", {
-      detail: { id: SECTION_ID }
-    }));
+    window.dispatchEvent(
+      new CustomEvent('cinesphere-video-play', {
+        detail: { id: SECTION_ID }
+      })
+    );
   }, []);
 
   // Intersection Observer for hero video - pause when scrolled out of viewport
@@ -214,8 +194,8 @@ export default function HeroSection() {
         });
       },
       {
-        threshold: 0.1, // Trigger when less than 10% visible
-      },
+        threshold: 0.1 // Trigger when less than 10% visible
+      }
     );
 
     observer.observe(videoContainerRef.current);
@@ -247,7 +227,7 @@ export default function HeroSection() {
         setIsVideoPlaying(false);
       }
     } catch (error) {
-      console.error("Error toggling video playback:", error);
+      console.error('Error toggling video playback:', error);
     }
   };
 
@@ -291,17 +271,17 @@ export default function HeroSection() {
       const movie = movies.find((m: any) => m.id === movieDetails.id);
       if (movie) {
         localStorage.setItem(
-          "selectedFilm",
+          'selectedFilm',
           JSON.stringify({
             id: movie.id,
             title: movie.title,
-            poster: movie.cover_image,
-          }),
+            poster: movie.cover_image
+          })
         );
       }
-    } catch { }
+    } catch {}
     setIsModalOpen(false);
-    navigate("/booking");
+    navigate('/booking');
   };
 
   return (
@@ -312,7 +292,9 @@ export default function HeroSection() {
       onMouseEnter={onMouseEnter}
     >
       {/* Gradient overlays */}
-      <div className="absolute inset-0 bg-black"> {/* Added dark base */}
+      <div className="absolute inset-0 bg-black">
+        {' '}
+        {/* Added dark base */}
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_20%_20%,rgba(59,130,246,0.4),transparent_30%),radial-gradient(circle_at_80%_30%,rgba(236,72,153,0.3),transparent_35%),radial-gradient(circle_at_50%_70%,rgba(34,211,238,0.35),transparent_30%)]" />
         <div className="absolute inset-0 bg-gradient-to-b from-black/80 via-black/50 to-[#050915]/95" />
       </div>
@@ -324,7 +306,7 @@ export default function HeroSection() {
         style={{
           x: blobX,
           y: blobY,
-          translateZ: 0, // Force GPU backend
+          translateZ: 0 // Force GPU backend
         }}
       />
 
@@ -334,7 +316,7 @@ export default function HeroSection() {
           <motion.div
             initial={{ opacity: 0, x: -30 }}
             animate={{ opacity: 1, x: 0 }}
-            transition={{ duration: 0.8, ease: "easeOut" }}
+            transition={{ duration: 0.8, ease: 'easeOut' }}
             className="max-w-3xl space-y-6"
           >
             <motion.h1
@@ -346,9 +328,7 @@ export default function HeroSection() {
               <span className="bg-gradient-to-r from-cyan-300 via-blue-400 to-fuchsia-400 bg-clip-text text-transparent drop-shadow-[0_10px_40px_rgba(56,189,248,0.5)] py-2">
                 CINESPHERE
               </span>
-              <span className="text-white text-3xl md:text-3xl lg:text-5xl">
-                Huyễn cảnh không gian
-              </span>
+              <span className="text-white text-3xl md:text-3xl lg:text-5xl">Huyễn cảnh không gian</span>
             </motion.h1>
 
             <motion.p
@@ -357,9 +337,8 @@ export default function HeroSection() {
               transition={{ delay: 0.4 }}
               className="text-lg md:text-xl text-gray-200 leading-relaxed max-w-2xl"
             >
-              Dùng không gian nhỏ mô phỏng thế giới vô biên. Mỗi suất chiếu là
-              một hành trình nhập vai với độ phân giải 8K và âm thanh đa tầng
-              bao quanh
+              Dùng không gian nhỏ mô phỏng thế giới vô biên. Mỗi suất chiếu là một hành trình nhập vai với độ phân giải
+              8K và âm thanh đa tầng bao quanh
             </motion.p>
 
             <motion.div
@@ -371,8 +350,8 @@ export default function HeroSection() {
               <Button
                 className="group rounded-2xl px-9 py-8 text-base md:text-lg font-semibold bg-gradient-to-r from-cyan-400 via-blue-600 to-fuchsia-500 hover:from-fuchsia-500 hover:via-cyan-400 hover:to-blue-600 text-white shadow-[0_0_40px_rgba(59,130,246,0.6)] transition-all duration-500 hover:shadow-[0_0_60px_rgba(236,72,153,0.8)] hover:scale-105"
                 onClick={() => {
-                  const bookingSection = document.getElementById("promotions");
-                  bookingSection?.scrollIntoView({ behavior: "smooth" });
+                  const bookingSection = document.getElementById('promotions');
+                  bookingSection?.scrollIntoView({ behavior: 'smooth' });
                 }}
               >
                 <span className="flex items-center gap-2">
@@ -392,19 +371,19 @@ export default function HeroSection() {
               {[
                 {
                   icon: Waves,
-                  title: "Âm thanh đa tầng",
-                  desc: "Định vị 360° bao quanh",
+                  title: 'Âm thanh đa tầng',
+                  desc: 'Định vị 360° bao quanh'
                 },
                 {
                   icon: Sparkles,
-                  title: "Hiệu ứng vũ trụ",
-                  desc: "Hào quang, photon, nebula",
+                  title: 'Hiệu ứng vũ trụ',
+                  desc: 'Hào quang, photon, nebula'
                 },
                 {
                   icon: Play,
-                  title: "Độ phân giải 8K",
-                  desc: "Màn hình đa chiều siêu nét",
-                },
+                  title: 'Độ phân giải 8K',
+                  desc: 'Màn hình đa chiều siêu nét'
+                }
               ].map(({ icon: Icon, title, desc }, idx) => (
                 <motion.div
                   key={title}
@@ -416,7 +395,7 @@ export default function HeroSection() {
                   style={{
                     x: cardX,
                     y: cardY,
-                    translateZ: 0, // Force GPU backend for each card
+                    translateZ: 0 // Force GPU backend for each card
                   }}
                 >
                   <div className="flex flex-col gap-3">
@@ -437,7 +416,7 @@ export default function HeroSection() {
           <motion.div
             initial={{ opacity: 0, x: 30 }}
             animate={{ opacity: 1, x: 0 }}
-            transition={{ duration: 0.8, delay: 0.3, ease: "easeOut" }}
+            transition={{ duration: 0.8, delay: 0.3, ease: 'easeOut' }}
             className="relative hidden lg:block z-40"
           >
             <div
@@ -459,7 +438,6 @@ export default function HeroSection() {
                       alt="Cinesphere Cinematic Experience"
                       width={448}
                       height={796}
-
                       className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
                       loading="eager"
                     />
@@ -498,12 +476,12 @@ export default function HeroSection() {
                     >
                       <button
                         className="absolute inset-0 flex items-center justify-center"
-                        aria-label={isVideoPlaying ? "Pause video" : "Play video"}
+                        aria-label={isVideoPlaying ? 'Pause video' : 'Play video'}
                       >
                         <motion.div
                           animate={{
                             scale: isVideoPlaying ? 0 : 1,
-                            opacity: isVideoPlaying ? 0 : 1,
+                            opacity: isVideoPlaying ? 0 : 1
                           }}
                           className="w-16 h-16 rounded-full bg-black/40 backdrop-blur-sm flex items-center justify-center border border-white/20"
                         >
@@ -559,14 +537,12 @@ export default function HeroSection() {
                       try {
                         const genres = Array.isArray(movieDetails.genres)
                           ? movieDetails.genres
-                          : typeof movieDetails.genres === "string"
+                          : typeof movieDetails.genres === 'string'
                             ? JSON.parse(movieDetails.genres)
                             : [];
-                        return Array.isArray(genres) && genres.length > 0
-                          ? genres.join(" • ")
-                          : "Chưa phân loại";
+                        return Array.isArray(genres) && genres.length > 0 ? genres.join(' • ') : 'Chưa phân loại';
                       } catch {
-                        return "Chưa phân loại";
+                        return 'Chưa phân loại';
                       }
                     })()}
                   </DialogDescription>
@@ -578,7 +554,7 @@ export default function HeroSection() {
                     <img
                       src={
                         optimizeCloudinaryUrl(movieDetails.cover_image, 800) ||
-                        "https://images.unsplash.com/photo-1464375117522-1311d6a5b81f?auto=format&fit=crop&w=900&q=80"
+                        'https://images.unsplash.com/photo-1464375117522-1311d6a5b81f?auto=format&fit=crop&w=900&q=80'
                       }
                       alt={movieDetails.title}
                       width={400}
@@ -596,36 +572,28 @@ export default function HeroSection() {
                         Mô tả
                       </h3>
                       <p className="text-gray-300 leading-relaxed text-sm">
-                        {movieDetails.description ||
-                          "Chưa có mô tả cho bộ phim này."}
+                        {movieDetails.description || 'Chưa có mô tả cho bộ phim này.'}
                       </p>
                     </div>
 
                     <div className="grid grid-cols-2 gap-4 pt-4 border-t border-white/10">
-                      {movieDetails.rating !== null &&
-                        movieDetails.rating !== undefined && (
-                          <div className="flex items-center gap-2 p-2 rounded-lg bg-white/5 border border-white/10">
-                            <Star className="h-4 w-4 text-yellow-400 fill-yellow-400" />
-                            <span className="text-white font-medium text-sm">
-                              {movieDetails.rating.toFixed(1)} / 10
-                            </span>
-                          </div>
-                        )}
+                      {movieDetails.rating !== null && movieDetails.rating !== undefined && (
+                        <div className="flex items-center gap-2 p-2 rounded-lg bg-white/5 border border-white/10">
+                          <Star className="h-4 w-4 text-yellow-400 fill-yellow-400" />
+                          <span className="text-white font-medium text-sm">{movieDetails.rating.toFixed(1)} / 10</span>
+                        </div>
+                      )}
                       {movieDetails.duration_min && (
                         <div className="flex items-center gap-2 p-2 rounded-lg bg-white/5 border border-white/10">
                           <Clock className="h-4 w-4 text-cyan-400" />
-                          <span className="text-white font-medium text-sm">
-                            {movieDetails.duration_min} phút
-                          </span>
+                          <span className="text-white font-medium text-sm">{movieDetails.duration_min} phút</span>
                         </div>
                       )}
                       {movieDetails.release_date && (
                         <div className="flex items-center gap-2 p-2 rounded-lg bg-white/5 border border-white/10">
                           <Calendar className="h-4 w-4 text-fuchsia-400" />
                           <span className="text-white font-medium text-sm">
-                            {new Date(
-                              movieDetails.release_date,
-                            ).toLocaleDateString("vi-VN")}
+                            {new Date(movieDetails.release_date).toLocaleDateString('vi-VN')}
                           </span>
                         </div>
                       )}
@@ -639,12 +607,8 @@ export default function HeroSection() {
                         </h4>
                         <div className="grid grid-cols-2 gap-3">
                           <div className="p-3 rounded-lg bg-white/5 border border-white/10">
-                            <div className="text-xs text-gray-400 mb-1">
-                              Vé đã bán
-                            </div>
-                            <div className="text-lg font-bold text-cyan-300">
-                              {movieDetails.stats.totalTicketsSold}
-                            </div>
+                            <div className="text-xs text-gray-400 mb-1">Vé đã bán</div>
+                            <div className="text-lg font-bold text-cyan-300">{movieDetails.stats.totalTicketsSold}</div>
                           </div>
                         </div>
                       </div>

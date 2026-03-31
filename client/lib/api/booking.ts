@@ -1,4 +1,4 @@
-import { request } from "./http";
+import { request } from './http';
 
 export async function createBookingApi(body: {
   email: string;
@@ -7,15 +7,15 @@ export async function createBookingApi(body: {
   name: string;
   movieId?: number;
   ticketCount: number;
-  paymentMethod: "vietqr" | "momo" | "vnpay";
+  paymentMethod: 'vietqr' | 'momo' | 'vnpay';
   totalPrice?: number;
   ticketPackageId?: number;
   pay_txt_code: string;
   combo: string[];
 }) {
-  return request<{ message: string; booking: any }>("/api/create-booking", {
-    method: "POST",
-    body: JSON.stringify(body),
+  return request<{ message: string; booking: any }>('/api/create-booking', {
+    method: 'POST',
+    body: JSON.stringify(body)
   });
 }
 
@@ -42,9 +42,9 @@ export async function validateBookingApi(body: {
     ticketPackage?: { id: number; name: string; price: number };
     unitPrice?: number;
     totalPrice?: number;
-  }>("/api/validate-booking", {
-    method: "POST",
-    body: JSON.stringify(body),
+  }>('/api/validate-booking', {
+    method: 'POST',
+    body: JSON.stringify(body)
   });
 }
 
@@ -55,9 +55,9 @@ export async function confirmBookingApi(body: {
   transaction_id?: string;
   paid_at?: string;
 }) {
-  return request<{ message: string; booking: any }>("/api/confirm-booking", {
-    method: "POST",
-    body: JSON.stringify(body),
+  return request<{ message: string; booking: any }>('/api/confirm-booking', {
+    method: 'POST',
+    body: JSON.stringify(body)
   });
 }
 
@@ -106,7 +106,7 @@ export async function useTicketApi(code: string) {
     message: string;
     booking: { id: number; is_used: boolean };
   }>(`/api/bookings-use`, {
-    method: "POST",
-    body: JSON.stringify({ code }),
+    method: 'POST',
+    body: JSON.stringify({ code })
   });
 }

@@ -1,15 +1,22 @@
-import React, { useRef, useState, useEffect } from "react";
-import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Progress } from "@/components/ui/progress";
-import { uploadAdminVideo, uploadDirectToCloudinary, createSiteMediaApi, getSiteMediaApi, updateSiteMediaApi, deleteSiteMediaApi } from "@/lib/api/uploads";
-import { toast } from "sonner";
-import { formatDistanceToNow } from "date-fns";
-import { vi } from "date-fns/locale";
-import { optimizeCloudinaryUrl, getCloudinaryThumbnail } from "@/lib/utils";
+import React, { useRef, useState, useEffect } from 'react';
+import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Progress } from '@/components/ui/progress';
+import {
+  uploadAdminVideo,
+  uploadDirectToCloudinary,
+  createSiteMediaApi,
+  getSiteMediaApi,
+  updateSiteMediaApi,
+  deleteSiteMediaApi
+} from '@/lib/api/uploads';
+import { toast } from 'sonner';
+import { formatDistanceToNow } from 'date-fns';
+import { vi } from 'date-fns/locale';
+import { optimizeCloudinaryUrl, getCloudinaryThumbnail } from '@/lib/utils';
 import {
   Upload,
   FileVideo,
@@ -25,14 +32,13 @@ import {
   Grid3X3,
   RefreshCw,
   Info
-} from "lucide-react";
+} from 'lucide-react';
 
 export default function UploadsContent() {
-
   const fileRef = useRef<HTMLInputElement | null>(null);
   const [files, setFiles] = useState<File[]>([]);
   const [openConfirm, setOpenConfirm] = useState(false);
-  const [confirmMessage, setConfirmMessage] = useState("");
+  const [confirmMessage, setConfirmMessage] = useState('');
   const [pendingTargetId, setPendingTargetId] = useState<number | null>(null);
   const [uploads, setUploads] = useState<
     {
@@ -41,29 +47,31 @@ export default function UploadsContent() {
       name: string;
       size: number;
       type: string;
-      section: "hero_section" | "technology_section1" | "technology_section2";
+      section: 'hero_section' | 'technology_section1' | 'technology_section2';
       isVideo: boolean;
       isImage: boolean;
       compressProgress?: number | null;
       uploadProgress: number;
-      status: "pending" | "uploading" | "done" | "error";
+      status: 'pending' | 'uploading' | 'done' | 'error';
       error?: string;
       targetId?: number;
     }[]
   >([]);
   const runningRef = useRef(0);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
-  const [section, setSection] = useState<"hero_section" | "technology_section1" | "technology_section2">("hero_section");
+  const [section, setSection] = useState<'hero_section' | 'technology_section1' | 'technology_section2'>(
+    'hero_section'
+  );
   const [statusLines, setStatusLines] = useState<string[]>([]);
-  const [stage, setStage] = useState<"idle" | "compressing" | "uploading" | "done" | "error">("idle");
+  const [stage, setStage] = useState<'idle' | 'compressing' | 'uploading' | 'done' | 'error'>('idle');
   const [openMediaModal, setOpenMediaModal] = useState(false);
   const [mediaItems, setMediaItems] = useState<any[]>([]);
   const [mediaLoadingId, setMediaLoadingId] = useState<number | null>(null);
   const [playingVideoId, setPlayingVideoId] = useState<number | null>(null);
 
   const getThumbnail = (url: string, type: string) => {
-    if (type === "image") return url;
-    if (url.includes("cloudinary.com") || url.includes("res.cloudinary.com")) {
+    if (type === 'image') return url;
+    if (url.includes('cloudinary.com') || url.includes('res.cloudinary.com')) {
       return getCloudinaryThumbnail(url);
     }
     return null;
@@ -80,14 +88,14 @@ export default function UploadsContent() {
     // If all are done/error, we CAN reset (or maybe user wants to clear manually).
     // The user complaint is they CANNOT select. The previous code forced a reset.
 
-    const hasActive = uploads.some(u => u.status === "pending" || u.status === "uploading");
+    const hasActive = uploads.some((u) => u.status === 'pending' || u.status === 'uploading');
     if (!hasActive && arr.length > 0) {
       // If mixed done/error and we pick new files, maybe we should just keep them until manual clear?
       // But to be safe and consistent with previous "refresh" behavior on new batch:
       if (uploads.length > 0) {
         // Auto-clear old finished tasks if user picks new ones?
-        // Or just append? 
-        // User interaction implies "Add more". 
+        // Or just append?
+        // User interaction implies "Add more".
         // Let's NOT clear automatically. Let the user use the "Refresh" button to clear.
       }
     }
@@ -96,8 +104,7 @@ export default function UploadsContent() {
     // But stage is derivative.
   };
 
-  const isValidVideo = (f: File | null) =>
-    !!f && /^video\//.test(f.type);
+  const isValidVideo = (f: File | null) => !!f && /^video\//.test(f.type);
 
   const formatSize = (bytes: number) => {
     if (bytes < 1024) return `${bytes} B`;
@@ -131,20 +138,20 @@ export default function UploadsContent() {
       const ratio = Math.min(1, maxDim / Math.max(img.width, img.height));
       const w = Math.round(img.width * ratio);
       const h = Math.round(img.height * ratio);
-      const canvas = document.createElement("canvas");
+      const canvas = document.createElement('canvas');
       canvas.width = w;
       canvas.height = h;
-      const ctx = canvas.getContext("2d");
+      const ctx = canvas.getContext('2d');
       if (!ctx) return fi;
       ctx.drawImage(img, 0, 0, w, h);
       let quality = 0.82;
-      let blob: Blob | null = await new Promise((resolve) => canvas.toBlob(resolve, "image/webp", quality));
+      let blob: Blob | null = await new Promise((resolve) => canvas.toBlob(resolve, 'image/webp', quality));
       for (let i = 0; i < 3 && blob && blob.size > 10_000_000; i++) {
         quality = Math.max(0.5, quality - 0.12);
-        blob = await new Promise((resolve) => canvas.toBlob(resolve, "image/webp", quality));
+        blob = await new Promise((resolve) => canvas.toBlob(resolve, 'image/webp', quality));
       }
       if (blob && blob.size < fi.size) {
-        return new File([blob], fi.name.replace(/\.(png|jpg|jpeg|bmp|gif)$/i, ".webp"), { type: "image/webp" });
+        return new File([blob], fi.name.replace(/\.(png|jpg|jpeg|bmp|gif)$/i, '.webp'), { type: 'image/webp' });
       }
       return fi;
     } finally {
@@ -155,12 +162,12 @@ export default function UploadsContent() {
   // Effect to manage queue processing
   useEffect(() => {
     const maxConcurrent = 4;
-    const activeCount = uploads.filter((u) => u.status === "uploading").length;
-    const pendingItem = uploads.find((u) => u.status === "pending");
+    const activeCount = uploads.filter((u) => u.status === 'uploading').length;
+    const pendingItem = uploads.find((u) => u.status === 'pending');
 
     // Auto-update stage to "done" if nothing is running or pending
-    if (activeCount === 0 && !pendingItem && uploads.length > 0 && stage === "uploading") {
-      setStage("done");
+    if (activeCount === 0 && !pendingItem && uploads.length > 0 && stage === 'uploading') {
+      setStage('done');
     }
 
     // If we have slots and pending items
@@ -168,9 +175,7 @@ export default function UploadsContent() {
       const nextItem = pendingItem;
       if (nextItem) {
         // Mark as uploading immediately to prevent double processing in next render
-        setUploads((prev) =>
-          prev.map((u) => (u.id === nextItem.id ? { ...u, status: "uploading" } : u))
-        );
+        setUploads((prev) => prev.map((u) => (u.id === nextItem.id ? { ...u, status: 'uploading' } : u)));
 
         // Start async task
         (async () => {
@@ -193,47 +198,53 @@ export default function UploadsContent() {
                 if (i !== -1) cp[i] = { ...cp[i], compressProgress: 100 };
                 return cp;
               });
-              setStatusLines((prev) => [...prev, `Đã nén ảnh [${nextItem.name}] (${formatSize(finalFile.size)} từ ${formatSize(nextItem.size)}), đang upload...`]);
+              setStatusLines((prev) => [
+                ...prev,
+                `Đã nén ảnh [${nextItem.name}] (${formatSize(finalFile.size)} từ ${formatSize(nextItem.size)}), đang upload...`
+              ]);
             }
 
-            setStage("uploading");
+            setStage('uploading');
 
             const result = await (nextItem.isVideo
               ? uploadAdminVideo(finalFile, nextItem.section, (p) =>
-                setUploads((arr) => {
-                  const cp = [...arr];
-                  const i = cp.findIndex((x) => x.id === nextItem.id);
-                  if (i !== -1) cp[i] = { ...cp[i], uploadProgress: p };
-                  return cp;
-                })
-              )
+                  setUploads((arr) => {
+                    const cp = [...arr];
+                    const i = cp.findIndex((x) => x.id === nextItem.id);
+                    if (i !== -1) cp[i] = { ...cp[i], uploadProgress: p };
+                    return cp;
+                  })
+                )
               : uploadDirectToCloudinary(finalFile, nextItem.section, (p) =>
-                setUploads((arr) => {
-                  const cp = [...arr];
-                  const i = cp.findIndex((x) => x.id === nextItem.id);
-                  if (i !== -1) cp[i] = { ...cp[i], uploadProgress: p };
-                  return cp;
-                })
-              ));
+                  setUploads((arr) => {
+                    const cp = [...arr];
+                    const i = cp.findIndex((x) => x.id === nextItem.id);
+                    if (i !== -1) cp[i] = { ...cp[i], uploadProgress: p };
+                    return cp;
+                  })
+                ));
 
             if (nextItem.targetId) {
               await updateSiteMediaApi({
                 id: nextItem.targetId,
                 section: nextItem.section,
-                type: nextItem.isVideo ? "video" : "image",
+                type: nextItem.isVideo ? 'video' : 'image',
                 url: result.url,
                 public_id: result.public_id,
                 format: result.format,
                 width: result.width,
                 height: result.height,
                 duration: result.duration,
-                is_active: true,
+                is_active: true
               });
-              setStatusLines((prev) => [...prev, `Đã cập nhật [${nextItem.name}] vào ${nextItem.section} (ID: ${nextItem.targetId})`]);
+              setStatusLines((prev) => [
+                ...prev,
+                `Đã cập nhật [${nextItem.name}] vào ${nextItem.section} (ID: ${nextItem.targetId})`
+              ]);
             } else {
               await createSiteMediaApi({
                 section: nextItem.section,
-                type: nextItem.isVideo ? "video" : "image",
+                type: nextItem.isVideo ? 'video' : 'image',
                 url: result.url,
                 public_id: result.public_id,
                 format: result.format,
@@ -241,7 +252,7 @@ export default function UploadsContent() {
                 height: result.height,
                 duration: result.duration,
                 display_order: 0,
-                is_active: true,
+                is_active: true
               });
               setStatusLines((prev) => [...prev, `Đã tạo mới [${nextItem.name}] vào ${nextItem.section}`]);
             }
@@ -249,18 +260,21 @@ export default function UploadsContent() {
             setUploads((arr) => {
               const cp = [...arr];
               const i = cp.findIndex((x) => x.id === nextItem.id);
-              if (i !== -1) cp[i] = { ...cp[i], status: "done", uploadProgress: 100 };
+              if (i !== -1) cp[i] = { ...cp[i], status: 'done', uploadProgress: 100 };
               return cp;
             });
           } catch (err: any) {
             setUploads((arr) => {
               const cp = [...arr];
               const i = cp.findIndex((x) => x.id === nextItem.id);
-              if (i !== -1) cp[i] = { ...cp[i], status: "error", error: err?.message || "Upload lỗi" };
+              if (i !== -1) cp[i] = { ...cp[i], status: 'error', error: err?.message || 'Upload lỗi' };
               return cp;
             });
-            setStage("error");
-            setStatusLines((prev) => [...prev, `Upload thất bại [${nextItem.name}]: ${err?.message || "Có lỗi xảy ra"}`]);
+            setStage('error');
+            setStatusLines((prev) => [
+              ...prev,
+              `Upload thất bại [${nextItem.name}]: ${err?.message || 'Có lỗi xảy ra'}`
+            ]);
           }
         })();
       }
@@ -269,7 +283,7 @@ export default function UploadsContent() {
 
   const checkAndPrepareUpload = async () => {
     if (!files.length) return;
-    setConfirmMessage("");
+    setConfirmMessage('');
     setPendingTargetId(null);
 
     try {
@@ -277,7 +291,7 @@ export default function UploadsContent() {
       const res = await getSiteMediaApi({ section });
       const items = res.items || [];
 
-      if (section === "technology_section2") {
+      if (section === 'technology_section2') {
         if (items.length >= 6) {
           // Sort by display_order to find the 6th one
           const sorted = [...items].sort((a, b) => (a.display_order || 0) - (b.display_order || 0));
@@ -286,7 +300,9 @@ export default function UploadsContent() {
 
           if (target) {
             setPendingTargetId(target.id);
-            setConfirmMessage(`Mục ${section} đã đạt giới hạn 6 video. Hành động này sẽ GHI ĐÈ lên video thứ 6 (ID: ${target.id}).`);
+            setConfirmMessage(
+              `Mục ${section} đã đạt giới hạn 6 video. Hành động này sẽ GHI ĐÈ lên video thứ 6 (ID: ${target.id}).`
+            );
             setOpenConfirm(true);
             return;
           }
@@ -303,13 +319,15 @@ export default function UploadsContent() {
       }
 
       // Default: Insert new
-      setConfirmMessage(files.length === 1 && /^image\//.test(files[0].type)
-        ? "Bạn có chắc muốn tải lên ảnh này?"
-        : "Bạn có chắc muốn tải lên các tệp đã chọn?");
+      setConfirmMessage(
+        files.length === 1 && /^image\//.test(files[0].type)
+          ? 'Bạn có chắc muốn tải lên ảnh này?'
+          : 'Bạn có chắc muốn tải lên các tệp đã chọn?'
+      );
       setOpenConfirm(true);
     } catch (err) {
-      console.error("Check failed", err);
-      setConfirmMessage("Không thể kiểm tra dữ liệu cũ. Bạn có muốn tiếp tục tải lên?");
+      console.error('Check failed', err);
+      setConfirmMessage('Không thể kiểm tra dữ liệu cũ. Bạn có muốn tiếp tục tải lên?');
       setOpenConfirm(true);
     }
   };
@@ -317,8 +335,8 @@ export default function UploadsContent() {
   const startUpload = async () => {
     if (!files.length) return;
     setOpenConfirm(false);
-    setStage("compressing");
-    setStatusLines((prev) => [...prev, "Đã thêm vào hàng đợi..."]);
+    setStage('compressing');
+    setStatusLines((prev) => [...prev, 'Đã thêm vào hàng đợi...']);
     const toAdd = files.map((f) => ({
       id: crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}_${Math.random()}`,
       file: f,
@@ -330,13 +348,13 @@ export default function UploadsContent() {
       isImage: /^image\//.test(f.type),
       compressProgress: /^image\//.test(f.type) ? 0 : null,
       uploadProgress: 0,
-      status: "pending" as const,
-      targetId: pendingTargetId || undefined,
+      status: 'pending' as const,
+      targetId: pendingTargetId || undefined
     }));
     setUploads((arr) => [...arr, ...toAdd]);
     setFiles([]);
     setPendingTargetId(null); // Reset
-    if (fileRef.current) fileRef.current.value = "";
+    if (fileRef.current) fileRef.current.value = '';
   };
 
   return (
@@ -396,7 +414,7 @@ export default function UploadsContent() {
                     onClick={(e) => {
                       e.stopPropagation();
                       setFiles([]);
-                      if (fileRef.current) fileRef.current.value = "";
+                      if (fileRef.current) fileRef.current.value = '';
                     }}
                     className="ml-auto p-1 hover:bg-white/10 rounded-full transition-colors"
                   >
@@ -442,24 +460,26 @@ export default function UploadsContent() {
 
             <div className="flex items-center gap-3 pt-4 border-t border-white/10">
               <Button
-                disabled={!files.length || uploads.some(u => u.status === "uploading" || u.status === "pending")}
+                disabled={!files.length || uploads.some((u) => u.status === 'uploading' || u.status === 'pending')}
                 onClick={checkAndPrepareUpload}
                 className="bg-blue-600 hover:bg-blue-700 h-11 px-8 rounded-xl font-bold shadow-lg shadow-blue-900/20 active:scale-95 transition-all flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 <CloudUpload className="w-5 h-5" />
-                {uploads.some(u => u.status === "uploading" || u.status === "pending") ? "Đang xử lý..." : "Bắt đầu Upload"}
+                {uploads.some((u) => u.status === 'uploading' || u.status === 'pending')
+                  ? 'Đang xử lý...'
+                  : 'Bắt đầu Upload'}
               </Button>
               <Button
                 variant="outline"
                 size="icon"
-                disabled={uploads.some(u => u.status === "uploading" || u.status === "pending")}
+                disabled={uploads.some((u) => u.status === 'uploading' || u.status === 'pending')}
                 onClick={() => {
                   setFiles([]);
                   setUploads([]);
-                  if (fileRef.current) fileRef.current.value = "";
+                  if (fileRef.current) fileRef.current.value = '';
                   setPreviewUrl(null);
                   setStatusLines([]);
-                  setStage("idle");
+                  setStage('idle');
                 }}
                 className="rounded-xl shadow-sm hover:rotate-180 transition-transform duration-500 shrink-0 h-11 w-11 flex items-center justify-center bg-white/5 border-white/20 text-white disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:rotate-0"
                 title="Làm mới"
@@ -477,7 +497,7 @@ export default function UploadsContent() {
                     setMediaItems(items);
                     setOpenMediaModal(true);
                   } catch (err: any) {
-                    toast.error("Lỗi tải danh sách", { description: err?.message || "Không thể tải site media" });
+                    toast.error('Lỗi tải danh sách', { description: err?.message || 'Không thể tải site media' });
                   }
                 }}
                 className="text-blue-400 bg-blue-500/10 hover:bg-blue-500/20 border-blue-500/20 h-11 px-6 rounded-xl transition-all flex items-center gap-2"
@@ -494,10 +514,16 @@ export default function UploadsContent() {
               <div className="h-full rounded-2xl border border-white/10 bg-black/40 backdrop-blur-md overflow-hidden flex flex-col shadow-2xl">
                 <div className="p-4 border-b border-white/5 flex items-center justify-between bg-white/5">
                   <div className="flex items-center gap-2">
-                    {/^image\//.test(files[0].type) ? <FileImage className="w-4 h-4 text-emerald-400" /> : <FileVideo className="w-4 h-4 text-blue-400" />}
+                    {/^image\//.test(files[0].type) ? (
+                      <FileImage className="w-4 h-4 text-emerald-400" />
+                    ) : (
+                      <FileVideo className="w-4 h-4 text-blue-400" />
+                    )}
                     <span className="text-sm font-semibold truncate max-w-[200px]">{files[0].name}</span>
                   </div>
-                  <span className="text-[10px] uppercase tracking-wider font-bold text-gray-500 bg-white/5 px-2 py-0.5 rounded">Preview</span>
+                  <span className="text-[10px] uppercase tracking-wider font-bold text-gray-500 bg-white/5 px-2 py-0.5 rounded">
+                    Preview
+                  </span>
                 </div>
 
                 <div className="relative flex-1 bg-black/20 flex items-center justify-center p-6">
@@ -509,11 +535,7 @@ export default function UploadsContent() {
                         className="w-full h-full object-contain max-h-[400px] animate-in zoom-in-95 duration-500"
                       />
                     ) : (
-                      <video
-                        src={previewUrl}
-                        controls
-                        className="w-full h-full object-contain max-h-[400px]"
-                      />
+                      <video src={previewUrl} controls className="w-full h-full object-contain max-h-[400px]" />
                     )}
                   </div>
                 </div>
@@ -526,7 +548,7 @@ export default function UploadsContent() {
                     </div>
                     <div className="space-y-1">
                       <p className="text-[10px] text-gray-500 font-bold uppercase tracking-tight">Định dạng</p>
-                      <p className="text-sm text-white font-medium truncate">{files[0].type || "N/A"}</p>
+                      <p className="text-sm text-white font-medium truncate">{files[0].type || 'N/A'}</p>
                     </div>
                   </div>
                 </div>
@@ -552,43 +574,63 @@ export default function UploadsContent() {
               <div className="space-y-4">
                 <div className="flex items-center justify-between">
                   <h3 className="text-sm font-bold text-blue-200 uppercase tracking-wider flex items-center gap-2">
-                    <RefreshCw className={`w-4 h-4 ${stage === "uploading" ? "animate-spin" : ""}`} />
+                    <RefreshCw className={`w-4 h-4 ${stage === 'uploading' ? 'animate-spin' : ''}`} />
                     Tiến trình trực tiếp
                   </h3>
                   <span className="text-[10px] text-gray-500 bg-white/5 px-2 py-0.5 rounded-full border border-white/10">
-                    {uploads.filter(u => u.status === "done").length}/{uploads.length} Hoàn thành
+                    {uploads.filter((u) => u.status === 'done').length}/{uploads.length} Hoàn thành
                   </span>
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   {uploads.map((u) => (
-                    <div key={u.id} className="relative group rounded-xl bg-white/5 border border-white/10 p-4 transition-all hover:bg-white/10 overflow-hidden">
+                    <div
+                      key={u.id}
+                      className="relative group rounded-xl bg-white/5 border border-white/10 p-4 transition-all hover:bg-white/10 overflow-hidden"
+                    >
                       <div className="flex items-start justify-between mb-3">
                         <div className="flex items-center gap-3 overflow-hidden">
-                          <div className={`w-10 h-10 rounded-lg flex items-center justify-center shrink-0 ${u.status === "done" ? "bg-emerald-500/20 text-emerald-400" :
-                            u.status === "error" ? "bg-red-500/20 text-red-400" :
-                              "bg-blue-500/20 text-blue-400"
-                            }`}>
+                          <div
+                            className={`w-10 h-10 rounded-lg flex items-center justify-center shrink-0 ${
+                              u.status === 'done'
+                                ? 'bg-emerald-500/20 text-emerald-400'
+                                : u.status === 'error'
+                                  ? 'bg-red-500/20 text-red-400'
+                                  : 'bg-blue-500/20 text-blue-400'
+                            }`}
+                          >
                             {u.isImage ? <FileImage className="w-5 h-5" /> : <FileVideo className="w-5 h-5" />}
                           </div>
                           <div className="overflow-hidden">
                             <div className="text-sm text-white font-semibold truncate">{u.name}</div>
-                            <div className="text-[10px] text-gray-500 font-medium">{formatSize(u.size)} • {u.type.split('/')[1]?.toUpperCase() || "N/A"}</div>
+                            <div className="text-[10px] text-gray-500 font-medium">
+                              {formatSize(u.size)} • {u.type.split('/')[1]?.toUpperCase() || 'N/A'}
+                            </div>
                           </div>
                         </div>
-                        <div className={`shrink-0 px-2 py-1 rounded-md text-[10px] font-bold uppercase tracking-tighter ${u.status === "done" ? "bg-emerald-500/20 text-emerald-400" :
-                          u.status === "error" ? "bg-red-500/20 text-red-400" :
-                            u.status === "uploading" ? "bg-blue-500/20 text-blue-400 animate-pulse" :
-                              "bg-gray-500/20 text-gray-400"
-                          }`}>
-                          {u.status === "done" ? "Xong" :
-                            u.status === "error" ? "Lỗi" :
-                              u.status === "uploading" ? "Upload" : "Chờ"}
+                        <div
+                          className={`shrink-0 px-2 py-1 rounded-md text-[10px] font-bold uppercase tracking-tighter ${
+                            u.status === 'done'
+                              ? 'bg-emerald-500/20 text-emerald-400'
+                              : u.status === 'error'
+                                ? 'bg-red-500/20 text-red-400'
+                                : u.status === 'uploading'
+                                  ? 'bg-blue-500/20 text-blue-400 animate-pulse'
+                                  : 'bg-gray-500/20 text-gray-400'
+                          }`}
+                        >
+                          {u.status === 'done'
+                            ? 'Xong'
+                            : u.status === 'error'
+                              ? 'Lỗi'
+                              : u.status === 'uploading'
+                                ? 'Upload'
+                                : 'Chờ'}
                         </div>
                       </div>
 
                       <div className="space-y-3">
-                        {u.isImage && u.status !== "done" && u.status !== "error" && (
+                        {u.isImage && u.status !== 'done' && u.status !== 'error' && (
                           <div className="space-y-1.5">
                             <div className="flex justify-between text-[10px] font-bold text-gray-400">
                               <span>Nén ảnh</span>
@@ -598,7 +640,7 @@ export default function UploadsContent() {
                           </div>
                         )}
 
-                        {u.status !== "done" && u.status !== "error" && (
+                        {u.status !== 'done' && u.status !== 'error' && (
                           <div className="space-y-1.5">
                             <div className="flex justify-between text-[10px] font-bold text-gray-400">
                               <span>Tải lên</span>
@@ -608,7 +650,7 @@ export default function UploadsContent() {
                           </div>
                         )}
 
-                        {u.status === "done" && (
+                        {u.status === 'done' && (
                           <div className="flex items-center gap-2 text-[11px] text-emerald-400 font-medium py-1 animate-in fade-in">
                             <CheckCircle2 className="w-3.5 h-3.5" />
                             Upload thành công
@@ -648,7 +690,8 @@ export default function UploadsContent() {
                 <div>
                   <h4 className="text-sm font-bold text-blue-300">Sẵn sàng tải lên</h4>
                   <p className="text-xs text-blue-400/60 mt-0.5">
-                    Nhấn nút <span className="text-blue-300 font-bold">"Bắt đầu Upload"</span> để xử lý {files.length} tệp đã chọn.
+                    Nhấn nút <span className="text-blue-300 font-bold">"Bắt đầu Upload"</span> để xử lý {files.length}{' '}
+                    tệp đã chọn.
                   </p>
                 </div>
               </div>
@@ -662,8 +705,13 @@ export default function UploadsContent() {
                 </h3>
                 <div className="rounded-xl bg-black/40 p-4 max-h-40 overflow-y-auto border border-white/5 font-mono">
                   {statusLines.map((ln, idx) => (
-                    <div key={idx} className="text-[10px] text-gray-500 py-1 flex gap-2 border-b border-white/5 last:border-0">
-                      <span className="text-blue-500/50 shrink-0">[{new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}]</span>
+                    <div
+                      key={idx}
+                      className="text-[10px] text-gray-500 py-1 flex gap-2 border-b border-white/5 last:border-0"
+                    >
+                      <span className="text-blue-500/50 shrink-0">
+                        [{new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}]
+                      </span>
                       <span className="leading-relaxed">{ln}</span>
                     </div>
                   ))}
@@ -680,9 +728,10 @@ export default function UploadsContent() {
             </DialogHeader>
             <div className="space-y-3">
               <div className="text-sm text-gray-700">
-                {confirmMessage || (files.length === 1 && /^image\//.test(files[0].type)
-                  ? "Bạn có chắc muốn tải lên ảnh này?"
-                  : "Bạn có chắc muốn tải lên các tệp đã chọn?")}
+                {confirmMessage ||
+                  (files.length === 1 && /^image\//.test(files[0].type)
+                    ? 'Bạn có chắc muốn tải lên ảnh này?'
+                    : 'Bạn có chắc muốn tải lên các tệp đã chọn?')}
               </div>
               <div className="flex gap-2">
                 <Button onClick={startUpload}>Xác nhận</Button>
@@ -694,10 +743,13 @@ export default function UploadsContent() {
           </DialogContent>
         </Dialog>
 
-        <Dialog open={openMediaModal} onOpenChange={(val) => {
-          setOpenMediaModal(val);
-          if (!val) setPlayingVideoId(null);
-        }}>
+        <Dialog
+          open={openMediaModal}
+          onOpenChange={(val) => {
+            setOpenMediaModal(val);
+            if (!val) setPlayingVideoId(null);
+          }}
+        >
           <DialogContent className="bg-[#0b1224] text-white border-white/10 max-w-5xl w-[95vw] h-[85vh] flex flex-col p-0 overflow-hidden shadow-2xl [&>button]:hidden">
             <DialogHeader className="p-6 border-b border-white/5 bg-white/5 flex flex-row items-center justify-between space-y-0">
               <div className="flex items-center gap-3">
@@ -706,7 +758,9 @@ export default function UploadsContent() {
                 </div>
                 <div>
                   <DialogTitle className="text-xl font-bold">Thư viện Site Media</DialogTitle>
-                  <p className="text-xs text-gray-500 mt-0.5">Quản lý và xem trước nội dung đa phương tiện của trang web</p>
+                  <p className="text-xs text-gray-500 mt-0.5">
+                    Quản lý và xem trước nội dung đa phương tiện của trang web
+                  </p>
                 </div>
               </div>
               <Button
@@ -722,10 +776,13 @@ export default function UploadsContent() {
             <div className="flex-1 overflow-y-auto p-6 custom-scrollbar bg-black/20">
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
                 {mediaItems.map((m) => (
-                  <div key={m.id} className="group relative rounded-2xl border border-white/10 bg-[#16213e] overflow-hidden flex flex-col transition-all hover:border-blue-500/50 hover:shadow-lg hover:shadow-blue-900/10 hover:-translate-y-1">
+                  <div
+                    key={m.id}
+                    className="group relative rounded-2xl border border-white/10 bg-[#16213e] overflow-hidden flex flex-col transition-all hover:border-blue-500/50 hover:shadow-lg hover:shadow-blue-900/10 hover:-translate-y-1"
+                  >
                     {/* Media Preview Area */}
                     <div className="aspect-video bg-black/40 relative flex items-center justify-center group-hover:bg-black/20 transition-colors">
-                      {m.type === "image" ? (
+                      {m.type === 'image' ? (
                         <img
                           src={m.url}
                           alt={m.section}
@@ -738,12 +795,7 @@ export default function UploadsContent() {
                           onClick={() => setPlayingVideoId(m.id)}
                         >
                           {playingVideoId === m.id ? (
-                            <video
-                              src={m.url}
-                              autoPlay
-                              controls
-                              className="w-full h-full object-cover"
-                            />
+                            <video src={m.url} autoPlay controls className="w-full h-full object-cover" />
                           ) : (
                             <>
                               {getThumbnail(m.url, m.type) ? (
@@ -753,7 +805,7 @@ export default function UploadsContent() {
                                   loading="lazy"
                                   className="w-full h-full object-cover opacity-60 group-hover:opacity-80 transition-opacity"
                                 />
-                              ) : m.type === "video" ? (
+                              ) : m.type === 'video' ? (
                                 <video
                                   src={m.url}
                                   preload="metadata"
@@ -802,17 +854,17 @@ export default function UploadsContent() {
                           className="h-8 w-8 p-0 rounded-full bg-red-500/80 hover:bg-red-500 text-white backdrop-blur-md"
                           disabled={mediaLoadingId === m.id}
                           onClick={async () => {
-                            if (window.confirm("Bạn có chắc chắn muốn xóa media này?")) {
+                            if (window.confirm('Bạn có chắc chắn muốn xóa media này?')) {
                               try {
                                 setMediaLoadingId(m.id);
                                 const r = await deleteSiteMediaApi(Number(m.id));
                                 if (r.ok) {
-                                  toast.success("Đã xóa media thành công");
+                                  toast.success('Đã xóa media thành công');
                                   const { items } = await getSiteMediaApi({});
                                   setMediaItems(items);
                                 } else throw new Error();
                               } catch {
-                                toast.error("Xóa thất bại");
+                                toast.error('Xóa thất bại');
                               } finally {
                                 setMediaLoadingId(null);
                               }
@@ -830,8 +882,11 @@ export default function UploadsContent() {
                       <div className="space-y-2">
                         <div className="flex items-center justify-between">
                           <span className="text-[10px] font-mono text-gray-500 uppercase">ID: #{m.id}</span>
-                          <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase ${m.type === 'image' ? 'bg-emerald-500/10 text-emerald-400' : 'bg-blue-500/10 text-blue-400'
-                            }`}>
+                          <span
+                            className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase ${
+                              m.type === 'image' ? 'bg-emerald-500/10 text-emerald-400' : 'bg-blue-500/10 text-blue-400'
+                            }`}
+                          >
                             {m.type}
                           </span>
                         </div>
@@ -843,10 +898,12 @@ export default function UploadsContent() {
                       <div className="mt-4 pt-4 border-t border-white/5 flex items-center justify-between">
                         <div
                           className="flex items-center gap-1.5 text-[10px] text-gray-500 font-medium cursor-help"
-                          title={m.updated_at ? new Date(m.updated_at).toLocaleString("vi-VN") : ""}
+                          title={m.updated_at ? new Date(m.updated_at).toLocaleString('vi-VN') : ''}
                         >
                           <RefreshCw className="w-3 h-3" />
-                          {m.updated_at ? formatDistanceToNow(new Date(m.updated_at), { addSuffix: true, locale: vi }) : "N/A"}
+                          {m.updated_at
+                            ? formatDistanceToNow(new Date(m.updated_at), { addSuffix: true, locale: vi })
+                            : 'N/A'}
                         </div>
                       </div>
                     </div>

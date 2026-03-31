@@ -1,40 +1,28 @@
-import React, { useState } from "react";
-import { Clock, History, Loader2, RefreshCw, Edit3, Trash2, Info, Ticket as TicketIcon } from "lucide-react";
-import { format, formatDistanceToNow } from "date-fns";
-import { vi } from "date-fns/locale";
-import { Switch } from "@/components/ui/switch";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import { Badge } from "@/components/ui/badge";
+import React, { useState } from 'react';
+import { Clock, History, Loader2, RefreshCw, Edit3, Trash2, Info, Ticket as TicketIcon } from 'lucide-react';
+import { format, formatDistanceToNow } from 'date-fns';
+import { vi } from 'date-fns/locale';
+import { Switch } from '@/components/ui/switch';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Badge } from '@/components/ui/badge';
 import {
   Pagination,
   PaginationContent,
   PaginationItem,
   PaginationLink,
   PaginationNext,
-  PaginationPrevious,
-} from "@/components/ui/pagination";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Checkbox } from "@/components/ui/checkbox";
-import { toast } from "sonner";
-import { createTicketApi, updateTicketApi } from "@/lib/api";
-import { getMoviesAdmin } from "@/lib/api/movies";
-import { Skeleton } from "@/components/ui/skeleton";
+  PaginationPrevious
+} from '@/components/ui/pagination';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Checkbox } from '@/components/ui/checkbox';
+import { toast } from 'sonner';
+import { createTicketApi, updateTicketApi } from '@/lib/api';
+import { getMoviesAdmin } from '@/lib/api/movies';
+import { Skeleton } from '@/components/ui/skeleton';
 
 interface TicketPackage {
   id: number;
@@ -73,7 +61,6 @@ interface Props {
 }
 
 export default function TicketsContent(props: Props) {
-
   const {
     data,
     totalPages,
@@ -89,7 +76,7 @@ export default function TicketsContent(props: Props) {
     onRefresh,
     deleteTicketApi,
     showActiveOnly,
-    setShowActiveOnly,
+    setShowActiveOnly
   } = props;
   const { isLoading = false } = props as any;
 
@@ -99,7 +86,7 @@ export default function TicketsContent(props: Props) {
 
   React.useEffect(() => {
     if (isEditOpen) {
-      getMoviesAdmin({ status: "active", pageSize: 100 }).then((res) => {
+      getMoviesAdmin({ status: 'active', pageSize: 100 }).then((res) => {
         setMovies(res.items);
       });
     }
@@ -111,9 +98,7 @@ export default function TicketsContent(props: Props) {
         <div className="flex flex-col gap-1">
           <h3 className="text-lg font-bold text-slate-900">Quản lý gói vé</h3>
           <div className="flex items-center gap-2 px-3 py-1 bg-slate-50 rounded-lg border border-slate-200 w-fit">
-            <span className="text-[10px] font-black text-slate-500 uppercase tracking-tighter">
-              Chỉ hiện khả dụng
-            </span>
+            <span className="text-[10px] font-black text-slate-500 uppercase tracking-tighter">Chỉ hiện khả dụng</span>
             <Switch
               checked={showActiveOnly}
               onCheckedChange={setShowActiveOnly}
@@ -122,19 +107,19 @@ export default function TicketsContent(props: Props) {
           </div>
         </div>
         <div className="flex gap-2 ml-auto">
-          <Button 
-            onClick={onCreate} 
+          <Button
+            onClick={onCreate}
             className="h-10 px-6 rounded-xl text-sm font-bold bg-blue-600 hover:bg-blue-700 shadow-lg shadow-blue-200"
           >
             + Thêm gói vé
           </Button>
-          <Button 
-            variant="outline" 
+          <Button
+            variant="outline"
             size="icon"
             onClick={onRefresh}
             className="h-10 w-10 rounded-xl shadow-sm hover:rotate-180 transition-transform duration-500 shrink-0"
           >
-            <RefreshCw className={`w-4 h-4 ${isLoading ? "animate-spin" : ""}`} />
+            <RefreshCw className={`w-4 h-4 ${isLoading ? 'animate-spin' : ''}`} />
           </Button>
         </div>
       </div>
@@ -148,7 +133,9 @@ export default function TicketsContent(props: Props) {
                 <TableHead className="text-[10px] uppercase font-bold text-slate-500">Giá niêm yết</TableHead>
                 <TableHead className="text-[10px] uppercase font-bold text-slate-500">Cập nhật</TableHead>
                 <TableHead className="text-center text-[10px] uppercase font-bold text-slate-500">Trạng Thái</TableHead>
-                <TableHead className="text-right text-[10px] uppercase font-bold text-slate-500 pr-6">Thao tác</TableHead>
+                <TableHead className="text-right text-[10px] uppercase font-bold text-slate-500 pr-6">
+                  Thao tác
+                </TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -179,44 +166,50 @@ export default function TicketsContent(props: Props) {
                     </TableRow>
                   ))
                 : data.map((t) => (
-                    <TableRow key={t.id} className="group hover:bg-slate-50/80 transition-colors border-b last:border-0">
+                    <TableRow
+                      key={t.id}
+                      className="group hover:bg-slate-50/80 transition-colors border-b last:border-0"
+                    >
                       <TableCell className="py-4">
                         <div className="flex flex-col gap-0.5">
                           <span className="font-bold text-slate-900">{t.name}</span>
-                          <span className="text-[10px] text-slate-400 font-mono">CODE: {t.code || "N/A"}</span>
+                          <span className="text-[10px] text-slate-400 font-mono">CODE: {t.code || 'N/A'}</span>
                         </div>
                       </TableCell>
                       <TableCell>
-                        <Badge variant="outline" className="text-[10px] font-bold border-slate-200 text-slate-600 bg-white">
-                          TYPE-{t.type || "0"}
+                        <Badge
+                          variant="outline"
+                          className="text-[10px] font-bold border-slate-200 text-slate-600 bg-white"
+                        >
+                          TYPE-{t.type || '0'}
                         </Badge>
                       </TableCell>
                       <TableCell className="font-black text-slate-700">
-                        {Number(t.price).toLocaleString("vi-VN")} đ
+                        {Number(t.price).toLocaleString('vi-VN')} đ
                       </TableCell>
                       <TableCell>
                         <div className="flex flex-col text-[10px]">
                           <span className="text-slate-600 font-bold flex items-center gap-1">
                             <History size={10} className="text-slate-400" />
-                            {t.updated_at ? format(new Date(t.updated_at), "HH:mm") : "-"}
+                            {t.updated_at ? format(new Date(t.updated_at), 'HH:mm') : '-'}
                           </span>
-                          <span 
+                          <span
                             className="text-slate-400 italic cursor-help"
-                            title={t.updated_at ? new Date(t.updated_at).toLocaleString("vi-VN") : ""}
+                            title={t.updated_at ? new Date(t.updated_at).toLocaleString('vi-VN') : ''}
                           >
-                            {t.updated_at ? formatDistanceToNow(new Date(t.updated_at), { addSuffix: true, locale: vi }) : ""}
+                            {t.updated_at
+                              ? formatDistanceToNow(new Date(t.updated_at), { addSuffix: true, locale: vi })
+                              : ''}
                           </span>
                         </div>
                       </TableCell>
                       <TableCell className="text-center">
                         <Badge
                           className={`text-[10px] font-bold px-2 py-0.5 rounded-lg border-none shadow-sm ${
-                            t.is_active
-                              ? "bg-emerald-100 text-emerald-700"
-                              : "bg-slate-100 text-slate-500"
+                            t.is_active ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-500'
                           }`}
                         >
-                          {t.is_active ? "HOẠT ĐỘNG" : "ĐÃ ẨN"}
+                          {t.is_active ? 'HOẠT ĐỘNG' : 'ĐÃ ẨN'}
                         </Badge>
                       </TableCell>
                       <TableCell className="text-right pr-6 space-x-1">
@@ -234,20 +227,18 @@ export default function TicketsContent(props: Props) {
                           className="h-8 w-8 rounded-full hover:bg-red-50 text-red-600"
                           disabled={isDeletingId === t.id}
                           onClick={async () => {
-                            const confirmDelete = window.confirm(
-                              "Bạn có chắc chắn muốn ngừng hoạt động gói vé này?",
-                            );
+                            const confirmDelete = window.confirm('Bạn có chắc chắn muốn ngừng hoạt động gói vé này?');
                             if (!confirmDelete) return;
                             try {
                               setIsDeletingId(t.id);
                               await deleteTicketApi(t.id);
                               await onRefresh();
-                              toast.success("Thành công", {
-                                description: "Gói vé đã được ngừng hoạt động",
+                              toast.success('Thành công', {
+                                description: 'Gói vé đã được ngừng hoạt động'
                               });
                             } catch (error: any) {
-                              toast.error("Lỗi", {
-                                description: error.message || "Không thể thực hiện thao tác",
+                              toast.error('Lỗi', {
+                                description: error.message || 'Không thể thực hiện thao tác'
                               });
                             } finally {
                               setIsDeletingId(null);
@@ -271,9 +262,7 @@ export default function TicketsContent(props: Props) {
                     setPage(Math.max(1, currentPage - 1));
                   }}
                   aria-disabled={currentPage === 1}
-                  className={
-                    currentPage === 1 ? "pointer-events-none opacity-50" : ""
-                  }
+                  className={currentPage === 1 ? 'pointer-events-none opacity-50' : ''}
                 />
               </PaginationItem>
               {Array.from({ length: totalPages }).map((_, i) => (
@@ -298,11 +287,7 @@ export default function TicketsContent(props: Props) {
                     setPage(Math.min(totalPages, currentPage + 1));
                   }}
                   aria-disabled={currentPage === totalPages}
-                  className={
-                    currentPage === totalPages
-                      ? "pointer-events-none opacity-50"
-                      : ""
-                  }
+                  className={currentPage === totalPages ? 'pointer-events-none opacity-50' : ''}
                 />
               </PaginationItem>
             </PaginationContent>
@@ -317,7 +302,7 @@ export default function TicketsContent(props: Props) {
                 <TicketIcon size={20} className="text-blue-400" />
               </div>
               <DialogTitle className="text-xl font-bold text-white">
-                {editData?.id ? "Chỉnh sửa gói vé" : "Thêm gói vé"}
+                {editData?.id ? 'Chỉnh sửa gói vé' : 'Thêm gói vé'}
               </DialogTitle>
             </div>
           </DialogHeader>
@@ -335,10 +320,8 @@ export default function TicketsContent(props: Props) {
                     </Label>
                     <Input
                       placeholder="Vd: Vé đơn"
-                      value={editData?.name || ""}
-                      onChange={(e) =>
-                        setEditData({ ...editData, name: e.target.value })
-                      }
+                      value={editData?.name || ''}
+                      onChange={(e) => setEditData({ ...editData, name: e.target.value })}
                       className="mt-1.5"
                     />
                   </div>
@@ -346,10 +329,8 @@ export default function TicketsContent(props: Props) {
                     <Label className="text-sm font-medium">Mã</Label>
                     <Input
                       placeholder="Vd: GV1"
-                      value={editData?.code || ""}
-                      onChange={(e) =>
-                        setEditData({ ...editData, code: e.target.value })
-                      }
+                      value={editData?.code || ''}
+                      onChange={(e) => setEditData({ ...editData, code: e.target.value })}
                       className="mt-1.5"
                     />
                   </div>
@@ -359,10 +340,8 @@ export default function TicketsContent(props: Props) {
                     <Label className="text-sm font-medium">Loại</Label>
                     <Input
                       placeholder="Vd: 1"
-                      value={editData?.type || ""}
-                      onChange={(e) =>
-                        setEditData({ ...editData, type: e.target.value })
-                      }
+                      value={editData?.type || ''}
+                      onChange={(e) => setEditData({ ...editData, type: e.target.value })}
                       className="mt-1.5"
                     />
                   </div>
@@ -374,13 +353,12 @@ export default function TicketsContent(props: Props) {
                       type="text"
                       placeholder="300,000"
                       value={
-                        editData?.price !== undefined &&
-                        editData?.price !== null
-                          ? Number(editData.price).toLocaleString("en-US")
-                          : ""
+                        editData?.price !== undefined && editData?.price !== null
+                          ? Number(editData.price).toLocaleString('en-US')
+                          : ''
                       }
                       onChange={(e) => {
-                        const v = Number(e.target.value.replace(/,/g, ""));
+                        const v = Number(e.target.value.replace(/,/g, ''));
                         setEditData({ ...editData, price: isNaN(v) ? 0 : v });
                       }}
                       className="mt-1.5"
@@ -391,10 +369,8 @@ export default function TicketsContent(props: Props) {
                   <Label className="text-sm font-medium">Mô tả</Label>
                   <textarea
                     placeholder="Vé dành cho 1 người xem cả nhân"
-                    value={editData?.description || ""}
-                    onChange={(e) =>
-                      setEditData({ ...editData, description: e.target.value })
-                    }
+                    value={editData?.description || ''}
+                    onChange={(e) => setEditData({ ...editData, description: e.target.value })}
                     className="w-full h-20 border rounded-md px-3 py-2 mt-1.5 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-blue-500"
                   />
                 </div>
@@ -402,40 +378,29 @@ export default function TicketsContent(props: Props) {
 
               {/* Tính năng và Combo */}
               <div className="space-y-4">
-                <h3 className="text-sm font-semibold text-gray-700 border-b pb-2">
-                  Tính năng & Combo
-                </h3>
+                <h3 className="text-sm font-semibold text-gray-700 border-b pb-2">Tính năng & Combo</h3>
                 <div>
-                  <Label className="text-sm font-medium">
-                    Tính năng (phân tách bằng dấu phẩy)
-                  </Label>
+                  <Label className="text-sm font-medium">Tính năng (phân tách bằng dấu phẩy)</Label>
                   <Input
                     placeholder="ghế ấm,nệm ấm"
-                    value={editData?.features || ""}
+                    value={editData?.features || ''}
                     onChange={(e) =>
                       setEditData({
                         ...editData,
-                        features: e.target.value,
+                        features: e.target.value
                       })
                     }
                     className="mt-1.5"
                   />
                 </div>
                 <div>
-                  <Label className="text-sm font-medium">
-                    Combo Phim ({editData?.combo?.length || 0})
-                  </Label>
+                  <Label className="text-sm font-medium">Combo Phim ({editData?.combo?.length || 0})</Label>
                   <div className="border rounded-md p-3 h-36 overflow-y-auto space-y-2 mt-1.5 bg-gray-50">
                     {movies.length === 0 ? (
-                      <p className="text-sm text-gray-500 text-center py-4">
-                        Không có phim nào
-                      </p>
+                      <p className="text-sm text-gray-500 text-center py-4">Không có phim nào</p>
                     ) : (
                       movies.map((movie) => (
-                        <div
-                          key={movie.id}
-                          className="flex items-center space-x-2 hover:bg-white p-1.5 rounded"
-                        >
+                        <div key={movie.id} className="flex items-center space-x-2 hover:bg-white p-1.5 rounded">
                           <Checkbox
                             id={`movie-${movie.id}`}
                             checked={(editData.combo || []).includes(movie.id)}
@@ -444,14 +409,12 @@ export default function TicketsContent(props: Props) {
                               if (checked) {
                                 setEditData({
                                   ...editData,
-                                  combo: [...current, movie.id],
+                                  combo: [...current, movie.id]
                                 });
                               } else {
                                 setEditData({
                                   ...editData,
-                                  combo: current.filter(
-                                    (id: number) => id !== movie.id,
-                                  ),
+                                  combo: current.filter((id: number) => id !== movie.id)
                                 });
                               }
                             }}
@@ -471,22 +434,18 @@ export default function TicketsContent(props: Props) {
 
               {/* Cài đặt nâng cao */}
               <div className="space-y-4">
-                <h3 className="text-sm font-semibold text-gray-700 border-b pb-2">
-                  Cài đặt nâng cao
-                </h3>
+                <h3 className="text-sm font-semibold text-gray-700 border-b pb-2">Cài đặt nâng cao</h3>
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <Label className="text-sm font-medium">
-                      Nhóm tối thiểu
-                    </Label>
+                    <Label className="text-sm font-medium">Nhóm tối thiểu</Label>
                     <Input
                       type="number"
                       placeholder="1"
-                      value={editData?.min_group_size ?? ""}
+                      value={editData?.min_group_size ?? ''}
                       onChange={(e) =>
                         setEditData({
                           ...editData,
-                          min_group_size: Number(e.target.value || 0),
+                          min_group_size: Number(e.target.value || 0)
                         })
                       }
                       className="mt-1.5"
@@ -497,11 +456,11 @@ export default function TicketsContent(props: Props) {
                     <Input
                       type="number"
                       placeholder="1"
-                      value={editData?.max_group_size ?? ""}
+                      value={editData?.max_group_size ?? ''}
                       onChange={(e) =>
                         setEditData({
                           ...editData,
-                          max_group_size: Number(e.target.value || 0),
+                          max_group_size: Number(e.target.value || 0)
                         })
                       }
                       className="mt-1.5"
@@ -510,9 +469,7 @@ export default function TicketsContent(props: Props) {
                 </div>
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <Label className="text-sm font-medium">
-                      Thứ tự hiển thị
-                    </Label>
+                    <Label className="text-sm font-medium">Thứ tự hiển thị</Label>
                     <Input
                       type="number"
                       placeholder="0"
@@ -520,7 +477,7 @@ export default function TicketsContent(props: Props) {
                       onChange={(e) =>
                         setEditData({
                           ...editData,
-                          display_order: Number(e.target.value || 0),
+                          display_order: Number(e.target.value || 0)
                         })
                       }
                       className="mt-1.5"
@@ -529,11 +486,11 @@ export default function TicketsContent(props: Props) {
                   <div>
                     <Label className="text-sm font-medium">Trạng thái</Label>
                     <select
-                      value={editData?.is_active ? "active" : "inactive"}
+                      value={editData?.is_active ? 'active' : 'inactive'}
                       onChange={(e) =>
                         setEditData({
                           ...editData,
-                          is_active: e.target.value === "active",
+                          is_active: e.target.value === 'active'
                         })
                       }
                       className="w-full h-10 border rounded-md px-3 mt-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
@@ -549,11 +506,7 @@ export default function TicketsContent(props: Props) {
 
           {/* Buttons */}
           <div className="flex justify-end gap-3 px-6 py-4 border-t bg-gray-50">
-            <Button
-              variant="outline"
-              onClick={() => setIsEditOpen(false)}
-              disabled={isSaving}
-            >
+            <Button variant="outline" onClick={() => setIsEditOpen(false)} disabled={isSaving}>
               Hủy
             </Button>
             <Button
@@ -570,17 +523,11 @@ export default function TicketsContent(props: Props) {
                       features: editData.features || [],
                       combo: editData.combo || [],
                       type: editData.type,
-                      min_group_size: editData.min_group_size
-                        ? Number(editData.min_group_size)
-                        : undefined,
-                      max_group_size: editData.max_group_size
-                        ? Number(editData.max_group_size)
-                        : undefined,
+                      min_group_size: editData.min_group_size ? Number(editData.min_group_size) : undefined,
+                      max_group_size: editData.max_group_size ? Number(editData.max_group_size) : undefined,
                       is_member_only: !!editData.is_member_only,
                       is_active: !!editData.is_active,
-                      display_order: editData.display_order
-                        ? Number(editData.display_order)
-                        : 0,
+                      display_order: editData.display_order ? Number(editData.display_order) : 0
                     });
                   } else {
                     await updateTicketApi(Number(editData.id), {
@@ -591,24 +538,16 @@ export default function TicketsContent(props: Props) {
                       features: editData.features || [],
                       combo: editData.combo || [],
                       type: editData.type,
-                      min_group_size: editData.min_group_size
-                        ? Number(editData.min_group_size)
-                        : undefined,
-                      max_group_size: editData.max_group_size
-                        ? Number(editData.max_group_size)
-                        : undefined,
+                      min_group_size: editData.min_group_size ? Number(editData.min_group_size) : undefined,
+                      max_group_size: editData.max_group_size ? Number(editData.max_group_size) : undefined,
                       is_member_only: !!editData.is_member_only,
                       is_active: !!editData.is_active,
-                      display_order: editData.display_order
-                        ? Number(editData.display_order)
-                        : 0,
+                      display_order: editData.display_order ? Number(editData.display_order) : 0
                     });
                   }
                   await onRefresh();
-                  toast.success("Thành công", {
-                    description: editData?.id
-                      ? "Cập nhật gói vé thành công"
-                      : "Thêm gói vé thành công",
+                  toast.success('Thành công', {
+                    description: editData?.id ? 'Cập nhật gói vé thành công' : 'Thêm gói vé thành công'
                   });
                 } finally {
                   setIsSaving(false);
@@ -621,7 +560,7 @@ export default function TicketsContent(props: Props) {
                   <Loader2 className="h-4 w-4 animate-spin" /> Đang lưu...
                 </span>
               ) : (
-                "Lưu"
+                'Lưu'
               )}
             </Button>
           </div>
