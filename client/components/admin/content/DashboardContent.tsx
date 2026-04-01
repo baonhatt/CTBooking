@@ -1,4 +1,5 @@
 import React from "react";
+import AIAnalyticsPanel from "./AIAnalyticsPanel";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
@@ -675,7 +676,10 @@ export default function DashboardContent({
               max={Math.max(...revenueByMonthData.map(d => d.revenue), 1000000)}
             />
           </Card>
-      </div>
+       </div>
+
+      {/* AI Analytics Panel */}
+      <AIAnalyticsPanel />
     </div>
   );
 }

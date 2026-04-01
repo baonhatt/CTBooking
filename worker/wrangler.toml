@@ -33,6 +33,9 @@ database_id = "9bae4fb3-570a-4ded-9a75-922ce4d6ef81"
 binding = "KV_BINDING"
 id = "e2a5a9184efb40afb73b7a17a41c9328"
 
+[ai]
+binding = "AI"
+
 [env.preview]
 
 [env.preview.placement]
@@ -71,6 +74,9 @@ database_id = "fd9274ae-d1a3-42e2-b83d-2fc1bdc71caf"
 [[env.preview.kv_namespaces]]
 binding = "KV_BINDING"
 id = "e2a5a9184efb40afb73b7a17a41c9328"
+
+[env.preview.ai]
+binding = "AI"
 
 [env.production]
 routes = [
