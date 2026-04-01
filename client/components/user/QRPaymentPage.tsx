@@ -15,16 +15,9 @@ import {
   Check,
   QrCode,
   Info
-<<<<<<< HEAD
-} from "lucide-react";
-import { toast } from "sonner";
-import UserLayout from "@/user/layouts/UserLayout";
-import { SERVER_BASE_URL } from "@/lib/api";
-=======
 } from 'lucide-react';
 import { toast } from 'sonner';
 import UserLayout from '@/user/layouts/UserLayout';
->>>>>>> nhat
 import {
   AlertDialog,
   AlertDialogAction,
@@ -78,11 +71,7 @@ export default function QRPaymentPage() {
       const bId = data?.bookingId || data?.booking_id;
       if (bId) {
         try {
-<<<<<<< HEAD
-          const baseUrl = SERVER_BASE_URL || "";
-=======
           const baseUrl = (import.meta as any).env?.VITE_SERVER_BASE_URL || '';
->>>>>>> nhat
           const res = await fetch(`${baseUrl}/api/bookings/${bId}`);
           if (res.ok) {
             const json = await res.json();
@@ -136,11 +125,7 @@ export default function QRPaymentPage() {
 
     if (bId) {
       try {
-<<<<<<< HEAD
-        const baseUrl = SERVER_BASE_URL || "";
-=======
         const baseUrl = (import.meta as any).env?.VITE_SERVER_BASE_URL || '';
->>>>>>> nhat
         const res = await fetch(`${baseUrl}/api/confirm-booking`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -212,13 +197,8 @@ export default function QRPaymentPage() {
     setIsChecking(true);
     try {
       // Use backend base URL from environment variable
-<<<<<<< HEAD
-      const baseUrl = SERVER_BASE_URL || "";
-      const res = await fetch(`${baseUrl}/api/bookings/${bId}`, { cache: "no-store" });
-=======
       const baseUrl = (import.meta as any).env?.VITE_SERVER_BASE_URL || '';
       const res = await fetch(`${baseUrl}/api/bookings/${bId}`, { cache: 'no-store' });
->>>>>>> nhat
       if (res.ok) {
         const booking = await res.json();
         if (booking.payment_status === 'paid') {
@@ -249,11 +229,7 @@ export default function QRPaymentPage() {
 
     if (bId) {
       try {
-<<<<<<< HEAD
-        const baseUrl = SERVER_BASE_URL || "";
-=======
         const baseUrl = (import.meta as any).env?.VITE_SERVER_BASE_URL || '';
->>>>>>> nhat
         const res = await fetch(`${baseUrl}/api/confirm-booking`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -280,7 +256,7 @@ export default function QRPaymentPage() {
               booking_id: bId
             };
             localStorage.setItem('lastCheckoutOrder', JSON.stringify(newOrder));
-          } catch (e) {}
+          } catch (e) { }
 
           localStorage.removeItem('qrPaymentData');
           localStorage.removeItem('qrPaymentEndTime');
@@ -306,7 +282,7 @@ export default function QRPaymentPage() {
   return (
     <UserLayout
       className="bg-[#050915]"
-      headerProps={{ onBookClick: () => {}, disableNav: true }}
+      headerProps={{ onBookClick: () => { }, disableNav: true }}
       hideFooter
       contentClassName="text-white"
     >
@@ -449,7 +425,7 @@ export default function QRPaymentPage() {
                             <span className="text-gray-300 font-bold tabular-nums">
                               {Math.round(
                                 (paymentData?.totalAmount || 0) /
-                                  (bookingDetails?.ticket_count || paymentData?.ticketCount || 1)
+                                (bookingDetails?.ticket_count || paymentData?.ticketCount || 1)
                               ).toLocaleString('vi-VN')}{' '}
                               ₫
                             </span>
@@ -693,7 +669,7 @@ export default function QRPaymentPage() {
       </AlertDialog>
 
       {/* Expired Dialog */}
-      <AlertDialog open={showExpiredDialog} onOpenChange={() => {}}>
+      <AlertDialog open={showExpiredDialog} onOpenChange={() => { }}>
         <AlertDialogContent className="bg-[#0f172a] border-white/10 text-white max-w-[400px]">
           <AlertDialogHeader>
             <AlertDialogTitle className="text-xl font-bold text-red-400 text-center">
