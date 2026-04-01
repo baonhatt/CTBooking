@@ -1,7 +1,8 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/hooks/useAuth';
 import { useNavigate, useLocation } from 'react-router-dom';
+import { buildUrl } from '@/lib/api/http';
 
 // Components
 
@@ -39,7 +40,8 @@ export default function Header({
 
   // Custom hooks
   const isScrolled = useScrollDetect(50);
-  const effectiveDisable = disableNav || location.pathname !== '/';
+  const isPostsRoute = location.pathname === '/posts' || location.pathname.startsWith('/posts/');
+  const effectiveDisable = disableNav || (location.pathname !== '/' && !isPostsRoute);
   const activeSection = useActiveSection(effectiveDisable);
   const { userName, setUserName } = useAuthState();
   const { handleLogout } = useAuthHandlers(setUserName);
@@ -48,6 +50,7 @@ export default function Header({
   const [isLoginOpen, setIsLoginOpen] = useState(false);
   const [isRegisterOpen, setIsRegisterOpen] = useState(false);
   const [isForgetPassOpen, setIsForgetPassOpen] = useState(false);
+  const [isUserPostsEnabled, setIsUserPostsEnabled] = useState(true);
   const [errorModal, setErrorModal] = useState<ErrorModalState>({
     open: false,
     title: '',
@@ -56,6 +59,25 @@ export default function Header({
 
   // Utilities
   const scrollToSection = (id: string) => {
+    if (id === 'posts') {
+      navigator('/posts');
+      return;
+    }
+
+    if (location.pathname !== '/') {
+      navigator('/');
+      setTimeout(() => {
+        const element = document.getElementById(id);
+        if (!element) return;
+        const headerEl = document.querySelector('header') as HTMLElement | null;
+        const headerOffset = headerEl?.offsetHeight || 72;
+        const rect = element.getBoundingClientRect();
+        const absoluteTop = window.scrollY + rect.top;
+        window.scrollTo({ top: Math.max(0, absoluteTop - headerOffset), behavior: 'smooth' });
+      }, 180);
+      return;
+    }
+
     const element = document.getElementById(id);
     if (!element) return;
     const headerEl = document.querySelector('header') as HTMLElement | null;
@@ -89,6 +111,40 @@ export default function Header({
     }
   };
 
+  useEffect(() => {
+    const applyFromStorage = () => {
+      const stored = localStorage.getItem('admin_sidebar_hidden_tabs');
+      const hiddenTabs = stored ? JSON.parse(stored) : [];
+      const isAdminPostsEnabled = !hiddenTabs.includes('posts');
+      const isUserPostsSettingEnabled = !hiddenTabs.includes('posts-user');
+      setIsUserPostsEnabled(isAdminPostsEnabled && isUserPostsSettingEnabled);
+    };
+
+    applyFromStorage();
+    window.addEventListener('storage', applyFromStorage);
+    window.addEventListener('admin_sidebar_update', applyFromStorage);
+
+    const isProd = window.location.hostname !== 'localhost';
+    if (isProd) {
+      fetch(buildUrl('/api/admin/settings'))
+        .then((res) => res.json())
+        .then((data) => {
+          if (data && data.settings) {
+            localStorage.setItem('admin_sidebar_hidden_tabs', JSON.stringify(data.settings));
+            applyFromStorage();
+          }
+        })
+        .catch(() => {});
+    }
+
+    return () => {
+      window.removeEventListener('storage', applyFromStorage);
+      window.removeEventListener('admin_sidebar_update', applyFromStorage);
+    };
+  }, []);
+
+  const navItems = isUserPostsEnabled ? [...NAV_ITEMS, { label: 'Bài viết', target: 'posts' }] : NAV_ITEMS;
+
   return (
     <header
       className={cn(
@@ -115,13 +171,13 @@ export default function Header({
 
         {/* Desktop Navigation */}
         <nav className="hidden md:flex items-center gap-6 lg:gap-8 animate-fade-in delay-200">
-          {NAV_ITEMS.map((item) => (
+          {navItems.map((item) => (
             <NavItem
               key={item.target}
               label={item.label}
               target={item.target}
-              isActive={activeSection === item.target}
-              disabled={effectiveDisable}
+              isActive={item.target === 'posts' ? location.pathname.startsWith('/posts') : activeSection === item.target}
+              disabled={item.target === 'posts' ? false : effectiveDisable}
               onClick={() => scrollToSection(item.target)}
             />
           ))}
@@ -132,7 +188,7 @@ export default function Header({
           {/* Mobile Menu */}
           <div className="md:hidden">
             <MobileMenu
-              navItems={NAV_ITEMS}
+              navItems={navItems}
               effectiveDisable={effectiveDisable}
               scrollToSection={scrollToSection}
               userName={userName}

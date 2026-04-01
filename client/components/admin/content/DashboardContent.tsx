@@ -1,4 +1,3 @@
-<<<<<<< HEAD
 import React from "react";
 import AIAnalyticsPanel from "./AIAnalyticsPanel";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -11,19 +10,6 @@ import {
   Users, 
   CreditCard, 
   TrendingUp, 
-=======
-import React from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Skeleton } from '@/components/ui/skeleton';
-import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
-import {
-  Film,
-  Package,
-  Users,
-  CreditCard,
-  TrendingUp,
->>>>>>> nhat
   TrendingDown,
   Loader2,
   RefreshCcw,
@@ -799,8 +785,8 @@ export default function DashboardContent({
                 Phân tích dòng tiền theo tháng
               </p>
             </div>
-<<<<<<< HEAD
-            <BarChart
+          </div>
+          <BarChart
               data={revenueByMonthData.map((d) => ({
                 ...d,
                 label: monthNames[d.month - 1],
@@ -814,20 +800,6 @@ export default function DashboardContent({
 
       {/* AI Analytics Panel */}
       <AIAnalyticsPanel />
-=======
-          </div>
-          <BarChart
-            data={revenueByMonthData.map((d) => ({
-              ...d,
-              label: monthNames[d.month - 1]
-            }))}
-            dataKey="revenue"
-            colorScheme="single"
-            max={Math.max(...revenueByMonthData.map((d) => d.revenue), 1000000)}
-          />
-        </Card>
-      </div>
->>>>>>> nhat
     </div>
   );
 }

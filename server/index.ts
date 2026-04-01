@@ -78,6 +78,7 @@ export function createServer() {
     fs.mkdirSync(uploadDir, { recursive: true });
     fs.mkdirSync(uploadMoviesDir, { recursive: true });
     fs.mkdirSync(path.join(uploadDir, 'toys'), { recursive: true });
+    fs.mkdirSync(path.join(uploadDir, 'posts'), { recursive: true });
   } catch {}
   // --- Local Upload Logic ---
   const uploadVideoDir = path.join(uploadDir, 'videos');
@@ -85,6 +86,7 @@ export function createServer() {
     fs.mkdirSync(uploadDir, { recursive: true });
     fs.mkdirSync(uploadMoviesDir, { recursive: true });
     fs.mkdirSync(path.join(uploadDir, 'toys'), { recursive: true });
+    fs.mkdirSync(path.join(uploadDir, 'posts'), { recursive: true });
     fs.mkdirSync(uploadVideoDir, { recursive: true });
   } catch {}
   app.use('/uploads', express.static(uploadDir));
@@ -97,6 +99,7 @@ export function createServer() {
     let localFolder = 'others';
     if (folder.includes('movies')) localFolder = 'movies';
     else if (folder.includes('toys')) localFolder = 'toys';
+    else if (folder.includes('posts')) localFolder = 'posts';
 
     const targetDir = path.join(uploadDir, localFolder);
     if (!fs.existsSync(targetDir)) fs.mkdirSync(targetDir, { recursive: true });
@@ -767,6 +770,20 @@ export function createServer() {
       const page = req.query.page ? parseInt(String(req.query.page)) : 1;
       const pageSize = req.query.pageSize ? parseInt(String(req.query.pageSize)) : 10;
       const q = req.query.q ? String(req.query.q) : undefined;
+      const status = req.query.status ? String(req.query.status) : 'published';
+      const r = await listPostsImpl(db, { posts: pgPosts }, { page, pageSize, q, status });
+      res.status(200).json(r);
+    } catch (error: any) {
+      res.status(500).json({ status: 'error', message: error?.message || 'Internal error' });
+    }
+  });
+
+  // Admin list posts: can see all statuses / filter by status
+  app.get('/api/admin/posts', async (req, res) => {
+    try {
+      const page = req.query.page ? parseInt(String(req.query.page)) : 1;
+      const pageSize = req.query.pageSize ? parseInt(String(req.query.pageSize)) : 10;
+      const q = req.query.q ? String(req.query.q) : undefined;
       const status = req.query.status ? String(req.query.status) : undefined;
       const r = await listPostsImpl(db, { posts: pgPosts }, { page, pageSize, q, status });
       res.status(200).json(r);
@@ -1175,6 +1192,55 @@ export function createServer() {
   });
   // app.post("/api/admin/uploads/video", uploadAdminVideo);
   // Override: Use local upload logic for video if running locally
+  app.post('/api/admin/uploads/image', (req, res, next) => {
+    const uploadPostsDir = path.join(uploadDir, 'posts');
+    try {
+      if (!fs.existsSync(uploadPostsDir)) fs.mkdirSync(uploadPostsDir, { recursive: true });
+    } catch {}
+
+    const storage = multer.diskStorage({
+      destination: (req: any, _file: any, cb: any) => {
+        const folderParam = req.body.folder || req.query.folder || 'general';
+        const safeFolder = String(folderParam).replace(/[^a-zA-Z0-9._-]/g, '_');
+        const targetDir = path.join(uploadPostsDir, safeFolder);
+        if (!fs.existsSync(targetDir)) fs.mkdirSync(targetDir, { recursive: true });
+        cb(null, targetDir);
+      },
+      filename: (_req: any, file: any, cb: any) => {
+        const safe = String(file.originalname || 'image').replace(/[^a-zA-Z0-9._-]/g, '_');
+        cb(null, `${Date.now()}_${safe}`);
+      }
+    });
+
+    const upload = multer({
+      storage,
+      limits: { fileSize: 1024 * 1024 * 20 }, // 20MB
+      fileFilter: (_req: any, file: any, cb: any) => {
+        if (!file.mimetype.startsWith('image/')) return cb(new Error('Chỉ chấp nhận ảnh'));
+        cb(null, true);
+      }
+    }).single('file');
+
+    upload(req, res, (err: any) => {
+      if (err) return res.status(400).json({ message: err.message });
+      const file = (req as any).file;
+      if (!file) return res.status(400).json({ message: 'Thiếu tệp ảnh' });
+
+      const folderParam = req.body.folder || req.query.folder || 'general';
+      const safeFolder = String(folderParam).replace(/[^a-zA-Z0-9._-]/g, '_');
+
+      res.status(200).json({
+        public_id: file.filename,
+        url: `/uploads/posts/${safeFolder}/${file.filename}`,
+        bytes: file.size,
+        duration: 0,
+        format: file.mimetype.split('/')[1] || 'jpg',
+        width: 0,
+        height: 0
+      });
+    });
+  });
+
   app.post('/api/admin/uploads/video', (req, res, next) => {
     // Local implementation
     const storage = multer.diskStorage({

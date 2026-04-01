@@ -15,6 +15,8 @@ const Checkout = lazy(() => import('./pages/user/Checkout'));
 const Booking = lazy(() => import('./pages/user/Booking'));
 const Account = lazy(() => import('./pages/user/Account'));
 const SuccessPayment = lazy(() => import('./pages/user/SuccessPayment'));
+const UserPostsPage = lazy(() => import('./pages/user/Posts'));
+const UserPostDetailPage = lazy(() => import('./pages/user/PostDetail'));
 const AdminGate = lazy(() => import('@/admin/auth/AdminGate').then((m) => ({ default: m.AdminGate })));
 const QRPaymentPage = lazy(() => import('./components/user/QRPaymentPage'));
 
@@ -142,6 +144,8 @@ const App = () => (
             <Route path="/successPayment" element={<SuccessPayment />} />
             <Route path="/booking" element={<Booking />} />
             <Route path="/account" element={<Account />} />
+            <Route path="/posts" element={<UserPostsPage />} />
+            <Route path="/posts/:id" element={<UserPostDetailPage />} />
             <Route path="/reset-password" element={<ConfirmToken />} />
             <Route path="/admin/*" element={<AdminGate />} />
             <Route path="/qr-payment" element={<QRPaymentPage />} />

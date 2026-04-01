@@ -77,7 +77,7 @@ export async function createPostImpl(
 
   if (image_base64 && typeof image_base64 === 'string' && uploader) {
     try {
-      const uploadResult = await uploader(image_base64, 'ctbooking/posts');
+      const uploadResult = await uploader(image_base64, 'ctbooking/images/posts');
       savedImage = uploadResult.url;
     } catch (e) {
       console.error('Upload post image failed', e);
@@ -164,12 +164,16 @@ export async function updatePostImpl(
     if (status === 'published' && !existing.published_at) {
       data.published_at = formatDateForDb(new Date(), RUN_ENV?.RUNTIME_ENV);
     }
+    if (status !== 'published') {
+      // "Gỡ bài" / lưu trữ: không còn public
+      data.published_at = null;
+    }
   }
   if (is_featured !== undefined) data.is_featured = is_featured;
 
   if (image_base64 && typeof image_base64 === 'string' && uploader) {
     try {
-      const uploadResult = await uploader(image_base64, 'ctbooking/posts');
+      const uploadResult = await uploader(image_base64, 'ctbooking/images/posts');
       data.featured_image = uploadResult.url;
     } catch (e) {
       console.error('Upload post image failed', e);
