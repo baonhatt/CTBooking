@@ -407,12 +407,24 @@
   }
 
 
-  /* CKEditor inside Dialog: ensure popovers are clickable */
+  /* CKEditor inside Dialog: ensure popovers are clickable and focusable */
+  .ck-body-wrapper {
+    z-index: 100000 !important;
+    pointer-events: auto !important;
+    position: relative; /* Sometimes helps with rendering */
+  }
+  
   .ck.ck-balloon-panel,
   .ck.ck-dropdown__panel,
   .ck.ck-tooltip,
-  .ck-body-wrapper {
+  .ck.ck-button,
+  .ck.ck-input_text,
+  .ck.ck-input {
     z-index: 100000 !important;
+    pointer-events: auto !important;
+  }
+  
+  .ck-body-wrapper * {
     pointer-events: auto !important;
   }
 

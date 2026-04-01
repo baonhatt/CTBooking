@@ -403,11 +403,28 @@ export const PostManagement = () => {
           // Chỉ cho đóng bằng nút X/Hủy (được gọi qua requestClose).
           if (next) setIsEditOpen(true);
         }}
+        modal={false}
       >
         <DialogContent
-          className="max-w-6xl w-[95vw] h-[92vh] p-0 overflow-hidden bg-white [&>button]:hidden"
-          onPointerDownOutside={(e) => e.preventDefault()}
-          onInteractOutside={(e) => e.preventDefault()}
+          className="max-w-6xl w-[95vw] h-[92vh] p-0 overflow-hidden bg-white [&>button]:hidden shadow-[0_0_0_100vw_rgba(0,0,0,0.5)]"
+          onOpenAutoFocus={(e) => e.preventDefault()}
+          onPointerDownOutside={(e) => {
+            const target = e.target as HTMLElement;
+            // Nếu click vào bất kì thành phần nào của CKEditor thì không chặn
+            if (target?.closest('.ck-body-wrapper, .ck-balloon-panel, [class*="ck-"]')) return;
+            e.preventDefault();
+          }}
+          onInteractOutside={(e) => {
+            const target = e.target as HTMLElement;
+            if (target?.closest('.ck-body-wrapper, .ck-balloon-panel, [class*="ck-"]')) return;
+            e.preventDefault();
+          }}
+          onFocusOutside={(e) => {
+            const target = e.target as HTMLElement;
+            if (target?.closest('.ck-body-wrapper, .ck-balloon-panel, [class*="ck-"]')) {
+              e.preventDefault();
+            }
+          }}
           onEscapeKeyDown={(e) => e.preventDefault()}
         >
           <div className="flex flex-col h-full">
