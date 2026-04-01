@@ -1,17 +1,11 @@
-import { useState } from "react";
-import { Button } from "@/components/ui/button";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
-import { Loader2 } from "lucide-react";
-import { cn } from "@/lib/utils";
-import icon from "@/assets/images/icon.svg";
-import { toast } from "sonner";
+import { useState } from 'react';
+import { Button } from '@/components/ui/button';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
+import { Loader2 } from 'lucide-react';
+import { cn } from '@/lib/utils';
+import icon from '@/assets/images/icon.svg';
+import { toast } from 'sonner';
 
 interface ForgetPasswordDialogProps {
   isOpen: boolean;
@@ -20,26 +14,21 @@ interface ForgetPasswordDialogProps {
   auth: any;
 }
 
-export function ForgetPasswordDialog({
-  isOpen,
-  onOpenChange,
-  onBackToLogin,
-  auth,
-}: ForgetPasswordDialogProps) {
+export function ForgetPasswordDialog({ isOpen, onOpenChange, onBackToLogin, auth }: ForgetPasswordDialogProps) {
   const [isLoading, setIsLoading] = useState(false);
-  const [email, setEmail] = useState("");
-  const [emailError, setEmailError] = useState("");
-  const [submitError, setSubmitError] = useState("");
+  const [email, setEmail] = useState('');
+  const [emailError, setEmailError] = useState('');
+  const [submitError, setSubmitError] = useState('');
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setEmailError("");
-    setSubmitError("");
+    setEmailError('');
+    setSubmitError('');
 
     // Validate email
     const emailOk = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
     if (!emailOk) {
-      setEmailError("Vui lòng nhập email hợp lệ");
+      setEmailError('Vui lòng nhập email hợp lệ');
       return;
     }
 
@@ -47,13 +36,13 @@ export function ForgetPasswordDialog({
       setIsLoading(true);
       const data = await auth.forgetPass(email);
 
-      if (data?.status === "success") {
+      if (data?.status === 'success') {
         onOpenChange(false);
-        setEmail("");
-        toast.success("Đổi mật khẩu thành công!", { description: data.message });
+        setEmail('');
+        toast.success('Đổi mật khẩu thành công!', { description: data.message });
       }
     } catch (err: any) {
-      setSubmitError(String(err?.message || "Yêu cầu thất bại"));
+      setSubmitError(String(err?.message || 'Yêu cầu thất bại'));
     } finally {
       setIsLoading(false);
     }
@@ -81,8 +70,8 @@ export function ForgetPasswordDialog({
             <Input
               type="email"
               className={cn(
-                "bg-white/10 border-white/20 text-white placeholder:text-gray-400 focus-visible:ring-cyan-400 focus-visible:ring-offset-1 rounded-lg",
-                emailError && "border-yellow-500 focus-visible:ring-yellow-500",
+                'bg-white/10 border-white/20 text-white placeholder:text-gray-400 focus-visible:ring-cyan-400 focus-visible:ring-offset-1 rounded-lg',
+                emailError && 'border-yellow-500 focus-visible:ring-yellow-500'
               )}
               placeholder="you@gmail.com"
               value={email}
@@ -90,10 +79,9 @@ export function ForgetPasswordDialog({
                 const val = e.target.value;
                 setEmail(val);
                 const ok = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(val);
-                if (ok) setEmailError("");
-                else if (val.length > 0)
-                  setEmailError("Vui lòng nhập email hợp lệ");
-                if (submitError) setSubmitError("");
+                if (ok) setEmailError('');
+                else if (val.length > 0) setEmailError('Vui lòng nhập email hợp lệ');
+                if (submitError) setSubmitError('');
               }}
               maxLength={50}
               title="Vui lòng nhập email của bạn để thay đổi mật khẩu!"
@@ -101,9 +89,7 @@ export function ForgetPasswordDialog({
               required
             />
             {emailError && (
-              <div className="mt-1 rounded-md bg-yellow-500/10 px-3 py-2 text-xs text-yellow-300">
-                {emailError}
-              </div>
+              <div className="mt-1 rounded-md bg-yellow-500/10 px-3 py-2 text-xs text-yellow-300">{emailError}</div>
             )}
           </div>
 
@@ -126,7 +112,7 @@ export function ForgetPasswordDialog({
                 Đang gửi...
               </span>
             ) : (
-              "Xác Nhận"
+              'Xác Nhận'
             )}
           </Button>
 

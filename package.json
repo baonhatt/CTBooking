@@ -24,16 +24,19 @@
     "deploy:preview": "npm run build:server && npx wrangler deploy --env preview --config worker/wrangler.toml",
     "deploy:prod": "npm run build:server && npx wrangler deploy --config worker/wrangler.toml",
     "pages:deploy:prod": "npm run build:client && npx wrangler pages deploy dist/spa --project-name=cinema-pages --branch=main",
-    "pages:deploy:preview": "npm run build:client:preview && npx wrangler pages deploy dist/spa --project-name=cinema-pages --branch=preview"
+    "pages:deploy:preview": "npm run build:client:preview && npx wrangler pages deploy dist/spa --project-name=cinema-pages --branch=preview",
+    "db:push": "drizzle-kit push"
   },
   "rollup": {
     "forceJs": true
   },
   "dependencies": {
     "@ant-design/icons": "^6.1.0",
+    "@ckeditor/ckeditor5-react": "^11.1.0",
     "antd": "^6.0.0",
     "bcryptjs": "^3.0.3",
     "body-parser": "^2.2.1",
+    "ckeditor5": "^48.0.0",
     "cloudinary": "^2.8.0",
     "dotenv": "^17.2.3",
     "drizzle-kit": "^0.31.8",
@@ -92,6 +95,7 @@
     "@types/three": "^0.176.0",
     "@vitejs/plugin-react-swc": "^4.0.0",
     "autoprefixer": "^10.4.21",
+    "baseline-browser-mapping": "^2.10.13",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "cmdk": "^1.1.1",

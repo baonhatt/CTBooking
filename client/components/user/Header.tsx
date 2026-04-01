@@ -1,32 +1,33 @@
-import { useState } from "react";
-import { cn } from "@/lib/utils";
-import { useAuth } from "@/hooks/useAuth";
-import { useNavigate, useLocation } from "react-router-dom";
+import { useState } from 'react';
+import { cn } from '@/lib/utils';
+import { useAuth } from '@/hooks/useAuth';
+import { useNavigate, useLocation } from 'react-router-dom';
 
 // Components
 
-
 // Assets
-import icon from "@/assets/images/icon.svg";
-import { useActiveSection } from "@/hooks/useActiveSection";
-import { useAuthHandlers } from "@/hooks/useAuthHandlers";
-import { useAuthState } from "@/hooks/useAuthState";
-import { useScrollDetect } from "@/hooks/useScrollDetect";
-import { lazy, Suspense } from "react";
-import { NavItem } from "../NavItem";
-import { UserMenu } from "../UserMenu";
-import { NAV_ITEMS } from "../constants";
-import { HeaderProps, ErrorModalState } from "../filetypes/IType.model";
-import { MobileMenu } from "../MobileMenu";
+import icon from '@/assets/images/icon.svg';
+import { useActiveSection } from '@/hooks/useActiveSection';
+import { useAuthHandlers } from '@/hooks/useAuthHandlers';
+import { useAuthState } from '@/hooks/useAuthState';
+import { useScrollDetect } from '@/hooks/useScrollDetect';
+import { lazy, Suspense } from 'react';
+import { NavItem } from '../NavItem';
+import { UserMenu } from '../UserMenu';
+import { NAV_ITEMS } from '../constants';
+import { HeaderProps, ErrorModalState } from '../filetypes/IType.model';
+import { MobileMenu } from '../MobileMenu';
 
 // Lazy load dialogs to reduce initial JS payload
-const LoginDialog = lazy(() => import("../LoginDialog").then(m => ({ default: m.LoginDialog })));
-const RegisterDialog = lazy(() => import("../RegisterDialog").then(m => ({ default: m.RegisterDialog })));
-const ForgetPasswordDialog = lazy(() => import("../ForgetPasswordDialog").then(m => ({ default: m.ForgetPasswordDialog })));
-const ErrorModal = lazy(() => import("../ErrorModal").then(m => ({ default: m.ErrorModal })));
+const LoginDialog = lazy(() => import('../LoginDialog').then((m) => ({ default: m.LoginDialog })));
+const RegisterDialog = lazy(() => import('../RegisterDialog').then((m) => ({ default: m.RegisterDialog })));
+const ForgetPasswordDialog = lazy(() =>
+  import('../ForgetPasswordDialog').then((m) => ({ default: m.ForgetPasswordDialog }))
+);
+const ErrorModal = lazy(() => import('../ErrorModal').then((m) => ({ default: m.ErrorModal })));
 
 export default function Header({
-  onBookClick = () => { },
+  onBookClick = () => {},
   disableNav = false,
   tooltipPrefix,
   extraMenuOptions = [],
@@ -38,7 +39,7 @@ export default function Header({
 
   // Custom hooks
   const isScrolled = useScrollDetect(50);
-  const effectiveDisable = disableNav || location.pathname !== "/";
+  const effectiveDisable = disableNav || location.pathname !== '/';
   const activeSection = useActiveSection(effectiveDisable);
   const { userName, setUserName } = useAuthState();
   const { handleLogout } = useAuthHandlers(setUserName);
@@ -49,19 +50,19 @@ export default function Header({
   const [isForgetPassOpen, setIsForgetPassOpen] = useState(false);
   const [errorModal, setErrorModal] = useState<ErrorModalState>({
     open: false,
-    title: "",
-    message: ""
+    title: '',
+    message: ''
   });
 
   // Utilities
   const scrollToSection = (id: string) => {
     const element = document.getElementById(id);
     if (!element) return;
-    const headerEl = document.querySelector("header") as HTMLElement | null;
+    const headerEl = document.querySelector('header') as HTMLElement | null;
     const headerOffset = headerEl?.offsetHeight || 72;
     const rect = element.getBoundingClientRect();
     const absoluteTop = window.scrollY + rect.top;
-    window.scrollTo({ top: Math.max(0, absoluteTop - headerOffset), behavior: "smooth" });
+    window.scrollTo({ top: Math.max(0, absoluteTop - headerOffset), behavior: 'smooth' });
   };
 
   const openRegister = () => {
@@ -80,10 +81,10 @@ export default function Header({
   };
 
   const handleLogoClick = () => {
-    if (location.pathname === "/") {
-      window.scrollTo({ top: 0, behavior: "smooth" });
+    if (location.pathname === '/') {
+      window.scrollTo({ top: 0, behavior: 'smooth' });
     } else {
-      navigator("/");
+      navigator('/');
       window.scrollTo(0, 0);
     }
   };
@@ -91,12 +92,12 @@ export default function Header({
   return (
     <header
       className={cn(
-        "fixed top-0 left-0 right-0 z-50 transition-all duration-300",
+        'fixed top-0 left-0 right-0 z-50 transition-all duration-300',
         forceDark
-          ? "bg-black/95 backdrop-blur-lg border-b border-white/10 shadow-[0_10px_40px_rgba(67,97,238,0.15)]"
+          ? 'bg-black/95 backdrop-blur-lg border-b border-white/10 shadow-[0_10px_40px_rgba(67,97,238,0.15)]'
           : isScrolled
-            ? "bg-black/80 backdrop-blur-lg border-b border-white/10 shadow-[0_10px_40px_rgba(67,97,238,0.15)]"
-            : "bg-gradient-to-b from-black/80 via-black/60 to-transparent border-b border-white/10",
+            ? 'bg-black/80 backdrop-blur-lg border-b border-white/10 shadow-[0_10px_40px_rgba(67,97,238,0.15)]'
+            : 'bg-gradient-to-b from-black/80 via-black/60 to-transparent border-b border-white/10'
       )}
     >
       <div className="container mx-auto px-3 md:px-6 lg:px-8 py-4 md:py-[10px] flex items-center gap-3 md:gap-8 justify-between">
@@ -107,7 +108,6 @@ export default function Header({
             src="/logo.svg"
             width={80}
             height={80}
-
             className="cursor-pointer h-12 w-12 md:h-16 md:w-16 lg:h-20 lg:w-20 drop-shadow-[0_0_30px_rgba(59,130,246,0.6)] transition-transform duration-300 hover:scale-110"
             alt="Cinesphere logo"
           />
@@ -150,7 +150,7 @@ export default function Header({
                 userName={userName}
                 tooltipPrefix={tooltipPrefix}
                 extraMenuOptions={extraMenuOptions}
-                onNavigateAccount={() => navigator("/account")}
+                onNavigateAccount={() => navigator('/account')}
                 onLogout={handleLogout}
               />
             </div>

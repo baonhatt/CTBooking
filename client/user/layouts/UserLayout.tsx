@@ -1,7 +1,7 @@
-import { ComponentProps, lazy, Suspense } from "react";
-import Header from "@/components/user/Header";
-const Footer = lazy(() => import("@/components/user/Footer"));
-import { cn } from "@/lib/utils";
+import { ComponentProps, lazy, Suspense } from 'react';
+import Header from '@/components/user/Header';
+const Footer = lazy(() => import('@/components/user/Footer'));
+import { cn } from '@/lib/utils';
 
 type HeaderProps = ComponentProps<typeof Header>;
 
@@ -18,10 +18,10 @@ export default function UserLayout({
   headerProps,
   hideFooter = false,
   className,
-  contentClassName,
+  contentClassName
 }: UserLayoutProps) {
   return (
-    <div className={cn("min-h-screen bg-gradient-dark", className)}>
+    <div className={cn('min-h-screen bg-gradient-dark', className)}>
       <Header {...headerProps} />
       <div className={contentClassName}>{children}</div>
       {!hideFooter && (
@@ -32,4 +32,3 @@ export default function UserLayout({
     </div>
   );
 }
-

@@ -1,7 +1,7 @@
 // Import các hàm cần thiết từ thư viện
-import { eq, or, desc, asc, count, inArray, and, sql } from "drizzle-orm";
-import { formatDateForDb } from "../../lib/date-utils";
-import { deleteCache } from "../../../worker/src/utils";
+import { eq, or, desc, asc, count, inArray, and, sql } from 'drizzle-orm';
+import { formatDateForDb } from '../../lib/date-utils';
+import { deleteCache } from '../../../worker/src/utils';
 
 /**
  * Hàm helper xử lý dữ liệu combo
@@ -18,22 +18,22 @@ function processComboInput(combo: any): number[] {
       try {
         const parsed = JSON.parse(combo);
         if (Array.isArray(parsed)) {
-          return parsed.map(Number).filter(id => !isNaN(id) && id > 0);
+          return parsed.map(Number).filter((id) => !isNaN(id) && id > 0);
         }
       } catch {
         // Nếu không phải JSON, xử lý như chuỗi thông thường
         return combo
           .split(',')
-          .map(x => parseInt(x.trim(), 10))
-          .filter(id => !isNaN(id) && id > 0);
+          .map((x) => parseInt(x.trim(), 10))
+          .filter((id) => !isNaN(id) && id > 0);
       }
     }
 
     // Nếu là mảng, xử lý các phần tử
     if (Array.isArray(combo)) {
       return combo
-        .map(item => typeof item === 'number' ? item : parseInt(item, 10))
-        .filter(id => !isNaN(id) && id > 0);
+        .map((item) => (typeof item === 'number' ? item : parseInt(item, 10)))
+        .filter((id) => !isNaN(id) && id > 0);
     }
 
     return [];
@@ -53,14 +53,12 @@ function processComboInput(combo: any): number[] {
 export async function listTicketPackagesImpl(
   anyDb: any,
   tables: { ticket_packages: any; movies: any },
-  args: { page: number; pageSize: number; q: string; includeInactive?: boolean },
+  args: { page: number; pageSize: number; q: string; includeInactive?: boolean }
 ) {
   const { page, pageSize, q, includeInactive = false } = args;
 
   // 1. Xây dựng điều kiện where
-  let whereCondition = includeInactive
-    ? undefined
-    : eq(tables.ticket_packages.is_active, true);
+  let whereCondition = includeInactive ? undefined : eq(tables.ticket_packages.is_active, true);
 
   if (q) {
     const lowerSearch = q.toLowerCase();
@@ -70,25 +68,17 @@ export async function listTicketPackagesImpl(
       sql`LOWER(${tables.ticket_packages.type}) LIKE ${`%${lowerSearch}%`}`
     );
 
-    whereCondition = whereCondition
-      ? and(whereCondition, searchCondition)
-      : searchCondition;
+    whereCondition = whereCondition ? and(whereCondition, searchCondition) : searchCondition;
   }
 
   // 2. Lấy dữ liệu phân trang
   const [totalResArray, pkgList] = await Promise.all([
-    anyDb
-      .select({ count: count() })
-      .from(tables.ticket_packages)
-      .where(whereCondition),
+    anyDb.select({ count: count() }).from(tables.ticket_packages).where(whereCondition),
     anyDb
       .select()
       .from(tables.ticket_packages)
       .where(whereCondition)
-      .orderBy(
-        asc(tables.ticket_packages.display_order),
-        desc(tables.ticket_packages.id)
-      )
+      .orderBy(asc(tables.ticket_packages.display_order), desc(tables.ticket_packages.id))
       .limit(pageSize)
       .offset((page - 1) * pageSize)
   ]);
@@ -122,17 +112,13 @@ export async function listTicketPackagesImpl(
  * @param id ID của gói vé cần lấy
  * @returns Thông tin chi tiết gói vé hoặc null nếu không tìm thấy
  */
-export async function getTicketPackageImpl(
-  anyDb: any,
-  tables: { ticket_packages: any },
-  id: number,
-) {
+export async function getTicketPackageImpl(anyDb: any, tables: { ticket_packages: any }, id: number) {
   const [item] = await anyDb
     .select()
     .from(tables.ticket_packages)
-    .where(eq(tables.ticket_packages.id, id))  // Tìm theo ID
-    .limit(1);  // Chỉ lấy 1 bản ghi
-  return item || null;  // Trả về null nếu không tìm thấy
+    .where(eq(tables.ticket_packages.id, id)) // Tìm theo ID
+    .limit(1); // Chỉ lấy 1 bản ghi
+  return item || null; // Trả về null nếu không tìm thấy
 }
 
 /**
@@ -147,20 +133,20 @@ export async function createTicketPackageImpl(
   anyDb: any,
   tables: { ticket_packages: any; movies: any },
   args: {
-    name: string;                  // Tên gói vé
-    code?: string;                 // Mã gói vé
-    description?: string;          // Mô tả
-    price: number;                 // Giá
-    features?: any;                // Các tính năng (dạng mảng)
-    combo?: any;                   // Danh sách ID phim (dạng mảng hoặc chuỗi)
-    type?: string;                 // Loại gói vé
-    min_group_size?: number;       // Số lượng tối thiểu
-    max_group_size?: number;       // Số lượng tối đa
-    is_member_only?: boolean;      // Chỉ dành cho thành viên
-    is_active?: boolean;           // Trạng thái hoạt động
-    display_order?: number;        // Thứ tự hiển thị
+    name: string; // Tên gói vé
+    code?: string; // Mã gói vé
+    description?: string; // Mô tả
+    price: number; // Giá
+    features?: any; // Các tính năng (dạng mảng)
+    combo?: any; // Danh sách ID phim (dạng mảng hoặc chuỗi)
+    type?: string; // Loại gói vé
+    min_group_size?: number; // Số lượng tối thiểu
+    max_group_size?: number; // Số lượng tối đa
+    is_member_only?: boolean; // Chỉ dành cho thành viên
+    is_active?: boolean; // Trạng thái hoạt động
+    display_order?: number; // Thứ tự hiển thị
   },
-  RUN_ENV: any,
+  RUN_ENV: any
 ) {
   const {
     name,
@@ -174,7 +160,7 @@ export async function createTicketPackageImpl(
     max_group_size,
     is_member_only,
     is_active,
-    display_order,
+    display_order
   } = args;
 
   // 1. Chuẩn bị thời gian tạo và cập nhật
@@ -186,11 +172,11 @@ export async function createTicketPackageImpl(
   let processedFeatures = undefined;
   if (features) {
     processedFeatures = Array.isArray(features)
-      ? features  // Nếu đã là mảng thì giữ nguyên
-      : String(features)  // Nếu là chuỗi thì tách thành mảng
-        .split(",")
-        .map((x) => x.trim())  // Xóa khoảng trắng thừa
-        .filter(Boolean);      // Lọc bỏ các phần tử rỗng
+      ? features // Nếu đã là mảng thì giữ nguyên
+      : String(features) // Nếu là chuỗi thì tách thành mảng
+          .split(',')
+          .map((x) => x.trim()) // Xóa khoảng trắng thừa
+          .filter(Boolean); // Lọc bỏ các phần tử rỗng
   }
 
   // 3. Xử lý danh sách phim (combo)
@@ -201,12 +187,12 @@ export async function createTicketPackageImpl(
     if (Array.isArray(combo)) {
       // Nếu là mảng, lọc bỏ các giá trị null/undefined
       processedCombo = combo.filter((v) => v !== null && v !== undefined);
-    } else if (typeof combo === "string") {
+    } else if (typeof combo === 'string') {
       // Nếu là chuỗi, tách thành mảng dựa trên dấu phẩy
       processedCombo = combo
-        .split(",")
-        .map((x) => x.trim())  // Xóa khoảng trắng thừa
-        .filter(Boolean);      // Lọc bỏ các phần tử rỗng
+        .split(',')
+        .map((x) => x.trim()) // Xóa khoảng trắng thừa
+        .filter(Boolean); // Lọc bỏ các phần tử rỗng
     }
 
     // Loại bỏ các ID trùng lặp bằng cách chuyển qua Set
@@ -215,9 +201,7 @@ export async function createTicketPackageImpl(
     // Nếu có ID phim, kiểm tra tính hợp lệ
     if (processedCombo.length > 0) {
       // Chuyển đổi tất cả ID sang số và lọc bỏ các giá trị không hợp lệ
-      const numericIds = processedCombo
-        .map((v) => Number(v))
-        .filter((v) => !Number.isNaN(v));
+      const numericIds = processedCombo.map((v) => Number(v)).filter((v) => !Number.isNaN(v));
 
       // Kiểm tra xem tất cả ID phim có tồn tại trong database không
       const [movieCountRes] = await anyDb
@@ -227,7 +211,7 @@ export async function createTicketPackageImpl(
 
       const movieCount = movieCountRes ? Number(movieCountRes.count) : 0;
       if (movieCount !== numericIds.length) {
-        throw new Error("Một hoặc nhiều ID phim trong combo không tồn tại");
+        throw new Error('Một hoặc nhiều ID phim trong combo không tồn tại');
       }
 
       // Cập nhật lại danh sách ID đã được kiểm tra và chuyển đổi
@@ -239,16 +223,16 @@ export async function createTicketPackageImpl(
   const inserted = await anyDb
     .insert(tables.ticket_packages)
     .values({
-      name,  // Tên gói vé (bắt buộc)
-      code,  // Mã gói vé
-      description,  // Mô tả
+      name, // Tên gói vé (bắt buộc)
+      code, // Mã gói vé
+      description, // Mô tả
       // Lưu danh sách ID phim dưới dạng mảng hoặc null nếu không có
       combo: processedCombo.length > 0 ? processedCombo : null,
       // Đảm bảo giá luôn là chuỗi
       price: Number(price).toString(),
       // Danh sách tính năng đã xử lý
       features: processedFeatures,
-      type,  // Loại gói vé
+      type, // Loại gói vé
       // Xử lý giá trị mặc định cho các trường tùy chọn
       min_group_size: min_group_size !== undefined ? Number(min_group_size) : null,
       max_group_size: max_group_size !== undefined ? Number(max_group_size) : null,
@@ -260,28 +244,28 @@ export async function createTicketPackageImpl(
       display_order: Number(display_order ?? 0),
       // Thời gian tạo và cập nhật
       created_at: formattedNow,
-      updated_at: formattedNow,
+      updated_at: formattedNow
     })
-    .returning();  // Trả về bản ghi vừa được tạo
+    .returning(); // Trả về bản ghi vừa được tạo
 
   // Xử lý kết quả trả về từ database
   const item = Array.isArray(inserted) ? inserted[0] : inserted;
 
   // Nếu không tạo được gói vé, ném lỗi
-  if (!item) throw new Error("Không thể tạo gói vé");
+  if (!item) throw new Error('Không thể tạo gói vé');
 
   // Trả về thông tin gói vé vừa tạo
   // Tự động xóa cache trang active-ticket-packages
-  const origin = "https://cinesphere.com.vn"; // Default origin if not provided in env
+  const origin = 'https://cinesphere.com.vn'; // Default origin if not provided in env
   // NOTE: Server routes often don't have access to full Request object to get Origin header easily if not passed down.
   // We'll trust the worker to clear it or use a well-known key if we can.
-  // In our worker setup, we use full URL as cache key. 
+  // In our worker setup, we use full URL as cache key.
   // We need to clear `${origin}/api/active-ticket-packages`.
 
   if (RUN_ENV && RUN_ENV.KV_BINDING) {
     // Direct KV delete if possible? No, we used Cache API or KV put manually.
     // If we manual `KV.put("activeTicketPackages")` in worker, we should delete it here.
-    await RUN_ENV.KV_BINDING.delete("activeTicketPackages");
+    await RUN_ENV.KV_BINDING.delete('activeTicketPackages');
   }
 
   return { item };
@@ -301,20 +285,20 @@ export async function updateTicketPackageImpl(
   tables: { ticket_packages: any; movies: any },
   id: number,
   args: {
-    name?: string;                  // Tên gói vé
-    code?: string;                  // Mã gói vé
-    description?: string;           // Mô tả
-    price?: number;                 // Giá
-    features?: any;                 // Các tính năng
-    combo?: any;                    // Danh sách ID phim
-    type?: string;                  // Loại gói vé
-    min_group_size?: number;        // Số lượng tối thiểu
-    max_group_size?: number;        // Số lượng tối đa
-    is_member_only?: boolean;       // Chỉ dành cho thành viên
-    is_active?: boolean;            // Trạng thái hoạt động
-    display_order?: number;         // Thứ tự hiển thị
+    name?: string; // Tên gói vé
+    code?: string; // Mã gói vé
+    description?: string; // Mô tả
+    price?: number; // Giá
+    features?: any; // Các tính năng
+    combo?: any; // Danh sách ID phim
+    type?: string; // Loại gói vé
+    min_group_size?: number; // Số lượng tối thiểu
+    max_group_size?: number; // Số lượng tối đa
+    is_member_only?: boolean; // Chỉ dành cho thành viên
+    is_active?: boolean; // Trạng thái hoạt động
+    display_order?: number; // Thứ tự hiển thị
   },
-  RUN_ENV: any,
+  RUN_ENV: any
 ) {
   const {
     name,
@@ -328,7 +312,7 @@ export async function updateTicketPackageImpl(
     max_group_size,
     is_member_only,
     is_active,
-    display_order,
+    display_order
   } = args;
 
   const now = new Date();
@@ -341,12 +325,9 @@ export async function updateTicketPackageImpl(
   if (description !== undefined) data.description = description;
   if (type !== undefined) data.type = type;
   if (price !== undefined) data.price = Number(price).toString();
-  if (min_group_size !== undefined)
-    data.min_group_size = Number(min_group_size);
-  if (max_group_size !== undefined)
-    data.max_group_size = Number(max_group_size);
-  if (is_member_only !== undefined)
-    data.is_member_only = Boolean(is_member_only);
+  if (min_group_size !== undefined) data.min_group_size = Number(min_group_size);
+  if (max_group_size !== undefined) data.max_group_size = Number(max_group_size);
+  if (is_member_only !== undefined) data.is_member_only = Boolean(is_member_only);
   if (is_active !== undefined) data.is_active = Boolean(is_active);
   if (display_order !== undefined) data.display_order = Number(display_order);
 
@@ -355,9 +336,9 @@ export async function updateTicketPackageImpl(
     data.features = Array.isArray(features)
       ? features
       : String(features)
-        .split(",")
-        .map((x) => x.trim())
-        .filter(Boolean);
+          .split(',')
+          .map((x) => x.trim())
+          .filter(Boolean);
   }
 
   // 3. Tối ưu xử lý Combo (Lưu dạng chuỗi "1|3")
@@ -367,9 +348,9 @@ export async function updateTicketPackageImpl(
     if (Array.isArray(combo)) {
       // Giữ nguyên mảng nếu FE gửi lên [1, 3]
       comboArr = combo.filter((v) => v !== null && v !== undefined);
-    } else if (typeof combo === "string") {
+    } else if (typeof combo === 'string') {
       comboArr = combo
-        .split(",")
+        .split(',')
         .map((x) => x.trim())
         .filter(Boolean);
     }
@@ -379,9 +360,7 @@ export async function updateTicketPackageImpl(
 
     if (comboArr.length > 0) {
       // Kiểm tra tính hợp lệ của phim (Chuyển sang Number để query DB)
-      const numericIds = comboArr
-        .map((v) => Number(v))
-        .filter((v) => !Number.isNaN(v));
+      const numericIds = comboArr.map((v) => Number(v)).filter((v) => !Number.isNaN(v));
       const [movieCountRes] = await anyDb
         .select({ count: count() })
         .from(tables.movies)
@@ -389,7 +368,7 @@ export async function updateTicketPackageImpl(
 
       const movieCount = movieCountRes ? Number(movieCountRes.count) : 0;
       if (movieCount !== numericIds.length) {
-        throw new Error("Một hoặc nhiều ID phim trong combo không tồn tại");
+        throw new Error('Một hoặc nhiều ID phim trong combo không tồn tại');
       }
     }
     data.combo = comboArr;
@@ -405,7 +384,7 @@ export async function updateTicketPackageImpl(
   const item = Array.isArray(updatedRes) ? updatedRes[0] : updatedRes;
 
   if (RUN_ENV && RUN_ENV.KV_BINDING) {
-    await RUN_ENV.KV_BINDING.delete("activeTicketPackages");
+    await RUN_ENV.KV_BINDING.delete('activeTicketPackages');
   }
 
   return item || null;
@@ -427,7 +406,7 @@ export async function deleteTicketPackageImpl(
   try {
     // 1. Kiểm tra gói vé có tồn tại không
     const existing = await anyDb.query.ticket_packages.findFirst({
-      where: eq(tables.ticket_packages.id, id),
+      where: eq(tables.ticket_packages.id, id)
     });
 
     // Nếu không tìm thấy gói vé, trả về null
@@ -443,12 +422,12 @@ export async function deleteTicketPackageImpl(
       .where(eq(tables.ticket_packages.id, id));
 
     if (RUN_ENV && RUN_ENV.KV_BINDING) {
-      await RUN_ENV.KV_BINDING.delete("activeTicketPackages");
+      await RUN_ENV.KV_BINDING.delete('activeTicketPackages');
     }
 
     return {
       status: 200,
-      message: 'Gói vé đã được chuyển sang trạng thái Ngừng hoạt động thành công',
+      message: 'Gói vé đã được chuyển sang trạng thái Ngừng hoạt động thành công'
     };
   } catch (err: any) {
     // Bắt và ném lại lỗi nếu có

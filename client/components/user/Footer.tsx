@@ -1,12 +1,6 @@
-import {
-  MapPin,
-  Phone,
-  Mail,
-  Facebook,
-  ArrowUp,
-} from "lucide-react";
-import { motion, AnimatePresence } from "framer-motion";
-import { useState, useEffect } from "react";
+import { MapPin, Phone, Mail, Facebook, ArrowUp } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { useState, useEffect } from 'react';
 
 export default function Footer() {
   const [isVisible, setIsVisible] = useState(false);
@@ -20,18 +14,15 @@ export default function Footer() {
       }
     };
 
-    window.addEventListener("scroll", toggleVisibility);
-    return () => window.removeEventListener("scroll", toggleVisibility);
+    window.addEventListener('scroll', toggleVisibility);
+    return () => window.removeEventListener('scroll', toggleVisibility);
   }, []);
 
   const scrollToTop = () => {
-    window.scrollTo({ top: 0, behavior: "smooth" });
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   return (
-
-
-
     <footer className="relative bg-gradient-to-b from-[#060915] to-black border-t border-white/10 py-10 md:py-16 overflow-hidden">
       <div className="absolute inset-0 neon-noise opacity-30 pointer-events-none" />
       <div className="absolute left-0 top-0 w-96 h-96 bg-purple-500/10 blur-[120px]" />
@@ -51,8 +42,7 @@ export default function Footer() {
               </span>
             </h3>
             <p className="text-gray-300 mb-6 leading-relaxed text-sm">
-              Phòng chiếu phim 8K công nghệ cao, mang đến trải nghiệm giải trí
-              đa giác quan chân thực nhất.
+              Phòng chiếu phim 8K công nghệ cao, mang đến trải nghiệm giải trí đa giác quan chân thực nhất.
             </p>
             <div className="flex gap-4">
               <motion.a
@@ -107,9 +97,7 @@ export default function Footer() {
                   <MapPin className="h-5 w-5 text-red-400" />
                 </div>
                 <div className="text-gray-300 text-sm">
-                  <p className="font-semibold text-white mb-1">
-                    Công ty TNHH CÔNG NGHỆ VR VIỆT NAM
-                  </p>
+                  <p className="font-semibold text-white mb-1">Công ty TNHH CÔNG NGHỆ VR VIỆT NAM</p>
                   <p className="text-xs leading-relaxed">
                     Vạn Hạnh Mall, số 11 đường Sư Vạn Hạnh, Quận 10, Thành phố Hồ Chí Minh
                   </p>
@@ -154,7 +142,7 @@ export default function Footer() {
             <div className="relative w-full h-64 rounded-lg overflow-hidden border border-white/20 shadow-lg">
               <iframe
                 src={`https://www.google.com/maps?q=${encodeURIComponent(
-                  "Vạn Hạnh Mall, số 11 đường Sư Vạn Hạnh, Quận 10, Thành phố Hồ Chí Minh"
+                  'Vạn Hạnh Mall, số 11 đường Sư Vạn Hạnh, Quận 10, Thành phố Hồ Chí Minh'
                 )}&output=embed`}
                 width="100%"
                 height="100%"
@@ -206,9 +194,7 @@ export default function Footer() {
         </div>
 
         <div className="border-t border-white/10 pt-8 text-center">
-          <p className="text-gray-400 text-sm">
-            © 2025 CINESPHERE. Tất cả quyền được bảo lưu.
-          </p>
+          <p className="text-gray-400 text-sm">© 2025 CINESPHERE. Tất cả quyền được bảo lưu.</p>
         </div>
       </div>
 

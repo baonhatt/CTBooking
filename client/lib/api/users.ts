@@ -1,16 +1,11 @@
-import { request } from "./http";
+import { request } from './http';
 
-export async function getUsers(options?: {
-  page?: number;
-  pageSize?: number;
-  q?: string;
-  signal?: AbortSignal;
-}) {
+export async function getUsers(options?: { page?: number; pageSize?: number; q?: string; signal?: AbortSignal }) {
   const params = new URLSearchParams();
-  if (options?.page) params.set("page", String(options.page));
-  if (options?.pageSize) params.set("pageSize", String(options.pageSize));
-  if (options?.q) params.set("q", options.q);
-  const path = `/api/admin/users${params.toString() ? `?${params.toString()}` : ""}`;
+  if (options?.page) params.set('page', String(options.page));
+  if (options?.pageSize) params.set('pageSize', String(options.pageSize));
+  if (options?.q) params.set('q', options.q);
+  const path = `/api/admin/users${params.toString() ? `?${params.toString()}` : ''}`;
   return request<{
     items: any[];
     page: number;
@@ -44,31 +39,37 @@ export async function getUserById(id: number) {
   }>(`/api/admin/users/${id}`);
 }
 
-export async function updateUserProfileApi(body: { email: string; name?: string; phone?: string; gender?: string; dob?: string }) {
+export async function updateUserProfileApi(body: {
+  email: string;
+  name?: string;
+  phone?: string;
+  gender?: string;
+  dob?: string;
+}) {
   return request<{ ok: boolean; user: any }>(`/api/users-profile`, {
-    method: "POST",
-    body: JSON.stringify(body),
+    method: 'POST',
+    body: JSON.stringify(body)
   });
 }
 
 export async function changePasswordApi(body: { email: string; oldPassword: string; newPassword: string }) {
   return request<{ ok: boolean }>(`/api/users/password`, {
-    method: "POST",
-    body: JSON.stringify(body),
+    method: 'POST',
+    body: JSON.stringify(body)
   });
 }
 
-export async function getUserTransactionsApi(options: { email: string; status?: "paid"; signal?: AbortSignal }) {
+export async function getUserTransactionsApi(options: { email: string; status?: 'paid'; signal?: AbortSignal }) {
   const params = new URLSearchParams();
-  params.set("email", options.email);
-  if (options.status) params.set("status", options.status);
+  params.set('email', options.email);
+  if (options.status) params.set('status', options.status);
   const path = `/api/usersprofile/transactions?${params.toString()}`;
   return request<{ items: any[] }>(path, { signal: options.signal });
 }
 
 export async function getUserProfileByEmailApi(email: string) {
   const params = new URLSearchParams();
-  params.set("email", email);
+  params.set('email', email);
   return request<{
     id?: number;
     fullname?: string;
@@ -83,4 +84,3 @@ export async function getUserProfileByEmailApi(email: string) {
     account_created_at?: string | null;
   }>(`/api/users-profile?${params.toString()}`);
 }
-

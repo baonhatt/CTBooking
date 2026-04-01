@@ -41,4 +41,3 @@ class MovieStore {
 
 // Export singleton instance
 export const movieStore = new MovieStore();
-
