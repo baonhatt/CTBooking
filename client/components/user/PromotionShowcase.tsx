@@ -1,29 +1,31 @@
-import { motion } from "framer-motion";
-import { useNavigate } from "react-router-dom";
-import { useQuery } from "@tanstack/react-query";
-import { getActiveTickets } from "@/lib/api";
+import { motion } from 'framer-motion';
+import { useNavigate } from 'react-router-dom';
+import { useQuery } from '@tanstack/react-query';
+import { getActiveTickets } from '@/lib/api';
 
-import { cn } from "@/lib/utils";
-import { Carousel, CarouselContent, CarouselItem, CarouselNext, CarouselPrevious } from "../ui/carousel";
+import { cn } from '@/lib/utils';
+import { Carousel, CarouselContent, CarouselItem, CarouselNext, CarouselPrevious } from '../ui/carousel';
 
 export default function PromotionShowcase() {
   const navigate = useNavigate();
 
   const { data: ticketsData, isLoading } = useQuery({
-    queryKey: ["activeTickets"],
+    queryKey: ['activeTickets'],
     queryFn: ({ signal }) => getActiveTickets({ signal }),
-    staleTime: 60000,
+    staleTime: 60000
   });
 
-  const combos = (ticketsData?.items || []).map((t: any) => ({
-    id: t.id,
-    name: t.name,
-    price: Number(t.price || 0),
-    type: t.type || "",
-    display_order: t.display_order || 0,
-  })).sort((a, b) => a.display_order - b.display_order);
+  const combos = (ticketsData?.items || [])
+    .map((t: any) => ({
+      id: t.id,
+      name: t.name,
+      price: Number(t.price || 0),
+      type: t.type || '',
+      display_order: t.display_order || 0
+    }))
+    .sort((a, b) => a.display_order - b.display_order);
 
-  const handleBookCombo = (combo: typeof combos[0]) => {
+  const handleBookCombo = (combo: (typeof combos)[0]) => {
     try {
       // Lưu combo được chọn vào localStorage dưới dạng package để tương thích với hệ thống booking
       const comboPackage = {
@@ -31,7 +33,7 @@ export default function PromotionShowcase() {
         name: combo.name,
         price: combo.price,
         type: combo.type,
-        display_order: combo.display_order,
+        display_order: combo.display_order
       };
       localStorage.setItem('selectedTicketPackage', JSON.stringify(comboPackage));
     } catch (error) {
@@ -50,15 +52,9 @@ export default function PromotionShowcase() {
 
       <div className="container mx-auto px-4 relative z-10">
         <div className="text-center max-w-3xl mx-auto mb-10">
-          <p className="text-sm uppercase tracking-[0.22em] text-cyan-200">
-            Ưu đãi suất chiếu
-          </p>
-          <h2 className="text-3xl md:text-4xl font-bold text-white mt-2">
-            Chọn gói phù hợp – ưu đãi kèm quà tặng
-          </h2>
-          <p className="text-gray-300 mt-3">
-            “Quà tặng hộp đèn kèm hình ảnh” - “Cúp ngàn quang cáo”
-          </p>
+          <p className="text-sm uppercase tracking-[0.22em] text-cyan-200">Ưu đãi suất chiếu</p>
+          <h2 className="text-3xl md:text-4xl font-bold text-white mt-2">Chọn gói phù hợp – ưu đãi kèm quà tặng</h2>
+          <p className="text-gray-300 mt-3">“Quà tặng hộp đèn kèm hình ảnh” - “Cúp ngàn quang cáo”</p>
         </div>
 
         {isLoading ? (
@@ -67,15 +63,13 @@ export default function PromotionShowcase() {
             <span className="ml-3 text-gray-300">Đang tải dữ liệu...</span>
           </div>
         ) : combos.length === 0 ? (
-          <div className="text-center py-12 text-gray-400">
-            Chưa có gói vé nào
-          </div>
+          <div className="text-center py-12 text-gray-400">Chưa có gói vé nào</div>
         ) : (
           <div className="mx-auto max-w-7xl px-10 py-10">
             <Carousel
               opts={{
-                align: "start",
-                loop: combos.length > 4,
+                align: 'start',
+                loop: combos.length > 4
               }}
               className="w-full"
             >
@@ -84,22 +78,21 @@ export default function PromotionShowcase() {
                   <CarouselItem
                     key={combo.id}
                     className={cn(
-                      "md:basis-1/2 lg:basis-1/4 py-10 pl-6",
-                      index === 0 && combos.length === 1 && "md:ml-[25%] lg:ml-[37.5%]",
-                      index === 0 && combos.length === 2 && "lg:ml-[25%]",
-                      index === 0 && combos.length === 3 && "lg:ml-[12.5%]"
+                      'md:basis-1/2 lg:basis-1/4 py-10 pl-6',
+                      index === 0 && combos.length === 1 && 'md:ml-[25%] lg:ml-[37.5%]',
+                      index === 0 && combos.length === 2 && 'lg:ml-[25%]',
+                      index === 0 && combos.length === 3 && 'lg:ml-[12.5%]'
                     )}
                   >
                     <motion.div
                       initial={{ opacity: 0, y: 50 }}
                       whileInView={{ opacity: 1, y: 0 }}
-
                       viewport={{ once: true }}
                       transition={{
                         delay: index * 0.1,
                         duration: 0.5,
-                        type: "spring",
-                        stiffness: 100,
+                        type: 'spring',
+                        stiffness: 100
                       }}
                       className="h-full relative overflow-hidden rounded-3xl p-6 px-4 bg-white/5 border border-cyan-400/20 shadow-[0_10px_50px_rgba(59,130,246,0.15)] group transition-colors duration-300 flex flex-col justify-between"
                     >
@@ -120,11 +113,10 @@ export default function PromotionShowcase() {
                           whileHover={{ scale: 1.1, originX: 0 }}
                           className="text-3xl  font-extrabold text-cyan-300 drop-shadow group-hover:text-cyan-200 transition-colors"
                         >
-                          {combo.price.toLocaleString("vi-VN")}₫
+                          {combo.price.toLocaleString('vi-VN')}₫
                         </motion.p>
                         <p className="text-sm text-gray-200 group-hover:text-white transition-colors">
-                          Vé trải nghiệm CINESPHERE kèm quà tặng ánh sáng lưu
-                          niệm.
+                          Vé trải nghiệm CINESPHERE kèm quà tặng ánh sáng lưu niệm.
                         </p>
                         <motion.button
                           whileHover={{ scale: 1.05 }}
@@ -139,13 +131,19 @@ export default function PromotionShowcase() {
                   </CarouselItem>
                 ))}
               </CarouselContent>
-              <div className={cn("hidden", combos.length > 2 ? "md:block" : "md:hidden", combos.length <= 4 && "lg:hidden")}>
+              <div
+                className={cn(
+                  'hidden',
+                  combos.length > 2 ? 'md:block' : 'md:hidden',
+                  combos.length <= 4 && 'lg:hidden'
+                )}
+              >
                 <CarouselPrevious className="bg-white/10 hover:bg-cyan-500 hover:text-white border-none text-white -left-12" />
                 <CarouselNext className="bg-white/10 hover:bg-cyan-500 hover:text-white border-none text-white -right-12" />
               </div>
 
               {/* Mobile Navigation */}
-              <div className={cn("flex justify-center gap-4 mt-6 md:hidden", combos.length <= 1 && "hidden")}>
+              <div className={cn('flex justify-center gap-4 mt-6 md:hidden', combos.length <= 1 && 'hidden')}>
                 <CarouselPrevious className="static translate-y-0 bg-white/10 hover:bg-cyan-500 hover:text-white border-none text-white" />
                 <CarouselNext className="static translate-y-0 bg-white/10 hover:bg-cyan-500 hover:text-white border-none text-white" />
               </div>
@@ -156,4 +154,3 @@ export default function PromotionShowcase() {
     </section>
   );
 }
-

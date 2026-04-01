@@ -1,14 +1,14 @@
-import { User, LogOut, Settings, LayoutDashboard, UserCircle } from "lucide-react";
+import { User, LogOut, Settings, LayoutDashboard, UserCircle } from 'lucide-react';
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
   DropdownMenuSeparator,
-  DropdownMenuLabel,
-} from "@/components/ui/dropdown-menu";
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { cn } from "@/lib/utils";
+  DropdownMenuLabel
+} from '@/components/ui/dropdown-menu';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
+import { cn } from '@/lib/utils';
 
 interface UserMenuProps {
   userName: string;
@@ -18,13 +18,7 @@ interface UserMenuProps {
   onLogout: () => void;
 }
 
-export function UserMenu({
-  userName,
-  tooltipPrefix,
-  extraMenuOptions,
-  onNavigateAccount,
-  onLogout
-}: UserMenuProps) {
+export function UserMenu({ userName, tooltipPrefix, extraMenuOptions, onNavigateAccount, onLogout }: UserMenuProps) {
   const getIconForLabel = (label: string) => {
     const l = label.toLowerCase();
     if (l.includes('admin') || l.includes('quản trị') || l.includes('dashboard')) {
@@ -46,8 +40,12 @@ export function UserMenu({
             </button>
           </DropdownMenuTrigger>
         </TooltipTrigger>
-        <TooltipContent side="bottom" align="center" className="bg-neutral-900/90 backdrop-blur-md border border-white/10 text-white text-xs py-1.5 px-3 rounded-lg shadow-xl">
-          {(tooltipPrefix || "Chào") + ", " + (userName || "bạn")}
+        <TooltipContent
+          side="bottom"
+          align="center"
+          className="bg-neutral-900/90 backdrop-blur-md border border-white/10 text-white text-xs py-1.5 px-3 rounded-lg shadow-xl"
+        >
+          {(tooltipPrefix || 'Chào') + ', ' + (userName || 'bạn')}
         </TooltipContent>
       </Tooltip>
 
@@ -58,7 +56,9 @@ export function UserMenu({
       >
         <DropdownMenuLabel className="px-4 py-4 select-none">
           <div className="flex flex-col gap-1">
-            <span className="text-[11px] uppercase tracking-[0.12em] font-bold text-blue-500/90">Tài khoản cá nhân</span>
+            <span className="text-[11px] uppercase tracking-[0.12em] font-bold text-blue-500/90">
+              Tài khoản cá nhân
+            </span>
             <span className="text-base font-bold text-white leading-tight truncate">{userName}</span>
           </div>
         </DropdownMenuLabel>

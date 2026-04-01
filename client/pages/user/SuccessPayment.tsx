@@ -1,5 +1,5 @@
-import { useEffect } from "react";
-import { useNavigate, useSearchParams } from "react-router-dom";
+import { useEffect } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 
 export default function SuccessPayment() {
   const navigate = useNavigate();
@@ -8,7 +8,7 @@ export default function SuccessPayment() {
   useEffect(() => {
     // Lấy tất cả query params từ URL và redirect về /checkout với các params đó
     const params = new URLSearchParams();
-    
+
     // Copy tất cả params từ URL hiện tại
     searchParams.forEach((value, key) => {
       params.set(key, value);
@@ -16,7 +16,7 @@ export default function SuccessPayment() {
 
     // Redirect về /checkout với tất cả query params
     const queryString = params.toString();
-    navigate(`/checkout${queryString ? `?${queryString}` : ""}`, { replace: true });
+    navigate(`/checkout${queryString ? `?${queryString}` : ''}`, { replace: true });
   }, [navigate, searchParams]);
 
   // Hiển thị loading trong khi redirect
@@ -29,4 +29,3 @@ export default function SuccessPayment() {
     </div>
   );
 }
-

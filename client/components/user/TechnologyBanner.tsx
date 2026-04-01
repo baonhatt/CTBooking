@@ -1,67 +1,70 @@
-import { motion, AnimatePresence } from "framer-motion";
-import { Play, Pause, ChevronLeft, ChevronRight } from "lucide-react";
-import { useState, useEffect, useRef, useCallback, useMemo } from "react";
-import { cn, optimizeCloudinaryUrl, optimizeCloudinaryVideoUrl, getCloudinaryThumbnail } from "@/lib/utils";
-import { useQuery } from "@tanstack/react-query";
-import { getSiteMediaApi } from "@/lib/api/uploads";
-import useEmblaCarousel from "embla-carousel-react";
-import type { EmblaCarouselType } from "embla-carousel";
+import { motion, AnimatePresence } from 'framer-motion';
+import { Play, Pause, ChevronLeft, ChevronRight } from 'lucide-react';
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import { cn, optimizeCloudinaryUrl, optimizeCloudinaryVideoUrl, getCloudinaryThumbnail } from '@/lib/utils';
+import { useQuery } from '@tanstack/react-query';
+import { getSiteMediaApi } from '@/lib/api/uploads';
+import useEmblaCarousel from 'embla-carousel-react';
+import type { EmblaCarouselType } from 'embla-carousel';
 
 // Decorative space elements
 const spaceElements = [
-  { id: 1, size: "w-32 h-32", position: "top-20 left-4", delay: 0, duration: 8 },
-  { id: 2, size: "w-24 h-24", position: "top-40 left-8", delay: 1, duration: 10 },
-  { id: 3, size: "w-20 h-20", position: "top-60 left-12", delay: 2, duration: 12 },
-  { id: 4, size: "w-28 h-28", position: "top-80 left-6", delay: 0.5, duration: 9 },
-  { id: 5, size: "w-36 h-36", position: "top-20 right-4", delay: 1.5, duration: 11 },
-  { id: 6, size: "w-24 h-24", position: "top-40 right-8", delay: 2.5, duration: 13 },
-  { id: 7, size: "w-20 h-20", position: "top-60 right-12", delay: 0.8, duration: 10 },
-  { id: 8, size: "w-32 h-32", position: "top-80 right-6", delay: 1.2, duration: 9 },
+  { id: 1, size: 'w-32 h-32', position: 'top-20 left-4', delay: 0, duration: 8 },
+  { id: 2, size: 'w-24 h-24', position: 'top-40 left-8', delay: 1, duration: 10 },
+  { id: 3, size: 'w-20 h-20', position: 'top-60 left-12', delay: 2, duration: 12 },
+  { id: 4, size: 'w-28 h-28', position: 'top-80 left-6', delay: 0.5, duration: 9 },
+  { id: 5, size: 'w-36 h-36', position: 'top-20 right-4', delay: 1.5, duration: 11 },
+  { id: 6, size: 'w-24 h-24', position: 'top-40 right-8', delay: 2.5, duration: 13 },
+  { id: 7, size: 'w-20 h-20', position: 'top-60 right-12', delay: 0.8, duration: 10 },
+  { id: 8, size: 'w-32 h-32', position: 'top-80 right-6', delay: 1.2, duration: 9 }
 ];
 
 // Main video placeholder logic
 const mainVisualPlaceholder = {
-  type: "video" as const,
-  src: "",
-  thumbnail: "",
+  type: 'video' as const,
+  src: '',
+  thumbnail: ''
 };
 
 export default function TechnologyBanner() {
   // Consolidated query for all technology media
   const { data: siteMediaData, isLoading } = useQuery({
-    queryKey: ["siteMedia", "all_active_videos"],
+    queryKey: ['siteMedia', 'all_active_videos'],
     queryFn: ({ signal }) =>
       getSiteMediaApi({
         active: true,
-        type: "video",
-        signal,
+        type: 'video',
+        signal
       }),
-    staleTime: 600000,
+    staleTime: 600000
   });
 
-  const mainItem = useMemo(() =>
-    siteMediaData?.items?.find((it: any) => it.section === "technology_section1"),
+  const mainItem = useMemo(
+    () => siteMediaData?.items?.find((it: any) => it.section === 'technology_section1'),
     [siteMediaData]
   );
 
-  const listItemsData = useMemo(() =>
-    siteMediaData?.items?.filter((it: any) => it.section === "technology_section2") || [],
+  const listItemsData = useMemo(
+    () => siteMediaData?.items?.filter((it: any) => it.section === 'technology_section2') || [],
     [siteMediaData]
   );
 
   const mainVideoUrl = mainItem?.url;
-  const mainVisual = useMemo(() => ({
-    type: "video" as const,
-    src: mainVideoUrl ? optimizeCloudinaryVideoUrl(mainVideoUrl, 1080) : "",
-    thumbnail: mainVideoUrl ? getCloudinaryThumbnail(mainVideoUrl, 480) : "",
-  }), [mainVideoUrl]);
+  const mainVisual = useMemo(
+    () => ({
+      type: 'video' as const,
+      src: mainVideoUrl ? optimizeCloudinaryVideoUrl(mainVideoUrl, 1080) : '',
+      thumbnail: mainVideoUrl ? getCloudinaryThumbnail(mainVideoUrl, 480) : ''
+    }),
+    [mainVideoUrl]
+  );
 
   const videoPreviewsMerged = useMemo(() => {
     return listItemsData.map((it: any) => ({
       src: optimizeCloudinaryVideoUrl(it.url as string, 480),
       thumbnail: getCloudinaryThumbnail(it.url as string, 300),
-      title: it.title || "Công nghệ Cinesphere",
-      description: it.description || "Trải nghiệm đỉnh cao",
+      title: it.title || 'Công nghệ Cinesphere',
+      description: it.description || 'Trải nghiệm đỉnh cao'
     }));
   }, [listItemsData]);
   const [playingVideo, setPlayingVideo] = useState<string | null>(null);
@@ -90,29 +93,29 @@ export default function TechnologyBanner() {
   const [galleryBuffering, setGalleryBuffering] = useState<boolean[]>([]);
   const [canScrollPrev, setCanScrollPrev] = useState(false);
   const [canScrollNext, setCanScrollNext] = useState(false);
-  const SECTION_ID = "tech-section";
+  const SECTION_ID = 'tech-section';
 
   const isGalleryLoading = isLoading;
 
   const formatTime = (s: number) => {
-    if (!isFinite(s) || s <= 0) return "0:00";
+    if (!isFinite(s) || s <= 0) return '0:00';
     const m = Math.floor(s / 60);
     const sec = Math.floor(s % 60);
-    return `${m}:${sec < 10 ? "0" : ""}${sec}`;
+    return `${m}:${sec < 10 ? '0' : ''}${sec}`;
   };
 
   // Embla Carousel setup with optimized options for mobile
   const [emblaRef, emblaApi] = useEmblaCarousel(
     {
-      align: "start",
+      align: 'start',
       dragFree: false,
-      containScroll: "trimSnaps",
+      containScroll: 'trimSnaps',
       slidesToScroll: 1,
       breakpoints: {
-        "(min-width: 640px)": { slidesToScroll: 1 },
-        "(min-width: 1024px)": { slidesToScroll: 2 },
-        "(min-width: 1280px)": { slidesToScroll: 3 },
-      },
+        '(min-width: 640px)': { slidesToScroll: 1 },
+        '(min-width: 1024px)': { slidesToScroll: 2 },
+        '(min-width: 1280px)': { slidesToScroll: 3 }
+      }
     },
     []
   );
@@ -129,11 +132,11 @@ export default function TechnologyBanner() {
     if (!emblaApi) return;
 
     onSelect(emblaApi);
-    emblaApi.on("reInit", onSelect);
-    emblaApi.on("select", onSelect);
+    emblaApi.on('reInit', onSelect);
+    emblaApi.on('select', onSelect);
 
     return () => {
-      emblaApi.off("select", onSelect);
+      emblaApi.off('select', onSelect);
     };
   }, [emblaApi, onSelect]);
 
@@ -197,15 +200,17 @@ export default function TechnologyBanner() {
       });
     };
 
-    window.addEventListener("cinesphere-video-play", handleGlobalPlay);
-    return () => window.removeEventListener("cinesphere-video-play", handleGlobalPlay);
+    window.addEventListener('cinesphere-video-play', handleGlobalPlay);
+    return () => window.removeEventListener('cinesphere-video-play', handleGlobalPlay);
   }, []);
 
   const notifyGlobalPlay = useCallback((subId?: string) => {
     const id = subId ? `${SECTION_ID}-${subId}` : SECTION_ID;
-    window.dispatchEvent(new CustomEvent("cinesphere-video-play", {
-      detail: { id }
-    }));
+    window.dispatchEvent(
+      new CustomEvent('cinesphere-video-play', {
+        detail: { id }
+      })
+    );
   }, []);
 
   // Intersection Observer for carousel videos - pause when scrolled out of viewport
@@ -279,8 +284,8 @@ export default function TechnologyBanner() {
   }, []); // Observe container unconditionally from mount
 
   useEffect(() => {
-    if (playingVideo === "main") {
-      mainVideoRef.current?.play().catch(() => { });
+    if (playingVideo === 'main') {
+      mainVideoRef.current?.play().catch(() => {});
     }
   }, [playingVideo]);
 
@@ -304,15 +309,14 @@ export default function TechnologyBanner() {
     if (!isMainVideoPlaying) {
       setIsMainVideoPlaying(true);
       setMainVideoLoaded(true);
-      notifyGlobalPlay("main");
+      notifyGlobalPlay('main');
     } else {
       const el = mainVideoRef.current;
       if (el) {
         if (el.paused) {
-          el.play().catch(() => { });
-          notifyGlobalPlay("main");
-        }
-        else el.pause();
+          el.play().catch(() => {});
+          notifyGlobalPlay('main');
+        } else el.pause();
       }
     }
   };
@@ -329,10 +333,9 @@ export default function TechnologyBanner() {
       const el = videoRefs.current[i];
       if (el) {
         if (el.paused) {
-          el.play().catch(() => { });
+          el.play().catch(() => {});
           notifyGlobalPlay(`carousel-${i}`);
-        }
-        else el.pause();
+        } else el.pause();
       }
     }
   };
@@ -387,13 +390,13 @@ export default function TechnologyBanner() {
               y: [0, -20, 0],
               x: [0, 10, 0],
               rotate: [0, 180, 360],
-              scale: [1, 1.1, 1],
+              scale: [1, 1.1, 1]
             }}
             transition={{
               duration: element.duration,
               repeat: Infinity,
-              ease: "easeInOut",
-              delay: element.delay,
+              ease: 'easeInOut',
+              delay: element.delay
             }}
           >
             {/* Planet/Celestial Body */}
@@ -403,7 +406,10 @@ export default function TechnologyBanner() {
               <div className="absolute top-1/3 right-1/4 w-1.5 h-1.5 bg-white/40 rounded-full blur-sm" />
               {/* Rings for some planets */}
               {element.id % 2 === 0 && (
-                <div className="absolute inset-0 border-2 border-cyan-300/20 rounded-full" style={{ transform: 'scale(1.2)' }} />
+                <div
+                  className="absolute inset-0 border-2 border-cyan-300/20 rounded-full"
+                  style={{ transform: 'scale(1.2)' }}
+                />
               )}
             </div>
           </motion.div>
@@ -416,16 +422,16 @@ export default function TechnologyBanner() {
             className="absolute w-1 h-1 bg-cyan-300 rounded-full"
             style={{
               left: `${5 + (i % 4) * 3}%`,
-              top: `${20 + Math.floor(i / 4) * 25}%`,
+              top: `${20 + Math.floor(i / 4) * 25}%`
             }}
             animate={{
               opacity: [0.3, 1, 0.3],
-              scale: [1, 1.5, 1],
+              scale: [1, 1.5, 1]
             }}
             transition={{
               duration: 2 + (i % 3),
               repeat: Infinity,
-              delay: i * 0.2,
+              delay: i * 0.2
             }}
           />
         ))}
@@ -439,13 +445,13 @@ export default function TechnologyBanner() {
               y: [0, -20, 0],
               x: [0, -10, 0],
               rotate: [0, -180, -360],
-              scale: [1, 1.1, 1],
+              scale: [1, 1.1, 1]
             }}
             transition={{
               duration: element.duration,
               repeat: Infinity,
-              ease: "easeInOut",
-              delay: element.delay,
+              ease: 'easeInOut',
+              delay: element.delay
             }}
           >
             {/* Planet/Celestial Body */}
@@ -455,7 +461,10 @@ export default function TechnologyBanner() {
               <div className="absolute top-1/3 right-1/4 w-1.5 h-1.5 bg-white/40 rounded-full blur-sm" />
               {/* Rings for some planets */}
               {element.id % 2 === 1 && (
-                <div className="absolute inset-0 border-2 border-purple-300/20 rounded-full" style={{ transform: 'scale(1.2)' }} />
+                <div
+                  className="absolute inset-0 border-2 border-purple-300/20 rounded-full"
+                  style={{ transform: 'scale(1.2)' }}
+                />
               )}
             </div>
           </motion.div>
@@ -468,16 +477,16 @@ export default function TechnologyBanner() {
             className="absolute w-1 h-1 bg-purple-300 rounded-full"
             style={{
               right: `${5 + (i % 4) * 3}%`,
-              top: `${20 + Math.floor(i / 4) * 25}%`,
+              top: `${20 + Math.floor(i / 4) * 25}%`
             }}
             animate={{
               opacity: [0.3, 1, 0.3],
-              scale: [1, 1.5, 1],
+              scale: [1, 1.5, 1]
             }}
             transition={{
               duration: 2 + (i % 3),
               repeat: Infinity,
-              delay: i * 0.2,
+              delay: i * 0.2
             }}
           />
         ))}
@@ -488,12 +497,12 @@ export default function TechnologyBanner() {
           animate={{
             x: [0, 30, 0],
             y: [0, -20, 0],
-            scale: [1, 1.2, 1],
+            scale: [1, 1.2, 1]
           }}
           transition={{
             duration: 15,
             repeat: Infinity,
-            ease: "easeInOut",
+            ease: 'easeInOut'
           }}
         />
         <motion.div
@@ -501,12 +510,12 @@ export default function TechnologyBanner() {
           animate={{
             x: [0, -30, 0],
             y: [0, 20, 0],
-            scale: [1, 1.2, 1],
+            scale: [1, 1.2, 1]
           }}
           transition={{
             duration: 18,
             repeat: Infinity,
-            ease: "easeInOut",
+            ease: 'easeInOut'
           }}
         />
       </div>
@@ -520,19 +529,19 @@ export default function TechnologyBanner() {
           transition={{ duration: 0.4 }}
           className="text-center mb-16 max-w-4xl mx-auto"
         >
-          <p className="text-sm uppercase tracking-[0.28em] text-cyan-200 mb-4">
-            CINESPHERE EXPERIENCE
-          </p>
+          <p className="text-sm uppercase tracking-[0.28em] text-cyan-200 mb-4">CINESPHERE EXPERIENCE</p>
           <h2 className="text-4xl md:text-5xl lg:text-6xl font-extrabold mb-6 lg:leading-[1.25]">
             <span className="bg-gradient-to-r from-cyan-300 to-blue-400 bg-clip-text text-transparent">
               Chạm tới Vô Cực
-            </span>{" "}
+            </span>{' '}
             <span className="bg-gradient-to-r from-purple-400 to-pink-400 bg-clip-text text-transparent">
               cùng Vũ Trụ Đa Chiều 8K
             </span>
           </h2>
           <p className="text-lg md:text-xl whitespace-break-spaces text-gray-200 leading-relaxed">
-            Chào mừng bạn đến với Huyễn Cảnh Không Gian, nơi những giới hạn về vật lý bị xóa nhòa để nhường chỗ cho những trải nghiệm thị giác đỉnh cao. Không đơn thuần là một phòng chiếu phim, đây là "cánh cửa thần kỳ" đưa bạn bước vào những chiều không gian mà thực tại chưa bao giờ chạm tới.
+            Chào mừng bạn đến với Huyễn Cảnh Không Gian, nơi những giới hạn về vật lý bị xóa nhòa để nhường chỗ cho
+            những trải nghiệm thị giác đỉnh cao. Không đơn thuần là một phòng chiếu phim, đây là "cánh cửa thần kỳ" đưa
+            bạn bước vào những chiều không gian mà thực tại chưa bao giờ chạm tới.
           </p>
         </motion.div>
 
@@ -559,7 +568,7 @@ export default function TechnologyBanner() {
                       className="absolute inset-0 z-10"
                     >
                       <img
-                        src={mainVisual.thumbnail || "/placeholder-video.jpg"}
+                        src={mainVisual.thumbnail || '/placeholder-video.jpg'}
                         alt="Cinesphere Technology Experience"
                         width={480}
                         height={693}
@@ -591,7 +600,9 @@ export default function TechnologyBanner() {
                           >
                             <div className="flex flex-col items-center gap-4">
                               <div className="w-14 h-14 border-4 border-cyan-500/20 border-t-cyan-500 rounded-full animate-spin" />
-                              <span className="text-cyan-400 text-sm font-medium tracking-widest uppercase animate-pulse text-center px-4">Đang kết nối...</span>
+                              <span className="text-cyan-400 text-sm font-medium tracking-widest uppercase animate-pulse text-center px-4">
+                                Đang kết nối...
+                              </span>
                             </div>
                           </motion.div>
                         )}
@@ -631,7 +642,7 @@ export default function TechnologyBanner() {
                       >
                         <button
                           className="absolute inset-0 flex items-center justify-center"
-                          aria-label={isMainVideoPlaying ? "Pause video" : "Play video"}
+                          aria-label={isMainVideoPlaying ? 'Pause video' : 'Play video'}
                         >
                           {!isMainVideoPlaying && (
                             <motion.div
@@ -663,20 +674,26 @@ export default function TechnologyBanner() {
               </div>
             </div>
             <div className="w-full md:basis-7/12 lg:basis-7/12 space-y-8">
-              <h3 className="text-3xl md:text-4xl font-bold text-white">
-                ✨ Tại sao bạn không nên bỏ lỡ?
-              </h3>
+              <h3 className="text-3xl md:text-4xl font-bold text-white">✨ Tại sao bạn không nên bỏ lỡ?</h3>
               <p className="text-lg text-gray-300 leading-relaxed">
-                <span className="text-white font-semibold">Trải Nghiệm Đắm Chìm Không Giới Hạn:</span> Với hệ thống màn hình đa diện bao quanh, chúng tôi tái tạo những khung cảnh vĩ đại, từ sự tĩnh lặng của vũ trụ bao la đến nhịp sống sôi động của những thành phố tương lai, tất cả gói gọn trong một không gian tinh tế.
+                <span className="text-white font-semibold">Trải Nghiệm Đắm Chìm Không Giới Hạn:</span> Với hệ thống màn
+                hình đa diện bao quanh, chúng tôi tái tạo những khung cảnh vĩ đại, từ sự tĩnh lặng của vũ trụ bao la đến
+                nhịp sống sôi động của những thành phố tương lai, tất cả gói gọn trong một không gian tinh tế.
               </p>
               <p className="text-lg text-gray-300 leading-relaxed">
-                <span className="text-white font-semibold">Siêu Định Dạng 8K+8K:</span> Hãy chuẩn bị để ngỡ ngàng trước những thước phim CG siêu phân giải 8K. Mọi chi tiết đều chân thực đến mức khó tin, cho phép bạn đắm mình vào cảnh vật mà không cần đeo bất kỳ thiết bị hỗ trợ nào.
+                <span className="text-white font-semibold">Siêu Định Dạng 8K+8K:</span> Hãy chuẩn bị để ngỡ ngàng trước
+                những thước phim CG siêu phân giải 8K. Mọi chi tiết đều chân thực đến mức khó tin, cho phép bạn đắm mình
+                vào cảnh vật mà không cần đeo bất kỳ thiết bị hỗ trợ nào.
               </p>
               <p className="text-lg text-gray-300 leading-relaxed">
-                <span className="text-white font-semibold">Xuyên Không Trong Chớp Mắt:</span> Chỉ một cái chạm, bối cảnh sẽ thay đổi tức thì. Bạn có thể đang dạo bước giữa rừng nguyên sinh rồi ngay lập tức lao vút qua những thiên hà xa xôi với tốc độ và cảm giác chân thực tuyệt đối.
+                <span className="text-white font-semibold">Xuyên Không Trong Chớp Mắt:</span> Chỉ một cái chạm, bối cảnh
+                sẽ thay đổi tức thì. Bạn có thể đang dạo bước giữa rừng nguyên sinh rồi ngay lập tức lao vút qua những
+                thiên hà xa xôi với tốc độ và cảm giác chân thực tuyệt đối.
               </p>
               <p className="text-lg text-gray-300 leading-relaxed">
-                <span className="text-white font-semibold">Thánh Địa "Check-in" Nghệ Thuật:</span> Không chỉ để xem, Huyễn Cảnh Không Gian còn là studio hoàn hảo để bạn sở hữu những thước phim TikTok "triệu view" hay những bức ảnh nghệ thuật đầy ảo diệu, khẳng định phong cách riêng trên mạng xã hội.
+                <span className="text-white font-semibold">Thánh Địa "Check-in" Nghệ Thuật:</span> Không chỉ để xem,
+                Huyễn Cảnh Không Gian còn là studio hoàn hảo để bạn sở hữu những thước phim TikTok "triệu view" hay
+                những bức ảnh nghệ thuật đầy ảo diệu, khẳng định phong cách riêng trên mạng xã hội.
               </p>
             </div>
           </div>
@@ -722,7 +739,10 @@ export default function TechnologyBanner() {
                 {isGalleryLoading ? (
                   // Skeleton Loading State
                   [...Array(4)].map((_, i) => (
-                    <div key={`skeleton-${i}`} className="flex-[0_0_auto] w-[180px] sm:w-[220px] md:w-[260px] lg:w-[300px]">
+                    <div
+                      key={`skeleton-${i}`}
+                      className="flex-[0_0_auto] w-[180px] sm:w-[220px] md:w-[260px] lg:w-[300px]"
+                    >
                       <div className="w-full aspect-[10/16] rounded-2xl bg-white/5 animate-pulse border border-white/10 flex items-center justify-center">
                         <div className="w-12 h-12 rounded-full bg-white/5 border-2 border-white/10" />
                       </div>
@@ -756,7 +776,8 @@ export default function TechnologyBanner() {
                                 className="absolute inset-0 z-10"
                                 onClick={() => togglePlay(gi)}
                               >
-                                {(item.thumbnail?.includes("cloudinary.com") || !item.thumbnail?.match(/\.(mp4|webm|mov|ogg)$/i)) ? (
+                                {item.thumbnail?.includes('cloudinary.com') ||
+                                !item.thumbnail?.match(/\.(mp4|webm|mov|ogg)$/i) ? (
                                   <img
                                     src={item.thumbnail}
                                     alt={item.title}
@@ -811,21 +832,27 @@ export default function TechnologyBanner() {
                                   playsInline
                                   autoPlay
                                   loop
-                                  onWaiting={() => setGalleryBuffering(prev => {
-                                    const arr = [...prev];
-                                    arr[gi] = true;
-                                    return arr;
-                                  })}
-                                  onPlaying={() => setGalleryBuffering(prev => {
-                                    const arr = [...prev];
-                                    arr[gi] = false;
-                                    return arr;
-                                  })}
-                                  onCanPlay={() => setGalleryBuffering(prev => {
-                                    const arr = [...prev];
-                                    arr[gi] = false;
-                                    return arr;
-                                  })}
+                                  onWaiting={() =>
+                                    setGalleryBuffering((prev) => {
+                                      const arr = [...prev];
+                                      arr[gi] = true;
+                                      return arr;
+                                    })
+                                  }
+                                  onPlaying={() =>
+                                    setGalleryBuffering((prev) => {
+                                      const arr = [...prev];
+                                      arr[gi] = false;
+                                      return arr;
+                                    })
+                                  }
+                                  onCanPlay={() =>
+                                    setGalleryBuffering((prev) => {
+                                      const arr = [...prev];
+                                      arr[gi] = false;
+                                      return arr;
+                                    })
+                                  }
                                 />
                               </motion.div>
                             )}
@@ -834,7 +861,7 @@ export default function TechnologyBanner() {
                           <button
                             onClick={() => togglePlay(gi)}
                             className="absolute inset-0 z-20 group/play"
-                            aria-label={playingArr[gi] ? "Pause video" : "Play video"}
+                            aria-label={playingArr[gi] ? 'Pause video' : 'Play video'}
                           >
                             {playingArr[gi] && (
                               <div className="absolute top-2 right-2 w-8 h-8 sm:w-9 sm:h-9 rounded-full bg-black/60 backdrop-blur-md flex items-center justify-center border border-white/30 hover:bg-black/80 hover:border-white/50 transition-all">
@@ -847,7 +874,6 @@ export default function TechnologyBanner() {
                     );
                   })
                 )}
-
               </div>
             </div>
 
@@ -878,4 +904,3 @@ export default function TechnologyBanner() {
     </section>
   );
 }
-

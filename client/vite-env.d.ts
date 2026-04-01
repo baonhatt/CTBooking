@@ -1,11 +1,11 @@
 /// <reference types="vite/client" />
 
-declare module "*.PNG" {
+declare module '*.PNG' {
   const src: string;
   export default src;
 }
 
-declare module "*.png" {
+declare module '*.png' {
   const src: string;
   export default src;
 }

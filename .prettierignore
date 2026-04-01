@@ -1,0 +1,74 @@
+# Dependencies
+node_modules
+.pnpm-store
+
+# Build outputs
+dist
+build
+.next
+out
+
+# Package manager
+pnpm-lock.yaml
+pnpm-workspace.yaml
+package-lock.json
+yarn.lock
+
+# Binary files
+*.ico
+*.woff
+*.woff2
+*.ttf
+*.eot
+*.png
+*.jpg
+*.jpeg
+*.gif
+*.svg
+*.webp
+*.pem
+
+# Database
+*.sql
+*.db
+*.sqlite
+
+# Config files
+.env*
+*.log
+.prettierrc
+.prettierignore
+.dockerignore
+.gitignore
+.npmrc
+.nvmrc
+*.yml
+*.yaml
+
+# Markdown and docs
+*.md
+*.mdc
+
+# Drizzle
+drizzle/**
+db_backup/**
+
+# Temporary files
+tmp/**
+uploads/**
+
+# Hidden folders
+.agent/**
+.builder/**
+.github/**
+.trae/**
+.vercel/**
+
+# Other
+public/robots.txt
+placeholder
+render.yaml
+netlify.toml
+vercel.json
+components.json
+ca.pem

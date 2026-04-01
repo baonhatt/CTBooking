@@ -1,14 +1,9 @@
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import { Button } from "@/components/ui/button";
-import { Calendar, Eye, Loader2, Lock, Plus, X } from "lucide-react";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import React, { useEffect, useState } from "react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Button } from '@/components/ui/button';
+import { Calendar, Eye, Loader2, Lock, Plus, X } from 'lucide-react';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import React, { useEffect, useState } from 'react';
 import {
   createMovieApi,
   updateMovieApi,
@@ -16,15 +11,15 @@ import {
   createToyApi,
   updateToyApi,
   getToys,
-  getMovieById,
-} from "@/lib/api";
-import { toast } from "sonner";
-import { format } from "date-fns";
+  getMovieById
+} from '@/lib/api';
+import { toast } from 'sonner';
+import { format } from 'date-fns';
 
 interface AdminEditModalProps {
   isEditOpen: boolean;
   setIsEditOpen: (open: boolean) => void;
-  editType: "user" | "movie" | "toy" | null;
+  editType: 'user' | 'movie' | 'toy' | null;
   editData: any;
   setEditData: (data: any) => void;
   moviesLocal: any[];
@@ -33,16 +28,13 @@ interface AdminEditModalProps {
   currentPage: number;
   setUsers: React.Dispatch<React.SetStateAction<any[]>>;
   setMoviesLocal: React.Dispatch<React.SetStateAction<any[]>>;
-  setMovieStatus: React.Dispatch<
-    React.SetStateAction<Record<string, "active" | "inactive">>
-  >;
+  setMovieStatus: React.Dispatch<React.SetStateAction<Record<string, 'active' | 'inactive'>>>;
   setToys: React.Dispatch<React.SetStateAction<any[]>>;
   onViewDetails?: (id: number) => void;
   onRefresh?: () => Promise<void>;
 }
 
 const AdminEditModal: React.FC<AdminEditModalProps> = (props) => {
-
   const [isSaving, setIsSaving] = useState(false);
   const {
     isEditOpen,
@@ -57,12 +49,12 @@ const AdminEditModal: React.FC<AdminEditModalProps> = (props) => {
     moviesLocal,
     toLocalDateTimeString,
     pageSize,
-    currentPage,
+    currentPage
   } = props;
 
   useEffect(() => {
     const run = async () => {
-      if (!isEditOpen || editType !== "movie") return;
+      if (!isEditOpen || editType !== 'movie') return;
       const idNum = Number(editData?.id);
       if (!idNum || editData?.description) return;
       try {
@@ -70,15 +62,15 @@ const AdminEditModal: React.FC<AdminEditModalProps> = (props) => {
         if (m) {
           setEditData({
             ...editData,
-            description: m.description || "",
-            posterUrl: editData?.posterUrl || m.cover_image || "",
+            description: m.description || '',
+            posterUrl: editData?.posterUrl || m.cover_image || '',
             genresText:
               editData?.genresText ??
               (Array.isArray(editData?.genres) && editData.genres.length
-                ? editData.genres.join(", ")
+                ? editData.genres.join(', ')
                 : Array.isArray(m.genres)
-                  ? m.genres.join(", ")
-                  : ""),
+                  ? m.genres.join(', ')
+                  : ''),
             genres:
               Array.isArray(editData?.genres) && editData.genres.length
                 ? editData.genres
@@ -89,12 +81,12 @@ const AdminEditModal: React.FC<AdminEditModalProps> = (props) => {
             duration:
               editData?.duration !== undefined && editData?.duration !== null
                 ? editData.duration
-                : (m.duration_min ?? ""),
+                : (m.duration_min ?? ''),
             release_date: editData?.release_date ?? m.release_date ?? null,
-            is_active: editData?.is_active ?? m.is_active ?? true,
+            is_active: editData?.is_active ?? m.is_active ?? true
           });
         }
-      } catch { }
+      } catch {}
     };
     run();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -102,12 +94,12 @@ const AdminEditModal: React.FC<AdminEditModalProps> = (props) => {
 
   async function fileToCompressedDataURL(
     file: File,
-    opts?: { maxW?: number; maxH?: number; quality?: number; type?: string },
+    opts?: { maxW?: number; maxH?: number; quality?: number; type?: string }
   ) {
     const maxW = opts?.maxW ?? 1280;
     const maxH = opts?.maxH ?? 1280;
     const quality = opts?.quality ?? 0.75;
-    const type = opts?.type ?? "image/webp";
+    const type = opts?.type ?? 'image/webp';
     const blobUrl = URL.createObjectURL(file);
     const img = await new Promise<HTMLImageElement>((resolve, reject) => {
       const i = new Image();
@@ -118,23 +110,23 @@ const AdminEditModal: React.FC<AdminEditModalProps> = (props) => {
     const ratio = Math.min(maxW / img.width, maxH / img.height, 1);
     const w = Math.max(1, Math.round(img.width * ratio));
     const h = Math.max(1, Math.round(img.height * ratio));
-    const canvas = document.createElement("canvas");
+    const canvas = document.createElement('canvas');
     canvas.width = w;
     canvas.height = h;
-    const ctx = canvas.getContext("2d")!;
+    const ctx = canvas.getContext('2d')!;
     ctx.drawImage(img, 0, 0, w, h);
     const dataUrl = canvas.toDataURL(type, quality);
     URL.revokeObjectURL(blobUrl);
     return dataUrl;
   }
 
-  async function refetch(type: "movie" | "toy") {
-    if (type === "movie") {
+  async function refetch(type: 'movie' | 'toy') {
+    if (type === 'movie') {
       if (props.onRefresh) {
         await props.onRefresh();
       }
     }
-    if (type === "toy") {
+    if (type === 'toy') {
       const { items } = await getToys({ page: currentPage, pageSize });
       setToys(
         items.map((t: any) => ({
@@ -144,8 +136,8 @@ const AdminEditModal: React.FC<AdminEditModalProps> = (props) => {
           price: Number(t.price),
           stock: t.stock,
           status: t.status,
-          image_url: t.image_url,
-        })),
+          image_url: t.image_url
+        }))
       );
     }
   }
@@ -154,20 +146,16 @@ const AdminEditModal: React.FC<AdminEditModalProps> = (props) => {
     const norm = (s: string) => s.trim().toLowerCase();
     const localHit =
       moviesLocal?.some(
-        (m: any) =>
-          norm(m.title) === norm(title) &&
-          (excludeId == null || String(m.id) !== String(excludeId)),
+        (m: any) => norm(m.title) === norm(title) && (excludeId == null || String(m.id) !== String(excludeId))
       ) || false;
     if (localHit) return true;
     const { items } = await getMoviesAdmin({
       page: 1,
       pageSize: 10,
-      q: title,
+      q: title
     });
     return items.some(
-      (m: any) =>
-        norm(m.title) === norm(title) &&
-        (excludeId == null || String(m.id) !== String(excludeId)),
+      (m: any) => norm(m.title) === norm(title) && (excludeId == null || String(m.id) !== String(excludeId))
     );
   }
 
@@ -176,15 +164,15 @@ const AdminEditModal: React.FC<AdminEditModalProps> = (props) => {
       <DialogContent className="max-h-[90vh] w-[90vw] max-w-[900px] overflow-y-auto [&>button]:hidden">
         <DialogHeader className="flex flex-row items-center gap-3 space-y-0 pb-4 border-b">
           <DialogTitle className="text-lg font-bold text-slate-800">
-            {editType === "user"
-              ? "Chỉnh sửa người dùng"
-              : editType === "movie"
-                ? "Chỉnh sửa phim"
-                : editType === "toy"
-                  ? "Chỉnh sửa đồ chơi"
-                  : ""}
+            {editType === 'user'
+              ? 'Chỉnh sửa người dùng'
+              : editType === 'movie'
+                ? 'Chỉnh sửa phim'
+                : editType === 'toy'
+                  ? 'Chỉnh sửa đồ chơi'
+                  : ''}
           </DialogTitle>
-          {editType === "movie" && editData?.id && (
+          {editType === 'movie' && editData?.id && (
             <Button
               variant="outline"
               size="sm"
@@ -192,9 +180,7 @@ const AdminEditModal: React.FC<AdminEditModalProps> = (props) => {
               className="h-7 rounded-full gap-1.5 border-slate-200 hover:bg-blue-50 hover:text-blue-600 group transition-all px-3"
             >
               <Eye className="w-3.5 h-3.5 text-slate-400 group-hover:text-blue-500" />
-              <span className="text-[10px] font-bold uppercase tracking-wider">
-                Xem chi tiết
-              </span>
+              <span className="text-[10px] font-bold uppercase tracking-wider">Xem chi tiết</span>
             </Button>
           )}
 
@@ -209,33 +195,27 @@ const AdminEditModal: React.FC<AdminEditModalProps> = (props) => {
           </Button>
         </DialogHeader>
 
-        {editType === "user" && (
+        {editType === 'user' && (
           <div className="space-y-3">
             <div>
               <Label>Họ tên</Label>
               <Input
-                value={editData?.name || ""}
-                onChange={(e) =>
-                  setEditData({ ...editData, name: e.target.value })
-                }
+                value={editData?.name || ''}
+                onChange={(e) => setEditData({ ...editData, name: e.target.value })}
               />
             </div>
             <div>
               <Label>Email</Label>
               <Input
-                value={editData?.email || ""}
-                onChange={(e) =>
-                  setEditData({ ...editData, email: e.target.value })
-                }
+                value={editData?.email || ''}
+                onChange={(e) => setEditData({ ...editData, email: e.target.value })}
               />
             </div>
             <div>
               <Label>SĐT</Label>
               <Input
-                value={editData?.phone || ""}
-                onChange={(e) =>
-                  setEditData({ ...editData, phone: e.target.value })
-                }
+                value={editData?.phone || ''}
+                onChange={(e) => setEditData({ ...editData, phone: e.target.value })}
               />
             </div>
             <div className="flex justify-end gap-2">
@@ -247,18 +227,14 @@ const AdminEditModal: React.FC<AdminEditModalProps> = (props) => {
                 onClick={async () => {
                   try {
                     setIsSaving(true);
-                    setUsers((prev) =>
-                      prev.map((u) =>
-                        u.id === editData.id ? { ...u, ...editData } : u,
-                      ),
-                    );
-                    toast.success("Thành công", {
-                      description: "Cập nhật người dùng thành công",
+                    setUsers((prev) => prev.map((u) => (u.id === editData.id ? { ...u, ...editData } : u)));
+                    toast.success('Thành công', {
+                      description: 'Cập nhật người dùng thành công'
                     });
                     setIsEditOpen(false);
                   } catch (e: any) {
-                    toast.error("Lỗi", {
-                      description: e?.message || "Có lỗi xảy ra",
+                    toast.error('Lỗi', {
+                      description: e?.message || 'Có lỗi xảy ra'
                     });
                   } finally {
                     setIsSaving(false);
@@ -270,14 +246,14 @@ const AdminEditModal: React.FC<AdminEditModalProps> = (props) => {
                     <Loader2 className="h-4 w-4 animate-spin" /> Đang lưu...
                   </span>
                 ) : (
-                  "Lưu"
+                  'Lưu'
                 )}
               </Button>
             </div>
           </div>
         )}
 
-        {editType === "movie" && (
+        {editType === 'movie' && (
           <div className="flex flex-col h-full overflow-hidden bg-white">
             {/* VÙNG CUỘN (SCROLLABLE AREA) */}
             <div className="flex-1 overflow-y-auto px-6 py-6 space-y-6 bg-slate-50/30">
@@ -292,11 +268,7 @@ const AdminEditModal: React.FC<AdminEditModalProps> = (props) => {
                     <div className="aspect-[2/3] relative border-2 border-dashed rounded-xl overflow-hidden bg-slate-50 group-hover:border-blue-200 transition-colors">
                       {editData?.posterUrl ? (
                         <>
-                          <img
-                            src={editData.posterUrl}
-                            className="w-full h-full object-cover"
-                            alt="Poster preview"
-                          />
+                          <img src={editData.posterUrl} className="w-full h-full object-cover" alt="Poster preview" />
                           <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
                             <span className="text-white text-xs font-medium bg-black/50 px-3 py-1.5 rounded-full backdrop-blur-sm">
                               Thay đổi ảnh
@@ -308,9 +280,7 @@ const AdminEditModal: React.FC<AdminEditModalProps> = (props) => {
                           <div className="p-3 rounded-full bg-slate-100 mb-2 group-hover:bg-blue-50 group-hover:text-blue-500 transition-colors">
                             <Plus size={24} />
                           </div>
-                          <span className="text-xs font-medium">
-                            Tải ảnh lên
-                          </span>
+                          <span className="text-xs font-medium">Tải ảnh lên</span>
                         </div>
                       )}
 
@@ -325,7 +295,7 @@ const AdminEditModal: React.FC<AdminEditModalProps> = (props) => {
                             setEditData({
                               ...editData,
                               posterUrl: url,
-                              posterFile: file,
+                              posterFile: file
                             });
                           }
                         }}
@@ -361,18 +331,12 @@ const AdminEditModal: React.FC<AdminEditModalProps> = (props) => {
                         </div>
                       ) : null}
 
-                      <div
-                        className={`${editData?.id ? "col-span-12 lg:col-span-9" : "col-span-12"}`}
-                      >
-                        <Label className="text-[11px] font-bold uppercase text-slate-400 mb-1.5 block">
-                          Tên phim
-                        </Label>
+                      <div className={`${editData?.id ? 'col-span-12 lg:col-span-9' : 'col-span-12'}`}>
+                        <Label className="text-[11px] font-bold uppercase text-slate-400 mb-1.5 block">Tên phim</Label>
                         <Input
                           placeholder="Ví dụ: Đào, Phở và Piano"
-                          value={editData?.title || ""}
-                          onChange={(e) =>
-                            setEditData({ ...editData, title: e.target.value })
-                          }
+                          value={editData?.title || ''}
+                          onChange={(e) => setEditData({ ...editData, title: e.target.value })}
                           className="focus-visible:ring-blue-500/20"
                         />
                       </div>
@@ -384,11 +348,11 @@ const AdminEditModal: React.FC<AdminEditModalProps> = (props) => {
                         Mô tả nội dung
                       </Label>
                       <textarea
-                        value={editData?.description || ""}
+                        value={editData?.description || ''}
                         onChange={(e) =>
                           setEditData({
                             ...editData,
-                            description: e.target.value,
+                            description: e.target.value
                           })
                         }
                         placeholder="Nhập tóm tắt nội dung phim..."
@@ -403,10 +367,7 @@ const AdminEditModal: React.FC<AdminEditModalProps> = (props) => {
                       </Label>
                       <Input
                         placeholder="Nhập các thể loại, ngăn cách bằng dấu phẩy"
-                        value={
-                          editData?.genresText ??
-                          (editData?.genres || []).join(", ")
-                        }
+                        value={editData?.genresText ?? (editData?.genres || []).join(', ')}
                         onChange={(e) =>
                           setEditData({
                             ...editData,
@@ -414,7 +375,7 @@ const AdminEditModal: React.FC<AdminEditModalProps> = (props) => {
                             genres: e.target.value
                               .split(/[,;|\n]| {2,}/)
                               .map((x) => x.trim())
-                              .filter(Boolean),
+                              .filter(Boolean)
                           })
                         }
                       />
@@ -429,14 +390,11 @@ const AdminEditModal: React.FC<AdminEditModalProps> = (props) => {
                         <Input
                           type="number"
                           placeholder="120"
-                          value={editData?.duration || ""}
+                          value={editData?.duration || ''}
                           onChange={(e) =>
                             setEditData({
                               ...editData,
-                              duration:
-                                e.target.value === ""
-                                  ? ""
-                                  : Number(e.target.value),
+                              duration: e.target.value === '' ? '' : Number(e.target.value)
                             })
                           }
                         />
@@ -450,13 +408,11 @@ const AdminEditModal: React.FC<AdminEditModalProps> = (props) => {
                           type="number"
                           step="0.1"
                           placeholder="8.5"
-                          value={editData?.rating ?? ""}
+                          value={editData?.rating ?? ''}
                           onChange={(e) =>
                             setEditData({
                               ...editData,
-                              rating: e.target.value
-                                ? Number(e.target.value)
-                                : undefined,
+                              rating: e.target.value ? Number(e.target.value) : undefined
                             })
                           }
                         />
@@ -471,18 +427,13 @@ const AdminEditModal: React.FC<AdminEditModalProps> = (props) => {
                             type="datetime-local"
                             value={
                               editData?.release_date
-                                ? format(
-                                  new Date(editData.release_date),
-                                  "yyyy-MM-dd'T'HH:mm",
-                                )
-                                : ""
+                                ? format(new Date(editData.release_date), "yyyy-MM-dd'T'HH:mm")
+                                : ''
                             }
                             onChange={(e) =>
                               setEditData({
                                 ...editData,
-                                release_date: e.target.value
-                                  ? new Date(e.target.value).toISOString()
-                                  : undefined,
+                                release_date: e.target.value ? new Date(e.target.value).toISOString() : undefined
                               })
                             }
                             className="absolute inset-0 w-full h-full opacity-0 z-20 cursor-pointer"
@@ -490,16 +441,10 @@ const AdminEditModal: React.FC<AdminEditModalProps> = (props) => {
                           <div className="absolute inset-0 w-full h-full border rounded-md px-3 flex items-center justify-between bg-white group-hover:border-blue-400 transition-all z-10">
                             <span className="text-sm truncate">
                               {editData?.release_date
-                                ? format(
-                                  new Date(editData.release_date),
-                                  "dd/MM/yyyy HH:mm",
-                                )
-                                : "Chọn ngày"}
+                                ? format(new Date(editData.release_date), 'dd/MM/yyyy HH:mm')
+                                : 'Chọn ngày'}
                             </span>
-                            <Calendar
-                              size={16}
-                              className="text-slate-400 shrink-0"
-                            />
+                            <Calendar size={16} className="text-slate-400 shrink-0" />
                           </div>
                         </div>
                       </div>
@@ -509,15 +454,11 @@ const AdminEditModal: React.FC<AdminEditModalProps> = (props) => {
                           Trạng thái
                         </Label>
                         <select
-                          value={
-                            editData?.is_active !== false
-                              ? "active"
-                              : "inactive"
-                          }
+                          value={editData?.is_active !== false ? 'active' : 'inactive'}
                           onChange={(e) =>
                             setEditData({
                               ...editData,
-                              is_active: e.target.value === "active",
+                              is_active: e.target.value === 'active'
                             })
                           }
                           className="w-full h-10 border border-slate-200 rounded-md px-3 text-sm focus:border-blue-400 focus:ring-4 focus:ring-blue-500/5 outline-none transition-all"
@@ -535,8 +476,7 @@ const AdminEditModal: React.FC<AdminEditModalProps> = (props) => {
             {/* VÙNG NÚT BẤM CỐ ĐỊNH */}
             <div className="px-6 py-4 border-t bg-white flex justify-end items-center gap-3 shrink-0">
               <span className="text-[11px] text-slate-400 mr-auto italic font-sans">
-                * Lưu ý: Mọi thay đổi sẽ ảnh hưởng trực tiếp đến lịch chiếu hiện
-                tại.
+                * Lưu ý: Mọi thay đổi sẽ ảnh hưởng trực tiếp đến lịch chiếu hiện tại.
               </span>
               <Button
                 variant="ghost"
@@ -552,14 +492,14 @@ const AdminEditModal: React.FC<AdminEditModalProps> = (props) => {
                 onClick={async () => {
                   // --- VALIDATION LOGIC ---
                   if (!editData.title?.trim()) {
-                    toast.error("Lỗi", {
-                      description: "Vui lòng nhập tên phim",
+                    toast.error('Lỗi', {
+                      description: 'Vui lòng nhập tên phim'
                     });
                     return;
                   }
                   if (!editData.duration || Number(editData.duration) <= 0) {
-                    toast.error("Lỗi", {
-                      description: "Thời lượng phim không hợp lệ",
+                    toast.error('Lỗi', {
+                      description: 'Thời lượng phim không hợp lệ'
                     });
                     return;
                   }
@@ -571,17 +511,12 @@ const AdminEditModal: React.FC<AdminEditModalProps> = (props) => {
                     let coverBase64: string | undefined = undefined;
                     if (editData.posterFile) {
                       const f = editData.posterFile as File;
-                      const q =
-                        f.size > 15_000_000
-                          ? 0.5
-                          : f.size > 8_000_000
-                            ? 0.6
-                            : 0.75;
+                      const q = f.size > 15_000_000 ? 0.5 : f.size > 8_000_000 ? 0.6 : 0.75;
                       coverBase64 = await fileToCompressedDataURL(f, {
                         maxW: 1280,
                         maxH: 1280,
                         quality: q,
-                        type: "image/webp",
+                        type: 'image/webp'
                       });
                     }
 
@@ -594,7 +529,7 @@ const AdminEditModal: React.FC<AdminEditModalProps> = (props) => {
                       rating: Number(editData.rating) || 0,
                       duration_min: Number(editData.duration),
                       is_active: editData.is_active !== false,
-                      release_date: editData.release_date,
+                      release_date: editData.release_date
                     };
 
                     if (editData.id) {
@@ -603,16 +538,14 @@ const AdminEditModal: React.FC<AdminEditModalProps> = (props) => {
                       await createMovieApi(payload as any);
                     }
 
-                    await refetch("movie");
-                    toast.success("Thành công", {
-                      description: editData.id
-                        ? "Đã cập nhật thông tin phim"
-                        : "Đã thêm phim mới",
+                    await refetch('movie');
+                    toast.success('Thành công', {
+                      description: editData.id ? 'Đã cập nhật thông tin phim' : 'Đã thêm phim mới'
                     });
                     setIsEditOpen(false);
                   } catch (err: any) {
-                    toast.error("Lỗi hệ thống", {
-                      description: err?.message || "Không thể lưu dữ liệu",
+                    toast.error('Lỗi hệ thống', {
+                      description: err?.message || 'Không thể lưu dữ liệu'
                     });
                   } finally {
                     setIsSaving(false);
@@ -625,14 +558,14 @@ const AdminEditModal: React.FC<AdminEditModalProps> = (props) => {
                     <span>Đang xử lý</span>
                   </div>
                 ) : (
-                  <span>{editData.id ? "Lưu thay đổi" : "Tạo phim mới"}</span>
+                  <span>{editData.id ? 'Lưu thay đổi' : 'Tạo phim mới'}</span>
                 )}
               </Button>
             </div>
           </div>
         )}
 
-        {editType === "toy" && (
+        {editType === 'toy' && (
           <div className="space-y-3">
             <div>
               <Label>Ảnh</Label>
@@ -646,36 +579,29 @@ const AdminEditModal: React.FC<AdminEditModalProps> = (props) => {
                     setEditData({
                       ...editData,
                       image_url: url,
-                      imageFile: file,
+                      imageFile: file
                     });
                   }
                 }}
               />
               {editData?.image_url && (
                 <div className="mt-2">
-                  <img
-                    src={editData?.image_url}
-                    className="w-full max-h-40 object-cover rounded"
-                  />
+                  <img src={editData?.image_url} className="w-full max-h-40 object-cover rounded" />
                 </div>
               )}
             </div>
             <div>
               <Label>Tên đồ chơi</Label>
               <Input
-                value={editData?.name || ""}
-                onChange={(e) =>
-                  setEditData({ ...editData, name: e.target.value })
-                }
+                value={editData?.name || ''}
+                onChange={(e) => setEditData({ ...editData, name: e.target.value })}
               />
             </div>
             <div>
               <Label>Danh mục</Label>
               <Input
-                value={editData?.category || ""}
-                onChange={(e) =>
-                  setEditData({ ...editData, category: e.target.value })
-                }
+                value={editData?.category || ''}
+                onChange={(e) => setEditData({ ...editData, category: e.target.value })}
               />
             </div>
             <div className="grid grid-cols-2 gap-3">
@@ -685,16 +611,12 @@ const AdminEditModal: React.FC<AdminEditModalProps> = (props) => {
                   type="number"
                   min="0"
                   step="1"
-                  value={
-                    editData.price !== undefined && editData.price !== null
-                      ? editData.price
-                      : ""
-                  }
+                  value={editData.price !== undefined && editData.price !== null ? editData.price : ''}
                   onChange={(e) => {
                     const val = e.target.value;
                     setEditData({
                       ...editData,
-                      price: val === "" ? "" : Number(val),
+                      price: val === '' ? '' : Number(val)
                     });
                   }}
                 />
@@ -705,16 +627,12 @@ const AdminEditModal: React.FC<AdminEditModalProps> = (props) => {
                   type="number"
                   min="0"
                   step="1"
-                  value={
-                    editData.stock !== undefined && editData.stock !== null
-                      ? editData.stock
-                      : ""
-                  }
+                  value={editData.stock !== undefined && editData.stock !== null ? editData.stock : ''}
                   onChange={(e) => {
                     const val = e.target.value;
                     setEditData({
                       ...editData,
-                      stock: val === "" ? "" : Number(val),
+                      stock: val === '' ? '' : Number(val)
                     });
                   }}
                 />
@@ -723,10 +641,8 @@ const AdminEditModal: React.FC<AdminEditModalProps> = (props) => {
             <div>
               <Label>Trạng thái</Label>
               <select
-                value={editData?.status || "active"}
-                onChange={(e) =>
-                  setEditData({ ...editData, status: e.target.value })
-                }
+                value={editData?.status || 'active'}
+                onChange={(e) => setEditData({ ...editData, status: e.target.value })}
                 className="w-full h-10 border rounded-md px-3"
               >
                 <option value="active">Hoạt động</option>
@@ -759,7 +675,7 @@ const AdminEditModal: React.FC<AdminEditModalProps> = (props) => {
                         stock: Number(editData.stock || 0),
                         status: editData.status,
                         image_url: editData.image_url,
-                        image_base64: imageBase64,
+                        image_base64: imageBase64
                       });
                     } else {
                       let imageBase64: string | undefined = undefined;
@@ -778,14 +694,12 @@ const AdminEditModal: React.FC<AdminEditModalProps> = (props) => {
                         stock: Number(editData.stock || 0),
                         status: editData.status,
                         image_url: editData.image_url,
-                        image_base64: imageBase64,
+                        image_base64: imageBase64
                       });
                     }
-                    await refetch("toy");
-                    toast.success("Thành công", {
-                      description: editData.id
-                        ? "Cập nhật đồ chơi thành công"
-                        : "Thêm đồ chơi mới thành công",
+                    await refetch('toy');
+                    toast.success('Thành công', {
+                      description: editData.id ? 'Cập nhật đồ chơi thành công' : 'Thêm đồ chơi mới thành công'
                     });
                   } finally {
                     setIsSaving(false);
@@ -798,7 +712,7 @@ const AdminEditModal: React.FC<AdminEditModalProps> = (props) => {
                     <Loader2 className="h-4 w-4 animate-spin" /> Đang lưu...
                   </span>
                 ) : (
-                  "Lưu"
+                  'Lưu'
                 )}
               </Button>
             </div>

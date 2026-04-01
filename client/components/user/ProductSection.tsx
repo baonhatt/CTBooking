@@ -1,10 +1,10 @@
-import { useEffect, useState } from "react";
-import { motion } from "framer-motion";
-import { Card, CardContent } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { ArrowRight } from "lucide-react";
-import { getActiveToys } from "@/lib/api";
-import { optimizeCloudinaryUrl, generateCloudinarySrcSet } from "@/lib/utils";
+import { useEffect, useState } from 'react';
+import { motion } from 'framer-motion';
+import { Card, CardContent } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { ArrowRight } from 'lucide-react';
+import { getActiveToys } from '@/lib/api';
+import { optimizeCloudinaryUrl, generateCloudinarySrcSet } from '@/lib/utils';
 
 export default function ProductSection() {
   const [products, setProducts] = useState<any[]>([]);
@@ -17,10 +17,10 @@ export default function ProductSection() {
           items.map((t: any) => ({
             id: t.id,
             name: t.name,
-            category: t.category || "TOY",
+            category: t.category || 'TOY',
             price: Number(t.price),
-            image: t.image_url,
-          })),
+            image: t.image_url
+          }))
         );
       } catch {
         setProducts([]);
@@ -47,20 +47,14 @@ export default function ProductSection() {
             viewport={{ once: true }}
             transition={{ duration: 0.6 }}
           >
-            <p className="text-sm uppercase tracking-[0.28em] text-cyan-200 mb-2">
-              CINESPHERE STORE
-            </p>
+            <p className="text-sm uppercase tracking-[0.28em] text-cyan-200 mb-2">CINESPHERE STORE</p>
             <h2 className="text-4xl md:text-5xl font-extrabold text-white mb-2">
               <span className="bg-gradient-to-r from-cyan-300 to-blue-400 bg-clip-text text-transparent">
                 CINESPHERE
-              </span>{" "}
-              <span className="bg-gradient-to-r from-purple-400 to-pink-400 bg-clip-text text-transparent">
-                STORE
-              </span>
+              </span>{' '}
+              <span className="bg-gradient-to-r from-purple-400 to-pink-400 bg-clip-text text-transparent">STORE</span>
             </h2>
-            <p className="text-lg text-gray-300">
-              Mang trải nghiệm về nhà cùng bạn
-            </p>
+            <p className="text-lg text-gray-300">Mang trải nghiệm về nhà cùng bạn</p>
           </motion.div>
 
           <motion.button
@@ -70,8 +64,7 @@ export default function ProductSection() {
             transition={{ duration: 0.6 }}
             className="text-purple-400 hover:text-purple-300 font-semibold flex items-center gap-2 transition-colors group"
           >
-            XEM TẤT CẢ{" "}
-            <ArrowRight className="h-5 w-5 group-hover:translate-x-1 transition-transform" />
+            XEM TẤT CẢ <ArrowRight className="h-5 w-5 group-hover:translate-x-1 transition-transform" />
           </motion.button>
         </div>
 
@@ -113,7 +106,7 @@ export default function ProductSection() {
                   </h3>
                   <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
                     <span className="text-2xl md:text-3xl font-bold bg-gradient-to-r from-cyan-300 to-purple-400 bg-clip-text text-transparent">
-                      {product.price.toLocaleString("vi-VN")}₫
+                      {product.price.toLocaleString('vi-VN')}₫
                     </span>
                     <Button className="bg-gradient-to-r from-purple-500 via-pink-500 to-purple-600 hover:from-purple-600 hover:via-pink-600 hover:to-purple-700 text-white font-semibold shadow-lg hover:shadow-purple-500/50 transition-all duration-300 w-full sm:w-auto">
                       Mua Ngay
