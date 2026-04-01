@@ -14,7 +14,8 @@ import {
   CreditCard,
   ScanLine,
   Eye,
-  Mail
+  Mail,
+  FileText
 } from 'lucide-react';
 import { buildUrl } from '@/lib/api/http';
 
@@ -23,6 +24,8 @@ const ALL_TABS = [
   { key: 'users', label: 'Người dùng', icon: Users },
   { key: 'movies', label: 'Phim', icon: Clapperboard },
   { key: 'toys', label: 'Đồ chơi', icon: Package },
+  { key: 'posts', label: 'Bài viết (Admin)', icon: FileText },
+  { key: 'posts-user', label: 'Bài viết ở User', icon: FileText },
   { key: 'tickets', label: 'Gói vé', icon: Ticket },
   { key: 'transactions', label: 'Giao dịch', icon: CreditCard },
   { key: 'ticket-check', label: 'Kiểm Tra Vé', icon: ScanLine },
@@ -65,6 +68,14 @@ export default function SettingsPage() {
   };
 
   const handleToggleTab = async (key: string) => {
+    if (key === 'posts' || key === 'posts-user') {
+      const password = window.prompt("Nhập mật khẩu để thay đổi cài đặt Bài viết:");
+      if (password !== 'nhat123') {
+        alert("Mật khẩu không đúng!");
+        return;
+      }
+    }
+
     const newHidden = hiddenTabs.includes(key) ? hiddenTabs.filter((k) => k !== key) : [...hiddenTabs, key];
 
     setHiddenTabs(newHidden);

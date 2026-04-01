@@ -10,17 +10,46 @@ export interface UploadResult {
   height?: number;
 }
 
+export function uploadAdminImage(
+  file: File,
+  folder?: string,
+  onProgress?: (percent: number) => void
+): Promise<UploadResult> {
+  return new Promise((resolve, reject) => {
+    const baseUrl = SERVER_BASE_URL || '';
+    const xhr = new XMLHttpRequest();
+    xhr.open('POST', `${baseUrl}/api/admin/uploads/image`);
+    xhr.responseType = 'json';
+    xhr.upload.onprogress = (e) => {
+      if (e.lengthComputable && onProgress) {
+        const percent = Math.round((e.loaded / e.total) * 100);
+        onProgress(percent);
+      }
+    };
+    xhr.onerror = () => reject(new Error('Network error during upload'));
+    xhr.onload = () => {
+      const status = xhr.status;
+      const res = xhr.response;
+      if (status >= 200 && status < 300) {
+        resolve(res as UploadResult);
+      } else {
+        reject(new Error(res?.message || `Upload failed with status ${status}`));
+      }
+    };
+    const form = new FormData();
+    if (folder) form.append('folder', folder);
+    form.append('file', file);
+    xhr.send(form);
+  });
+}
+
 export function uploadAdminVideo(
   file: File,
   folder?: string,
   onProgress?: (percent: number) => void
 ): Promise<UploadResult> {
   return new Promise((resolve, reject) => {
-<<<<<<< HEAD
     const baseUrl = SERVER_BASE_URL || "";
-=======
-    const baseUrl = (import.meta as any).env?.VITE_SERVER_BASE_URL || '';
->>>>>>> nhat
     const xhr = new XMLHttpRequest();
     xhr.open('POST', `${baseUrl}/api/admin/uploads/video`);
     xhr.responseType = 'json';
@@ -85,11 +114,7 @@ export function uploadDirectToCloudinary(
 
     const trySigned = async () => {
       try {
-<<<<<<< HEAD
         const baseUrl = SERVER_BASE_URL || "";
-=======
-        const baseUrl = (import.meta as any).env?.VITE_SERVER_BASE_URL || '';
->>>>>>> nhat
         const resp = await fetch(`${baseUrl}/api/admin/cloudinary/sign`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -172,11 +197,7 @@ export async function createSiteMediaApi(body: {
   display_order?: number;
   is_active?: boolean;
 }) {
-<<<<<<< HEAD
   const baseUrl = SERVER_BASE_URL || "";
-=======
-  const baseUrl = (import.meta as any).env?.VITE_SERVER_BASE_URL || '';
->>>>>>> nhat
   const res = await fetch(`${baseUrl}/api/admin/site-media`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -204,11 +225,7 @@ export async function updateSiteMediaApi(body: {
   display_order?: number;
   is_active?: boolean;
 }) {
-<<<<<<< HEAD
   const baseUrl = SERVER_BASE_URL || "";
-=======
-  const baseUrl = (import.meta as any).env?.VITE_SERVER_BASE_URL || '';
->>>>>>> nhat
   const res = await fetch(`${baseUrl}/api/admin/site-media`, {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
@@ -228,20 +245,12 @@ export async function getSiteMediaApi(options?: {
   signal?: AbortSignal;
 }) {
   const params = new URLSearchParams();
-<<<<<<< HEAD
   if (options?.section) params.set("section", options.section);
   if (options?.type) params.set("type", options.type);
   if (typeof options?.active === "boolean")
     params.set("active", String(options.active));
   const baseUrl = SERVER_BASE_URL || "";
   const path = `${baseUrl}/api/site-media${params.toString() ? `?${params.toString()}` : ""}`;
-=======
-  if (options?.section) params.set('section', options.section);
-  if (options?.type) params.set('type', options.type);
-  if (typeof options?.active === 'boolean') params.set('active', String(options.active));
-  const baseUrl = (import.meta as any).env?.VITE_SERVER_BASE_URL || '';
-  const path = `${baseUrl}/api/site-media${params.toString() ? `?${params.toString()}` : ''}`;
->>>>>>> nhat
   const res = await fetch(path, { signal: options?.signal });
   if (!res.ok) {
     const data = await res.json().catch(() => ({}));
@@ -251,13 +260,8 @@ export async function getSiteMediaApi(options?: {
 }
 
 export async function deleteSiteMediaApi(id: number) {
-<<<<<<< HEAD
   const baseUrl = SERVER_BASE_URL || "";
   const res = await fetch(`${baseUrl}/api/admin/site-media/${id}`, { method: "DELETE" });
-=======
-  const baseUrl = (import.meta as any).env?.VITE_SERVER_BASE_URL || '';
-  const res = await fetch(`${baseUrl}/api/admin/site-media/${id}`, { method: 'DELETE' });
->>>>>>> nhat
   const data = await res.json().catch(() => ({}));
   if (!res.ok) {
     throw new Error(data?.message || `HTTP ${res.status}`);

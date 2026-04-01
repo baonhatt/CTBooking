@@ -63,11 +63,13 @@ export function MobileMenu({
                 <button
                   className={cn(
                     'text-left font-medium text-lg tracking-wide transition-colors duration-300 py-3 border-b border-white/5',
-                    effectiveDisable ? 'opacity-50 cursor-not-allowed text-gray-400' : 'text-white hover:text-cyan-300'
+                    effectiveDisable && item.target !== 'posts'
+                      ? 'opacity-50 cursor-not-allowed text-gray-400'
+                      : 'text-white hover:text-cyan-300'
                   )}
-                  disabled={effectiveDisable}
+                  disabled={effectiveDisable && item.target !== 'posts'}
                   onClick={() => {
-                    if (!effectiveDisable) {
+                    if (!effectiveDisable || item.target === 'posts') {
                       scrollToSection(item.target);
                     }
                   }}

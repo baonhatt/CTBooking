@@ -4,26 +4,44 @@ import {
   Alignment,
   BlockQuote,
   Bold,
+  Code,
+  CodeBlock,
   ClassicEditor,
   EditorConfig,
   Essentials,
+  FontBackgroundColor,
+  FontColor,
+  FontFamily,
+  FontSize,
   Heading,
+  Highlight,
+  HorizontalLine,
   Image,
   ImageCaption,
   ImageResize,
   ImageStyle,
   ImageToolbar,
   ImageUpload,
+  Indent,
+  IndentBlock,
   Italic,
   Link,
   List,
+  ListProperties,
   Paragraph,
   PictureEditing,
+  RemoveFormat,
+  Strikethrough,
+  Table,
+  TableCellProperties,
+  TableProperties,
+  TableToolbar,
+  TodoList,
   Underline,
   Undo
 } from 'ckeditor5';
 import 'ckeditor5/ckeditor5.css';
-import { uploadDirectToCloudinary } from '@/lib/api/uploads';
+import { uploadAdminImage, uploadDirectToCloudinary } from '@/lib/api/uploads';
 import { toast } from 'sonner';
 
 type PostRichTextEditorProps = {
@@ -47,7 +65,8 @@ class CloudinaryUploadAdapter {
 
   async upload() {
     const file = await this.loader.file;
-    const result = await uploadDirectToCloudinary(file, 'posts');
+    const isLocal = typeof window !== 'undefined' && window.location.hostname === 'localhost';
+    const result = isLocal ? await uploadAdminImage(file, 'posts_editor') : await uploadDirectToCloudinary(file, 'posts');
 
     return {
       default: result.url
@@ -68,6 +87,7 @@ function cloudinaryUploadPlugin(editor: any) {
 export function PostRichTextEditor({ value, onChange }: PostRichTextEditorProps) {
   const [isUploadingImage, setIsUploadingImage] = useState(false);
   const [editorData, setEditorData] = useState(() => normalizeInitialContent(value));
+  const isLocal = typeof window !== 'undefined' && window.location.hostname === 'localhost';
 
   const editorConfig = useMemo<EditorConfig>(
     () => ({
@@ -79,10 +99,24 @@ export function PostRichTextEditor({ value, onChange }: PostRichTextEditorProps)
         Alignment,
         Bold,
         Italic,
+        Strikethrough,
         Underline,
+        Code,
         Link,
         List,
+        ListProperties,
+        TodoList,
+        Indent,
+        IndentBlock,
         BlockQuote,
+        HorizontalLine,
+        Highlight,
+        FontFamily,
+        FontSize,
+        FontColor,
+        FontBackgroundColor,
+        RemoveFormat,
+        CodeBlock,
         Image,
         ImageToolbar,
         ImageCaption,
@@ -90,6 +124,10 @@ export function PostRichTextEditor({ value, onChange }: PostRichTextEditorProps)
         ImageResize,
         ImageUpload,
         PictureEditing,
+        Table,
+        TableToolbar,
+        TableProperties,
+        TableCellProperties,
         Undo
       ],
       toolbar: [
@@ -98,16 +136,33 @@ export function PostRichTextEditor({ value, onChange }: PostRichTextEditorProps)
         '|',
         'heading',
         '|',
+        'fontFamily',
+        'fontSize',
+        '|',
         'bold',
         'italic',
         'underline',
+        'strikethrough',
+        'code',
+        '|',
+        'fontColor',
+        'fontBackgroundColor',
+        'highlight',
+        'removeFormat',
         'alignment',
         'link',
         '|',
         'bulletedList',
         'numberedList',
-        'blockQuote',
+        'todoList',
         '|',
+        'outdent',
+        'indent',
+        'blockQuote',
+        'codeBlock',
+        'horizontalLine',
+        '|',
+        'insertTable',
         'uploadImage'
       ],
       heading: {
@@ -122,14 +177,57 @@ export function PostRichTextEditor({ value, onChange }: PostRichTextEditorProps)
             view: 'h2',
             title: 'Tiêu đề',
             class: 'ck-heading_heading2'
+          },
+          {
+            model: 'heading3',
+            view: 'h3',
+            title: 'Tiêu đề phụ',
+            class: 'ck-heading_heading3'
           }
         ]
       },
       alignment: {
         options: ['left', 'center', 'right', 'justify']
       },
+      list: {
+        properties: {
+          styles: true,
+          startIndex: true,
+          reversed: true
+        }
+      },
       image: {
-        toolbar: ['imageTextAlternative', '|', 'imageStyle:inline', 'imageStyle:block', 'imageStyle:side']
+        styles: [
+          'inline',
+          'block',
+          'side',
+          'alignLeft',
+          'alignCenter',
+          'alignRight'
+        ],
+        toolbar: [
+          'imageTextAlternative',
+          '|',
+          'imageStyle:alignLeft',
+          'imageStyle:alignCenter',
+          'imageStyle:alignRight',
+          '|',
+          'imageStyle:inline',
+          'imageStyle:block',
+          'imageStyle:side',
+          '|',
+          'resizeImage'
+        ]
+      },
+      table: {
+        contentToolbar: [
+          'tableColumn',
+          'tableRow',
+          'mergeTableCells',
+          '|',
+          'tableProperties',
+          'tableCellProperties'
+        ]
       },
       extraPlugins: [cloudinaryUploadPlugin]
     }),
@@ -145,7 +243,7 @@ export function PostRichTextEditor({ value, onChange }: PostRichTextEditorProps)
 
   return (
     <div>
-      <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm [&_.ck.ck-editor]:border-0 [&_.ck.ck-editor__main>.ck-editor__editable]:min-h-[260px] [&_.ck.ck-editor__main>.ck-editor__editable]:border-0 [&_.ck.ck-editor__main>.ck-editor__editable]:px-4 [&_.ck.ck-editor__main>.ck-editor__editable]:py-3 [&_.ck.ck-editor__main>.ck-editor__editable]:text-sm [&_.ck.ck-editor__main>.ck-editor__editable]:leading-6 [&_.ck.ck-editor__top_.ck-sticky-panel_.ck-toolbar]:border-0 [&_.ck.ck-toolbar]:border-0 [&_.ck.ck-toolbar]:border-b [&_.ck.ck-toolbar]:border-slate-200 [&_.ck.ck-toolbar]:bg-slate-50 [&_.ck-content_.image>img]:rounded-xl [&_.ck-content_.image>img]:max-w-full">
+      <div className="post-editor-scroll rounded-xl border border-slate-200 bg-white shadow-sm [&_.ck.ck-editor]:border-0 [&_.ck.ck-editor__main>.ck-editor__editable]:min-h-[260px] [&_.ck.ck-editor__main>.ck-editor__editable]:border-0 [&_.ck.ck-editor__main>.ck-editor__editable]:px-4 [&_.ck.ck-editor__main>.ck-editor__editable]:py-3 [&_.ck.ck-editor__main>.ck-editor__editable]:text-sm [&_.ck.ck-editor__main>.ck-editor__editable]:leading-6 [&_.ck.ck-editor__top_.ck-sticky-panel_.ck-toolbar]:border-0 [&_.ck.ck-toolbar]:border-0 [&_.ck.ck-toolbar]:border-b [&_.ck.ck-toolbar]:border-slate-200 [&_.ck.ck-toolbar]:bg-slate-50 [&_.ck-content_.image>img]:rounded-xl [&_.ck-content_.image>img]:max-w-full [&_.ck-content_.image>img]:h-auto">
         <CKEditor
           editor={ClassicEditor}
           data={editorData}
@@ -186,7 +284,9 @@ export function PostRichTextEditor({ value, onChange }: PostRichTextEditorProps)
       </div>
       <p className="mt-2 text-xs text-slate-500">
         {isUploadingImage
-          ? 'Đang tải ảnh lên Cloudinary...'
+          ? isLocal
+            ? 'Đang tải ảnh lên máy chủ (local)...'
+            : 'Đang tải ảnh lên Cloudinary...'
           : 'CKEditor 5 đang được dùng cho nội dung bài viết và hỗ trợ chèn ảnh trực tiếp.'}
       </p>
     </div>
