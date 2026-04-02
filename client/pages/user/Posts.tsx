@@ -112,7 +112,7 @@ export default function UserPostsPage() {
               {/* Left Large Post */}
               {featuredItems[0] && (
                 <div className="xl:col-span-2 group block cursor-pointer">
-                  <Link to={`/posts/${featuredItems[0].id}`}>
+                  <Link to={`/posts/${featuredItems[0].slug || featuredItems[0].id}`}>
                     <div className="relative aspect-[16/9] lg:aspect-[2/1] rounded-[1.25rem] overflow-hidden mb-6">
                       <img
                         src={featuredItems[0].featured_image || 'https://images.unsplash.com/photo-1489599849927-2ee91cede3ba?q=80&w=1200'}
@@ -147,7 +147,7 @@ export default function UserPostsPage() {
               <div className="xl:col-span-1 flex flex-col gap-8 xl:gap-8 justify-between">
                 {featuredItems.slice(1, 3).map(post => (
                   <div key={post.id} className="group block flex-1">
-                    <Link to={`/posts/${post.id}`} className="flex flex-col h-full">
+                    <Link to={`/posts/${post.slug || post.id}`} className="flex flex-col h-full">
                       <div className="relative aspect-[16/9] xl:aspect-[4/3] 2xl:aspect-[16/9] rounded-2xl overflow-hidden mb-4">
                         <img
                           src={post.featured_image || 'https://images.unsplash.com/photo-1536440136628-849c177e76a1?q=80&w=800'}
@@ -188,7 +188,7 @@ export default function UserPostsPage() {
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 lg:gap-8">
               {otherPosts.map(post => (
                 <article key={post.id} className="group block">
-                  <Link to={`/posts/${post.id}`} className="block flex flex-col h-full">
+                  <Link to={`/posts/${post.slug || post.id}`} className="block flex flex-col h-full">
                     <div className="relative aspect-[16/10] rounded-[1rem] overflow-hidden mb-4 shadow-sm">
                       <img
                         src={post.featured_image || 'https://images.unsplash.com/photo-1542204165-65bf26472b9b?q=80&w=800'}

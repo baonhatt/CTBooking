@@ -48,16 +48,19 @@ export async function listPostsImpl(
   return { items, page, pageSize, total };
 }
 
-export async function getPostImpl(anyDb: any, tables: { posts: any }, id: number, incrementView = false) {
+export async function getPostImpl(anyDb: any, tables: { posts: any }, identifier: string | number, incrementView = false) {
+  const isId = typeof identifier === 'number' || (!isNaN(Number(identifier)) && String(identifier).trim() !== '');
+  const condition = isId ? eq(tables.posts.id, Number(identifier)) : eq(tables.posts.slug, String(identifier));
+
   const post = await anyDb.query.posts.findFirst({
-    where: eq(tables.posts.id, id)
+    where: condition
   });
   if (!post) return null;
   if (incrementView) {
     anyDb
       .update(tables.posts)
       .set({ view_count: sql`${tables.posts.view_count} + 1` })
-      .where(eq(tables.posts.id, id))
+      .where(condition)
       .catch(() => {});
     return { ...post, view_count: (post.view_count ?? 0) + 1 };
   }
