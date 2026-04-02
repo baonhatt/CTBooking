@@ -285,7 +285,7 @@ app.post('/api/forget-password', async (c) => {
         if (allowHost(u.hostname)) {
           appBaseUrl = origin;
         }
-      } catch {}
+      } catch { }
     }
 
     // 2. Fallback về env
@@ -762,7 +762,6 @@ app.get('/api/getActiveMovies', async (c) => {
     return new Response(responseBody, {
       status: 200,
       headers: {
-<<<<<<< HEAD
         "Content-Type": "application/json",
         "Cache-Control": "no-cache, no-store, must-revalidate, max-age=0",
         "Cloudflare-CDN-Cache-Control": "no-cache, no-store, must-revalidate, max-age=0",
@@ -771,14 +770,6 @@ app.get('/api/getActiveMovies', async (c) => {
         Vary: "Origin",
         "X-KV-Cache": "DISABLED"
       },
-=======
-        'Content-Type': 'application/json',
-        'Cache-Control': 'public, max-age=900, must-revalidate, s-maxage=900',
-        'Cloudflare-CDN-Cache-Control': 'max-age=900',
-        Vary: 'Origin',
-        'X-KV-Cache': 'MISS'
-      }
->>>>>>> nhat
     });
   } catch (err: any) {
     return c.json({ status: 'error', message: String(err?.message || 'Internal error') }, 500);
@@ -1062,7 +1053,6 @@ app.get('/api/movies/:id', async (c) => {
   }
 });
 
-<<<<<<< HEAD
 app.get("/api/movies-detail/:id", async (c) => {
   const id = Number(c.req.param("id"));
   const db = drizzle(c.env.cinema_db, { schema });
@@ -1074,44 +1064,6 @@ app.get("/api/movies-detail/:id", async (c) => {
       ticket_packages: schema.ticket_packages,
     },
     id,
-=======
-// Get movie details by ID (detailed)
-// GET /api/movies-detail/:id
-app.get('/api/movies-detail/:id', async (c) => {
-  return await withCache(
-    c.req.raw,
-    c.env,
-    c.executionCtx,
-    async () => {
-      const id = Number(c.req.param('id'));
-      const db = drizzle(c.env.cinema_db, { schema });
-      const r = await getMovieByIdImpl(
-        db,
-        {
-          movies: schema.movies,
-          bookings: schema.bookings,
-          ticket_packages: schema.ticket_packages
-        },
-        id
-      );
-      if (!r)
-        return new Response(JSON.stringify({ status: 'error', message: 'Không tìm thấy phim' }), {
-          status: 404,
-          headers: { 'Content-Type': 'application/json' }
-        });
-
-      return new Response(JSON.stringify(r), {
-        status: 200,
-        headers: {
-          'Content-Type': 'application/json',
-          'Cache-Control': 'public, max-age=900, must-revalidate, s-maxage=900',
-          'Cloudflare-CDN-Cache-Control': 'max-age=900',
-          Vary: 'Origin'
-        }
-      });
-    },
-    900
->>>>>>> nhat
   );
   if (!r)
     return c.json({ status: "error", message: "Không tìm thấy phim" }, 404);
@@ -1433,7 +1385,6 @@ app.get('/api/toys-active', async (c) => {
     return new Response(responseBody, {
       status: 200,
       headers: {
-<<<<<<< HEAD
         "Content-Type": "application/json",
         "Cache-Control": "no-cache, no-store, must-revalidate, max-age=0",
         "Cloudflare-CDN-Cache-Control": "no-cache, no-store, must-revalidate, max-age=0",
@@ -1442,14 +1393,6 @@ app.get('/api/toys-active', async (c) => {
         Vary: "Origin",
         "X-KV-Cache": "DISABLED"
       },
-=======
-        'Content-Type': 'application/json',
-        'Cache-Control': 'public, s-maxage=300',
-        'Cloudflare-CDN-Cache-Control': 'max-age=300',
-        Vary: 'Origin',
-        'X-KV-Cache': 'MISS'
-      }
->>>>>>> nhat
     });
   } catch (err: any) {
     return c.json({ status: 'error', message: String(err?.message || 'Internal error') }, 500);
@@ -1640,7 +1583,6 @@ app.get('/api/tickets-active', async (c) => {
     return new Response(responseBody, {
       status: 200,
       headers: {
-<<<<<<< HEAD
         "Content-Type": "application/json",
         "Cache-Control": "no-cache, no-store, must-revalidate, max-age=0",
         "Cloudflare-CDN-Cache-Control": "no-cache, no-store, must-revalidate, max-age=0",
@@ -1649,14 +1591,6 @@ app.get('/api/tickets-active', async (c) => {
         Vary: "Origin",
         "X-KV-Cache": "DISABLED"
       },
-=======
-        'Content-Type': 'application/json',
-        'Cache-Control': 'public, s-maxage=300',
-        'Cloudflare-CDN-Cache-Control': 'max-age=300',
-        Vary: 'Origin',
-        'X-KV-Cache': 'MISS'
-      }
->>>>>>> nhat
     });
   } catch (err: any) {
     return c.json({ status: 'error', message: String(err?.message || 'Internal error') }, 500);
@@ -1836,7 +1770,7 @@ app.delete('/api/admin/site-media/:id', async (c) => {
       if (env.r2_cinemastore) {
         try {
           await env.r2_cinemastore.delete(publicId);
-        } catch {}
+        } catch { }
       }
 
       // Try Cloudinary (manual fetch because SDK might not work in Worker or env missing in shared code)
@@ -1854,7 +1788,7 @@ app.delete('/api/admin/site-media/:id', async (c) => {
           const cloudName = env.CLOUDINARY_CLOUD_NAME;
           const endpoint = `https://api.cloudinary.com/v1_1/${cloudName}/${type}/destroy`;
           await fetch(endpoint, { method: 'POST', body: fd });
-        } catch {}
+        } catch { }
       }
     }
 
@@ -1924,7 +1858,7 @@ app.post('/api/momo/create-payment', async (c) => {
             const redirectPath = c.env.VITE_MOMO_REDIRECT_URL || '/checkout';
             redirectUrl = `${origin}${redirectPath}`;
           }
-        } catch {}
+        } catch { }
       }
     }
 
@@ -2007,7 +1941,7 @@ app.post('/api/vnpay/create-payment', async (c) => {
             const returnPath = c.env.VITE_VNPAY_RETURN_URL || '/checkout';
             returnUrl = `${origin}${returnPath}`;
           }
-        } catch {}
+        } catch { }
       }
     }
 
@@ -2042,7 +1976,6 @@ app.post('/api/vnpay/ipn', async (_c) => {
   });
 });
 
-<<<<<<< HEAD
 
 // ===== AI ANALYTICS ENDPOINT =====
 // POST /api/ai-analytics
@@ -2065,11 +1998,11 @@ app.post("/api/ai-analytics", async (c) => {
     const [sr] = await db
       .select({
         total_bookings: count(schema.bookings.id),
-        total_revenue:  sql<number>`COALESCE(SUM(CASE WHEN ${schema.bookings.payment_status}='paid' THEN ${schema.bookings.total_price} ELSE 0 END),0)`,
-        paid_count:     sql<number>`SUM(CASE WHEN ${schema.bookings.payment_status}='paid'    THEN 1 ELSE 0 END)`,
-        pending_count:  sql<number>`SUM(CASE WHEN ${schema.bookings.payment_status}='pending' THEN 1 ELSE 0 END)`,
-        failed_count:   sql<number>`SUM(CASE WHEN ${schema.bookings.payment_status}='failed'  THEN 1 ELSE 0 END)`,
-        used_tickets:   sql<number>`SUM(CASE WHEN ${schema.bookings.is_used}=1 THEN 1 ELSE 0 END)`,
+        total_revenue: sql<number>`COALESCE(SUM(CASE WHEN ${schema.bookings.payment_status}='paid' THEN ${schema.bookings.total_price} ELSE 0 END),0)`,
+        paid_count: sql<number>`SUM(CASE WHEN ${schema.bookings.payment_status}='paid'    THEN 1 ELSE 0 END)`,
+        pending_count: sql<number>`SUM(CASE WHEN ${schema.bookings.payment_status}='pending' THEN 1 ELSE 0 END)`,
+        failed_count: sql<number>`SUM(CASE WHEN ${schema.bookings.payment_status}='failed'  THEN 1 ELSE 0 END)`,
+        used_tickets: sql<number>`SUM(CASE WHEN ${schema.bookings.is_used}=1 THEN 1 ELSE 0 END)`,
       })
       .from(schema.bookings)
       .all();
@@ -2077,9 +2010,9 @@ app.post("/api/ai-analytics", async (c) => {
     // 2. Revenue by payment method
     const revenueByMethod = await db
       .select({
-        method:  schema.bookings.payment_method,
+        method: schema.bookings.payment_method,
         revenue: sql<number>`SUM(${schema.bookings.total_price})`,
-        cnt:     count(schema.bookings.id),
+        cnt: count(schema.bookings.id),
       })
       .from(schema.bookings)
       .where(eq(schema.bookings.payment_status, "paid"))
@@ -2089,9 +2022,9 @@ app.post("/api/ai-analytics", async (c) => {
     // 3. Top movies by bookings
     const topMovies = await db
       .select({
-        title:    schema.bookings.movie_title,
+        title: schema.bookings.movie_title,
         bookings: count(schema.bookings.id),
-        revenue:  sql<number>`SUM(CASE WHEN ${schema.bookings.payment_status}='paid' THEN ${schema.bookings.total_price} ELSE 0 END)`,
+        revenue: sql<number>`SUM(CASE WHEN ${schema.bookings.payment_status}='paid' THEN ${schema.bookings.total_price} ELSE 0 END)`,
       })
       .from(schema.bookings)
       .where(sql`${schema.bookings.movie_title} IS NOT NULL`)
@@ -2104,7 +2037,7 @@ app.post("/api/ai-analytics", async (c) => {
     const peakHours = await db
       .select({
         hour: sql<number>`CAST(strftime('%H',${schema.bookings.created_at}) AS INTEGER)`,
-        cnt:  count(schema.bookings.id),
+        cnt: count(schema.bookings.id),
       })
       .from(schema.bookings)
       .groupBy(sql`strftime('%H',${schema.bookings.created_at})`)
@@ -2115,9 +2048,9 @@ app.post("/api/ai-analytics", async (c) => {
     const yr = new Date().getFullYear();
     const monthlyRevenue = await db
       .select({
-        month:   sql<number>`CAST(strftime('%m',${schema.bookings.paid_at}) AS INTEGER)`,
+        month: sql<number>`CAST(strftime('%m',${schema.bookings.paid_at}) AS INTEGER)`,
         revenue: sql<number>`SUM(${schema.bookings.total_price})`,
-        cnt:     count(schema.bookings.id),
+        cnt: count(schema.bookings.id),
       })
       .from(schema.bookings)
       .where(
@@ -2133,8 +2066,8 @@ app.post("/api/ai-analytics", async (c) => {
     // 6. Top ticket packages
     const topPackages = await db
       .select({
-        pkg:     schema.bookings.ticket_package_name,
-        cnt:     count(schema.bookings.id),
+        pkg: schema.bookings.ticket_package_name,
+        cnt: count(schema.bookings.id),
         revenue: sql<number>`SUM(CASE WHEN ${schema.bookings.payment_status}='paid' THEN ${schema.bookings.total_price} ELSE 0 END)`,
       })
       .from(schema.bookings)
@@ -2175,17 +2108,17 @@ app.post("/api/ai-analytics", async (c) => {
       revenue: sql<number>`SUM(${schema.bookings.total_price})`,
       cnt: count(schema.bookings.id)
     })
-    .from(schema.bookings)
-    .where(and(
-      eq(schema.bookings.payment_status, "paid"),
-      sql`${schema.bookings.paid_at} IS NOT NULL`
-      // SQLite date comparison works with string comparison if formatted correctly.
-      // We will just fetch top 30 recent paid days to be safe across dialects.
-    ))
-    .groupBy(sql`strftime('%Y-%m-%d', ${schema.bookings.paid_at})`)
-    .orderBy(desc(sql`strftime('%Y-%m-%d', ${schema.bookings.paid_at})`))
-    .limit(30)
-    .all();
+      .from(schema.bookings)
+      .where(and(
+        eq(schema.bookings.payment_status, "paid"),
+        sql`${schema.bookings.paid_at} IS NOT NULL`
+        // SQLite date comparison works with string comparison if formatted correctly.
+        // We will just fetch top 30 recent paid days to be safe across dialects.
+      ))
+      .groupBy(sql`strftime('%Y-%m-%d', ${schema.bookings.paid_at})`)
+      .orderBy(desc(sql`strftime('%Y-%m-%d', ${schema.bookings.paid_at})`))
+      .limit(30)
+      .all();
 
     // 11. Top users failed/cancelled
     const failedUsersRows = await db.select({
@@ -2193,12 +2126,12 @@ app.post("/api/ai-analytics", async (c) => {
       name: schema.bookings.name,
       failed_count: count(schema.bookings.id)
     })
-    .from(schema.bookings)
-    .where(sql`${schema.bookings.payment_status} IN ('failed', 'pending')`)
-    .groupBy(schema.bookings.email, schema.bookings.name)
-    .orderBy(desc(count(schema.bookings.id)))
-    .limit(10)
-    .all();
+      .from(schema.bookings)
+      .where(sql`${schema.bookings.payment_status} IN ('failed', 'pending')`)
+      .groupBy(schema.bookings.email, schema.bookings.name)
+      .orderBy(desc(count(schema.bookings.id)))
+      .limit(10)
+      .all();
 
     // 12. Toys catalog
     const toysCatalog = await db.select({
@@ -2210,12 +2143,12 @@ app.post("/api/ai-analytics", async (c) => {
 
     const ctx = {
       summary: {
-        total_bookings:     Number(sr?.total_bookings ?? 0),
-        total_revenue_paid: Number(sr?.total_revenue  ?? 0),
-        paid_bookings:      Number(sr?.paid_count     ?? 0),
-        pending_bookings:   Number(sr?.pending_count  ?? 0),
-        failed_bookings:    Number(sr?.failed_count   ?? 0),
-        tickets_used:       Number(sr?.used_tickets   ?? 0),
+        total_bookings: Number(sr?.total_bookings ?? 0),
+        total_revenue_paid: Number(sr?.total_revenue ?? 0),
+        paid_bookings: Number(sr?.paid_count ?? 0),
+        pending_bookings: Number(sr?.pending_count ?? 0),
+        failed_bookings: Number(sr?.failed_count ?? 0),
+        tickets_used: Number(sr?.used_tickets ?? 0),
       },
       revenue_by_payment_method: revenueByMethod.map(r => ({
         method: r.method ?? "unknown", revenue: Number(r.revenue ?? 0), count: Number(r.cnt ?? 0),
@@ -2279,7 +2212,7 @@ HƯỚNG DẪN CHỌN "display_type":
     const aiResp: any = await c.env.AI.run("@cf/meta/llama-3-8b-instruct", {
       messages: [
         { role: "system", content: systemPrompt },
-        { role: "user",   content: userMessage },
+        { role: "user", content: userMessage },
       ],
       max_tokens: 1500,
       temperature: 0.3,
@@ -2294,10 +2227,10 @@ HƯỚNG DẪN CHỌN "display_type":
       parsed = JSON.parse(m[0]);
     } catch {
       parsed = {
-        display_type:     "summary",
+        display_type: "summary",
         analysis_summary: rawText || "AI khong the phan tich. Vui long thu lai.",
-        ui_config:        { title: "Ket qua phan tich" },
-        processed_data:   [],
+        ui_config: { title: "Ket qua phan tich" },
+        processed_data: [],
       };
     }
 
@@ -2308,6 +2241,4 @@ HƯỚNG DẪN CHỌN "display_type":
   }
 });
 
-=======
->>>>>>> nhat
 export default app;

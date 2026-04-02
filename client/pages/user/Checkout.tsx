@@ -17,7 +17,6 @@ import {
   Calendar,
   CreditCard,
   Hash,
-<<<<<<< HEAD
   Phone,
 } from "lucide-react";
 import UserLayout from "@/user/layouts/UserLayout";
@@ -28,12 +27,6 @@ import {
   confirmBookingApi,
   getBookingByIdApi,
 } from "@/lib/api";
-=======
-  Phone
-} from 'lucide-react';
-import UserLayout from '@/user/layouts/UserLayout';
-import { createMomoPaymentApi, API_BASE_URL, confirmBookingApi, getBookingByIdApi } from '@/lib/api';
->>>>>>> nhat
 
 export default function Checkout() {
   const navigate = useNavigate();
@@ -87,7 +80,7 @@ export default function Checkout() {
     if (extraData) {
       try {
         pending = JSON.parse(decodeURIComponent(escape(atob(extraData))));
-      } catch {}
+      } catch { }
     }
 
     // Nếu là VNPay với booking_id từ URL hoặc sessionStorage, fetch booking info từ API
@@ -117,7 +110,7 @@ export default function Checkout() {
             setOrder(pendingFromApi);
             try {
               localStorage.setItem('lastCheckoutOrder', JSON.stringify(pendingFromApi));
-            } catch {}
+            } catch { }
 
             // Chỉ gọi handleVNPayCallback nếu là lần đầu callback (URL có vnp params)
             if (isFirstCallback) {
@@ -184,14 +177,14 @@ export default function Checkout() {
               );
               localStorage.setItem('lastCheckoutOrder', JSON.stringify(pendingFromApi));
             }
-          } catch {}
+          } catch { }
         })();
       } else if (savedOrder) {
         try {
           const o = JSON.parse(savedOrder);
           setOrder(o);
           setStatus(o.payment_status === 'paid' ? 'success' : o.payment_status === 'failed' ? 'failed' : '');
-        } catch {}
+        } catch { }
       } else {
         navigate('/');
       }
@@ -226,12 +219,12 @@ export default function Checkout() {
             // Xóa URL params sau khi update thành công
             window.history.replaceState({}, document.title, window.location.pathname);
           })
-          .catch(() => {});
+          .catch(() => { });
       }
       try {
         const snap = { ...(pending || {}), payment_status };
         localStorage.setItem('lastCheckoutOrder', JSON.stringify(snap));
-      } catch {}
+      } catch { }
       localStorage.removeItem('pendingOrder');
     }
 
@@ -285,9 +278,9 @@ export default function Checkout() {
           setOrder(merged);
           try {
             localStorage.setItem('lastCheckoutOrder', JSON.stringify(merged));
-          } catch {}
+          } catch { }
         }
-      } catch {}
+      } catch { }
     })();
   }, [order?.booking_id]);
 
@@ -352,12 +345,8 @@ export default function Checkout() {
       // Tuy nhiên logic serverBase ở đây hơi rối, nên tách bạch:
       // - redirectUrl: URL user sẽ được chuyển về (Client URL)
       // - ipnUrl: URL MoMo gọi server (Server API URL)
-<<<<<<< HEAD
       const serverBase =
         SERVER_BASE_URL || clientBase;
-=======
-      const serverBase = (import.meta as any).env?.VITE_SERVER_BASE_URL || clientBase;
->>>>>>> nhat
       const ipnUrl = `${serverBase}${ipnPath}`;
       const accessKey = (import.meta as any).env?.VITE_MOMO_ACCESS_KEY || '';
       const secretKey = (import.meta as any).env?.VITE_MOMO_SECRET_KEY || '';
@@ -451,7 +440,7 @@ export default function Checkout() {
   return (
     <UserLayout
       className="bg-[#020617] border-none"
-      headerProps={{ onBookClick: () => {}, forceDark: true }}
+      headerProps={{ onBookClick: () => { }, forceDark: true }}
       hideFooter
     >
       <section className="relative min-h-screen flex items-center justify-center pt-16 md:pt-20 lg:pt-24 pb-10 overflow-hidden">
@@ -622,11 +611,10 @@ export default function Checkout() {
 
                   <div className="text-right flex flex-col items-end gap-1">
                     <span
-                      className={`px-2 py-0.5 rounded-full text-[9px] font-bold uppercase tracking-tighter ${
-                        isSuccess
+                      className={`px-2 py-0.5 rounded-full text-[9px] font-bold uppercase tracking-tighter ${isSuccess
                           ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
                           : 'bg-rose-500/10 text-rose-400 border border-rose-500/20'
-                      }`}
+                        }`}
                     >
                       {order?.method === 'momo'
                         ? 'Momo Wallet'
@@ -638,13 +626,13 @@ export default function Checkout() {
                       Thực hiện lúc:{' '}
                       {order?.paidAt
                         ? new Date(order.paidAt).toLocaleString('vi-VN', {
-                            day: '2-digit',
-                            month: '2-digit',
-                            year: 'numeric',
-                            hour: '2-digit',
-                            minute: '2-digit',
-                            second: '2-digit'
-                          })
+                          day: '2-digit',
+                          month: '2-digit',
+                          year: 'numeric',
+                          hour: '2-digit',
+                          minute: '2-digit',
+                          second: '2-digit'
+                        })
                         : new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })}
                     </p>
                   </div>
