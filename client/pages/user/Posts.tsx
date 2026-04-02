@@ -4,7 +4,7 @@ import UserLayout from '@/user/layouts/UserLayout';
 import { getPublicPosts } from '@/lib/api/posts';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { CalendarDays, Search } from 'lucide-react';
+import { CalendarDays, Eye, Search } from 'lucide-react';
 
 type PostItem = {
   id: number;
@@ -16,6 +16,7 @@ type PostItem = {
   is_featured?: boolean;
   published_at?: string;
   created_at?: string;
+  view_count?: number;
 };
 
 export default function UserPostsPage() {
@@ -55,7 +56,7 @@ export default function UserPostsPage() {
 
   return (
     <UserLayout className="bg-gradient-dark">
-      <main className="pt-20 md:pt-24 pb-12 md:pb-16">
+      <main className="pt-20 mt-10 md:pt-24 pb-12 md:pb-16">
         <section className="container mx-auto px-4 md:px-6 lg:px-8">
           <div className="rounded-2xl md:rounded-3xl neon-border glass-tile neon-noise bg-white/5 p-5 md:p-10">
             <p className="text-cyan-300 text-xs font-black uppercase tracking-[0.25em]">Cinesphere Blog</p>
@@ -106,10 +107,18 @@ export default function UserPostsPage() {
                       <h3 className="text-white font-extrabold text-lg line-clamp-2">{post.title}</h3>
                       <p className="mt-2 text-slate-300 text-sm line-clamp-3">{post.excerpt?.trim() || 'Bài viết không có tóm tắt.'}</p>
                       <div className="mt-4 flex items-center justify-between text-xs text-slate-400">
-                        <span className="inline-flex items-center gap-1.5">
-                          <CalendarDays className="w-3.5 h-3.5" />
-                          {new Date(post.published_at || post.created_at || Date.now()).toLocaleDateString('vi-VN')}
-                        </span>
+                        <div className="flex items-center gap-3">
+                          <span className="inline-flex items-center gap-1.5">
+                            <CalendarDays className="w-3.5 h-3.5" />
+                            {new Date(post.published_at || post.created_at || Date.now()).toLocaleDateString('vi-VN')}
+                          </span>
+                          {(post.view_count ?? 0) > 0 && (
+                            <span className="inline-flex items-center gap-1">
+                              <Eye className="w-3.5 h-3.5" />
+                              {(post.view_count ?? 0).toLocaleString('vi-VN')}
+                            </span>
+                          )}
+                        </div>
                         <Button variant="ghost" className="text-cyan-300 hover:text-cyan-200 hover:bg-transparent p-0 h-auto">
                           Xem chi tiết
                         </Button>
