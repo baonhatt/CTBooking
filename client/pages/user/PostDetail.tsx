@@ -10,6 +10,7 @@ import { Helmet } from 'react-helmet-async';
 type PostDetail = {
   id: number;
   title: string;
+  slug?: string;
   content: string;
   excerpt?: string;
   featured_image?: string;
@@ -23,6 +24,7 @@ type PostDetail = {
 type RecentViewedPost = {
   id: number;
   title: string;
+  slug?: string;
   viewed_at: string;
 };
 
@@ -45,7 +47,7 @@ function timeAgo(dateInput?: string) {
 }
 
 export default function UserPostDetailPage() {
-  const { id } = useParams();
+  const { slug } = useParams();
   const navigate = useNavigate();
   const [post, setPost] = useState<PostDetail | null>(null);
   const [relatedPosts, setRelatedPosts] = useState<PostDetail[]>([]);
@@ -66,10 +68,10 @@ export default function UserPostDetailPage() {
 
   useEffect(() => {
     const run = async () => {
-      if (!id) return;
+      if (!slug) return;
       setLoading(true);
       try {
-        const res = await getPostById(Number(id));
+        const res = await getPostById(slug);
         const p = res?.post as PostDetail;
         // Public detail chỉ hiển thị bài published
         if (!p || p.status !== 'published') {
@@ -84,7 +86,7 @@ export default function UserPostDetailPage() {
       }
     };
     run();
-  }, [id]);
+  }, [slug]);
 
   useEffect(() => {
     const runRelated = async () => {
@@ -109,6 +111,7 @@ export default function UserPostDetailPage() {
       const nextItem: RecentViewedPost = {
         id: post.id,
         title: post.title,
+        slug: post.slug,
         viewed_at: new Date().toISOString()
       };
       const next = [nextItem, ...list.filter((x) => x.id !== post.id)].slice(0, 10);
@@ -278,7 +281,7 @@ export default function UserPostDetailPage() {
                     ) : (
                       <div className="mt-3 space-y-3">
                         {recentPosts.map((item) => (
-                          <Link key={item.id} to={`/posts/${item.id}`} className="block group">
+                          <Link key={item.id} to={`/posts/${item.slug || item.id}`} className="block group">
                             <p className="text-slate-200 text-sm group-hover:text-cyan-300 transition-colors line-clamp-2">{item.title}</p>
                             <p className="text-slate-500 text-xs mt-1">{timeAgo(item.viewed_at)}</p>
                           </Link>
@@ -299,7 +302,7 @@ export default function UserPostDetailPage() {
                     {relatedPosts.map((item) => (
                       <Link
                         key={item.id}
-                        to={`/posts/${item.id}`}
+                        to={`/posts/${item.slug || item.id}`}
                         className="rounded-2xl neon-border bg-white/5 hover:bg-white/[0.1] transition-colors p-4"
                       >
                         {item.featured_image && (

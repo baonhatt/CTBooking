@@ -792,10 +792,10 @@ export function createServer() {
     }
   });
 
-  app.get('/api/posts/:id', async (req, res) => {
+  app.get('/api/posts/:identifier', async (req, res) => {
     try {
-      const id = Number(req.params.id);
-      const r = await getPostImpl(db, { posts: pgPosts }, id, true);
+      const identifier = req.params.identifier;
+      const r = await getPostImpl(db, { posts: pgPosts }, identifier, true);
       if (!r) return res.status(404).json({ message: 'Không tìm thấy' });
       res.status(200).json({ post: r });
     } catch (error: any) {

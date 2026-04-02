@@ -147,7 +147,7 @@ const App = () => (
             <Route path="/booking" element={<Booking />} />
             <Route path="/account" element={<Account />} />
             <Route path="/posts" element={<UserPostsPage />} />
-            <Route path="/posts/:id" element={<UserPostDetailPage />} />
+            <Route path="/posts/:slug" element={<UserPostDetailPage />} />
             <Route path="/reset-password" element={<ConfirmToken />} />
             <Route path="/admin/*" element={<AdminGate />} />
             <Route path="/qr-payment" element={<QRPaymentPage />} />
