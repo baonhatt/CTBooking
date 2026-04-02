@@ -25,7 +25,6 @@ import {
   createMomoPaymentApi,
   createVnpayPaymentApi,
   API_BASE_URL,
-<<<<<<< HEAD
   SERVER_BASE_URL,
   validateBookingApi,
 } from "@/lib/api";
@@ -33,14 +32,6 @@ import { optimizeCloudinaryUrl } from "@/lib/utils";
 import UserLayout from "@/user/layouts/UserLayout";
 import styles from "@/pages/user/style/user.style.scss"
 import { ArrowLeft, ArrowRight, CreditCard, ChevronRight, X, Loader2 } from "lucide-react";
-=======
-  validateBookingApi
-} from '@/lib/api';
-import { optimizeCloudinaryUrl } from '@/lib/utils';
-import UserLayout from '@/user/layouts/UserLayout';
-import styles from '@/pages/user/style/user.style.scss';
-import { ArrowLeft, ArrowRight, CreditCard, ChevronRight, X, Loader2 } from 'lucide-react';
->>>>>>> nhat
 export default function BookingPage() {
   // Đổi USE_MOCK_DATA = false khi đã có API thật
   const USE_MOCK_DATA = true;
@@ -130,7 +121,7 @@ export default function BookingPage() {
         }
         localStorage.removeItem('selectedFilm');
       }
-    } catch {}
+    } catch { }
   }, [activeMoviesFull]);
 
   useEffect(() => {
@@ -141,7 +132,7 @@ export default function BookingPage() {
         setSelectedPackage(pkg);
         localStorage.removeItem('selectedTicketPackage');
       }
-    } catch {}
+    } catch { }
   }, []);
 
   useEffect(() => {
@@ -216,7 +207,7 @@ export default function BookingPage() {
         if (!phone && p?.phone) setPhone(p.phone);
         return;
       }
-    } catch {}
+    } catch { }
     try {
       const raw = localStorage.getItem('authUser');
 
@@ -229,7 +220,7 @@ export default function BookingPage() {
         if (!name && authName) setName(authName);
         if (!phone && authPhone) setPhone(authPhone);
       }
-    } catch {}
+    } catch { }
   }, [email, name, phone]);
 
   const resolveImageUrl = (u: string | undefined | null) => {
@@ -393,7 +384,6 @@ export default function BookingPage() {
             )
           )
         );
-<<<<<<< HEAD
         const partnerCode =
           (import.meta as any).env?.VITE_MOMO_PARTNER_CODE || "";
         const partnerName =
@@ -409,15 +399,6 @@ export default function BookingPage() {
           (import.meta as any).env?.VITE_MOMO_REDIRECT_URL || "/checkout";
         const ipnPath =
           (import.meta as any).env?.VITE_MOMO_IPN_URL || "/api/momo/ipn";
-=======
-        const partnerCode = (import.meta as any).env?.VITE_MOMO_PARTNER_CODE || '';
-        const partnerName = (import.meta as any).env?.VITE_MOMO_PARTNER_NAME || 'CineSphere';
-        const storeId = (import.meta as any).env?.VITE_MOMO_STORE_ID || 'devstore';
-        const clientBase = (import.meta as any).env?.VITE_CLIENT_BASE_URL || window.location.origin;
-        const serverBase = (import.meta as any).env?.VITE_SERVER_BASE_URL || clientBase;
-        const redirectPath = (import.meta as any).env?.VITE_MOMO_REDIRECT_URL || '/checkout';
-        const ipnPath = (import.meta as any).env?.VITE_MOMO_IPN_URL || '/api/momo/ipn';
->>>>>>> nhat
         const redirectUrl = `${clientBase}${redirectPath}`;
         const ipnUrl = `${serverBase}${ipnPath}`;
         const accessKey = (import.meta as any).env?.VITE_MOMO_ACCESS_KEY || '';
@@ -477,7 +458,7 @@ export default function BookingPage() {
   return (
     <UserLayout
       className="bg-gradient-to-br from-[#050915] via-[#0b1226] to-[#0e1b3d]"
-      headerProps={{ onBookClick: () => {}, disableNav: true }}
+      headerProps={{ onBookClick: () => { }, disableNav: true }}
       hideFooter
       contentClassName="text-white"
     >
@@ -608,11 +589,10 @@ export default function BookingPage() {
                                         return [...prev, m.id];
                                       });
                                     }}
-                                    className={`group relative rounded-xl overflow-hidden cursor-pointer transition-all shadow-lg hover:shadow-blue-500/10 ${
-                                      selectedMovieIds.includes(m.id)
+                                    className={`group relative rounded-xl overflow-hidden cursor-pointer transition-all shadow-lg hover:shadow-blue-500/10 ${selectedMovieIds.includes(m.id)
                                         ? 'border-2 border-blue-500 ring-2 ring-blue-500/30 bg-blue-500/10'
                                         : 'border border-white/10 bg-white/5 hover:border-blue-500/50'
-                                    }`}
+                                      }`}
                                   >
                                     <div className="aspect-[2/3] relative">
                                       {/* Tỉ lệ 2:3 chuẩn poster phim */}

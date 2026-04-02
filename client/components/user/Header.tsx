@@ -28,7 +28,7 @@ const ForgetPasswordDialog = lazy(() =>
 const ErrorModal = lazy(() => import('../ErrorModal').then((m) => ({ default: m.ErrorModal })));
 
 export default function Header({
-  onBookClick = () => {},
+  onBookClick = () => { },
   disableNav = false,
   tooltipPrefix,
   extraMenuOptions = [],
@@ -134,7 +134,7 @@ export default function Header({
             applyFromStorage();
           }
         })
-        .catch(() => {});
+        .catch(() => { });
     }
 
     return () => {
@@ -143,7 +143,7 @@ export default function Header({
     };
   }, []);
 
-  const navItems = isUserPostsEnabled ? [...NAV_ITEMS, { label: 'Bài viết', target: 'posts' }] : NAV_ITEMS;
+  const navItems = isUserPostsEnabled ? [...NAV_ITEMS] : NAV_ITEMS;
 
   return (
     <header

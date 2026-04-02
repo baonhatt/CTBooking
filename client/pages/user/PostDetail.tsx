@@ -5,6 +5,7 @@ import { getPostById, getPublicPosts } from '@/lib/api/posts';
 import { ArrowLeft, Link2, Share2, Clock3, Eye } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
+import { Helmet } from 'react-helmet-async';
 
 type PostDetail = {
   id: number;
@@ -118,30 +119,7 @@ export default function UserPostDetailPage() {
     }
   }, [post]);
 
-  useEffect(() => {
-    const previousTitle = document.title;
-    const title = post?.title?.trim() ? `${post.title} | Cinesphere` : 'Bài viết | Cinesphere';
-    document.title = title;
 
-    const descriptionContent = post?.excerpt?.trim() || 'Bài viết điện ảnh và công nghệ từ Cinesphere.';
-    let meta = document.querySelector('meta[name="description"]') as HTMLMetaElement | null;
-    const created = !meta;
-    if (!meta) {
-      meta = document.createElement('meta');
-      meta.setAttribute('name', 'description');
-      document.head.appendChild(meta);
-    }
-    const prevDesc = meta.getAttribute('content') || '';
-    meta.setAttribute('content', descriptionContent);
-
-    return () => {
-      document.title = previousTitle;
-      if (meta) {
-        if (created) meta.remove();
-        else meta.setAttribute('content', prevDesc);
-      }
-    };
-  }, [post?.title, post?.excerpt]);
 
   const copyLink = async () => {
     try {
@@ -183,6 +161,17 @@ export default function UserPostDetailPage() {
           </div>
         ) : (
           <>
+            <Helmet>
+              <title>{post.title} | Cinesphere Blog</title>
+              <meta name="description" content={post.excerpt?.trim() || 'Bài viết điện ảnh và công nghệ từ Cinesphere.'} />
+              <meta property="og:title" content={post.title} />
+              <meta property="og:description" content={post.excerpt?.trim() || 'Bài viết điện ảnh và công nghệ từ Cinesphere.'} />
+              <meta property="og:image" content={post.featured_image || 'https://images.unsplash.com/photo-1489599849927-2ee91cede3ba?q=80&w=1200'} />
+              <meta property="og:type" content="article" />
+              {post.published_at && (
+                 <meta property="article:published_time" content={post.published_at} />
+              )}
+            </Helmet>
             {/* ── Hero Banner ── */}
             <section className="relative mt-4 w-full overflow-hidden" style={{ minHeight: '520px' }}>
               {/* Background image */}
