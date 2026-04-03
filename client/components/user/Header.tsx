@@ -40,8 +40,7 @@ export default function Header({
 
   // Custom hooks
   const isScrolled = useScrollDetect(50);
-  const isPostsRoute = location.pathname === '/posts' || location.pathname.startsWith('/posts/');
-  const effectiveDisable = disableNav || (location.pathname !== '/' && !isPostsRoute);
+  const effectiveDisable = disableNav || (location.pathname !== '/');
   const activeSection = useActiveSection(effectiveDisable);
   const { userName, setUserName } = useAuthState();
   const { handleLogout } = useAuthHandlers(setUserName);
@@ -176,8 +175,8 @@ export default function Header({
               key={item.target}
               label={item.label}
               target={item.target}
-              isActive={item.target === 'posts' ? location.pathname.startsWith('/posts') : activeSection === item.target}
-              disabled={item.target === 'posts' ? false : effectiveDisable}
+              isActive={activeSection === item.target}
+              disabled={effectiveDisable}
               onClick={() => scrollToSection(item.target)}
             />
           ))}
