@@ -229,11 +229,11 @@
 
   /* CKEditor DOM có thể bọc thêm lớp, nên bắt rộng để chắc chắn có scroll */
   .post-editor-scroll .ck-editor__editable {
-    max-height: min(360px, 35vh) !important;
-    overflow-y: scroll !important;
-    scrollbar-width: thin;
-    scrollbar-color: hsl(var(--ring)) rgba(15, 23, 42, 0.08);
-    scrollbar-gutter: stable;
+    min-height: 450px !important;
+    height: auto !important;
+    max-height: none !important;
+    overflow-y: visible !important;
+    scrollbar-width: none;
   }
 
   .post-editor-scroll .ck-editor__editable::-webkit-scrollbar {

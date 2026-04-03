@@ -56,6 +56,13 @@ import {
   getUserProfileByEmailImpl,
   updateUserProfileImpl
 } from '../../server/routes/user/users';
+import {
+  listPostsImpl,
+  getPostImpl,
+  createPostImpl,
+  updatePostImpl,
+  deletePostImpl
+} from '../../server/routes/admin/posts';
 
 // import { getMailConfig, verifyMailProvider } from "../../server/routes/mail-service";
 import {
@@ -2238,6 +2245,94 @@ HƯỚNG DẪN CHỌN "display_type":
   } catch (err: any) {
     console.error("[ai-analytics]", err);
     return c.json({ error: String(err?.message || "Loi may chu noi bo") }, 500);
+  }
+});
+
+// ===== POSTS ENDPOINTS (BLOG) =====
+
+// Public: List published posts
+app.get('/api/posts', async (c) => {
+  try {
+    const page = Number(c.req.query('page') || 1);
+    const pageSize = Number(c.req.query('pageSize') || 10);
+    const q = String(c.req.query('q') || '');
+    const status = 'published';
+    const db = drizzle(c.env.cinema_db, { schema });
+    const r = await listPostsImpl(db, { posts: schema.posts }, { page, pageSize, q, status });
+    return c.json(r);
+  } catch (err: any) {
+    return c.json({ status: 'error', message: String(err?.message || 'Internal error') }, 500);
+  }
+});
+
+// Public: Get post detail (by ID or Slug)
+app.get('/api/posts/:identifier', async (c) => {
+  try {
+    const identifier = c.req.param('identifier');
+    const db = drizzle(c.env.cinema_db, { schema });
+    const post = await getPostImpl(db, { posts: schema.posts }, identifier, true);
+    if (!post) return c.json({ message: 'Không tìm thấy bài viết' }, 404);
+    if (post.status !== 'published' && c.env.IS_PREVIEW !== 'true') {
+      return c.json({ message: 'Bài viết không công khai' }, 403);
+    }
+    return c.json({ post });
+  } catch (err: any) {
+    return c.json({ status: 'error', message: String(err?.message || 'Internal error') }, 500);
+  }
+});
+
+// Admin: List all posts
+app.get('/api/admin/posts', async (c) => {
+  try {
+    const page = Number(c.req.query('page') || 1);
+    const pageSize = Number(c.req.query('pageSize') || 10);
+    const q = String(c.req.query('q') || '');
+    const status = String(c.req.query('status') || 'all');
+    const db = drizzle(c.env.cinema_db, { schema });
+    const r = await listPostsImpl(db, { posts: schema.posts }, { page, pageSize, q, status });
+    return c.json(r);
+  } catch (err: any) {
+    return c.json({ status: 'error', message: String(err?.message || 'Internal error') }, 500);
+  }
+});
+
+// Admin: Create post
+app.post('/api/posts', async (c) => {
+  try {
+    const db = drizzle(c.env.cinema_db, { schema });
+    const body = await c.req.json().catch(() => ({}));
+    const r = await createPostImpl(db, { posts: schema.posts }, body, c.env, getCloudHelpers(c.env).uploader);
+    return c.json({ status: 'success', post: r });
+  } catch (err: any) {
+    return c.json({ status: 'error', message: String(err?.message || 'Internal error') }, 500);
+  }
+});
+
+// Admin: Update post
+app.put('/api/posts/:id', async (c) => {
+  try {
+    const id = Number(c.req.param('id'));
+    const db = drizzle(c.env.cinema_db, { schema });
+    const body = await c.req.json().catch(() => ({}));
+    const helpers = getCloudHelpers(c.env);
+    const r = await updatePostImpl(db, { posts: schema.posts }, id, body, c.env, helpers.uploader, helpers.deleter);
+    if (!r) return c.json({ message: 'Không tìm thấy' }, 404);
+    return c.json({ status: 'success', post: r });
+  } catch (err: any) {
+    return c.json({ status: 'error', message: String(err?.message || 'Internal error') }, 500);
+  }
+});
+
+// Admin: Delete post
+app.delete('/api/posts/:id', async (c) => {
+  try {
+    const id = Number(c.req.param('id'));
+    const db = drizzle(c.env.cinema_db, { schema });
+    const r = await deletePostImpl(db, { posts: schema.posts }, id, getCloudHelpers(c.env).deleter);
+    if (!r) return c.json({ message: 'Không tìm thấy' }, 404);
+    return c.json({ status: 'success', message: 'Đã xóa' });
+  } catch (err: any) {
+    return c.json({ status: 'error', message: String(err?.message || 'Internal error') }, 500);
   }
 });
 

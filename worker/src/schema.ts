@@ -175,6 +175,22 @@ export const site_media = sqliteTable('site_media', {
     .notNull()
 });
 
+export const posts = sqliteTable('posts', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  title: text('title').notNull(),
+  slug: text('slug').unique(),
+  content: text('content').notNull(),
+  excerpt: text('excerpt'),
+  featured_image: text('featured_image'),
+  author_id: integer('author_id').references(() => users.id, { onDelete: 'set null' }),
+  status: text('status').default('draft').notNull(),
+  is_featured: integer('is_featured', { mode: 'boolean' }).default(false),
+  view_count: integer('view_count').default(0),
+  published_at: text('published_at'),
+  created_at: text('created_at').default(sql`(CURRENT_TIMESTAMP)`),
+  updated_at: text('updated_at').default(sql`(CURRENT_TIMESTAMP)`)
+});
+
 // Relations
 export const usersRelations = relations(users, ({ many }) => ({
   accounts: many(accounts),
