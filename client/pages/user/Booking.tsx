@@ -561,7 +561,7 @@ export default function BookingPage() {
                       <section className="space-y-3 animate-in fade-in slide-in-from-top-2 duration-300">
                         <div className="flex flex-wrap items-center justify-between gap-2">
                           <div className="text-[13px] font-semibold text-blue-400 uppercase tracking-wider leading-relaxed">
-                            Danh sách phim áp dụng ({activeMoviesFull.length})
+                            Vui lòng chọn phim áp dụng ({activeMoviesFull.length})
                           </div>
                           <Button
                             variant="link"
@@ -572,7 +572,7 @@ export default function BookingPage() {
                           </Button>
                         </div>
 
-                        {showMovies && (
+                        {!showMovies && (
                           <div className="animate-in fade-in zoom-in-95 duration-200">
                             {activeMoviesFull && activeMoviesFull.length > 0 ? (
                               /* Sử dụng grid-cols-2 cho mobile và grid-cols-5 cho desktop */
@@ -590,8 +590,8 @@ export default function BookingPage() {
                                       });
                                     }}
                                     className={`group relative rounded-xl overflow-hidden cursor-pointer transition-all shadow-lg hover:shadow-blue-500/10 ${selectedMovieIds.includes(m.id)
-                                        ? 'border-2 border-blue-500 ring-2 ring-blue-500/30 bg-blue-500/10'
-                                        : 'border border-white/10 bg-white/5 hover:border-blue-500/50'
+                                      ? 'border-2 border-blue-500 ring-2 ring-blue-500/30 bg-blue-500/10'
+                                      : 'border border-white/10 bg-white/5 hover:border-blue-500/50'
                                       }`}
                                   >
                                     <div className="aspect-[2/3] relative">
@@ -820,6 +820,7 @@ export default function BookingPage() {
                         }}
                         disabled={
                           !selectedPackage ||
+                          (activeMoviesFull.length > 0 && selectedMovieIds.length === 0) ||
                           !name ||
                           !phone ||
                           !email ||
@@ -1084,6 +1085,7 @@ export default function BookingPage() {
             }}
             disabled={
               !selectedPackage ||
+              (activeMoviesFull.length > 0 && selectedMovieIds.length === 0) ||
               !name ||
               !phone ||
               !email ||
