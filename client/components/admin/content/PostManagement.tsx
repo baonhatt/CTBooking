@@ -456,7 +456,7 @@ export const PostManagement = () => {
               <div className="grid grid-cols-12 gap-6 p-6">
                 {/* Left: Form */}
                 <div className="col-span-8 pr-2">
-                  <div className="bg-white rounded-2xl border shadow-sm p-5 space-y-5">
+                  <div className="bg-white rounded-2xl border shadow-sm p-5 space-y-5 mb-6">
                     <div className="grid grid-cols-12 gap-4 items-start">
                       <div className="col-span-8">
                         <Label>Tiêu đề</Label>
