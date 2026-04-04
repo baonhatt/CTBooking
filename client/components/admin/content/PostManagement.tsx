@@ -18,6 +18,7 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { getPosts, createPostApi, updatePostApi } from '@/lib/api';
+import { uploadDirectToCloudinary } from '@/lib/api/uploads';
 import { PostRichTextEditor } from './PostRichTextEditor';
 import { toast } from 'sonner';
 
@@ -157,14 +158,18 @@ export const PostManagement = () => {
     setIsSaving(true);
     try {
       const isNew = !editData.id;
-      let imageBase64: string | undefined = undefined;
+
+      // Upload ảnh thẳng lên Cloudinary từ browser, lấy URL
+      let featuredImageUrl: string | undefined = editData.imageFile ? undefined : editData.featured_image;
       if (editData.imageFile) {
-        const file = editData.imageFile;
-        imageBase64 = await new Promise<string>((resolve) => {
-          const reader = new FileReader();
-          reader.onload = () => resolve(String(reader.result));
-          reader.readAsDataURL(file);
-        });
+        try {
+          const result = await uploadDirectToCloudinary(editData.imageFile, 'posts');
+          featuredImageUrl = result.url;
+        } catch (uploadErr: any) {
+          toast.error('Lỗi upload ảnh', { description: uploadErr?.message || 'Không thể upload ảnh' });
+          setIsSaving(false);
+          return;
+        }
       }
 
       // Flow: tạo mới luôn là nháp. Xuất bản chỉ thực hiện khi edit bài đã tồn tại.
@@ -175,8 +180,7 @@ export const PostManagement = () => {
         title: editData.title!,
         content: editData.content!,
         excerpt: editData.excerpt,
-        featured_image: editData.imageFile ? undefined : editData.featured_image,
-        image_base64: imageBase64,
+        featured_image: featuredImageUrl,
         status: nextStatus,
         is_featured: editData.is_featured || false
       };
