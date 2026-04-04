@@ -1,7 +1,6 @@
 import './global.css';
 
 import { createRoot } from 'react-dom/client';
-import { HelmetProvider } from 'react-helmet-async';
 import { Toaster } from '@/components/ui/sonner';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
@@ -32,7 +31,6 @@ const queryClient = new QueryClient({
 });
 
 const App = () => (
-  <HelmetProvider>
   <QueryClientProvider client={queryClient}>
     <TooltipProvider>
       <Toaster
@@ -147,7 +145,7 @@ const App = () => (
             <Route path="/booking" element={<Booking />} />
             <Route path="/account" element={<Account />} />
             <Route path="/posts" element={<UserPostsPage />} />
-            <Route path="/posts/:slug" element={<UserPostDetailPage />} />
+            <Route path="/posts/:id" element={<UserPostDetailPage />} />
             <Route path="/reset-password" element={<ConfirmToken />} />
             <Route path="/admin/*" element={<AdminGate />} />
             <Route path="/qr-payment" element={<QRPaymentPage />} />
@@ -158,7 +156,6 @@ const App = () => (
       </BrowserRouter>
     </TooltipProvider>
   </QueryClientProvider>
-  </HelmetProvider>
 );
 
 createRoot(document.getElementById('root')!).render(<App />);

@@ -48,24 +48,27 @@ export async function listPostsImpl(
   return { items, page, pageSize, total };
 }
 
-export async function getPostImpl(anyDb: any, tables: { posts: any }, identifier: string | number, incrementView = false) {
-  const isId = typeof identifier === 'number' || (!isNaN(Number(identifier)) && String(identifier).trim() !== '');
-  const condition = isId ? eq(tables.posts.id, Number(identifier)) : eq(tables.posts.slug, String(identifier));
+export async function getPostImpl(
+  anyDb: any,
+  tables: { posts: any },
+  identifier: number | string,
+  publicOnly: boolean = false
+) {
+  const where = typeof identifier === 'number' || !isNaN(Number(identifier))
+    ? eq(tables.posts.id, Number(identifier))
+    : eq(tables.posts.slug, String(identifier));
+
+  let condition = where;
+  if (publicOnly) {
+    condition = and(where, eq(tables.posts.status, 'published'));
+  }
 
   const post = await anyDb.query.posts.findFirst({
     where: condition
   });
-  if (!post) return null;
-  if (incrementView) {
-    anyDb
-      .update(tables.posts)
-      .set({ view_count: sql`${tables.posts.view_count} + 1` })
-      .where(condition)
-      .catch(() => {});
-    return { ...post, view_count: (post.view_count ?? 0) + 1 };
-  }
-  return post;
+  return post || null;
 }
+
 
 export async function createPostImpl(
   anyDb: any,
@@ -108,22 +111,35 @@ export async function createPostImpl(
   const nowIso = new Date();
   const published_at = status === 'published' ? nowIso : null;
 
+  // Build the data object explicitly to avoid issues with undefined values
+  // which can cause parameter shifting in some Drizzle version/driver combinations.
+  const insertData: any = {
+    title,
+    slug,
+    content,
+    excerpt: excerpt || null,
+    featured_image: savedImage || null,
+    status: status || 'draft',
+    is_featured: is_featured || false,
+    published_at: published_at ? formatDateForDb(published_at, RUN_ENV?.RUNTIME_ENV) : null,
+    created_at: formatDateForDb(nowIso, RUN_ENV?.RUNTIME_ENV),
+    updated_at: formatDateForDb(nowIso, RUN_ENV?.RUNTIME_ENV)
+  };
+
+  // Only include author_id if it's actually provided as a number
+  if (typeof author_id === 'number') {
+    insertData.author_id = author_id;
+  } else {
+    // If not provided, we can either omit it (letting DB default to NULL)
+    // or explicitly set to null.
+    insertData.author_id = null;
+  }
+
   const inserted = await anyDb
     .insert(tables.posts)
-    .values({
-      title,
-      slug,
-      content,
-      excerpt,
-      featured_image: savedImage,
-      author_id,
-      status: status || 'draft',
-      is_featured: is_featured || false,
-      published_at: published_at ? formatDateForDb(published_at, RUN_ENV?.RUNTIME_ENV) : null,
-      created_at: formatDateForDb(nowIso, RUN_ENV?.RUNTIME_ENV),
-      updated_at: formatDateForDb(nowIso, RUN_ENV?.RUNTIME_ENV)
-    })
+    .values(insertData)
     .returning();
+
 
   let post: any = Array.isArray(inserted) ? inserted[0] : inserted;
   return post || null;
