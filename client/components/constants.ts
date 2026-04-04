@@ -4,8 +4,7 @@ export const NAV_ITEMS = [
   { label: 'Phim', target: 'films' },
   { label: 'Giá vé', target: 'promotions' },
   { label: 'Công nghệ', target: 'technology' },
-  { label: 'Cửa hàng', target: 'store' },
-  { label: 'Bài viết', target: 'posts' }
+  { label: 'Cửa hàng', target: 'store' }
 ] as any;
 
 export const SECTION_IDS = ['hero', 'films', 'pricing', 'technology', 'promotions', 'store', 'posts'] as const;

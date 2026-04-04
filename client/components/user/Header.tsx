@@ -120,11 +120,14 @@ export default function Header({
       setIsUserPostsEnabled(isAdminPostsEnabled && isUserPostsSettingEnabled);
     };
 
-    applyFromStorage();
+    const isProd = window.location.hostname !== 'localhost';
+    if (!isProd) {
+      applyFromStorage();
+    }
+
     window.addEventListener('storage', applyFromStorage);
     window.addEventListener('admin_sidebar_update', applyFromStorage);
 
-    const isProd = window.location.hostname !== 'localhost';
     if (isProd) {
       fetch(buildUrl('/api/admin/settings'))
         .then((res) => res.json())

@@ -37,6 +37,7 @@ export default function SettingsPage() {
   const navigate = useNavigate();
   const [adminEmail, setAdminEmail] = useState('');
   const [hiddenTabs, setHiddenTabs] = useState<string[]>(() => {
+    if (window.location.hostname !== 'localhost') return [];
     const stored = localStorage.getItem('admin_sidebar_hidden_tabs');
     return stored ? JSON.parse(stored) : [];
   });
