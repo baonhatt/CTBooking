@@ -29,7 +29,7 @@ import {
 import { getRevenueImpl, listTransactionsImpl, getTransactionByIdImpl } from './routes/admin/payments';
 import { listActiveToys } from './routes/user/toys';
 import { listToysImpl, createToyImpl, getToyImpl, updateToyImpl, deleteToyImpl } from './routes/admin/toys';
-import { listPostsImpl, createPostImpl, getPostImpl, updatePostImpl, deletePostImpl } from './routes/admin/posts';
+import { listPostsImpl, createPostImpl, getPostImpl, updatePostImpl, deletePostImpl, incrementPostViewImpl } from './routes/admin/posts';
 import {
   getDashboardMetricsImpl,
   getRevenueByDateImpl,
@@ -794,9 +794,15 @@ export function createServer() {
 
   app.get('/api/posts/:id', async (req, res) => {
     try {
-      const id = Number(req.params.id);
-      const r = await getPostImpl(db, { posts: pgPosts }, id);
+      const idOrSlug = req.params.id;
+      const r = await getPostImpl(db, { posts: pgPosts }, idOrSlug);
       if (!r) return res.status(404).json({ message: 'Không tìm thấy' });
+
+      // Increment view count in background
+      if (r.id) {
+        incrementPostViewImpl(db, { posts: pgPosts }, r.id).catch(e => console.error('Failed to increment view', e));
+      }
+
       res.status(200).json({ post: r });
     } catch (error: any) {
       res.status(500).json({ status: 'error', message: error?.message || 'Internal error' });

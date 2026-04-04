@@ -37,7 +37,7 @@ export async function getPublicPosts(options?: {
   });
 }
 
-export async function getPostById(id: number) {
+export async function getPostById(id: number | string) {
   return request<{ post: any }>(`/api/posts/${id}`);
 }
 

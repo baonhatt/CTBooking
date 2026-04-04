@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { CKEditor } from '@ckeditor/ckeditor5-react';
 import {
   Alignment,
@@ -26,6 +26,7 @@ import {
   IndentBlock,
   Italic,
   Link,
+  LinkImage,
   List,
   ListProperties,
   Paragraph,
@@ -86,7 +87,7 @@ function cloudinaryUploadPlugin(editor: any) {
 
 export function PostRichTextEditor({ value, onChange }: PostRichTextEditorProps) {
   const [isUploadingImage, setIsUploadingImage] = useState(false);
-  const [editorData, setEditorData] = useState(() => normalizeInitialContent(value));
+  const editorRef = useRef<any>(null);
   const isLocal = typeof window !== 'undefined' && window.location.hostname === 'localhost';
 
   const editorConfig = useMemo<EditorConfig>(
@@ -103,6 +104,7 @@ export function PostRichTextEditor({ value, onChange }: PostRichTextEditorProps)
         Underline,
         Code,
         Link,
+        LinkImage,
         List,
         ListProperties,
         TodoList,
@@ -204,9 +206,11 @@ export function PostRichTextEditor({ value, onChange }: PostRichTextEditorProps)
           'alignLeft',
           'alignCenter',
           'alignRight'
-        ],
+        ] as any,
         toolbar: [
           'imageTextAlternative',
+          'toggleImageCaption',
+          'linkImage',
           '|',
           'imageStyle:alignLeft',
           'imageStyle:alignCenter',
@@ -235,20 +239,24 @@ export function PostRichTextEditor({ value, onChange }: PostRichTextEditorProps)
   );
 
   useEffect(() => {
-    const nextValue = normalizeInitialContent(value);
-    if (editorData !== nextValue) {
-      setEditorData(nextValue);
+    if (editorRef.current) {
+      const currentData = editorRef.current.getData();
+      const nextValue = normalizeInitialContent(value);
+      if (currentData !== nextValue) {
+        editorRef.current.setData(nextValue);
+      }
     }
-  }, [editorData, value]);
+  }, [value]);
 
   return (
     <div>
-      <div className="post-editor-scroll rounded-xl border border-slate-200 bg-white shadow-sm [&_.ck.ck-editor]:border-0 [&_.ck.ck-editor__main>.ck-editor__editable]:min-h-[260px] [&_.ck.ck-editor__main>.ck-editor__editable]:border-0 [&_.ck.ck-editor__main>.ck-editor__editable]:px-4 [&_.ck.ck-editor__main>.ck-editor__editable]:py-3 [&_.ck.ck-editor__main>.ck-editor__editable]:text-sm [&_.ck.ck-editor__main>.ck-editor__editable]:leading-6 [&_.ck.ck-editor__top_.ck-sticky-panel_.ck-toolbar]:border-0 [&_.ck.ck-toolbar]:border-0 [&_.ck.ck-toolbar]:border-b [&_.ck.ck-toolbar]:border-slate-200 [&_.ck.ck-toolbar]:bg-slate-50 [&_.ck-content_.image>img]:rounded-xl [&_.ck-content_.image>img]:max-w-full [&_.ck-content_.image>img]:h-auto">
+      <div className=" mb-2 post-editor-scroll rounded-xl border border-slate-200 bg-white shadow-sm [&_.ck.ck-editor]:border-0 [&_.ck.ck-editor__main>.ck-editor__editable]:min-h-[300px] [&_.ck.ck-editor__main>.ck-editor__editable]:border-0 [&_.ck.ck-editor__main>.ck-editor__editable]:px-4 [&_.ck.ck-editor__main>.ck-editor__editable]:py-3 [&_.ck.ck-editor__main>.ck-editor__editable]:text-sm [&_.ck.ck-editor__main>.ck-editor__editable]:leading-6 [&_.ck.ck-top_.ck-sticky-panel_.ck-toolbar]:border-0 [&_.ck.ck-toolbar]:border-0 [&_.ck.ck-toolbar]:border-b [&_.ck.ck-toolbar]:border-slate-200 [&_.ck.ck-toolbar]:bg-slate-50 [&_.ck-content_.image>img]:rounded-xl [&_.ck-content_.image>img]:max-w-full [&_.ck-content_.image>img]:h-auto">
         <CKEditor
           editor={ClassicEditor}
-          data={editorData}
+          data={normalizeInitialContent(value)}
           config={editorConfig}
           onReady={(editor) => {
+            editorRef.current = editor;
             const fileRepository = editor.plugins.get('FileRepository');
             const originalCreateUploadAdapter = fileRepository.createUploadAdapter.bind(fileRepository);
 
@@ -277,7 +285,6 @@ export function PostRichTextEditor({ value, onChange }: PostRichTextEditorProps)
           }}
           onChange={(_, editor) => {
             const data = editor.getData();
-            setEditorData(data);
             onChange(data);
           }}
         />
@@ -287,7 +294,7 @@ export function PostRichTextEditor({ value, onChange }: PostRichTextEditorProps)
           ? isLocal
             ? 'Đang tải ảnh lên máy chủ (local)...'
             : 'Đang tải ảnh lên Cloudinary...'
-          : 'CKEditor 5 đang được dùng cho nội dung bài viết và hỗ trợ chèn ảnh trực tiếp.'}
+          : ''}
       </p>
     </div>
   );

@@ -30,6 +30,7 @@ interface PostData {
   featured_image?: string;
   status: string;
   is_featured?: boolean;
+  view_count?: number;
   published_at?: string;
   created_at: string;
   updated_at: string;
@@ -260,6 +261,7 @@ export const PostManagement = () => {
                 <TableHead className="text-[10px] uppercase font-bold text-slate-500 min-w-[420px]">Tiêu đề</TableHead>
                 <TableHead className="text-[10px] uppercase font-bold text-slate-500 text-center w-[140px]">Trạng thái</TableHead>
                 <TableHead className="text-[10px] uppercase font-bold text-slate-500 text-center w-[120px]">Xuất bản</TableHead>
+                <TableHead className="text-[10px] uppercase font-bold text-slate-500 text-center w-[100px]">Lượt xem</TableHead>
                 <TableHead className="text-right text-[10px] uppercase font-bold text-slate-500 pr-6 w-[90px]">
                   Thao tác
                 </TableHead>
@@ -338,6 +340,12 @@ export const PostManagement = () => {
                     <TableCell className="text-center text-xs text-slate-500">
                       {post.published_at ? new Date(post.published_at).toLocaleDateString('vi-VN') : '---'}
                     </TableCell>
+                    <TableCell className="text-center">
+                       <span className="inline-flex items-center gap-1.5 text-xs font-mono text-slate-600 bg-slate-100 px-2 py-1 rounded-md">
+                          <Eye className="w-3 h-3" />
+                          {post.view_count || 0}
+                       </span>
+                    </TableCell>
                     <TableCell className="text-right space-x-2">
                       <Button
                         variant="ghost"
@@ -398,7 +406,6 @@ export const PostManagement = () => {
       <Dialog
         open={isEditOpen}
         onOpenChange={(next) => {
-          // Chỉ cho đóng bằng nút X/Hủy (được gọi qua requestClose).
           if (next) setIsEditOpen(true);
         }}
       >
@@ -407,6 +414,7 @@ export const PostManagement = () => {
           onPointerDownOutside={(e) => e.preventDefault()}
           onInteractOutside={(e) => e.preventDefault()}
           onEscapeKeyDown={(e) => e.preventDefault()}
+          onOpenAutoFocus={(e) => e.preventDefault()}
         >
           <div className="flex flex-col h-full">
             {/* Header */}
