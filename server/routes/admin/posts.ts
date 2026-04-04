@@ -54,13 +54,29 @@ export async function getPostImpl(
   identifier: number | string,
   publicOnly: boolean = false
 ) {
-  const where = typeof identifier === 'number' || !isNaN(Number(identifier))
-    ? eq(tables.posts.id, Number(identifier))
-    : eq(tables.posts.slug, String(identifier));
+  let condition;
+  const rawId = Number(identifier);
 
-  let condition = where;
+  if (!isNaN(rawId)) {
+    // Trường hợp là numbers thuần (VD: 123)
+    condition = eq(tables.posts.id, rawId);
+  } else {
+    // Trường hợp là string (slug hoặc slug-id)
+    const strId = String(identifier);
+    const parts = strId.split('-');
+    const potentialId = Number(parts[parts.length - 1]);
+
+    if (parts.length > 1 && !isNaN(potentialId)) {
+      // Định dạng slug-id (VD: tieu-de-bai-viet-123)
+      condition = eq(tables.posts.id, potentialId);
+    } else {
+      // Định dạng slug thuần (VD: tieu-de-bai-viet)
+      condition = eq(tables.posts.slug, strId);
+    }
+  }
+
   if (publicOnly) {
-    condition = and(where, eq(tables.posts.status, 'published'));
+    condition = and(condition, eq(tables.posts.status, 'published'));
   }
 
   const post = await anyDb.query.posts.findFirst({
@@ -242,4 +258,17 @@ export async function deletePostImpl(
 
   await anyDb.delete(tables.posts).where(eq(tables.posts.id, id));
   return existing;
+}
+
+export async function incrementPostViewImpl(
+  anyDb: any,
+  tables: { posts: any },
+  id: number
+) {
+  return anyDb.update(tables.posts)
+    .set({
+      view_count: sql`${tables.posts.view_count} + 1`
+    })
+    .where(eq(tables.posts.id, id))
+    .returning();
 }
