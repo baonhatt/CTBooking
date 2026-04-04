@@ -302,13 +302,11 @@ export const PostManagement = () => {
                     <TableCell>
                       <div className="flex items-center gap-3">
                         {post.featured_image && (
-                          <div className="shrink-0 w-16 h-16 rounded-lg overflow-hidden border border-slate-200 bg-slate-50">
-                            <img
-                              src={post.featured_image}
-                              alt={post.title}
-                              className="w-full h-full object-cover"
-                            />
-                          </div>
+                          <img
+                            src={post.featured_image}
+                            alt={post.title}
+                            className="w-12 h-12 rounded-lg object-cover border border-slate-200"
+                          />
                         )}
                         <div>
                           <div className="font-bold text-slate-700 line-clamp-2">{post.title}</div>
@@ -403,28 +401,11 @@ export const PostManagement = () => {
           // Chỉ cho đóng bằng nút X/Hủy (được gọi qua requestClose).
           if (next) setIsEditOpen(true);
         }}
-        modal={false}
       >
         <DialogContent
-          className="max-w-6xl w-[95vw] h-[92vh] p-0 overflow-hidden bg-white [&>button]:hidden shadow-[0_0_0_100vw_rgba(0,0,0,0.5)]"
-          onOpenAutoFocus={(e) => e.preventDefault()}
-          onPointerDownOutside={(e) => {
-            const target = e.target as HTMLElement;
-            // Nếu click vào bất kì thành phần nào của CKEditor thì không chặn
-            if (target?.closest('.ck-body-wrapper, .ck-balloon-panel, [class*="ck-"]')) return;
-            e.preventDefault();
-          }}
-          onInteractOutside={(e) => {
-            const target = e.target as HTMLElement;
-            if (target?.closest('.ck-body-wrapper, .ck-balloon-panel, [class*="ck-"]')) return;
-            e.preventDefault();
-          }}
-          onFocusOutside={(e) => {
-            const target = e.target as HTMLElement;
-            if (target?.closest('.ck-body-wrapper, .ck-balloon-panel, [class*="ck-"]')) {
-              e.preventDefault();
-            }
-          }}
+          className="max-w-6xl w-[95vw] h-[92vh] p-0 overflow-hidden bg-white [&>button]:hidden"
+          onPointerDownOutside={(e) => e.preventDefault()}
+          onInteractOutside={(e) => e.preventDefault()}
           onEscapeKeyDown={(e) => e.preventDefault()}
         >
           <div className="flex flex-col h-full">
@@ -456,7 +437,7 @@ export const PostManagement = () => {
               <div className="grid grid-cols-12 gap-6 p-6">
                 {/* Left: Form */}
                 <div className="col-span-8 pr-2">
-                  <div className="bg-white rounded-2xl border shadow-sm p-5 space-y-5 mb-6">
+                  <div className="bg-white rounded-2xl border shadow-sm p-5 space-y-5">
                     <div className="grid grid-cols-12 gap-4 items-start">
                       <div className="col-span-8">
                         <Label>Tiêu đề</Label>
@@ -698,7 +679,7 @@ export const PostManagement = () => {
               </header>
 
               <section
-                className="post-content"
+                className="prose prose-slate max-w-none prose-img:rounded-xl prose-headings:font-extrabold"
                 dangerouslySetInnerHTML={{
                   __html: editData.content?.trim() || '<p>Nội dung bài viết sẽ hiển thị ở đây.</p>'
                 }}

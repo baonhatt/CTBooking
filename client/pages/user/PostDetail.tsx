@@ -2,29 +2,24 @@ import { useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import UserLayout from '@/user/layouts/UserLayout';
 import { getPostById, getPublicPosts } from '@/lib/api/posts';
-import { ArrowLeft, Link2, Share2, Clock3, Eye } from 'lucide-react';
+import { ArrowLeft, CalendarDays, Link2, Share2, Clock3 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
-import { Helmet } from 'react-helmet-async';
 
 type PostDetail = {
   id: number;
   title: string;
-  slug?: string;
   content: string;
   excerpt?: string;
   featured_image?: string;
   status: string;
   published_at?: string;
   created_at?: string;
-  view_count?: number;
-  alt?: string;
 };
 
 type RecentViewedPost = {
   id: number;
   title: string;
-  slug?: string;
   viewed_at: string;
 };
 
@@ -47,7 +42,7 @@ function timeAgo(dateInput?: string) {
 }
 
 export default function UserPostDetailPage() {
-  const { slug } = useParams();
+  const { id } = useParams();
   const navigate = useNavigate();
   const [post, setPost] = useState<PostDetail | null>(null);
   const [relatedPosts, setRelatedPosts] = useState<PostDetail[]>([]);
@@ -55,23 +50,14 @@ export default function UserPostDetailPage() {
   const [loading, setLoading] = useState(false);
   const [copied, setCopied] = useState(false);
 
-  const processed = useMemo(() => {
-    const raw = post?.content || '';
-    // Wrap <img> tags that have a non-empty alt into <figure> + <figcaption>
-    const html = raw.replace(
-      /<img([^>]*)\salt="([^"]+)"([^>]*)>/gi,
-      (_, before, alt, after) =>
-        `<figure class="image"><img${before} alt="${alt}"${after}><figcaption>${alt}</figcaption></figure>`
-    );
-    return { html };
-  }, [post?.content]);
+  const processed = useMemo(() => ({ html: post?.content || '' }), [post?.content]);
 
   useEffect(() => {
     const run = async () => {
-      if (!slug) return;
+      if (!id) return;
       setLoading(true);
       try {
-        const res = await getPostById(slug);
+        const res = await getPostById(Number(id));
         const p = res?.post as PostDetail;
         // Public detail chỉ hiển thị bài published
         if (!p || p.status !== 'published') {
@@ -86,7 +72,7 @@ export default function UserPostDetailPage() {
       }
     };
     run();
-  }, [slug]);
+  }, [id]);
 
   useEffect(() => {
     const runRelated = async () => {
@@ -111,7 +97,6 @@ export default function UserPostDetailPage() {
       const nextItem: RecentViewedPost = {
         id: post.id,
         title: post.title,
-        slug: post.slug,
         viewed_at: new Date().toISOString()
       };
       const next = [nextItem, ...list.filter((x) => x.id !== post.id)].slice(0, 10);
@@ -122,7 +107,30 @@ export default function UserPostDetailPage() {
     }
   }, [post]);
 
+  useEffect(() => {
+    const previousTitle = document.title;
+    const title = post?.title?.trim() ? `${post.title} | Cinesphere` : 'Bài viết | Cinesphere';
+    document.title = title;
 
+    const descriptionContent = post?.excerpt?.trim() || 'Bài viết điện ảnh và công nghệ từ Cinesphere.';
+    let meta = document.querySelector('meta[name="description"]') as HTMLMetaElement | null;
+    const created = !meta;
+    if (!meta) {
+      meta = document.createElement('meta');
+      meta.setAttribute('name', 'description');
+      document.head.appendChild(meta);
+    }
+    const prevDesc = meta.getAttribute('content') || '';
+    meta.setAttribute('content', descriptionContent);
+
+    return () => {
+      document.title = previousTitle;
+      if (meta) {
+        if (created) meta.remove();
+        else meta.setAttribute('content', prevDesc);
+      }
+    };
+  }, [post?.title, post?.excerpt]);
 
   const copyLink = async () => {
     try {
@@ -137,9 +145,8 @@ export default function UserPostDetailPage() {
 
   return (
     <UserLayout className="bg-gradient-dark">
-      <main className="pb-16">
-        {/* Back button */}
-        <div className="container mx-auto px-4 md:px-6 lg:px-8 pt-20 md:pt-24">
+      <main className="pt-20 md:pt-24 pb-12 md:pb-16">
+        <section className="container mx-auto px-4 md:px-6 lg:px-8">
           <Button
             variant="ghost"
             className="text-slate-300 hover:text-white hover:bg-white/10 bg-transparent focus-visible:ring-cyan-300/40"
@@ -148,12 +155,12 @@ export default function UserPostDetailPage() {
             <ArrowLeft className="w-4 h-4 mr-2" />
             Quay lại danh sách bài viết
           </Button>
-        </div>
+        </section>
 
         {loading ? (
-          <div className="container mx-auto px-4 md:px-6 lg:px-8 mt-8 text-slate-300">Đang tải bài viết...</div>
+          <section className="container mx-auto px-4 md:px-6 lg:px-8 mt-8 text-slate-300">Đang tải bài viết...</section>
         ) : !post ? (
-          <div className="container mx-auto px-4 md:px-6 lg:px-8 mt-8">
+          <section className="container mx-auto px-4 md:px-6 lg:px-8 mt-8">
             <div className="rounded-2xl border border-white/10 bg-white/5 p-8 text-slate-300">
               Bài viết không tồn tại hoặc chưa được xuất bản.{' '}
               <Link to="/posts" className="text-cyan-300 underline">
@@ -161,91 +168,35 @@ export default function UserPostDetailPage() {
               </Link>
               .
             </div>
-          </div>
+          </section>
         ) : (
           <>
-            <Helmet>
-              <title>{post.title} | Cinesphere Blog</title>
-              <meta name="description" content={post.excerpt?.trim() || 'Bài viết điện ảnh và công nghệ từ Cinesphere.'} />
-              <meta property="og:title" content={post.title} />
-              <meta property="og:description" content={post.excerpt?.trim() || 'Bài viết điện ảnh và công nghệ từ Cinesphere.'} />
-              <meta property="og:image" content={post.featured_image || 'https://images.unsplash.com/photo-1489599849927-2ee91cede3ba?q=80&w=1200'} />
-              <meta property="og:type" content="article" />
-              {post.published_at && (
-                 <meta property="article:published_time" content={post.published_at} />
-              )}
-            </Helmet>
-            {/* ── Hero Banner ── */}
-            <section className="relative mt-4 w-full overflow-hidden" style={{ minHeight: '520px' }}>
-              {/* Background image */}
+            <section className="container mx-auto px-4 md:px-6 lg:px-8 mt-6">
               {post.featured_image ? (
-                <img
-                  src={post.featured_image}
-                  alt={post.title}
-                  className="absolute inset-0 w-full h-full object-cover object-center"
-                />
-              ) : (
-                <div className="absolute inset-0 bg-gradient-to-b from-slate-800 to-slate-950" />
-              )}
-
-              {/* Gradient overlays */}
-              <div className="absolute inset-0 bg-gradient-to-t from-black via-black/60 to-black/20" />
-              <div className="absolute inset-0 bg-gradient-to-b from-black/50 via-transparent to-transparent" />
-
-              {/* Banner content */}
-              <div className="relative z-10 container mx-auto px-4 md:px-6 lg:px-8 flex flex-col justify-end h-full" style={{ minHeight: '520px', paddingBottom: '3rem' }}>
-                {/* Category + date badge */}
-                <div className="flex items-center gap-3 mb-4">
-                  <span className="bg-yellow-400 text-black text-[10px] font-black uppercase tracking-widest px-3 py-1 rounded-sm">
-                    Bài Viết
-                  </span>
-                  <span className="text-slate-300 text-xs uppercase tracking-widest font-semibold">
-                    {new Date(post.published_at || post.created_at || Date.now()).toLocaleDateString('vi-VN', {
-                      month: 'long',
-                      year: 'numeric'
-                    })}
-                  </span>
+                <div className="w-full max-h-[420px] aspect-[16/9] md:aspect-[21/9] rounded-2xl md:rounded-3xl border border-white/10 shadow-[0_20px_70px_rgba(0,0,0,0.45)] overflow-hidden bg-black/20">
+                  <img src={post.featured_image} alt={post.title} className="w-full h-full object-cover" />
                 </div>
-
-                {/* Title */}
-                <h1 className="text-white font-black leading-[1.05] tracking-tight text-4xl sm:text-5xl md:text-6xl lg:text-7xl max-w-5xl">
-                  {post.title}
-                </h1>
-
-                {/* Excerpt */}
-                {post.excerpt?.trim() && (
-                  <p className="mt-5 text-slate-300 italic text-base md:text-lg max-w-3xl leading-relaxed">
-                    "{post.excerpt.trim()}"
-                  </p>
-                )}
-
-                {/* View count */}
-                {(post.view_count ?? 0) > 0 && (
-                  <div className="mt-4 inline-flex items-center gap-1.5 text-slate-400 text-xs">
-                    <Eye className="w-3.5 h-3.5" />
-                    {(post.view_count ?? 0).toLocaleString('vi-VN')} lượt xem
-                  </div>
-                )}
-              </div>
+              ) : null}
             </section>
 
-            {/* ── Article + Sidebar ── */}
-            <div className="container mx-auto px-4 md:px-6 lg:px-8 mt-10">
-              <div className="max-w-6xl mx-auto grid grid-cols-1 lg:grid-cols-12 gap-8">
-
-                {/* Article body */}
-                <article className="lg:col-span-8">
-                  <div className="rounded-2xl md:rounded-3xl neon-border bg-white/5 p-6 md:p-10">
-                    <div
-                      className="leading-7 text-slate-200 [&_h1]:text-white [&_h1]:font-black [&_h1]:text-3xl [&_h1]:mt-8 [&_h2]:text-white [&_h2]:font-extrabold [&_h2]:text-2xl [&_h2]:mt-8 [&_h3]:text-white [&_h3]:font-bold [&_h3]:text-xl [&_h3]:mt-6 [&_p]:text-slate-200 [&_p]:mb-4 [&_strong]:text-white [&_a]:text-cyan-300 [&_a]:underline [&_ol]:list-decimal [&_ol]:pl-6 [&_ol]:my-4 [&_ul]:list-disc [&_ul]:pl-6 [&_ul]:my-4 [&_li]:text-slate-200 [&_li]:mb-1 [&_img]:rounded-xl [&_img]:my-6 [&_img]:w-full [&_blockquote]:border-l-4 [&_blockquote]:border-cyan-400 [&_blockquote]:pl-4 [&_blockquote]:italic [&_blockquote]:text-slate-300 [&_blockquote]:my-4 [&_figure]:my-6 [&_figure]:text-center [&_figure_img]:rounded-xl [&_figure_img]:w-full [&_figure_img]:my-0 [&_figcaption]:mt-2 [&_figcaption]:text-xs [&_figcaption]:text-slate-400 [&_figcaption]:italic"
-                      dangerouslySetInnerHTML={{ __html: processed.html || '' }}
-                    />
+            <article className="container mx-auto px-4 md:px-6 lg:px-8 mt-8">
+              <div className="max-w-6xl mx-auto grid grid-cols-1 lg:grid-cols-12 gap-6">
+                <div className="lg:col-span-8 rounded-2xl md:rounded-3xl neon-border bg-white/5 p-5 md:p-10">
+                  <p className="text-cyan-300 text-xs font-black uppercase tracking-[0.2em]">Bài viết</p>
+                  <h1 className="mt-3 text-white text-2xl sm:text-3xl md:text-5xl font-black leading-tight">{post.title}</h1>
+                  <div className="mt-4 text-slate-400 text-sm inline-flex items-center gap-2">
+                    <CalendarDays className="w-4 h-4" />
+                    {new Date(post.published_at || post.created_at || Date.now()).toLocaleDateString('vi-VN')}
                   </div>
-                </article>
+                  {post.excerpt?.trim() ? <p className="mt-5 text-slate-300 leading-7">{post.excerpt.trim()}</p> : null}
 
-                {/* Sidebar */}
+                  <div
+                    className="max-w-none mt-8 leading-7 text-slate-200 [&_h1]:text-white [&_h1]:font-black [&_h1]:text-3xl [&_h2]:text-white [&_h2]:font-extrabold [&_h2]:text-2xl [&_h2]:mt-8 [&_h3]:text-white [&_h3]:font-bold [&_h3]:text-xl [&_h3]:mt-6 [&_p]:text-slate-200 [&_p]:mb-4 [&_strong]:text-white [&_a]:text-cyan-300 [&_a]:underline [&_ol]:list-decimal [&_ol]:pl-6 [&_ol]:my-4 [&_ul]:list-disc [&_ul]:pl-6 [&_ul]:my-4 [&_li]:text-slate-200 [&_li]:mb-1 [&_img]:rounded-xl [&_img]:my-6 [&_blockquote]:border-l-4 [&_blockquote]:border-cyan-400 [&_blockquote]:pl-4 [&_blockquote]:text-slate-300"
+                    dangerouslySetInnerHTML={{ __html: processed.html || '' }}
+                  />
+                </div>
+
                 <aside className="lg:col-span-4 space-y-4 xl:sticky xl:top-24 h-fit">
-                  {/* Share */}
                   <div className="rounded-2xl neon-border bg-white/5 p-4 md:p-5">
                     <p className="text-cyan-300 text-xs font-black uppercase tracking-[0.2em] flex items-center gap-2">
                       <Share2 className="w-3.5 h-3.5" /> Chia sẻ
@@ -271,7 +222,6 @@ export default function UserPostDetailPage() {
                     </div>
                   </div>
 
-                  {/* Recently viewed */}
                   <div className="rounded-2xl neon-border bg-white/5 p-4 md:p-5">
                     <p className="text-cyan-300 text-xs font-black uppercase tracking-[0.2em] flex items-center gap-2">
                       <Clock3 className="w-3.5 h-3.5" /> Đã xem gần đây
@@ -281,7 +231,7 @@ export default function UserPostDetailPage() {
                     ) : (
                       <div className="mt-3 space-y-3">
                         {recentPosts.map((item) => (
-                          <Link key={item.id} to={`/posts/${item.slug || item.id}`} className="block group">
+                          <Link key={item.id} to={`/posts/${item.id}`} className="block group">
                             <p className="text-slate-200 text-sm group-hover:text-cyan-300 transition-colors line-clamp-2">{item.title}</p>
                             <p className="text-slate-500 text-xs mt-1">{timeAgo(item.viewed_at)}</p>
                           </Link>
@@ -291,9 +241,8 @@ export default function UserPostDetailPage() {
                   </div>
                 </aside>
               </div>
-            </div>
+            </article>
 
-            {/* ── Related Posts ── */}
             {relatedPosts.length > 0 && (
               <section className="container mx-auto px-4 md:px-6 lg:px-8 mt-12">
                 <div className="max-w-6xl mx-auto">
@@ -302,23 +251,15 @@ export default function UserPostDetailPage() {
                     {relatedPosts.map((item) => (
                       <Link
                         key={item.id}
-                        to={`/posts/${item.slug || item.id}`}
+                        to={`/posts/${item.id}`}
                         className="rounded-2xl neon-border bg-white/5 hover:bg-white/[0.1] transition-colors p-4"
                       >
-                        {item.featured_image && (
-                          <img
-                            src={item.featured_image}
-                            alt={item.title}
-                            className="w-full h-36 object-cover rounded-xl mb-3"
-                          />
-                        )}
                         <p className="text-white font-bold line-clamp-2">{item.title}</p>
                         <p className="text-slate-400 text-xs mt-2">
                           {new Date(item.published_at || item.created_at || Date.now()).toLocaleDateString('vi-VN')}
                         </p>
                       </Link>
                     ))}
-
                   </div>
                 </div>
               </section>

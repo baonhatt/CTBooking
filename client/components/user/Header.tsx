@@ -28,7 +28,7 @@ const ForgetPasswordDialog = lazy(() =>
 const ErrorModal = lazy(() => import('../ErrorModal').then((m) => ({ default: m.ErrorModal })));
 
 export default function Header({
-  onBookClick = () => { },
+  onBookClick = () => {},
   disableNav = false,
   tooltipPrefix,
   extraMenuOptions = [],
@@ -40,7 +40,8 @@ export default function Header({
 
   // Custom hooks
   const isScrolled = useScrollDetect(50);
-  const effectiveDisable = disableNav || (location.pathname !== '/');
+  const isPostsRoute = location.pathname === '/posts' || location.pathname.startsWith('/posts/');
+  const effectiveDisable = disableNav || (location.pathname !== '/' && !isPostsRoute);
   const activeSection = useActiveSection(effectiveDisable);
   const { userName, setUserName } = useAuthState();
   const { handleLogout } = useAuthHandlers(setUserName);
@@ -133,7 +134,7 @@ export default function Header({
             applyFromStorage();
           }
         })
-        .catch(() => { });
+        .catch(() => {});
     }
 
     return () => {
@@ -142,7 +143,7 @@ export default function Header({
     };
   }, []);
 
-  const navItems = isUserPostsEnabled ? [...NAV_ITEMS] : NAV_ITEMS;
+  const navItems = isUserPostsEnabled ? [...NAV_ITEMS, { label: 'Bài viết', target: 'posts' }] : NAV_ITEMS;
 
   return (
     <header
@@ -175,8 +176,8 @@ export default function Header({
               key={item.target}
               label={item.label}
               target={item.target}
-              isActive={activeSection === item.target}
-              disabled={effectiveDisable}
+              isActive={item.target === 'posts' ? location.pathname.startsWith('/posts') : activeSection === item.target}
+              disabled={item.target === 'posts' ? false : effectiveDisable}
               onClick={() => scrollToSection(item.target)}
             />
           ))}

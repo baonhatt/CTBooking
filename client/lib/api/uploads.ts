@@ -82,10 +82,9 @@ export function uploadDirectToCloudinary(
   onProgress?: (percent: number) => void
 ): Promise<UploadResult> {
   return new Promise((resolve, reject) => {
-    const env = (import.meta as any).env || {};
-    const cloudName = env.VITE_CLOUDINARY_CLOUD_NAME || '';
-    const presetVideo = env.VITE_CLOUDINARY_UPLOAD_PRESET_VIDEO || 'ctbooking_videos_unsigned';
-    const presetImage = env.VITE_CLOUDINARY_UPLOAD_PRESET_IMAGE || 'ctbooking_images_unsigned';
+    const cloudName = import.meta.env.VITE_CLOUDINARY_CLOUD_NAME || '';
+    const presetVideo = import.meta.env.VITE_CLOUDINARY_UPLOAD_PRESET_VIDEO || 'ctbooking_videos_unsigned';
+    const presetImage = import.meta.env.VITE_CLOUDINARY_UPLOAD_PRESET_IMAGE || 'ctbooking_images_unsigned';
     if (!cloudName) return reject(new Error('Thiếu VITE_CLOUDINARY_CLOUD_NAME'));
     const isVideo = /^video\//.test(file.type);
     const isImage = /^image\//.test(file.type);
@@ -108,9 +107,6 @@ export function uploadDirectToCloudinary(
     const form = new FormData();
     form.append('file', file);
     form.append('folder', folder);
-    form.append('use_filename', 'true');
-    form.append('unique_filename', 'false');
-    form.append('overwrite', 'true');
 
     const trySigned = async () => {
       try {
@@ -172,6 +168,9 @@ export function uploadDirectToCloudinary(
           form.append('api_key', signed.api_key);
           form.append('timestamp', String(signed.timestamp));
           form.append('signature', signed.signature);
+          form.append('use_filename', 'true');
+          form.append('unique_filename', 'false');
+          form.append('overwrite', 'true');
         } else {
           // Neither signature nor preset available
           reject(new Error('Thiếu cấu hình upload: cần VITE_CLOUDINARY_UPLOAD_PRESET_* hoặc bật ký server'));
