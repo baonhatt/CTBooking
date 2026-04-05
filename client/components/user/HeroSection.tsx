@@ -1,5 +1,5 @@
 import { useMemo, useState, useEffect, useRef, useCallback } from 'react';
-import { motion, AnimatePresence, useMotionValue, useSpring, useTransform } from 'framer-motion';
+import { LazyMotion, domAnimation, m, AnimatePresence, useMotionValue, useSpring, useTransform } from 'framer-motion';
 import { Play, Pause, Sparkles, Waves, Clock, Star, Calendar, Ticket } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useQuery } from '@tanstack/react-query';
@@ -76,6 +76,17 @@ export default function HeroSection() {
   const [storeUpdateTrigger, setStoreUpdateTrigger] = useState(0);
   const SECTION_ID = 'hero-main';
 
+  const [isDesktopHero, setIsDesktopHero] = useState(() =>
+    typeof window !== 'undefined' ? window.matchMedia('(min-width: 1024px)').matches : false
+  );
+  useEffect(() => {
+    const mq = window.matchMedia('(min-width: 1024px)');
+    const apply = () => setIsDesktopHero(mq.matches);
+    apply();
+    mq.addEventListener('change', apply);
+    return () => mq.removeEventListener('change', apply);
+  }, []);
+
   const { data } = useQuery({
     queryKey: ['activeMovies'],
     queryFn: ({ signal }) => getAllActiveMoviesToday({ signal }),
@@ -94,8 +105,14 @@ export default function HeroSection() {
 
   const heroItem = useMemo(() => siteMedia?.items?.find((it: any) => it.section === 'hero_section'), [siteMedia]);
 
-  const heroVideoSrc = optimizeCloudinaryVideoUrl(heroItem?.url as string, 720, 'auto:low');
-  const heroVideoThumbnail = getCloudinaryThumbnail(heroItem?.url as string, 448);
+  const heroVideoSrc = useMemo(
+    () => optimizeCloudinaryVideoUrl(heroItem?.url as string, isDesktopHero ? 720 : 480, 'auto:low'),
+    [heroItem, isDesktopHero]
+  );
+  const heroVideoThumbnail = useMemo(
+    () => getCloudinaryThumbnail(heroItem?.url as string, isDesktopHero ? 448 : 360),
+    [heroItem, isDesktopHero]
+  );
   const [hasStarted, setHasStarted] = useState(false);
 
   // Use static images and map to movies from API
@@ -119,12 +136,31 @@ export default function HeroSection() {
     return () => clearInterval(interval);
   }, [moviePosters.length]);
 
-  // Preload images to prevent flashing
+  // Preload first poster only; defer second to idle (saves bandwidth on mobile)
   useEffect(() => {
-    moviePosters.forEach((src) => {
-      const img = new Image();
-      img.src = src;
-    });
+    const first = moviePosters[0];
+    if (!first) return;
+    const img = new Image();
+    img.src = first;
+    if (moviePosters.length < 2) return;
+    let cancelled = false;
+    const loadSecond = () => {
+      if (cancelled) return;
+      const img2 = new Image();
+      img2.src = moviePosters[1];
+    };
+    let idleId: number | undefined;
+    let timeoutId: number | undefined;
+    if (typeof requestIdleCallback !== 'undefined') {
+      idleId = requestIdleCallback(loadSecond) as unknown as number;
+    } else {
+      timeoutId = window.setTimeout(loadSecond, 400) as unknown as number;
+    }
+    return () => {
+      cancelled = true;
+      if (idleId !== undefined) cancelIdleCallback(idleId);
+      if (timeoutId !== undefined) clearTimeout(timeoutId);
+    };
   }, [moviePosters]);
 
   // Pause video on mount and set preview frame
@@ -285,12 +321,13 @@ export default function HeroSection() {
   };
 
   return (
-    <section
-      id="hero"
-      className="relative min-h-screen overflow-hidden bg-gradient-to-br from-[#050915] via-[#0b1226] to-[#0e1b3d] text-white pt-24"
-      onMouseMove={onMove}
-      onMouseEnter={onMouseEnter}
-    >
+    <LazyMotion features={domAnimation} strict>
+      <section
+        id="hero"
+        className="relative min-h-screen overflow-hidden bg-gradient-to-br from-[#050915] via-[#0b1226] to-[#0e1b3d] text-white pt-24"
+        onMouseMove={isDesktopHero ? onMove : undefined}
+        onMouseEnter={isDesktopHero ? onMouseEnter : undefined}
+      >
       {/* Gradient overlays */}
       <div className="absolute inset-0 bg-black">
         {' '}
@@ -301,7 +338,7 @@ export default function HeroSection() {
 
       {/* Animated background blobs - Optimized with hardware acceleration */}
       <div className="absolute -left-24 top-10 w-[520px] h-[520px] rounded-full bg-cyan-500/15 blur-[120px] animate-pulse pointer-events-none" />
-      <motion.div
+      <m.div
         className="absolute -right-16 top-32 w-[420px] h-[420px] rounded-full bg-fuchsia-500/15 blur-[120px] pointer-events-none"
         style={{
           x: blobX,
@@ -311,15 +348,15 @@ export default function HeroSection() {
       />
 
       <div className="container mx-auto px-4 relative z-10 min-h-[calc(100vh-6rem)] flex flex-col justify-center py-20">
-        <div className="grid lg:grid-cols-2 gap-12 items-center">
+        <div className="grid lg:grid-cols-2 gap-10 lg:gap-12 items-center">
           {/* Left Content */}
-          <motion.div
+          <m.div
             initial={{ opacity: 0, x: -30 }}
             animate={{ opacity: 1, x: 0 }}
             transition={{ duration: 0.8, ease: 'easeOut' }}
             className="max-w-3xl space-y-6"
           >
-            <motion.h1
+            <m.h1
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.3 }}
@@ -329,9 +366,9 @@ export default function HeroSection() {
                 CINESPHERE
               </span>
               <span className="text-white text-3xl md:text-3xl lg:text-5xl">Huyễn cảnh không gian</span>
-            </motion.h1>
+            </m.h1>
 
-            <motion.p
+            <m.p
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.4 }}
@@ -339,9 +376,9 @@ export default function HeroSection() {
             >
               Dùng không gian nhỏ mô phỏng thế giới vô biên. Mỗi suất chiếu là một hành trình nhập vai với độ phân giải
               8K và âm thanh đa tầng bao quanh
-            </motion.p>
+            </m.p>
 
-            <motion.div
+            <m.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.5 }}
@@ -359,10 +396,10 @@ export default function HeroSection() {
                   <Play className="h-5 w-5 group-hover:translate-x-1 transition-transform" />
                 </span>
               </Button>
-            </motion.div>
+            </m.div>
 
             {/* Feature Cards */}
-            <motion.div
+            <m.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.6 }}
@@ -385,7 +422,7 @@ export default function HeroSection() {
                   desc: 'Màn hình đa chiều siêu nét'
                 }
               ].map(({ icon: Icon, title, desc }, idx) => (
-                <motion.div
+                <m.div
                   key={title}
                   initial={{ opacity: 0, y: 24 }}
                   animate={{ opacity: 1, y: 0 }}
@@ -407,27 +444,27 @@ export default function HeroSection() {
                       <p className="text-sm text-gray-300">{desc}</p>
                     </div>
                   </div>
-                </motion.div>
+                </m.div>
               ))}
-            </motion.div>
-          </motion.div>
+            </m.div>
+          </m.div>
 
-          {/* Right Video Section - Optimized with Click-to-Play */}
-          <motion.div
+          {/* Video — visible on all breakpoints; click-to-play saves data on mobile */}
+          <m.div
             initial={{ opacity: 0, x: 30 }}
             animate={{ opacity: 1, x: 0 }}
             transition={{ duration: 0.8, delay: 0.3, ease: 'easeOut' }}
-            className="relative hidden lg:block z-40"
+            className="relative z-40 w-full max-w-[min(100%,20rem)] sm:max-w-md mx-auto mt-4 lg:mt-0"
           >
             <div
               ref={videoContainerRef}
-              className="relative w-full max-w-md mx-auto aspect-[9/16] rounded-3xl overflow-hidden border-2 border-white/20 bg-black backdrop-blur-xl shadow-2xl group cursor-pointer"
+              className="relative w-full aspect-[9/16] rounded-2xl sm:rounded-3xl overflow-hidden border-2 border-white/20 bg-black backdrop-blur-xl shadow-2xl group cursor-pointer"
               onClick={!hasStarted ? toggleVideoPlayback : undefined}
             >
               <AnimatePresence mode="wait">
                 {!hasStarted ? (
                   /* Placeholder Image - HIGH PRIORITY FOR LCP */
-                  <motion.div
+                  <m.div
                     key="placeholder"
                     initial={{ opacity: 1 }}
                     exit={{ opacity: 0 }}
@@ -440,6 +477,7 @@ export default function HeroSection() {
                       height={796}
                       className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
                       loading="eager"
+                      fetchPriority="high"
                     />
                     {/* Play Button Overlay */}
                     <div className="absolute inset-0 flex items-center justify-center bg-black/20 group-hover:bg-black/10 transition-colors">
@@ -447,10 +485,10 @@ export default function HeroSection() {
                         <Play className="h-10 w-10 text-white ml-1" fill="white" />
                       </div>
                     </div>
-                  </motion.div>
+                  </m.div>
                 ) : (
                   /* Video - Only rendered after click */
-                  <motion.div
+                  <m.div
                     key="video"
                     initial={{ opacity: 0 }}
                     animate={{ opacity: 1 }}
@@ -478,7 +516,7 @@ export default function HeroSection() {
                         className="absolute inset-0 flex items-center justify-center"
                         aria-label={isVideoPlaying ? 'Pause video' : 'Play video'}
                       >
-                        <motion.div
+                        <m.div
                           animate={{
                             scale: isVideoPlaying ? 0 : 1,
                             opacity: isVideoPlaying ? 0 : 1
@@ -486,10 +524,10 @@ export default function HeroSection() {
                           className="w-16 h-16 rounded-full bg-black/40 backdrop-blur-sm flex items-center justify-center border border-white/20"
                         >
                           <Play className="h-8 w-8 text-white ml-1" fill="white" />
-                        </motion.div>
+                        </m.div>
                       </button>
                     </div>
-                  </motion.div>
+                  </m.div>
                 )}
               </AnimatePresence>
 
@@ -507,7 +545,7 @@ export default function HeroSection() {
                 <p className="text-gray-300 text-xs">Phòng chiếu 360° Đa Chiều</p>
               </div>
             </div>
-          </motion.div>
+          </m.div>
         </div>
       </div>
 
@@ -640,6 +678,7 @@ export default function HeroSection() {
           )}
         </DialogContent>
       </Dialog>
-    </section>
+      </section>
+    </LazyMotion>
   );
 }
