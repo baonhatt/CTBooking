@@ -238,7 +238,9 @@ export default function FilmCarousel({ onSelectFilm }: FilmCarouselProps) {
                         alt={film.title}
                         width={280}
                         height={320}
-                        loading="lazy"
+                        loading={index === 0 ? 'eager' : 'lazy'}
+                        fetchPriority={index === 0 ? 'high' : 'low'}
+                        decoding="async"
                         className="absolute object-cover inset-0 w-full h-full transition-transform duration-500 group-hover:scale-105"
                       />
                       <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/30 to-transparent" />
