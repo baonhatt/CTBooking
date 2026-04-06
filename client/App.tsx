@@ -6,6 +6,7 @@ import { TooltipProvider } from '@/components/ui/tooltip';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { lazy, Suspense } from 'react';
+import LoadingScreen from './components/LoadingScreen';
 import { HelmetProvider } from 'react-helmet-async';
 import Index from './pages/user/Index';
 
@@ -139,7 +140,7 @@ const App = () => (
           }}
         />
         <BrowserRouter>
-          <Suspense fallback={null}>
+          <Suspense fallback={<LoadingScreen />}>
             <Routes>
               <Route path="/" element={<Index />} />
               <Route path="/checkout" element={<Checkout />} />
