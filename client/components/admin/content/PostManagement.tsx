@@ -39,14 +39,9 @@ interface PostData {
 
 function getPlainTextFromHtml(value?: string) {
   if (!value) return '';
-
   if (typeof document === 'undefined') {
-    return value
-      .replace(/<[^>]+>/g, ' ')
-      .replace(/\s+/g, ' ')
-      .trim();
+    return value.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
   }
-
   const temp = document.createElement('div');
   temp.innerHTML = value;
   return temp.textContent?.replace(/\s+/g, ' ').trim() || '';
@@ -126,14 +121,7 @@ export const PostManagement = () => {
   const totalPages = useMemo(() => Math.max(1, Math.ceil(totalPosts / pageSize)), [totalPosts]);
 
   const handleCreate = () => {
-    const next = {
-      id: 0,
-      title: '',
-      content: '',
-      excerpt: '',
-      status: 'draft',
-      is_featured: false
-    };
+    const next = { id: 0, title: '', content: '', excerpt: '', status: 'draft', is_featured: false };
     setEditData(next);
     initialSnapshotRef.current = snapshotEditData(next);
     setIsEditOpen(true);
@@ -159,7 +147,6 @@ export const PostManagement = () => {
     try {
       const isNew = !editData.id;
 
-      // Upload ảnh thẳng lên Cloudinary từ browser, lấy URL
       let featuredImageUrl: string | undefined = editData.imageFile ? undefined : editData.featured_image;
       if (editData.imageFile) {
         try {
@@ -172,7 +159,6 @@ export const PostManagement = () => {
         }
       }
 
-      // Flow: tạo mới luôn là nháp. Xuất bản chỉ thực hiện khi edit bài đã tồn tại.
       const nextStatus: 'draft' | 'published' | 'archived' =
         isNew ? 'draft' : overrideStatus || (editData.status as any) || 'draft';
 
@@ -203,9 +189,83 @@ export const PostManagement = () => {
     }
   };
 
+  // ─── Status badge helper ───────────────────────────────────────────────────
+  const StatusBadge = ({ status }: { status: string }) => {
+    if (status === 'published')
+      return (
+        <span className="inline-flex items-center gap-1 bg-emerald-100 text-emerald-700 border border-emerald-200 px-2 py-0.5 rounded-full text-[10px] font-bold uppercase">
+          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+          Đã xuất bản
+        </span>
+      );
+    if (status === 'draft')
+      return (
+        <span className="inline-flex items-center gap-1 bg-amber-100 text-amber-700 border border-amber-200 px-2 py-0.5 rounded-full text-[10px] font-bold uppercase">
+          Nháp
+        </span>
+      );
+    return (
+      <span className="inline-flex items-center gap-1 bg-slate-100 text-slate-500 border border-slate-200 px-2 py-0.5 rounded-full text-[10px] font-bold uppercase">
+        Lưu trữ
+      </span>
+    );
+  };
+
+  // ─── Save action buttons ───────────────────────────────────────────────────
+  const renderSaveButtons = () => {
+    if (!editData.id) {
+      return (
+        <Button
+          onClick={() => handleSave('draft')}
+          disabled={isSaving}
+          className="rounded-xl bg-blue-600 hover:bg-blue-700"
+        >
+          {isSaving ? 'Đang lưu...' : 'Tạo nháp'}
+        </Button>
+      );
+    }
+    return (
+      <>
+        <Button
+          onClick={() => handleSave(undefined)}
+          disabled={isSaving}
+          className="rounded-xl bg-blue-600 hover:bg-blue-700"
+        >
+          {isSaving ? 'Đang lưu...' : 'Lưu'}
+        </Button>
+        {editData.status === 'published' ? (
+          <Button
+            onClick={() => handleSave('archived')}
+            disabled={isSaving}
+            className="rounded-xl bg-slate-600 hover:bg-slate-700"
+          >
+            Gỡ phát hành
+          </Button>
+        ) : editData.status === 'archived' ? (
+          <Button
+            onClick={() => handleSave('draft')}
+            disabled={isSaving}
+            className="rounded-xl bg-amber-600 hover:bg-amber-700"
+          >
+            Chuyển sang nháp
+          </Button>
+        ) : (
+          <Button
+            onClick={() => handleSave('published')}
+            disabled={isSaving}
+            className="rounded-xl bg-emerald-600 hover:bg-emerald-700"
+          >
+            Xuất bản
+          </Button>
+        )}
+      </>
+    );
+  };
+
   return (
     <div className="space-y-6">
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-white p-4 rounded-2xl border shadow-sm">
+      {/* ── Toolbar ─────────────────────────────────────────────────────────── */}
+      <div className="flex flex-col min-h-0 md:flex-row justify-between items-start md:items-center gap-4 bg-white p-4 rounded-2xl border shadow-sm">
         <div className="flex flex-col gap-1">
           <h3 className="text-lg font-bold text-slate-900">Quản lý bài viết</h3>
           <p className="text-xs text-slate-500">Tổng cộng {totalPosts} bài viết</p>
@@ -217,20 +277,14 @@ export const PostManagement = () => {
               type="text"
               placeholder="Tìm kiếm bài viết..."
               value={searchQuery}
-              onChange={(e) => {
-                setSearchQuery(e.target.value);
-                setCurrentPage(1);
-              }}
+              onChange={(e) => { setSearchQuery(e.target.value); setCurrentPage(1); }}
               className="w-full pl-10 pr-4 py-2 bg-slate-50 border-transparent focus:bg-white focus:ring-2 focus:ring-blue-500 rounded-xl transition-all outline-none text-sm border"
             />
           </div>
           <div className="flex gap-2 items-center">
             <select
               value={statusFilter}
-              onChange={(e) => {
-                setStatusFilter(e.target.value);
-                setCurrentPage(1);
-              }}
+              onChange={(e) => { setStatusFilter(e.target.value); setCurrentPage(1); }}
               className="px-3 py-2 bg-slate-50 rounded-xl border border-slate-200 text-sm font-medium"
             >
               <option value="all">Tất cả</option>
@@ -256,6 +310,7 @@ export const PostManagement = () => {
         </div>
       </div>
 
+      {/* ── Table ───────────────────────────────────────────────────────────── */}
       <Card className="border-none shadow-xl shadow-slate-200/50 rounded-2xl overflow-hidden bg-white">
         <CardContent className="p-0">
           <Table>
@@ -266,35 +321,23 @@ export const PostManagement = () => {
                 <TableHead className="text-[10px] uppercase font-bold text-slate-500 text-center w-[140px]">Trạng thái</TableHead>
                 <TableHead className="text-[10px] uppercase font-bold text-slate-500 text-center w-[120px]">Xuất bản</TableHead>
                 <TableHead className="text-[10px] uppercase font-bold text-slate-500 text-center w-[100px]">Lượt xem</TableHead>
-                <TableHead className="text-right text-[10px] uppercase font-bold text-slate-500 pr-6 w-[90px]">
-                  Thao tác
-                </TableHead>
+                <TableHead className="text-right text-[10px] uppercase font-bold text-slate-500 pr-6 w-[90px]">Thao tác</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {isLoading ? (
                 Array.from({ length: 5 }).map((_, idx) => (
                   <TableRow key={`sk-${idx}`}>
-                    <TableCell>
-                      <Skeleton className="h-4 w-8 mx-auto" />
-                    </TableCell>
-                    <TableCell>
-                      <Skeleton className="h-4 w-64 " />
-                    </TableCell>
-                    <TableCell>
-                      <Skeleton className="h-5 w-20 mx-auto" />
-                    </TableCell>
-                    <TableCell>
-                      <Skeleton className="h-4 w-24 mx-auto" />
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <Skeleton className="h-8 w-24 ml-auto" />
-                    </TableCell>
+                    <TableCell><Skeleton className="h-4 w-8 mx-auto" /></TableCell>
+                    <TableCell><Skeleton className="h-4 w-64" /></TableCell>
+                    <TableCell><Skeleton className="h-5 w-20 mx-auto" /></TableCell>
+                    <TableCell><Skeleton className="h-4 w-24 mx-auto" /></TableCell>
+                    <TableCell className="text-right"><Skeleton className="h-8 w-24 ml-auto" /></TableCell>
                   </TableRow>
                 ))
               ) : posts.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={5} className="text-center h-32 text-muted-foreground italic">
+                  <TableCell colSpan={6} className="text-center h-32 text-muted-foreground italic">
                     <div className="flex flex-col items-center gap-2">
                       <FileText size={32} className="opacity-20" />
                       <span>Chưa có bài viết nào</span>
@@ -311,46 +354,33 @@ export const PostManagement = () => {
                           <img
                             src={post.featured_image}
                             alt={post.title}
-                            className="w-12 h-12 rounded-lg object-cover border border-slate-200"
+                            className="w-12 h-12 rounded-lg object-cover border border-slate-200 shrink-0"
                           />
                         )}
                         <div>
                           <div className="font-bold text-slate-700 line-clamp-2">{post.title}</div>
                           {post.excerpt && <div className="text-xs text-slate-400 line-clamp-2">{post.excerpt}</div>}
-                          {post.is_featured ? (
+                          {post.is_featured && (
                             <span className="inline-flex mt-1 items-center rounded-full bg-cyan-100 text-cyan-700 border border-cyan-200 px-2 py-0.5 text-[10px] font-bold uppercase">
                               Nổi bật
                             </span>
-                          ) : null}
+                          )}
                         </div>
                       </div>
                     </TableCell>
                     <TableCell className="text-center">
-                      {post.status === 'published' ? (
-                        <span className="inline-flex items-center gap-1 bg-emerald-100 text-emerald-700 border border-emerald-200 px-2 py-0.5 rounded-full text-[10px] font-bold uppercase">
-                          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                          Đã xuất bản
-                        </span>
-                      ) : post.status === 'draft' ? (
-                        <span className="inline-flex items-center gap-1 bg-amber-100 text-amber-700 border border-amber-200 px-2 py-0.5 rounded-full text-[10px] font-bold uppercase">
-                          Nháp
-                        </span>
-                      ) : (
-                        <span className="inline-flex items-center gap-1 bg-slate-100 text-slate-500 border border-slate-200 px-2 py-0.5 rounded-full text-[10px] font-bold uppercase">
-                          Lưu trữ
-                        </span>
-                      )}
+                      <StatusBadge status={post.status} />
                     </TableCell>
                     <TableCell className="text-center text-xs text-slate-500">
                       {post.published_at ? new Date(post.published_at).toLocaleDateString('vi-VN') : '---'}
                     </TableCell>
                     <TableCell className="text-center">
-                       <span className="inline-flex items-center gap-1.5 text-xs font-mono text-slate-600 bg-slate-100 px-2 py-1 rounded-md">
-                          <Eye className="w-3 h-3" />
-                          {post.view_count || 0}
-                       </span>
+                      <span className="inline-flex items-center gap-1.5 text-xs font-mono text-slate-600 bg-slate-100 px-2 py-1 rounded-md">
+                        <Eye className="w-3 h-3" />
+                        {post.view_count || 0}
+                      </span>
                     </TableCell>
-                    <TableCell className="text-right space-x-2">
+                    <TableCell className="text-right">
                       <Button
                         variant="ghost"
                         size="icon"
@@ -369,15 +399,13 @@ export const PostManagement = () => {
         </CardContent>
       </Card>
 
+      {/* ── Pagination ──────────────────────────────────────────────────────── */}
       <Pagination className="mt-4">
         <PaginationContent>
           <PaginationItem>
             <PaginationPrevious
               href="#"
-              onClick={(e) => {
-                e.preventDefault();
-                if (currentPage > 1) setCurrentPage(currentPage - 1);
-              }}
+              onClick={(e) => { e.preventDefault(); if (currentPage > 1) setCurrentPage(currentPage - 1); }}
             />
           </PaginationItem>
           {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
@@ -385,10 +413,7 @@ export const PostManagement = () => {
               <PaginationLink
                 href="#"
                 isActive={page === currentPage}
-                onClick={(e) => {
-                  e.preventDefault();
-                  setCurrentPage(page);
-                }}
+                onClick={(e) => { e.preventDefault(); setCurrentPage(page); }}
               >
                 {page}
               </PaginationLink>
@@ -397,286 +422,233 @@ export const PostManagement = () => {
           <PaginationItem>
             <PaginationNext
               href="#"
-              onClick={(e) => {
-                e.preventDefault();
-                if (currentPage < totalPages) setCurrentPage(currentPage + 1);
-              }}
+              onClick={(e) => { e.preventDefault(); if (currentPage < totalPages) setCurrentPage(currentPage + 1); }}
             />
           </PaginationItem>
         </PaginationContent>
       </Pagination>
 
-      {/* Edit/Create Dialog */}
+      {/* ── Edit / Create Dialog ─────────────────────────────────────────────
+           Cấu trúc chuẩn để scroll hoạt động:
+           DialogContent  h-[92vh]  flex flex-col
+             ├─ Header    shrink-0
+             ├─ Body      flex-1  min-h-0  overflow-y-auto   ← scroll tại đây
+             └─ Footer    shrink-0
+      ──────────────────────────────────────────────────────────────────────── */}
       <Dialog
         open={isEditOpen}
-        onOpenChange={(next) => {
-          if (next) setIsEditOpen(true);
-        }}
+        onOpenChange={(next) => { if (next) setIsEditOpen(true); }}
       >
         <DialogContent
-          className="max-w-6xl w-[95vw] h-[92vh] p-0 overflow-hidden bg-white [&>button]:hidden"
+          className="max-w-6xl w-[95vw] h-[92vh] p-0 overflow-hidden bg-white flex flex-col [&>button]:hidden"
           onPointerDownOutside={(e) => e.preventDefault()}
           onInteractOutside={(e) => e.preventDefault()}
           onEscapeKeyDown={(e) => e.preventDefault()}
           onOpenAutoFocus={(e) => e.preventDefault()}
         >
-          <div className="flex flex-col h-full">
-            {/* Header */}
-            <div className="px-6 py-4 border-b bg-slate-900 text-white flex items-center justify-between">
-              <div className="min-w-0">
-                <DialogHeader>
-                  <DialogTitle className="text-white">
-                    {editData.id ? 'Chỉnh sửa bài viết' : 'Tạo bài viết mới'}
-                  </DialogTitle>
-                </DialogHeader>
-                <p className="text-[10px] text-slate-300 font-bold uppercase tracking-widest mt-1">
-                  {hasUnsavedChanges() ? 'Đang nhập liệu • Chưa lưu' : 'Sẵn sàng'}
-                </p>
-              </div>
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={() => requestClose(false)}
-                className="h-9 w-9 text-slate-300 hover:text-white hover:bg-white/10 rounded-full"
-                title="Đóng"
-              >
-                <X size={18} />
-              </Button>
+          {/* Header — cố định trên cùng */}
+          <div className="shrink-0 px-6 py-4 border-b bg-slate-900 text-white flex items-center justify-between">
+            <div className="min-w-0">
+              <DialogHeader>
+                <DialogTitle className="text-white">
+                  {editData.id ? 'Chỉnh sửa bài viết' : 'Tạo bài viết mới'}
+                </DialogTitle>
+              </DialogHeader>
+              <p className="text-[10px] text-slate-300 font-bold uppercase tracking-widest mt-1">
+                {hasUnsavedChanges() ? 'Đang nhập liệu • Chưa lưu' : 'Sẵn sàng'}
+              </p>
             </div>
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => requestClose(false)}
+              className="h-9 w-9 text-slate-300 hover:text-white hover:bg-white/10 rounded-full"
+              title="Đóng"
+            >
+              <X size={18} />
+            </Button>
+          </div>
 
-            {/* Body */}
-            <div className="flex-1 bg-slate-50 min-h-0 overflow-y-scroll scrollbar-neon scrollbar-gutter-stable">
-              <div className="grid grid-cols-12 gap-6 p-6">
-                {/* Left: Form */}
-                <div className="col-span-8 pr-2">
-                  <div className="bg-white rounded-2xl border shadow-sm p-5 space-y-5">
-                    <div className="grid grid-cols-12 gap-4 items-start">
-                      <div className="col-span-8">
-                        <Label>Tiêu đề</Label>
-                        <Textarea
-                          className="mt-2 min-h-[44px] resize-y"
-                          value={editData.title || ''}
-                          onChange={(e) => setEditData({ ...editData, title: e.target.value })}
-                          placeholder="Nhập tiêu đề bài viết..."
-                        />
-                        <p className="mt-2 text-[11px] text-slate-500 flex items-center gap-1.5">
-                          <Link2 className="w-3.5 h-3.5 text-slate-400" />
-                          Slug dự kiến: <span className="font-mono text-slate-700">{makeSlug(editData.title || '') || '---'}</span>
-                        </p>
-                      </div>
-                      <div className="col-span-4">
-                        <Label>Tóm tắt</Label>
-                        <Textarea
-                          className="mt-2 min-h-[92px] resize-y"
-                          value={editData.excerpt || ''}
-                          onChange={(e) => setEditData({ ...editData, excerpt: e.target.value })}
-                          placeholder="Tóm tắt 1–2 câu..."
-                        />
-                        <p className="mt-2 text-[11px] text-slate-500">
-                          Gợi ý: giữ trong khoảng <strong>120–180 ký tự</strong> để hiển thị đẹp.
-                        </p>
-                      </div>
+          {/* Body — scroll toàn bộ nội dung form */}
+          <div className="flex-1 min-h-0 overflow-y-auto">
+            <div className="grid grid-cols-12 gap-6 p-6 items-start">
+
+              {/* ── Cột trái: Form ────────────────────────────────────────── */}
+              <div className="col-span-8">
+                <div className="bg-white rounded-2xl border shadow-sm p-5 space-y-5">
+
+                  {/* Tiêu đề + Tóm tắt */}
+                  <div className="grid grid-cols-12 gap-4 items-start">
+                    <div className="col-span-8">
+                      <Label>Tiêu đề</Label>
+                      <Textarea
+                        className="mt-2 min-h-[44px] resize-y"
+                        value={editData.title || ''}
+                        onChange={(e) => setEditData({ ...editData, title: e.target.value })}
+                        placeholder="Nhập tiêu đề bài viết..."
+                      />
+                      <p className="mt-2 text-[11px] text-slate-500 flex items-center gap-1.5">
+                        <Link2 className="w-3.5 h-3.5 text-slate-400" />
+                        Slug dự kiến:{' '}
+                        <span className="font-mono text-slate-700">{makeSlug(editData.title || '') || '---'}</span>
+                      </p>
                     </div>
-
-                    <div className="grid grid-cols-12 gap-4">
-                      <div className="col-span-7">
-                        <Label>Ảnh đại diện</Label>
-                        <div className="mt-2 flex items-center gap-3">
-                          <Input
-                            type="file"
-                            accept="image/*"
-                            onChange={(e) => {
-                              const file = e.target.files?.[0];
-                              if (file) {
-                                const url = URL.createObjectURL(file);
-                                setEditData((prev) => ({
-                                  ...prev,
-                                  featured_image: url,
-                                  imageFile: file
-                                }));
-                              }
-                            }}
-                          />
-                          <Button
-                            type="button"
-                            variant="outline"
-                            className="shrink-0 rounded-xl"
-                            onClick={() => setEditData((prev) => ({ ...prev, featured_image: '', imageFile: undefined }))}
-                            disabled={!editData.featured_image}
-                            title="Gỡ ảnh"
-                          >
-                            Gỡ
-                          </Button>
-                        </div>
-                        <p className="mt-2 text-[11px] text-slate-500">
-                          Ảnh này sẽ dùng làm thumbnail trong danh sách & khi share link.
-                        </p>
-                      </div>
-
-                      <div className="col-span-5">
-                        <Label>Thiết lập</Label>
-                        <div className="mt-2 grid grid-cols-1 gap-3">
-                          <div className="flex items-center gap-2 px-3 h-10 border border-slate-200 rounded-xl bg-white">
-                            <Switch
-                              checked={editData.is_featured || false}
-                              onCheckedChange={(checked) => setEditData({ ...editData, is_featured: checked })}
-                            />
-                            <Label className="cursor-pointer">Nổi bật</Label>
-                          </div>
-                        </div>
-                      </div>
+                    <div className="col-span-4">
+                      <Label>Tóm tắt</Label>
+                      <Textarea
+                        className="mt-2 min-h-[92px] resize-y"
+                        value={editData.excerpt || ''}
+                        onChange={(e) => setEditData({ ...editData, excerpt: e.target.value })}
+                        placeholder="Tóm tắt 1–2 câu..."
+                      />
+                      <p className="mt-2 text-[11px] text-slate-500">
+                        Gợi ý: giữ trong khoảng <strong>120–180 ký tự</strong> để hiển thị đẹp.
+                      </p>
                     </div>
+                  </div>
 
-                    <div>
-                      <Label>Nội dung</Label>
+                  {/* Ảnh đại diện + Thiết lập */}
+                  <div className="grid grid-cols-12 gap-4">
+                    <div className="col-span-7">
+                      <Label>Ảnh đại diện</Label>
+                      <div className="mt-2 flex items-center gap-3">
+                        <Input
+                          type="file"
+                          accept="image/*"
+                          onChange={(e) => {
+                            const file = e.target.files?.[0];
+                            if (file) {
+                              const url = URL.createObjectURL(file);
+                              setEditData((prev) => ({ ...prev, featured_image: url, imageFile: file }));
+                            }
+                          }}
+                        />
+                        <Button
+                          type="button"
+                          variant="outline"
+                          className="shrink-0 rounded-xl"
+                          onClick={() => setEditData((prev) => ({ ...prev, featured_image: '', imageFile: undefined }))}
+                          disabled={!editData.featured_image}
+                          title="Gỡ ảnh"
+                        >
+                          Gỡ
+                        </Button>
+                      </div>
+                      <p className="mt-2 text-[11px] text-slate-500">
+                        Ảnh này sẽ dùng làm thumbnail trong danh sách & khi share link.
+                      </p>
+                    </div>
+                    <div className="col-span-5">
+                      <Label>Thiết lập</Label>
                       <div className="mt-2">
-                        <PostRichTextEditor
-                          value={editData.content || ''}
-                          onChange={(content) => setEditData((prev) => ({ ...prev, content }))}
-                        />
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Right: Preview / Tips */}
-                <div className="col-span-4">
-                  <div className="space-y-4">
-                    <div className="bg-white rounded-2xl border shadow-sm overflow-hidden">
-                      <div className="px-5 py-3 bg-slate-50 border-b flex items-center gap-2">
-                        <ImageIcon className="w-4 h-4 text-slate-500" />
-                        <span className="text-[11px] font-black text-slate-500 uppercase tracking-widest">
-                          Preview thumbnail
-                        </span>
-                      </div>
-                      <div className="p-5">
-                        {editData.featured_image ? (
-                          <img
-                            src={editData.featured_image}
-                            alt="Preview"
-                            className="w-full aspect-[16/10] rounded-xl object-cover border border-slate-200"
+                        <div className="flex items-center gap-2 px-3 h-10 border border-slate-200 rounded-xl bg-white">
+                          <Switch
+                            checked={editData.is_featured || false}
+                            onCheckedChange={(checked) => setEditData({ ...editData, is_featured: checked })}
                           />
-                        ) : (
-                          <div className="w-full aspect-[16/10] rounded-xl border border-dashed border-slate-200 bg-slate-50 flex items-center justify-center text-slate-400 text-xs italic">
-                            Chưa chọn ảnh đại diện
-                          </div>
-                        )}
-                        <div className="mt-4 space-y-1">
-                          <p className="text-sm font-black text-slate-900 line-clamp-2">
-                            {editData.title?.trim() || 'Tiêu đề bài viết...'}
-                          </p>
-                          <p className="text-xs text-slate-500 line-clamp-2">
-                            {editData.excerpt?.trim() || 'Tóm tắt ngắn (excerpt) sẽ hiện ở danh sách / SEO...'}
-                          </p>
+                          <Label className="cursor-pointer">Nổi bật</Label>
                         </div>
                       </div>
                     </div>
+                  </div>
 
-                    <div className="bg-blue-50 border border-blue-100 rounded-2xl p-5">
-                      <p className="text-[10px] font-black text-blue-600 uppercase tracking-widest mb-2">Gợi ý nhập liệu</p>
-                      <ul className="text-xs text-slate-700 space-y-2 leading-relaxed">
-                        <li>
-                          <strong>Tiêu đề</strong>: 6–12 từ, rõ chủ đề. Tránh viết HOA toàn bộ.
-                        </li>
-                        <li>
-                          <strong>Tóm tắt</strong>: 1–2 câu giúp người đọc hiểu nhanh.
-                        </li>
-                        <li>
-                          <strong>Ảnh đại diện</strong>: ưu tiên ảnh ngang tỉ lệ 16:10 hoặc 16:9.
-                        </li>
-                        <li>
-                          <strong>Nội dung</strong>: dùng heading để chia đoạn, chèn ảnh minh họa khi cần.
-                        </li>
-                      </ul>
+                  {/* Rich text editor — không giới hạn chiều cao, body tự scroll */}
+                  <div>
+                    <Label>Nội dung</Label>
+                    <div className="mt-2">
+                      <PostRichTextEditor
+                        value={editData.content || ''}
+                        onChange={(content) => setEditData((prev) => ({ ...prev, content }))}
+                      />
                     </div>
                   </div>
                 </div>
               </div>
-            </div>
 
-            {/* Footer */}
-            <div className="px-6 py-4 border-t bg-white flex items-center justify-between shrink-0 sticky bottom-0 z-20">
-              <span className="text-[11px] text-slate-500">
-                {hasUnsavedChanges() ? 'Có thay đổi chưa lưu' : 'Không có thay đổi'}
-              </span>
-              <div className="flex items-center gap-2 flex-wrap justify-end">
-                <Button
-                  variant="outline"
-                  className="rounded-xl"
-                  onClick={() => setIsPreviewOpen(true)}
-                  disabled={!editData.title?.trim() && !getPlainTextFromHtml(editData.content)}
-                >
-                  <Eye className="w-4 h-4 mr-1.5" />
-                  Preview
-                </Button>
-                <Button variant="outline" className="rounded-xl" onClick={() => requestClose(false)} disabled={isSaving}>
-                  Hủy
-                </Button>
-                {editData.id ? (
-                  <>
-                    <Button
-                      onClick={() => handleSave(undefined)}
-                      disabled={isSaving}
-                      className="rounded-xl bg-blue-600 hover:bg-blue-700"
-                    >
-                      {isSaving ? 'Đang lưu...' : 'Lưu'}
-                    </Button>
-                    {editData.status === 'published' ? (
-                      <Button
-                        onClick={() => handleSave('archived')}
-                        disabled={isSaving}
-                        className="rounded-xl bg-slate-600 hover:bg-slate-700"
-                        title="Gỡ phát hành (chuyển sang lưu trữ)"
-                      >
-                        Gỡ phát hành
-                      </Button>
-                    ) : editData.status === 'archived' ? (
-                      <Button
-                        onClick={() => handleSave('draft')}
-                        disabled={isSaving}
-                        className="rounded-xl bg-amber-600 hover:bg-amber-700"
-                        title="Chuyển bài viết về bản nháp"
-                      >
-                        Chuyển sang nháp
-                      </Button>
+              {/* ── Cột phải: Preview + Gợi ý — sticky ──────────────────── */}
+              <div className="col-span-4 sticky top-0 space-y-4">
+                {/* Preview thumbnail */}
+                <div className="bg-white rounded-2xl border shadow-sm overflow-hidden">
+                  <div className="px-5 py-3 bg-slate-50 border-b flex items-center gap-2">
+                    <ImageIcon className="w-4 h-4 text-slate-500" />
+                    <span className="text-[11px] font-black text-slate-500 uppercase tracking-widest">
+                      Preview thumbnail
+                    </span>
+                  </div>
+                  <div className="p-5">
+                    {editData.featured_image ? (
+                      <img
+                        src={editData.featured_image}
+                        alt="Preview"
+                        className="w-full aspect-[16/10] rounded-xl object-cover border border-slate-200"
+                      />
                     ) : (
-                      <Button
-                        onClick={() => handleSave('published')}
-                        disabled={isSaving}
-                        className="rounded-xl bg-emerald-600 hover:bg-emerald-700"
-                        title="Xuất bản bài viết"
-                      >
-                        Xuất bản
-                      </Button>
+                      <div className="w-full aspect-[16/10] rounded-xl border border-dashed border-slate-200 bg-slate-50 flex items-center justify-center text-slate-400 text-xs italic">
+                        Chưa chọn ảnh đại diện
+                      </div>
                     )}
-                  </>
-                ) : (
-                  <Button
-                    onClick={() => handleSave('draft')}
-                    disabled={isSaving}
-                    className="rounded-xl bg-blue-600 hover:bg-blue-700"
-                  >
-                    {isSaving ? 'Đang lưu...' : 'Tạo nháp'}
-                  </Button>
-                )}
+                    <div className="mt-4 space-y-1">
+                      <p className="text-sm font-black text-slate-900 line-clamp-2">
+                        {editData.title?.trim() || 'Tiêu đề bài viết...'}
+                      </p>
+                      <p className="text-xs text-slate-500 line-clamp-2">
+                        {editData.excerpt?.trim() || 'Tóm tắt ngắn (excerpt) sẽ hiện ở danh sách / SEO...'}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Gợi ý nhập liệu */}
+                <div className="bg-blue-50 border border-blue-100 rounded-2xl p-5">
+                  <p className="text-[10px] font-black text-blue-600 uppercase tracking-widest mb-2">Gợi ý nhập liệu</p>
+                  <ul className="text-xs text-slate-700 space-y-2 leading-relaxed">
+                    <li><strong>Tiêu đề</strong>: 6–12 từ, rõ chủ đề. Tránh viết HOA toàn bộ.</li>
+                    <li><strong>Tóm tắt</strong>: 1–2 câu giúp người đọc hiểu nhanh.</li>
+                    <li><strong>Ảnh đại diện</strong>: ưu tiên ảnh ngang tỉ lệ 16:10 hoặc 16:9.</li>
+                    <li><strong>Nội dung</strong>: dùng heading để chia đoạn, chèn ảnh minh họa khi cần.</li>
+                  </ul>
+                </div>
               </div>
+
+            </div>
+          </div>
+
+          {/* Footer — cố định dưới cùng */}
+          <div className="shrink-0 px-6 py-4 border-t bg-white flex items-center justify-between">
+            <span className="text-[11px] text-slate-500">
+              {hasUnsavedChanges() ? 'Có thay đổi chưa lưu' : 'Không có thay đổi'}
+            </span>
+            <div className="flex items-center gap-2 flex-wrap justify-end">
+              <Button
+                variant="outline"
+                className="rounded-xl"
+                onClick={() => setIsPreviewOpen(true)}
+                disabled={!editData.title?.trim() && !getPlainTextFromHtml(editData.content)}
+              >
+                <Eye className="w-4 h-4 mr-1.5" />
+                Preview
+              </Button>
+              <Button variant="outline" className="rounded-xl" onClick={() => requestClose(false)} disabled={isSaving}>
+                Hủy
+              </Button>
+              {renderSaveButtons()}
             </div>
           </div>
         </DialogContent>
       </Dialog>
 
+      {/* ── Preview Dialog ───────────────────────────────────────────────────── */}
       <Dialog open={isPreviewOpen} onOpenChange={setIsPreviewOpen}>
         <DialogContent className="max-w-4xl w-[95vw] h-[90vh] p-0 overflow-hidden bg-white">
           <div className="h-full overflow-y-auto bg-slate-50">
             <article className="max-w-3xl mx-auto p-6 md:p-8 space-y-6">
-              {editData.featured_image ? (
+              {editData.featured_image && (
                 <img
                   src={editData.featured_image}
                   alt={editData.title || 'Ảnh đại diện bài viết'}
                   className="w-full aspect-[16/9] object-cover rounded-2xl border border-slate-200 shadow-sm"
                 />
-              ) : null}
-
+              )}
               <header className="space-y-3">
                 <h1 className="text-2xl md:text-3xl font-black tracking-tight text-slate-900">
                   {editData.title?.trim() || 'Tiêu đề bài viết'}
@@ -687,9 +659,10 @@ export const PostManagement = () => {
                   </span>
                   <span>{new Date().toLocaleDateString('vi-VN')}</span>
                 </div>
-                {editData.excerpt?.trim() ? <p className="text-slate-600 leading-7">{editData.excerpt.trim()}</p> : null}
+                {editData.excerpt?.trim() && (
+                  <p className="text-slate-600 leading-7">{editData.excerpt.trim()}</p>
+                )}
               </header>
-
               <section
                 className="prose prose-slate max-w-none prose-img:rounded-xl prose-headings:font-extrabold"
                 dangerouslySetInnerHTML={{
