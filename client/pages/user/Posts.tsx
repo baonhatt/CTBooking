@@ -81,7 +81,7 @@ export default function UserPostsPage() {
                 Cinesphere Editorial
               </p>
               <h1 className="text-3xl md:text-4xl lg:text-5xl font-extrabold text-white tracking-tight">
-                Bài Viết Nổi Bật
+                Tin Tức Nổi Bật
               </h1>
             </div>
 
