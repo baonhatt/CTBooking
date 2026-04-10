@@ -1361,5 +1361,43 @@ export function createServer() {
     }
   });
 
+  // ===== SITEMAP XML =====
+  app.get('/sitemap.xml', async (_req, res) => {
+    try {
+      const baseUrl = (process.env.SITE_URL || process.env.VITE_API_URL || 'https://cinesphere.com.vn').replace(/\/$/, '');
+      const r = await listPostsImpl(db, { posts: pgPosts }, { page: 1, pageSize: 1000, status: 'published' });
+      const posts = r.items as Array<{ id: number; slug?: string | null; updated_at?: Date | string | null }>;
+
+      const now = new Date().toISOString().split('T')[0];
+
+      const staticPages = [
+        { url: '/', priority: '1.0', changefreq: 'weekly' },
+        { url: '/posts', priority: '0.9', changefreq: 'daily' },
+        { url: '/movies', priority: '0.8', changefreq: 'weekly' }
+      ];
+
+      const urlBlocks = [
+        ...staticPages.map(
+          (p) =>
+            `  <url>\n    <loc>${baseUrl}${p.url}</loc>\n    <lastmod>${now}</lastmod>\n    <changefreq>${p.changefreq}</changefreq>\n    <priority>${p.priority}</priority>\n  </url>`
+        ),
+        ...posts.map((p) => {
+          const slug = p.slug ? `${p.slug}-${p.id}` : String(p.id);
+          const lastmod = p.updated_at ? new Date(p.updated_at).toISOString().split('T')[0] : now;
+          return `  <url>\n    <loc>${baseUrl}/posts/${slug}</loc>\n    <lastmod>${lastmod}</lastmod>\n    <changefreq>monthly</changefreq>\n    <priority>0.7</priority>\n  </url>`;
+        })
+      ];
+
+      const xml = `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${urlBlocks.join('\n')}\n</urlset>`;
+
+      res.setHeader('Content-Type', 'application/xml; charset=utf-8');
+      res.setHeader('Cache-Control', 'public, max-age=3600');
+      res.send(xml);
+    } catch {
+      res.status(500).send('Error generating sitemap');
+    }
+  });
+
   return app;
 }
+
