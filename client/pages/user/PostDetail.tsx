@@ -10,6 +10,7 @@ import { Helmet } from 'react-helmet-async';
 type PostDetail = {
   id: number;
   title: string;
+  slug?: string;
   content: string;
   excerpt?: string;
   featured_image?: string;
@@ -17,6 +18,7 @@ type PostDetail = {
   view_count?: number;
   published_at?: string;
   created_at?: string;
+  updated_at?: string;
 };
 
 type RecentViewedPost = {
@@ -121,14 +123,61 @@ export default function UserPostDetailPage() {
     }
   };
 
+  const SITE_BASE = 'https://cinesphere.com.vn';
+  const postUrl = post
+    ? `${SITE_BASE}/posts/${post.slug ? `${post.slug}-${post.id}` : post.id}`
+    : `${SITE_BASE}/posts`;
+  const seoTitle = post?.title ? `${post.title} | Cinesphere` : 'Bài viết | Cinesphere';
+  const seoDesc = post?.excerpt?.trim() || 'Bài viết điện ảnh và công nghệ từ Cinesphere.';
+
   return (
     <UserLayout className="bg-gradient-dark">
       <Helmet>
-        <title>{post?.title ? `${post.title} | Cinesphere` : 'Bài viết | Cinesphere'}</title>
-        <meta name="description" content={post?.excerpt?.trim() || 'Bài viết điện ảnh và công nghệ từ Cinesphere.'} />
+        <title>{seoTitle}</title>
+        <meta name="description" content={seoDesc} />
+        <link rel="canonical" href={postUrl} />
+        <meta name="robots" content="index, follow" />
+
+        {/* Open Graph */}
+        <meta property="og:type" content="article" />
+        <meta property="og:url" content={postUrl} />
+        <meta property="og:title" content={seoTitle} />
+        <meta property="og:description" content={seoDesc} />
+        <meta property="og:site_name" content="Cinesphere" />
         {post?.featured_image && <meta property="og:image" content={post.featured_image} />}
-        <meta property="og:title" content={post?.title ? `${post.title} | Cinesphere` : 'Bài viết | Cinesphere'} />
-        <meta property="og:description" content={post?.excerpt?.trim() || 'Bài viết điện ảnh và công nghệ từ Cinesphere.'} />
+        {post?.featured_image && <meta property="og:image:width" content="1200" />}
+        {post?.featured_image && <meta property="og:image:height" content="630" />}
+        {post?.published_at && <meta property="article:published_time" content={new Date(post.published_at).toISOString()} />}
+        {post?.updated_at && <meta property="article:modified_time" content={new Date(post.updated_at).toISOString()} />}
+
+        {/* Twitter Card */}
+        <meta name="twitter:card" content="summary_large_image" />
+        <meta name="twitter:title" content={seoTitle} />
+        <meta name="twitter:description" content={seoDesc} />
+        {post?.featured_image && <meta name="twitter:image" content={post.featured_image} />}
+
+        {/* JSON-LD Article */}
+        {post && (
+          <script type="application/ld+json">
+            {JSON.stringify({
+              '@context': 'https://schema.org',
+              '@type': 'Article',
+              headline: post.title,
+              description: post.excerpt?.trim() || '',
+              image: post.featured_image ? [post.featured_image] : [],
+              datePublished: new Date(post.published_at || post.created_at || Date.now()).toISOString(),
+              dateModified: new Date(post.updated_at || post.published_at || post.created_at || Date.now()).toISOString(),
+              author: { '@type': 'Organization', name: 'Cinesphere', url: SITE_BASE },
+              publisher: {
+                '@type': 'Organization',
+                name: 'Cinesphere',
+                url: SITE_BASE,
+                logo: { '@type': 'ImageObject', url: `${SITE_BASE}/logo.svg` }
+              },
+              mainEntityOfPage: { '@type': 'WebPage', '@id': postUrl }
+            })}
+          </script>
+        )}
       </Helmet>
       <main className="pb-16">
         {/* Back button */}
@@ -284,7 +333,7 @@ export default function UserPostDetailPage() {
                     {relatedPosts.map((item) => (
                       <Link
                         key={item.id}
-                        to={`/posts/${item.id}`}
+                        to={`/posts/${item.slug ? `${item.slug}-${item.id}` : item.id}`}
                         className="rounded-2xl neon-border bg-white/5 hover:bg-white/[0.1] transition-colors p-4"
                       >
                         {item.featured_image && (
