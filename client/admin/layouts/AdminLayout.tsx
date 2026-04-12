@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { useNavigate } from 'react-router-dom';
 import iconCine from '@/assets/images/iconCine.svg';
@@ -13,7 +13,9 @@ import {
   ScanLine,
   LogOut,
   Settings,
-  Mail
+  Mail,
+  Menu,
+  X
 } from 'lucide-react';
 import { buildUrl } from '@/lib/api/http';
 
@@ -38,8 +40,11 @@ interface Props {
 
 export default function AdminLayout({ active, setActive, adminEmailState, handleLogout, children }: Props) {
   const navigate = useNavigate();
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+
   function go(tab: Props['active']) {
     setActive(tab);
+    setIsSidebarOpen(false); // Close sidebar on mobile when navigating
     if (tab === 'ticket-check') {
       navigate('/admin/ticket-check');
     } else {
@@ -101,15 +106,37 @@ export default function AdminLayout({ active, setActive, adminEmailState, handle
   ].filter((item) => !hiddenTabs.includes(item.key));
 
   return (
-    <div className="min-h-screen grid grid-cols-[260px_1fr]">
-      <aside className="sticky top-0 h-screen overflow-y-auto bg-gradient-to-b from-[#0e1b3d] to-[#15325f] border-r border-white/10 p-4 text-white flex flex-col justify-between">
+    <div className="min-h-screen flex md:grid md:grid-cols-[260px_1fr] flex-col md:flex-row relative">
+      {/* Mobile Overlay */}
+      {isSidebarOpen && (
+        <div 
+          className="fixed inset-0 bg-black/60 z-40 md:hidden" 
+          onClick={() => setIsSidebarOpen(false)} 
+        />
+      )}
+
+      {/* Sidebar */}
+      <aside 
+        className={`fixed inset-y-0 left-0 z-50 w-[260px] transform transition-transform duration-300 ease-in-out md:relative md:translate-x-0
+        ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'}
+        bg-gradient-to-b from-[#0e1b3d] to-[#15325f] border-r border-white/10 p-4 text-white flex flex-col justify-between h-screen overflow-y-auto
+      `}>
         <div>
-          <div className="flex items-center gap-3 mb-4 px-1">
-            <img src={iconCine} alt="CINESPHERE" className="h-10 w-auto" />
-            <div className="font-bold tracking-widest text-sm">CINESPHERE ADMIN</div>
-          </div>
-          <div className="text-[10px] font-bold uppercase tracking-widest text-white/40 mb-6 px-1">
-            {adminEmailState}
+          <div className="flex flex-col mb-4 px-1 gap-1 relative">
+            {/* Mobile close button */}
+            <button 
+              className="absolute top-0 right-0 p-1 md:hidden text-white/70 hover:text-white"
+              onClick={() => setIsSidebarOpen(false)}
+            >
+              <X className="h-5 w-5" />
+            </button>
+            <div className="flex items-center gap-3">
+              <img src={iconCine} alt="CINESPHERE" className="h-10 w-auto" />
+              <div className="font-bold tracking-widest text-sm">CINESPHERE</div>
+            </div>
+            <div className="text-[10px] font-bold uppercase tracking-widest text-white/40 mb-2 mt-2">
+              {adminEmailState}
+            </div>
           </div>
 
           <div className="space-y-1">
@@ -139,7 +166,24 @@ export default function AdminLayout({ active, setActive, adminEmailState, handle
           </Button>
         </div>
       </aside>
-      <main className="p-6 bg-[#f8fafc] overflow-y-auto h-screen">{children}</main>
+
+      <main className="flex-1 bg-[#f8fafc] md:overflow-y-auto h-screen flex flex-col">
+        {/* Toggle Bar / Header for Mobile */}
+        <div className="lg:hidden md:hidden w-full bg-white border-b border-gray-200 p-4 flex items-center justify-between sticky top-0 z-30 shadow-sm">
+          <div className="flex items-center gap-3">
+            <Button variant="ghost" size="icon" onClick={() => setIsSidebarOpen(true)}>
+              <Menu className="h-6 w-6 text-gray-700" />
+            </Button>
+            <span className="font-bold text-gray-800">Admin Dashboard</span>
+          </div>
+          <img src={iconCine} alt="Logo" className="h-8 w-auto filter invert brightness-0" />
+        </div>
+
+        {/* Content area */}
+        <div className="p-4 md:p-6 overflow-y-auto flex-1">
+          {children}
+        </div>
+      </main>
     </div>
   );
 }
