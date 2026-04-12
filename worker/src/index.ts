@@ -1120,8 +1120,12 @@ app.put('/api/movies/:id', async (c) => {
     await deleteCache(c.env, `${origin}/api/movies-detail/${id}`);
 
     return c.json(r, 200);
-  } catch {
-    return c.json({ status: 'error', message: 'Lỗi máy chủ nội bộ' }, 500);
+  } catch (err: any) {
+    console.error('[PUT /api/movies/:id] Error:', err?.message || err, err?.stack);
+    const msg = err?.message || 'Lỗi máy chủ nội bộ';
+    // Ưu tiên dùng statusCode từ error object nếu có (ví dụ conflict packages = 400)
+    const statusCode = err?.statusCode || (msg.includes('Không thể') || msg.includes('đang được sử dụng') ? 400 : 500);
+    return c.json({ status: 'error', message: msg }, statusCode);
   }
 });
 
