@@ -134,13 +134,19 @@ export async function updateMovieImpl(
 
     if (conflictPackages.length > 0) {
       const packageNames = conflictPackages.map((p: any) => p.name).join(', ');
-      throw new Error(`Không thể ẩn phim vì phim đang được sử dụng trong các gói: ${packageNames}`);
+      const conflictErr: any = new Error(`Không thể ẩn phim vì phim đang được sử dụng trong các gói: ${packageNames}`);
+      conflictErr.statusCode = 400;
+      throw conflictErr;
     }
   }
   try {
     const updated = await anyDb.update(tables.movies).set(payload).where(eq(tables.movies.id, id)).returning();
 
-    const movie = Array.isArray(updated) ? updated[0] : updated;
+    let movie: any = Array.isArray(updated) ? updated[0] : updated;
+    // Fallback: D1/SQLite sometimes returns empty array from .returning()
+    if (!movie) {
+      movie = await anyDb.query.movies.findFirst({ where: eq(tables.movies.id, id) });
+    }
     if (!movie) throw new Error('Không tìm thấy phim để cập nhật');
 
     // Clean up old Cloudinary image if changed
