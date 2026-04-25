@@ -10,8 +10,13 @@ export const onRequestGet: PagesFunction<Env> = async (context) => {
   const { request, env, params, next } = context;
   const slug = params.slug as string;
 
-  // 1. Fetch the static index.html from Pages
-  const response = await next();
+  // 1. Fetch the static index.html from Pages using ASSETS binding
+  // This is required for SPAs because `await next()` for a dynamic route returns 404
+  // and Cloudflare's automatic SPA fallback would strip our changes.
+  const url = new URL(request.url);
+  url.pathname = '/';
+  const response = await env.ASSETS.fetch(new Request(url, request));
+  
   const clonedResponse = new Response(response.body, response);
   clonedResponse.headers.set('X-Function-Executed', 'true');
 
