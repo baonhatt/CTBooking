@@ -8,7 +8,7 @@ import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { lazy, Suspense } from 'react';
 import LoadingScreen from './components/LoadingScreen';
 import { HelmetProvider } from 'react-helmet-async';
-import Index from './pages/user/Index';
+const Index = lazy(() => import('./pages/user/Index'));
 
 // Lazy load secondary pages to reduce initial bundle size
 const NotFound = lazy(() => import('./pages/NotFound'));
