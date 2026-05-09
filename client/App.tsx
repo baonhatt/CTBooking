@@ -9,6 +9,7 @@ import { lazy, Suspense } from 'react';
 import LoadingScreen from './components/LoadingScreen';
 import { HelmetProvider } from 'react-helmet-async';
 const Index = lazy(() => import('./pages/user/Index'));
+const Maintenance = lazy(() => import('./pages/Maintenance'));
 
 // Lazy load secondary pages to reduce initial bundle size
 const NotFound = lazy(() => import('./pages/NotFound'));
@@ -32,9 +33,16 @@ const queryClient = new QueryClient({
   }
 });
 
+const isMaintenanceMode = import.meta.env.VITE_IS_MAINTENANCE === 'true';
+
 const App = () => (
   <HelmetProvider>
-    <QueryClientProvider client={queryClient}>
+    {isMaintenanceMode ? (
+      <Suspense fallback={<LoadingScreen />}>
+        <Maintenance />
+      </Suspense>
+    ) : (
+      <QueryClientProvider client={queryClient}>
       <TooltipProvider>
         <Toaster
           position="top-center"
@@ -159,6 +167,7 @@ const App = () => (
         </BrowserRouter>
       </TooltipProvider>
     </QueryClientProvider>
+    )}
   </HelmetProvider>
 );
 
