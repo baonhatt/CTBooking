@@ -7,7 +7,7 @@ workers_dev = true
 preview_urls = true
 
 [vars]
-RUNTIME_ENV = "cloudflare-worker"
+
 VITE_SERVER_BASE_URL = "https://cinesphere.com.vn"
 VITE_CLIENT_BASE_URL = "https://cinesphere.com.vn"
 VITE_VNPAY_RETURN_URL = "/checkout"
@@ -43,7 +43,7 @@ mode = "smart"
 
 [env.preview.vars]
 IS_PREVIEW = "true"
-RUNTIME_ENV = "cloudflare-worker"
+
 VITE_SERVER_BASE_URL = "https://cinema-worker-preview.baonhat20.workers.dev"
 VITE_CLIENT_BASE_URL = "https://preview.cinema-pages.pages.dev"
 

@@ -35,7 +35,6 @@ export async function registerImpl(
   payload: Partial<Register> & { gender?: string; dob?: string; phone?: string; name?: string },
   sendMailFn?: (to: string, subject: string, html: string) => Promise<any>,
   getWelcomeEmailHtml?: (data: { customerName: string; email: string }) => string,
-  RUNTIME_ENV?: string,
   context?: { waitUntil: (promise: Promise<any>) => void }
 ) {
   try {
@@ -62,7 +61,7 @@ export async function registerImpl(
 
     let dob: string | undefined | Date;
     if (dobStr && typeof dobStr === 'string' && dobStr.trim()) {
-      dob = formatDateForDb(dobStr, RUNTIME_ENV);
+      dob = formatDateForDb(dobStr);
     }
 
     // D1/SQLite có thể không hỗ trợ transaction đầy đủ như Postgres
@@ -78,8 +77,8 @@ export async function registerImpl(
         phone: phone,
         gender: gender,
         dob: dob,
-        created_at: formatDateForDb(nowIso, RUNTIME_ENV),
-        updated_at: formatDateForDb(nowIso, RUNTIME_ENV)
+        created_at: formatDateForDb(nowIso),
+        updated_at: formatDateForDb(nowIso)
       })
       .returning();
 
@@ -94,8 +93,8 @@ export async function registerImpl(
       password: hashedPassword,
       login_type: 'email',
       is_active: true,
-      created_at: formatDateForDb(nowIso, RUNTIME_ENV),
-      updated_at: formatDateForDb(nowIso, RUNTIME_ENV)
+      created_at: formatDateForDb(nowIso),
+      updated_at: formatDateForDb(nowIso)
     });
 
     const newUser = user;
@@ -131,8 +130,7 @@ export async function registerImpl(
           subject: '🎉 Chào mừng bạn đến CINESPHERE',
           emailType: 'welcome',
           userId: newUser.id,
-          emailLogsTable: tables.email_logs,
-          runtimeEnv: RUNTIME_ENV
+          emailLogsTable: tables.email_logs
         },
         context
       );

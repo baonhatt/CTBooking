@@ -137,9 +137,9 @@ export async function createPostImpl(
     featured_image: savedImage || null,
     status: status || 'draft',
     is_featured: is_featured || false,
-    published_at: published_at ? formatDateForDb(published_at, RUN_ENV?.RUNTIME_ENV) : null,
-    created_at: formatDateForDb(nowIso, RUN_ENV?.RUNTIME_ENV),
-    updated_at: formatDateForDb(nowIso, RUN_ENV?.RUNTIME_ENV)
+    published_at: published_at ? formatDateForDb(published_at) : null,
+    created_at: formatDateForDb(nowIso),
+    updated_at: formatDateForDb(nowIso)
   };
 
   // Only include author_id if it's actually provided as a number
@@ -186,7 +186,7 @@ export async function updatePostImpl(
   const { title, content, excerpt, featured_image, image_base64, status, is_featured } = args;
 
   const data: any = {
-    updated_at: formatDateForDb(new Date(), RUN_ENV?.RUNTIME_ENV)
+    updated_at: formatDateForDb(new Date())
   };
 
   if (title !== undefined) {
@@ -206,7 +206,7 @@ export async function updatePostImpl(
   if (status !== undefined) {
     data.status = status;
     if (status === 'published' && !existing.published_at) {
-      data.published_at = formatDateForDb(new Date(), RUN_ENV?.RUNTIME_ENV);
+      data.published_at = formatDateForDb(new Date());
     }
     if (status !== 'published') {
       // "Gỡ bài" / lưu trữ: không còn public

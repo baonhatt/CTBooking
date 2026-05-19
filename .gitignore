@@ -27,3 +27,6 @@ dist-ssr
 !.env
 
 /generated/prisma
+
+# Wrangler local secrets — KHÔNG commit!
+worker/.dev.vars

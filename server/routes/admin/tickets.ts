@@ -126,7 +126,6 @@ export async function getTicketPackageImpl(anyDb: any, tables: { ticket_packages
  * @param anyDb Kết nối database
  * @param tables Danh sách các bảng cần sử dụng
  * @param args Thông tin gói vé cần tạo
- * @param RUNTIME_ENV Môi trường chạy (tùy chọn)
  * @returns Thông tin gói vé vừa tạo
  */
 export async function createTicketPackageImpl(
@@ -165,7 +164,7 @@ export async function createTicketPackageImpl(
 
   // 1. Chuẩn bị thời gian tạo và cập nhật
   const now = new Date();
-  const formattedNow = formatDateForDb(now, RUN_ENV?.RUNTIME_ENV);
+  const formattedNow = formatDateForDb(now);
 
   // 2. Xử lý danh sách tính năng (features)
   // Chuyển đổi features thành mảng nếu là chuỗi, ngược lại giữ nguyên nếu đã là mảng
@@ -277,7 +276,6 @@ export async function createTicketPackageImpl(
  * @param tables Danh sách các bảng cần sử dụng
  * @param id ID của gói vé cần cập nhật
  * @param args Thông tin cập nhật
- * @param RUNTIME_ENV Môi trường chạy (tùy chọn)
  * @returns Thông tin gói vé đã được cập nhật
  */
 export async function updateTicketPackageImpl(
@@ -317,7 +315,7 @@ export async function updateTicketPackageImpl(
 
   const now = new Date();
   // Khởi tạo object data với ngày cập nhật
-  const data: any = { updated_at: formatDateForDb(now, RUN_ENV?.RUNTIME_ENV) };
+  const data: any = { updated_at: formatDateForDb(now) };
 
   // 1. Tối ưu gán giá trị cơ bản (Chỉ gán nếu không phải undefined)
   if (name !== undefined) data.name = name;

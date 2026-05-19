@@ -4,7 +4,6 @@ import { formatDateForDb } from '../../../server/lib/date-utils';
 export async function getDashboardMetricsImpl(
   anyDb: any,
   tables: { movies: any; toys?: any; users: any; bookings: any; ticket_packages: any },
-  RUNTIME_ENV?: string,
   topPeriod: string = 'week',
   year?: number
 ) {
@@ -17,12 +16,12 @@ export async function getDashboardMetricsImpl(
 
   const yearCondition = or(
     and(
-      gte(tables.bookings.created_at, formatDateForDb(yearStart, RUNTIME_ENV)),
-      lte(tables.bookings.created_at, formatDateForDb(yearEnd, RUNTIME_ENV))
+      gte(tables.bookings.created_at, formatDateForDb(yearStart)),
+      lte(tables.bookings.created_at, formatDateForDb(yearEnd))
     ),
     and(
-      gte(tables.bookings.paid_at, formatDateForDb(yearStart, RUNTIME_ENV)),
-      lte(tables.bookings.paid_at, formatDateForDb(yearEnd, RUNTIME_ENV))
+      gte(tables.bookings.paid_at, formatDateForDb(yearStart)),
+      lte(tables.bookings.paid_at, formatDateForDb(yearEnd))
     )
   );
 
@@ -33,8 +32,8 @@ export async function getDashboardMetricsImpl(
     .where(
       and(
         eq(tables.movies.is_active, true),
-        gte(tables.movies.created_at, formatDateForDb(yearStart, RUNTIME_ENV)),
-        lte(tables.movies.created_at, formatDateForDb(yearEnd, RUNTIME_ENV))
+        gte(tables.movies.created_at, formatDateForDb(yearStart)),
+        lte(tables.movies.created_at, formatDateForDb(yearEnd))
       )
     );
   const totalMovies = totalMoviesRes?.count || 0;
@@ -47,8 +46,8 @@ export async function getDashboardMetricsImpl(
         .from(tables.toys)
         .where(
           and(
-            gte(tables.toys.created_at, formatDateForDb(yearStart, RUNTIME_ENV)),
-            lte(tables.toys.created_at, formatDateForDb(yearEnd, RUNTIME_ENV))
+            gte(tables.toys.created_at, formatDateForDb(yearStart)),
+            lte(tables.toys.created_at, formatDateForDb(yearEnd))
           )
         );
       return r?.count || 0;
@@ -62,8 +61,8 @@ export async function getDashboardMetricsImpl(
     .from(tables.users)
     .where(
       and(
-        gte(tables.users.created_at, formatDateForDb(yearStart, RUNTIME_ENV)),
-        lte(tables.users.created_at, formatDateForDb(yearEnd, RUNTIME_ENV))
+        gte(tables.users.created_at, formatDateForDb(yearStart)),
+        lte(tables.users.created_at, formatDateForDb(yearEnd))
       )
     );
   const totalUsers = totalUsersRes?.count || 0;
@@ -214,12 +213,12 @@ export async function getDashboardMetricsImpl(
         inArray(tables.bookings.payment_status, ['paid']),
         or(
           and(
-            gte(tables.bookings.created_at, formatDateForDb(topStartDate, RUNTIME_ENV)),
-            lte(tables.bookings.created_at, formatDateForDb(topEndDate, RUNTIME_ENV))
+            gte(tables.bookings.created_at, formatDateForDb(topStartDate)),
+            lte(tables.bookings.created_at, formatDateForDb(topEndDate))
           ),
           and(
-            gte(tables.bookings.paid_at, formatDateForDb(topStartDate, RUNTIME_ENV)),
-            lte(tables.bookings.paid_at, formatDateForDb(topEndDate, RUNTIME_ENV))
+            gte(tables.bookings.paid_at, formatDateForDb(topStartDate)),
+            lte(tables.bookings.paid_at, formatDateForDb(topEndDate))
           )
         )
       )
@@ -325,8 +324,7 @@ export async function getDashboardMetricsImpl(
 export async function getRevenueByDateImpl(
   anyDb: any,
   tables: { bookings: any },
-  args: { date?: string; status?: string; year?: number },
-  RUNTIME_ENV?: string
+  args: { date?: string; status?: string; year?: number }
 ) {
   const dateStr = String(args.date || '');
   const status = String(args.status || 'paid').toLowerCase();
@@ -342,12 +340,12 @@ export async function getRevenueByDateImpl(
 
     dateCondition = or(
       and(
-        gte(tables.bookings.created_at, formatDateForDb(dayStart, RUNTIME_ENV)),
-        lte(tables.bookings.created_at, formatDateForDb(dayEnd, RUNTIME_ENV))
+        gte(tables.bookings.created_at, formatDateForDb(dayStart)),
+        lte(tables.bookings.created_at, formatDateForDb(dayEnd))
       ),
       and(
-        gte(tables.bookings.paid_at, formatDateForDb(dayStart, RUNTIME_ENV)),
-        lte(tables.bookings.paid_at, formatDateForDb(dayEnd, RUNTIME_ENV))
+        gte(tables.bookings.paid_at, formatDateForDb(dayStart)),
+        lte(tables.bookings.paid_at, formatDateForDb(dayEnd))
       )
     );
   } else {
@@ -356,12 +354,12 @@ export async function getRevenueByDateImpl(
     const yearEnd = new Date(selectedYear, 11, 31, 23, 59, 59, 999);
     dateCondition = or(
       and(
-        gte(tables.bookings.created_at, formatDateForDb(yearStart, RUNTIME_ENV)),
-        lte(tables.bookings.created_at, formatDateForDb(yearEnd, RUNTIME_ENV))
+        gte(tables.bookings.created_at, formatDateForDb(yearStart)),
+        lte(tables.bookings.created_at, formatDateForDb(yearEnd))
       ),
       and(
-        gte(tables.bookings.paid_at, formatDateForDb(yearStart, RUNTIME_ENV)),
-        lte(tables.bookings.paid_at, formatDateForDb(yearEnd, RUNTIME_ENV))
+        gte(tables.bookings.paid_at, formatDateForDb(yearStart)),
+        lte(tables.bookings.paid_at, formatDateForDb(yearEnd))
       )
     );
   }
@@ -403,7 +401,7 @@ export async function getRevenueByDateImpl(
   };
 }
 
-export async function getRevenue7DaysImpl(anyDb: any, tables: { bookings: any }, RUNTIME_ENV?: string, year?: number) {
+export async function getRevenue7DaysImpl(anyDb: any, tables: { bookings: any }, year?: number) {
   const selectedYear = year || new Date().getFullYear();
   const yearStart = new Date(selectedYear, 0, 1);
   const yearEnd = new Date(selectedYear, 11, 31, 23, 59, 59, 999);
@@ -433,12 +431,12 @@ export async function getRevenue7DaysImpl(anyDb: any, tables: { bookings: any },
           inArray(tables.bookings.payment_status, ['paid']),
           or(
             and(
-              gte(tables.bookings.created_at, formatDateForDb(dayStart, RUNTIME_ENV)),
-              lte(tables.bookings.created_at, formatDateForDb(dayEnd, RUNTIME_ENV))
+              gte(tables.bookings.created_at, formatDateForDb(dayStart)),
+              lte(tables.bookings.created_at, formatDateForDb(dayEnd))
             ),
             and(
-              gte(tables.bookings.paid_at, formatDateForDb(dayStart, RUNTIME_ENV)),
-              lte(tables.bookings.paid_at, formatDateForDb(dayEnd, RUNTIME_ENV))
+              gte(tables.bookings.paid_at, formatDateForDb(dayStart)),
+              lte(tables.bookings.paid_at, formatDateForDb(dayEnd))
             )
           )
         )
@@ -457,8 +455,7 @@ export async function getRevenue7DaysImpl(anyDb: any, tables: { bookings: any },
 export async function getRevenueByMonthImpl(
   anyDb: any,
   tables: { bookings: any },
-  args: { year?: string; month?: string; status?: string },
-  RUNTIME_ENV?: string
+  args: { year?: string; month?: string; status?: string }
 ) {
   const yearStr = String(args.year || '');
   const monthStr = String(args.month || '');
@@ -472,12 +469,12 @@ export async function getRevenueByMonthImpl(
     monthEnd.setHours(23, 59, 59, 999);
     const dateCondition = or(
       and(
-        gte(tables.bookings.created_at, formatDateForDb(monthStart, RUNTIME_ENV)),
-        lte(tables.bookings.created_at, formatDateForDb(monthEnd, RUNTIME_ENV))
+        gte(tables.bookings.created_at, formatDateForDb(monthStart)),
+        lte(tables.bookings.created_at, formatDateForDb(monthEnd))
       ),
       and(
-        gte(tables.bookings.paid_at, formatDateForDb(monthStart, RUNTIME_ENV)),
-        lte(tables.bookings.paid_at, formatDateForDb(monthEnd, RUNTIME_ENV))
+        gte(tables.bookings.paid_at, formatDateForDb(monthStart)),
+        lte(tables.bookings.paid_at, formatDateForDb(monthEnd))
       )
     );
     const statusCondition = status !== 'all' ? inArray(tables.bookings.payment_status, ['paid']) : undefined;
@@ -528,12 +525,12 @@ export async function getRevenueByMonthImpl(
     monthEnd.setHours(23, 59, 59, 999);
     const dateCondition = or(
       and(
-        gte(tables.bookings.created_at, formatDateForDb(monthStart, RUNTIME_ENV)),
-        lte(tables.bookings.created_at, formatDateForDb(monthEnd, RUNTIME_ENV))
+        gte(tables.bookings.created_at, formatDateForDb(monthStart)),
+        lte(tables.bookings.created_at, formatDateForDb(monthEnd))
       ),
       and(
-        gte(tables.bookings.paid_at, formatDateForDb(monthStart, RUNTIME_ENV)),
-        lte(tables.bookings.paid_at, formatDateForDb(monthEnd, RUNTIME_ENV))
+        gte(tables.bookings.paid_at, formatDateForDb(monthStart)),
+        lte(tables.bookings.paid_at, formatDateForDb(monthEnd))
       )
     );
     const statusCondition = status !== 'all' ? inArray(tables.bookings.payment_status, ['paid']) : undefined;

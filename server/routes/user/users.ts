@@ -10,8 +10,7 @@ export async function updateUserProfileImpl(
     phone?: string;
     gender?: string;
     dob?: string;
-  },
-  RUNTIME_ENV?: string
+  }
 ) {
   const { email, name, phone, gender, dob } = payload;
   if (!email) return { status: 400, message: 'Thiếu email' };
@@ -38,12 +37,12 @@ export async function updateUserProfileImpl(
   })();
 
   const updateData: any = {
-    updated_at: formatDateForDb(new Date(), RUNTIME_ENV)
+    updated_at: formatDateForDb(new Date())
   };
   if (typeof name === 'string') updateData.fullname = name;
   if (typeof phone === 'string') updateData.phone = phone;
   if (normalizedGender) updateData.gender = normalizedGender;
-  if (dobDate) updateData.dob = formatDateForDb(dobDate, RUNTIME_ENV);
+  if (dobDate) updateData.dob = formatDateForDb(dobDate);
   // Try to use .returning() to fetch updated row when supported, fallback for D1/SQLite
   const updatedRes = await anyDb
     .update(tables.users)
@@ -133,8 +132,7 @@ export async function listUserTransactionsImpl(
     payment_method: string;
     from?: string;
     to?: string;
-  },
-  RUNTIME_ENV?: string
+  }
 ) {
   const { email: emailRaw, status, page, pageSize, sort, dir, payment_method, from: fromStr, to: toStr } = args;
   const skip = (page - 1) * pageSize;
@@ -161,7 +159,7 @@ export async function listUserTransactionsImpl(
 
   // Calculate 3 hours ago
   const threeHoursAgo = new Date(Date.now() - 3 * 60 * 60 * 1000);
-  const threeHoursAgoStr = formatDateForDb(threeHoursAgo, RUNTIME_ENV);
+  const threeHoursAgoStr = formatDateForDb(threeHoursAgo);
 
   const mainFilter = or(
     eq(tables.bookings.payment_status, 'paid'),
@@ -175,8 +173,8 @@ export async function listUserTransactionsImpl(
   }
   // Xử lý ngày tháng (Đảm bảo formatDateForDb trả về string ISO hoặc format SQLite hiểu)
   if (fromStr || toStr) {
-    const from = fromStr ? formatDateForDb(new Date(fromStr), RUNTIME_ENV) : null;
-    const to = toStr ? formatDateForDb(new Date(toStr), RUNTIME_ENV) : null;
+    const from = fromStr ? formatDateForDb(new Date(fromStr)) : null;
+    const to = toStr ? formatDateForDb(new Date(toStr)) : null;
 
     const dateConditions: any[] = [];
     if (from && to) {

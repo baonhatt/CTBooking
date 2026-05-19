@@ -7,7 +7,6 @@ export async function handleSePayWebhookImpl(
   body: any,
   sendMailFn?: (to: string, subject: string, html: string) => Promise<any>,
   getBookingEmailHtml?: (data: any) => string,
-  RUNTIME_ENV?: string,
   context?: { waitUntil: (promise: Promise<any>) => void }
 ) {
   try {
@@ -91,8 +90,7 @@ export async function handleSePayWebhookImpl(
         },
         undefined, // No email for failed payments
         undefined,
-        tables,
-        RUNTIME_ENV
+        tables
       );
 
       console.log(
@@ -119,7 +117,6 @@ export async function handleSePayWebhookImpl(
       sendMailFn,
       getBookingEmailHtml,
       tables,
-      RUNTIME_ENV,
       context
     );
 
