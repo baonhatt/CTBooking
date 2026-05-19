@@ -27,7 +27,7 @@
     "pages:deploy:prod": "npm run build:client && npx wrangler pages deploy dist/spa --project-name=cinema-pages --branch=main",
     "pages:deploy:preview": "npm run build:client:preview && npx wrangler pages deploy dist/spa --project-name=cinema-pages --branch=preview",
     "db:push": "drizzle-kit push",
-    "db:import-local": "worker\\sqlite3.exe worker/.wrangler/state/v3/d1/miniflare-D1DatabaseObject/dc5d280edf9eaba2188cc16d17cdca877f849b752d47dbc851c7391ec3436a8e.sqlite < cinema_db_prod.sql"
+    "db:import-local": "npx wrangler d1 execute cinema-db --local --file=cinema_db_prod.sql --config worker/wrangler.toml"
   },
   "rollup": {
     "forceJs": true
