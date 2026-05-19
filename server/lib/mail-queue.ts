@@ -52,7 +52,7 @@ export class MailQueue {
       if (!table) {
         // Import schema dynamically to avoid circular dependencies
         try {
-          const schemaModule = await import('../db/schema.js').catch(() => import('../../worker/src/schema.js'));
+          const schemaModule = await import('../../worker/src/schema.js');
           table = schemaModule.email_logs;
         } catch (e) {
           console.error('[EmailTracking] Could not load email_logs table:', e);
@@ -72,8 +72,8 @@ export class MailQueue {
             user_id: userId || null,
             booking_id: bookingId || null,
             metadata: additionalData ? JSON.stringify(additionalData) : null,
-            created_at: formatDateForDb(new Date(), runtimeEnv),
-            updated_at: formatDateForDb(new Date(), runtimeEnv)
+            created_at: formatDateForDb(new Date()),
+            updated_at: formatDateForDb(new Date())
           })
           .returning({ id: table.id });
 
@@ -89,8 +89,8 @@ export class MailQueue {
           .update(table)
           .set({
             status: 'sent',
-            sent_at: formatDateForDb(new Date(), runtimeEnv),
-            updated_at: formatDateForDb(new Date(), runtimeEnv)
+            sent_at: formatDateForDb(new Date()),
+            updated_at: formatDateForDb(new Date())
           })
           .where(eq(table.id, logId));
       }
@@ -105,7 +105,7 @@ export class MailQueue {
             .set({
               status: 'failed',
               error_message: error?.message || String(error),
-              updated_at: formatDateForDb(new Date(), runtimeEnv)
+              updated_at: formatDateForDb(new Date())
             })
             .where(eq(table.id, logId));
         } catch (updateError) {

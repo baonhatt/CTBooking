@@ -239,7 +239,8 @@ export default function FilmCarousel({ onSelectFilm }: FilmCarouselProps) {
                         width={280}
                         height={320}
                         loading={index === 0 ? 'eager' : 'lazy'}
-                        fetchPriority={index === 0 ? 'high' : 'low'}
+                        // @ts-ignore
+                        fetchpriority={index === 0 ? 'high' : 'low'}
                         decoding="async"
                         className="absolute object-cover inset-0 w-full h-full transition-transform duration-500 group-hover:scale-105"
                       />

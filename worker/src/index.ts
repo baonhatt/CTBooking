@@ -1,5 +1,5 @@
 // Main API server setup using Hono framework
-import { Hono } from 'hono';
+import { Hono, Context } from 'hono';
 import { cors } from 'hono/cors';
 import { drizzle } from 'drizzle-orm/d1';
 import * as schema from './schema';
@@ -82,7 +82,11 @@ import {
   logSystemError,
   withCache,
   deleteCache,
-  checkRateLimitKV
+  checkRateLimitKV,
+  isLocal,
+  parseMediaUrl,
+  localUploader,
+  localDeleter
 } from './utils';
 
 type Bindings = {
@@ -108,34 +112,91 @@ type Bindings = {
   BREVO_API_KEY: string;
   BREVO_SENDER_EMAIL: string;
   BREVO_SENDER_NAME: string;
-  RUNTIME_ENV: string;
   IS_PREVIEW?: string;
   VITE_RATE_LIMIT_BOOKING_CHECK_MAX: string;
   VITE_RATE_LIMIT_BOOKING_CHECK_WINDOWMS: string;
   AI: any; // Cloudflare Workers AI binding
 };
 
-const getCloudHelpers = (env: Bindings) => ({
-  uploader: async (base64: string, folder: string) => {
-    const res = await uploadCloudinaryImageDataURI(env, base64, folder);
-    return { url: res.url };
-  },
-  deleter: async (url: string, type: 'image' | 'video' = 'image') => {
-    const publicId = getPublicIdFromUrl(url);
-    if (publicId) await deleteCloudinaryImage(env, publicId, type);
-  }
-});
+const getCloudHelpers = (c: Context, env: Bindings) => {
+  const local = isLocal(c.req.url);
+  return {
+    uploader: async (base64: string, folder: string) => {
+      if (local) {
+        return await localUploader(base64, folder);
+      }
+      const res = await uploadCloudinaryImageDataURI(env, base64, folder);
+      return { url: res.url };
+    },
+    deleter: async (url: string, type: 'image' | 'video' = 'image') => {
+      if (local && url.startsWith('/uploads/')) {
+        return await localDeleter(url);
+      }
+      const publicId = getPublicIdFromUrl(url);
+      if (publicId) await deleteCloudinaryImage(env, publicId, type);
+    }
+  };
+};
 
 const app = new Hono<{ Bindings: Bindings }>();
+
+// DEBUG: Global Request Logger
+app.use('*', async (c, next) => {
+  const url = new URL(c.req.url);
+  const isL = isLocal(c.req.url);
+  console.log(`[Worker Request] ${c.req.method} ${url.pathname} (Local: ${isL})`);
+  await next();
+});
+
+// Serve local uploads during development - MOVE TO TOP
+app.get('/uploads/*', async (c) => {
+  if (!isLocal(c.req.url)) return c.notFound();
+  
+  try {
+    const fs = await import('node:fs');
+    const path = await import('node:path');
+    
+    const urlPath = new URL(c.req.url).pathname;
+    const relativePath = urlPath.replace(/^\//, '');
+    const filePath = path.resolve(process.cwd(), relativePath);
+    
+    if (fs.existsSync(filePath)) {
+      const ext = path.extname(filePath).toLowerCase();
+      const mimeMap: Record<string, string> = {
+        '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.png': 'image/png',
+        '.gif': 'image/gif', '.webp': 'image/webp', '.svg': 'image/svg+xml',
+        '.mp4': 'video/mp4', '.webm': 'video/webm', '.mov': 'video/quicktime'
+      };
+      
+      return new Response(fs.readFileSync(filePath), {
+        headers: { 
+          'Content-Type': mimeMap[ext] || 'application/octet-stream',
+          'Access-Control-Allow-Origin': '*'
+        }
+      });
+    }
+  } catch (err) {
+    console.error('[Static Serve] Error:', err);
+  }
+  
+  return c.notFound();
+});
 
 app.use(
   '*',
   cors({
-    origin: (origin) => {
+    origin: (origin, c) => {
       if (!origin) return 'https://cinesphere.com.vn';
 
-      // // Allow localhost for development
-      // if (origin.startsWith("http://localhost:")) return origin;
+      // Allow localhost for development automatically
+      try {
+        const url = new URL(c.req.url);
+        if (url.hostname === 'localhost' || url.hostname === '127.0.0.1') {
+           if (origin.startsWith('http://localhost:') || origin.startsWith('http://127.0.0.1:')) {
+             return origin;
+           }
+        }
+      } catch {}
 
       const allowedExact = new Set([
         'https://cinesphere.com.vn',
@@ -169,11 +230,18 @@ app.use(
 // Global Error Handler for debugging preview issues
 app.onError((err, c) => {
   console.error(`[Worker Error] ${err.message}`, err);
+  
+  let isLocal = false;
+  try {
+    const url = new URL(c.req.url);
+    isLocal = url.hostname === 'localhost' || url.hostname === '127.0.0.1';
+  } catch {}
+
   return c.json(
     {
       status: 'error',
       message: err.message || 'Internal Server Error',
-      stack: c.env.RUNTIME_ENV === 'development' || c.env.IS_PREVIEW === 'true' ? err.stack : undefined
+      stack: isLocal || c.env.IS_PREVIEW === 'true' ? err.stack : undefined
     },
     500
   );
@@ -237,7 +305,6 @@ app.post('/api/register', async (c) => {
       body as any,
       mailer,
       renderWelcome,
-      c.env.RUNTIME_ENV,
       c.executionCtx
     );
     const status = typeof (r as any).status === 'number' ? (r as any).status : 200;
@@ -321,7 +388,6 @@ app.post('/api/forget-password', async (c) => {
       email,
       mailer,
       renderReset,
-      c.env.RUNTIME_ENV,
       c.executionCtx
     );
     const status = typeof (r as any).status === 'number' ? (r as any).status : 200;
@@ -345,8 +411,7 @@ app.post('/api/reset-password', async (c) => {
     const r = await resetPasswordImpl(
       db,
       { accounts: schema.accounts, tokens: schema.tokens },
-      body as any,
-      c.env.RUNTIME_ENV
+      body as any
     );
     const status = typeof (r as any).status === 'number' ? (r as any).status : 200;
     const payload = {
@@ -365,7 +430,7 @@ app.get('/api/admin/revenue', async (c) => {
     const to = String(c.req.query('to') || '');
     const status = String(c.req.query('status') || 'paid');
     const db = drizzle(c.env.cinema_db, { schema });
-    const r = await getRevenueImpl(db, { bookings: schema.bookings }, { from, to, status }, c.env.RUNTIME_ENV);
+    const r = await getRevenueImpl(db, { bookings: schema.bookings }, { from, to, status });
     return c.json(r);
   } catch (err: any) {
     return c.json({ status: 'error', message: String(err?.message || 'Internal error') }, 500);
@@ -403,8 +468,7 @@ app.get('/api/admin/transactions', async (c) => {
         payment_method,
         from,
         to
-      },
-      c.env.RUNTIME_ENV
+      }
     );
     return c.json(r);
   } catch (err: any) {
@@ -451,7 +515,6 @@ app.get('/api/admin/dashboard/metrics', async (c) => {
         ticket_packages: schema.ticket_packages,
         toys: schema.toys
       },
-      c.env.RUNTIME_ENV,
       period,
       year
     );
@@ -470,7 +533,7 @@ app.get('/api/admin/dashboard/revenue-date', async (c) => {
     const yearParam = c.req.query('year');
     const year = yearParam ? parseInt(yearParam) : undefined;
     const db = drizzle(c.env.cinema_db, { schema });
-    const r = await getRevenueByDateImpl(db, { bookings: schema.bookings }, { date, status, year }, c.env.RUNTIME_ENV);
+    const r = await getRevenueByDateImpl(db, { bookings: schema.bookings }, { date, status, year });
     return c.json(r);
   } catch (err: any) {
     return c.json({ status: 'error', message: String(err?.message || 'Internal error') }, 500);
@@ -484,7 +547,7 @@ app.get('/api/admin/dashboard/revenue-7days', async (c) => {
     const yearParam = c.req.query('year');
     const year = yearParam ? parseInt(yearParam) : undefined;
     const db = drizzle(c.env.cinema_db, { schema });
-    const r = await getRevenue7DaysImpl(db, { bookings: schema.bookings }, c.env.RUNTIME_ENV, year);
+    const r = await getRevenue7DaysImpl(db, { bookings: schema.bookings }, year);
     return c.json(r);
   } catch (err: any) {
     return c.json({ status: 'error', message: String(err?.message || 'Internal error') }, 500);
@@ -502,8 +565,7 @@ app.get('/api/admin/dashboard/revenue-month', async (c) => {
     const r = await getRevenueByMonthImpl(
       db,
       { bookings: schema.bookings },
-      { year, month, status },
-      c.env.RUNTIME_ENV
+      { year, month, status }
     );
     return c.json(r);
   } catch (err: any) {
@@ -739,17 +801,17 @@ app.get('/api/getActiveMovies', async (c) => {
     });
     const optimized = activeMovies.map((m) => ({
       ...m,
-      cover_image: optimizeCloudinaryUrl(m.cover_image ?? ''),
+      cover_image: parseMediaUrl(m.cover_image ?? '', c),
       detail_images: (() => {
         const v = m.detail_images;
         if (v === null || v === undefined) return '[]';
         try {
           const parsed = typeof v === 'string' ? JSON.parse(v) : v;
           if (Array.isArray(parsed)) {
-            const opt = parsed.map((u: string) => optimizeCloudinaryUrl(u));
+            const opt = parsed.map((u: string) => parseMediaUrl(u, c));
             return JSON.stringify(opt);
           }
-          return typeof v === 'string' ? v : JSON.stringify(v);
+          return typeof v === 'string' ? parseMediaUrl(v, c) : JSON.stringify(v);
         } catch {
           return '[]';
         }
@@ -824,7 +886,7 @@ app.post('/api/create-booking', async (c) => {
     const tables = getD1Tables(schema);
     body = await c.req.json().catch(() => ({}));
     // Pass schema tables to ensure correct schema is used (D1 schema instead of PostgreSQL)
-    const r = await createPaymentImpl(db, body as any, tables, c.env.RUNTIME_ENV);
+    const r = await createPaymentImpl(db, body as any, tables);
     const status = typeof (r as any).status === 'number' ? (r as any).status : 200;
     const payload = {
       ...(r as any),
@@ -868,7 +930,6 @@ app.post('/api/confirm-booking', async (c) => {
       mailer,
       renderBooking,
       tables,
-      c.env.RUNTIME_ENV,
       c.executionCtx
     );
     const status = typeof (r as any).status === 'number' ? (r as any).status : 200;
@@ -906,7 +967,6 @@ app.post('/api/sepay/webhook', async (c) => {
       body,
       mailer,
       renderBooking,
-      c.env.RUNTIME_ENV,
       c.executionCtx
     );
 
@@ -986,7 +1046,7 @@ app.post('/api/bookings-use', async (c) => {
   const tables = getD1Tables(schema);
   const body = await c.req.json().catch(() => ({}));
   const code = String((body as any)?.code || '');
-  const r = await confirmUseTicketImpl(db, code, tables, c.env.RUNTIME_ENV);
+  const r = await confirmUseTicketImpl(db, code, tables);
   const status = (r as any)?.status === 'error' ? 400 : 200;
   const payload = {
     ...(r as any),
@@ -1011,7 +1071,11 @@ app.get('/api/movies', async (c) => {
       { movies: schema.movies },
       { page, pageSize, q, sort: sortKey, dir, status: status as any }
     );
-    return c.json({ items, page, pageSize, total }, 200);
+    const parsedItems = items.map((m: any) => ({
+      ...m,
+      cover_image: parseMediaUrl(m.cover_image, c)
+    }));
+    return c.json({ items: parsedItems, page, pageSize, total }, 200);
   } catch {
     return c.json({ status: 'error', message: 'Lỗi máy chủ nội bộ' }, 500);
   }
@@ -1029,8 +1093,15 @@ app.post('/api/movies', async (c) => {
       CLOUDINARY_API_SECRET: c.env.CLOUDINARY_API_SECRET,
       CLOUDINARY_CLOUD_NAME: c.env.CLOUDINARY_CLOUD_NAME
     };
-    const { uploader: localUploader } = getCloudHelpers(c.env);
-    const r = await createMovieImpl(db, { movies: schema.movies }, body as any, undefined, c.env, localUploader);
+    const cloud = getCloudHelpers(c, c.env);
+    const r = await createMovieImpl(
+      db,
+      { movies: schema.movies },
+      body as any,
+      undefined,
+      undefined,
+      cloud.uploader
+    );
     // Clear cache active movies
     const origin = new URL(c.req.url).origin;
     await deleteCache(c.env, `${origin}/api/getActiveMovies`);
@@ -1054,7 +1125,11 @@ app.get('/api/movies/:id', async (c) => {
     const db = drizzle(c.env.cinema_db, { schema });
     const movie = await getMovie(db, { movies: schema.movies }, id);
     if (!movie) return c.json({ message: 'Không tìm thấy' }, 404);
-    return c.json({ movie }, 200);
+    const parsedMovie = {
+      ...movie,
+      cover_image: parseMediaUrl(movie.cover_image, c)
+    };
+    return c.json({ movie: parsedMovie }, 200);
   } catch {
     return c.json({ status: 'error', message: 'Lỗi máy chủ nội bộ' }, 500);
   }
@@ -1075,7 +1150,15 @@ app.get("/api/movies-detail/:id", async (c) => {
   if (!r)
     return c.json({ status: "error", message: "Không tìm thấy phim" }, 404);
 
-  return new Response(JSON.stringify(r), {
+  const parsed = {
+    ...r,
+    cover_image: parseMediaUrl((r as any).cover_image, c),
+    detail_images: Array.isArray((r as any).detail_images) 
+      ? (r as any).detail_images.map((u: string) => parseMediaUrl(u, c))
+      : (r as any).detail_images
+  };
+
+  return new Response(JSON.stringify(parsed), {
     status: 200,
     headers: {
       "Content-Type": "application/json",
@@ -1101,7 +1184,7 @@ app.put('/api/movies/:id', async (c) => {
       CLOUDINARY_API_SECRET: c.env.CLOUDINARY_API_SECRET,
       CLOUDINARY_CLOUD_NAME: c.env.CLOUDINARY_CLOUD_NAME
     };
-    const { uploader: localUploader, deleter: localDeleter } = getCloudHelpers(c.env);
+    const { uploader: localUploader, deleter: localDeleter } = getCloudHelpers(c, c.env);
     const r = await updateMovieImpl(
       db,
       { movies: schema.movies, ticket_packages: schema.ticket_packages },
@@ -1168,7 +1251,7 @@ app.delete('/api/movies/:id', async (c) => {
   try {
     const id = Number(c.req.param('id'));
     const db = drizzle(c.env.cinema_db, { schema });
-    const { deleter: localDeleter } = getCloudHelpers(c.env);
+    const { deleter: localDeleter } = getCloudHelpers(c, c.env);
     const r = await deleteMovieImpl(db, { movies: schema.movies }, id, c.env, localDeleter);
 
     if (!r) return c.json({ status: 'error', message: 'Không tìm thấy' }, 404);
@@ -1284,8 +1367,7 @@ app.post('/api/users-profile', async (c) => {
     const r = await updateUserProfileImpl(
       db,
       { accounts: schema.accounts, users: schema.users },
-      body as any,
-      c.env.RUNTIME_ENV
+      body as any
     );
     const status = typeof (r as any).status === 'number' ? (r as any).status : 200;
     const payload = {
@@ -1305,7 +1387,7 @@ app.post('/api/users-password', async (c) => {
   try {
     const db = drizzle(c.env.cinema_db, { schema });
     const body = await c.req.json().catch(() => ({}));
-    const r = await changePasswordImpl(db, { accounts: schema.accounts }, body as any, c.env.RUNTIME_ENV);
+    const r = await changePasswordImpl(db, { accounts: schema.accounts }, body as any);
     const status = typeof (r as any).status === 'number' ? (r as any).status : 200;
     const payload = {
       ...(r as any),
@@ -1339,8 +1421,7 @@ app.get('/api/usersprofile/transactions', async (c) => {
         movies: schema.movies,
         ticket_packages: schema.ticket_packages
       },
-      { email, status, page, pageSize, sort, dir, payment_method, from, to },
-      c.env.RUNTIME_ENV
+      { email, status, page, pageSize, sort, dir, payment_method, from, to }
     );
     return c.json(r, 200);
   } catch {
@@ -1358,7 +1439,13 @@ app.get('/api/toys', async (c) => {
     const status = String(c.req.query('status') || 'all');
     const db = drizzle(c.env.cinema_db, { schema });
     const r = await listToysImpl(db, { toys: schema.toys }, { page, pageSize, q, status });
-    return c.json(r, 200);
+    return c.json({
+      ...r,
+      items: (r.items as any[]).map((t: any) => ({
+        ...t,
+        image: parseMediaUrl(t.image, c)
+      }))
+    }, 200);
   } catch {
     return c.json({ status: 'error', message: 'Lỗi máy chủ nội bộ' }, 500);
   }
@@ -1367,44 +1454,13 @@ app.get('/api/toys', async (c) => {
 // Get list of active toys
 app.get('/api/toys-active', async (c) => {
   try {
-    /* TẠM THỜI VÔ HIỆU HÓA CACHE
-    if (c.env.KV_BINDING) {
-      const cached = await c.env.KV_BINDING.get('activeToys');
-      if (cached) {
-        return new Response(cached, {
-          headers: {
-            'Content-Type': 'application/json',
-            'X-KV-Cache': 'HIT'
-          }
-        });
-      }
-    }
-    */
-
     const db = drizzle(c.env.cinema_db, { schema });
     const r = await listActiveToys(db, { toys: schema.toys });
-
-    const responseBody = JSON.stringify(r);
-
-    // Save to KV with specific TTL (e.g., 1 hour) - TEMPORARILY DISABLED
-    /*
-    if (c.env.KV_BINDING) {
-      c.executionCtx.waitUntil(c.env.KV_BINDING.put('activeToys', responseBody, { expirationTtl: 3600 }));
-    }
-    */
-
-    return new Response(responseBody, {
-      status: 200,
-      headers: {
-        "Content-Type": "application/json",
-        "Cache-Control": "no-cache, no-store, must-revalidate, max-age=0",
-        "Cloudflare-CDN-Cache-Control": "no-cache, no-store, must-revalidate, max-age=0",
-        "Pragma": "no-cache",
-        "Expires": "0",
-        Vary: "Origin",
-        "X-KV-Cache": "DISABLED"
-      },
-    });
+    const parsed = (r.items || []).map((t: any) => ({
+      ...t,
+      image: parseMediaUrl(t.image, c)
+    }));
+    return c.json(parsed, 200);
   } catch (err: any) {
     return c.json({ status: 'error', message: String(err?.message || 'Internal error') }, 500);
   }
@@ -1418,7 +1474,11 @@ app.get('/api/toys/:id', async (c) => {
     const db = drizzle(c.env.cinema_db, { schema });
     const r = await getToyImpl(db, { toys: schema.toys }, id);
     if (!r) return c.json({ message: 'Không tìm thấy' }, 404);
-    return c.json(r, 200);
+    const parsedToy = {
+      ...r,
+      image: parseMediaUrl((r as any).image, c)
+    };
+    return c.json({ toy: parsedToy }, 200);
   } catch {
     return c.json({ status: 'error', message: 'Lỗi máy chủ nội bộ' }, 500);
   }
@@ -1431,7 +1491,7 @@ app.post('/api/toys', async (c) => {
   try {
     const db = drizzle(c.env.cinema_db, { schema });
     const body = await c.req.json().catch(() => ({}));
-    const { uploader } = getCloudHelpers(c.env);
+    const { uploader } = getCloudHelpers(c, c.env);
     const r = await createToyImpl(db, { toys: schema.toys }, body as any, c.env, uploader);
     // --- LOGIC XÓA CACHE BẮT ĐẦU ---
     if (r) {
@@ -1470,7 +1530,7 @@ app.put('/api/toys/:id', async (c) => {
     const id = Number(c.req.param('id'));
     const db = drizzle(c.env.cinema_db, { schema });
     const body = await c.req.json().catch(() => ({}));
-    const { uploader, deleter } = getCloudHelpers(c.env);
+    const { uploader, deleter } = getCloudHelpers(c, c.env);
     const r = await updateToyImpl(db, { toys: schema.toys }, id, body as any, c.env, uploader, deleter);
     if (!r) return c.json({ message: 'Không tìm thấy' }, 404);
     // --- LOGIC XÓA CACHE BẮT ĐẦU ---
@@ -1508,7 +1568,7 @@ app.delete('/api/toys/:id', async (c) => {
   try {
     const id = Number(c.req.param('id'));
     const db = drizzle(c.env.cinema_db, { schema });
-    const { deleter } = getCloudHelpers(c.env);
+    const { deleter } = getCloudHelpers(c, c.env);
     const r = await deleteToyImpl(db, { toys: schema.toys }, id, c.env, deleter);
     if (!r) return c.json({ message: 'Không tìm thấy' }, 404);
     // --- LOGIC XÓA CACHE BẮT ĐẦU ---
@@ -1704,7 +1764,7 @@ app.post('/api/admin/site-media', async (c) => {
   try {
     const db = drizzle(c.env.cinema_db, { schema });
     const body = await c.req.json().catch(() => ({}));
-    const r = await createSiteMediaImpl(db, { site_media: schema.site_media }, body as any, c.env.RUNTIME_ENV);
+    const r = await createSiteMediaImpl(db, { site_media: schema.site_media }, body as any);
     return c.json(r, 201);
   } catch {
     return c.json({ status: 'error', message: 'Lỗi máy chủ nội bộ' }, 500);
@@ -1720,7 +1780,7 @@ app.put('/api/admin/site-media', async (c) => {
   try {
     const db = drizzle(c.env.cinema_db, { schema });
     const body = await c.req.json().catch(() => ({}));
-    const r = await updateSiteMediaImpl(db, { site_media: schema.site_media }, body as any, c.env.RUNTIME_ENV);
+    const r = await updateSiteMediaImpl(db, { site_media: schema.site_media }, body as any);
     const status = (r as any)?.item ? 200 : 404;
     const payload = {
       ...(r as any),
@@ -1749,7 +1809,14 @@ app.get('/api/site-media', async (c) => {
       const db = drizzle(c.env.cinema_db, { schema });
       const r = await listSiteMediaImpl(db, { site_media: schema.site_media }, { section, type, active });
 
-      return new Response(JSON.stringify(r), {
+      const parsed = {
+        ...r,
+        items: (r.items as any[]).map((m: any) => ({
+          ...m,
+          url: parseMediaUrl(m.url, c)
+        }))
+      };
+      return new Response(JSON.stringify(parsed), {
         status: 200,
         headers: {
           'Content-Type': 'application/json',
@@ -1769,7 +1836,7 @@ app.delete('/api/admin/site-media/:id', async (c) => {
   try {
     const id = Number(c.req.param('id'));
     const db = drizzle(c.env.cinema_db, { schema });
-    const { deleter } = getCloudHelpers(c.env);
+    const { deleter } = getCloudHelpers(c, c.env);
     const r = await deleteSiteMediaImpl(db, { site_media: schema.site_media }, id, deleter);
 
     // Manual deletion from cloud storage for Worker environment
@@ -1968,7 +2035,7 @@ app.post('/api/vnpay/create-payment', async (c) => {
       gateway: c.env.VITE_VNPAY_GATEWAY,
       returnUrl
     };
-    const r = await createVnpayPaymentImpl({ ...(body as any), ip, ...config }, c.env.RUNTIME_ENV);
+    const r = await createVnpayPaymentImpl({ ...(body as any), ip, ...config });
     const status = typeof (r as any).status === 'number' ? (r as any).status : 200;
     const payload = {
       ...(r as any),
@@ -2303,7 +2370,11 @@ app.get('/api/posts', async (c) => {
     const status = 'published';
     const db = drizzle(c.env.cinema_db, { schema });
     const r = await listPostsImpl(db, { posts: schema.posts }, { page, pageSize, q, status });
-    return c.json(r);
+    const parsedItems = (r.items || []).map((p: any) => ({
+      ...p,
+      cover_image: parseMediaUrl(p.cover_image, c)
+    }));
+    return c.json({ ...r, items: parsedItems });
   } catch (err: any) {
     return c.json({ status: 'error', message: String(err?.message || 'Internal error') }, 500);
   }
@@ -2319,7 +2390,11 @@ app.get('/api/posts/:identifier', async (c) => {
     if (post.status !== 'published' && c.env.IS_PREVIEW !== 'true') {
       return c.json({ message: 'Bài viết không công khai' }, 403);
     }
-    return c.json({ post });
+    const parsed = {
+      ...post,
+      cover_image: parseMediaUrl(post.cover_image, c)
+    };
+    return c.json({ post: parsed }, 200);
   } catch (err: any) {
     return c.json({ status: 'error', message: String(err?.message || 'Internal error') }, 500);
   }
@@ -2334,7 +2409,11 @@ app.get('/api/admin/posts', async (c) => {
     const status = String(c.req.query('status') || 'all');
     const db = drizzle(c.env.cinema_db, { schema });
     const r = await listPostsImpl(db, { posts: schema.posts }, { page, pageSize, q, status });
-    return c.json(r);
+    const parsedItems = (r.items || []).map((p: any) => ({
+      ...p,
+      cover_image: parseMediaUrl(p.cover_image, c)
+    }));
+    return c.json({ ...r, items: parsedItems });
   } catch (err: any) {
     return c.json({ status: 'error', message: String(err?.message || 'Internal error') }, 500);
   }
@@ -2345,7 +2424,7 @@ app.post('/api/posts', async (c) => {
   try {
     const db = drizzle(c.env.cinema_db, { schema });
     const body = await c.req.json().catch(() => ({}));
-    const r = await createPostImpl(db, { posts: schema.posts }, body, c.env, getCloudHelpers(c.env).uploader);
+    const r = await createPostImpl(db, { posts: schema.posts }, body, c.env, getCloudHelpers(c, c.env).uploader);
     return c.json({ status: 'success', post: r });
   } catch (err: any) {
     return c.json({ status: 'error', message: String(err?.message || 'Internal error') }, 500);
@@ -2358,7 +2437,7 @@ app.put('/api/posts/:id', async (c) => {
     const id = Number(c.req.param('id'));
     const db = drizzle(c.env.cinema_db, { schema });
     const body = await c.req.json().catch(() => ({}));
-    const helpers = getCloudHelpers(c.env);
+    const helpers = getCloudHelpers(c, c.env);
     const r = await updatePostImpl(db, { posts: schema.posts }, id, body, c.env, helpers.uploader, helpers.deleter);
     if (!r) return c.json({ message: 'Không tìm thấy' }, 404);
     return c.json({ status: 'success', post: r });
@@ -2372,7 +2451,7 @@ app.delete('/api/posts/:id', async (c) => {
   try {
     const id = Number(c.req.param('id'));
     const db = drizzle(c.env.cinema_db, { schema });
-    const r = await deletePostImpl(db, { posts: schema.posts }, id, getCloudHelpers(c.env).deleter);
+    const r = await deletePostImpl(db, { posts: schema.posts }, id, getCloudHelpers(c, c.env).deleter);
     if (!r) return c.json({ message: 'Không tìm thấy' }, 404);
     return c.json({ status: 'success', message: 'Đã xóa' });
   } catch (err: any) {

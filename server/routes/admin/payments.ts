@@ -4,8 +4,7 @@ import { formatDateForDb } from '../../../server/lib/date-utils';
 export async function getRevenueImpl(
   anyDb: any,
   tables: { bookings: any },
-  args: { from?: string; to?: string; status?: string },
-  RUNTIME_ENV?: string
+  args: { from?: string; to?: string; status?: string }
 ) {
   const from = args.from ? new Date(args.from) : undefined;
   const to = args.to ? new Date(args.to) : undefined;
@@ -15,23 +14,23 @@ export async function getRevenueImpl(
   if (from && to) {
     dateCondition = or(
       and(
-        gte(tables.bookings.paid_at, formatDateForDb(from, RUNTIME_ENV)),
-        lte(tables.bookings.paid_at, formatDateForDb(to, RUNTIME_ENV))
+        gte(tables.bookings.paid_at, formatDateForDb(from)),
+        lte(tables.bookings.paid_at, formatDateForDb(to))
       ),
       and(
-        gte(tables.bookings.created_at, formatDateForDb(from, RUNTIME_ENV)),
-        lte(tables.bookings.created_at, formatDateForDb(to, RUNTIME_ENV))
+        gte(tables.bookings.created_at, formatDateForDb(from)),
+        lte(tables.bookings.created_at, formatDateForDb(to))
       )
     );
   } else if (from) {
     dateCondition = or(
-      gte(tables.bookings.paid_at, formatDateForDb(from, RUNTIME_ENV)),
-      gte(tables.bookings.created_at, formatDateForDb(from, RUNTIME_ENV))
+      gte(tables.bookings.paid_at, formatDateForDb(from)),
+      gte(tables.bookings.created_at, formatDateForDb(from))
     );
   } else if (to) {
     dateCondition = or(
-      lte(tables.bookings.paid_at, formatDateForDb(to, RUNTIME_ENV)),
-      lte(tables.bookings.created_at, formatDateForDb(to, RUNTIME_ENV))
+      lte(tables.bookings.paid_at, formatDateForDb(to)),
+      lte(tables.bookings.created_at, formatDateForDb(to))
     );
   }
   const finalWhere = and(whereCondition, dateCondition);
@@ -63,8 +62,7 @@ export async function listTransactionsImpl(
     payment_method: string;
     from?: string;
     to?: string;
-  },
-  RUNTIME_ENV?: string
+  }
 ) {
   const { page, pageSize, searchText, status, sort, dir, payment_method, from, to } = args;
   const skip = (page - 1) * pageSize;
@@ -86,17 +84,17 @@ export async function listTransactionsImpl(
     if (f && t) {
       whereCondition.push(
         or(
-          and(gte(createdField, formatDateForDb(f, RUNTIME_ENV)), lte(createdField, formatDateForDb(t, RUNTIME_ENV))),
-          and(gte(paidField, formatDateForDb(f, RUNTIME_ENV)), lte(paidField, formatDateForDb(t, RUNTIME_ENV)))
+          and(gte(createdField, formatDateForDb(f)), lte(createdField, formatDateForDb(t))),
+          and(gte(paidField, formatDateForDb(f)), lte(paidField, formatDateForDb(t)))
         )
       );
     } else if (f) {
       whereCondition.push(
-        or(gte(createdField, formatDateForDb(f, RUNTIME_ENV)), gte(paidField, formatDateForDb(f, RUNTIME_ENV)))
+        or(gte(createdField, formatDateForDb(f)), gte(paidField, formatDateForDb(f)))
       );
     } else if (t) {
       whereCondition.push(
-        or(lte(createdField, formatDateForDb(t, RUNTIME_ENV)), lte(paidField, formatDateForDb(t, RUNTIME_ENV)))
+        or(lte(createdField, formatDateForDb(t)), lte(paidField, formatDateForDb(t)))
       );
     }
   }

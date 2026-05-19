@@ -19,7 +19,6 @@ export async function forgetPassImpl(
   email: string,
   sendMailFn?: (to: string, subject: string, html: string) => Promise<any>,
   getResetPasswordEmailHtml?: (link: string) => string,
-  RUNTIME_ENV?: string,
   context?: { waitUntil: (promise: Promise<any>) => void }
 ) {
   const useracc = await anyDb.query.accounts.findFirst({
@@ -34,7 +33,7 @@ export async function forgetPassImpl(
     account_id: useracc.id,
     type: 'reset_password',
     token: token,
-    expired_at: formatDateForDb(expired_at_dt, RUNTIME_ENV)
+    expired_at: formatDateForDb(expired_at_dt)
   });
 
   let contentMail = '';
@@ -69,8 +68,7 @@ export async function forgetPassImpl(
       subject: 'Đặt lại mật khẩu - Film',
       emailType: 'reset_password',
       userId: useracc.id,
-      emailLogsTable: tables.email_logs,
-      runtimeEnv: RUNTIME_ENV
+      emailLogsTable: tables.email_logs
     },
     context
   );
@@ -81,8 +79,7 @@ export async function forgetPassImpl(
 export async function resetPasswordImpl(
   anyDb: any,
   tables: { accounts: any; tokens: any },
-  payload: { token?: string; newPassword?: string },
-  RUNTIME_ENV?: string
+  payload: { token?: string; newPassword?: string }
 ) {
   const { token, newPassword } = payload;
   const now = new Date();
@@ -90,7 +87,7 @@ export async function resetPasswordImpl(
     where: and(
       eq(tables.tokens.token, token || ''),
       eq(tables.tokens.type, 'reset_password'),
-      gte(tables.tokens.expired_at, formatDateForDb(now, RUNTIME_ENV))
+      gte(tables.tokens.expired_at, formatDateForDb(now))
     )
   });
   if (!tokenRecord) {
@@ -116,7 +113,7 @@ export async function resetPasswordImpl(
   const hashedPassword = await bcrypt.hash(String(newPassword), 10);
   await anyDb
     .update(tables.accounts)
-    .set({ password: hashedPassword, updated_at: formatDateForDb(now, RUNTIME_ENV) })
+    .set({ password: hashedPassword, updated_at: formatDateForDb(now) })
     .where(eq(tables.accounts.id, tokenRecord.account_id));
   await anyDb.delete(tables.tokens).where(eq(tables.tokens.id, tokenRecord.id));
 
@@ -126,8 +123,7 @@ export async function resetPasswordImpl(
 export async function changePasswordImpl(
   anyDb: any,
   tables: { accounts: any },
-  payload: { email?: string; oldPassword?: string; newPassword?: string },
-  RUNTIME_ENV?: string
+  payload: { email?: string; oldPassword?: string; newPassword?: string }
 ) {
   const { email, oldPassword, newPassword } = payload;
   if (!email || !oldPassword || !newPassword) {
@@ -143,7 +139,7 @@ export async function changePasswordImpl(
   const now = new Date();
   await anyDb
     .update(tables.accounts)
-    .set({ password: hashed, updated_at: formatDateForDb(now, RUNTIME_ENV) })
+    .set({ password: hashed, updated_at: formatDateForDb(now) })
     .where(eq(tables.accounts.id, account.id));
   return { status: 200, message: 'Đổi mật khẩu thành công' };
 }

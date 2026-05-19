@@ -43,9 +43,9 @@ export async function createMovieImpl(
     rating: data.rating ?? null,
     duration_min: data.duration_min,
     is_active: data.is_active === undefined ? true : Boolean(data.is_active),
-    release_date: data.release_date ? formatDateForDb(data.release_date, RUN_ENV?.RUNTIME_ENV) : null,
-    created_at: formatDateForDb(now, RUN_ENV?.RUNTIME_ENV),
-    updated_at: formatDateForDb(now, RUN_ENV?.RUNTIME_ENV)
+    release_date: data.release_date ? formatDateForDb(data.release_date) : null,
+    created_at: formatDateForDb(now),
+    updated_at: formatDateForDb(now)
   };
   try {
     const movieInsert = await anyDb.insert(tables.movies).values(baseData).returning();
@@ -91,7 +91,7 @@ export async function updateMovieImpl(
   const oldMovie = await anyDb.query.movies.findFirst({
     where: eq(tables.movies.id, id)
   });
-  const payload: any = { updated_at: formatDateForDb(now, RUN_ENV?.RUNTIME_ENV) };
+  const payload: any = { updated_at: formatDateForDb(now) };
   // Xử lý upload ảnh nếu có base64
   if (data.cover_image_base64 && uploader) {
     try {
@@ -113,7 +113,7 @@ export async function updateMovieImpl(
   if (data.duration_min !== undefined) payload.duration_min = data.duration_min;
   if (data.is_active !== undefined) payload.is_active = data.is_active;
   if (data.release_date !== undefined) {
-    payload.release_date = data.release_date ? formatDateForDb(data.release_date, RUN_ENV?.RUNTIME_ENV) : null;
+    payload.release_date = data.release_date ? formatDateForDb(data.release_date) : null;
   }
   if (data.is_active === false) {
     const searchId = String(id);
@@ -231,7 +231,7 @@ export async function updateMovieStatusImpl(
     }
     const payload: any = {
       is_active: isActive,
-      updated_at: formatDateForDb(new Date(), RUN_ENV?.RUNTIME_ENV)
+      updated_at: formatDateForDb(new Date())
     };
 
     const result = await anyDb.update(tables.movies).set(payload).where(eq(tables.movies.id, id)).returning();

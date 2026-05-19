@@ -79,8 +79,8 @@ export async function createToyImpl(
       stock: Number(stock ?? 0),
       status: status ?? 'active',
       image_url: savedImage,
-      created_at: formatDateForDb(nowIso, RUN_ENV?.RUNTIME_ENV),
-      updated_at: formatDateForDb(nowIso, RUN_ENV?.RUNTIME_ENV)
+      created_at: formatDateForDb(nowIso),
+      updated_at: formatDateForDb(nowIso)
     })
     .returning();
 
@@ -121,7 +121,7 @@ export async function updateToyImpl(
   const oldToy = await anyDb.query.toys.findFirst({
     where: eq(tables.toys.id, id)
   });
-  const data: any = { updated_at: formatDateForDb(now, RUN_ENV?.RUNTIME_ENV) };
+  const data: any = { updated_at: formatDateForDb(now) };
   if (name !== undefined) data.name = name;
   if (category !== undefined) data.category = category;
   if (priceNum !== undefined) data.price = String(priceNum);

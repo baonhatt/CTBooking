@@ -662,3 +662,5 @@ export async function deleteCloudinaryImage(env: any, publicId: string, type: 'i
   if (!res.ok) console.error('Cloudinary delete error:', json);
   return json;
 }
+
+export { isLocal, parseMediaUrl, localUploader, localDeleter } from '../../server/lib/media-utils';

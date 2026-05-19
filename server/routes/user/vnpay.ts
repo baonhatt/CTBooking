@@ -47,8 +47,7 @@ export async function createVnpayPaymentImpl(
     returnUrl?: string;
     ip?: string;
     gateway?: string;
-  },
-  RUNTIME_ENV?: string
+  }
 ) {
   const { amount, orderId, orderInfo, locale = 'vn' } = payload;
   if (!amount || !orderId || !orderInfo) {

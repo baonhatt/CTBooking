@@ -37,7 +37,6 @@
     "server/**/*",
     "shared/**/*",
     "vite.config.ts",
-    "vite.config.server.ts",
     "worker/**/*"
   ],
   "exclude": ["node_modules", "dist"]

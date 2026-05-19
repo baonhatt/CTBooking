@@ -159,8 +159,7 @@ export async function createPaymentImpl(
     accounts: any;
     movies: any;
     ticket_packages: any;
-  },
-  RUNTIME_ENV?: string
+  }
 ) {
   try {
     const validation = await validateBookingInput(anyDb, payload, tables);
@@ -202,8 +201,8 @@ export async function createPaymentImpl(
         ticket_package_name: validation.ticketPackage?.name || null,
         ticket_unit_price: validation.ticketPackage?.price ? Number(validation.ticketPackage.price) : null,
         pay_txt_code: pay_txt_code_dt,
-        created_at: formatDateForDb(nowIso, RUNTIME_ENV),
-        updated_at: formatDateForDb(nowIso, RUNTIME_ENV)
+        created_at: formatDateForDb(nowIso),
+        updated_at: formatDateForDb(nowIso)
       })
       .returning();
 
@@ -255,7 +254,6 @@ export async function updatePaymentImpl(
     ticket_packages: any;
     email_logs?: any;
   },
-  RUNTIME_ENV?: string,
   context?: { waitUntil: (promise: Promise<any>) => void }
 ) {
   try {
@@ -314,7 +312,7 @@ export async function updatePaymentImpl(
     const now = new Date();
     const updatePayload: any = {
       payment_status,
-      updated_at: formatDateForDb(now, RUNTIME_ENV),
+      updated_at: formatDateForDb(now),
       transaction_id: transaction_id ?? booking.transaction_id
     };
 
@@ -322,10 +320,9 @@ export async function updatePaymentImpl(
       const paidAtDate = paid_at ? new Date(paid_at) : new Date();
       const validPaidAt = isNaN(paidAtDate.getTime()) ? new Date() : paidAtDate;
 
-      updatePayload.paid_at = formatDateForDb(validPaidAt, RUNTIME_ENV);
+      updatePayload.paid_at = formatDateForDb(validPaidAt);
       updatePayload.expiry_date = formatDateForDb(
-        new Date(validPaidAt.getTime() + 10 * 24 * 60 * 60 * 1000),
-        RUNTIME_ENV
+        new Date(validPaidAt.getTime() + 10 * 24 * 60 * 60 * 1000)
       );
       updatePayload.booking_code = bookingCode;
     }
@@ -375,8 +372,7 @@ export async function updatePaymentImpl(
           emailType: 'booking_confirmation',
           userId: booking.user_id || undefined,
           bookingId: booking.id,
-          emailLogsTable: tables?.email_logs,
-          runtimeEnv: RUNTIME_ENV
+          emailLogsTable: tables?.email_logs
         },
         context
       );
@@ -544,8 +540,7 @@ export async function getBookingByCodeImpl(anyDb: any, codeRaw: string, tables: 
 export async function confirmUseTicketImpl(
   anyDb: any,
   codeRaw: string,
-  tables: { bookings: any },
-  RUNTIME_ENV?: string
+  tables: { bookings: any }
 ) {
   try {
     const code = String(codeRaw || '');
@@ -567,8 +562,8 @@ export async function confirmUseTicketImpl(
       .update(bookingsTable)
       .set({
         is_used: true,
-        updated_at: formatDateForDb(new Date(), RUNTIME_ENV),
-        checked_in_at: formatDateForDb(new Date(), RUNTIME_ENV)
+        updated_at: formatDateForDb(new Date()),
+        checked_in_at: formatDateForDb(new Date())
       })
       .where(eq(bookingsTable.id, booking.id))
       .returning();

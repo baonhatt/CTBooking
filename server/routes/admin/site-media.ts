@@ -17,8 +17,7 @@ export async function createSiteMediaImpl(
     duration?: string | number;
     display_order?: number;
     is_active?: boolean;
-  },
-  RUNTIME_ENV?: string
+  }
 ) {
   const {
     section,
@@ -53,8 +52,7 @@ export async function createSiteMediaImpl(
         ...args,
         id: existing.id,
         duration: args.duration !== undefined ? Number(args.duration) : undefined
-      },
-      RUNTIME_ENV
+      }
     );
   }
 
@@ -75,8 +73,8 @@ export async function createSiteMediaImpl(
       duration: duration !== undefined ? String(duration) : null,
       display_order: display_order !== undefined ? Number(display_order) : 0,
       is_active: typeof is_active === 'boolean' ? is_active : true,
-      created_at: formatDateForDb(nowIso, RUNTIME_ENV),
-      updated_at: formatDateForDb(nowIso, RUNTIME_ENV)
+      created_at: formatDateForDb(nowIso),
+      updated_at: formatDateForDb(nowIso)
     })
     .returning();
 
@@ -124,8 +122,7 @@ export async function updateSiteMediaImpl(
     duration?: number;
     display_order?: number;
     is_active?: boolean;
-  },
-  RUNTIME_ENV?: string
+  }
 ) {
   const {
     id,
@@ -143,7 +140,7 @@ export async function updateSiteMediaImpl(
     is_active
   } = args;
   const now = new Date();
-  const payload: any = { updated_at: formatDateForDb(now, RUNTIME_ENV) };
+  const payload: any = { updated_at: formatDateForDb(now) };
   if (section !== undefined) payload.section = String(section);
   if (type !== undefined) payload.type = String(type);
   if (title !== undefined) payload.title = title ? String(title) : null;
