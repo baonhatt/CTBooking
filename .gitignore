@@ -30,3 +30,9 @@ dist-ssr
 
 # Wrangler local secrets — KHÔNG commit!
 worker/.dev.vars
+.wrangler/
+worker/.wrangler/
+
+# Media and Database - KHÔNG commit!
+uploads/
+*.sql
