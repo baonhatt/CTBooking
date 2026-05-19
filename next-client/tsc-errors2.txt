@@ -1,0 +1,10 @@
+src/components/ui/breadcrumb.tsx(44,11): error TS2322: Type '{ slot?: string | undefined; style?: CSSProperties | undefined; title?: string | undefined; key?: Key | null | undefined; type?: string | undefined; defaultChecked?: boolean | undefined; ... 280 more ...; className: string; }' is not assignable to type 'SlotProps'.
+  Types of property 'children' are incompatible.
+    Type 'React.ReactNode' is not assignable to type 'import("D:/Web_Film/CTBooking/node_modules/@types/react/index").ReactNode'.
+      Type 'bigint' is not assignable to type 'ReactNode'.
+src/components/ui/button.tsx(42,13): error TS2322: Type '{ disabled?: boolean | undefined; form?: string | undefined; formAction?: string | ((formData: FormData) => void | Promise<void>) | undefined; formEncType?: string | undefined; ... 283 more ...; ref: ForwardedRef<...>; }' is not assignable to type 'SlotProps'.
+  Types of property 'children' are incompatible.
+    Type 'React.ReactNode' is not assignable to type 'import("D:/Web_Film/CTBooking/node_modules/@types/react/index").ReactNode'.
+      Type 'bigint' is not assignable to type 'ReactNode'.
+src/components/user/home/FilmCarousel.tsx(299,47): error TS2345: Argument of type 'string | null' is not assignable to parameter of type 'string'.
+  Type 'null' is not assignable to type 'string'.

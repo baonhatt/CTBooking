@@ -1,0 +1,17 @@
+# wrangler.toml – Cloudflare Pages deployment
+# Dành cho next-client (Next.js), KHÔNG phải worker/wrangler.toml
+# Build: npx @cloudflare/next-on-pages
+# Output dir: .vercel/output/static
+
+name = "cinema-pages"
+compatibility_date = "2024-12-01"
+compatibility_flags = ["nodejs_compat"]
+pages_build_output_dir = ".vercel/output/static"
+
+[env.preview]
+[env.preview.vars]
+NEXT_PUBLIC_API_URL = "https://cinema-worker-preview.baonhat20.workers.dev"
+
+[env.production]
+[env.production.vars]
+NEXT_PUBLIC_API_URL = "https://cinesphere.com.vn"
