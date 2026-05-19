@@ -160,6 +160,39 @@ app.get('/uploads/*', async (c) => {
     const relativePath = urlPath.replace(/^\//, '');
     const filePath = path.resolve(process.cwd(), relativePath);
     
+    // 1. Download if missing and on localhost
+    if (!fs.existsSync(filePath)) {
+      console.log(`[Worker Downloader] Missing file: ${urlPath}`);
+      
+      const cloudName = 'dzp3rbeix';
+      const ext = path.extname(urlPath).toLowerCase();
+      const isVideo = ['.mp4', '.webm', '.mov', '.m4v'].includes(ext);
+      const resourceType = isVideo ? 'video' : 'image';
+      
+      const publicPath = urlPath.replace('/uploads/', '');
+      const cloudinaryUrl = `https://res.cloudinary.com/${cloudName}/${resourceType}/upload/${publicPath}`;
+      
+      try {
+        const targetDir = path.dirname(filePath);
+        if (!fs.existsSync(targetDir)) {
+          fs.mkdirSync(targetDir, { recursive: true });
+        }
+
+        const response = await fetch(cloudinaryUrl);
+        if (response.ok) {
+          const arrayBuffer = await response.arrayBuffer();
+          const buffer = Buffer.from(arrayBuffer);
+          fs.writeFileSync(filePath, buffer);
+          console.log(`[Worker Downloader] Saved to: ${filePath}`);
+        } else {
+          console.error(`[Worker Downloader] Cloudinary failed (${response.status}): ${cloudinaryUrl}`);
+        }
+      } catch (err) {
+        console.error(`[Worker Downloader] Download Error:`, err);
+      }
+    }
+
+    // 2. Serve the file
     if (fs.existsSync(filePath)) {
       const ext = path.extname(filePath).toLowerCase();
       const mimeMap: Record<string, string> = {

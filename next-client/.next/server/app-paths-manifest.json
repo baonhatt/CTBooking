@@ -1,0 +1,9 @@
+{
+  "/page": "app/page.js",
+  "/booking/page": "app/booking/page.js",
+  "/qr-payment/page": "app/qr-payment/page.js",
+  "/posts/page": "app/posts/page.js",
+  "/posts/[slug]/page": "app/posts/[slug]/page.js",
+  "/_not-found/page": "app/_not-found/page.js",
+  "/uploads/[...path]/route": "app/uploads/[...path]/route.js"
+}

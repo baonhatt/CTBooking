@@ -1,0 +1,61 @@
+src/components/ui/breadcrumb.tsx(44,11): error TS2322: Type '{ slot?: string | undefined; style?: CSSProperties | undefined; title?: string | undefined; key?: Key | null | undefined; type?: string | undefined; defaultChecked?: boolean | undefined; ... 280 more ...; className: string; }' is not assignable to type 'SlotProps'.
+  Types of property 'children' are incompatible.
+    Type 'React.ReactNode' is not assignable to type 'import("D:/Web_Film/CTBooking/node_modules/@types/react/index").ReactNode'.
+      Type 'bigint' is not assignable to type 'ReactNode'.
+src/components/ui/button.tsx(42,13): error TS2322: Type '{ disabled?: boolean | undefined; form?: string | undefined; formAction?: string | ((formData: FormData) => void | Promise<void>) | undefined; formEncType?: string | undefined; ... 283 more ...; ref: ForwardedRef<...>; }' is not assignable to type 'SlotProps'.
+  Types of property 'children' are incompatible.
+    Type 'React.ReactNode' is not assignable to type 'import("D:/Web_Film/CTBooking/node_modules/@types/react/index").ReactNode'.
+      Type 'bigint' is not assignable to type 'ReactNode'.
+src/components/ui/input-otp.tsx(28,44): error TS2769: No overload matches this call.
+  Overload 1 of 2, '(context: ServerContext<ServerContextJSONValue>): ServerContextJSONValue', gave the following error.
+    Argument of type 'Context<RenderProps>' is not assignable to parameter of type 'ServerContext<ServerContextJSONValue>'.
+      The types of 'Provider.propTypes' are incompatible between these types.
+        Type 'WeakValidationMap<ProviderProps<RenderProps>> | undefined' is not assignable to type 'WeakValidationMap<ProviderProps<ServerContextJSONValue>> | undefined'.
+          Type 'WeakValidationMap<ProviderProps<RenderProps>>' is not assignable to type 'WeakValidationMap<ProviderProps<ServerContextJSONValue>>'.
+            Types of property 'value' are incompatible.
+              Type 'Validator<RenderProps> | undefined' is not assignable to type 'Validator<ServerContextJSONValue | undefined> | undefined'.
+                Type 'Validator<RenderProps>' is not assignable to type 'Validator<ServerContextJSONValue | undefined>'.
+                  Type 'RenderProps' is not assignable to type 'ServerContextJSONValue | undefined'.
+                    Type 'RenderProps' is not assignable to type '{ [key: string]: ServerContextJSONValue; }'.
+                      Index signature for type 'string' is missing in type 'RenderProps'.
+  Overload 2 of 2, '(context: Context<RenderProps>): RenderProps', gave the following error.
+    Argument of type 'import("D:/Web_Film/CTBooking/node_modules/@types/react/index").Context<import("D:/Web_Film/CTBooking/node_modules/input-otp/dist/index").RenderProps>' is not assignable to parameter of type 'React.Context<import("D:/Web_Film/CTBooking/node_modules/input-otp/dist/index").RenderProps>'.
+      Types of property 'Provider' are incompatible.
+        Type 'import("D:/Web_Film/CTBooking/node_modules/@types/react/index").Provider<import("D:/Web_Film/CTBooking/node_modules/input-otp/dist/index").RenderProps>' is not assignable to type 'React.Provider<import("D:/Web_Film/CTBooking/node_modules/input-otp/dist/index").RenderProps>'.
+          Types of parameters 'props' and 'props' are incompatible.
+            Type 'React.ProviderProps<import("D:/Web_Film/CTBooking/node_modules/input-otp/dist/index").RenderProps>' is not assignable to type 'import("D:/Web_Film/CTBooking/node_modules/@types/react/index").ProviderProps<import("D:/Web_Film/CTBooking/node_modules/input-otp/dist/index").RenderProps>'.
+              Types of property 'children' are incompatible.
+                Type 'React.ReactNode' is not assignable to type 'import("D:/Web_Film/CTBooking/node_modules/@types/react/index").ReactNode'.
+                  Type 'bigint' is not assignable to type 'ReactNode'.
+src/components/ui/input-otp.tsx(29,44): error TS18047: 'inputOTPContext' is possibly 'null'.
+src/components/ui/input-otp.tsx(29,60): error TS2339: Property 'slots' does not exist on type 'string | number | boolean | ServerContextJSONArray | { [key: string]: ServerContextJSONValue; }'.
+  Property 'slots' does not exist on type 'string'.
+src/components/ui/sidebar.tsx(6,29): error TS2307: Cannot find module '@/hooks/use-mobile' or its corresponding type declarations.
+src/components/ui/sidebar.tsx(360,8): error TS2322: Type '{ slot?: string | undefined; style?: CSSProperties | undefined; title?: string | undefined; key?: Key | null | undefined; defaultChecked?: boolean | undefined; ... 274 more ...; className: string; }' is not assignable to type 'SlotProps'.
+  Types of property 'children' are incompatible.
+    Type 'React.ReactNode' is not assignable to type 'import("D:/Web_Film/CTBooking/node_modules/@types/react/index").ReactNode'.
+      Type 'bigint' is not assignable to type 'ReactNode'.
+src/components/ui/sidebar.tsx(380,8): error TS2322: Type '{ form?: string | undefined; slot?: string | undefined; style?: CSSProperties | undefined; title?: string | undefined; key?: Key | null | undefined; disabled?: boolean | undefined; ... 283 more ...; className: string; }' is not assignable to type 'SlotProps'.
+  Types of property 'children' are incompatible.
+    Type 'React.ReactNode' is not assignable to type 'import("D:/Web_Film/CTBooking/node_modules/@types/react/index").ReactNode'.
+      Type 'bigint' is not assignable to type 'ReactNode'.
+src/components/ui/sidebar.tsx(448,6): error TS2322: Type '{ form?: string | undefined; slot?: string | undefined; style?: CSSProperties | undefined; title?: string | undefined; key?: Key | null | undefined; disabled?: boolean | undefined; ... 285 more ...; className: string; }' is not assignable to type 'SlotProps'.
+  Types of property 'children' are incompatible.
+    Type 'React.ReactNode' is not assignable to type 'import("D:/Web_Film/CTBooking/node_modules/@types/react/index").ReactNode'.
+      Type 'bigint' is not assignable to type 'ReactNode'.
+src/components/ui/sidebar.tsx(487,6): error TS2322: Type '{ form?: string | undefined; slot?: string | undefined; style?: CSSProperties | undefined; title?: string | undefined; key?: Key | null | undefined; disabled?: boolean | undefined; ... 283 more ...; className: string; }' is not assignable to type 'SlotProps'.
+  Types of property 'children' are incompatible.
+    Type 'React.ReactNode' is not assignable to type 'import("D:/Web_Film/CTBooking/node_modules/@types/react/index").ReactNode'.
+      Type 'bigint' is not assignable to type 'ReactNode'.
+src/components/ui/sidebar.tsx(593,6): error TS2322: Type '{ slot?: string | undefined; style?: CSSProperties | undefined; title?: string | undefined; key?: Key | null | undefined; type?: string | undefined; defaultChecked?: boolean | undefined; ... 283 more ...; className: string; }' is not assignable to type 'SlotProps'.
+  Types of property 'children' are incompatible.
+    Type 'React.ReactNode' is not assignable to type 'import("D:/Web_Film/CTBooking/node_modules/@types/react/index").ReactNode'.
+      Type 'bigint' is not assignable to type 'ReactNode'.
+src/components/ui/toaster.tsx(1,26): error TS2307: Cannot find module '@/hooks/use-toast' or its corresponding type declarations.
+src/components/ui/toaster.tsx(9,31): error TS7031: Binding element 'id' implicitly has an 'any' type.
+src/components/ui/toaster.tsx(9,35): error TS7031: Binding element 'title' implicitly has an 'any' type.
+src/components/ui/toaster.tsx(9,42): error TS7031: Binding element 'description' implicitly has an 'any' type.
+src/components/ui/toaster.tsx(9,55): error TS7031: Binding element 'action' implicitly has an 'any' type.
+src/components/ui/use-toast.ts(1,33): error TS2307: Cannot find module '@/hooks/use-toast' or its corresponding type declarations.
+src/components/user/home/FilmCarousel.tsx(299,47): error TS2345: Argument of type 'string | null' is not assignable to parameter of type 'string'.
+  Type 'null' is not assignable to type 'string'.
