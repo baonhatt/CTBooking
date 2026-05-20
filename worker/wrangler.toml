@@ -81,7 +81,9 @@ binding = "AI"
 [env.production]
 routes = [
   { pattern = "cinesphere.com.vn/api/*", zone_name = "cinesphere.com.vn" },
-  { pattern = "cinesphere.com.vn/uploads/*", zone_name = "cinesphere.com.vn" }
+  { pattern = "cinesphere.com.vn/uploads/*", zone_name = "cinesphere.com.vn" },
+  { pattern = "cinephere.com.vn/api/*", zone_name = "cinephere.com.vn" },
+  { pattern = "cinephere.com.vn/uploads/*", zone_name = "cinephere.com.vn" }
 ]
 [observability]
 enabled = false
