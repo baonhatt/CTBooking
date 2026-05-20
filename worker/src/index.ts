@@ -234,6 +234,7 @@ app.use(
                         const allowedExact = new Set([
                                 'https://cinesphere.com.vn',
                                 'https://www.cinesphere.com.vn',
+                                'https://cinephere.com.vn', // Test domain
                                 'https://cinema-pages.pages.dev', // Pages production
                                 'https://cinema-next-pages.pages.dev', // Next.js user client production
                                 'https://cinema-next.pages.dev', // Next.js user client (actual .pages.dev URL)
