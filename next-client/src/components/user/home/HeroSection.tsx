@@ -64,6 +64,11 @@ export default function HeroSection({
         const [storeUpdateTrigger, setStoreUpdateTrigger] = useState(0);
         const SECTION_ID = 'hero-main';
 
+        // Prefetch booking page để tránh lag khi user bấm đặt vé
+        useEffect(() => {
+                router.prefetch('/booking');
+        }, [router]);
+
         const [isDesktopHero, setIsDesktopHero] = useState(false);
         useEffect(() => {
                 setIsDesktopHero(window.matchMedia('(min-width: 1024px)').matches);

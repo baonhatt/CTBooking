@@ -1,0 +1,18 @@
+# wrangler.toml – Cloudflare Pages deployment for Admin (React Client)
+# Build: npm run build:client
+# Output dir: dist/spa
+
+name = "cinema-admin"
+compatibility_date = "2024-12-01"
+compatibility_flags = ["nodejs_compat"]
+pages_build_output_dir = "dist/spa"
+
+[env.preview]
+[env.preview.vars]
+VITE_SERVER_BASE_URL = "https://cinema-worker-preview.baonhat20.workers.dev"
+VITE_CLIENT_BASE_URL = "https://cinema-admin.pages.dev"
+
+[env.production]
+[env.production.vars]
+VITE_SERVER_BASE_URL = "https://cinesphere.com.vn"
+VITE_CLIENT_BASE_URL = "https://admin.cinesphere.com.vn"
