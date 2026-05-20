@@ -35,6 +35,10 @@ export async function getPublicPosts(options?: {
 
         const res = await fetch(`${API}/api/posts?${params.toString()}`, {
                 next: { revalidate: 3600 }, // ISR: tái tạo cache sau 1h
+                headers: {
+                        // Thêm headers để giúp SEO bot nhận diện request server-side
+                        ...(typeof window === "undefined" && { "User-Agent": "Mozilla/5.0 (compatible; CinesphereBot/1.0; +https://cinephere.com.vn)" }),
+                },
         });
 
         if (!res.ok) throw new Error(`Failed to fetch posts: ${res.status}`);
@@ -45,6 +49,10 @@ export async function getPublicPosts(options?: {
 export async function getPostBySlugId(slugId: string): Promise<PostItem | null> {
         const res = await fetch(`${API}/api/posts/${slugId}`, {
                 next: { revalidate: 3600 },
+                headers: {
+                        // Thêm headers để giúp SEO bot nhận diện request server-side
+                        ...(typeof window === "undefined" && { "User-Agent": "Mozilla/5.0 (compatible; CinesphereBot/1.0; +https://cinephere.com.vn)" }),
+                },
         });
         if (res.status === 404) return null;
         if (!res.ok) throw new Error(`Failed to fetch post: ${res.status}`);

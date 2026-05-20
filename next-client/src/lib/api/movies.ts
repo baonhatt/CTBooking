@@ -27,6 +27,10 @@ export type ActiveMovieToday = {
 export async function getActiveMoviesToday(): Promise<ActiveMovieToday[]> {
         const res = await fetch(`${API}/api/getActiveMovies`, {
                 next: { revalidate: 300 },
+                headers: {
+                        // Thêm headers để giúp SEO bot nhận diện request server-side
+                        ...(typeof window === "undefined" && { "User-Agent": "Mozilla/5.0 (compatible; CinesphereBot/1.0; +https://cinephere.com.vn)" }),
+                },
         });
         if (!res.ok) return [];
         const data = await res.json() as { activeMovies?: ActiveMovieToday[] };
@@ -37,6 +41,10 @@ export async function getActiveMoviesToday(): Promise<ActiveMovieToday[]> {
 export async function getMovies2025(): Promise<Movie[]> {
         const res = await fetch(`${API}/api/movies/2025`, {
                 next: { revalidate: 3600 },
+                headers: {
+                        // Thêm headers để giúp SEO bot nhận diện request server-side
+                        ...(typeof window === "undefined" && { "User-Agent": "Mozilla/5.0 (compatible; CinesphereBot/1.0; +https://cinephere.com.vn)" }),
+                },
         });
         if (!res.ok) return [];
         const data = await res.json() as { items?: Movie[] } | Movie[];
@@ -47,6 +55,10 @@ export async function getMovies2025(): Promise<Movie[]> {
 export async function getMovieById(id: number) {
         const res = await fetch(`${API}/api/movies-detail/${id}`, {
                 next: { revalidate: 600 },
+                headers: {
+                        // Thêm headers để giúp SEO bot nhận diện request server-side
+                        ...(typeof window === "undefined" && { "User-Agent": "Mozilla/5.0 (compatible; CinesphereBot/1.0; +https://cinephere.com.vn)" }),
+                },
         });
         if (!res.ok) return null;
         const data = await res.json();
