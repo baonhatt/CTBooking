@@ -7,7 +7,7 @@ import PostsSearchClient from '@/app/posts/PostsSearchClient';
 
 export const runtime = 'edge';
 
-const SITE_URL = 'https://cinesphere.com.vn';
+const SITE_URL = 'https://cinephere.com.vn';
 
 export const metadata: Metadata = {
         title: 'Tin Tức Điện Ảnh | Cinesphere Blog',

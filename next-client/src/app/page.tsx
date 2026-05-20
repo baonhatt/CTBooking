@@ -11,7 +11,7 @@ import { getActiveMoviesToday } from '@/lib/api/movies';
 import { getSiteMediaApi } from '@/lib/api/uploads';
 import { getActiveTickets, getActiveToys } from '@/lib/api/products';
 
-const SITE_URL = 'https://cinesphere.com.vn';
+const SITE_URL = 'https://cinephere.com.vn';
 
 export const metadata: Metadata = {
         title: 'Cinesphere | Trải Nghiệm Điện Ảnh Đỉnh Cao',

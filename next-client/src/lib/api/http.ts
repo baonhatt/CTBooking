@@ -32,7 +32,7 @@ export const SERVER_BASE_URL = (() => {
                 }
 
                 if (h === "cinesphere.com.vn" || h === "www.cinesphere.com.vn" || h === "cinephere.com.vn" || h === "www.cinephere.com.vn" || h === "cinema-pages.pages.dev") {
-                        return "https://cinesphere.com.vn";
+                        return "https://cinephere.com.vn";
                 }
 
                 return base;

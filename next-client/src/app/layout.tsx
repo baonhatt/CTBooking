@@ -7,7 +7,7 @@ import NextTopLoader from 'nextjs-toploader';
 
 export const runtime = 'edge';
 
-const SITE_URL = 'https://cinesphere.com.vn';
+const SITE_URL = 'https://cinephere.com.vn';
 
 export const metadata: Metadata = {
         title: {
