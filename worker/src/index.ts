@@ -236,6 +236,7 @@ app.use(
                                 'https://www.cinesphere.com.vn',
                                 'https://cinema-pages.pages.dev', // Pages production
                                 'https://cinema-next-pages.pages.dev', // Next.js user client production
+                                'https://cinema-next.pages.dev', // Next.js user client (actual .pages.dev URL)
                                 'https://cinema-admin-pages.pages.dev' // Admin client production
                         ]);
 
@@ -247,6 +248,7 @@ app.use(
                                 if (
                                         url.hostname === 'cinema-pages.pages.dev' || url.hostname.endsWith('.cinema-pages.pages.dev') ||
                                         url.hostname === 'cinema-next-pages.pages.dev' || url.hostname.endsWith('.cinema-next-pages.pages.dev') ||
+                                        url.hostname === 'cinema-next.pages.dev' || url.hostname.endsWith('.cinema-next.pages.dev') ||
                                         url.hostname === 'cinema-admin-pages.pages.dev' || url.hostname.endsWith('.cinema-admin-pages.pages.dev')
                                 ) {
                                         return origin;
