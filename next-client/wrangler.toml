@@ -29,8 +29,8 @@ NEXT_PUBLIC_BACKDROP_BLUR = "2"
 
 [env.production]
 [env.production.vars]
-NEXT_PUBLIC_API_URL = "https://cinephere.com.vn"
-NEXT_PUBLIC_SERVER_BASE_URL = "https://cinephere.com.vn"
+NEXT_PUBLIC_API_URL = "https://api.cinephere.com.vn"
+NEXT_PUBLIC_SERVER_BASE_URL = "https://api.cinephere.com.vn"
 NEXT_PUBLIC_CLIENT_BASE_URL = "https://cinephere.com.vn"
 NEXT_PUBLIC_MOMO_PARTNER_CODE = ""
 NEXT_PUBLIC_MOMO_PARTNER_NAME = "CineSphere"
