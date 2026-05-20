@@ -1,44 +1,9 @@
-export const API_BASE_URL = (() => {
-        const env = (import.meta as any).env || {};
-        const base = env?.VITE_API_BASE_URL || env?.VITE_API_URL || "";
-        if (typeof window !== "undefined") {
-                const h = window.location.hostname || "";
+// Sử dụng biến môi trường Next.js thay vì Vite syntax
+// Trong SSR (Server-Side Rendering), luôn dùng NEXT_PUBLIC_API_URL để gọi API
+export const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? '';
 
-                if (h === "localhost" || h === "127.0.0.1") return "";
-
-                if (h.endsWith("pages.dev") && h !== "cinema-pages.pages.dev") {
-                        return "https://cinema-worker-preview.baonhat20.workers.dev";
-                }
-
-                if (h === "cinesphere.com.vn" || h === "www.cinesphere.com.vn" || h === "cinephere.com.vn" || h === "www.cinephere.com.vn" || h === "cinema-pages.pages.dev") {
-                        return "";
-                }
-
-                return base;
-        }
-        return base;
-})();
-
-export const SERVER_BASE_URL = (() => {
-        const env = (import.meta as any).env || {};
-        const base = env?.VITE_SERVER_BASE_URL || "";
-        if (typeof window !== "undefined") {
-                const h = window.location.hostname || "";
-
-                if (h === "localhost" || h === "127.0.0.1") return base;
-
-                if (h.endsWith("pages.dev") && h !== "cinema-pages.pages.dev") {
-                        return "https://cinema-worker-preview.baonhat20.workers.dev";
-                }
-
-                if (h === "cinesphere.com.vn" || h === "www.cinesphere.com.vn" || h === "cinephere.com.vn" || h === "www.cinephere.com.vn" || h === "cinema-pages.pages.dev") {
-                        return "https://cinephere.com.vn";
-                }
-
-                return base;
-        }
-        return base;
-})();
+// SERVER_BASE_URL dùng cho server-side API calls (IPN callbacks, v.v.)
+export const SERVER_BASE_URL = process.env.NEXT_PUBLIC_SERVER_BASE_URL ?? process.env.NEXT_PUBLIC_API_URL ?? '';
 
 export function buildUrl(path: string) {
         return API_BASE_URL ? `${API_BASE_URL}${path}` : path;
@@ -50,6 +15,8 @@ export async function request<T>(path: string, init: RequestInit = {}) {
                 ...init,
                 headers: {
                         "Content-Type": "application/json",
+                        // Thêm User-Agent để giúp SEO bot nhận diện request
+                        ...(typeof window === "undefined" && { "User-Agent": "Mozilla/5.0 (compatible; CinesphereBot/1.0; +https://cinephere.com.vn)" }),
                         ...(init.headers || {}),
                 },
         });
