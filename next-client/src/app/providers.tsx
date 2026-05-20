@@ -3,9 +3,9 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { Toaster } from 'sonner';
 import { TooltipProvider } from '@/components/ui/tooltip';
-import { useState } from 'react';
+import React, { useState } from 'react';
 
-export default function Providers({ children }: { children: React.ReactNode }) {
+export default function Providers({ children }: React.PropsWithChildren) {
         const [queryClient] = useState(
                 () =>
                         new QueryClient({
