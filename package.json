@@ -16,6 +16,7 @@
     "dev:all": "concurrently \"npm run dev\" \"npm run dev:worker\"",
     "dev:debug": "tsx --inspect=9229 --tsconfig tsconfig.json node_modules/vite/bin/vite.js",
     "build": "npm run build:client",
+    "build:next": "cd next-client && npx @cloudflare/next-on-pages",
     "build:client": "cross-env VITE_SERVER_BASE_URL=https://cinesphere.com.vn vite build",
     "build:client:preview": "cross-env VITE_SERVER_BASE_URL=https://cinema-worker-preview.baonhat20.workers.dev vite build --mode preview",
     "start": "node dist/server/node-build.mjs",
@@ -24,8 +25,8 @@
     "typecheck": "tsc",
     "deploy:preview": "npx wrangler deploy --env preview --config worker/wrangler.toml",
     "deploy:prod": "npx wrangler deploy --config worker/wrangler.toml",
-    "pages:deploy:prod": "npm run build:client && npx wrangler pages deploy dist/spa --project-name=cinema-pages --branch=main",
-    "pages:deploy:preview": "npm run build:client:preview && npx wrangler pages deploy dist/spa --project-name=cinema-pages --branch=preview",
+    "pages:deploy:prod": "npm run build:client && npx wrangler pages deploy dist/spa --project-name=cinema-admin-pages --branch=main",
+    "pages:deploy:preview": "npm run build:client:preview && npx wrangler pages deploy dist/spa --project-name=cinema-admin-pages --branch=preview",
     "db:push": "drizzle-kit push",
     "db:import-local": "npx wrangler d1 execute cinema-db --local --file=cinema_db_prod.sql --config worker/wrangler.toml"
   },
