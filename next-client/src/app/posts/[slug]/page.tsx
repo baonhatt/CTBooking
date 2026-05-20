@@ -10,7 +10,7 @@ import PostSidebar from './PostSidebar';
 export const runtime = 'edge';
 export const revalidate = 3600;
 
-const SITE_URL = 'https://cinesphere.com.vn';
+const SITE_URL = 'https://cinephere.com.vn';
 
 export async function generateMetadata({
         params,
