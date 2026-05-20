@@ -63,6 +63,13 @@ export default function BookingPage() {
         };
         const [overlayDark, setOverlayDark] = useState(backdropConfig.base);
 
+        // Prefetch các trang để tránh lag khi điều hướng
+        useEffect(() => {
+                router.prefetch('/qr-payment');
+                router.prefetch('/checkout');
+                router.prefetch('/');
+        }, [router]);
+
         const { data: ticketsData, isLoading: isLoadingTickets } = useQuery({
                 queryKey: ['activeTickets'],
                 queryFn: ({ signal }) => getActiveTickets({ signal })

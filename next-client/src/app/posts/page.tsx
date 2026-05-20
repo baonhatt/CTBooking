@@ -7,15 +7,36 @@ import PostsSearchClient from '@/app/posts/PostsSearchClient';
 
 export const runtime = 'edge';
 
+const SITE_URL = 'https://cinesphere.com.vn';
+
 export const metadata: Metadata = {
-        title: 'Bài Viết Nổi Bật | Cinesphere Blog',
+        title: 'Tin Tức Điện Ảnh | Cinesphere Blog',
         description:
                 'Cập nhật tin tức phim ảnh, review đánh giá các siêu phẩm phòng vé và xu hướng công nghệ chiếu rạp mới nhất tại Cinesphere.',
+        alternates: { canonical: `${SITE_URL}/posts` },
         openGraph: {
-                title: 'Bài Viết Nổi Bật | Cinesphere Blog',
+                title: 'Tin Tức Điện Ảnh | Cinesphere Blog',
                 description:
                         'Khám phá các tin tức điện ảnh độc quyền và review khách quan từ đội ngũ chuyên gia Cinesphere.',
                 type: 'website',
+                url: `${SITE_URL}/posts`,
+                locale: 'vi_VN',
+                siteName: 'Cinesphere',
+                images: [
+                        {
+                                url: '/og-default.jpg',
+                                width: 1200,
+                                height: 630,
+                                alt: 'Cinesphere Blog - Tin Tức Điện Ảnh',
+                        },
+                ],
+        },
+        twitter: {
+                card: 'summary_large_image',
+                title: 'Tin Tức Điện Ảnh | Cinesphere Blog',
+                description:
+                        'Khám phá các tin tức điện ảnh độc quyền và review khách quan từ đội ngũ chuyên gia Cinesphere.',
+                images: ['/og-default.jpg'],
         },
 };
 

@@ -47,6 +47,13 @@ export default function Header({
         const { userName, setUserName } = useAuthState();
         const { handleLogout } = useAuthHandlers(setUserName);
 
+        // Prefetch các trang chính để tránh lag khi điều hướng
+        useEffect(() => {
+                router.prefetch('/booking');
+                router.prefetch('/posts');
+                router.prefetch('/account');
+        }, [router]);
+
         // Dialog states
         const [isLoginOpen, setIsLoginOpen] = useState(false);
         const [isRegisterOpen, setIsRegisterOpen] = useState(false);

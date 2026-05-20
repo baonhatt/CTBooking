@@ -3,7 +3,7 @@
 # Build: npx @cloudflare/next-on-pages
 # Output dir: .vercel/output/static
 
-name = "cinema-pages"
+name = "cinema-next-pages"
 compatibility_date = "2024-12-01"
 compatibility_flags = ["nodejs_compat"]
 pages_build_output_dir = ".vercel/output/static"
@@ -11,7 +11,37 @@ pages_build_output_dir = ".vercel/output/static"
 [env.preview]
 [env.preview.vars]
 NEXT_PUBLIC_API_URL = "https://cinema-worker-preview.baonhat20.workers.dev"
+NEXT_PUBLIC_SERVER_BASE_URL = "https://cinema-worker-preview.baonhat20.workers.dev"
+NEXT_PUBLIC_CLIENT_BASE_URL = "https://preview.cinema-next-pages.pages.dev"
+NEXT_PUBLIC_MOMO_PARTNER_CODE = ""
+NEXT_PUBLIC_MOMO_PARTNER_NAME = "CineSphere"
+NEXT_PUBLIC_MOMO_STORE_ID = "devstore"
+NEXT_PUBLIC_MOMO_REDIRECT_URL = "/checkout"
+NEXT_PUBLIC_MOMO_IPN_URL = "/api/momo/ipn"
+NEXT_PUBLIC_MOMO_ACCESS_KEY = ""
+NEXT_PUBLIC_MOMO_SECRET_KEY = ""
+NEXT_PUBLIC_VNPAY_RETURN_URL = "/checkout"
+NEXT_PUBLIC_BACKDROP_DARK_BASE = "0.5"
+NEXT_PUBLIC_BACKDROP_DARK_MIN = "0.4"
+NEXT_PUBLIC_BACKDROP_DARK_MAX = "0.7"
+NEXT_PUBLIC_BACKDROP_BRIGHTNESS = "0.85"
+NEXT_PUBLIC_BACKDROP_BLUR = "2"
 
 [env.production]
 [env.production.vars]
 NEXT_PUBLIC_API_URL = "https://cinesphere.com.vn"
+NEXT_PUBLIC_SERVER_BASE_URL = "https://cinesphere.com.vn"
+NEXT_PUBLIC_CLIENT_BASE_URL = "https://cinesphere.com.vn"
+NEXT_PUBLIC_MOMO_PARTNER_CODE = ""
+NEXT_PUBLIC_MOMO_PARTNER_NAME = "CineSphere"
+NEXT_PUBLIC_MOMO_STORE_ID = "devstore"
+NEXT_PUBLIC_MOMO_REDIRECT_URL = "/checkout"
+NEXT_PUBLIC_MOMO_IPN_URL = "/api/momo/ipn"
+NEXT_PUBLIC_MOMO_ACCESS_KEY = ""
+NEXT_PUBLIC_MOMO_SECRET_KEY = ""
+NEXT_PUBLIC_VNPAY_RETURN_URL = "/checkout"
+NEXT_PUBLIC_BACKDROP_DARK_BASE = "0.5"
+NEXT_PUBLIC_BACKDROP_DARK_MIN = "0.4"
+NEXT_PUBLIC_BACKDROP_DARK_MAX = "0.7"
+NEXT_PUBLIC_BACKDROP_BRIGHTNESS = "0.85"
+NEXT_PUBLIC_BACKDROP_BLUR = "2"

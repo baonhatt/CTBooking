@@ -70,6 +70,11 @@ export default function FilmCarousel({ initialFilms = [], onSelectFilm }: FilmCa
                 setCanScrollNext(emblaApi.canScrollNext());
         }, []);
 
+        // Prefetch booking page để tránh lag khi user bấm đặt vé
+        useEffect(() => {
+                router.prefetch('/booking');
+        }, [router]);
+
         // Setup Embla event listeners
         useEffect(() => {
                 if (!emblaApi) return;

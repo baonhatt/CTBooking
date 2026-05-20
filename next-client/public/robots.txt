@@ -1,0 +1,14 @@
+User-agent: *
+Allow: /
+Allow: /posts
+Allow: /booking
+
+Disallow: /account
+Disallow: /checkout
+Disallow: /qr-payment
+Disallow: /success-payment
+Disallow: /reset-password
+Disallow: /maintenance
+Disallow: /api/
+
+Sitemap: https://cinesphere.com.vn/sitemap.xml
