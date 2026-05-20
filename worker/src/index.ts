@@ -235,6 +235,9 @@ app.use(
                                 'https://cinesphere.com.vn',
                                 'https://www.cinesphere.com.vn',
                                 'https://cinephere.com.vn', // Test domain
+                                'https://api.cinephere.com.vn', // API domain
+                                'https://admin.cinephere.com.vn', // Admin domain (correct spelling)
+                                'https://admin.cinesphere.com.vn', // Admin domain (old spelling)
                                 'https://cinema-pages.pages.dev', // Pages production
                                 'https://cinema-next-pages.pages.dev', // Next.js user client production
                                 'https://cinema-next.pages.dev', // Next.js user client (actual .pages.dev URL)

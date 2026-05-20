@@ -9,10 +9,10 @@ pages_build_output_dir = "dist/spa"
 
 [env.preview]
 [env.preview.vars]
-VITE_SERVER_BASE_URL = "https://cinema-worker-preview.baonhat20.workers.dev"
-VITE_CLIENT_BASE_URL = "https://cinema-admin.pages.dev"
+VITE_SERVER_BASE_URL = "https://api.cinephere.com.vn"
+VITE_CLIENT_BASE_URL = "https://admin.cinephere.com.vn"
 
 [env.production]
 [env.production.vars]
-VITE_SERVER_BASE_URL = "https://cinesphere.com.vn"
-VITE_CLIENT_BASE_URL = "https://admin.cinesphere.com.vn"
+VITE_SERVER_BASE_URL = "https://api.cinephere.com.vn"
+VITE_CLIENT_BASE_URL = "https://admin.cinephere.com.vn"

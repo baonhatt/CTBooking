@@ -44,7 +44,7 @@ mode = "smart"
 [env.preview.vars]
 IS_PREVIEW = "true"
 
-VITE_SERVER_BASE_URL = "https://cinema-worker-preview.baonhat20.workers.dev"
+VITE_SERVER_BASE_URL = "https://api.cinephere.com.vn"
 VITE_CLIENT_BASE_URL = "https://preview.cinema-pages.pages.dev"
 
 VITE_MOMO_REDIRECT_URL = "/checkout"
