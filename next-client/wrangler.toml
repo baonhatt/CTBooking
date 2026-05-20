@@ -3,7 +3,7 @@
 # Build: npx @cloudflare/next-on-pages
 # Output dir: .vercel/output/static
 
-name = "cinema-next-pages"
+name = "cinema-next"
 compatibility_date = "2024-12-01"
 compatibility_flags = ["nodejs_compat"]
 pages_build_output_dir = ".vercel/output/static"
@@ -12,7 +12,7 @@ pages_build_output_dir = ".vercel/output/static"
 [env.preview.vars]
 NEXT_PUBLIC_API_URL = "https://cinema-worker-preview.baonhat20.workers.dev"
 NEXT_PUBLIC_SERVER_BASE_URL = "https://cinema-worker-preview.baonhat20.workers.dev"
-NEXT_PUBLIC_CLIENT_BASE_URL = "https://preview.cinema-next-pages.pages.dev"
+NEXT_PUBLIC_CLIENT_BASE_URL = "https://preview.cinema-next.pages.dev"
 NEXT_PUBLIC_MOMO_PARTNER_CODE = ""
 NEXT_PUBLIC_MOMO_PARTNER_NAME = "CineSphere"
 NEXT_PUBLIC_MOMO_STORE_ID = "devstore"
