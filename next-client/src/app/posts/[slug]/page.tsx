@@ -170,7 +170,12 @@ export default async function PostDetailPage({
                                                         <div className="rounded-2xl md:rounded-3xl neon-border bg-white/5 p-6 md:p-10">
                                                                 <div
                                                                         className="leading-7 text-slate-200 [&_h1]:text-white [&_h1]:font-black [&_h1]:text-3xl [&_h1]:mt-8 [&_h2]:text-white [&_h2]:font-extrabold [&_h2]:text-2xl [&_h2]:mt-8 [&_h3]:text-white [&_h3]:font-bold [&_h3]:text-xl [&_h3]:mt-6 [&_p]:text-slate-200 [&_p]:mb-4 [&_strong]:text-white [&_a]:text-cyan-300 [&_a]:underline [&_ol]:list-decimal [&_ol]:pl-6 [&_ol]:my-4 [&_ul]:list-disc [&_ul]:pl-6 [&_ul]:my-4 [&_li]:text-slate-200 [&_li]:mb-1 [&_img]:rounded-xl [&_img]:my-6 [&_img]:w-full [&_blockquote]:border-l-4 [&_blockquote]:border-cyan-400 [&_blockquote]:pl-4 [&_blockquote]:italic [&_blockquote]:text-slate-300 [&_blockquote]:my-4 [&_figure]:my-6 [&_figure]:text-center [&_figure_img]:rounded-xl [&_figure_img]:w-full [&_figure_img]:my-0 [&_figcaption]:mt-2 [&_figcaption]:text-xs [&_figcaption]:text-slate-400 [&_figcaption]:italic"
-                                                                        dangerouslySetInnerHTML={{ __html: post.content || '' }}
+                                                                        dangerouslySetInnerHTML={{
+                                                                                __html: (post.content || '').replace(
+                                                                                        /<img(?![^>]*\balt=)([^>]*)(\/?>)/gi,
+                                                                                        `<img alt="${post.title}"$1$2`
+                                                                                ),
+                                                                        }}
                                                                 />
                                                         </div>
                                                 </article>
