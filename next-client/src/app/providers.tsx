@@ -21,6 +21,7 @@ export default function Providers({ children }: React.PropsWithChildren) {
 
         return (
                 <QueryClientProvider client={queryClient}>
+                        {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
                         <TooltipProvider>
                                 <Toaster
                                         position="top-center"
@@ -42,7 +43,7 @@ export default function Providers({ children }: React.PropsWithChildren) {
                                                 },
                                         }}
                                 />
-                                {children}
+                                {children as any}
                         </TooltipProvider>
                 </QueryClientProvider>
         );
