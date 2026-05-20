@@ -8,14 +8,14 @@ preview_urls = true
 
 [vars]
 
-VITE_SERVER_BASE_URL = "https://cinesphere.com.vn"
-VITE_CLIENT_BASE_URL = "https://cinesphere.com.vn"
+VITE_SERVER_BASE_URL = "https://cinephere.com.vn"
+VITE_CLIENT_BASE_URL = "https://cinephere.com.vn"
 VITE_VNPAY_RETURN_URL = "/checkout"
 VITE_VNPAY_GATEWAY = "https://sandbox.vnpayment.vn/paymentv2/vpcpay.html"
 VITE_MOMO_ENDPOINT = "https://test-payment.momo.vn/v2/gateway/api/create"
 VITE_MOMO_REDIRECT_URL = "/checkout"
 VITE_MOMO_IPN_URL = "/api/momo/ipn"
-R2_PUBLIC_BASE = "https://cinesphere.com.vn"
+R2_PUBLIC_BASE = "https://cinephere.com.vn"
 R2_PUBLIC_ENABLED = "false"
 GMAIL_SENDER_EMAIL = "no-reply@cinesphere.com.vn"
 GMAIL_SENDER_NAME = "CINESPHERE"
@@ -23,6 +23,7 @@ BREVO_SENDER_EMAIL = "no-reply@cinesphere.com.vn"
 BREVO_SENDER_NAME = "CINESPHERE"
 VITE_RATE_LIMIT_BOOKING_CHECK_MAX = "10"
 VITE_RATE_LIMIT_BOOKING_CHECK_WINDOWMS = "60000"
+INDEXNOW_KEY = "a7f3c2e1b5d8f4a9c6e2d1b8f5a3c7e4"
 
 [[d1_databases]]
 binding = "cinema_db"
@@ -61,6 +62,7 @@ BREVO_SENDER_EMAIL = "no-reply@cinesphere.com.vn"
 BREVO_SENDER_NAME = "CINESPHERE"
 VITE_RATE_LIMIT_BOOKING_CHECK_MAX = "10"
 VITE_RATE_LIMIT_BOOKING_CHECK_WINDOWMS = "60000"
+INDEXNOW_KEY = "a7f3c2e1b5d8f4a9c6e2d1b8f5a3c7e4"
 VITE_CLOUDINARY_CLOUD_NAME = "dzp3rbeix"
 VITE_CLOUDINARY_UPLOAD_PRESET_VIDEO="ctbooking_videos_unsigned"
 VITE_CLOUDINARY_UPLOAD_PRESET_IMAGE="ctbooking_images_unsigned"
