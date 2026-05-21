@@ -100,14 +100,14 @@ export async function resetPasswordImpl(
         });
 
         if (!account) {
-                return { status: 'error', message: 'Tài khoản không tồn tại!' };
+                return { status: 400, message: 'Tài khoản không tồn tại!' };
         }
 
         // Kiểm tra nếu mật khẩu mới trùng với mật khẩu cũ
         const isMatch = await bcrypt.compare(String(newPassword), account.password);
         if (isMatch) {
                 console.log(`[Security] User ${account.email} attempted to reset password with the same password.`);
-                return { status: 'error', message: 'Mật khẩu mới không được trùng với mật khẩu hiện tại' };
+                return { status: 400, message: 'Mật khẩu mới không được trùng với mật khẩu hiện tại' };
         }
 
         const hashedPassword = await bcrypt.hash(String(newPassword), 10);
