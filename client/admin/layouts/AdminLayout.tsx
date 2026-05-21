@@ -50,16 +50,23 @@ export default function AdminLayout({ active, setActive, adminEmailState, handle
         const itemClass = (isActive: boolean) =>
                 `w-full justify-start gap-2 rounded-md ${isActive ? 'bg-white/10 text-white' : 'text-white/90'} hover:bg-white/10`;
 
-        const [hiddenTabs, setHiddenTabs] = React.useState<string[]>(() => {
+        const [hiddenTabs, setHiddenTabs] = React.useState<string[] | { hidden_tabs: string[] }>(() => {
                 const stored = localStorage.getItem('admin_sidebar_hidden_tabs');
-                return stored ? JSON.parse(stored) : [];
+                if (!stored) return [];
+                const parsed = JSON.parse(stored);
+                return Array.isArray(parsed) ? parsed : (parsed?.hidden_tabs || []);
         });
 
         // Listen for storage changes to update sidebar visibility in real-time if needed
         React.useEffect(() => {
                 const handleStorageChange = () => {
                         const stored = localStorage.getItem('admin_sidebar_hidden_tabs');
-                        setHiddenTabs(stored ? JSON.parse(stored) : []);
+                        if (!stored) {
+                                setHiddenTabs([]);
+                                return;
+                        }
+                        const parsed = JSON.parse(stored);
+                        setHiddenTabs(Array.isArray(parsed) ? parsed : (parsed?.hidden_tabs || []));
                 };
                 window.addEventListener('storage', handleStorageChange);
                 // Custom event for same-window updates
@@ -72,10 +79,12 @@ export default function AdminLayout({ active, setActive, adminEmailState, handle
                                 .then((res) => res.json())
                                 .then((data) => {
                                         if (data && data.settings) {
-                                                const settingsStr = JSON.stringify(data.settings);
+                                                const settings = data.settings;
+                                                const hiddenTabsArray = Array.isArray(settings) ? settings : (settings?.hidden_tabs || []);
+                                                const settingsStr = JSON.stringify(hiddenTabsArray);
                                                 if (localStorage.getItem('admin_sidebar_hidden_tabs') !== settingsStr) {
                                                         localStorage.setItem('admin_sidebar_hidden_tabs', settingsStr);
-                                                        setHiddenTabs(data.settings);
+                                                        setHiddenTabs(hiddenTabsArray);
                                                 }
                                         }
                                 })
@@ -99,7 +108,10 @@ export default function AdminLayout({ active, setActive, adminEmailState, handle
                 { key: 'ticket-check' as const, label: 'Kiểm Tra Vé', icon: <ScanLine className="h-4 w-4" /> },
                 { key: 'uploads' as const, label: 'Uploads', icon: <Clapperboard className="h-4 w-4" /> },
                 { key: 'email-logs' as const, label: 'Email Logs', icon: <Mail className="h-4 w-4" /> }
-        ].filter((item) => !hiddenTabs.includes(item.key));
+        ].filter((item) => {
+                const hiddenTabsArray = Array.isArray(hiddenTabs) ? hiddenTabs : (hiddenTabs?.hidden_tabs || []);
+                return !hiddenTabsArray.includes(item.key);
+        });
 
         return (
                 <div className="min-h-screen flex md:grid md:grid-cols-[260px_1fr] flex-col md:flex-row relative">
