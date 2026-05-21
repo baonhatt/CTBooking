@@ -53,7 +53,7 @@ export async function updateUserProfileApi(body: {
 }
 
 export async function changePasswordApi(body: { email: string; oldPassword: string; newPassword: string }) {
-        return request<{ ok: boolean }>(`/api/users/password`, {
+        return request<{ ok: boolean }>(`/api/users-password`, {
                 method: 'POST',
                 body: JSON.stringify(body)
         });
