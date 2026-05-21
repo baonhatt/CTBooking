@@ -41,16 +41,18 @@ export default function Header({
 
         // Custom hooks
         const isScrolled = useScrollDetect(50);
-        const isPostsRoute = pathname === '/posts' || pathname.startsWith('/posts/');
+        const isPostsRoute = pathname === '/bai-viet' || pathname.startsWith('/bai-viet/');
+        const isAccountOrCheckout = pathname === '/account' || pathname === '/checkout';
+        const shouldCheckAuth = isAccountOrCheckout;
+        const { userName, setUserName } = useAuthState(shouldCheckAuth);
         const effectiveDisable = disableNav || (pathname !== '/' && !isPostsRoute);
         const activeSection = useActiveSection(effectiveDisable);
-        const { userName, setUserName } = useAuthState();
         const { handleLogout } = useAuthHandlers(setUserName);
 
         // Prefetch các trang chính để tránh lag khi điều hướng
         useEffect(() => {
                 router.prefetch('/booking');
-                router.prefetch('/posts');
+                router.prefetch('/bai-viet');
                 router.prefetch('/account');
         }, [router]);
 
@@ -68,7 +70,7 @@ export default function Header({
         // Utilities
         const scrollToSection = (id: string) => {
                 if (id === 'posts') {
-                        router.push('/posts');
+                        router.push('/bai-viet');
                         return;
                 }
 
@@ -187,7 +189,7 @@ export default function Header({
                                                         key={item.target}
                                                         label={item.label}
                                                         target={item.target}
-                                                        isActive={item.target === 'posts' ? pathname.startsWith('/posts') : activeSection === item.target}
+                                                        isActive={item.target === 'posts' ? pathname.startsWith('/bai-viet') : activeSection === item.target}
                                                         disabled={item.target === 'posts' ? false : effectiveDisable}
                                                         onClick={() => scrollToSection(item.target)}
                                                 />

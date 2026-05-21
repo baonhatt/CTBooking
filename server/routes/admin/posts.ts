@@ -94,11 +94,13 @@ export async function createPostImpl(
                 author_id?: number;
                 status?: string;
                 is_featured?: boolean;
+                meta_description?: string;
+                meta_keywords?: string;
         },
         RUN_ENV?: any,
         uploader?: (base64: string, folder: string) => Promise<{ url: string }>
 ) {
-        const { title, content, excerpt, featured_image, image_base64, author_id, status, is_featured } = args;
+        const { title, content, excerpt, featured_image, image_base64, author_id, status, is_featured, meta_description, meta_keywords } = args;
 
         let savedImage = featured_image;
 
@@ -133,6 +135,8 @@ export async function createPostImpl(
                 featured_image: savedImage || null,
                 status: status || 'draft',
                 is_featured: is_featured || false,
+                meta_description: meta_description || null,
+                meta_keywords: meta_keywords || null,
                 published_at: published_at ? formatDateForDb(published_at) : null,
                 created_at: formatDateForDb(nowIso),
                 updated_at: formatDateForDb(nowIso)
@@ -169,6 +173,8 @@ export async function updatePostImpl(
                 image_base64?: string;
                 status?: string;
                 is_featured?: boolean;
+                meta_description?: string;
+                meta_keywords?: string;
         },
         RUN_ENV?: any,
         uploader?: (base64: string, folder: string) => Promise<{ url: string }>,
@@ -179,7 +185,7 @@ export async function updatePostImpl(
         });
         if (!existing) return null;
 
-        const { title, content, excerpt, featured_image, image_base64, status, is_featured } = args;
+        const { title, content, excerpt, featured_image, image_base64, status, is_featured, meta_description, meta_keywords } = args;
 
         const data: any = {
                 updated_at: formatDateForDb(new Date())
@@ -210,6 +216,8 @@ export async function updatePostImpl(
                 }
         }
         if (is_featured !== undefined) data.is_featured = is_featured;
+        if (meta_description !== undefined) data.meta_description = meta_description;
+        if (meta_keywords !== undefined) data.meta_keywords = meta_keywords;
 
         if (image_base64 && typeof image_base64 === 'string' && uploader) {
                 try {

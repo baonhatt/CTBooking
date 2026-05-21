@@ -30,6 +30,7 @@ export async function generateMetadata({
 
         const canonicalUrl = `${SITE_URL}${buildPostHref(post)}`;
         const description =
+                post.meta_description?.trim() ||
                 post.excerpt?.trim() ||
                 `Đọc bài viết "${post.title}" tại Cinesphere - Rạp chiếu phim công nghệ hiện đại.`;
         const ogImage = post.featured_image || `${SITE_URL}/logo.svg`;
@@ -83,7 +84,8 @@ export default async function PostDetailPage({
                 '@context': 'https://schema.org',
                 '@type': 'Article',
                 headline: post.title,
-                description: post.excerpt?.trim() || '',
+                description: post.meta_description?.trim() || post.excerpt?.trim() || '',
+                keywords: post.meta_keywords || '',
                 image: post.featured_image || `${SITE_URL}/logo.svg`,
                 datePublished: post.published_at || post.created_at,
                 dateModified: post.updated_at || post.published_at || post.created_at,
@@ -106,7 +108,7 @@ export default async function PostDetailPage({
                                 {/* Back button */}
                                 <div className="container mx-auto px-4 md:px-6 lg:px-8 pt-20 md:pt-24">
                                         <Link
-                                                href="/posts"
+                                                href="/bai-viet"
                                                 className="inline-flex items-center gap-2 text-slate-300 hover:text-white hover:bg-white/10 bg-transparent px-3 py-2 rounded-md transition-colors text-sm"
                                         >
                                                 <ArrowLeft className="w-4 h-4" />

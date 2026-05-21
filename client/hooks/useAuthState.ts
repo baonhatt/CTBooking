@@ -1,38 +1,54 @@
 import { useState, useEffect } from 'react';
+import { getMeApi } from '@/lib/api';
 
-export function useAuthState() {
-  const [userName, setUserName] = useState<string | null>(null);
+export function useAuthState(setUserName: (name: string | null) => void, shouldCheck: boolean = false) {
+        const [isAuthenticated, setIsAuthenticated] = useState(false);
+        const [isLoading, setIsLoading] = useState(false);
 
-  useEffect(() => {
-    const readAuth = () => {
-      const raw = localStorage.getItem('authUser');
-      if (!raw) {
-        setUserName(null);
-        return;
-      }
-      try {
-        const parsed = JSON.parse(raw);
-        const name =
-          parsed?.user?.username || parsed?.username || (parsed?.user?.email || parsed?.email || '').split('@')[0];
-        if (name) setUserName(name);
-      } catch {
-        setUserName(null);
-      }
-    };
+        useEffect(() => {
+                if (!shouldCheck) {
+                        setIsLoading(false);
+                        return;
+                }
 
-    readAuth();
+                const checkAuth = async () => {
+                        try {
+                                setIsLoading(true);
+                                // Gọi API để check session
+                                const response = await getMeApi();
+                                if (response?.status === 'success' && response?.user) {
+                                        const name = response.user.username || (response.user.email || '').split('@')[0];
+                                        setUserName(name);
+                                        setIsAuthenticated(true);
+                                        // Lưu userProfile vào localStorage để hiển thị UI
+                                        localStorage.setItem('userProfile', JSON.stringify({
+                                                email: response.user.email,
+                                                name: name,
+                                                phone: response.user.phone || ''
+                                        }));
+                                } else {
+                                        setUserName(null);
+                                        setIsAuthenticated(false);
+                                }
+                        } catch (error) {
+                                console.error('Auth check failed:', error);
+                                setUserName(null);
+                                setIsAuthenticated(false);
+                        } finally {
+                                setIsLoading(false);
+                        }
+                };
 
-    const onAuthChanged = () => readAuth();
-    const onOpenLogin = () => {}; // Handle in parent
+                checkAuth();
 
-    window.addEventListener('user-auth-changed', onAuthChanged as any);
-    window.addEventListener('storage', onAuthChanged as any);
+                const handleAuthChange = () => checkAuth();
 
-    return () => {
-      window.removeEventListener('user-auth-changed', onAuthChanged as any);
-      window.removeEventListener('storage', onAuthChanged as any);
-    };
-  }, []);
+                window.addEventListener('user-auth-changed', handleAuthChange);
 
-  return { userName, setUserName };
+                return () => {
+                        window.removeEventListener('user-auth-changed', handleAuthChange);
+                };
+        }, [setUserName, shouldCheck]);
+
+        return { isAuthenticated, isLoading };
 }

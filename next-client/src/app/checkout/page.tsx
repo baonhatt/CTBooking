@@ -29,6 +29,7 @@ import {
         confirmBookingApi,
         getBookingByIdApi,
 } from "@/lib/api";
+import { useAuthState } from '@/hooks/useAuthState';
 
 export default function Checkout() {
         const router = useRouter();
@@ -37,7 +38,8 @@ export default function Checkout() {
         const [status, setStatus] = useState<string>('');
         const [loading, setLoading] = useState(false);
         const [bookingCode, setBookingCode] = useState<string | null>(null);
-        const [isLoggedIn, setIsLoggedIn] = useState<boolean>(!!localStorage.getItem('authUser'));
+        const { userName, isLoading: authLoading } = useAuthState(true);
+        const [isLoggedIn, setIsLoggedIn] = useState<boolean>(false);
         const formatMoney = (n: number | string) => new Intl.NumberFormat('en-US').format(Number(n || 0));
 
         useEffect(() => {
@@ -241,14 +243,14 @@ export default function Checkout() {
                         // Just wait for poll to update status to "success"
                 }
 
-                const onAuthChanged = () => setIsLoggedIn(!!localStorage.getItem('authUser'));
+                const onAuthChanged = () => setIsLoggedIn(!!userName);
                 window.addEventListener('user-auth-changed', onAuthChanged as any);
                 window.addEventListener('storage', onAuthChanged as any);
                 return () => {
                         window.removeEventListener('user-auth-changed', onAuthChanged as any);
                         window.removeEventListener('storage', onAuthChanged as any);
                 };
-        }, [searchParams]);
+        }, [searchParams, userName]);
 
         useEffect(() => {
                 if (!order?.booking_id) return;

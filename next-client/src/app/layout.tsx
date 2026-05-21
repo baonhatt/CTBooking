@@ -5,7 +5,6 @@ import Header from '@/components/user/Header';
 import Footer from '@/components/user/Footer';
 import NextTopLoader from 'nextjs-toploader';
 
-export const runtime = 'edge';
 
 import { siteConfig } from '@/config/site';
 
@@ -90,7 +89,7 @@ const websiteSchema = {
                 '@type': 'SearchAction',
                 target: {
                         '@type': 'EntryPoint',
-                        urlTemplate: `${SITE_URL}/posts?q={search_term_string}`,
+                        urlTemplate: `${SITE_URL}/bai-viet?q={search_term_string}`,
                 },
                 'query-input': 'required name=search_term_string',
         },
