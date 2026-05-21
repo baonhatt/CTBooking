@@ -8,6 +8,7 @@ export default function UploadsPage() {
                 | 'users'
                 | 'movies'
                 | 'toys'
+                | 'posts'
                 | 'transactions'
                 | 'tickets'
                 | 'ticket-check'

@@ -201,19 +201,6 @@ export default function BookingPage() {
                                 return;
                         }
                 } catch { }
-                try {
-                        const raw = localStorage.getItem('authUser');
-
-                        if (raw) {
-                                const parsed = JSON.parse(raw);
-                                const authEmail = parsed?.user?.email || parsed?.email || '';
-                                const authName = parsed?.user?.username || parsed?.username || (authEmail ? authEmail.split('@')[0] : '');
-                                const authPhone = parsed?.user?.phone || parsed?.phone || '';
-                                if (!email && authEmail) setEmail(authEmail);
-                                if (!name && authName) setName(authName);
-                                if (!phone && authPhone) setPhone(authPhone);
-                        }
-                } catch { }
         }, [email, name, phone]);
 
         const resolveImageUrl = (u: string | undefined | null) => {
@@ -660,7 +647,7 @@ export default function BookingPage() {
                                                                                                 <div className="space-y-1.5">
                                                                                                         <Label className="text-sm font-medium text-gray-400 ml-1">Họ Và Tên</Label>
                                                                                                         <Input
-                                                                                                                className="bg-white/5 border-white/10 focus:border-blue-500/50 focus:ring-blue-500/10 h-12 rounded-lg placeholder:text-gray-600 text-sm"
+                                                                                                                className="bg-white/5 border-white/10 focus:border-blue-500/50 focus:ring-blue-500/10 h-12 rounded-lg placeholder:text-gray-400 text-sm"
                                                                                                                 value={name}
                                                                                                                 onChange={(e) => setName(e.target.value)}
                                                                                                                 placeholder="Nhập họ và tên"

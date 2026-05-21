@@ -1,29 +1,31 @@
 'use client';
-import { forgetPassApi, loginApi, registerApi, resetPasswordApi } from '@/lib/api';
+import { forgetPassApi, loginApi, registerApi, resetPasswordApi, logoutApi } from '@/lib/api';
 
 export function useAuth() {
-  async function login(email: string, password: string) {
-    return loginApi({ email, password });
-  }
+        async function login(email: string, password: string) {
+                return loginApi({ email, password });
+        }
 
-  async function register(
-    email: string,
-    password: string,
-    name?: string,
-    options?: { gender?: string; dob?: string; phone?: string }
-  ) {
-    return registerApi({ email, password, name, ...(options || {}) });
-  }
+        async function logout() {
+                return logoutApi();
+        }
 
-  async function forgetPass(email: string) {
-    return forgetPassApi({ email });
-  }
+        async function register(
+                email: string,
+                password: string,
+                name?: string,
+                options?: { gender?: string; dob?: string; phone?: string }
+        ) {
+                return registerApi({ email, password, name, ...(options || {}) });
+        }
 
-  async function resetPass(token: string, newPassword: string) {
-    return resetPasswordApi({ token, newPassword });
-  }
+        async function forgetPass(email: string) {
+                return forgetPassApi({ email });
+        }
 
-  return { login, register, forgetPass, resetPass };
+        async function resetPass(token: string, newPassword: string) {
+                return resetPasswordApi({ token, newPassword });
+        }
+
+        return { login, logout, register, forgetPass, resetPass };
 }
-
-

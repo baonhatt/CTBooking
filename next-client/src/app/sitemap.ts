@@ -17,7 +17,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
                         priority: 1.0,
                 },
                 {
-                        url: `${SITE_URL}/posts`,
+                        url: `${SITE_URL}/bai-viet`,
                         lastModified: new Date(),
                         changeFrequency: 'daily',
                         priority: 0.9,

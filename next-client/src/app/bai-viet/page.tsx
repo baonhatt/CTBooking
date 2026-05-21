@@ -3,7 +3,7 @@ import Link from 'next/link';
 import { getPublicPosts, type PostItem } from '@/lib/api/posts';
 import { buildPostHref, formatDate } from '@/lib/utils';
 import UserLayout from '@/layouts/UserLayout';
-import PostsSearchClient from '@/app/posts/PostsSearchClient';
+import PostsSearchClient from '@/app/bai-viet/PostsSearchClient';
 
 export const runtime = 'edge';
 
@@ -15,13 +15,13 @@ export const metadata: Metadata = {
         title: 'Tin Tức Điện Ảnh | Cinesphere Blog',
         description:
                 'Cập nhật tin tức phim ảnh, review đánh giá các siêu phẩm phòng vé và xu hướng công nghệ chiếu rạp mới nhất tại Cinesphere.',
-        alternates: { canonical: `${SITE_URL}/posts` },
+        alternates: { canonical: `${SITE_URL}/bai-viet` },
         openGraph: {
                 title: 'Tin Tức Điện Ảnh | Cinesphere Blog',
                 description:
                         'Khám phá các tin tức điện ảnh độc quyền và review khách quan từ đội ngũ chuyên gia Cinesphere.',
                 type: 'website',
-                url: `${SITE_URL}/posts`,
+                url: `${SITE_URL}/bai-viet`,
                 locale: 'vi_VN',
                 siteName: 'Cinesphere',
                 images: [

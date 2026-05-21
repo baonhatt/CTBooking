@@ -686,3 +686,36 @@ export async function pingIndexNow(env: any, urls: string[]): Promise<void> {
                 console.error('[IndexNow] ping failed:', e);
         }
 }
+
+export async function generateSessionToken(): Promise<string> {
+        const array = new Uint8Array(32);
+        crypto.getRandomValues(array);
+        return Array.from(array)
+                .map((b) => b.toString(16).padStart(2, '0'))
+                .join('');
+}
+
+export const formatDateForDb = (date: Date | string | null) => {
+        if (!date) return null;
+
+        const dateObj = date instanceof Date ? date : new Date(date);
+        const iso = dateObj.toISOString();
+
+        // Tất cả logic đã chuyển sang Cloudflare Worker + D1 (SQLite)
+        // D1 yêu cầu timestamp được insert dưới dạng chuỗi
+        // SQLite chuẩn format: YYYY-MM-DD HH:MM:SS (không có milliseconds)
+        // Khớp với CURRENT_TIMESTAMP mặc định của SQLite
+        return iso.replace('T', ' ').replace('Z', '').split('.')[0];
+};
+
+export function calculateSessionExpiry(days: number = 30): string {
+        const now = new Date();
+        now.setDate(now.getDate() + days);
+        return formatDateForDb(now);
+}
+
+export function calculateSessionExpiryFromNow(hours: number = 24): string {
+        const now = new Date();
+        now.setHours(now.getHours() + hours);
+        return formatDateForDb(now);
+}

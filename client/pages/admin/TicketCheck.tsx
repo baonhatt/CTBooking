@@ -8,6 +8,7 @@ export default function TicketCheckPage() {
                 | 'users'
                 | 'movies'
                 | 'toys'
+                | 'posts'
                 | 'transactions'
                 | 'tickets'
                 | 'ticket-check'

@@ -29,7 +29,7 @@ import {
         getRevenueByMonthImpl
 } from '../../server/routes/admin/dashboard';
 import { getUsersImpl, getUserByIdImpl } from '../../server/routes/admin/users';
-import { loginImpl, registerImpl } from '../../server/routes/user/auth';
+import { loginImpl, registerImpl, loginWithSessionImpl, validateSessionTokenImpl, validateOTPImpl, resendOTPImpl } from '../../server/routes/user/auth';
 import { forgetPassImpl, resetPasswordImpl, changePasswordImpl } from '../../server/routes/user/password';
 import { listActiveToys } from '../../server/routes/user/toys';
 import { listToysImpl, createToyImpl, getToyImpl, updateToyImpl, deleteToyImpl } from '../../server/routes/admin/toys';
@@ -87,7 +87,10 @@ import {
         parseMediaUrl,
         localUploader,
         localDeleter,
-        pingIndexNow
+        pingIndexNow,
+        generateSessionToken,
+        calculateSessionExpiry,
+        formatDateForDb
 } from './utils';
 
 type Bindings = {
@@ -316,8 +319,44 @@ app.post('/api/login', async (c) => {
         try {
                 const db = drizzle(c.env.cinema_db, { schema });
                 const body = await c.req.json().catch(() => ({}));
-                const r = await loginImpl(db, { accounts: schema.accounts, users: schema.users }, body as any);
+                const r = await loginWithSessionImpl(
+                        db,
+                        { accounts: schema.accounts, users: schema.users, tokens: schema.tokens, email_logs: schema.email_logs },
+                        { ...body, days: 30 },
+                        generateSessionToken,
+                        calculateSessionExpiry,
+                        c.env.KV_BINDING,
+                        { waitUntil: (promise) => c.executionCtx.waitUntil(promise) }
+                );
                 const status = typeof (r as any).status === 'number' ? (r as any).status : 200;
+
+                if (status === 200 && (r as any).requires_otp) {
+                        return c.json({
+                                status: 'success',
+                                requires_otp: true,
+                                message: (r as any).message,
+                                temp_account_id: (r as any).temp_account_id,
+                                email: (r as any).email
+                        }, 200);
+                }
+
+                if (status === 200 && (r as any).user) {
+                        // Set httpOnly cookie
+                        const isLocalEnv = isLocal(c.req.url);
+                        const cookieOptions = isLocalEnv
+                                ? 'Path=/; HttpOnly; SameSite=Lax; Max-Age=2592000' // 30 days
+                                : 'Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=2592000';
+
+                        c.header('Set-Cookie', `session_token=${(r as any).token}; ${cookieOptions}`);
+
+                        return c.json({
+                                status: 'success',
+                                message: (r as any).message,
+                                user: (r as any).user,
+                                token: (r as any).token
+                        }, 200);
+                }
+
                 const payload = {
                         ...(r as any),
                         status: status >= 400 ? 'error' : 'success'
@@ -327,6 +366,76 @@ app.post('/api/login', async (c) => {
                 return c.json({ status: 'error', message: 'Lỗi máy chủ nội bộ' }, 500);
         }
 });
+
+// OTP validation endpoint
+// POST /api/validate-otp
+// Body: { temp_account_id: number, otp: string }
+app.post('/api/validate-otp', async (c) => {
+        try {
+                const db = drizzle(c.env.cinema_db, { schema });
+                const body = await c.req.json().catch(() => ({}));
+                const r = await validateOTPImpl(
+                        db,
+                        { accounts: schema.accounts, users: schema.users, tokens: schema.tokens, email_logs: schema.email_logs },
+                        { ...body, days: 30 },
+                        generateSessionToken,
+                        calculateSessionExpiry
+                );
+                const status = typeof (r as any).status === 'number' ? (r as any).status : 200;
+
+                if (status === 200 && (r as any).user) {
+                        // Set httpOnly cookie
+                        const isLocalEnv = isLocal(c.req.url);
+                        const cookieOptions = isLocalEnv
+                                ? 'Path=/; HttpOnly; SameSite=Lax; Max-Age=2592000' // 30 days
+                                : 'Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=2592000';
+
+                        c.header('Set-Cookie', `session_token=${(r as any).token}; ${cookieOptions}`);
+
+                        return c.json({
+                                status: 'success',
+                                message: (r as any).message,
+                                user: (r as any).user,
+                                token: (r as any).token
+                        }, 200);
+                }
+
+                const payload = {
+                        ...(r as any),
+                        status: status >= 400 ? 'error' : 'success'
+                };
+                return c.json(payload as any, status as any);
+        } catch {
+                return c.json({ status: 'error', message: 'Lỗi máy chủ nội bộ' }, 500);
+        }
+});
+
+// Resend OTP endpoint
+// POST /api/resend-otp
+// Body: { temp_account_id: number, email: string }
+app.post('/api/resend-otp', async (c) => {
+        try {
+                const db = drizzle(c.env.cinema_db, { schema });
+                const body = await c.req.json().catch(() => ({}));
+                const r = await resendOTPImpl(
+                        db,
+                        { accounts: schema.accounts, users: schema.users, tokens: schema.tokens, email_logs: schema.email_logs },
+                        body,
+                        c.env.KV_BINDING,
+                        { waitUntil: (promise) => c.executionCtx.waitUntil(promise) }
+                );
+                const status = typeof (r as any).status === 'number' ? (r as any).status : 200;
+
+                const payload = {
+                        ...(r as any),
+                        status: status >= 400 ? 'error' : 'success'
+                };
+                return c.json(payload as any, status as any);
+        } catch {
+                return c.json({ status: 'error', message: 'Lỗi máy chủ nội bộ' }, 500);
+        }
+});
+
 // User registration endpoint
 // POST /api/register
 // Body: { name: string, email: string, password: string, ... }
@@ -465,6 +574,125 @@ app.post('/api/reset-password', async (c) => {
                 return c.json({ status: 'error', message: 'Lỗi máy chủ nội bộ' }, 500);
         }
 });
+
+// Logout endpoint
+// POST /api/logout
+app.post('/api/logout', async (c) => {
+        try {
+                const db = drizzle(c.env.cinema_db, { schema });
+                const token = c.req.header('cookie')?.match(/session_token=([^;]+)/)?.[1];
+
+                if (token) {
+                        await db.delete(schema.tokens).where(eq(schema.tokens.token, token));
+                }
+
+                // Clear cookie
+                const isLocalEnv = isLocal(c.req.url);
+                const cookieOptions = isLocalEnv
+                        ? 'Path=/; HttpOnly; SameSite=Lax; Max-Age=0'
+                        : 'Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=0';
+
+                c.header('Set-Cookie', `session_token=; ${cookieOptions}`);
+
+                return c.json({ status: 'success', message: 'Đăng xuất thành công' });
+        } catch {
+                return c.json({ status: 'error', message: 'Lỗi máy chủ nội bộ' }, 500);
+        }
+});
+
+// Get current user info endpoint
+// GET /api/me
+app.get('/api/me', async (c) => {
+        try {
+                const db = drizzle(c.env.cinema_db, { schema });
+                const token = c.req.header('cookie')?.match(/session_token=([^;]+)/)?.[1];
+                const validation = await validateSessionTokenImpl(db, { tokens: schema.tokens }, token);
+
+                if (!validation.valid || !validation.userId) {
+                        return c.json({ status: 'error', message: 'Unauthorized' }, 401);
+                }
+
+                const user = await db.query.users.findFirst({
+                        where: eq(schema.users.id, validation.userId)
+                });
+
+                if (!user) {
+                        return c.json({ status: 'error', message: 'User not found' }, 404);
+                }
+
+                const account = await db.query.accounts.findFirst({
+                        where: eq(schema.accounts.user_id, user.id)
+                });
+
+                return c.json({
+                        status: 'success',
+                        user: {
+                                id: user.id,
+                                username: user.fullname,
+                                email: account?.email,
+                                phone: user.phone
+                        }
+                });
+        } catch (err: any) {
+                return c.json({ status: 'error', message: 'Lỗi máy chủ nội bộ' }, 500);
+        }
+});
+
+// Admin login endpoint with 1-day expiry cookie
+// POST /api/admin/login
+// Body: { email: string, password: string }
+app.post('/api/admin/login', async (c) => {
+        try {
+                const db = drizzle(c.env.cinema_db, { schema });
+                const body = await c.req.json().catch(() => ({}));
+                const r = await loginWithSessionImpl(
+                        db,
+                        { accounts: schema.accounts, users: schema.users, tokens: schema.tokens, email_logs: schema.email_logs },
+                        { ...body, days: 1 },
+                        generateSessionToken,
+                        calculateSessionExpiry,
+                        c.env.KV_BINDING,
+                        { waitUntil: (promise) => c.executionCtx.waitUntil(promise) }
+                );
+                const status = typeof (r as any).status === 'number' ? (r as any).status : 200;
+
+                if (status === 200 && (r as any).requires_otp) {
+                        return c.json({
+                                status: 'success',
+                                requires_otp: true,
+                                message: (r as any).message,
+                                temp_account_id: (r as any).temp_account_id,
+                                email: (r as any).email
+                        }, 200);
+                }
+
+                if (status === 200 && (r as any).user) {
+                        // Set cookie với Max-Age 1 ngày (86400 seconds)
+                        const isLocalEnv = isLocal(c.req.url);
+                        const cookieOptions = isLocalEnv
+                                ? 'Path=/; HttpOnly; SameSite=Lax; Max-Age=86400' // 1 day
+                                : 'Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=86400'; // 1 day
+
+                        c.header('Set-Cookie', `session_token=${(r as any).token}; ${cookieOptions}`);
+
+                        return c.json({
+                                status: 'success',
+                                message: (r as any).message,
+                                user: (r as any).user,
+                                token: (r as any).token
+                        }, 200);
+                }
+
+                const payload = {
+                        ...(r as any),
+                        status: status >= 400 ? 'error' : 'success'
+                };
+                return c.json(payload as any, status as any);
+        } catch {
+                return c.json({ status: 'error', message: 'Lỗi máy chủ nội bộ' }, 500);
+        }
+});
+
 
 app.get('/api/admin/revenue', async (c) => {
         try {
@@ -2373,7 +2601,7 @@ app.get('/sitemap.xml', async (c) => {
 
                 const staticPages = [
                         { url: '/', priority: '1.0', changefreq: 'weekly' },
-                        { url: '/posts', priority: '0.9', changefreq: 'daily' },
+                        { url: '/bai-viet', priority: '0.9', changefreq: 'daily' },
                 ];
 
                 const urlBlocks = [
@@ -2384,7 +2612,7 @@ app.get('/sitemap.xml', async (c) => {
                         ...posts.map((p) => {
                                 const slug = p.slug ? `${p.slug}-${p.id}` : String(p.id);
                                 const lastmod = p.updated_at ? String(p.updated_at).split('T')[0] : now;
-                                return `  <url>\n    <loc>${baseUrl}/posts/${slug}</loc>\n    <lastmod>${lastmod}</lastmod>\n    <changefreq>monthly</changefreq>\n    <priority>0.7</priority>\n  </url>`;
+                                return `  <url>\n    <loc>${baseUrl}/bai-viet/${slug}</loc>\n    <lastmod>${lastmod}</lastmod>\n    <changefreq>monthly</changefreq>\n    <priority>0.7</priority>\n  </url>`;
                         })
                 ];
 
@@ -2469,7 +2697,7 @@ app.post('/api/posts', async (c) => {
                 const r = await createPostImpl(db, { posts: schema.posts }, body, c.env, getCloudHelpers(c, c.env).uploader);
                 if (r && r.status === 'published') {
                         const base = String(c.env.VITE_CLIENT_BASE_URL || 'https://cinesphere.com.vn').replace(/\/$/, '');
-                        const url = `${base}/posts/${r.slug ? `${r.slug}-` : ''}${r.id}`;
+                        const url = `${base}/bai-viet/${r.slug ? `${r.slug}-` : ''}${r.id}`;
                         c.executionCtx.waitUntil(pingIndexNow(c.env, [url]));
                 }
                 return c.json({ status: 'success', post: r });
@@ -2489,7 +2717,7 @@ app.put('/api/posts/:id', async (c) => {
                 if (!r) return c.json({ message: 'Không tìm thấy' }, 404);
                 if (r.status === 'published') {
                         const base = String(c.env.VITE_CLIENT_BASE_URL || 'https://cinesphere.com.vn').replace(/\/$/, '');
-                        const url = `${base}/posts/${r.slug ? `${r.slug}-` : ''}${r.id}`;
+                        const url = `${base}/bai-viet/${r.slug ? `${r.slug}-` : ''}${r.id}`;
                         c.executionCtx.waitUntil(pingIndexNow(c.env, [url]));
                 }
                 return c.json({ status: 'success', post: r });

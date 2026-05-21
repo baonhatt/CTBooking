@@ -1,9 +1,24 @@
 import { request } from '@/lib/api/http';
 
 export async function loginApi(body: { email: string; password: string }) {
-        return request<{ status: string; message: string; user: any }>('/api/login', {
+        return request<{ status: string; message: string; user: any; token: string }>('/api/login', {
                 method: 'POST',
-                body: JSON.stringify(body)
+                body: JSON.stringify(body),
+                credentials: 'include'
+        });
+}
+
+export async function logoutApi() {
+        return request<{ status: string; message: string }>('/api/logout', {
+                method: 'POST',
+                credentials: 'include'
+        });
+}
+
+export async function getMeApi() {
+        return request<{ status: string; user: any }>('/api/me', {
+                method: 'GET',
+                credentials: 'include'
         });
 }
 

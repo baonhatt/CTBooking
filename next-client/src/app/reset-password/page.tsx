@@ -6,11 +6,14 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { toast } from 'sonner';
 import { resetPasswordApi } from '@/lib/api/auth';
+import { Eye, EyeOff } from 'lucide-react';
 
 export default function ConfirmToken() {
         const [newPassword, setNewPassword] = useState('');
         const [confirmPassword, setConfirmPassword] = useState('');
         const [errorMessage, setErrorMessage] = useState('');
+        const [showNewPassword, setShowNewPassword] = useState(false);
+        const [showConfirmPassword, setShowConfirmPassword] = useState(false);
         const searchParams = useSearchParams();
         const token = searchParams.get('token') || '';
         const router = useRouter();
@@ -66,25 +69,43 @@ export default function ConfirmToken() {
                                 )}
                                 <div>
                                         <label className="text-sm text-gray-300 mb-1 block">Mật khẩu mới</label>
-                                        <Input
-                                                type="password"
-                                                value={newPassword}
-                                                onChange={(e) => setNewPassword(e.target.value)}
-                                                className="bg-gray-900 !text-white border-gray-700"
-                                                required
-                                                style={{ color: 'white' }}
-                                        />
+                                        <div className="relative">
+                                                <Input
+                                                        type={showNewPassword ? 'text' : 'password'}
+                                                        value={newPassword}
+                                                        onChange={(e) => setNewPassword(e.target.value)}
+                                                        className="bg-white/10 border-white/20 text-white placeholder:text-gray-400 pr-10"
+                                                        required
+                                                />
+                                                <button
+                                                        type="button"
+                                                        className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-white"
+                                                        onClick={() => setShowNewPassword((v) => !v)}
+                                                        aria-label={showNewPassword ? 'Ẩn mật khẩu' : 'Hiển thị mật khẩu'}
+                                                >
+                                                        {showNewPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                                                </button>
+                                        </div>
                                 </div>
                                 <div>
                                         <label className="text-sm text-gray-300 mb-1 block">Xác nhận mật khẩu mới</label>
-                                        <Input
-                                                type="password"
-                                                value={confirmPassword}
-                                                onChange={(e) => setConfirmPassword(e.target.value)}
-                                                className="bg-gray-900 !text-white border-gray-700"
-                                                required
-                                                style={{ color: 'white' }}
-                                        />
+                                        <div className="relative">
+                                                <Input
+                                                        type={showConfirmPassword ? 'text' : 'password'}
+                                                        value={confirmPassword}
+                                                        onChange={(e) => setConfirmPassword(e.target.value)}
+                                                        className="bg-white/10 border-blue-400/50 text-white placeholder:text-gray-400 pr-10"
+                                                        required
+                                                />
+                                                <button
+                                                        type="button"
+                                                        className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-white"
+                                                        onClick={() => setShowConfirmPassword((v) => !v)}
+                                                        aria-label={showConfirmPassword ? 'Ẩn mật khẩu' : 'Hiển thị mật khẩu'}
+                                                >
+                                                        {showConfirmPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                                                </button>
+                                        </div>
                                 </div>
                                 <Button
                                         type="submit"

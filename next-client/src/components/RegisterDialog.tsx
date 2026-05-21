@@ -93,7 +93,8 @@ export function RegisterDialog({
                         const data = await auth.register(email, password, name);
 
                         if (data?.status === 'success') {
-                                localStorage.setItem('authUser', JSON.stringify({ user: data.user }));
+                                // Token được lưu trong httpOnly cookie bởi backend (nếu có)
+                                // Không cần lưu vào localStorage anymore
 
                                 try {
                                         const derivedName = data.user.username || (data.user.email || '').split('@')[0];

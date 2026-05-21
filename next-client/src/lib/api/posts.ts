@@ -15,6 +15,8 @@ export type PostItem = {
         updated_at?: string;
         view_count?: number;
         content?: string;
+        meta_description?: string;
+        meta_keywords?: string;
 };
 
 export type PostsResponse = {
