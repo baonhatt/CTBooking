@@ -66,7 +66,13 @@ export default function ConfirmToken() {
                                 )}
                                 <div>
                                         <label className="text-sm text-gray-300 mb-1 block">Mật khẩu mới</label>
-                                        <Input type="password" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} required />
+                                        <Input
+                                                type="password"
+                                                value={newPassword}
+                                                onChange={(e) => setNewPassword(e.target.value)}
+                                                className="bg-gray-900 text-white border-gray-700"
+                                                required
+                                        />
                                 </div>
                                 <div>
                                         <label className="text-sm text-gray-300 mb-1 block">Xác nhận mật khẩu mới</label>
@@ -74,6 +80,7 @@ export default function ConfirmToken() {
                                                 type="password"
                                                 value={confirmPassword}
                                                 onChange={(e) => setConfirmPassword(e.target.value)}
+                                                className="bg-gray-900 text-white border-gray-700"
                                                 required
                                         />
                                 </div>
