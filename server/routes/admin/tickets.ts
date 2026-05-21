@@ -87,12 +87,22 @@ export async function listTicketPackagesImpl(
 
         const total = totalResult ? Number(totalResult.count) : 0;
 
-        // 3. Xử lý combo cho từng gói vé
+        // 3. Xử lý combo và features cho từng gói vé
         const items = packages.map((pkg: any) => ({
                 ...pkg,
-                // Giữ nguyên giá trị combo từ database
-                // Nếu cần đảm bảo combo là mảng, có thể thêm:
-                combo: Array.isArray(pkg.combo) ? pkg.combo : undefined
+                // Parse JSON string to array (handle old data formats: JSON array or "1|2|3")
+                combo: pkg.combo ? (Array.isArray(pkg.combo) ? pkg.combo : (() => {
+                        try { return JSON.parse(pkg.combo); } catch {
+                                // Handle old format: "1|2|3"
+                                if (typeof pkg.combo === 'string' && pkg.combo.includes('|')) {
+                                        return pkg.combo.split('|').map((x: string) => x.trim()).filter(Boolean);
+                                }
+                                return [];
+                        }
+                })()) : [],
+                features: pkg.features ? (Array.isArray(pkg.features) ? pkg.features : (() => {
+                        try { return JSON.parse(pkg.features); } catch { return []; }
+                })()) : []
         }));
 
         // 4. Trả về kết quả phân trang
@@ -118,7 +128,23 @@ export async function getTicketPackageImpl(anyDb: any, tables: { ticket_packages
                 .from(tables.ticket_packages)
                 .where(eq(tables.ticket_packages.id, id)) // Tìm theo ID
                 .limit(1); // Chỉ lấy 1 bản ghi
-        return item || null; // Trả về null nếu không tìm thấy
+        if (!item) return null;
+        // Parse JSON strings to arrays (handle old data formats: JSON array or "1|2|3")
+        return {
+                ...item,
+                combo: item.combo ? (Array.isArray(item.combo) ? item.combo : (() => {
+                        try { return JSON.parse(item.combo); } catch {
+                                // Handle old format: "1|2|3"
+                                if (typeof item.combo === 'string' && item.combo.includes('|')) {
+                                        return item.combo.split('|').map((x: string) => x.trim()).filter(Boolean);
+                                }
+                                return [];
+                        }
+                })()) : [],
+                features: item.features ? (Array.isArray(item.features) ? item.features : (() => {
+                        try { return JSON.parse(item.features); } catch { return []; }
+                })()) : []
+        };
 }
 
 /**
@@ -225,12 +251,12 @@ export async function createTicketPackageImpl(
                         name, // Tên gói vé (bắt buộc)
                         code, // Mã gói vé
                         description, // Mô tả
-                        // Lưu danh sách ID phim dưới dạng mảng hoặc null nếu không có
-                        combo: processedCombo.length > 0 ? processedCombo : null,
+                        // Lưu danh sách ID phim dưới dạng JSON string
+                        combo: processedCombo.length > 0 ? JSON.stringify(processedCombo) : null,
                         // Đảm bảo giá luôn là chuỗi
                         price: Number(price).toString(),
-                        // Danh sách tính năng đã xử lý
-                        features: processedFeatures,
+                        // Danh sách tính năng đã xử lý - lưu dạng JSON string
+                        features: processedFeatures ? JSON.stringify(processedFeatures) : null,
                         type, // Loại gói vé
                         // Xử lý giá trị mặc định cho các trường tùy chọn
                         min_group_size: min_group_size !== undefined ? Number(min_group_size) : null,
@@ -331,15 +357,16 @@ export async function updateTicketPackageImpl(
 
         // 2. Tối ưu xử lý Features
         if (features !== undefined) {
-                data.features = Array.isArray(features)
+                const featuresArr = Array.isArray(features)
                         ? features
                         : String(features)
                                 .split(',')
                                 .map((x) => x.trim())
                                 .filter(Boolean);
+                data.features = featuresArr.length > 0 ? JSON.stringify(featuresArr) : null;
         }
 
-        // 3. Tối ưu xử lý Combo (Lưu dạng chuỗi "1|3")
+        // 3. Tối ưu xử lý Combo (Lưu dạng JSON string)
         if (combo !== undefined) {
                 let comboArr: (number | string)[] = [];
 
@@ -369,7 +396,7 @@ export async function updateTicketPackageImpl(
                                 throw new Error('Một hoặc nhiều ID phim trong combo không tồn tại');
                         }
                 }
-                data.combo = comboArr;
+                data.combo = comboArr.length > 0 ? JSON.stringify(comboArr) : null;
         }
         // 4. Thực thi Update
         const updatedRes = await anyDb
