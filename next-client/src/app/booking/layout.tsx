@@ -1,6 +1,8 @@
 import type { Metadata } from 'next';
 
-const SITE_URL = 'https://cinephere.com.vn';
+import { siteConfig } from '@/config/site';
+
+const SITE_URL = siteConfig.domain;
 
 export const metadata: Metadata = {
         title: 'Đặt Vé Xem Phim Trực Tuyến',

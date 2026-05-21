@@ -1,3 +1,5 @@
+import { siteConfig } from '@/config/site';
+
 // Sử dụng biến môi trường Next.js thay vì Vite syntax
 // Trong SSR (Server-Side Rendering), luôn dùng NEXT_PUBLIC_API_URL để gọi API
 export const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? '';
@@ -16,7 +18,7 @@ export async function request<T>(path: string, init: RequestInit = {}) {
                 headers: {
                         "Content-Type": "application/json",
                         // Thêm User-Agent để giúp SEO bot nhận diện request
-                        ...(typeof window === "undefined" && { "User-Agent": "Mozilla/5.0 (compatible; CinesphereBot/1.0; +https://cinephere.com.vn)" }),
+                        ...(typeof window === "undefined" && { "User-Agent": `Mozilla/5.0 (compatible; CinesphereBot/1.0; +${siteConfig.domain})` }),
                         ...(init.headers || {}),
                 },
         });

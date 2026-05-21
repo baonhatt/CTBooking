@@ -1,3 +1,5 @@
+import { siteConfig } from '@/config/site';
+
 const API = process.env.NEXT_PUBLIC_API_URL ?? '';
 
 export type Movie = {
@@ -29,7 +31,7 @@ export async function getActiveMoviesToday(): Promise<ActiveMovieToday[]> {
                 next: { revalidate: 300 },
                 headers: {
                         // Thêm headers để giúp SEO bot nhận diện request server-side
-                        ...(typeof window === "undefined" && { "User-Agent": "Mozilla/5.0 (compatible; CinesphereBot/1.0; +https://cinephere.com.vn)" }),
+                        ...(typeof window === "undefined" && { "User-Agent": `Mozilla/5.0 (compatible; CinesphereBot/1.0; +${siteConfig.domain})` }),
                 },
         });
         if (!res.ok) return [];
@@ -43,7 +45,7 @@ export async function getMovies2025(): Promise<Movie[]> {
                 next: { revalidate: 3600 },
                 headers: {
                         // Thêm headers để giúp SEO bot nhận diện request server-side
-                        ...(typeof window === "undefined" && { "User-Agent": "Mozilla/5.0 (compatible; CinesphereBot/1.0; +https://cinephere.com.vn)" }),
+                        ...(typeof window === "undefined" && { "User-Agent": `Mozilla/5.0 (compatible; CinesphereBot/1.0; +${siteConfig.domain})` }),
                 },
         });
         if (!res.ok) return [];
@@ -57,7 +59,7 @@ export async function getMovieById(id: number) {
                 next: { revalidate: 600 },
                 headers: {
                         // Thêm headers để giúp SEO bot nhận diện request server-side
-                        ...(typeof window === "undefined" && { "User-Agent": "Mozilla/5.0 (compatible; CinesphereBot/1.0; +https://cinephere.com.vn)" }),
+                        ...(typeof window === "undefined" && { "User-Agent": `Mozilla/5.0 (compatible; CinesphereBot/1.0; +${siteConfig.domain})` }),
                 },
         });
         if (!res.ok) return null;

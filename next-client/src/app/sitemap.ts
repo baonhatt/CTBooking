@@ -4,7 +4,9 @@ import { buildPostHref } from '@/lib/utils';
 
 export const runtime = 'edge';
 
-const SITE_URL = 'https://cinephere.com.vn';
+import { siteConfig } from '@/config/site';
+
+const SITE_URL = siteConfig.domain;
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
         const staticPages: MetadataRoute.Sitemap = [

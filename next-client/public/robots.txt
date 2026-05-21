@@ -11,4 +11,4 @@ Disallow: /reset-password
 Disallow: /maintenance
 Disallow: /api/
 
-Sitemap: https://cinephere.com.vn/sitemap.xml
+Sitemap: https://cinesphere.com.vn/sitemap.xml
