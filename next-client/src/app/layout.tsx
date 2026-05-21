@@ -19,6 +19,10 @@ export const metadata: Metadata = {
         description:
                 'Đặt vé xem phim trực tuyến tại Cinesphere. Khám phá các siêu phẩm bom tấn với công nghệ chiếu rạp hiện đại nhất.',
         metadataBase: new URL(SITE_URL),
+        icons: {
+                icon: '/icon.svg',
+                apple: '/logo.svg',
+        },
         keywords: [
                 'đặt vé xem phim',
                 'rạp chiếu phim',
