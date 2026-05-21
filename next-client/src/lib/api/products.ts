@@ -1,3 +1,5 @@
+import { siteConfig } from '@/config/site';
+
 const API = process.env.NEXT_PUBLIC_API_URL ?? '';
 
 export async function getActiveTickets(options?: { signal?: AbortSignal }) {
@@ -5,7 +7,7 @@ export async function getActiveTickets(options?: { signal?: AbortSignal }) {
                 next: { revalidate: 3600 },
                 headers: {
                         // Thêm headers để giúp SEO bot nhận diện request server-side
-                        ...(typeof window === "undefined" && { "User-Agent": "Mozilla/5.0 (compatible; CinesphereBot/1.0; +https://cinephere.com.vn)" }),
+                        ...(typeof window === "undefined" && { "User-Agent": `Mozilla/5.0 (compatible; CinesphereBot/1.0; +${siteConfig.domain})` }),
                 },
         });
         if (!res.ok) {
@@ -19,7 +21,7 @@ export async function getActiveToys(options?: { signal?: AbortSignal }) {
                 next: { revalidate: 3600 },
                 headers: {
                         // Thêm headers để giúp SEO bot nhận diện request server-side
-                        ...(typeof window === "undefined" && { "User-Agent": "Mozilla/5.0 (compatible; CinesphereBot/1.0; +https://cinephere.com.vn)" }),
+                        ...(typeof window === "undefined" && { "User-Agent": `Mozilla/5.0 (compatible; CinesphereBot/1.0; +${siteConfig.domain})` }),
                 },
         });
         if (!res.ok) {

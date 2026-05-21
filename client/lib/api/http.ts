@@ -14,8 +14,8 @@ export const API_BASE_URL = (() => {
                         return "";
                 }
 
-                if (h === "cinephere.com.vn" || h === "www.cinephere.com.vn" || h === "admin.cinephere.com.vn") {
-                        return "https://api.cinephere.com.vn";
+                if (h === "cinesphere.com.vn" || h === "www.cinesphere.com.vn" || h === "admin.cinesphere.com.vn") {
+                        return "https://api.cinesphere.com.vn";
                 }
 
                 return base;
@@ -44,9 +44,9 @@ export const SERVER_BASE_URL = (() => {
                         return url;
                 }
 
-                if (h === "cinephere.com.vn" || h === "www.cinephere.com.vn" || h === "admin.cinephere.com.vn") {
-                        const url = "https://api.cinephere.com.vn";
-                        console.log('[DEBUG] Using api.cinephere:', url);
+                if (h === "cinesphere.com.vn" || h === "www.cinesphere.com.vn" || h === "admin.cinesphere.com.vn") {
+                        const url = "https://api.cinesphere.com.vn";
+                        console.log('[DEBUG] Using api.cinesphere:', url);
                         return url;
                 }
 

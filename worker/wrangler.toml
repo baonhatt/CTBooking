@@ -8,14 +8,14 @@ preview_urls = true
 
 [vars]
 
-VITE_SERVER_BASE_URL = "https://cinephere.com.vn"
-VITE_CLIENT_BASE_URL = "https://cinephere.com.vn"
+VITE_SERVER_BASE_URL = "https://cinesphere.com.vn"
+VITE_CLIENT_BASE_URL = "https://cinesphere.com.vn"
 VITE_VNPAY_RETURN_URL = "/checkout"
 VITE_VNPAY_GATEWAY = "https://sandbox.vnpayment.vn/paymentv2/vpcpay.html"
 VITE_MOMO_ENDPOINT = "https://test-payment.momo.vn/v2/gateway/api/create"
 VITE_MOMO_REDIRECT_URL = "/checkout"
 VITE_MOMO_IPN_URL = "/api/momo/ipn"
-R2_PUBLIC_BASE = "https://cinephere.com.vn"
+R2_PUBLIC_BASE = "https://cinesphere.com.vn"
 R2_PUBLIC_ENABLED = "false"
 GMAIL_SENDER_EMAIL = "no-reply@cinesphere.com.vn"
 GMAIL_SENDER_NAME = "CINESPHERE"
@@ -45,7 +45,7 @@ mode = "smart"
 [env.preview.vars]
 IS_PREVIEW = "true"
 
-VITE_SERVER_BASE_URL = "https://api.cinephere.com.vn"
+VITE_SERVER_BASE_URL = "https://api.cinesphere.com.vn"
 VITE_CLIENT_BASE_URL = "https://preview.cinema-pages.pages.dev"
 
 VITE_MOMO_REDIRECT_URL = "/checkout"
@@ -83,9 +83,7 @@ binding = "AI"
 [env.production]
 routes = [
   { pattern = "cinesphere.com.vn/api/*", zone_name = "cinesphere.com.vn" },
-  { pattern = "cinesphere.com.vn/uploads/*", zone_name = "cinesphere.com.vn" },
-  { pattern = "cinephere.com.vn/api/*", zone_name = "cinephere.com.vn" },
-  { pattern = "cinephere.com.vn/uploads/*", zone_name = "cinephere.com.vn" }
+  { pattern = "cinesphere.com.vn/uploads/*", zone_name = "cinesphere.com.vn" }
 ]
 [observability]
 enabled = false

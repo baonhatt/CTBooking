@@ -220,7 +220,7 @@ app.use(
         '*',
         cors({
                 origin: (origin, c) => {
-                        if (!origin) return 'https://cinephere.com.vn';
+                        if (!origin) return 'https://cinesphere.com.vn';
 
                         // Allow localhost for development automatically
                         try {
@@ -235,10 +235,8 @@ app.use(
                         const allowedExact = new Set([
                                 'https://cinesphere.com.vn',
                                 'https://www.cinesphere.com.vn',
-                                'https://cinephere.com.vn', // Test domain
-                                'https://api.cinephere.com.vn', // API domain
-                                'https://admin.cinephere.com.vn', // Admin domain (correct spelling)
-                                'https://admin.cinesphere.com.vn', // Admin domain (old spelling)
+                                'https://api.cinesphere.com.vn', // API domain
+                                'https://admin.cinesphere.com.vn', // Admin domain
                                 'https://cinema-pages.pages.dev', // Pages production
                                 'https://cinema-next-pages.pages.dev', // Next.js user client production
                                 'https://cinema-next.pages.dev', // Next.js user client (actual .pages.dev URL)
@@ -263,7 +261,7 @@ app.use(
                         }
 
                         // Fallback: default to prod domain
-                        return 'https://cinephere.com.vn';
+                        return 'https://cinesphere.com.vn';
                 },
                 allowMethods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
                 allowHeaders: ['Content-Type', 'Authorization', 'Accept', 'Origin', 'Referer', 'Access-Control-Request-Headers'],
@@ -341,7 +339,7 @@ app.post('/api/register', async (c) => {
                         if (!res.ok) throw new Error(`Email failed: ${res.status} ${res.body}`);
                         return res;
                 };
-                const appBaseUrl = c.env.VITE_CLIENT_BASE_URL || 'https://cinephere.com.vn';
+                const appBaseUrl = c.env.VITE_CLIENT_BASE_URL || 'https://cinesphere.com.vn';
                 const renderWelcome = (data: { customerName: string; email: string }) => getWelcomeEmailTemplate(appBaseUrl, data);
                 const r = await registerImpl(
                         db,
@@ -394,7 +392,6 @@ app.post('/api/forget-password', async (c) => {
                 const allowHost = (host: string) =>
                         host === 'cinesphere.com.vn' ||
                         host === 'www.cinesphere.com.vn' ||
-                        host === 'cinephere.com.vn' ||
                         host === 'cinema-pages.pages.dev' ||
                         host.endsWith('.cinema-pages.pages.dev');
 
@@ -409,7 +406,7 @@ app.post('/api/forget-password', async (c) => {
 
                 // 2. Fallback về env
                 if (!appBaseUrl) {
-                        appBaseUrl = c.env.VITE_CLIENT_BASE_URL || 'https://cinephere.com.vn';
+                        appBaseUrl = c.env.VITE_CLIENT_BASE_URL || 'https://cinesphere.com.vn';
                 }
 
                 const renderReset = (link: string) => {
@@ -967,7 +964,7 @@ app.post('/api/confirm-booking', async (c) => {
                         if (!res.ok) throw new Error(`Email failed: ${res.status} ${res.body}`);
                         return res;
                 };
-                const appBaseUrl = c.env.VITE_CLIENT_BASE_URL || 'https://cinephere.com.vn';
+                const appBaseUrl = c.env.VITE_CLIENT_BASE_URL || 'https://cinesphere.com.vn';
                 const renderBooking = (data: any) => getBookingEmailTemplate(appBaseUrl, data);
                 const r = await updatePaymentImpl(
                         db,
@@ -1003,7 +1000,7 @@ app.post('/api/sepay/webhook', async (c) => {
                         if (!res.ok) throw new Error(`Email failed: ${res.status} ${res.body}`);
                         return res;
                 };
-                const appBaseUrl = c.env.VITE_CLIENT_BASE_URL || 'https://cinephere.com.vn';
+                const appBaseUrl = c.env.VITE_CLIENT_BASE_URL || 'https://cinesphere.com.vn';
                 const renderBooking = (data: any) => getBookingEmailTemplate(appBaseUrl, data);
 
                 const result = await handleSePayWebhookImpl(
@@ -1957,7 +1954,6 @@ app.post('/api/momo/create-payment', async (c) => {
                 const allowHost = (host: string) =>
                         host === 'cinesphere.com.vn' ||
                         host === 'www.cinesphere.com.vn' ||
-                        host === 'cinephere.com.vn' ||
                         host === 'cinema-pages.pages.dev' ||
                         host.endsWith('.cinema-pages.pages.dev');
 
@@ -1988,13 +1984,13 @@ app.post('/api/momo/create-payment', async (c) => {
 
                 // Fallback: build từ env nếu client không gửi hoặc không hợp lệ
                 if (!redirectUrl) {
-                        const clientBase = c.env.VITE_CLIENT_BASE_URL || 'https://cinephere.com.vn';
+                        const clientBase = c.env.VITE_CLIENT_BASE_URL || 'https://cinesphere.com.vn';
                         const redirectPath = c.env.VITE_MOMO_REDIRECT_URL || '/checkout';
                         redirectUrl = redirectPath.startsWith('http') ? redirectPath : `${clientBase}${redirectPath}`;
                 }
 
                 // 2) ipnUrl: luôn dùng server base (không tin client, tránh bị đổi IPN)
-                const serverBase = c.env.VITE_SERVER_BASE_URL || 'https://cinephere.com.vn';
+                const serverBase = c.env.VITE_SERVER_BASE_URL || 'https://cinesphere.com.vn';
                 const ipnPath = c.env.VITE_MOMO_IPN_URL || '/api/momo/ipn';
                 const ipnUrl = ipnPath.startsWith('http') ? ipnPath : `${serverBase}${ipnPath}`;
 
@@ -2041,7 +2037,6 @@ app.post('/api/vnpay/create-payment', async (c) => {
                 const allowHost = (host: string) =>
                         host === 'cinesphere.com.vn' ||
                         host === 'www.cinesphere.com.vn' ||
-                        host === 'cinephere.com.vn' ||
                         host === 'cinema-pages.pages.dev' ||
                         host.endsWith('.cinema-pages.pages.dev');
 
@@ -2071,7 +2066,7 @@ app.post('/api/vnpay/create-payment', async (c) => {
                 }
 
                 if (!returnUrl) {
-                        const clientBase = c.env.VITE_CLIENT_BASE_URL || 'https://cinephere.com.vn';
+                        const clientBase = c.env.VITE_CLIENT_BASE_URL || 'https://cinesphere.com.vn';
                         const returnPath = c.env.VITE_VNPAY_RETURN_URL || '/checkout';
                         returnUrl = returnPath.startsWith('http') ? returnPath : `${clientBase}${returnPath}`;
                 }

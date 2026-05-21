@@ -10,7 +10,9 @@ import PostSidebar from './PostSidebar';
 export const runtime = 'edge';
 export const revalidate = 3600;
 
-const SITE_URL = 'https://cinephere.com.vn';
+import { siteConfig } from '@/config/site';
+
+const SITE_URL = siteConfig.domain;
 
 export async function generateMetadata({
         params,

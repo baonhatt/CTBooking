@@ -1,3 +1,5 @@
+import { siteConfig } from '@/config/site';
+
 const API = process.env.NEXT_PUBLIC_API_URL ?? '';
 
 export type PostItem = {
@@ -37,7 +39,7 @@ export async function getPublicPosts(options?: {
                 next: { revalidate: 3600 }, // ISR: tái tạo cache sau 1h
                 headers: {
                         // Thêm headers để giúp SEO bot nhận diện request server-side
-                        ...(typeof window === "undefined" && { "User-Agent": "Mozilla/5.0 (compatible; CinesphereBot/1.0; +https://cinephere.com.vn)" }),
+                        ...(typeof window === "undefined" && { "User-Agent": `Mozilla/5.0 (compatible; CinesphereBot/1.0; +${siteConfig.domain})` }),
                 },
         });
 
@@ -51,7 +53,7 @@ export async function getPostBySlugId(slugId: string): Promise<PostItem | null> 
                 next: { revalidate: 3600 },
                 headers: {
                         // Thêm headers để giúp SEO bot nhận diện request server-side
-                        ...(typeof window === "undefined" && { "User-Agent": "Mozilla/5.0 (compatible; CinesphereBot/1.0; +https://cinephere.com.vn)" }),
+                        ...(typeof window === "undefined" && { "User-Agent": `Mozilla/5.0 (compatible; CinesphereBot/1.0; +${siteConfig.domain})` }),
                 },
         });
         if (res.status === 404) return null;

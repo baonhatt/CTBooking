@@ -122,7 +122,7 @@ export async function sendMail(
                 const inboxId = String(env.MAILTRAP_INBOX_ID || '');
 
                 if (token && inboxId) {
-                        const senderEmail = String(env.GMAIL_SENDER_EMAIL || 'no-reply@cinephere.com.vn');
+                        const senderEmail = String(env.GMAIL_SENDER_EMAIL || 'no-reply@cinesphere.com.vn');
                         const senderName = String(env.GMAIL_SENDER_NAME || 'CINESPHERE');
 
                         const payload = {
@@ -667,7 +667,7 @@ export { isLocal, parseMediaUrl, localUploader, localDeleter } from '../../serve
 
 export async function pingIndexNow(env: any, urls: string[]): Promise<void> {
         const key = String(env.INDEXNOW_KEY || '');
-        const baseHost = String(env.VITE_CLIENT_BASE_URL || 'https://cinephere.com.vn').replace(/\/$/, '');
+        const baseHost = String(env.VITE_CLIENT_BASE_URL || 'https://cinesphere.com.vn').replace(/\/$/, '');
         if (!key || !urls.length) return;
         try {
                 const hostname = new URL(baseHost).hostname;
