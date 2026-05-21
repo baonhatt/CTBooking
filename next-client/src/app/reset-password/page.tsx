@@ -70,8 +70,9 @@ export default function ConfirmToken() {
                                                 type="password"
                                                 value={newPassword}
                                                 onChange={(e) => setNewPassword(e.target.value)}
-                                                className="bg-gray-900 text-white border-gray-700"
+                                                className="bg-gray-900 !text-white border-gray-700"
                                                 required
+                                                style={{ color: 'white' }}
                                         />
                                 </div>
                                 <div>
@@ -80,8 +81,9 @@ export default function ConfirmToken() {
                                                 type="password"
                                                 value={confirmPassword}
                                                 onChange={(e) => setConfirmPassword(e.target.value)}
-                                                className="bg-gray-900 text-white border-gray-700"
+                                                className="bg-gray-900 !text-white border-gray-700"
                                                 required
+                                                style={{ color: 'white' }}
                                         />
                                 </div>
                                 <Button
