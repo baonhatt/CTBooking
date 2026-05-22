@@ -9,6 +9,7 @@ export function useAuthHandlers(setUserName: (name: string | null) => void) {
         const handleLogout = async () => {
                 try {
                         await logout();
+                        localStorage.removeItem('userToken');
                         localStorage.removeItem('userProfile');
                         setUserName(null);
                         window.dispatchEvent(new Event('user-auth-changed'));

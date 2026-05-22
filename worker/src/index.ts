@@ -1628,7 +1628,11 @@ app.get('/api/users/:id', async (c) => {
         }
 });
 
-// Get user profile by email (PROTECTED - requires login)
+// ===== PROTECTED USER ROUTES (requires login) =====
+// All routes in this section require valid session token
+// Middleware: requireAuth checks session token from cookie or Authorization header
+
+// Get user profile by email
 // GET /api/users-profile?email=user@example.com
 app.get('/api/users-profile', requireAuth, async (c) => {
         try {
@@ -1646,7 +1650,7 @@ app.get('/api/users-profile', requireAuth, async (c) => {
         }
 });
 
-// Update user profile (PROTECTED - requires login)
+// Update user profile
 // POST /api/users-profile
 // Body: { email: string, name: string, ... }
 app.post('/api/users-profile', requireAuth, async (c) => {
@@ -1669,7 +1673,7 @@ app.post('/api/users-profile', requireAuth, async (c) => {
         }
 });
 
-// Change user password (PROTECTED - requires login)
+// Change user password
 // POST /api/users-password
 // Body: { oldPassword: string, newPassword: string }
 app.post('/api/users-password', requireAuth, async (c) => {
@@ -1688,7 +1692,7 @@ app.post('/api/users-password', requireAuth, async (c) => {
         }
 });
 
-// Get user's transaction history (PROTECTED - requires login)
+// Get user's transaction history
 // GET /api/usersprofile/transactions?email=user@example.com&status=paid&page=1
 app.get('/api/usersprofile/transactions', requireAuth, async (c) => {
         try {
@@ -1717,6 +1721,8 @@ app.get('/api/usersprofile/transactions', requireAuth, async (c) => {
                 return c.json({ status: 'error', message: 'Lỗi máy chủ nội bộ' }, 500);
         }
 });
+
+// ===== END PROTECTED USER ROUTES =====
 
 // Get list of toys
 // GET /api/toys?page=1&pageSize=20&q=search_term
