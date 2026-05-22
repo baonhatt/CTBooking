@@ -390,7 +390,6 @@ export default function Account() {
                                 dob: profile.dob
                         };
                         localStorage.setItem('userProfile', JSON.stringify(p));
-                        window.dispatchEvent(new Event('user-auth-changed'));
                         toast.success('Cập nhật thành công');
                 } catch (e: any) {
                         toast.error('Cập nhật thất bại', { description: e?.message || '' });
