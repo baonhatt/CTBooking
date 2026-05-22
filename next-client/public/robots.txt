@@ -1,6 +1,6 @@
 User-agent: *
 Allow: /
-Allow: /posts
+Allow: /bai-viet
 Allow: /booking
 
 Disallow: /account

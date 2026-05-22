@@ -10,6 +10,7 @@ import UsersPage from '@/pages/admin/Users';
 import MoviesPage from '@/pages/admin/Movies';
 import ToysPage from '@/pages/admin/Toys';
 import PostsPage from '@/pages/admin/Posts';
+import PostEditPage from '@/pages/admin/PostEdit';
 import TransactionsPage from '@/pages/admin/Transactions';
 import TicketsPage from '@/pages/admin/Tickets';
 import TicketCheckPage from '@/pages/admin/TicketCheck';
@@ -115,6 +116,7 @@ export const AdminGate = () => {
                         <Route path="/movies" element={<MoviesPage />} />
                         <Route path="/toys" element={<ToysPage />} />
                         <Route path="/posts" element={<PostsPage />} />
+                        <Route path="/posts/:id/edit" element={<PostEditPage />} />
                         <Route path="/tickets" element={<TicketsPage />} />
                         <Route path="/transactions" element={<TransactionsPage />} />
                         <Route path="/ticket-check" element={<TicketCheckPage />} />
