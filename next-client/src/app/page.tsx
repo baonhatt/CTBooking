@@ -1,5 +1,6 @@
 import { Suspense } from 'react';
 import type { Metadata } from 'next';
+import UserLayout from '@/layouts/UserLayout';
 import HeroSection from '@/components/user/home/HeroSection';
 import FilmCarousel from '@/components/user/home/FilmCarousel';
 import PromotionShowcase from '@/components/user/home/PromotionShowcase';
@@ -67,17 +68,19 @@ export default async function Home() {
         const techListItems = items.filter((i: any) => i.section === 'technology_section2' && i.type === 'video');
 
         return (
-                <main>
-                        <ClearStorageOnMount />
-                        <HeroSection initialMovies={activeMovies} heroMedia={heroMedia} />
+                <UserLayout>
+                        <main>
+                                <ClearStorageOnMount />
+                                <HeroSection initialMovies={activeMovies} heroMedia={heroMedia} />
 
-                        <Suspense fallback={<div className="min-h-[200px]" />}>
-                                {/* Pass initial data to the interactive Client Components */}
-                                <FilmCarousel initialFilms={activeMovies} />
-                                <PromotionShowcase initialCombos={ticketsRes.items || []} />
-                                <TechnologyBanner initialMainItem={techMainItem} initialListItems={techListItems} />
-                                <ProductSection initialProducts={toysRes.items || []} />
-                        </Suspense>
-                </main>
+                                <Suspense fallback={<div className="min-h-[200px]" />}>
+                                        {/* Pass initial data to the interactive Client Components */}
+                                        <FilmCarousel initialFilms={activeMovies} />
+                                        <PromotionShowcase initialCombos={ticketsRes.items || []} />
+                                        <TechnologyBanner initialMainItem={techMainItem} initialListItems={techListItems} />
+                                        <ProductSection initialProducts={toysRes.items || []} />
+                                </Suspense>
+                        </main>
+                </UserLayout>
         );
 }
