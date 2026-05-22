@@ -15,13 +15,6 @@ export async function logoutApi() {
         });
 }
 
-export async function getMeApi() {
-        return request<{ status: string; user: any }>('/api/me', {
-                method: 'GET',
-                credentials: 'include'
-        });
-}
-
 export async function registerApi(body: {
         email: string;
         password: string;
