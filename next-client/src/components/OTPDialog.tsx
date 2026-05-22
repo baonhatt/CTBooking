@@ -6,6 +6,7 @@ import { Input } from '@/components/ui/input';
 import { toast } from 'sonner';
 import { Loader2, RefreshCw } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { buildUrl } from '@/lib/api/http';
 
 interface OTPDialogProps {
         isOpen: boolean;
@@ -146,7 +147,7 @@ export function OTPDialog({
                         setIsLoading(true);
                         setError('');
 
-                        const response = await fetch('/api/validate-otp', {
+                        const response = await fetch(buildUrl('/api/validate-otp'), {
                                 method: 'POST',
                                 headers: {
                                         'Content-Type': 'application/json'
@@ -183,7 +184,7 @@ export function OTPDialog({
                         setIsResending(true);
                         setError('');
 
-                        const response = await fetch('/api/resend-otp', {
+                        const response = await fetch(buildUrl('/api/resend-otp'), {
                                 method: 'POST',
                                 headers: {
                                         'Content-Type': 'application/json'
