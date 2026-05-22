@@ -49,8 +49,14 @@ export default function Header({
         const activeSection = useActiveSection(effectiveDisable);
         const { handleLogout } = useAuthHandlers(setUserName);
 
-        // Check login state from localStorage (userToken)
-        const isLoggedIn = !!localStorage.getItem('userToken');
+        // Check login state from localStorage (userToken) - client-side only
+        const [isLoggedIn, setIsLoggedIn] = useState(false);
+
+        useEffect(() => {
+                if (typeof window !== 'undefined') {
+                        setIsLoggedIn(!!localStorage.getItem('userToken'));
+                }
+        }, []);
 
         // Prefetch các trang chính để tránh lag khi điều hướng
         useEffect(() => {
