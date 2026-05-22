@@ -119,6 +119,7 @@ export async function createPostImpl(
 
         const slug = title
                 .toLowerCase()
+                .replace(/[đĐ]/g, 'd')
                 .normalize('NFD')
                 .replace(/[\u0300-\u036f]/g, '')
                 .replace(/[^a-z0-9\s-]/g, '')
@@ -175,6 +176,7 @@ export async function updatePostImpl(
         id: number,
         args: {
                 title?: string;
+                slug?: string;
                 content?: string;
                 excerpt?: string;
                 featured_image?: string;
@@ -205,14 +207,9 @@ export async function updatePostImpl(
 
         if (title !== undefined) {
                 data.title = title;
-                data.slug = title
-                        .toLowerCase()
-                        .normalize('NFD')
-                        .replace(/[\u0300-\u036f]/g, '')
-                        .replace(/[^a-z0-9\s-]/g, '')
-                        .replace(/\s+/g, '-')
-                        .replace(/-+/g, '-')
-                        .slice(0, 255);
+        }
+        if (args.slug !== undefined) {
+                data.slug = args.slug;
         }
         if (content !== undefined) data.content = content;
         if (excerpt !== undefined) data.excerpt = excerpt;
