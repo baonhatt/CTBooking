@@ -56,6 +56,16 @@ export default function Header({
                 if (typeof window !== 'undefined') {
                         setIsLoggedIn(!!localStorage.getItem('userToken'));
                 }
+
+                // Listen for auth changes (login/logout)
+                const handleAuthChange = () => {
+                        if (typeof window !== 'undefined') {
+                                setIsLoggedIn(!!localStorage.getItem('userToken'));
+                        }
+                };
+
+                window.addEventListener('user-auth-changed', handleAuthChange);
+                return () => window.removeEventListener('user-auth-changed', handleAuthChange);
         }, []);
 
         // Prefetch các trang chính để tránh lag khi điều hướng
