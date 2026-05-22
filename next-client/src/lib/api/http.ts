@@ -1,4 +1,5 @@
 import { siteConfig } from '@/config/site';
+import { handleAutoLogout } from '../auth-utils';
 
 // Sử dụng biến môi trường Next.js thay vì Vite syntax
 // Trong SSR (Server-Side Rendering), luôn dùng NEXT_PUBLIC_API_URL để gọi API
@@ -34,6 +35,11 @@ export async function request<T>(path: string, init: RequestInit = {}) {
                 },
         });
         if (!res.ok) {
+                // Auto logout khi 401 Unauthorized (token hết hạn hoặc invalid)
+                if (res.status === 401 && typeof window !== 'undefined') {
+                        handleAutoLogout();
+                }
+
                 let errorMessage = `HTTP ${res.status}`;
                 try {
                         const errorData = await res.json();

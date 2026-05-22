@@ -1,3 +1,5 @@
+import { handleAutoLogout } from '../auth-utils';
+
 export const API_BASE_URL = (() => {
         const env = (import.meta as any).env || {};
         const base = env?.VITE_API_BASE_URL || env?.VITE_API_URL || "";
@@ -70,6 +72,11 @@ export async function request<T>(path: string, init: RequestInit = {}) {
                 },
         });
         if (!res.ok) {
+                // Auto logout khi 401 Unauthorized (token hết hạn hoặc invalid)
+                if (res.status === 401 && typeof window !== 'undefined') {
+                        handleAutoLogout();
+                }
+
                 let errorMessage = `HTTP ${res.status}`;
                 try {
                         const errorData = await res.json();
