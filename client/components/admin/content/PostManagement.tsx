@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Card, CardContent } from '@/components/ui/card';
 import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
@@ -17,6 +18,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { getPosts, createPostApi, updatePostApi } from '@/lib/api';
 import { uploadDirectToCloudinary } from '@/lib/api/uploads';
 import { PostRichTextEditor } from './PostRichTextEditor';
@@ -54,6 +56,7 @@ function getPlainTextFromHtml(value?: string) {
 }
 
 export const PostManagement = () => {
+        const navigate = useNavigate();
         const [posts, setPosts] = useState<PostData[]>([]);
         const [totalPosts, setTotalPosts] = useState(0);
         const [currentPage, setCurrentPage] = useState(1);
@@ -64,6 +67,7 @@ export const PostManagement = () => {
         const [isPreviewOpen, setIsPreviewOpen] = useState(false);
         const [editData, setEditData] = useState<Partial<PostData> & { imageFile?: File; ogImageFile?: File }>({});
         const [isSaving, setIsSaving] = useState(false);
+        const [activeTab, setActiveTab] = useState('content');
         const initialSnapshotRef = useRef<string>('');
 
         const pageSize = 10;
@@ -141,9 +145,7 @@ export const PostManagement = () => {
         };
 
         const handleEdit = (post: PostData) => {
-                setEditData(post);
-                initialSnapshotRef.current = snapshotEditData(post);
-                setIsEditOpen(true);
+                navigate(`/posts/${post.id}/edit`);
         };
 
         const handleSave = async (overrideStatus?: 'draft' | 'published' | 'archived') => {
@@ -342,17 +344,17 @@ export const PostManagement = () => {
                         </div>
 
                         {/* ── Table ───────────────────────────────────────────────────────────── */}
-                        <Card className="border-none shadow-xl shadow-slate-200/50 rounded-2xl overflow-hidden bg-white">
+                        <Card className="border-none shadow-xl shadow-slate-200/50 rounded-2xl overflow-hidden bg-white w-full min-w-0">
                                 <CardContent className="p-0">
-                                        <Table>
+                                        <Table className="w-full table-fixed">
                                                 <TableHeader className="bg-slate-50/80">
                                                         <TableRow className="hover:bg-transparent border-none">
-                                                                <TableHead className="w-16 text-center text-[10px] uppercase font-bold text-slate-400">ID</TableHead>
-                                                                <TableHead className="text-[10px] uppercase font-bold text-slate-500 min-w-[420px]">Tiêu đề</TableHead>
-                                                                <TableHead className="text-[10px] uppercase font-bold text-slate-500 text-center w-[140px]">Trạng thái</TableHead>
-                                                                <TableHead className="text-[10px] uppercase font-bold text-slate-500 text-center w-[120px]">Xuất bản</TableHead>
-                                                                <TableHead className="text-[10px] uppercase font-bold text-slate-500 text-center w-[100px]">Lượt xem</TableHead>
-                                                                <TableHead className="text-right text-[10px] uppercase font-bold text-slate-500 pr-6 w-[90px]">Thao tác</TableHead>
+                                                                <TableHead className="w-14 text-center text-[10px] uppercase font-bold text-slate-400 shrink-0">ID</TableHead>
+                                                                <TableHead className="text-[10px] uppercase font-bold text-slate-500 min-w-0">Tiêu đề</TableHead>
+                                                                <TableHead className="text-[10px] uppercase font-bold text-slate-500 text-center w-[110px] shrink-0">Trạng thái</TableHead>
+                                                                <TableHead className="text-[10px] uppercase font-bold text-slate-500 text-center w-[100px] hidden sm:table-cell shrink-0">Xuất bản</TableHead>
+                                                                <TableHead className="text-[10px] uppercase font-bold text-slate-500 text-center w-[80px] hidden md:table-cell shrink-0">Lượt xem</TableHead>
+                                                                <TableHead className="text-right text-[10px] uppercase font-bold text-slate-500 pr-4 w-[70px] shrink-0">Thao tác</TableHead>
                                                         </TableRow>
                                                 </TableHeader>
                                                 <TableBody>
@@ -379,39 +381,41 @@ export const PostManagement = () => {
                                                                 posts.map((post) => (
                                                                         <TableRow key={post.id} className="hover:bg-slate-50/50 transition-colors">
                                                                                 <TableCell className="text-center font-mono text-xs text-slate-500">#{post.id}</TableCell>
-                                                                                <TableCell>
-                                                                                        <div className="flex items-center gap-3">
+                                                                                <TableCell className="max-w-0">
+                                                                                        <div className="flex items-center gap-2 sm:gap-3">
                                                                                                 {post.featured_image && (
                                                                                                         <img
                                                                                                                 src={post.featured_image}
                                                                                                                 alt={post.title}
-                                                                                                                className="w-12 h-12 rounded-lg object-cover border border-slate-200 shrink-0"
+                                                                                                                className="w-10 h-10 sm:w-12 sm:h-12 rounded-lg object-cover border border-slate-200 shrink-0"
                                                                                                         />
                                                                                                 )}
-                                                                                                <div>
-                                                                                                        <div className="font-bold text-slate-700 line-clamp-2">{post.title}</div>
-                                                                                                        {post.excerpt && <div className="text-xs text-slate-400 line-clamp-2">{post.excerpt}</div>}
-                                                                                                        {post.is_featured && (
-                                                                                                                <span className="inline-flex mt-1 items-center rounded-full bg-cyan-100 text-cyan-700 border border-cyan-200 px-2 py-0.5 text-[10px] font-bold uppercase">
-                                                                                                                        Nổi bật
-                                                                                                                </span>
-                                                                                                        )}
+                                                                                                <div className="min-w-0 flex-1">
+                                                                                                        <div className="font-bold text-slate-700 text-sm line-clamp-1">{post.title}</div>
+                                                                                                        <div className="flex items-center gap-2 mt-0.5">
+                                                                                                                {post.is_featured && (
+                                                                                                                        <span className="inline-flex items-center rounded-full bg-cyan-100 text-cyan-700 border border-cyan-200 px-1.5 py-0 text-[9px] font-bold uppercase shrink-0">
+                                                                                                                                Nổi bật
+                                                                                                                        </span>
+                                                                                                                )}
+                                                                                                                {post.excerpt && <div className="text-xs text-slate-400 truncate hidden sm:block" title={post.excerpt}>{post.excerpt}</div>}
+                                                                                                        </div>
                                                                                                 </div>
                                                                                         </div>
                                                                                 </TableCell>
                                                                                 <TableCell className="text-center">
                                                                                         <StatusBadge status={post.status} />
                                                                                 </TableCell>
-                                                                                <TableCell className="text-center text-xs text-slate-500">
+                                                                                <TableCell className="text-center text-xs text-slate-500 hidden sm:table-cell">
                                                                                         {post.published_at ? new Date(post.published_at).toLocaleDateString('vi-VN') : '---'}
                                                                                 </TableCell>
-                                                                                <TableCell className="text-center">
+                                                                                <TableCell className="text-center hidden md:table-cell">
                                                                                         <span className="inline-flex items-center gap-1.5 text-xs font-mono text-slate-600 bg-slate-100 px-2 py-1 rounded-md">
                                                                                                 <Eye className="w-3 h-3" />
                                                                                                 {post.view_count || 0}
                                                                                         </span>
                                                                                 </TableCell>
-                                                                                <TableCell className="text-right">
+                                                                                <TableCell className="text-right pr-4">
                                                                                         <Button
                                                                                                 variant="ghost"
                                                                                                 size="icon"
@@ -502,147 +506,168 @@ export const PostManagement = () => {
 
                                         {/* Body — scroll toàn bộ nội dung form */}
                                         <div className="flex-1 min-h-0 overflow-y-auto">
-                                                <div className="grid grid-cols-12 gap-6 p-6 items-start">
+                                                <div className="p-6">
+                                                        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+                                                                <TabsList className="grid w-full grid-cols-3 mb-6">
+                                                                        <TabsTrigger value="content">Nội dung</TabsTrigger>
+                                                                        <TabsTrigger value="seo">SEO</TabsTrigger>
+                                                                        <TabsTrigger value="preview">Preview</TabsTrigger>
+                                                                </TabsList>
 
-                                                        {/* ── Cột trái: Form ────────────────────────────────────────── */}
-                                                        <div className="col-span-8">
-                                                                <div className="bg-white rounded-2xl border shadow-sm p-5 space-y-5">
-
-                                                                        {/* Tiêu đề + Tóm tắt */}
-                                                                        <div className="grid grid-cols-12 gap-4 items-start">
-                                                                                <div className="col-span-8">
-                                                                                        <Label>Tiêu đề</Label>
-                                                                                        <Textarea
-                                                                                                className="mt-2 min-h-[44px] resize-y"
-                                                                                                value={editData.title || ''}
-                                                                                                onChange={(e) => setEditData({ ...editData, title: e.target.value })}
-                                                                                                placeholder="Nhập tiêu đề bài viết..."
-                                                                                        />
-                                                                                        <p className="mt-2 text-[11px] text-slate-500 flex items-center gap-1.5">
-                                                                                                <Link2 className="w-3.5 h-3.5 text-slate-400" />
-                                                                                                Slug dự kiến:{' '}
-                                                                                                <span className="font-mono text-slate-700">{makeSlug(editData.title || '') || '---'}</span>
-                                                                                        </p>
-                                                                                </div>
-                                                                                <div className="col-span-4">
-                                                                                        <Label>Tóm tắt</Label>
-                                                                                        <Textarea
-                                                                                                className="mt-2 min-h-[92px] resize-y"
-                                                                                                value={editData.excerpt || ''}
-                                                                                                onChange={(e) => setEditData({ ...editData, excerpt: e.target.value })}
-                                                                                                placeholder="Tóm tắt 1–2 câu..."
-                                                                                        />
-                                                                                        <p className="mt-2 text-[11px] text-slate-500">
-                                                                                                Gợi ý: giữ trong khoảng <strong>120–180 ký tự</strong> để hiển thị đẹp.
-                                                                                        </p>
-                                                                                </div>
-                                                                        </div>
-
-                                                                        {/* Ảnh đại diện + Thiết lập */}
-                                                                        <div className="grid grid-cols-12 gap-4">
-                                                                                <div className="col-span-7">
-                                                                                        <Label>Ảnh đại diện</Label>
-                                                                                        <div className="mt-2 flex items-center gap-3">
-                                                                                                <Input
-                                                                                                        type="file"
-                                                                                                        accept="image/*"
-                                                                                                        onChange={(e) => {
-                                                                                                                const file = e.target.files?.[0];
-                                                                                                                if (file) {
-                                                                                                                        const url = URL.createObjectURL(file);
-                                                                                                                        setEditData((prev) => ({ ...prev, featured_image: url, imageFile: file }));
-                                                                                                                }
-                                                                                                        }}
+                                                                {/* Tab: Nội dung chính */}
+                                                                <TabsContent value="content" className="space-y-5">
+                                                                        <div className="bg-white rounded-2xl border shadow-sm p-5 space-y-5">
+                                                                                {/* Tiêu đề + Tóm tắt */}
+                                                                                <div className="grid grid-cols-12 gap-4 items-start">
+                                                                                        <div className="col-span-8">
+                                                                                                <Label>Tiêu đề</Label>
+                                                                                                <Textarea
+                                                                                                        className="mt-2 min-h-[44px] resize-y"
+                                                                                                        value={editData.title || ''}
+                                                                                                        onChange={(e) => setEditData({ ...editData, title: e.target.value })}
+                                                                                                        placeholder="Nhập tiêu đề bài viết..."
                                                                                                 />
-                                                                                                <Button
-                                                                                                        type="button"
-                                                                                                        variant="outline"
-                                                                                                        className="shrink-0 rounded-xl"
-                                                                                                        onClick={() => setEditData((prev) => ({ ...prev, featured_image: '', imageFile: undefined }))}
-                                                                                                        disabled={!editData.featured_image}
-                                                                                                        title="Gỡ ảnh"
-                                                                                                >
-                                                                                                        Gỡ
-                                                                                                </Button>
+                                                                                                <p className="mt-2 text-[11px] text-slate-500 flex items-center gap-1.5">
+                                                                                                        <Link2 className="w-3.5 h-3.5 text-slate-400" />
+                                                                                                        Slug dự kiến:{' '}
+                                                                                                        <span className="font-mono text-slate-700">{makeSlug(editData.title || '') || '---'}</span>
+                                                                                                </p>
                                                                                         </div>
-                                                                                        <p className="mt-2 text-[11px] text-slate-500">
-                                                                                                Ảnh này sẽ dùng làm thumbnail trong danh sách & khi share link.
-                                                                                        </p>
+                                                                                        <div className="col-span-4">
+                                                                                                <Label>Tóm tắt</Label>
+                                                                                                <Textarea
+                                                                                                        className="mt-2 min-h-[92px] resize-y"
+                                                                                                        value={editData.excerpt || ''}
+                                                                                                        onChange={(e) => setEditData({ ...editData, excerpt: e.target.value })}
+                                                                                                        placeholder="Tóm tắt 1–2 câu..."
+                                                                                                />
+                                                                                                <p className="mt-2 text-[11px] text-slate-500">
+                                                                                                        Gợi ý: giữ trong khoảng <strong>120–180 ký tự</strong> để hiển thị đẹp.
+                                                                                                </p>
+                                                                                        </div>
                                                                                 </div>
-                                                                                <div className="col-span-5">
-                                                                                        <Label>Thiết lập</Label>
-                                                                                        <div className="mt-2">
-                                                                                                <div className="flex items-center gap-2 px-3 h-10 border border-slate-200 rounded-xl bg-white">
-                                                                                                        <Switch
-                                                                                                                checked={editData.is_featured || false}
-                                                                                                                onCheckedChange={(checked) => setEditData({ ...editData, is_featured: checked })}
+
+                                                                                {/* Ảnh đại diện + Thiết lập */}
+                                                                                <div className="grid grid-cols-12 gap-4">
+                                                                                        <div className="col-span-7">
+                                                                                                <Label>Ảnh đại diện</Label>
+                                                                                                <div className="mt-2 flex items-center gap-3">
+                                                                                                        <Input
+                                                                                                                type="file"
+                                                                                                                accept="image/*"
+                                                                                                                onChange={(e) => {
+                                                                                                                        const file = e.target.files?.[0];
+                                                                                                                        if (file) {
+                                                                                                                                const url = URL.createObjectURL(file);
+                                                                                                                                setEditData((prev) => ({ ...prev, featured_image: url, imageFile: file }));
+                                                                                                                        }
+                                                                                                                }}
                                                                                                         />
-                                                                                                        <Label className="cursor-pointer">Nổi bật</Label>
+                                                                                                        <Button
+                                                                                                                type="button"
+                                                                                                                variant="outline"
+                                                                                                                className="shrink-0 rounded-xl"
+                                                                                                                onClick={() => setEditData((prev) => ({ ...prev, featured_image: '', imageFile: undefined }))}
+                                                                                                                disabled={!editData.featured_image}
+                                                                                                                title="Gỡ ảnh"
+                                                                                                        >
+                                                                                                                Gỡ
+                                                                                                        </Button>
+                                                                                                </div>
+                                                                                                <p className="mt-2 text-[11px] text-slate-500">
+                                                                                                        Ảnh này sẽ dùng làm thumbnail trong danh sách & khi share link.
+                                                                                                </p>
+                                                                                        </div>
+                                                                                        <div className="col-span-5">
+                                                                                                <Label>Thiết lập</Label>
+                                                                                                <div className="mt-2">
+                                                                                                        <div className="flex items-center gap-2 px-3 h-10 border border-slate-200 rounded-xl bg-white">
+                                                                                                                <Switch
+                                                                                                                        checked={editData.is_featured || false}
+                                                                                                                        onCheckedChange={(checked) => setEditData({ ...editData, is_featured: checked })}
+                                                                                                                />
+                                                                                                                <Label className="cursor-pointer">Nổi bật</Label>
+                                                                                                        </div>
                                                                                                 </div>
                                                                                         </div>
                                                                                 </div>
-                                                                        </div>
 
-                                                                        {/* SEO Fields */}
-                                                                        <div className="grid grid-cols-12 gap-4">
-                                                                                <div className="col-span-8">
-                                                                                        <Label>Meta Description (SEO)</Label>
-                                                                                        <Textarea
-                                                                                                className="mt-2 min-h-[60px] resize-y"
-                                                                                                value={editData.meta_description || ''}
-                                                                                                onChange={(e) => setEditData({ ...editData, meta_description: e.target.value })}
-                                                                                                placeholder="Mô tả ngắn cho Google (120-160 ký tự)..."
-                                                                                                maxLength={160}
-                                                                                        />
-                                                                                        <p className="mt-1 text-[11px] text-slate-500">
-                                                                                                {editData.meta_description?.length || 0}/160 ký tự
-                                                                                        </p>
-                                                                                </div>
-                                                                                <div className="col-span-4">
-                                                                                        <Label>Meta Keywords</Label>
-                                                                                        <Textarea
-                                                                                                className="mt-2 min-h-[60px] resize-y"
-                                                                                                value={editData.meta_keywords || ''}
-                                                                                                onChange={(e) => setEditData({ ...editData, meta_keywords: e.target.value })}
-                                                                                                placeholder="Từ khóa, cách nhau bằng dấu phẩy..."
-                                                                                        />
-                                                                                        <p className="mt-1 text-[11px] text-slate-500">
-                                                                                                Ví dụ: phim, rạp chiếu, review
-                                                                                        </p>
+                                                                                {/* Rich text editor */}
+                                                                                <div>
+                                                                                        <Label>Nội dung</Label>
+                                                                                        <div className="mt-2">
+                                                                                                <PostRichTextEditor
+                                                                                                        value={editData.content || ''}
+                                                                                                        onChange={(content) => setEditData((prev) => ({ ...prev, content }))}
+                                                                                                />
+                                                                                        </div>
                                                                                 </div>
                                                                         </div>
+                                                                </TabsContent>
 
-                                                                        {/* Additional SEO Fields */}
-                                                                        <div className="grid grid-cols-12 gap-4">
-                                                                                <div className="col-span-6">
-                                                                                        <Label>SEO Title</Label>
-                                                                                        <Input
-                                                                                                className="mt-2"
-                                                                                                value={editData.seo_title || ''}
-                                                                                                onChange={(e) => setEditData({ ...editData, seo_title: e.target.value })}
-                                                                                                placeholder="Tiêu đề tùy chỉnh cho SEO (nếu khác tiêu đề chính)..."
-                                                                                                maxLength={60}
-                                                                                        />
-                                                                                        <p className="mt-1 text-[11px] text-slate-500">
-                                                                                                {editData.seo_title?.length || 0}/60 ký tự
-                                                                                        </p>
+                                                                {/* Tab: SEO */}
+                                                                <TabsContent value="seo" className="space-y-5">
+                                                                        <div className="bg-white rounded-2xl border shadow-sm p-5 space-y-5">
+                                                                                {/* Meta Description + Keywords */}
+                                                                                <div className="grid grid-cols-12 gap-4">
+                                                                                        <div className="col-span-8">
+                                                                                                <Label>Meta Description (SEO)</Label>
+                                                                                                <Textarea
+                                                                                                        className="mt-2 min-h-[60px] resize-y"
+                                                                                                        value={editData.meta_description || ''}
+                                                                                                        onChange={(e) => setEditData({ ...editData, meta_description: e.target.value })}
+                                                                                                        placeholder="Mô tả ngắn cho Google (120-160 ký tự)..."
+                                                                                                        maxLength={160}
+                                                                                                />
+                                                                                                <p className="mt-1 text-[11px] text-slate-500">
+                                                                                                        {editData.meta_description?.length || 0}/160 ký tự
+                                                                                                </p>
+                                                                                        </div>
+                                                                                        <div className="col-span-4">
+                                                                                                <Label>Meta Keywords</Label>
+                                                                                                <Textarea
+                                                                                                        className="mt-2 min-h-[60px] resize-y"
+                                                                                                        value={editData.meta_keywords || ''}
+                                                                                                        onChange={(e) => setEditData({ ...editData, meta_keywords: e.target.value })}
+                                                                                                        placeholder="Từ khóa, cách nhau bằng dấu phẩy..."
+                                                                                                />
+                                                                                                <p className="mt-1 text-[11px] text-slate-500">
+                                                                                                        Ví dụ: phim, rạp chiếu, review
+                                                                                                </p>
+                                                                                        </div>
                                                                                 </div>
-                                                                                <div className="col-span-6">
-                                                                                        <Label>Schema Type</Label>
-                                                                                        <select
-                                                                                                className="mt-2 w-full px-3 py-2 border border-slate-200 rounded-xl bg-white text-sm"
-                                                                                                value={editData.schema_type || 'Article'}
-                                                                                                onChange={(e) => setEditData({ ...editData, schema_type: e.target.value })}
-                                                                                        >
-                                                                                                <option value="Article">Article</option>
-                                                                                                <option value="NewsArticle">NewsArticle</option>
-                                                                                                <option value="BlogPosting">BlogPosting</option>
-                                                                                        </select>
-                                                                                </div>
-                                                                        </div>
 
-                                                                        <div className="grid grid-cols-12 gap-4">
-                                                                                <div className="col-span-12">
+                                                                                {/* SEO Title + Schema Type */}
+                                                                                <div className="grid grid-cols-12 gap-4">
+                                                                                        <div className="col-span-6">
+                                                                                                <Label>SEO Title</Label>
+                                                                                                <Input
+                                                                                                        className="mt-2"
+                                                                                                        value={editData.seo_title || ''}
+                                                                                                        onChange={(e) => setEditData({ ...editData, seo_title: e.target.value })}
+                                                                                                        placeholder="Tiêu đề tùy chỉnh cho SEO (nếu khác tiêu đề chính)..."
+                                                                                                        maxLength={60}
+                                                                                                />
+                                                                                                <p className="mt-1 text-[11px] text-slate-500">
+                                                                                                        {editData.seo_title?.length || 0}/60 ký tự
+                                                                                                </p>
+                                                                                        </div>
+                                                                                        <div className="col-span-6">
+                                                                                                <Label>Schema Type</Label>
+                                                                                                <select
+                                                                                                        className="mt-2 w-full px-3 py-2 border border-slate-200 rounded-xl bg-white text-sm"
+                                                                                                        value={editData.schema_type || 'Article'}
+                                                                                                        onChange={(e) => setEditData({ ...editData, schema_type: e.target.value })}
+                                                                                                >
+                                                                                                        <option value="Article">Article</option>
+                                                                                                        <option value="NewsArticle">NewsArticle</option>
+                                                                                                        <option value="BlogPosting">BlogPosting</option>
+                                                                                                </select>
+                                                                                        </div>
+                                                                                </div>
+
+                                                                                {/* Canonical URL */}
+                                                                                <div>
                                                                                         <Label>Canonical URL</Label>
                                                                                         <Input
                                                                                                 className="mt-2"
@@ -651,10 +676,9 @@ export const PostManagement = () => {
                                                                                                 placeholder="URL chuẩn (canonical) để tránh trùng lặp nội dung..."
                                                                                         />
                                                                                 </div>
-                                                                        </div>
 
-                                                                        <div className="grid grid-cols-12 gap-4">
-                                                                                <div className="col-span-12">
+                                                                                {/* OG Image */}
+                                                                                <div>
                                                                                         <Label>OG Image (Ảnh cho Facebook/Social)</Label>
                                                                                         <div className="mt-2 flex items-center gap-3">
                                                                                                 <Input
@@ -676,67 +700,74 @@ export const PostManagement = () => {
                                                                                         </div>
                                                                                 </div>
                                                                         </div>
+                                                                </TabsContent>
 
-                                                                        {/* Rich text editor — không giới hạn chiều cao, body tự scroll */}
-                                                                        <div>
-                                                                                <Label>Nội dung</Label>
-                                                                                <div className="mt-2">
-                                                                                        <PostRichTextEditor
-                                                                                                value={editData.content || ''}
-                                                                                                onChange={(content) => setEditData((prev) => ({ ...prev, content }))}
-                                                                                        />
-                                                                                </div>
-                                                                        </div>
-                                                                </div>
-                                                        </div>
-
-                                                        {/* ── Cột phải: Preview + Gợi ý — sticky ──────────────────── */}
-                                                        <div className="col-span-4 sticky top-0 space-y-4">
-                                                                {/* Preview thumbnail */}
-                                                                <div className="bg-white rounded-2xl border shadow-sm overflow-hidden">
-                                                                        <div className="px-5 py-3 bg-slate-50 border-b flex items-center gap-2">
-                                                                                <ImageIcon className="w-4 h-4 text-slate-500" />
-                                                                                <span className="text-[11px] font-black text-slate-500 uppercase tracking-widest">
-                                                                                        Preview thumbnail
-                                                                                </span>
-                                                                        </div>
-                                                                        <div className="p-5">
-                                                                                {editData.featured_image ? (
-                                                                                        <img
-                                                                                                src={editData.featured_image}
-                                                                                                alt="Preview"
-                                                                                                className="w-full aspect-[16/10] rounded-xl object-cover border border-slate-200"
-                                                                                        />
-                                                                                ) : (
-                                                                                        <div className="w-full aspect-[16/10] rounded-xl border border-dashed border-slate-200 bg-slate-50 flex items-center justify-center text-slate-400 text-xs italic">
-                                                                                                Chưa chọn ảnh đại diện
+                                                                {/* Tab: Preview */}
+                                                                <TabsContent value="preview" className="space-y-5">
+                                                                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                                                                                {/* Preview Card */}
+                                                                                <div className="bg-white rounded-2xl border shadow-sm overflow-hidden">
+                                                                                        <div className="px-5 py-3 bg-slate-50 border-b flex items-center gap-2">
+                                                                                                <ImageIcon className="w-4 h-4 text-slate-500" />
+                                                                                                <span className="text-[11px] font-black text-slate-500 uppercase tracking-widest">
+                                                                                                        Preview thumbnail
+                                                                                                </span>
                                                                                         </div>
-                                                                                )}
-                                                                                <div className="mt-4 space-y-1">
-                                                                                        <p className="text-sm font-black text-slate-900 line-clamp-2">
-                                                                                                {editData.title?.trim() || 'Tiêu đề bài viết...'}
-                                                                                        </p>
-                                                                                        <p className="text-xs text-slate-500 line-clamp-2">
-                                                                                                {editData.excerpt?.trim() || 'Tóm tắt ngắn (excerpt) sẽ hiện ở danh sách / SEO...'}
-                                                                                        </p>
+                                                                                        <div className="p-5">
+                                                                                                {/* Sử dụng og_image nếu có, fallback featured_image */}
+                                                                                                {(editData.og_image || editData.featured_image) ? (
+                                                                                                        <img
+                                                                                                                src={editData.og_image || editData.featured_image}
+                                                                                                                alt="Preview"
+                                                                                                                className="w-full aspect-[16/10] rounded-xl object-cover border border-slate-200"
+                                                                                                        />
+                                                                                                ) : (
+                                                                                                        <div className="w-full aspect-[16/10] rounded-xl border border-dashed border-slate-200 bg-slate-50 flex items-center justify-center text-slate-400 text-xs italic">
+                                                                                                                Chưa chọn ảnh
+                                                                                                        </div>
+                                                                                                )}
+                                                                                                <div className="mt-4 space-y-2">
+                                                                                                        {/* Sử dụng seo_title nếu có, fallback title */}
+                                                                                                        <p className="text-sm font-black text-slate-900 line-clamp-1" title={editData.seo_title?.trim() || editData.title?.trim() || ''}>
+                                                                                                                {editData.seo_title?.trim() || editData.title?.trim() || 'Tiêu đề bài viết...'}
+                                                                                                        </p>
+                                                                                                        {/* Sử dụng meta_description nếu có, fallback excerpt */}
+                                                                                                        <p className="text-xs text-slate-500 line-clamp-2" title={editData.meta_description?.trim() || editData.excerpt?.trim() || ''}>
+                                                                                                                {editData.meta_description?.trim() || editData.excerpt?.trim() || 'Tóm tắt ngắn (excerpt) sẽ hiện ở danh sách / SEO...'}
+                                                                                                        </p>
+                                                                                                        {/* Hiển thị Schema Type */}
+                                                                                                        {editData.schema_type && (
+                                                                                                                <p className="text-[10px] text-slate-400 font-mono">
+                                                                                                                        Schema: {editData.schema_type}
+                                                                                                                </p>
+                                                                                                        )}
+                                                                                                        {/* Hiển thị Canonical URL */}
+                                                                                                        {editData.canonical_url && (
+                                                                                                                <p className="text-[10px] text-blue-600 truncate" title={editData.canonical_url}>
+                                                                                                                        Canonical: {editData.canonical_url}
+                                                                                                                </p>
+                                                                                                        )}
+                                                                                                </div>
+                                                                                        </div>
+                                                                                </div>
+
+                                                                                {/* Gợi ý nhập liệu */}
+                                                                                <div className="bg-blue-50 border border-blue-100 rounded-2xl p-5">
+                                                                                        <p className="text-[10px] font-black text-blue-600 uppercase tracking-widest mb-2">Gợi ý nhập liệu</p>
+                                                                                        <ul className="text-xs text-slate-700 space-y-2 leading-relaxed">
+                                                                                                <li><strong>Tiêu đề</strong>: 6–12 từ, rõ chủ đề. Tránh viết HOA toàn bộ.</li>
+                                                                                                <li><strong>Tóm tắt</strong>: 1–2 câu giúp người đọc hiểu nhanh.</li>
+                                                                                                <li><strong>Meta Description</strong>: 120-160 ký tự cho Google, khác với tóm tắt.</li>
+                                                                                                <li><strong>Meta Keywords</strong>: từ khóa cách nhau dấu phẩy.</li>
+                                                                                                <li><strong>SEO Title</strong>: tối đa 60 ký tự, khác tiêu đề chính nếu cần.</li>
+                                                                                                <li><strong>OG Image</strong>: ảnh riêng cho Facebook, tỉ lệ 1200x630.</li>
+                                                                                                <li><strong>Canonical URL</strong>: URL chuẩn để tránh duplicate content.</li>
+                                                                                                <li><strong>Schema Type</strong>: Article, NewsArticle, hoặc BlogPosting.</li>
+                                                                                        </ul>
                                                                                 </div>
                                                                         </div>
-                                                                </div>
-
-                                                                {/* Gợi ý nhập liệu */}
-                                                                <div className="bg-blue-50 border border-blue-100 rounded-2xl p-5">
-                                                                        <p className="text-[10px] font-black text-blue-600 uppercase tracking-widest mb-2">Gợi ý nhập liệu</p>
-                                                                        <ul className="text-xs text-slate-700 space-y-2 leading-relaxed">
-                                                                                <li><strong>Tiêu đề</strong>: 6–12 từ, rõ chủ đề. Tránh viết HOA toàn bộ.</li>
-                                                                                <li><strong>Tóm tắt</strong>: 1–2 câu giúp người đọc hiểu nhanh.</li>
-                                                                                <li><strong>Meta Description</strong>: 120-160 ký tự cho Google, khác với tóm tắt.</li>
-                                                                                <li><strong>Meta Keywords</strong>: từ khóa cách nhau dấu phẩy.</li>
-                                                                                <li><strong>Ảnh đại diện</strong>: ưu tiên ảnh ngang tỉ lệ 16:10 hoặc 16:9.</li>
-                                                                                <li><strong>Nội dung</strong>: dùng heading để chia đoạn, chèn ảnh minh họa khi cần.</li>
-                                                                        </ul>
-                                                                </div>
-                                                        </div>
-
+                                                                </TabsContent>
+                                                        </Tabs>
                                                 </div>
                                         </div>
 
