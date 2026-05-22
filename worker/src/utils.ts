@@ -116,7 +116,43 @@ export async function sendMail(
         provider: string;
         missing: string[];
 }> {
-        // Check for Preview/Review environment
+        // Try Brevo first if API key is available
+        const brevoKey = String(env.BREVO_API_KEY || '');
+        const useBrevo = Boolean(brevoKey);
+
+        if (useBrevo) {
+                const senderEmailBrevo = String(env.BREVO_SENDER_EMAIL || '');
+                const senderNameBrevo = String(env.BREVO_SENDER_NAME || '');
+                const senderEmailFallback = String(env.GMAIL_SENDER_EMAIL || 'no-reply@example.com');
+                const senderNameFallback = String(env.GMAIL_SENDER_NAME || 'CTBOOKING');
+                const missing: string[] = [];
+                if (!brevoKey) missing.push('BREVO_API_KEY');
+                if (!senderEmailBrevo) missing.push('BREVO_SENDER_EMAIL');
+                if (!senderNameBrevo) missing.push('BREVO_SENDER_NAME');
+                const senderEmail = senderEmailBrevo || senderEmailFallback;
+                const senderName = senderNameBrevo || senderNameFallback;
+                const payload = {
+                        sender: { email: senderEmail, name: senderName },
+                        to: [{ email: toEmail }],
+                        subject,
+                        htmlContent: html
+                };
+                const res = await fetch('https://api.brevo.com/v3/smtp/email', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json', 'api-key': brevoKey },
+                        body: JSON.stringify(payload)
+                });
+                const bodyText = await res.text().catch(() => '');
+                return {
+                        ok: res.ok,
+                        status: res.status,
+                        body: bodyText,
+                        provider: 'brevo',
+                        missing
+                };
+        }
+
+        // Fallback to Mailtrap for preview if Brevo is not configured
         if (env.IS_PREVIEW === 'true') {
                 const token = String(env.MAILTRAP_API_TOKEN || '');
                 const inboxId = String(env.MAILTRAP_INBOX_ID || '');
@@ -158,40 +194,6 @@ export async function sendMail(
                         body: 'Mailtrap provider is not configured for preview',
                         provider: 'mailtrap-sandbox',
                         missing: ['MAILTRAP_API_TOKEN', 'MAILTRAP_INBOX_ID']
-                };
-        }
-
-        const brevoKey = String(env.BREVO_API_KEY || '');
-        const useBrevo = Boolean(brevoKey);
-        if (useBrevo) {
-                const senderEmailBrevo = String(env.BREVO_SENDER_EMAIL || '');
-                const senderNameBrevo = String(env.BREVO_SENDER_NAME || '');
-                const senderEmailFallback = String(env.GMAIL_SENDER_EMAIL || 'no-reply@example.com');
-                const senderNameFallback = String(env.GMAIL_SENDER_NAME || 'CTBOOKING');
-                const missing: string[] = [];
-                if (!brevoKey) missing.push('BREVO_API_KEY');
-                if (!senderEmailBrevo) missing.push('BREVO_SENDER_EMAIL');
-                if (!senderNameBrevo) missing.push('BREVO_SENDER_NAME');
-                const senderEmail = senderEmailBrevo || senderEmailFallback;
-                const senderName = senderNameBrevo || senderNameFallback;
-                const payload = {
-                        sender: { email: senderEmail, name: senderName },
-                        to: [{ email: toEmail }],
-                        subject,
-                        htmlContent: html
-                };
-                const res = await fetch('https://api.brevo.com/v3/smtp/email', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json', 'api-key': brevoKey },
-                        body: JSON.stringify(payload)
-                });
-                const bodyText = await res.text().catch(() => '');
-                return {
-                        ok: res.ok,
-                        status: res.status,
-                        body: bodyText,
-                        provider: 'brevo',
-                        missing
                 };
         } else {
                 const fromEmail = String(env.GMAIL_SENDER_EMAIL || env.GMAIL_USER || 'no-reply@example.com');
