@@ -1,8 +1,6 @@
 import type { Metadata } from 'next';
 import './globals.css';
 import Providers from '@/app/providers';
-import Header from '@/components/user/Header';
-import Footer from '@/components/user/Footer';
 import NextTopLoader from 'nextjs-toploader';
 
 
@@ -113,9 +111,7 @@ export default function RootLayout({
                                         dangerouslySetInnerHTML={{ __html: JSON.stringify(websiteSchema) }}
                                 />
                                 <Providers>
-                                        <Header />
                                         {children}
-                                        <Footer />
                                 </Providers>
                         </body>
                 </html>
