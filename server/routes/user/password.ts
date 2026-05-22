@@ -33,7 +33,8 @@ export async function forgetPassImpl(
                 account_id: useracc.id,
                 type: 'reset_password',
                 token: token,
-                expired_at: formatDateForDb(expired_at_dt)
+                expired_at: formatDateForDb(expired_at_dt),
+                created_at: formatDateForDb(new Date())
         });
 
         let contentMail = '';

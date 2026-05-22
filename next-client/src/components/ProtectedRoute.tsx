@@ -20,7 +20,6 @@ export default function ProtectedRoute({ children }: Props) {
         useEffect(() => {
                 // Check auth via userToken (client-side route guard)
                 const token = localStorage.getItem('userToken');
-                console.log('[ProtectedRoute] Checking token:', token ? 'exists' : 'missing');
                 if (!token) {
                         toast.error('Vui lòng đăng nhập trước!', { duration: 3000 });
                         window.dispatchEvent(new Event('open-login'));
