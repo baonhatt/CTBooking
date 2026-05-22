@@ -2,10 +2,18 @@ import { siteConfig } from '@/config/site';
 
 // Sử dụng biến môi trường Next.js thay vì Vite syntax
 // Trong SSR (Server-Side Rendering), luôn dùng NEXT_PUBLIC_API_URL để gọi API
-export const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? '';
+let API_BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? '';
+
+// Override for preview environment if env var not set
+if (!API_BASE_URL && typeof window !== 'undefined') {
+        const hostname = window.location.hostname;
+        if (hostname.includes('preview.cinema-next.pages.dev') || hostname.endsWith('.cinema-next.pages.dev')) {
+                API_BASE_URL = 'https://cinema-worker-preview.baonhat20.workers.dev';
+        }
+}
 
 // SERVER_BASE_URL dùng cho server-side API calls (IPN callbacks, v.v.)
-export const SERVER_BASE_URL = process.env.NEXT_PUBLIC_SERVER_BASE_URL ?? process.env.NEXT_PUBLIC_API_URL ?? '';
+export const SERVER_BASE_URL = process.env.NEXT_PUBLIC_SERVER_BASE_URL ?? process.env.NEXT_PUBLIC_API_URL ?? API_BASE_URL;
 
 export function buildUrl(path: string) {
         return API_BASE_URL ? `${API_BASE_URL}${path}` : path;
