@@ -64,11 +64,16 @@ export function buildUrl(path: string) {
 
 export async function request<T>(path: string, init: RequestInit = {}) {
         const url = buildUrl(path);
+
+        // Get token from localStorage and send via Authorization header
+        const token = typeof window !== 'undefined' ? localStorage.getItem('userToken') : null;
+
         const res = await fetch(url, {
                 ...init,
                 credentials: 'include',
                 headers: {
                         "Content-Type": "application/json",
+                        ...(token && { "Authorization": `Bearer ${token}` }),
                         ...(init.headers || {}),
                 },
         });
