@@ -1,5 +1,4 @@
 import { eq, and, gte, lt } from 'drizzle-orm';
-import { sendMail } from '../routes/mail-service';
 import { mailQueue } from './mail-queue';
 import { getOTPEmailTemplate } from './email-templates';
 import { formatDateForDb } from './date-utils';
@@ -20,6 +19,7 @@ export async function sendOTPEmail(
         customerName: string,
         otp: string,
         expiryMinutes: number,
+        sendMailFn?: (to: string, subject: string, html: string) => Promise<any>,
         context?: { waitUntil: (promise: Promise<any>) => void }
 ) {
         const html = getOTPEmailTemplate({
@@ -33,7 +33,7 @@ export async function sendOTPEmail(
                 await mailQueue.add(
                         async () => {
                                 try {
-                                        await sendMail(to, '🔐 Mã Xác Thực - CINESPHERE', html);
+                                        await sendMailFn(to, '🔐 Mã Xác Thực - CINESPHERE', html);
                                         console.log(`[OTP] Sent OTP to ${to}`);
                                 } catch (e) {
                                         console.error(`[OTP] Failed to send OTP to ${to}`, e);
