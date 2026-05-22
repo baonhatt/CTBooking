@@ -36,10 +36,10 @@ export async function request<T>(path: string, init: RequestInit = {}) {
                 },
         });
         if (!res.ok) {
-                console.log('[http] API error:', res.status, path);
+                alert(`API Error: ${res.status} - ${path}`);
                 // Auto logout khi 401 Unauthorized (token hết hạn hoặc invalid)
                 if (res.status === 401 && typeof window !== 'undefined') {
-                        console.log('[http] 401 detected, triggering auto logout');
+                        alert('401 detected - Auto logout triggered');
                         handleAutoLogout();
                 }
 
