@@ -5,6 +5,7 @@ import { drizzle } from 'drizzle-orm/d1';
 import * as schema from './schema';
 import { eq, desc, asc, and, like, or, sql, count } from 'drizzle-orm';
 import type { D1Database, R2Bucket } from '@cloudflare/workers-types';
+import { requireAuth } from './middleware';
 import { getAllActiveMoviesToday, listMovies, getMovie } from '../../server/routes/user/movies';
 import {
         createMovieImpl,
@@ -1627,9 +1628,9 @@ app.get('/api/users/:id', async (c) => {
         }
 });
 
-// Get user profile by email
+// Get user profile by email (PROTECTED - requires login)
 // GET /api/users-profile?email=user@example.com
-app.get('/api/users-profile', async (c) => {
+app.get('/api/users-profile', requireAuth, async (c) => {
         try {
                 const emailRaw = String(c.req.query('email') || '');
                 const db = drizzle(c.env.cinema_db, { schema });
@@ -1645,10 +1646,10 @@ app.get('/api/users-profile', async (c) => {
         }
 });
 
-// Update user profile
+// Update user profile (PROTECTED - requires login)
 // POST /api/users-profile
 // Body: { email: string, name: string, ... }
-app.post('/api/users-profile', async (c) => {
+app.post('/api/users-profile', requireAuth, async (c) => {
         try {
                 const db = drizzle(c.env.cinema_db, { schema });
                 const body = await c.req.json().catch(() => ({}));
@@ -1668,10 +1669,10 @@ app.post('/api/users-profile', async (c) => {
         }
 });
 
-// Change user password
+// Change user password (PROTECTED - requires login)
 // POST /api/users-password
 // Body: { oldPassword: string, newPassword: string }
-app.post('/api/users-password', async (c) => {
+app.post('/api/users-password', requireAuth, async (c) => {
         try {
                 const db = drizzle(c.env.cinema_db, { schema });
                 const body = await c.req.json().catch(() => ({}));
@@ -1687,9 +1688,9 @@ app.post('/api/users-password', async (c) => {
         }
 });
 
-// Get user's transaction history
+// Get user's transaction history (PROTECTED - requires login)
 // GET /api/usersprofile/transactions?email=user@example.com&status=paid&page=1
-app.get('/api/usersprofile/transactions', async (c) => {
+app.get('/api/usersprofile/transactions', requireAuth, async (c) => {
         try {
                 const email = String(c.req.query('email') || '');
                 const status = String(c.req.query('status') || 'paid');
