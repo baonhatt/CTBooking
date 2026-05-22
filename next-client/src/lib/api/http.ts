@@ -12,6 +12,9 @@ if (!API_BASE_URL && typeof window !== 'undefined') {
         }
 }
 
+// Export for other modules to import
+export { API_BASE_URL };
+
 // SERVER_BASE_URL dùng cho server-side API calls (IPN callbacks, v.v.)
 export const SERVER_BASE_URL = process.env.NEXT_PUBLIC_SERVER_BASE_URL ?? process.env.NEXT_PUBLIC_API_URL ?? API_BASE_URL;
 
