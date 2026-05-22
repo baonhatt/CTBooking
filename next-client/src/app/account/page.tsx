@@ -26,6 +26,7 @@ import {
 
 export default function Account() {
         const router = useRouter();
+        const [isCheckingAuth, setIsCheckingAuth] = useState(true);
         const [profile, setProfile] = useState<{
                 name: string;
                 phone: string;
@@ -111,11 +112,22 @@ export default function Account() {
                 // Check auth via userToken (client-side route guard)
                 const token = localStorage.getItem('userToken');
                 if (!token) {
-                        toast.error('Vui lòng đăng nhập trước!');
+                        toast.error('Vui lòng đăng nhập trước!', { duration: 3000 });
                         window.dispatchEvent(new Event('open-login'));
                         router.replace('/');
+                } else {
+                        setIsCheckingAuth(false);
                 }
         }, [router]);
+
+        // Show loading while checking auth
+        if (isCheckingAuth) {
+                return (
+                        <div className="min-h-screen flex items-center justify-center">
+                                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
+                        </div>
+                );
+        }
 
         useEffect(() => {
                 try {
