@@ -25,11 +25,16 @@ export function buildUrl(path: string) {
 
 export async function request<T>(path: string, init: RequestInit = {}) {
         const url = buildUrl(path);
+
+        // Get token from localStorage and send via Authorization header
+        const token = typeof window !== 'undefined' ? localStorage.getItem('userToken') : null;
+
         const res = await fetch(url, {
                 ...init,
                 credentials: 'include',
                 headers: {
                         "Content-Type": "application/json",
+                        ...(token && { "Authorization": `Bearer ${token}` }),
                         // Thêm User-Agent để giúp SEO bot nhận diện request
                         ...(typeof window === "undefined" && { "User-Agent": `Mozilla/5.0 (compatible; CinesphereBot/1.0; +${siteConfig.domain})` }),
                         ...(init.headers || {}),
@@ -38,11 +43,10 @@ export async function request<T>(path: string, init: RequestInit = {}) {
         if (!res.ok) {
                 console.log('[http] API error:', res.status, path);
                 // Auto logout khi 401 Unauthorized (token hết hạn hoặc invalid)
-                // TEMPORARILY DISABLED FOR DEBUGGING
-                // if (res.status === 401 && typeof window !== 'undefined') {
-                //         console.log('[http] 401 detected, triggering auto logout');
-                //         handleAutoLogout();
-                // }
+                if (res.status === 401 && typeof window !== 'undefined') {
+                        console.log('[http] 401 detected, triggering auto logout');
+                        handleAutoLogout();
+                }
 
                 let errorMessage = `HTTP ${res.status}`;
                 try {
