@@ -17,6 +17,10 @@ export type PostItem = {
         content?: string;
         meta_description?: string;
         meta_keywords?: string;
+        seo_title?: string;
+        og_image?: string;
+        canonical_url?: string;
+        schema_type?: string;
 };
 
 export type PostsResponse = {

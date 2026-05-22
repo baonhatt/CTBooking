@@ -37,6 +37,10 @@ interface PostData {
         updated_at: string;
         meta_description?: string;
         meta_keywords?: string;
+        seo_title?: string;
+        og_image?: string;
+        canonical_url?: string;
+        schema_type?: string;
 }
 
 function getPlainTextFromHtml(value?: string) {
@@ -58,7 +62,7 @@ export const PostManagement = () => {
         const [isLoading, setIsLoading] = useState(false);
         const [isEditOpen, setIsEditOpen] = useState(false);
         const [isPreviewOpen, setIsPreviewOpen] = useState(false);
-        const [editData, setEditData] = useState<Partial<PostData> & { imageFile?: File }>({});
+        const [editData, setEditData] = useState<Partial<PostData> & { imageFile?: File; ogImageFile?: File }>({});
         const [isSaving, setIsSaving] = useState(false);
         const initialSnapshotRef = useRef<string>('');
 
@@ -75,7 +79,7 @@ export const PostManagement = () => {
                         .replace(/^-+|-+$/g, '')
                         .slice(0, 255);
 
-        const snapshotEditData = (data: Partial<PostData> & { imageFile?: File }) =>
+        const snapshotEditData = (data: Partial<PostData> & { imageFile?: File; ogImageFile?: File }) =>
                 JSON.stringify({
                         id: data.id ?? 0,
                         title: data.title ?? '',
@@ -86,7 +90,12 @@ export const PostManagement = () => {
                         is_featured: Boolean(data.is_featured),
                         meta_description: data.meta_description ?? '',
                         meta_keywords: data.meta_keywords ?? '',
-                        imageFileName: data.imageFile?.name || ''
+                        seo_title: data.seo_title ?? '',
+                        og_image: data.og_image ?? '',
+                        canonical_url: data.canonical_url ?? '',
+                        schema_type: data.schema_type ?? 'Article',
+                        imageFileName: data.imageFile?.name || '',
+                        ogImageFileName: data.ogImageFile?.name || ''
                 });
 
         const hasUnsavedChanges = () => initialSnapshotRef.current !== snapshotEditData(editData);
@@ -125,7 +134,7 @@ export const PostManagement = () => {
         const totalPages = useMemo(() => Math.max(1, Math.ceil(totalPosts / pageSize)), [totalPosts]);
 
         const handleCreate = () => {
-                const next = { id: 0, title: '', content: '', excerpt: '', status: 'draft', is_featured: false, meta_description: '', meta_keywords: '' };
+                const next = { id: 0, title: '', content: '', excerpt: '', status: 'draft', is_featured: false, meta_description: '', meta_keywords: '', seo_title: '', og_image: '', canonical_url: '', schema_type: 'Article' };
                 setEditData(next);
                 initialSnapshotRef.current = snapshotEditData(next);
                 setIsEditOpen(true);
@@ -163,6 +172,18 @@ export const PostManagement = () => {
                                 }
                         }
 
+                        let ogImageUrl: string | undefined = editData.ogImageFile ? undefined : editData.og_image;
+                        if (editData.ogImageFile) {
+                                try {
+                                        const result = await uploadDirectToCloudinary(editData.ogImageFile, 'posts');
+                                        ogImageUrl = result.url;
+                                } catch (uploadErr: any) {
+                                        toast.error('Lỗi upload OG image', { description: uploadErr?.message || 'Không thể upload OG image' });
+                                        setIsSaving(false);
+                                        return;
+                                }
+                        }
+
                         const nextStatus: 'draft' | 'published' | 'archived' =
                                 isNew ? 'draft' : overrideStatus || (editData.status as any) || 'draft';
 
@@ -171,10 +192,14 @@ export const PostManagement = () => {
                                 content: editData.content!,
                                 excerpt: editData.excerpt,
                                 featured_image: featuredImageUrl,
+                                og_image: ogImageUrl,
                                 status: nextStatus,
                                 is_featured: editData.is_featured || false,
                                 meta_description: editData.meta_description,
-                                meta_keywords: editData.meta_keywords
+                                meta_keywords: editData.meta_keywords,
+                                seo_title: editData.seo_title,
+                                canonical_url: editData.canonical_url,
+                                schema_type: editData.schema_type
                         };
 
                         if (editData.id) {
@@ -185,7 +210,7 @@ export const PostManagement = () => {
                                 toast.success('Đã tạo nháp bài viết');
                         }
 
-                        initialSnapshotRef.current = snapshotEditData({ ...editData, imageFile: undefined });
+                        initialSnapshotRef.current = snapshotEditData({ ...editData, imageFile: undefined, ogImageFile: undefined });
                         setIsEditOpen(false);
                         fetchPosts();
                 } catch (error: any) {
@@ -584,6 +609,71 @@ export const PostManagement = () => {
                                                                                         <p className="mt-1 text-[11px] text-slate-500">
                                                                                                 Ví dụ: phim, rạp chiếu, review
                                                                                         </p>
+                                                                                </div>
+                                                                        </div>
+
+                                                                        {/* Additional SEO Fields */}
+                                                                        <div className="grid grid-cols-12 gap-4">
+                                                                                <div className="col-span-6">
+                                                                                        <Label>SEO Title</Label>
+                                                                                        <Input
+                                                                                                className="mt-2"
+                                                                                                value={editData.seo_title || ''}
+                                                                                                onChange={(e) => setEditData({ ...editData, seo_title: e.target.value })}
+                                                                                                placeholder="Tiêu đề tùy chỉnh cho SEO (nếu khác tiêu đề chính)..."
+                                                                                                maxLength={60}
+                                                                                        />
+                                                                                        <p className="mt-1 text-[11px] text-slate-500">
+                                                                                                {editData.seo_title?.length || 0}/60 ký tự
+                                                                                        </p>
+                                                                                </div>
+                                                                                <div className="col-span-6">
+                                                                                        <Label>Schema Type</Label>
+                                                                                        <select
+                                                                                                className="mt-2 w-full px-3 py-2 border border-slate-200 rounded-xl bg-white text-sm"
+                                                                                                value={editData.schema_type || 'Article'}
+                                                                                                onChange={(e) => setEditData({ ...editData, schema_type: e.target.value })}
+                                                                                        >
+                                                                                                <option value="Article">Article</option>
+                                                                                                <option value="NewsArticle">NewsArticle</option>
+                                                                                                <option value="BlogPosting">BlogPosting</option>
+                                                                                        </select>
+                                                                                </div>
+                                                                        </div>
+
+                                                                        <div className="grid grid-cols-12 gap-4">
+                                                                                <div className="col-span-12">
+                                                                                        <Label>Canonical URL</Label>
+                                                                                        <Input
+                                                                                                className="mt-2"
+                                                                                                value={editData.canonical_url || ''}
+                                                                                                onChange={(e) => setEditData({ ...editData, canonical_url: e.target.value })}
+                                                                                                placeholder="URL chuẩn (canonical) để tránh trùng lặp nội dung..."
+                                                                                        />
+                                                                                </div>
+                                                                        </div>
+
+                                                                        <div className="grid grid-cols-12 gap-4">
+                                                                                <div className="col-span-12">
+                                                                                        <Label>OG Image (Ảnh cho Facebook/Social)</Label>
+                                                                                        <div className="mt-2 flex items-center gap-3">
+                                                                                                <Input
+                                                                                                        type="file"
+                                                                                                        accept="image/*"
+                                                                                                        onChange={(e) => {
+                                                                                                                const file = e.target.files?.[0];
+                                                                                                                if (file) setEditData({ ...editData, ogImageFile: file });
+                                                                                                        }}
+                                                                                                        className="flex-1"
+                                                                                                />
+                                                                                                {editData.og_image && (
+                                                                                                        <img
+                                                                                                                src={editData.og_image}
+                                                                                                                alt="OG Preview"
+                                                                                                                className="w-16 h-16 object-cover rounded-lg border"
+                                                                                                        />
+                                                                                                )}
+                                                                                        </div>
                                                                                 </div>
                                                                         </div>
 
