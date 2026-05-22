@@ -38,6 +38,7 @@ export async function loginWithSessionImpl(
         generateTokenFn: () => Promise<string>,
         calculateExpiryFn: (days: number) => string,
         kv?: any,
+        sendMailFn?: (to: string, subject: string, html: string) => Promise<any>,
         context?: { waitUntil: (promise: Promise<any>) => void }
 ) {
         const email = payload.email || '';
@@ -61,15 +62,17 @@ export async function loginWithSessionImpl(
         // Check 2FA settings
         const settingsResult = await getAdminSettingsImpl(kv);
         const settings = settingsResult.settings || {};
-        const enable2FA = settings.enable_2fa === true;
-        const otpExpiryMinutes = settings.otp_expiry_minutes || 5;
-        const otpLength = settings.otp_length || 6;
+        console.log('[LOGIN] Settings loaded:', JSON.stringify(settings));
+        const enable2FA = settings.otp_settings?.enable_2fa === true;
+        console.log('[LOGIN] 2FA enabled:', enable2FA);
+        const otpExpiryMinutes = settings.otp_settings?.otp_expiry_minutes || 5;
+        const otpLength = settings.otp_settings?.otp_length || 6;
 
         if (enable2FA) {
                 // Generate OTP
                 const otp = generateOTP(otpLength);
                 await createOTPRecord(anyDb, { tokens: tables.tokens }, useracc.id, otp, otpExpiryMinutes);
-                await sendOTPEmail(anyDb, { email_logs: tables.email_logs }, email, user?.fullname || email.split('@')[0], otp, otpExpiryMinutes, context);
+                await sendOTPEmail(anyDb, { email_logs: tables.email_logs }, email, user?.fullname || email.split('@')[0], otp, otpExpiryMinutes, sendMailFn, context);
 
                 return {
                         status: 200,
@@ -106,7 +109,7 @@ export async function validateSessionTokenImpl(
         token: string
 ): Promise<{ valid: boolean; accountId?: number; userId?: number }> {
         if (!token) return { valid: false };
-        console.log(123) 
+        console.log(123)
 
         const tokenRecord = await anyDb.query.tokens.findFirst({
                 where: and(eq(tables.tokens.token, token), eq(tables.tokens.type, 'session')),
@@ -188,6 +191,7 @@ export async function resendOTPImpl(
         tables: { accounts: any; users: any; tokens: any; email_logs?: any },
         payload: { temp_account_id: number; email: string },
         kv?: any,
+        sendMailFn?: (to: string, subject: string, html: string) => Promise<any>,
         context?: { waitUntil: (promise: Promise<any>) => void }
 ) {
         const { temp_account_id, email } = payload;
@@ -206,9 +210,10 @@ export async function resendOTPImpl(
         // Get settings for cooldown
         const settingsResult = await getAdminSettingsImpl(kv);
         const settings = settingsResult.settings || {};
-        const cooldownSeconds = settings.otp_resend_cooldown_seconds || 30;
-        const otpExpiryMinutes = settings.otp_expiry_minutes || 5;
-        const otpLength = settings.otp_length || 6;
+        console.log('[RESEND OTP] Settings loaded:', JSON.stringify(settings));
+        const cooldownSeconds = settings.otp_settings?.otp_resend_cooldown_seconds || 30;
+        const otpExpiryMinutes = settings.otp_settings?.otp_expiry_minutes || 5;
+        const otpLength = settings.otp_settings?.otp_length || 6;
 
         // Check cooldown
         const cooldownCheck = await canResendOTP(anyDb, { tokens: tables.tokens }, temp_account_id, cooldownSeconds);
@@ -222,8 +227,11 @@ export async function resendOTPImpl(
 
         // Generate new OTP
         const otp = generateOTP(otpLength);
+        console.log('[RESEND OTP] Generated OTP for account:', temp_account_id);
         await createOTPRecord(anyDb, { tokens: tables.tokens }, temp_account_id, otp, otpExpiryMinutes);
-        await sendOTPEmail(anyDb, { email_logs: tables.email_logs }, email, user?.fullname || email.split('@')[0], otp, otpExpiryMinutes, context);
+        console.log('[RESEND OTP] Sending email to:', email);
+        await sendOTPEmail(anyDb, { email_logs: tables.email_logs }, email, user?.fullname || email.split('@')[0], otp, otpExpiryMinutes, sendMailFn, context);
+        console.log('[RESEND OTP] Email sent successfully');
 
         return {
                 status: 200,

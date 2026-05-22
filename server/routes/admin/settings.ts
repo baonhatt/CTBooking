@@ -14,10 +14,14 @@ export async function getAdminSettingsImpl(kv?: KVNamespace) {
         if (!kv) return { settings: null, message: 'KV not configured' };
         const stored = await kv.get(ADMIN_SETTINGS_KEY);
         if (!stored) {
-                return { settings: DEFAULT_SETTINGS };
+                return { settings: { hidden_tabs: [], otp_settings: DEFAULT_SETTINGS } };
         }
         const parsed = JSON.parse(stored);
-        return { settings: { ...DEFAULT_SETTINGS, ...parsed } };
+        // Handle both old format (array) and new format (object)
+        if (Array.isArray(parsed)) {
+                return { settings: { hidden_tabs: parsed, otp_settings: DEFAULT_SETTINGS } };
+        }
+        return { settings: { hidden_tabs: parsed.hidden_tabs || [], otp_settings: { ...DEFAULT_SETTINGS, ...parsed.otp_settings } } };
 }
 
 export async function updateAdminSettingsImpl(kv: KVNamespace, settings: any) {

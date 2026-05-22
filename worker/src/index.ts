@@ -319,6 +319,11 @@ app.post('/api/login', async (c) => {
         try {
                 const db = drizzle(c.env.cinema_db, { schema });
                 const body = await c.req.json().catch(() => ({}));
+                const mailer = async (to: string, sub: string, html: string) => {
+                        const res = await sendMail(c.env, to, sub, html);
+                        if (!res.ok) throw new Error(`Email failed: ${res.status} ${res.body}`);
+                        return res;
+                };
                 const r = await loginWithSessionImpl(
                         db,
                         { accounts: schema.accounts, users: schema.users, tokens: schema.tokens, email_logs: schema.email_logs },
@@ -326,6 +331,7 @@ app.post('/api/login', async (c) => {
                         generateSessionToken,
                         calculateSessionExpiry,
                         c.env.KV_BINDING,
+                        mailer,
                         { waitUntil: (promise) => c.executionCtx.waitUntil(promise) }
                 );
                 const status = typeof (r as any).status === 'number' ? (r as any).status : 200;
@@ -417,11 +423,17 @@ app.post('/api/resend-otp', async (c) => {
         try {
                 const db = drizzle(c.env.cinema_db, { schema });
                 const body = await c.req.json().catch(() => ({}));
+                const mailer = async (to: string, sub: string, html: string) => {
+                        const res = await sendMail(c.env, to, sub, html);
+                        if (!res.ok) throw new Error(`Email failed: ${res.status} ${res.body}`);
+                        return res;
+                };
                 const r = await resendOTPImpl(
                         db,
                         { accounts: schema.accounts, users: schema.users, tokens: schema.tokens, email_logs: schema.email_logs },
                         body,
                         c.env.KV_BINDING,
+                        mailer,
                         { waitUntil: (promise) => c.executionCtx.waitUntil(promise) }
                 );
                 const status = typeof (r as any).status === 'number' ? (r as any).status : 200;
@@ -645,6 +657,11 @@ app.post('/api/admin/login', async (c) => {
         try {
                 const db = drizzle(c.env.cinema_db, { schema });
                 const body = await c.req.json().catch(() => ({}));
+                const mailer = async (to: string, sub: string, html: string) => {
+                        const res = await sendMail(c.env, to, sub, html);
+                        if (!res.ok) throw new Error(`Email failed: ${res.status} ${res.body}`);
+                        return res;
+                };
                 const r = await loginWithSessionImpl(
                         db,
                         { accounts: schema.accounts, users: schema.users, tokens: schema.tokens, email_logs: schema.email_logs },
@@ -652,6 +669,7 @@ app.post('/api/admin/login', async (c) => {
                         generateSessionToken,
                         calculateSessionExpiry,
                         c.env.KV_BINDING,
+                        mailer,
                         { waitUntil: (promise) => c.executionCtx.waitUntil(promise) }
                 );
                 const status = typeof (r as any).status === 'number' ? (r as any).status : 200;
