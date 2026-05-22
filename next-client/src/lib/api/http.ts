@@ -27,6 +27,7 @@ export async function request<T>(path: string, init: RequestInit = {}) {
         const url = buildUrl(path);
         const res = await fetch(url, {
                 ...init,
+                credentials: 'include',
                 headers: {
                         "Content-Type": "application/json",
                         // Thêm User-Agent để giúp SEO bot nhận diện request

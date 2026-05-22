@@ -66,6 +66,7 @@ export async function request<T>(path: string, init: RequestInit = {}) {
         const url = buildUrl(path);
         const res = await fetch(url, {
                 ...init,
+                credentials: 'include',
                 headers: {
                         "Content-Type": "application/json",
                         ...(init.headers || {}),
