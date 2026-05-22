@@ -7,6 +7,17 @@ export function useAuthState(shouldCheck: boolean = false) {
         const [isLoading, setIsLoading] = useState(false);
 
         useEffect(() => {
+                // Load from localStorage first
+                const userProfile = localStorage.getItem('userProfile');
+                if (userProfile) {
+                        try {
+                                const parsed = JSON.parse(userProfile);
+                                setUserName(parsed.name || null);
+                        } catch (e) {
+                                console.error('Failed to parse userProfile:', e);
+                        }
+                }
+
                 if (!shouldCheck) {
                         setIsLoading(false);
                         return;
@@ -28,10 +39,12 @@ export function useAuthState(shouldCheck: boolean = false) {
                                         }));
                                 } else {
                                         setUserName(null);
+                                        localStorage.removeItem('userProfile');
                                 }
                         } catch (error) {
                                 console.error('Auth check failed:', error);
                                 setUserName(null);
+                                localStorage.removeItem('userProfile');
                         } finally {
                                 setIsLoading(false);
                         }
