@@ -613,44 +613,6 @@ app.post('/api/logout', async (c) => {
         }
 });
 
-// Get current user info endpoint
-// GET /api/me
-app.get('/api/me', async (c) => {
-        try {
-                const db = drizzle(c.env.cinema_db, { schema });
-                const token = c.req.header('cookie')?.match(/session_token=([^;]+)/)?.[1];
-                const validation = await validateSessionTokenImpl(db, { tokens: schema.tokens }, token);
-
-                if (!validation.valid || !validation.userId) {
-                        return c.json({ status: 'error', message: 'Unauthorized' }, 401);
-                }
-
-                const user = await db.query.users.findFirst({
-                        where: eq(schema.users.id, validation.userId)
-                });
-
-                if (!user) {
-                        return c.json({ status: 'error', message: 'User not found' }, 404);
-                }
-
-                const account = await db.query.accounts.findFirst({
-                        where: eq(schema.accounts.user_id, user.id)
-                });
-
-                return c.json({
-                        status: 'success',
-                        user: {
-                                id: user.id,
-                                username: user.fullname,
-                                email: account?.email,
-                                phone: user.phone
-                        }
-                });
-        } catch (err: any) {
-                return c.json({ status: 'error', message: 'Lỗi máy chủ nội bộ' }, 500);
-        }
-});
-
 // Admin login endpoint with 1-day expiry cookie
 // POST /api/admin/login
 // Body: { email: string, password: string }

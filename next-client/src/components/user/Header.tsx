@@ -42,9 +42,7 @@ export default function Header({
         // Custom hooks
         const isScrolled = useScrollDetect(50);
         const isPostsRoute = pathname === '/bai-viet' || pathname.startsWith('/bai-viet/');
-        const isAccountOrCheckout = pathname === '/account' || pathname === '/checkout';
-        const shouldCheckAuth = isAccountOrCheckout;
-        const { userName, setUserName } = useAuthState(shouldCheckAuth);
+        const { userName, setUserName } = useAuthState(false);
         const effectiveDisable = disableNav || (pathname !== '/' && !isPostsRoute);
         const activeSection = useActiveSection(effectiveDisable);
         const { handleLogout } = useAuthHandlers(setUserName);
