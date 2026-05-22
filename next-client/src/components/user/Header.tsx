@@ -64,8 +64,17 @@ export default function Header({
                         }
                 };
 
+                // Listen for open-login event (triggered by route guard)
+                const handleOpenLogin = () => {
+                        setIsLoginOpen(true);
+                };
+
                 window.addEventListener('user-auth-changed', handleAuthChange);
-                return () => window.removeEventListener('user-auth-changed', handleAuthChange);
+                window.addEventListener('open-login', handleOpenLogin);
+                return () => {
+                        window.removeEventListener('user-auth-changed', handleAuthChange);
+                        window.removeEventListener('open-login', handleOpenLogin);
+                };
         }, []);
 
         // Prefetch các trang chính để tránh lag khi điều hướng
