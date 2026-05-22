@@ -160,6 +160,8 @@ export function OTPDialog({
                         const data = await response.json();
 
                         if (data.status === 'success' || data.status === 200) {
+                                // Lưu token vào localStorage để frontend check nhanh
+                                localStorage.setItem('userToken', data.token);
                                 toast.success('Xác thực OTP thành công!');
                                 onSuccess(data.user, data.token);
                                 onOpenChange(false);

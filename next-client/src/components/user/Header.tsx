@@ -49,6 +49,9 @@ export default function Header({
         const activeSection = useActiveSection(effectiveDisable);
         const { handleLogout } = useAuthHandlers(setUserName);
 
+        // Check login state from localStorage (userToken)
+        const isLoggedIn = !!localStorage.getItem('userToken');
+
         // Prefetch các trang chính để tránh lag khi điều hướng
         useEffect(() => {
                 router.prefetch('/booking');
@@ -213,10 +216,10 @@ export default function Header({
                                         </div>
 
                                         {/* Desktop User Menu or Login Button */}
-                                        {userName ? (
+                                        {isLoggedIn ? (
                                                 <div className="hidden md:flex items-center">
                                                         <UserMenu
-                                                                userName={userName}
+                                                                userName={userName || 'User'}
                                                                 tooltipPrefix={tooltipPrefix}
                                                                 extraMenuOptions={extraMenuOptions}
                                                                 onNavigateAccount={() => router.push('/account')}

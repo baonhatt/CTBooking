@@ -108,9 +108,9 @@ export default function Account() {
         };
 
         useEffect(() => {
-                // Check auth via userProfile (được cập nhật bởi useAuthState khi load trang)
-                const profRaw = localStorage.getItem('userProfile');
-                if (!profRaw) {
+                // Check auth via userToken (client-side route guard)
+                const token = localStorage.getItem('userToken');
+                if (!token) {
                         toast.error('Vui lòng đăng nhập trước!');
                         window.dispatchEvent(new Event('open-login'));
                         router.replace('/');

@@ -106,9 +106,9 @@ export function LoginDialog({
 
                         if (data?.status === 'success') {
                                 // Token được lưu trong httpOnly cookie bởi backend
-                                // Không cần lưu vào localStorage anymore
-
+                                // Lưu token vào localStorage để frontend check nhanh
                                 try {
+                                        localStorage.setItem('userToken', data.token);
                                         const derivedName = data.user.username || (data.user.email || '').split('@')[0];
                                         const profile = {
                                                 email: data.user.email,
