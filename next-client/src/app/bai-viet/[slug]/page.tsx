@@ -28,19 +28,20 @@ export async function generateMetadata({
                 };
         }
 
-        const canonicalUrl = `${SITE_URL}${buildPostHref(post)}`;
+        const canonicalUrl = post.canonical_url || `${SITE_URL}${buildPostHref(post)}`;
+        const seoTitle = post.seo_title?.trim() || post.title;
         const description =
                 post.meta_description?.trim() ||
                 post.excerpt?.trim() ||
                 `Đọc bài viết "${post.title}" tại Cinesphere - Rạp chiếu phim công nghệ hiện đại.`;
-        const ogImage = post.featured_image || `${SITE_URL}/logo.svg`;
+        const ogImage = post.og_image || post.featured_image || `${SITE_URL}/logo.svg`;
 
         return {
-                title: post.title,
+                title: seoTitle,
                 description,
                 alternates: { canonical: canonicalUrl },
                 openGraph: {
-                        title: post.title,
+                        title: seoTitle,
                         description,
                         type: 'article',
                         url: canonicalUrl,
@@ -48,11 +49,11 @@ export async function generateMetadata({
                         modifiedTime: post.updated_at,
                         locale: 'vi_VN',
                         siteName: 'Cinesphere',
-                        images: [{ url: ogImage, width: 1200, height: 630, alt: post.title }],
+                        images: [{ url: ogImage, width: 1200, height: 630, alt: seoTitle }],
                 },
                 twitter: {
                         card: 'summary_large_image',
-                        title: post.title,
+                        title: seoTitle,
                         description,
                         images: [ogImage],
                 },
@@ -82,11 +83,11 @@ export default async function PostDetailPage({
 
         const jsonLd = {
                 '@context': 'https://schema.org',
-                '@type': 'Article',
-                headline: post.title,
+                '@type': post.schema_type || 'Article',
+                headline: post.seo_title?.trim() || post.title,
                 description: post.meta_description?.trim() || post.excerpt?.trim() || '',
                 keywords: post.meta_keywords || '',
-                image: post.featured_image || `${SITE_URL}/logo.svg`,
+                image: post.og_image || post.featured_image || `${SITE_URL}/logo.svg`,
                 datePublished: post.published_at || post.created_at,
                 dateModified: post.updated_at || post.published_at || post.created_at,
                 author: { '@type': 'Organization', name: 'Cinesphere', url: SITE_URL },

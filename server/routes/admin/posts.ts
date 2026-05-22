@@ -96,11 +96,15 @@ export async function createPostImpl(
                 is_featured?: boolean;
                 meta_description?: string;
                 meta_keywords?: string;
+                seo_title?: string;
+                og_image?: string;
+                canonical_url?: string;
+                schema_type?: string;
         },
         RUN_ENV?: any,
         uploader?: (base64: string, folder: string) => Promise<{ url: string }>
 ) {
-        const { title, content, excerpt, featured_image, image_base64, author_id, status, is_featured, meta_description, meta_keywords } = args;
+        const { title, content, excerpt, featured_image, image_base64, author_id, status, is_featured, meta_description, meta_keywords, seo_title, og_image, canonical_url, schema_type } = args;
 
         let savedImage = featured_image;
 
@@ -137,6 +141,10 @@ export async function createPostImpl(
                 is_featured: is_featured || false,
                 meta_description: meta_description || null,
                 meta_keywords: meta_keywords || null,
+                seo_title: seo_title || null,
+                og_image: og_image || null,
+                canonical_url: canonical_url || null,
+                schema_type: schema_type || 'Article',
                 published_at: published_at ? formatDateForDb(published_at) : null,
                 created_at: formatDateForDb(nowIso),
                 updated_at: formatDateForDb(nowIso)
@@ -175,6 +183,10 @@ export async function updatePostImpl(
                 is_featured?: boolean;
                 meta_description?: string;
                 meta_keywords?: string;
+                seo_title?: string;
+                og_image?: string;
+                canonical_url?: string;
+                schema_type?: string;
         },
         RUN_ENV?: any,
         uploader?: (base64: string, folder: string) => Promise<{ url: string }>,
@@ -185,7 +197,7 @@ export async function updatePostImpl(
         });
         if (!existing) return null;
 
-        const { title, content, excerpt, featured_image, image_base64, status, is_featured, meta_description, meta_keywords } = args;
+        const { title, content, excerpt, featured_image, image_base64, status, is_featured, meta_description, meta_keywords, seo_title, og_image, canonical_url, schema_type } = args;
 
         const data: any = {
                 updated_at: formatDateForDb(new Date())
@@ -218,6 +230,10 @@ export async function updatePostImpl(
         if (is_featured !== undefined) data.is_featured = is_featured;
         if (meta_description !== undefined) data.meta_description = meta_description;
         if (meta_keywords !== undefined) data.meta_keywords = meta_keywords;
+        if (seo_title !== undefined) data.seo_title = seo_title;
+        if (og_image !== undefined) data.og_image = og_image;
+        if (canonical_url !== undefined) data.canonical_url = canonical_url;
+        if (schema_type !== undefined) data.schema_type = schema_type;
 
         if (image_base64 && typeof image_base64 === 'string' && uploader) {
                 try {
