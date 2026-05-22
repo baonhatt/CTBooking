@@ -62,9 +62,7 @@ export async function loginWithSessionImpl(
         // Check 2FA settings
         const settingsResult = await getAdminSettingsImpl(kv);
         const settings = settingsResult.settings || {};
-        console.log('[LOGIN] Settings loaded:', JSON.stringify(settings));
         const enable2FA = settings.otp_settings?.enable_2fa === true;
-        console.log('[LOGIN] 2FA enabled:', enable2FA);
         const otpExpiryMinutes = settings.otp_settings?.otp_expiry_minutes || 5;
         const otpLength = settings.otp_settings?.otp_length || 6;
 
@@ -109,7 +107,6 @@ export async function validateSessionTokenImpl(
         token: string
 ): Promise<{ valid: boolean; accountId?: number; userId?: number }> {
         if (!token) return { valid: false };
-        console.log(123)
 
         const tokenRecord = await anyDb.query.tokens.findFirst({
                 where: and(eq(tables.tokens.token, token), eq(tables.tokens.type, 'session')),

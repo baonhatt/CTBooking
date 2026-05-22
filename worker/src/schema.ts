@@ -8,8 +8,8 @@ export const users = sqliteTable('users', {
         avatar: text('avatar'),
         gender: text('gender'),
         dob: text('dob'),
-        created_at: text('created_at').default(sql`(CURRENT_TIMESTAMP)`),
-        updated_at: text('updated_at').default(sql`(CURRENT_TIMESTAMP)`)
+        created_at: text('created_at'),
+        updated_at: text('updated_at')
 });
 
 export const accounts = sqliteTable('accounts', {
@@ -21,8 +21,8 @@ export const accounts = sqliteTable('accounts', {
         password: text('password'),
         login_type: text('login_type').default('email').notNull(),
         is_active: integer('is_active', { mode: 'boolean' }).default(true),
-        created_at: text('created_at').default(sql`(CURRENT_TIMESTAMP)`),
-        updated_at: text('updated_at').default(sql`(CURRENT_TIMESTAMP)`)
+        created_at: text('created_at'),
+        updated_at: text('updated_at')
 });
 
 export const tokens = sqliteTable('tokens', {
@@ -33,9 +33,7 @@ export const tokens = sqliteTable('tokens', {
         type: text('type').notNull(),
         token: text('token').notNull().unique(),
         expired_at: text('expired_at'),
-        created_at: text('created_at')
-                .default(sql`(CURRENT_TIMESTAMP)`)
-                .notNull()
+        created_at: text('created_at').notNull()
 });
 
 export const movies = sqliteTable('movies', {
@@ -47,12 +45,8 @@ export const movies = sqliteTable('movies', {
         genres: text('genres'), // JSON string in SQLite
         rating: real('rating'),
         duration_min: integer('duration_min'),
-        created_at: text('created_at')
-                .default(sql`(CURRENT_TIMESTAMP)`)
-                .notNull(),
-        updated_at: text('updated_at')
-                .default(sql`(CURRENT_TIMESTAMP)`)
-                .notNull(),
+        created_at: text('created_at').notNull(),
+        updated_at: text('updated_at').notNull(),
         is_active: integer('is_active', { mode: 'boolean' }).default(true),
         release_date: text('release_date')
 });
@@ -71,12 +65,8 @@ export const ticket_packages = sqliteTable('ticket_packages', {
         is_member_only: integer('is_member_only', { mode: 'boolean' }).default(false),
         is_active: integer('is_active', { mode: 'boolean' }).default(true),
         display_order: integer('display_order').default(0),
-        created_at: text('created_at')
-                .default(sql`(CURRENT_TIMESTAMP)`)
-                .notNull(),
-        updated_at: text('updated_at')
-                .default(sql`(CURRENT_TIMESTAMP)`)
-                .notNull()
+        created_at: text('created_at').notNull(),
+        updated_at: text('updated_at').notNull()
 });
 
 export const bookings = sqliteTable('bookings', {
@@ -87,16 +77,12 @@ export const bookings = sqliteTable('bookings', {
         }),
         ticket_count: integer('ticket_count').default(1).notNull(),
         total_price: real('total_price').notNull(),
-        created_at: text('created_at')
-                .default(sql`(CURRENT_TIMESTAMP)`)
-                .notNull(),
+        created_at: text('created_at').notNull(),
         paid_at: text('paid_at'),
         payment_method: text('payment_method').default('cash'),
         payment_status: text('payment_status').default('pending'),
         transaction_id: text('transaction_id'),
-        updated_at: text('updated_at')
-                .default(sql`(CURRENT_TIMESTAMP)`)
-                .notNull(),
+        updated_at: text('updated_at').notNull(),
         name: text('name').default('').notNull(),
         phone: text('phone').default('').notNull(),
         email: text('email').default('').notNull(),
@@ -125,12 +111,8 @@ export const toys = sqliteTable('toys', {
         stock: integer('stock').default(0).notNull(),
         status: text('status').default('active').notNull(),
         image_url: text('image_url'),
-        created_at: text('created_at')
-                .default(sql`(CURRENT_TIMESTAMP)`)
-                .notNull(),
-        updated_at: text('updated_at')
-                .default(sql`(CURRENT_TIMESTAMP)`)
-                .notNull()
+        created_at: text('created_at').notNull(),
+        updated_at: text('updated_at').notNull()
 });
 
 export const email_logs = sqliteTable('email_logs', {
@@ -145,12 +127,8 @@ export const email_logs = sqliteTable('email_logs', {
         booking_id: integer('booking_id').references(() => bookings.id, { onDelete: 'set null' }),
         metadata: text('metadata'), // JSON string
         sent_at: text('sent_at'),
-        created_at: text('created_at')
-                .default(sql`(CURRENT_TIMESTAMP)`)
-                .notNull(),
-        updated_at: text('updated_at')
-                .default(sql`(CURRENT_TIMESTAMP)`)
-                .notNull()
+        created_at: text('created_at').notNull(),
+        updated_at: text('updated_at').notNull()
 });
 
 export const site_media = sqliteTable('site_media', {
@@ -167,12 +145,8 @@ export const site_media = sqliteTable('site_media', {
         duration: real('duration'),
         display_order: integer('display_order').default(0),
         is_active: integer('is_active', { mode: 'boolean' }).default(true),
-        created_at: text('created_at')
-                .default(sql`(CURRENT_TIMESTAMP)`)
-                .notNull(),
-        updated_at: text('updated_at')
-                .default(sql`(CURRENT_TIMESTAMP)`)
-                .notNull()
+        created_at: text('created_at').notNull(),
+        updated_at: text('updated_at').notNull()
 });
 
 export const posts = sqliteTable('posts', {
@@ -193,8 +167,8 @@ export const posts = sqliteTable('posts', {
         is_featured: integer('is_featured', { mode: 'boolean' }).default(false),
         view_count: integer('view_count').default(0),
         published_at: text('published_at'),
-        created_at: text('created_at').default(sql`(CURRENT_TIMESTAMP)`),
-        updated_at: text('updated_at').default(sql`(CURRENT_TIMESTAMP)`)
+        created_at: text('created_at'),
+        updated_at: text('updated_at')
 });
 
 // Relations
@@ -203,10 +177,18 @@ export const usersRelations = relations(users, ({ many }) => ({
         bookings: many(bookings)
 }));
 
-export const accountsRelations = relations(accounts, ({ one }) => ({
+export const accountsRelations = relations(accounts, ({ one, many }) => ({
         user: one(users, {
                 fields: [accounts.user_id],
                 references: [users.id]
+        }),
+        tokens: many(tokens)
+}));
+
+export const tokensRelations = relations(tokens, ({ one }) => ({
+        account: one(accounts, {
+                fields: [tokens.account_id],
+                references: [accounts.id]
         })
 }));
 
