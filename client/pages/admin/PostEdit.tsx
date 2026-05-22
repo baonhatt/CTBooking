@@ -96,6 +96,24 @@ export default function PostEditPage() {
 
         const hasUnsavedChanges = () => initialSnapshotRef.current !== snapshotEditData(editData);
 
+        const getChangedFields = () => {
+                if (!initialSnapshotRef.current) return {};
+                const initial = JSON.parse(initialSnapshotRef.current);
+                const current = editData;
+                const changed: Record<string, boolean> = {};
+                const fields = ['title', 'slug', 'content', 'excerpt', 'featured_image', 'status', 'is_featured', 'published_at', 'meta_description', 'meta_keywords', 'seo_title', 'og_image', 'canonical_url', 'schema_type'];
+                fields.forEach(field => {
+                        if (initial[field] !== current[field]) {
+                                changed[field] = true;
+                        }
+                });
+                return changed;
+        };
+
+        const changedFields = getChangedFields();
+
+        const isFieldChanged = (field: string) => changedFields[field];
+
         const fetchPost = async () => {
                 if (!id) return;
                 setIsLoading(true);
@@ -305,7 +323,7 @@ export default function PostEditPage() {
                                                                                         Tiêu đề bài viết
                                                                                 </Label>
                                                                                 <Input
-                                                                                        className="mt-2 text-lg font-semibold"
+                                                                                        className={`mt-2 text-lg font-semibold ${isFieldChanged('title') ? 'border-amber-500 ring-1 ring-amber-500' : ''}`}
                                                                                         value={editData.title || ''}
                                                                                         onChange={(e) => setEditData({ ...editData, title: e.target.value })}
                                                                                         placeholder="Nhập tiêu đề bài viết..."
@@ -321,7 +339,7 @@ export default function PostEditPage() {
                                                                                 <div className="mt-2 flex items-center gap-2">
                                                                                         <span className="text-slate-400 text-sm">/bai-viet/</span>
                                                                                         <Input
-                                                                                                className="flex-1 font-mono text-sm"
+                                                                                                className={`flex-1 font-mono text-sm ${isFieldChanged('slug') ? 'border-amber-500 ring-1 ring-amber-500' : ''}`}
                                                                                                 value={editData.slug || ''}
                                                                                                 onChange={(e) => setEditData({ ...editData, slug: e.target.value })}
                                                                                                 placeholder="tu-dong-tao-tu-tieu-de"
@@ -342,7 +360,7 @@ export default function PostEditPage() {
                                                                         {/* Rich Text Editor */}
                                                                         <div>
                                                                                 <Label>Nội dung</Label>
-                                                                                <div className="mt-2">
+                                                                                <div className={`mt-2 ${isFieldChanged('content') ? 'border-amber-500 ring-1 ring-amber-500 rounded-lg' : ''}`}>
                                                                                         <PostRichTextEditor value={editData.content || ''} onChange={(content) => setEditData((prev) => ({ ...prev, content }))} />
                                                                                 </div>
                                                                         </div>
@@ -368,7 +386,7 @@ export default function PostEditPage() {
                                                                                                 Trạng thái
                                                                                         </Label>
                                                                                         <select
-                                                                                                className="mt-2 w-full px-3 py-2 border border-slate-200 rounded-xl bg-white text-sm"
+                                                                                                className={`mt-2 w-full px-3 py-2 border border-slate-200 rounded-xl bg-white text-sm ${isFieldChanged('status') ? 'border-amber-500 ring-1 ring-amber-500' : ''}`}
                                                                                                 value={editData.status || 'draft'}
                                                                                                 onChange={(e) => setEditData({ ...editData, status: e.target.value as any })}
                                                                                         >
@@ -391,7 +409,7 @@ export default function PostEditPage() {
                                                                                         </Label>
                                                                                         <Input
                                                                                                 type="datetime-local"
-                                                                                                className="mt-2"
+                                                                                                className={`mt-2 ${isFieldChanged('published_at') ? 'border-amber-500 ring-1 ring-amber-500' : ''}`}
                                                                                                 value={editData.published_at ? new Date(editData.published_at).toISOString().slice(0, 16) : ''}
                                                                                                 onChange={(e) => setEditData({ ...editData, published_at: e.target.value })}
                                                                                         />
@@ -415,7 +433,7 @@ export default function PostEditPage() {
                                                                                                 <ImageIcon className="w-4 h-4 text-slate-500" />
                                                                                                 Ảnh đại diện
                                                                                         </Label>
-                                                                                        <div className="mt-2 flex items-center gap-2">
+                                                                                        <div className={`mt-2 flex items-center gap-2 ${isFieldChanged('featured_image') ? 'border-amber-500 ring-1 ring-amber-500 p-2 rounded-lg' : ''}`}>
                                                                                                 <Input type="file" accept="image/*" onChange={(e) => {
                                                                                                         const file = e.target.files?.[0];
                                                                                                         if (file) {
@@ -444,7 +462,7 @@ export default function PostEditPage() {
                                                                                                 Tóm tắt
                                                                                         </Label>
                                                                                         <Textarea
-                                                                                                className="mt-2 min-h-[80px] resize-y"
+                                                                                                className={`mt-2 min-h-[80px] resize-y ${isFieldChanged('excerpt') ? 'border-amber-500 ring-1 ring-amber-500' : ''}`}
                                                                                                 value={editData.excerpt || ''}
                                                                                                 onChange={(e) => setEditData({ ...editData, excerpt: e.target.value })}
                                                                                                 placeholder="1-2 câu mô tả ngắn, hiển thị ngoài danh sách"
@@ -471,7 +489,7 @@ export default function PostEditPage() {
                                                                                         </Label>
                                                                                         <div className="mt-2 flex items-center gap-2">
                                                                                                 <Input
-                                                                                                        className="flex-1"
+                                                                                                        className={`flex-1 ${isFieldChanged('seo_title') ? 'border-amber-500 ring-1 ring-amber-500' : ''}`}
                                                                                                         value={editData.seo_title || ''}
                                                                                                         onChange={(e) => setEditData({ ...editData, seo_title: e.target.value })}
                                                                                                         placeholder="Ví dụ: Phim 8 Kỳ Quan | Cinesphere"
@@ -502,7 +520,7 @@ export default function PostEditPage() {
                                                                                         </Label>
                                                                                         <div className="mt-2 flex items-start gap-2">
                                                                                                 <Textarea
-                                                                                                        className="flex-1 min-h-[80px] resize-y"
+                                                                                                        className={`flex-1 min-h-[80px] resize-y ${isFieldChanged('meta_description') ? 'border-amber-500 ring-1 ring-amber-500' : ''}`}
                                                                                                         value={editData.meta_description || ''}
                                                                                                         onChange={(e) => setEditData({ ...editData, meta_description: e.target.value })}
                                                                                                         placeholder="Tóm tắt ngắn 120-160 ký tự giúp tăng click từ Google"
@@ -542,7 +560,7 @@ export default function PostEditPage() {
                                                                                                 Từ khóa
                                                                                         </Label>
                                                                                         <Input
-                                                                                                className="mt-2"
+                                                                                                className={`mt-2 ${isFieldChanged('meta_keywords') ? 'border-amber-500 ring-1 ring-amber-500' : ''}`}
                                                                                                 value={editData.meta_keywords || ''}
                                                                                                 onChange={(e) => setEditData({ ...editData, meta_keywords: e.target.value })}
                                                                                                 placeholder="phim, rạp chiếu, review"
@@ -553,7 +571,7 @@ export default function PostEditPage() {
                                                                                                 <Share2 className="w-4 h-4 text-slate-500" />
                                                                                                 Ảnh khi chia sẻ Facebook/Zalo
                                                                                         </Label>
-                                                                                        <div className="mt-2 flex items-center gap-2">
+                                                                                        <div className={`mt-2 flex items-center gap-2 ${isFieldChanged('og_image') ? 'border-amber-500 ring-1 ring-amber-500 p-2 rounded-lg' : ''}`}>
                                                                                                 <Input type="file" accept="image/*" onChange={(e) => {
                                                                                                         const file = e.target.files?.[0];
                                                                                                         if (file) setEditData({ ...editData, ogImageFile: file });
@@ -576,7 +594,7 @@ export default function PostEditPage() {
                                                                                         </Label>
                                                                                         <div className="mt-2 flex items-center gap-2">
                                                                                                 <Input
-                                                                                                        className="flex-1"
+                                                                                                        className={`flex-1 ${isFieldChanged('canonical_url') ? 'border-amber-500 ring-1 ring-amber-500' : ''}`}
                                                                                                         value={editData.canonical_url || ''}
                                                                                                         onChange={(e) => setEditData({ ...editData, canonical_url: e.target.value })}
                                                                                                         placeholder="https://cinesphere.com.vn/bai-viet/ten-bai-viet"
@@ -600,7 +618,7 @@ export default function PostEditPage() {
                                                                                                 Loại nội dung
                                                                                         </Label>
                                                                                         <select
-                                                                                                className="mt-2 w-full px-3 py-2 border border-slate-200 rounded-xl bg-white text-sm"
+                                                                                                className={`mt-2 w-full px-3 py-2 border border-slate-200 rounded-xl bg-white text-sm ${isFieldChanged('schema_type') ? 'border-amber-500 ring-1 ring-amber-500' : ''}`}
                                                                                                 value={editData.schema_type || 'Article'}
                                                                                                 onChange={(e) => setEditData({ ...editData, schema_type: e.target.value })}
                                                                                         >
