@@ -39,7 +39,8 @@ next-client/.vercel/
 
 # Media and Database - KHÔNG commit!
 uploads/
-*.sql
 *.sqlite
 *.sqlite-shm
 *.sqlite-wal
+*.sql
+!worker/migrations/*.sql
