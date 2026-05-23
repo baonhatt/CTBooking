@@ -5,10 +5,22 @@ import { LazyMotion, domAnimation, m, AnimatePresence, useMotionValue, useSpring
 import { Play, Sparkles, Waves, Clock, Star, Calendar, Ticket } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import {
+        AlertDialog,
+        AlertDialogAction,
+        AlertDialogCancel,
+        AlertDialogContent,
+        AlertDialogDescription,
+        AlertDialogFooter,
+        AlertDialogHeader,
+        AlertDialogTitle
+} from '@/components/ui/alert-dialog';
+import { Checkbox } from '@/components/ui/checkbox';
 import { movieStore } from '@/store/movieStore';
 import { getMovieById } from '@/lib/api/movies';
 import { optimizeCloudinaryUrl, optimizeCloudinaryVideoUrl, getCloudinaryThumbnail } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
+import { useBranch } from '@/hooks/useBranch';
 
 // Local static assets served from Next.js public/ folder
 const heroImage1 = '/images/1.webp';
@@ -62,7 +74,9 @@ export default function HeroSection({
         const [isModalOpen, setIsModalOpen] = useState(false);
         const [isLoadingDetails, setIsLoadingDetails] = useState(false);
         const [storeUpdateTrigger, setStoreUpdateTrigger] = useState(0);
+        const [showBranchConfirmDialog, setShowBranchConfirmDialog] = useState(false);
         const SECTION_ID = 'hero-main';
+        const { selectedBranch, dontShowConfirm, toggleDontShowConfirm } = useBranch();
 
         // Prefetch booking page để tránh lag khi user bấm đặt vé
         useEffect(() => {
@@ -225,6 +239,13 @@ export default function HeroSection({
                         } catch { }
                 }
                 setIsModalOpen(false);
+
+                // Show branch confirmation dialog if not disabled
+                if (!dontShowConfirm && selectedBranch) {
+                        setShowBranchConfirmDialog(true);
+                        return;
+                }
+
                 router.push('/booking');
         };
 
@@ -429,6 +450,46 @@ export default function HeroSection({
                                         </div>
                                 </div>
                         </section>
+
+                        {/* Branch confirmation dialog */}
+                        <AlertDialog open={showBranchConfirmDialog} onOpenChange={setShowBranchConfirmDialog}>
+                                <AlertDialogContent className="bg-[#0f172a] border-white/10 text-white">
+                                        <AlertDialogHeader>
+                                                <AlertDialogTitle className="text-xl font-bold text-white">Xác nhận chi nhánh</AlertDialogTitle>
+                                                <AlertDialogDescription className="text-gray-300">
+                                                        Bạn đang đặt vé tại chi nhánh <span className="font-bold text-blue-400">{selectedBranch?.name}</span>.
+                                                        <br /><br />
+                                                        Nếu muốn đổi chi nhánh, hãy chọn ở dropdown trên header trước khi đặt vé.
+                                                </AlertDialogDescription>
+                                        </AlertDialogHeader>
+                                        <AlertDialogFooter className="flex-col items-stretch gap-2">
+                                                <div className="flex items-center gap-2">
+                                                        <Checkbox
+                                                                id="dont-show-branch-confirm-hero"
+                                                                checked={dontShowConfirm}
+                                                                onCheckedChange={(checked) => toggleDontShowConfirm(checked as boolean)}
+                                                        />
+                                                        <label htmlFor="dont-show-branch-confirm-hero" className="text-sm text-gray-300 cursor-pointer">
+                                                                Không nhắc lại lần sau
+                                                        </label>
+                                                </div>
+                                                <div className="flex gap-2 mt-2">
+                                                        <AlertDialogCancel className="bg-white/5 border-white/10 text-gray-300 hover:bg-white/10 hover:text-white flex-1">
+                                                                Hủy bỏ
+                                                        </AlertDialogCancel>
+                                                        <AlertDialogAction
+                                                                onClick={() => {
+                                                                        setShowBranchConfirmDialog(false);
+                                                                        router.push('/booking');
+                                                                }}
+                                                                className="bg-blue-600 hover:bg-blue-700 text-white flex-1"
+                                                        >
+                                                                Tiếp tục
+                                                        </AlertDialogAction>
+                                                </div>
+                                        </AlertDialogFooter>
+                                </AlertDialogContent>
+                        </AlertDialog>
                 </LazyMotion>
         );
 }

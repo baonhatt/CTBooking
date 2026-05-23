@@ -11,6 +11,7 @@ import ClearStorageOnMount from '@/components/user/home/ClearStorageOnMount';
 import { getActiveMoviesToday } from '@/lib/api/movies';
 import { getSiteMediaApi } from '@/lib/api/uploads';
 import { getActiveTickets, getActiveToys } from '@/lib/api/products';
+import { getDefaultBranch } from '@/lib/api/branches';
 
 import { siteConfig } from '@/config/site';
 
@@ -50,9 +51,20 @@ export const metadata: Metadata = {
 export const revalidate = 600; // 10 minutes default revalidation
 
 export default async function Home() {
-        // Fetch all initial data in parallel
+        // Fetch default branch for server-side rendering
+        let defaultBranchId: number | undefined = undefined;
+        try {
+                const { branch: defaultBranch } = await getDefaultBranch();
+                if (defaultBranch) {
+                        defaultBranchId = defaultBranch.id;
+                }
+        } catch (error) {
+                console.error('Error fetching default branch:', error);
+        }
+
+        // Fetch all initial data in parallel with default branch filter
         const [activeMovies, siteMediaRes, ticketsRes, toysRes] = await Promise.all([
-                getActiveMoviesToday().catch(() => []),
+                getActiveMoviesToday(defaultBranchId).catch(() => []),
                 getSiteMediaApi({ active: true }).catch(() => ({ items: [] })),
                 getActiveTickets().catch(() => ({ items: [] })),
                 getActiveToys().catch(() => ({ items: [] }))

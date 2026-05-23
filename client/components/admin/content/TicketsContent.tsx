@@ -20,7 +20,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
 import { toast } from 'sonner';
-import { createTicketApi, updateTicketApi } from '@/lib/api';
+import { createTicketApi, updateTicketApi, getBranches } from '@/lib/api';
 import { getMoviesAdmin } from '@/lib/api/movies';
 import { Skeleton } from '@/components/ui/skeleton';
 
@@ -89,11 +89,15 @@ export default function TicketsContent(props: Props) {
         const [isDeletingId, setIsDeletingId] = useState<number | null>(null);
         const [isSaving, setIsSaving] = useState(false);
         const [movies, setMovies] = useState<any[]>([]);
+        const [branchOptions, setBranchOptions] = useState<any[]>([]);
 
         React.useEffect(() => {
                 if (isEditOpen) {
                         getMoviesAdmin({ status: 'active', pageSize: 100 }).then((res) => {
                                 setMovies(res.items);
+                        });
+                        getBranches({ includeInactive: true }).then((res) => {
+                                setBranchOptions(res.items);
                         });
                 }
         }, [isEditOpen]);
@@ -350,6 +354,32 @@ export default function TicketsContent(props: Props) {
                                                                                         placeholder="Vd: GV1"
                                                                                         value={editData?.code || ''}
                                                                                         onChange={(e) => setEditData({ ...editData, code: e.target.value })}
+                                                                                        className="mt-1.5"
+                                                                                />
+                                                                        </div>
+                                                                </div>
+                                                                <div className="grid grid-cols-2 gap-4">
+                                                                        <div>
+                                                                                <Label className="text-sm font-medium">Chi nhánh</Label>
+                                                                                <select
+                                                                                        value={editData?.branch_id || ''}
+                                                                                        onChange={(e) => setEditData({ ...editData, branch_id: e.target.value ? Number(e.target.value) : null })}
+                                                                                        className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:border-blue-400 focus:ring-4 focus:ring-blue-500/5 outline-none transition-all mt-1.5"
+                                                                                >
+                                                                                        <option value="">Chọn chi nhánh</option>
+                                                                                        {branchOptions.map((branch) => (
+                                                                                                <option key={branch.id} value={branch.id}>
+                                                                                                        {branch.name}
+                                                                                                </option>
+                                                                                        ))}
+                                                                                </select>
+                                                                        </div>
+                                                                        <div>
+                                                                                <Label className="text-sm font-medium">Loại</Label>
+                                                                                <Input
+                                                                                        placeholder="Vd: 1"
+                                                                                        value={editData?.type || ''}
+                                                                                        onChange={(e) => setEditData({ ...editData, type: e.target.value })}
                                                                                         className="mt-1.5"
                                                                                 />
                                                                         </div>
