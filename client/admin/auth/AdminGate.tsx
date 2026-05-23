@@ -16,6 +16,7 @@ import TicketsPage from '@/pages/admin/Tickets';
 import TicketCheckPage from '@/pages/admin/TicketCheck';
 import UploadsPage from '@/pages/admin/Uploads';
 import SettingsPage from '@/pages/admin/Settings';
+import BranchesPage from '@/pages/admin/Branches';
 // import { adminLoginApi } from "@/lib/api";
 
 const AdminLoginView = () => {
@@ -120,6 +121,7 @@ export const AdminGate = () => {
                         <Route path="/tickets" element={<TicketsPage />} />
                         <Route path="/transactions" element={<TransactionsPage />} />
                         <Route path="/ticket-check" element={<TicketCheckPage />} />
+                        <Route path="/branches" element={<BranchesPage />} />
                         <Route path="/uploads" element={<UploadsPage />} />
                         <Route path="/email-logs" element={<EmailLogsPage />} />
                         <Route path="/settings" element={<SettingsPage />} />

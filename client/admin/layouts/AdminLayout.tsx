@@ -31,7 +31,8 @@ interface Props {
         | 'ticket-check'
         | 'uploads'
         | 'email-logs'
-        | 'settings';
+        | 'settings'
+        | 'branches';
         setActive: (x: Props['active']) => void;
         adminEmailState: string;
         handleLogout: () => void;
@@ -106,6 +107,7 @@ export default function AdminLayout({ active, setActive, adminEmailState, handle
                 { key: 'tickets' as const, label: 'Gói vé', icon: <TicketIcon className="h-4 w-4" /> },
                 { key: 'transactions' as const, label: 'Giao dịch', icon: <CreditCard className="h-4 w-4" /> },
                 { key: 'ticket-check' as const, label: 'Kiểm Tra Vé', icon: <ScanLine className="h-4 w-4" /> },
+                { key: 'branches' as const, label: 'Chi nhánh', icon: <Settings className="h-4 w-4" /> },
                 { key: 'uploads' as const, label: 'Uploads', icon: <Clapperboard className="h-4 w-4" /> },
                 { key: 'email-logs' as const, label: 'Email Logs', icon: <Mail className="h-4 w-4" /> }
         ].filter((item) => {
