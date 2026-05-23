@@ -39,15 +39,19 @@ const AdminLoginView = () => {
         return;
       }
 
+      // Store token first so getAdminMe can use it
+      localStorage.setItem('adminToken', token);
+      localStorage.setItem('adminEmail', email);
+
       try {
         const me = await getAdminMe();
-        localStorage.setItem('adminToken', token);
-        localStorage.setItem('adminEmail', email);
         localStorage.setItem('adminProfile', JSON.stringify(me));
         window.dispatchEvent(new Event('admin-auth-changed'));
         navigate('/', { replace: true });
       } catch (profileErr: any) {
-        // If profile fetch fails, don't store token - user is not fully authenticated
+        // If profile fetch fails, clear token - user is not fully authenticated
+        localStorage.removeItem('adminToken');
+        localStorage.removeItem('adminEmail');
         setError('Không thể tải thông tin tài khoản. Vui lòng thử lại.');
         return;
       }
