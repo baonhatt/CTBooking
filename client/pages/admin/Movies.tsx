@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { getMoviesAdmin, updateMovieStatus } from '@/lib/api';
+import { getMoviesAdmin, updateMovieStatus, getBranches } from '@/lib/api';
 import AdminLayout from '@/admin/layouts/AdminLayout';
 import MoviesContent from '@/components/admin/content/MoviesContent';
 import AdminEditModal from '@/components/admin/AdminEditModal';
@@ -25,6 +25,8 @@ export default function MoviesPage() {
                 initialFilters.sortKey ?? 'updated_at'
         );
         const [sortDir, setSortDir] = useState<'asc' | 'desc'>(initialFilters.sortDir ?? 'desc');
+        const [selectedBranchId, setSelectedBranchId] = useState<number | null>(initialFilters.branchId ?? null);
+        const [branches, setBranches] = useState<any[]>([]);
         const pageSize = 10;
         const [isEditOpen, setIsEditOpen] = useState(false);
         const [editType, setEditType] = useState<'movie' | null>(null);
@@ -35,6 +37,18 @@ export default function MoviesPage() {
         const [isDetailsOpen, setIsDetailsOpen] = useState(false);
         const [selectedMovieId, setSelectedMovieId] = useState<number | null>(null);
 
+        // Load branches
+        useEffect(() => {
+                (async () => {
+                        try {
+                                const { items } = await getBranches({ includeInactive: true });
+                                setBranches(items);
+                        } catch (error) {
+                                console.error('Error loading branches:', error);
+                        }
+                })();
+        }, []);
+
         useEffect(() => {
                 (async () => {
                         setIsLoading(true);
@@ -44,7 +58,8 @@ export default function MoviesPage() {
                                 q: searchQuery,
                                 sort: sortKey,
                                 dir: sortDir,
-                                status: showActiveOnly ? 'active' : 'all'
+                                status: showActiveOnly ? 'active' : 'all',
+                                branch_id: selectedBranchId
                         });
                         const mapped = items.map((m: any) => ({
                                 id: String(m.id),
@@ -57,7 +72,8 @@ export default function MoviesPage() {
                                 updated_at: m.updated_at ? new Date(m.updated_at).toISOString() : null,
                                 rating: m.rating ?? null,
                                 price: Number(m.price || 0),
-                                is_active: m.is_active
+                                is_active: m.is_active,
+                                branch_id: m.branch_id
                         }));
                         setMoviesLocal(mapped);
                         setTotalMovies(total);
@@ -68,10 +84,10 @@ export default function MoviesPage() {
                         setIsLoading(false);
                 })();
                 try {
-                        const state = { searchQuery, sortKey, sortDir, showActiveOnly };
+                        const state = { searchQuery, sortKey, sortDir, showActiveOnly, branchId: selectedBranchId };
                         localStorage.setItem('admin_movies_filters', JSON.stringify(state));
                 } catch { }
-        }, [moviesPage, pageSize, searchQuery, sortKey, sortDir, showActiveOnly]);
+        }, [moviesPage, pageSize, searchQuery, sortKey, sortDir, showActiveOnly, selectedBranchId]);
 
         const moviesTotalPages = useMemo(() => Math.max(1, Math.ceil(totalMovies / pageSize)), [totalMovies]);
         const filteredMovies = useMemo(
@@ -228,6 +244,9 @@ export default function MoviesPage() {
                                 setIsDetailsOpen={setIsDetailsOpen}
                                 selectedMovieId={selectedMovieId}
                                 setSelectedMovieId={setSelectedMovieId}
+                                branches={branches}
+                                selectedBranchId={selectedBranchId}
+                                setSelectedBranchId={setSelectedBranchId}
                         />
                         <AdminEditModal
                                 isEditOpen={isEditOpen}

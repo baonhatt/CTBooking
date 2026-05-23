@@ -4,10 +4,15 @@ import { eq, desc, asc, count, sql, and } from 'drizzle-orm';
 
 export async function getAllActiveMoviesToday(
         anyDb: any,
-        tables: { movies: any }
+        tables: { movies: any },
+        branch_id?: number
 ): Promise<{ activeMovies: ActiveMoviesTodayResponse[] }> {
+        const whereCondition = branch_id
+                ? and(eq(tables.movies.is_active, true), eq(tables.movies.branch_id, branch_id))
+                : eq(tables.movies.is_active, true);
+
         const active_movies = await anyDb.query.movies.findMany({
-                where: eq(tables.movies.is_active, true),
+                where: whereCondition,
                 orderBy: [desc(tables.movies.release_date)]
         });
         const activeMovies: ActiveMoviesTodayResponse[] = active_movies.map((m: any) => ({
@@ -39,9 +44,10 @@ export async function listMovies(
                 sort: string;
                 dir: 'asc' | 'desc';
                 status?: 'all' | 'active' | 'inactive';
+                branch_id?: number;
         }
 ) {
-        const { page, pageSize, q, sort, dir, status = 'all' } = args;
+        const { page, pageSize, q, sort, dir, status = 'all', branch_id } = args;
         const conditions: any[] = [];
         if (q) {
                 const term = `%${q.toLowerCase()}%`;
@@ -53,6 +59,9 @@ export async function listMovies(
                 conditions.push(eq(tables.movies.is_active, true));
         } else if (status === 'inactive') {
                 conditions.push(eq(tables.movies.is_active, false));
+        }
+        if (branch_id) {
+                conditions.push(eq(tables.movies.branch_id, branch_id));
         }
         const whereClause = conditions.length ? and(...conditions) : undefined;
         const totalResult = await anyDb.select({ count: count() }).from(tables.movies).where(whereClause);

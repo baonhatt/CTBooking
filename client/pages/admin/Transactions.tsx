@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { getTransactions } from '@/lib/api';
+import { getTransactions, getBranches } from '@/lib/api';
 import AdminLayout from '@/admin/layouts/AdminLayout';
 import TransactionsContent from '@/components/admin/content/TransactionsContent';
 
@@ -25,7 +25,21 @@ export default function TransactionsPage() {
         const [paymentMethod, setPaymentMethod] = useState<string>(initialFilters.paymentMethod ?? '');
         const [fromDate, setFromDate] = useState<string>(initialFilters.fromDate ?? '');
         const [toDate, setToDate] = useState<string>(initialFilters.toDate ?? '');
+        const [selectedBranchId, setSelectedBranchId] = useState<number | null>(initialFilters.branchId ?? null);
+        const [branches, setBranches] = useState<any[]>([]);
         const [isLoading, setIsLoading] = useState(false);
+
+        // Load branches
+        useEffect(() => {
+                (async () => {
+                        try {
+                                const { items } = await getBranches({ includeInactive: true });
+                                setBranches(items);
+                        } catch (error) {
+                                console.error('Error loading branches:', error);
+                        }
+                })();
+        }, []);
 
         useEffect(() => {
                 try {
@@ -36,11 +50,12 @@ export default function TransactionsPage() {
                                 sortDir,
                                 paymentMethod,
                                 fromDate,
-                                toDate
+                                toDate,
+                                branchId: selectedBranchId
                         };
                         localStorage.setItem('admin_transactions_filters', JSON.stringify(state));
                 } catch { }
-        }, [txQuery, txStatus, sortKey, sortDir, paymentMethod, fromDate, toDate]);
+        }, [txQuery, txStatus, sortKey, sortDir, paymentMethod, fromDate, toDate, selectedBranchId]);
 
         // Load transactions khi page hoặc query thay đổi
         useEffect(() => {
@@ -56,7 +71,8 @@ export default function TransactionsPage() {
                                         dir: sortDir,
                                         payment_method: paymentMethod || undefined,
                                         from: fromDate || undefined,
-                                        to: toDate || undefined
+                                        to: toDate || undefined,
+                                        branch_id: selectedBranchId
                                 });
                                 setTransactions(
                                         items.map((t: any) => ({
@@ -83,7 +99,7 @@ export default function TransactionsPage() {
                                 setIsLoading(false);
                         }
                 })();
-        }, [txPage, pageSize, txQuery, txStatus, sortKey, sortDir, paymentMethod, fromDate, toDate]);
+        }, [txPage, pageSize, txQuery, txStatus, sortKey, sortDir, paymentMethod, fromDate, toDate, selectedBranchId]);
 
         const txTotalPages = useMemo(() => Math.max(1, Math.ceil(totalTransactions / pageSize)), [totalTransactions]);
 
@@ -99,7 +115,8 @@ export default function TransactionsPage() {
                                 dir: sortDir,
                                 payment_method: paymentMethod || undefined,
                                 from: fromDate || undefined,
-                                to: toDate || undefined
+                                to: toDate || undefined,
+                                branch_id: selectedBranchId
                         });
                         setTransactions(
                                 items.map((t: any) => ({
@@ -150,6 +167,9 @@ export default function TransactionsPage() {
                                 onRefresh={handleRefresh}
                                 txStatus={txStatus}
                                 setTxStatus={setTxStatus}
+                                branches={branches}
+                                selectedBranchId={selectedBranchId}
+                                setSelectedBranchId={setSelectedBranchId}
                                 sortKey={sortKey}
                                 sortDir={sortDir}
                                 setSortKey={setSortKey}

@@ -15,6 +15,7 @@ export async function createMovieImpl(
                 duration_min: number;
                 is_active?: boolean;
                 release_date: string | Date | null;
+                branch_id?: number;
         },
         config?: any,
         RUN_ENV?: any,
@@ -42,6 +43,7 @@ export async function createMovieImpl(
                 genres: Array.isArray(data.genres) ? JSON.stringify(data.genres) : data.genres,
                 rating: data.rating ?? null,
                 duration_min: data.duration_min,
+                branch_id: data.branch_id || null,
                 is_active: data.is_active === undefined ? true : Boolean(data.is_active),
                 release_date: data.release_date ? formatDateForDb(data.release_date) : null,
                 created_at: formatDateForDb(now),
@@ -77,6 +79,7 @@ export async function updateMovieImpl(
                 duration_min?: number;
                 is_active?: boolean;
                 release_date?: string | Date | null;
+                branch_id?: number;
         },
         config?: any,
         RUN_ENV?: any,
@@ -111,6 +114,7 @@ export async function updateMovieImpl(
         if (data.genres !== undefined) payload.genres = Array.isArray(data.genres) ? JSON.stringify(data.genres) : data.genres;
         if (data.rating !== undefined) payload.rating = data.rating ?? null;
         if (data.duration_min !== undefined) payload.duration_min = data.duration_min;
+        if (data.branch_id !== undefined) payload.branch_id = data.branch_id;
         if (data.is_active !== undefined) payload.is_active = data.is_active;
         if (data.release_date !== undefined) {
                 payload.release_date = data.release_date ? formatDateForDb(data.release_date) : null;

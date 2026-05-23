@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import AdminLayout from '@/admin/layouts/AdminLayout';
 import DashboardContent from '@/components/admin/content/DashboardContent';
-import { getDashboardMetrics, getRevenueByDate, getRevenue7Days, getRevenueByMonth, getTransactions } from '@/lib/api';
+import { getDashboardMetrics, getRevenueByDate, getRevenue7Days, getRevenueByMonth, getTransactions, getBranches } from '@/lib/api';
 
 export default function DashboardPage() {
         const [metrics, setMetrics] = useState({
@@ -56,6 +56,22 @@ export default function DashboardPage() {
         // Global Refresh Key
         const [refreshKey, setRefreshKey] = useState(0);
 
+        // Branch filter
+        const [selectedBranchId, setSelectedBranchId] = useState<number | null>(null);
+        const [branches, setBranches] = useState<any[]>([]);
+
+        // Load branches
+        useEffect(() => {
+                (async () => {
+                        try {
+                                const { items } = await getBranches({ includeInactive: true });
+                                setBranches(items);
+                        } catch (error) {
+                                console.error('Error loading branches:', error);
+                        }
+                })();
+        }, []);
+
         const handleRefresh = () => {
                 setRefreshKey((prev) => prev + 1);
         };
@@ -65,7 +81,7 @@ export default function DashboardPage() {
                 (async () => {
                         try {
                                 setIsTopTicketsLoading(true);
-                                const data = await getDashboardMetrics(topPeriod, selectedYear);
+                                const data = await getDashboardMetrics(topPeriod, selectedYear, selectedBranchId);
                                 setMetrics(data);
                         } catch (err) {
                                 console.error('Failed to load metrics:', err);
@@ -74,7 +90,7 @@ export default function DashboardPage() {
                                 setIsPageLoading(false);
                         }
                 })();
-        }, [topPeriod, selectedYear, refreshKey]);
+        }, [topPeriod, selectedYear, refreshKey, selectedBranchId]);
 
         // Load revenue for selected year on mount or refresh
         useEffect(() => {
@@ -171,6 +187,9 @@ export default function DashboardPage() {
                                 revenueByMonthData={revenueByMonthData}
                                 isPageLoading={isPageLoading}
                                 isTopTicketsLoading={isTopTicketsLoading}
+                                branches={branches}
+                                selectedBranchId={selectedBranchId}
+                                setSelectedBranchId={setSelectedBranchId}
                                 isRevenueLoading={isRevenueLoading}
                                 topPeriod={topPeriod}
                                 setTopPeriod={setTopPeriod}

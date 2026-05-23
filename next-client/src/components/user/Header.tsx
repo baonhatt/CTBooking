@@ -4,6 +4,7 @@ import { cn } from '@/lib/utils';
 import { useAuth } from '@/hooks/useAuth';
 import { useRouter, usePathname } from 'next/navigation';
 import { buildUrl } from '@/lib/api/http';
+import { useBranch } from '@/hooks/useBranch';
 
 // Components
 
@@ -46,6 +47,7 @@ export default function Header({
         const effectiveDisable = disableNav || (pathname !== '/' && !isPostsRoute);
         const activeSection = useActiveSection(effectiveDisable);
         const { handleLogout } = useAuthHandlers(setUserName);
+        const { selectedBranch, branches, selectBranch } = useBranch();
 
         // Check login state from localStorage (userToken) - client-side only
         const [isLoggedIn, setIsLoggedIn] = useState(false);
@@ -223,7 +225,35 @@ export default function Header({
                                 </nav>
 
                                 {/* Action Buttons */}
-                                <div className="flex items-center gap-4 animate-fade-in delay-250">
+                                <div className="flex items-center gap-3 md:gap-4 animate-fade-in delay-250">
+                                        {/* Branch Selector */}
+                                        {selectedBranch && branches.length > 1 && (
+                                                <div className="relative group">
+                                                        <select
+                                                                value={selectedBranch.id}
+                                                                onChange={(e) => {
+                                                                        const branch = branches.find((b) => b.id === Number(e.target.value));
+                                                                        if (branch) {
+                                                                                selectBranch(branch);
+                                                                                window.location.reload();
+                                                                        }
+                                                                }}
+                                                                className="appearance-none bg-white/10 hover:bg-white/20 border border-white/20 rounded-lg px-3 py-2 pr-8 text-sm text-white/90 hover:text-white transition-colors cursor-pointer backdrop-blur-sm min-w-[140px] md:min-w-[160px]"
+                                                        >
+                                                                {branches.map((branch) => (
+                                                                        <option key={branch.id} value={branch.id} className="bg-gray-900 text-white">
+                                                                                {branch.name}
+                                                                        </option>
+                                                                ))}
+                                                        </select>
+                                                        <div className="absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none">
+                                                                <svg className="w-4 h-4 text-white/70" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                                                                </svg>
+                                                        </div>
+                                                </div>
+                                        )}
+
                                         {/* Mobile Menu */}
                                         <div className="md:hidden">
                                                 <MobileMenu
@@ -235,6 +265,9 @@ export default function Header({
                                                         onLogout={handleLogout}
                                                         onLogin={() => setIsLoginOpen(true)}
                                                         onRegister={() => setIsRegisterOpen(true)}
+                                                        branches={branches}
+                                                        selectedBranch={selectedBranch}
+                                                        selectBranch={selectBranch}
                                                 />
                                         </div>
 

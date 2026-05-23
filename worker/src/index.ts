@@ -64,6 +64,14 @@ import {
         updatePostImpl,
         deletePostImpl
 } from '../../server/routes/admin/posts';
+import {
+        listBranchesImpl,
+        getBranchImpl,
+        getDefaultBranchImpl,
+        createBranchImpl,
+        updateBranchImpl,
+        deleteBranchImpl
+} from '../../server/routes/admin/branches';
 
 // import { getMailConfig, verifyMailProvider } from "../../server/routes/mail-service";
 import {
@@ -1047,9 +1055,10 @@ app.get('/api/getActiveMovies', async (c) => {
                         );
                 }
 
+                const branchId = c.req.query('branch_id') ? Number(c.req.query('branch_id')) : undefined;
                 const { activeMovies } = await getAllActiveMoviesToday(db, {
                         movies: schema.movies
-                });
+                }, branchId);
                 const optimized = activeMovies.map((m) => ({
                         ...m,
                         cover_image: parseMediaUrl(m.cover_image ?? '', c),
@@ -1307,7 +1316,7 @@ app.post('/api/bookings-use', async (c) => {
 });
 
 // Get list of movies
-// GET /api/movies?page=1&pageSize=20&q=search_term
+// GET /api/movies?page=1&pageSize=20&q=search_term&branch_id=1
 app.get('/api/movies', async (c) => {
         try {
                 const page = Number(c.req.query('page') || 1);
@@ -1316,11 +1325,12 @@ app.get('/api/movies', async (c) => {
                 const sortKey = String(c.req.query('sort') || 'updated_at');
                 const dir = String(c.req.query('dir') || 'desc').toLowerCase() === 'asc' ? 'asc' : 'desc';
                 const status = String(c.req.query('status') || 'all');
+                const branchId = c.req.query('branch_id') ? Number(c.req.query('branch_id')) : undefined;
                 const db = drizzle(c.env.cinema_db, { schema });
                 const { items, total } = await listMovies(
                         db,
                         { movies: schema.movies },
-                        { page, pageSize, q, sort: sortKey, dir, status: status as any }
+                        { page, pageSize, q, sort: sortKey, dir, status: status as any, branch_id: branchId }
                 );
                 const parsedItems = items.map((m: any) => ({
                         ...m,
@@ -1894,10 +1904,11 @@ app.get('/api/tickets-active', async (c) => {
                 */
 
                 const db = drizzle(c.env.cinema_db, { schema });
+                const branchId = c.req.query('branch_id') ? Number(c.req.query('branch_id')) : undefined;
                 const r = await listActiveTicketPackages(db, {
                         ticket_packages: schema.ticket_packages,
                         movies: schema.movies
-                });
+                }, branchId);
 
                 const responseBody = JSON.stringify(r);
 
@@ -2738,6 +2749,96 @@ app.delete('/api/posts/:id', async (c) => {
                 const r = await deletePostImpl(db, { posts: schema.posts }, id, getCloudHelpers(c, c.env).deleter);
                 if (!r) return c.json({ message: 'Không tìm thấy' }, 404);
                 return c.json({ status: 'success', message: 'Đã xóa' });
+        } catch (err: any) {
+                return c.json({ status: 'error', message: String(err?.message || 'Internal error') }, 500);
+        }
+});
+
+// Admin: List branches
+app.get('/api/admin/branches', async (c) => {
+        try {
+                const page = Number(c.req.query('page') || 1);
+                const pageSize = Number(c.req.query('pageSize') || 10);
+                const q = String(c.req.query('q') || '');
+                const includeInactive = c.req.query('includeInactive') === 'true';
+                const db = drizzle(c.env.cinema_db, { schema });
+                const r = await listBranchesImpl(db, { branches: schema.branches, movies: schema.movies, ticket_packages: schema.ticket_packages, bookings: schema.bookings }, { page, pageSize, q, includeInactive });
+                return c.json(r);
+        } catch (err: any) {
+                return c.json({ status: 'error', message: String(err?.message || 'Internal error') }, 500);
+        }
+});
+
+// Admin: Get branch by ID
+app.get('/api/admin/branches/:id', async (c) => {
+        try {
+                const id = Number(c.req.param('id'));
+                const db = drizzle(c.env.cinema_db, { schema });
+                const branch = await getBranchImpl(db, { branches: schema.branches }, id);
+                if (!branch) return c.json({ message: 'Không tìm thấy chi nhánh' }, 404);
+                return c.json({ branch }, 200);
+        } catch (err: any) {
+                return c.json({ status: 'error', message: String(err?.message || 'Internal error') }, 500);
+        }
+});
+
+// Public: Get default branch
+app.get('/api/branches/default', async (c) => {
+        try {
+                const db = drizzle(c.env.cinema_db, { schema });
+                const branch = await getDefaultBranchImpl(db, { branches: schema.branches });
+                if (!branch) return c.json({ message: 'Không tìm thấy chi nhánh mặc định' }, 404);
+                return c.json({ branch }, 200);
+        } catch (err: any) {
+                return c.json({ status: 'error', message: String(err?.message || 'Internal error') }, 500);
+        }
+});
+
+// Public: List all active branches (for dropdown)
+app.get('/api/branches', async (c) => {
+        try {
+                const db = drizzle(c.env.cinema_db, { schema });
+                const r = await listBranchesImpl(db, { branches: schema.branches, movies: schema.movies, ticket_packages: schema.ticket_packages, bookings: schema.bookings }, { page: 1, pageSize: 100, q: '', includeInactive: false });
+                return c.json(r);
+        } catch (err: any) {
+                return c.json({ status: 'error', message: String(err?.message || 'Internal error') }, 500);
+        }
+});
+
+// Admin: Create branch
+app.post('/api/admin/branches', async (c) => {
+        try {
+                const db = drizzle(c.env.cinema_db, { schema });
+                const body = await c.req.json().catch(() => ({}));
+                const r = await createBranchImpl(db, { branches: schema.branches }, body);
+                return c.json({ status: 'success', branch: r.item });
+        } catch (err: any) {
+                return c.json({ status: 'error', message: String(err?.message || 'Internal error') }, 500);
+        }
+});
+
+// Admin: Update branch
+app.put('/api/admin/branches/:id', async (c) => {
+        try {
+                const id = Number(c.req.param('id'));
+                const db = drizzle(c.env.cinema_db, { schema });
+                const body = await c.req.json().catch(() => ({}));
+                const r = await updateBranchImpl(db, { branches: schema.branches }, id, body);
+                if (!r) return c.json({ message: 'Không tìm thấy chi nhánh' }, 404);
+                return c.json({ status: 'success', branch: r });
+        } catch (err: any) {
+                return c.json({ status: 'error', message: String(err?.message || 'Internal error') }, 500);
+        }
+});
+
+// Admin: Delete branch
+app.delete('/api/admin/branches/:id', async (c) => {
+        try {
+                const id = Number(c.req.param('id'));
+                const db = drizzle(c.env.cinema_db, { schema });
+                const r = await deleteBranchImpl(db, { branches: schema.branches, movies: schema.movies, ticket_packages: schema.ticket_packages, bookings: schema.bookings }, id);
+                if (!r) return c.json({ message: 'Không tìm thấy chi nhánh' }, 404);
+                return c.json({ status: 'success', message: 'Đã xóa chi nhánh' });
         } catch (err: any) {
                 return c.json({ status: 'error', message: String(err?.message || 'Internal error') }, 500);
         }

@@ -45,6 +45,7 @@ export const movies = sqliteTable('movies', {
         genres: text('genres'), // JSON string in SQLite
         rating: real('rating'),
         duration_min: integer('duration_min'),
+        branch_id: integer('branch_id').references(() => branches.id, { onDelete: 'restrict' }),
         created_at: text('created_at').notNull(),
         updated_at: text('updated_at').notNull(),
         is_active: integer('is_active', { mode: 'boolean' }).default(true),
@@ -65,6 +66,7 @@ export const ticket_packages = sqliteTable('ticket_packages', {
         is_member_only: integer('is_member_only', { mode: 'boolean' }).default(false),
         is_active: integer('is_active', { mode: 'boolean' }).default(true),
         display_order: integer('display_order').default(0),
+        branch_id: integer('branch_id').references(() => branches.id, { onDelete: 'restrict' }),
         created_at: text('created_at').notNull(),
         updated_at: text('updated_at').notNull()
 });
@@ -100,7 +102,8 @@ export const bookings = sqliteTable('bookings', {
         }),
         ticket_package_id: integer('ticket_package_id').references(() => ticket_packages.id),
         expiry_date: text('expiry_date'),
-        checked_in_at: text('checked_in_at')
+        checked_in_at: text('checked_in_at'),
+        branch_id: integer('branch_id').references(() => branches.id, { onDelete: 'restrict' })
 });
 
 export const toys = sqliteTable('toys', {
@@ -144,6 +147,19 @@ export const site_media = sqliteTable('site_media', {
         height: integer('height'),
         duration: real('duration'),
         display_order: integer('display_order').default(0),
+        is_active: integer('is_active', { mode: 'boolean' }).default(true),
+        created_at: text('created_at').notNull(),
+        updated_at: text('updated_at').notNull()
+});
+
+export const branches = sqliteTable('branches', {
+        id: integer('id').primaryKey({ autoIncrement: true }),
+        name: text('name').notNull(),
+        code: text('code').unique().notNull(),
+        address: text('address'),
+        phone: text('phone'),
+        email: text('email'),
+        is_default: integer('is_default', { mode: 'boolean' }).default(false),
         is_active: integer('is_active', { mode: 'boolean' }).default(true),
         created_at: text('created_at').notNull(),
         updated_at: text('updated_at').notNull()
