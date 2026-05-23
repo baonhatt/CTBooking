@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import AdminLayout from '@/admin/layouts/AdminLayout';
 import { getBranches, deleteBranchApi } from '@/lib/api/branches';
 import { toast } from 'sonner';
+import { Edit2 } from 'lucide-react';
 
 interface Branch {
         id: number;
@@ -31,6 +32,16 @@ export default function BranchesPage() {
         const [isLoading, setIsLoading] = useState(false);
         const [showActiveOnly, setShowActiveOnly] = useState(true);
         const [searchQuery, setSearchQuery] = useState('');
+        const [isCodeEditable, setIsCodeEditable] = useState(false);
+
+        const generateCode = () => {
+                const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+                let code = '';
+                for (let i = 0; i < 5; i++) {
+                        code += chars.charAt(Math.floor(Math.random() * chars.length));
+                }
+                return code;
+        };
 
         const handleRefresh = async () => {
                 setIsLoading(true);
@@ -50,7 +61,8 @@ export default function BranchesPage() {
         }, [page, showActiveOnly, searchQuery]);
 
         const openCreate = () => {
-                setEditData({ id: 0, name: '', code: '', is_default: false, is_active: true });
+                setEditData({ id: 0, name: '', code: generateCode(), is_default: false, is_active: true });
+                setIsCodeEditable(false);
                 setIsEditOpen(true);
         };
 
@@ -61,7 +73,7 @@ export default function BranchesPage() {
 
         const handleDelete = async (id: number) => {
                 if (!confirm('Bạn có chắc chắn muốn xóa chi nhánh này?')) return;
-                
+
                 try {
                         await deleteBranchApi(id);
                         toast.success('Đã xóa chi nhánh thành công');
@@ -224,6 +236,7 @@ function BranchEditModal({ isOpen, onClose, data, onSave }: any) {
                 is_active: true
         });
         const [isLoading, setIsLoading] = useState(false);
+        const [isCodeEditable, setIsCodeEditable] = useState(false);
 
         useEffect(() => {
                 if (data) {
@@ -236,6 +249,7 @@ function BranchEditModal({ isOpen, onClose, data, onSave }: any) {
                                 is_default: data.is_default || false,
                                 is_active: data.is_active ?? true
                         });
+                        setIsCodeEditable(data.id !== 0); // Allow edit for existing branches
                 }
         }, [data]);
 
@@ -245,7 +259,7 @@ function BranchEditModal({ isOpen, onClose, data, onSave }: any) {
 
                 try {
                         const { createBranchApi, updateBranchApi } = await import('@/lib/api/branches');
-                        
+
                         if (data.id === 0) {
                                 await createBranchApi(formData);
                                 toast.success('Đã tạo chi nhánh thành công');
@@ -253,7 +267,7 @@ function BranchEditModal({ isOpen, onClose, data, onSave }: any) {
                                 await updateBranchApi(data.id, formData);
                                 toast.success('Đã cập nhật chi nhánh thành công');
                         }
-                        
+
                         onSave();
                         onClose();
                 } catch (e: any) {
@@ -287,13 +301,24 @@ function BranchEditModal({ isOpen, onClose, data, onSave }: any) {
                                                 </div>
                                                 <div>
                                                         <label className="block text-sm font-medium mb-1">Mã chi nhánh *</label>
-                                                        <input
-                                                                type="text"
-                                                                value={formData.code}
-                                                                onChange={(e) => setFormData({ ...formData, code: e.target.value })}
-                                                                className="w-full px-3 py-2 border rounded"
-                                                                required
-                                                        />
+                                                        <div className="flex gap-2">
+                                                                <input
+                                                                        type="text"
+                                                                        value={formData.code}
+                                                                        onChange={(e) => setFormData({ ...formData, code: e.target.value })}
+                                                                        disabled={!isCodeEditable}
+                                                                        className={`flex-1 px-3 py-2 border rounded ${!isCodeEditable ? 'bg-gray-100 text-gray-600' : ''}`}
+                                                                        required
+                                                                />
+                                                                <button
+                                                                        type="button"
+                                                                        onClick={() => setIsCodeEditable(!isCodeEditable)}
+                                                                        className="px-3 py-2 bg-gray-200 hover:bg-gray-300 rounded"
+                                                                        title={isCodeEditable ? 'Khóa mã' : 'Sửa mã'}
+                                                                >
+                                                                        <Edit2 className="w-4 h-4" />
+                                                                </button>
+                                                        </div>
                                                 </div>
                                                 <div>
                                                         <label className="block text-sm font-medium mb-1">Địa chỉ</label>

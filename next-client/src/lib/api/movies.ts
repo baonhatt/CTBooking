@@ -26,8 +26,12 @@ export type ActiveMovieToday = {
 };
 
 /** Lấy danh sách phim đang chiếu hôm nay – ISR 5 phút */
-export async function getActiveMoviesToday(): Promise<ActiveMovieToday[]> {
-        const res = await fetch(`${API}/api/getActiveMovies`, {
+export async function getActiveMoviesToday(branchId?: number): Promise<ActiveMovieToday[]> {
+        const url = new URL(`${API}/api/getActiveMovies`);
+        if (branchId) {
+                url.searchParams.append('branch_id', String(branchId));
+        }
+        const res = await fetch(url.toString(), {
                 next: { revalidate: 300 },
                 headers: {
                         // Thêm headers để giúp SEO bot nhận diện request server-side
