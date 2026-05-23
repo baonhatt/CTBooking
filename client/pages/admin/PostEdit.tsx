@@ -9,7 +9,7 @@ import { Switch } from '@/components/ui/switch';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { ArrowLeft, Save, Eye, ChevronDown, ChevronUp, Copy, Type, Link, Calendar, Image as ImageIcon, FileText, Search, Share2, Globe, RefreshCw } from 'lucide-react';
 import { PostRichTextEditor } from '@/components/admin/content/PostRichTextEditor';
-import { getPosts, updatePostApi } from '@/lib/api';
+import { getPosts, updatePostApi, getPostById } from '@/lib/api';
 import { uploadDirectToCloudinary } from '@/lib/api/uploads';
 import { toast } from 'sonner';
 
@@ -118,8 +118,7 @@ export default function PostEditPage() {
                 if (!id) return;
                 setIsLoading(true);
                 try {
-                        const { items } = await getPosts({ page: 1, pageSize: 1 });
-                        const post = items.find((p: PostData) => p.id === parseInt(id));
+                        const { post } = await getPostById(id);
                         if (post) {
                                 setEditData(post);
                                 initialSnapshotRef.current = snapshotEditData(post);

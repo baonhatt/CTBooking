@@ -2676,6 +2676,23 @@ app.get('/api/admin/posts', async (c) => {
         }
 });
 
+// Admin: Get post by ID (any status)
+app.get('/api/admin/posts/:id', async (c) => {
+        try {
+                const id = c.req.param('id');
+                const db = drizzle(c.env.cinema_db, { schema });
+                const post = await getPostImpl(db, { posts: schema.posts }, id, false);
+                if (!post) return c.json({ message: 'Không tìm thấy bài viết' }, 404);
+                const parsed = {
+                        ...post,
+                        cover_image: parseMediaUrl(post.cover_image, c)
+                };
+                return c.json({ post: parsed }, 200);
+        } catch (err: any) {
+                return c.json({ status: 'error', message: String(err?.message || 'Internal error') }, 500);
+        }
+});
+
 // Admin: Create post
 app.post('/api/posts', async (c) => {
         try {
