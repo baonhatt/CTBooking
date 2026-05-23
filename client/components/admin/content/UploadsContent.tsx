@@ -17,6 +17,7 @@ import { toast } from 'sonner';
 import { formatDistanceToNow } from 'date-fns';
 import { vi } from 'date-fns/locale';
 import { optimizeCloudinaryUrl, getCloudinaryThumbnail } from '@/lib/utils';
+import { useAdminPermissions } from '@/lib/useAdminPermissions';
 import {
   Upload,
   FileVideo,
@@ -35,6 +36,7 @@ import {
 } from 'lucide-react';
 
 export default function UploadsContent() {
+  const { isViewer, isSuperAdmin, hasPermission } = useAdminPermissions();
   const fileRef = useRef<HTMLInputElement | null>(null);
   const [files, setFiles] = useState<File[]>([]);
   const [openConfirm, setOpenConfirm] = useState(false);
@@ -459,16 +461,18 @@ export default function UploadsContent() {
             </div>
 
             <div className="flex items-center gap-3 pt-4 border-t border-white/10">
-              <Button
-                disabled={!files.length || uploads.some((u) => u.status === 'uploading' || u.status === 'pending')}
-                onClick={checkAndPrepareUpload}
-                className="bg-blue-600 hover:bg-blue-700 h-11 px-8 rounded-xl font-bold shadow-lg shadow-blue-900/20 active:scale-95 transition-all flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                <CloudUpload className="w-5 h-5" />
-                {uploads.some((u) => u.status === 'uploading' || u.status === 'pending')
-                  ? 'Đang xử lý...'
-                  : 'Bắt đầu Upload'}
-              </Button>
+              {!isViewer && (isSuperAdmin || hasPermission('uploads.upload')) && (
+                <Button
+                  disabled={!files.length || uploads.some((u) => u.status === 'uploading' || u.status === 'pending')}
+                  onClick={checkAndPrepareUpload}
+                  className="bg-blue-600 hover:bg-blue-700 h-11 px-8 rounded-xl font-bold shadow-lg shadow-blue-900/20 active:scale-95 transition-all flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  <CloudUpload className="w-5 h-5" />
+                  {uploads.some((u) => u.status === 'uploading' || u.status === 'pending')
+                    ? 'Đang xử lý...'
+                    : 'Bắt đầu Upload'}
+                </Button>
+              )}
               <Button
                 variant="outline"
                 size="icon"
@@ -848,32 +852,34 @@ export default function UploadsContent() {
                         >
                           <ExternalLink className="w-4 h-4" />
                         </Button>
-                        <Button
-                          variant="destructive"
-                          size="sm"
-                          className="h-8 w-8 p-0 rounded-full bg-red-500/80 hover:bg-red-500 text-white backdrop-blur-md"
-                          disabled={mediaLoadingId === m.id}
-                          onClick={async () => {
-                            if (window.confirm('Bạn có chắc chắn muốn xóa media này?')) {
-                              try {
-                                setMediaLoadingId(m.id);
-                                const r = await deleteSiteMediaApi(Number(m.id));
-                                if (r.ok) {
-                                  toast.success('Đã xóa media thành công');
-                                  const { items } = await getSiteMediaApi({});
-                                  setMediaItems(items);
-                                } else throw new Error();
-                              } catch {
-                                toast.error('Xóa thất bại');
-                              } finally {
-                                setMediaLoadingId(null);
+                        {!isViewer && (isSuperAdmin || hasPermission('uploads.delete')) && (
+                          <Button
+                            variant="destructive"
+                            size="sm"
+                            className="h-8 w-8 p-0 rounded-full bg-red-500/80 hover:bg-red-500 text-white backdrop-blur-md"
+                            disabled={mediaLoadingId === m.id}
+                            onClick={async () => {
+                              if (window.confirm('Bạn có chắc chắn muốn xóa media này?')) {
+                                try {
+                                  setMediaLoadingId(m.id);
+                                  const r = await deleteSiteMediaApi(Number(m.id));
+                                  if (r.ok) {
+                                    toast.success('Đã xóa media thành công');
+                                    const { items } = await getSiteMediaApi({});
+                                    setMediaItems(items);
+                                  } else throw new Error();
+                                } catch {
+                                  toast.error('Xóa thất bại');
+                                } finally {
+                                  setMediaLoadingId(null);
+                                }
                               }
-                            }
-                          }}
-                          title="Xóa media"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </Button>
+                            }}
+                            title="Xóa media"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </Button>
+                        )}
                       </div>
                     </div>
 

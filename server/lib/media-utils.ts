@@ -20,28 +20,38 @@ export function parseMediaUrl(url: string | null | undefined, c: Context): strin
   if (!url || typeof url !== 'string') return '';
   if (!isLocal(c.req.url)) return url;
 
+  if (url.startsWith('/uploads/')) return url;
+
   // Cloudinary URL mapping
   if (url.includes('cloudinary.com')) {
     try {
       const parts = url.split('/upload/');
       if (parts.length < 2) return url;
-      
-      const rightPart = parts[1];
-      // Remove version (v1234567890/) if present
-      const versionRegex = /^v\d+\//;
-      let pathStr = rightPart.replace(versionRegex, '');
-      
-      const lowerPath = pathStr.toLowerCase();
-      const isVideo = lowerPath.includes('video') || lowerPath.endsWith('.mp4') || lowerPath.endsWith('.mov') || lowerPath.endsWith('.webm');
-      
+
+      const rightPart = parts[1].split('?')[0].split('#')[0];
+      let pathStr = rightPart;
+
+      // Prefer extracting from version segment if present: .../v123/... => take everything after v123/
+      const versionMatch = /v\d+\//.exec(rightPart);
+      if (versionMatch && typeof versionMatch.index === 'number') {
+        pathStr = rightPart.slice(versionMatch.index + versionMatch[0].length);
+      } else {
+        // Otherwise strip the first segment if it looks like transformations (contains comma)
+        const segs = rightPart.split('/').filter(Boolean);
+        if (segs.length > 1 && segs[0].includes(',')) {
+          segs.shift();
+        }
+        pathStr = segs.join('/');
+      }
+
       // Unified Logic: Just prepend /uploads/ to the pathStr (the Public ID + extension)
       // Standardize: ensure pathStr starts with 'ctbooking/'
       if (!pathStr.startsWith('ctbooking/')) {
         pathStr = `ctbooking/${pathStr}`;
       }
-      
+
       const localPath = `/uploads/${pathStr}`;
-      
+
       return localPath;
     } catch (e) {
       console.error('Error parsing Cloudinary URL:', e);
@@ -62,19 +72,21 @@ export async function localUploader(base64: string, folder: string): Promise<{ u
 
   // Check support
   if (!fs.writeFileSync || fs.writeFileSync.toString().includes('not implemented')) {
-    throw new Error('Local uploads are not supported in this environment. Please run the server in a Node.js-compatible runtime.');
+    throw new Error(
+      'Local uploads are not supported in this environment. Please run the server in a Node.js-compatible runtime.'
+    );
   }
 
   // folder format: "ctbooking/movies" or "ctbooking"
   // Requirement: Follow the Cloudinary folder structure locally
   const cleanFolder = folder.startsWith('ctbooking') ? folder : `ctbooking/${folder}`;
-  
+
   const matches = base64.match(/^data:([A-Za-z-+\/]+);base64,(.+)$/);
   if (!matches || matches.length !== 3) throw new Error('Invalid base64 string');
 
   const type = matches[1];
   const buffer = Buffer.from(matches[2], 'base64');
-  
+
   const targetDir = path.resolve(process.cwd(), 'uploads', cleanFolder);
   if (!fs.existsSync(targetDir)) fs.mkdirSync(targetDir, { recursive: true });
 

@@ -1,199 +1,175 @@
-import React, { useState } from 'react';
-import { Button } from '@/components/ui/button';
-import { useNavigate } from 'react-router-dom';
-import iconCine from '@/assets/images/iconCine.svg';
-import {
-        LayoutDashboard,
-        Users as UsersIcon,
-        Clapperboard,
-        Package,
-        FileText,
-        Ticket as TicketIcon,
-        CreditCard,
-        ScanLine,
-        LogOut,
-        Settings,
-        Mail,
-        Menu,
-        X
-} from 'lucide-react';
-import { buildUrl } from '@/lib/api/http';
+import React, { useEffect, useMemo, useState } from 'react';
+import { useNavigate, useLocation } from 'react-router-dom';
+import { Home, Users, Film, Puzzle, FileText, Ticket, Receipt, Scan, Upload, Mail, Settings, LogOut } from 'lucide-react';
+import { getAdminProfileFromStorage } from '@/lib/admin-profile-utils';
 
-interface Props {
-        active:
-        | 'dashboard'
-        | 'users'
-        | 'movies'
-        | 'toys'
-        | 'posts'
-        | 'transactions'
-        | 'tickets'
-        | 'ticket-check'
-        | 'uploads'
-        | 'email-logs'
-        | 'settings'
-        | 'branches';
-        setActive: (x: Props['active']) => void;
-        adminEmailState: string;
-        handleLogout: () => void;
-        children: React.ReactNode;
+interface AdminLayoutProps {
+  children: React.ReactNode;
+  active?: string;
+  setActive?: (active: string) => void;
+  adminEmailState?: string;
+  handleLogout?: () => void;
 }
 
-export default function AdminLayout({ active, setActive, adminEmailState, handleLogout, children }: Props) {
-        const navigate = useNavigate();
-        const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+interface NavigationItem {
+  title: string;
+  url: string;
+  icon: React.ElementType<{ className?: string }>;
+  superAdminOnly?: boolean;
+  requiredPermissions?: string[];
+}
 
-        function go(tab: Props['active']) {
-                setActive(tab);
-                setIsSidebarOpen(false); // Close sidebar on mobile when navigating
-                navigate(`/${tab === 'ticket-check' ? 'ticket-check' : tab}`);
-        }
-        const itemClass = (isActive: boolean) =>
-                `w-full justify-start gap-2 rounded-md ${isActive ? 'bg-white/10 text-white' : 'text-white/90'} hover:bg-white/10`;
+export const adminNavigationItems: NavigationItem[] = [
+  { title: 'Tổng quan', url: '/', icon: Home, requiredPermissions: ['dashboard.view', 'dashboard.stats'] },
+  { title: 'Người dùng', url: '/users', icon: Users, superAdminOnly: true },
+  {
+    title: 'Phim',
+    url: '/movies',
+    icon: Film,
+    requiredPermissions: ['movies.view', 'movies.create', 'movies.edit', 'movies.delete', 'movies.publish']
+  },
+  { title: 'Đồ chơi', url: '/toys', icon: Puzzle, requiredPermissions: ['toys.view', 'toys.create', 'toys.edit', 'toys.delete'] },
+  {
+    title: 'Bài viết',
+    url: '/posts',
+    icon: FileText,
+    requiredPermissions: ['posts.view', 'posts.create', 'posts.edit', 'posts.delete', 'posts.publish']
+  },
+  {
+    title: 'Gói vé',
+    url: '/tickets',
+    icon: Ticket,
+    requiredPermissions: ['tickets.view', 'tickets.create', 'tickets.edit', 'tickets.delete']
+  },
+  {
+    title: 'Giao dịch',
+    url: '/transactions',
+    icon: Receipt,
+    requiredPermissions: ['transactions.view', 'transactions.refund']
+  },
+  {
+    title: 'Soát vé',
+    url: '/ticket-check',
+    icon: Scan,
+    requiredPermissions: ['ticket_check.scan', 'ticket_check.validate', 'ticket_check.history']
+  },
+  { title: 'Tải lên', url: '/uploads', icon: Upload, requiredPermissions: ['uploads.view', 'uploads.upload', 'uploads.delete'] },
+  { title: 'Nhật ký email', url: '/email-logs', icon: Mail, requiredPermissions: ['email_logs.view', 'email_logs.resend'] },
+  { title: 'Cài đặt', url: '/settings', icon: Settings, requiredPermissions: ['settings.manage'] },
+];
 
-        const [hiddenTabs, setHiddenTabs] = React.useState<string[] | { hidden_tabs: string[] }>(() => {
-                const stored = localStorage.getItem('admin_sidebar_hidden_tabs');
-                if (!stored) return [];
-                const parsed = JSON.parse(stored);
-                return Array.isArray(parsed) ? parsed : (parsed?.hidden_tabs || []);
-        });
+export default function AdminLayout({ children, setActive, adminEmailState, handleLogout }: AdminLayoutProps) {
+  const navigate = useNavigate();
+  const location = useLocation();
+  const [adminRole, setAdminRole] = useState<string>(() => {
+    const profile = getAdminProfileFromStorage();
+    return profile?.role || '';
+  });
+  const [adminPermissions, setAdminPermissions] = useState<string[]>(() => {
+    const profile = getAdminProfileFromStorage();
+    return profile?.permissions || [];
+  });
 
-        // Listen for storage changes to update sidebar visibility in real-time if needed
-        React.useEffect(() => {
-                const handleStorageChange = () => {
-                        const stored = localStorage.getItem('admin_sidebar_hidden_tabs');
-                        if (!stored) {
-                                setHiddenTabs([]);
-                                return;
-                        }
-                        const parsed = JSON.parse(stored);
-                        setHiddenTabs(Array.isArray(parsed) ? parsed : (parsed?.hidden_tabs || []));
-                };
-                window.addEventListener('storage', handleStorageChange);
-                // Custom event for same-window updates
-                window.addEventListener('admin_sidebar_update', handleStorageChange);
+  useEffect(() => {
+    const onAuthChanged = () => {
+      const profile = getAdminProfileFromStorage();
+      setAdminRole(profile?.role || '');
+      setAdminPermissions(profile?.permissions || []);
+    };
+    window.addEventListener('admin-auth-changed', onAuthChanged as any);
+    window.addEventListener('storage', onAuthChanged as any);
+    return () => {
+      window.removeEventListener('admin-auth-changed', onAuthChanged as any);
+      window.removeEventListener('storage', onAuthChanged as any);
+    };
+  }, []);
 
-                // Initial sync from server if in production
-                const isProd = window.location.hostname !== 'localhost';
-                if (isProd) {
-                        fetch(buildUrl('/api/admin/settings'))
-                                .then((res) => res.json())
-                                .then((data) => {
-                                        if (data && data.settings) {
-                                                const settings = data.settings;
-                                                const hiddenTabsArray = Array.isArray(settings) ? settings : (settings?.hidden_tabs || []);
-                                                const settingsStr = JSON.stringify(hiddenTabsArray);
-                                                if (localStorage.getItem('admin_sidebar_hidden_tabs') !== settingsStr) {
-                                                        localStorage.setItem('admin_sidebar_hidden_tabs', settingsStr);
-                                                        setHiddenTabs(hiddenTabsArray);
-                                                }
-                                        }
-                                })
-                                .catch((err) => console.error('Failed to sync settings from server:', err));
-                }
+  useEffect(() => {
+    if (!setActive) return;
+    const item = adminNavigationItems.find(
+      (i) => location.pathname === i.url || (i.url !== '/' && location.pathname.startsWith(i.url))
+    );
+    setActive(item?.title || 'Dashboard');
+  }, [location.pathname, setActive, adminNavigationItems]);
 
-                return () => {
-                        window.removeEventListener('storage', handleStorageChange);
-                        window.removeEventListener('admin_sidebar_update', handleStorageChange);
-                };
-        }, []);
+  const adminPermissionsSet = useMemo(() => new Set(adminPermissions), [adminPermissions]);
 
-        const menu = [
-                { key: 'dashboard' as const, label: 'Bảng điều khiển', icon: <LayoutDashboard className="h-4 w-4" /> },
-                { key: 'users' as const, label: 'Người dùng', icon: <UsersIcon className="h-4 w-4" /> },
-                { key: 'movies' as const, label: 'Phim', icon: <Clapperboard className="h-4 w-4" /> },
-                { key: 'toys' as const, label: 'Đồ chơi', icon: <Package className="h-4 w-4" /> },
-                { key: 'posts' as const, label: 'Bài viết', icon: <FileText className="h-4 w-4" /> },
-                { key: 'tickets' as const, label: 'Gói vé', icon: <TicketIcon className="h-4 w-4" /> },
-                { key: 'transactions' as const, label: 'Giao dịch', icon: <CreditCard className="h-4 w-4" /> },
-                { key: 'ticket-check' as const, label: 'Kiểm Tra Vé', icon: <ScanLine className="h-4 w-4" /> },
-                { key: 'branches' as const, label: 'Chi nhánh', icon: <Settings className="h-4 w-4" /> },
-                { key: 'uploads' as const, label: 'Uploads', icon: <Clapperboard className="h-4 w-4" /> },
-                { key: 'email-logs' as const, label: 'Email Logs', icon: <Mail className="h-4 w-4" /> }
-        ].filter((item) => {
-                const hiddenTabsArray = Array.isArray(hiddenTabs) ? hiddenTabs : (hiddenTabs?.hidden_tabs || []);
-                return !hiddenTabsArray.includes(item.key);
-        });
+  const filteredNavItems = useMemo(() => {
+    return adminNavigationItems.filter((item) => {
+      if (adminRole === 'super_admin') return true;
+      if (item.superAdminOnly) return false;
 
-        return (
-                <div className="min-h-screen flex md:grid md:grid-cols-[260px_1fr] flex-col md:flex-row relative">
-                        {/* Mobile Overlay */}
-                        {isSidebarOpen && (
-                                <div
-                                        className="fixed inset-0 bg-black/60 z-40 md:hidden"
-                                        onClick={() => setIsSidebarOpen(false)}
-                                />
-                        )}
+      const required = item.requiredPermissions;
+      if (!required || required.length === 0) return true;
+      return required.some((p) => adminPermissionsSet.has(p));
+    });
+  }, [adminRole, adminPermissionsSet]);
 
-                        {/* Sidebar */}
-                        <aside
-                                className={`fixed inset-y-0 left-0 z-50 w-[260px] transform transition-transform duration-300 ease-in-out md:relative md:translate-x-0
-        ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'}
-        bg-gradient-to-b from-[#0e1b3d] to-[#15325f] border-r border-white/10 p-4 text-white flex flex-col justify-between h-screen overflow-y-auto
-      `}>
-                                <div>
-                                        <div className="flex flex-col mb-4 px-1 gap-1 relative">
-                                                {/* Mobile close button */}
-                                                <button
-                                                        className="absolute top-0 right-0 p-1 md:hidden text-white/70 hover:text-white"
-                                                        onClick={() => setIsSidebarOpen(false)}
-                                                >
-                                                        <X className="h-5 w-5" />
-                                                </button>
-                                                <div className="flex items-center gap-3">
-                                                        <img src={iconCine} alt="CINESPHERE" className="h-10 w-auto" />
-                                                        <div className="font-bold tracking-widest text-sm">CINESPHERE</div>
-                                                </div>
-                                                <div className="text-[10px] font-bold uppercase tracking-widest text-white/40 mb-2 mt-2">
-                                                        {adminEmailState}
-                                                </div>
-                                        </div>
+  const currentTitle = adminNavigationItems.find((item) =>
+    location.pathname === item.url ||
+    (item.url !== '/' && location.pathname.startsWith(item.url))
+  )?.title || 'Admin Dashboard';
 
-                                        <div className="space-y-1">
-                                                {menu.map((item) => (
-                                                        <Button
-                                                                key={item.key}
-                                                                variant="ghost"
-                                                                onClick={() => go(item.key)}
-                                                                className={itemClass(active === item.key)}
-                                                        >
-                                                                {item.icon} {item.label}
-                                                        </Button>
-                                                ))}
-                                        </div>
-                                </div>
+  return (
+    <div className="h-screen flex flex-col bg-gray-50 overflow-hidden">
+      <header className="h-14 bg-white border-b shadow-sm shrink-0 flex">
+        <div className="w-60 border-r flex items-center px-4 font-semibold text-gray-900 shrink-0">
+          Quản trị hệ thống
+        </div>
+        <div className="flex-1 flex items-center px-6 min-w-0">
+          <h1 className="text-lg font-semibold text-gray-900 truncate">{currentTitle}</h1>
+          <div className="flex-1" />
+          {adminEmailState && <span className="text-sm text-gray-600 truncate max-w-[320px]">{adminEmailState}</span>}
+        </div>
+      </header>
 
-                                <div className="space-y-2 mt-auto pt-8 border-t border-white/5">
-                                        <Button variant="ghost" onClick={() => go('settings')} className={itemClass(active === 'settings')}>
-                                                <Settings className="h-4 w-4" /> Cấu hình
-                                        </Button>
-                                        <Button
-                                                variant="destructive"
-                                                onClick={handleLogout}
-                                                className="w-full justify-start gap-2 bg-rose-500/10 hover:bg-rose-500 text-rose-500 hover:text-white border border-rose-500/20 transition-all duration-300 rounded-md px-3"
-                                        >
-                                                <LogOut className="h-4 w-4" /> Đăng xuất
-                                        </Button>
-                                </div>
-                        </aside>
+      <div className="flex flex-1 overflow-hidden">
+        <aside className="w-60 bg-white border-r flex flex-col overflow-hidden shrink-0">
+          <nav className="flex-1 p-2 overflow-y-auto">
+            <ul className="space-y-1">
+              {filteredNavItems.map((item) => {
+                const Icon = item.icon;
+                const isActive = location.pathname === item.url ||
+                  (item.url !== '/' && location.pathname.startsWith(item.url));
+                return (
+                  <li key={item.title}>
+                    <button
+                      onClick={() => navigate(item.url)}
+                      className={`w-full flex items-center gap-2 px-3 py-2 rounded text-left text-sm transition-colors border-l-4 ${
+                        isActive
+                          ? 'bg-blue-50 font-semibold text-blue-800 border-blue-600'
+                          : 'text-gray-700 hover:bg-gray-50 border-transparent'
+                      }`}
+                    >
+                      <Icon className="h-4 w-4" />
+                      <span className="truncate">{item.title}</span>
+                    </button>
+                  </li>
+                );
+              })}
+            </ul>
+          </nav>
 
-                        <main className="flex-1 bg-[#f8fafc] md:overflow-y-auto h-screen flex flex-col">
-                                {/* Toggle Bar / Header for Mobile */}
-                                <div className="lg:hidden md:hidden w-full bg-white border-b border-gray-200 p-4 flex items-center justify-between sticky top-0 z-30 shadow-sm">
-                                        <div className="flex items-center gap-3">
-                                                <Button variant="ghost" size="icon" onClick={() => setIsSidebarOpen(true)}>
-                                                        <Menu className="h-6 w-6 text-gray-700" />
-                                                </Button>
-                                                <span className="font-bold text-gray-800">Admin Dashboard</span>
-                                        </div>
-                                        <img src={iconCine} alt="Logo" className="h-8 w-auto filter invert brightness-0" />
-                                </div>
+          <div className="p-4 border-t mt-auto shrink-0">
+            {adminEmailState && (
+              <div className="text-xs text-gray-500 mb-2 truncate" title={adminEmailState}>
+                {adminEmailState}
+              </div>
+            )}
+            {handleLogout && (
+              <button
+                onClick={handleLogout}
+                className="w-full flex items-center gap-2 text-sm text-red-600 hover:text-red-800 hover:bg-red-50 px-3 py-2 rounded"
+              >
+                <LogOut className="h-4 w-4" />
+                <span>Đăng xuất</span>
+              </button>
+            )}
+          </div>
+        </aside>
 
-                                {/* Content area */}
-                                <div className="p-4 md:p-6 overflow-y-auto flex-1">
-                                        {children}
-                                </div>
-                        </main>
-                </div>
-        );
+        <main className="flex-1 p-6 overflow-auto min-w-0">{children}</main>
+      </div>
+    </div>
+  );
 }

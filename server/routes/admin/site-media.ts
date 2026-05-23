@@ -45,15 +45,11 @@ export async function createSiteMediaImpl(
 
   if (existing) {
     // Upsert: Update existing
-    return updateSiteMediaImpl(
-      anyDb,
-      tables,
-      {
-        ...args,
-        id: existing.id,
-        duration: args.duration !== undefined ? Number(args.duration) : undefined
-      }
-    );
+    return updateSiteMediaImpl(anyDb, tables, {
+      ...args,
+      id: existing.id,
+      duration: args.duration !== undefined ? Number(args.duration) : undefined
+    });
   }
 
   // 2. Insert new

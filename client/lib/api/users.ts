@@ -1,86 +1,56 @@
 import { request } from './http';
 
-export async function getUsers(options?: { page?: number; pageSize?: number; q?: string; signal?: AbortSignal }) {
+export async function getUsers(options?: { page?: number; pageSize?: number; q?: string }) {
   const params = new URLSearchParams();
   if (options?.page) params.set('page', String(options.page));
   if (options?.pageSize) params.set('pageSize', String(options.pageSize));
   if (options?.q) params.set('q', options.q);
+
   const path = `/api/admin/users${params.toString() ? `?${params.toString()}` : ''}`;
   return request<{
-    items: any[];
-    page: number;
-    pageSize: number;
+    data: any[];
     total: number;
-  }>(path, { signal: options?.signal });
+  }>(path);
 }
 
-export async function getUserById(id: number) {
+export async function getUserById(id: string | number) {
   return request<{
     id: number;
-    fullname: string;
-    phone: string;
+    name: string;
     email: string;
-    avatar: string | null;
+    role: string;
     is_active: boolean;
-    login_type: string;
-    account_created_at: string;
-    user_created_at: string;
-    user_updated_at: string;
-    recent_bookings: Array<{
-      id: number;
-      movie_title: string;
-      ticket_count: number;
-      total_price: number;
-      payment_method: string;
-      payment_status: string;
-      created_at: string;
-    }>;
-    total_bookings: number;
+    permissions: string[];
+    permissions_count?: number;
+    created_at: string;
   }>(`/api/admin/users/${id}`);
 }
 
-export async function updateUserProfileApi(body: {
+export async function createAdminUser(data: {
+  name: string;
   email: string;
-  name?: string;
-  phone?: string;
-  gender?: string;
-  dob?: string;
+  password: string;
+  role: string;
+  permissions: string[];
 }) {
-  return request<{ ok: boolean; user: any }>(`/api/users-profile`, {
+  return request('/api/admin/users', {
     method: 'POST',
-    body: JSON.stringify(body)
+    body: JSON.stringify(data)
   });
 }
 
-export async function changePasswordApi(body: { email: string; oldPassword: string; newPassword: string }) {
-  return request<{ ok: boolean }>(`/api/users/password`, {
-    method: 'POST',
-    body: JSON.stringify(body)
-  });
-}
-
-export async function getUserTransactionsApi(options: { email: string; status?: 'paid'; signal?: AbortSignal }) {
-  const params = new URLSearchParams();
-  params.set('email', options.email);
-  if (options.status) params.set('status', options.status);
-  const path = `/api/usersprofile/transactions?${params.toString()}`;
-  return request<{ items: any[] }>(path, { signal: options.signal });
-}
-
-export async function getUserProfileByEmailApi(email: string) {
-  const params = new URLSearchParams();
-  params.set('email', email);
-  return request<{
-    id?: number;
-    fullname?: string;
-    phone?: string;
-    gender?: string | null;
-    dob?: string | null;
-    email: string;
+export async function updateAdminUser(
+  id: string | number,
+  data: {
+    name?: string;
+    email?: string;
+    role?: string;
     is_active?: boolean;
-    login_type?: string;
-    user_created_at?: string | null;
-    user_updated_at?: string | null;
-    account_created_at?: string | null;
-  }>(`/api/users-profile?${params.toString()}`);
+    permissions?: string[];
+  }
+) {
+  return request(`/api/admin/users/${id}`, {
+    method: 'PUT',
+    body: JSON.stringify(data)
+  });
 }

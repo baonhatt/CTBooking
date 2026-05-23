@@ -7,6 +7,14 @@ export async function adminLoginApi(body: { email: string; password: string }) {
         });
 }
 
+export async function getAdminMe() {
+  return request<{ id: number; name: string; email: string; role: string; permissions: string[] }>('/api/admin/me');
+}
+
+export async function getAdminPermissions() {
+  return request<Record<string, Array<{ key: string; name: string }>>>('/api/admin/permissions');
+}
+
 export async function getAdminRevenue(options?: {
         from?: string;
         to?: string;

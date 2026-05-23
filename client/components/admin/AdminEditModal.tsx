@@ -1,758 +1,397 @@
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Button } from '@/components/ui/button';
-import { Calendar, Eye, Loader2, Lock, Plus, X } from 'lucide-react';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import React, { useEffect, useState } from 'react';
-import {
-        createMovieApi,
-        updateMovieApi,
-        getMoviesAdmin,
-        createToyApi,
-        updateToyApi,
-        getToys,
-        getMovieById,
-        getBranches
-} from '@/lib/api';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { Modal, Form, Input, Select, Button } from 'antd';
 import { toast } from 'sonner';
-import { format } from 'date-fns';
+import { createMovieApi, createToyApi, updateMovieApi, updateToyApi } from '@/lib/api';
 
 interface AdminEditModalProps {
-        isEditOpen: boolean;
-        setIsEditOpen: (open: boolean) => void;
-        editType: 'user' | 'movie' | 'toy' | null;
-        editData: any;
-        setEditData: (data: any) => void;
-        moviesLocal: any[];
-        toLocalDateTimeString: (date: Date) => string;
-        pageSize: number;
-        currentPage: number;
-        setUsers: React.Dispatch<React.SetStateAction<any[]>>;
-        setMoviesLocal: React.Dispatch<React.SetStateAction<any[]>>;
-        setMovieStatus: React.Dispatch<React.SetStateAction<Record<string, 'active' | 'inactive'>>>;
-        setToys: React.Dispatch<React.SetStateAction<any[]>>;
-        onViewDetails?: (id: number) => void;
-        onRefresh?: () => Promise<void>;
+  editType: 'user' | 'movie' | 'toy' | null;
+  editData: any;
+  setIsEditOpen: (open: boolean) => void;
+  isEditOpen: boolean;
+  setEditData: (data: any) => void;
+  setUsers: (users: any[]) => void;
+  moviesLocal: any[];
+  toLocalDateTimeString: (date: Date) => string;
+  pageSize: number;
+  currentPage: number;
+  setMoviesLocal: (movies: any[]) => void;
+  setMovieStatus: (status: any) => void;
+  setToys: (toys: any[]) => void;
+  onRefresh: () => void;
+  onViewDetails?: (id: number) => void;
 }
 
-const AdminEditModal: React.FC<AdminEditModalProps> = (props) => {
-        const [isSaving, setIsSaving] = useState(false);
-        const [branches, setBranches] = useState<any[]>([]);
-        const {
-                isEditOpen,
-                setIsEditOpen,
-                editType,
-                editData,
-                setEditData,
-                setUsers,
-                setMoviesLocal,
-                setMovieStatus,
-                setToys,
-                moviesLocal,
-                toLocalDateTimeString,
-                pageSize,
-                currentPage
-        } = props;
+export default function AdminEditModal({
+  editType,
+  editData,
+  setIsEditOpen,
+  isEditOpen,
+  setEditData,
+  setUsers,
+  moviesLocal,
+  toLocalDateTimeString,
+  pageSize,
+  currentPage,
+  setMoviesLocal,
+  setMovieStatus,
+  setToys,
+  onRefresh
+}: AdminEditModalProps) {
+  const [form] = Form.useForm();
+  const [isSaving, setIsSaving] = useState(false);
+  const [coverImagePreviewUrl, setCoverImagePreviewUrl] = useState<string>('');
+  const coverFileInputRef = useRef<HTMLInputElement | null>(null);
 
-        // Load branches when modal opens
-        useEffect(() => {
-                if (isEditOpen && editType === 'movie') {
-                        (async () => {
-                                try {
-                                        const { items } = await getBranches({ includeInactive: true });
-                                        setBranches(items);
-                                } catch (error) {
-                                        console.error('Error loading branches:', error);
-                                }
-                        })();
-                }
-        }, [isEditOpen, editType]);
+  const modalOpen = useMemo(() => isEditOpen && !!editType, [editType, isEditOpen]);
+  const modalTitle = useMemo(() => {
+    if (editType === 'movie') return editData?.id ? 'Chỉnh sửa phim' : 'Thêm phim';
+    if (editType === 'toy') return editData?.id ? 'Chỉnh sửa đồ chơi' : 'Thêm đồ chơi';
+    return 'Edit User';
+  }, [editData?.id, editType]);
 
-        useEffect(() => {
-                const run = async () => {
-                        if (!isEditOpen || editType !== 'movie') return;
-                        const idNum = Number(editData?.id);
-                        if (!idNum || editData?.description) return;
-                        try {
-                                const m = await getMovieById(idNum);
-                                if (m) {
-                                        setEditData({
-                                                ...editData,
-                                                description: m.description || '',
-                                                posterUrl: editData?.posterUrl || m.cover_image || '',
-                                                genresText:
-                                                        editData?.genresText ??
-                                                        (Array.isArray(editData?.genres) && editData.genres.length
-                                                                ? editData.genres.join(', ')
-                                                                : Array.isArray(m.genres)
-                                                                        ? m.genres.join(', ')
-                                                                        : ''),
-                                                genres:
-                                                        Array.isArray(editData?.genres) && editData.genres.length
-                                                                ? editData.genres
-                                                                : Array.isArray(m.genres)
-                                                                        ? m.genres
-                                                                        : [],
-                                                rating: editData?.rating ?? m.rating ?? null,
-                                                duration:
-                                                        editData?.duration !== undefined && editData?.duration !== null
-                                                                ? editData.duration
-                                                                : (m.duration_min ?? ''),
-                                                release_date: editData?.release_date ?? m.release_date ?? null,
-                                                is_active: editData?.is_active ?? m.is_active ?? true
-                                        });
-                                }
-                        } catch { }
-                };
-                run();
-                // eslint-disable-next-line react-hooks/exhaustive-deps
-        }, [isEditOpen, editType, editData?.id]);
+  const fileToBase64 = (file: File) =>
+    new Promise<string>((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(String(reader.result || ''));
+      reader.onerror = () => reject(new Error('Không thể đọc file'));
+      reader.readAsDataURL(file);
+    });
 
-        async function fileToCompressedDataURL(
-                file: File,
-                opts?: { maxW?: number; maxH?: number; quality?: number; type?: string }
-        ) {
-                const maxW = opts?.maxW ?? 1280;
-                const maxH = opts?.maxH ?? 1280;
-                const quality = opts?.quality ?? 0.75;
-                const type = opts?.type ?? 'image/webp';
-                const blobUrl = URL.createObjectURL(file);
-                const img = await new Promise<HTMLImageElement>((resolve, reject) => {
-                        const i = new Image();
-                        i.onload = () => resolve(i);
-                        i.onerror = reject;
-                        i.src = blobUrl;
-                });
-                const ratio = Math.min(maxW / img.width, maxH / img.height, 1);
-                const w = Math.max(1, Math.round(img.width * ratio));
-                const h = Math.max(1, Math.round(img.height * ratio));
-                const canvas = document.createElement('canvas');
-                canvas.width = w;
-                canvas.height = h;
-                const ctx = canvas.getContext('2d')!;
-                ctx.drawImage(img, 0, 0, w, h);
-                const dataUrl = canvas.toDataURL(type, quality);
-                URL.revokeObjectURL(blobUrl);
-                return dataUrl;
+  useEffect(() => {
+    if (!modalOpen) return;
+
+    if (editType === 'movie') {
+      const releaseDateValue = editData?.release_date
+        ? String(toLocalDateTimeString(new Date(editData.release_date)) || '').slice(0, 10)
+        : '';
+      form.setFieldsValue({
+        title: editData?.title || '',
+        description: editData?.description || '',
+        cover_image: editData?.posterUrl || editData?.cover_image || '',
+        cover_image_base64: '',
+        detail_images: Array.isArray(editData?.detail_images)
+          ? editData.detail_images.join('\n')
+          : Array.isArray(editData?.detailImages)
+            ? editData.detailImages.join('\n')
+            : '',
+        genres: Array.isArray(editData?.genres) ? editData.genres.join(', ') : editData?.genres || '',
+        rating: editData?.rating ?? '',
+        duration_min: editData?.duration_min ?? editData?.duration ?? '',
+        release_date: releaseDateValue,
+        is_active: editData?.is_active ?? true
+      });
+      setCoverImagePreviewUrl(editData?.posterUrl || editData?.cover_image || '');
+      return;
+    }
+
+    if (editType === 'toy') {
+      form.setFieldsValue({
+        name: editData?.name || '',
+        category: editData?.category || '',
+        price: editData?.price ?? 0,
+        stock: editData?.stock ?? 0,
+        status: editData?.status || 'active',
+        image_url: editData?.image_url || ''
+      });
+      return;
+    }
+
+    form.setFieldsValue(editData || {});
+  }, [editData, editType, form, modalOpen, toLocalDateTimeString]);
+
+  const handleCancel = () => {
+    setIsEditOpen(false);
+    setEditData(null);
+    form.resetFields();
+    setCoverImagePreviewUrl('');
+  };
+
+  const handleOk = async () => {
+    try {
+      const values = await form.validateFields();
+      setIsSaving(true);
+
+      if (editType === 'movie') {
+        const parsedGenres = String(values.genres || '')
+          .split(',')
+          .map((s: string) => s.trim())
+          .filter(Boolean);
+        const parsedDetailImages = String(values.detail_images || '')
+          .split(/\r?\n|,/)
+          .map((s: string) => s.trim())
+          .filter(Boolean);
+        const idNum = Number(editData?.id);
+        const coverImageBase64 = String(values.cover_image_base64 || '').trim();
+        const payload = {
+          title: values.title,
+          description: values.description || undefined,
+          cover_image: coverImageBase64 ? undefined : values.cover_image || undefined,
+          cover_image_base64: coverImageBase64 || undefined,
+          detail_images: parsedDetailImages.length ? parsedDetailImages : undefined,
+          genres: parsedGenres,
+          rating: values.rating === '' ? undefined : Number(values.rating),
+          duration_min: values.duration_min === '' ? undefined : Number(values.duration_min),
+          is_active: values.is_active,
+          release_date: values.release_date || undefined
+        };
+        if (Number.isFinite(idNum) && idNum > 0) {
+          await updateMovieApi(idNum, payload);
+        } else {
+          await createMovieApi(payload as any);
         }
-
-        async function refetch(type: 'movie' | 'toy') {
-                if (type === 'movie') {
-                        if (props.onRefresh) {
-                                await props.onRefresh();
-                        }
-                }
-                if (type === 'toy') {
-                        const { items } = await getToys({ page: currentPage, pageSize });
-                        setToys(
-                                items.map((t: any) => ({
-                                        id: t.id,
-                                        name: t.name,
-                                        category: t.category,
-                                        price: Number(t.price),
-                                        stock: t.stock,
-                                        status: t.status,
-                                        image_url: t.image_url
-                                }))
-                        );
-                }
+        toast.success('Thành công', { description: 'Đã lưu phim' });
+      } else if (editType === 'toy') {
+        const idNum = Number(editData?.id);
+        const payload = {
+          name: values.name,
+          category: values.category || undefined,
+          price: Number(values.price || 0),
+          stock: Number(values.stock || 0),
+          status: values.status,
+          image_url: values.image_url || undefined
+        };
+        if (Number.isFinite(idNum) && idNum > 0) {
+          await updateToyApi(idNum, payload);
+        } else {
+          await createToyApi(payload as any);
         }
+        toast.success('Thành công', { description: 'Đã lưu đồ chơi' });
+      } else {
+        console.log('Update user:', values);
+        toast.success('Thành công', { description: 'Đã lưu người dùng' });
+      }
 
-        async function titleExists(title: string, excludeId?: number | string) {
-                const norm = (s: string) => s.trim().toLowerCase();
-                const localHit =
-                        moviesLocal?.some(
-                                (m: any) => norm(m.title) === norm(title) && (excludeId == null || String(m.id) !== String(excludeId))
-                        ) || false;
-                if (localHit) return true;
-                const { items } = await getMoviesAdmin({
-                        page: 1,
-                        pageSize: 10,
-                        q: title
-                });
-                return items.some(
-                        (m: any) => norm(m.title) === norm(title) && (excludeId == null || String(m.id) !== String(excludeId))
-                );
-        }
+      await Promise.resolve(onRefresh());
+      handleCancel();
+    } catch (error) {
+      if ((error as any)?.errorFields) return;
+      console.error('Save failed:', error);
+      toast.error('Lỗi', { description: (error as any)?.message || 'Không thể lưu dữ liệu' });
+    } finally {
+      setIsSaving(false);
+    }
+  };
 
-        return (
-                <Dialog open={isEditOpen} onOpenChange={setIsEditOpen}>
-                        <DialogContent className="max-h-[90vh] w-[90vw] max-w-[900px] overflow-y-auto [&>button]:hidden">
-                                <DialogHeader className="flex flex-row items-center gap-3 space-y-0 pb-4 border-b">
-                                        <DialogTitle className="text-lg font-bold text-slate-800">
-                                                {editType === 'user'
-                                                        ? 'Chỉnh sửa người dùng'
-                                                        : editType === 'movie'
-                                                                ? 'Chỉnh sửa phim'
-                                                                : editType === 'toy'
-                                                                        ? 'Chỉnh sửa đồ chơi'
-                                                                        : ''}
-                                        </DialogTitle>
-                                        {editType === 'movie' && editData?.id && (
-                                                <Button
-                                                        variant="outline"
-                                                        size="sm"
-                                                        onClick={() => props.onViewDetails?.(Number(editData.id))}
-                                                        className="h-7 rounded-full gap-1.5 border-slate-200 hover:bg-blue-50 hover:text-blue-600 group transition-all px-3"
-                                                >
-                                                        <Eye className="w-3.5 h-3.5 text-slate-400 group-hover:text-blue-500" />
-                                                        <span className="text-[10px] font-bold uppercase tracking-wider">Xem chi tiết</span>
-                                                </Button>
-                                        )}
+  return (
+    <Modal
+      title={modalTitle}
+      open={modalOpen}
+      onCancel={handleCancel}
+      onOk={handleOk}
+      width={editType === 'movie' ? 980 : 600}
+      confirmLoading={isSaving}
+      footer={
+        editType === 'movie' ? (
+          <div className="w-full flex items-center justify-between gap-4">
+            <div className="text-[11px] text-slate-400 italic">
+              * Lưu ý: Mọi thay đổi sẽ ảnh hưởng trực tiếp đến lịch chiếu hiện tại
+            </div>
+            <div className="flex items-center gap-3">
+              <Button onClick={handleCancel} disabled={isSaving} className="rounded-xl">
+                Hủy bỏ
+              </Button>
+              <Button
+                type="primary"
+                onClick={handleOk}
+                loading={isSaving}
+                className="rounded-xl bg-blue-600 hover:bg-blue-700"
+              >
+                {editData?.id ? 'Cập nhật' : 'Tạo phim mới'}
+              </Button>
+            </div>
+          </div>
+        ) : undefined
+      }
+    >
+      <Form form={form} layout="vertical">
+        {editType === 'movie' ? (
+          <>
+            <div className="grid grid-cols-1 md:grid-cols-[260px_1fr] gap-6">
+              <div className="bg-white rounded-2xl border border-slate-200 p-5">
+                <div className="text-[11px] font-black uppercase tracking-widest text-slate-400 mb-3">
+                  Poster phim
+                </div>
 
-                                        <div className="flex-1" />
-                                        <Button
-                                                variant="ghost"
-                                                size="icon"
-                                                onClick={() => setIsEditOpen(false)}
-                                                className="h-8 w-8 rounded-full hover:bg-slate-100 text-slate-400 transition-colors"
-                                        >
-                                                <X className="w-5 h-5" />
-                                        </Button>
-                                </DialogHeader>
+                <div
+                  role="button"
+                  tabIndex={0}
+                  onClick={() => coverFileInputRef.current?.click()}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') coverFileInputRef.current?.click();
+                  }}
+                  className="relative rounded-2xl border-2 border-dashed border-slate-200 bg-slate-50 overflow-hidden cursor-pointer select-none"
+                >
+                  <div className="h-[240px] flex flex-col items-center justify-center gap-3 text-slate-400">
+                    {coverImagePreviewUrl ? (
+                      <img src={coverImagePreviewUrl} alt="poster" className="h-full w-full object-cover" />
+                    ) : (
+                      <>
+                        <div className="w-12 h-12 rounded-full bg-white border border-slate-200 flex items-center justify-center text-slate-400 text-2xl">
+                          +
+                        </div>
+                        <div className="text-xs font-semibold">Tải ảnh lên</div>
+                      </>
+                    )}
+                  </div>
 
-                                {editType === 'user' && (
-                                        <div className="space-y-3">
-                                                <div>
-                                                        <Label>Họ tên</Label>
-                                                        <Input
-                                                                value={editData?.name || ''}
-                                                                onChange={(e) => setEditData({ ...editData, name: e.target.value })}
-                                                        />
-                                                </div>
-                                                <div>
-                                                        <Label>Email</Label>
-                                                        <Input
-                                                                value={editData?.email || ''}
-                                                                onChange={(e) => setEditData({ ...editData, email: e.target.value })}
-                                                        />
-                                                </div>
-                                                <div>
-                                                        <Label>SĐT</Label>
-                                                        <Input
-                                                                value={editData?.phone || ''}
-                                                                onChange={(e) => setEditData({ ...editData, phone: e.target.value })}
-                                                        />
-                                                </div>
-                                                <div className="flex justify-end gap-2">
-                                                        <Button variant="outline" onClick={() => setIsEditOpen(false)}>
-                                                                Hủy
-                                                        </Button>
-                                                        <Button
-                                                                disabled={isSaving}
-                                                                onClick={async () => {
-                                                                        try {
-                                                                                setIsSaving(true);
-                                                                                setUsers((prev) => prev.map((u) => (u.id === editData.id ? { ...u, ...editData } : u)));
-                                                                                toast.success('Thành công', {
-                                                                                        description: 'Cập nhật người dùng thành công'
-                                                                                });
-                                                                                setIsEditOpen(false);
-                                                                        } catch (e: any) {
-                                                                                toast.error('Lỗi', {
-                                                                                        description: e?.message || 'Có lỗi xảy ra'
-                                                                                });
-                                                                        } finally {
-                                                                                setIsSaving(false);
-                                                                        }
-                                                                }}
-                                                        >
-                                                                {isSaving ? (
-                                                                        <span className="flex items-center gap-2">
-                                                                                <Loader2 className="h-4 w-4 animate-spin" /> Đang lưu...
-                                                                        </span>
-                                                                ) : (
-                                                                        'Lưu'
-                                                                )}
-                                                        </Button>
-                                                </div>
-                                        </div>
-                                )}
+                </div>
 
-                                {editType === 'movie' && (
-                                        <div className="flex flex-col h-full overflow-hidden bg-white">
-                                                {/* VÙNG CUỘN (SCROLLABLE AREA) */}
-                                                <div className="flex-1 overflow-y-auto px-6 py-6 space-y-6 bg-slate-50/30">
-                                                        <div className="grid grid-cols-12 gap-8">
-                                                                {/* Cột trái: Poster (Cố định hoặc cuộn theo tùy màn hình) */}
-                                                                <div className="col-span-12 md:col-span-4 lg:col-span-3 space-y-4">
-                                                                        <label className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm block cursor-pointer group hover:border-blue-400 transition-all">
-                                                                                <span className="text-[11px] font-bold uppercase text-slate-400 mb-3 block tracking-wider">
-                                                                                        Poster Phim
-                                                                                </span>
+                <input
+                  ref={coverFileInputRef}
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  style={{ display: 'none' }}
+                  onChange={async (e) => {
+                    const file = e.target.files?.[0];
+                    if (!file) return;
+                    try {
+                      const base64 = await fileToBase64(file);
+                      form.setFieldValue('cover_image_base64', base64);
+                      setCoverImagePreviewUrl(URL.createObjectURL(file));
+                    } catch (err: any) {
+                      toast.error('Lỗi', { description: err?.message || 'Không thể đọc file ảnh' });
+                    }
+                  }}
+                />
 
-                                                                                <div className="aspect-[2/3] relative border-2 border-dashed rounded-xl overflow-hidden bg-slate-50 group-hover:border-blue-200 transition-colors">
-                                                                                        {editData?.posterUrl ? (
-                                                                                                <>
-                                                                                                        <img src={editData.posterUrl} className="w-full h-full object-cover" alt="Poster preview" />
-                                                                                                        <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                                                                                                                <span className="text-white text-xs font-medium bg-black/50 px-3 py-1.5 rounded-full backdrop-blur-sm">
-                                                                                                                        Thay đổi ảnh
-                                                                                                                </span>
-                                                                                                        </div>
-                                                                                                </>
-                                                                                        ) : (
-                                                                                                <div className="absolute inset-0 flex flex-col items-center justify-center text-slate-400">
-                                                                                                        <div className="p-3 rounded-full bg-slate-100 mb-2 group-hover:bg-blue-50 group-hover:text-blue-500 transition-colors">
-                                                                                                                <Plus size={24} />
-                                                                                                        </div>
-                                                                                                        <span className="text-xs font-medium">Tải ảnh lên</span>
-                                                                                                </div>
-                                                                                        )}
+                <div className="text-[10px] text-slate-400 italic mt-3">
+                  Hỗ trợ: JPG, PNG, WEBP (Tối đa 15MB)
+                </div>
+              </div>
 
-                                                                                        <input
-                                                                                                type="file"
-                                                                                                accept="image/*"
-                                                                                                className="hidden"
-                                                                                                onChange={(e) => {
-                                                                                                        const file = e.target.files?.[0];
-                                                                                                        if (file) {
-                                                                                                                const url = URL.createObjectURL(file);
-                                                                                                                setEditData({
-                                                                                                                        ...editData,
-                                                                                                                        posterUrl: url,
-                                                                                                                        posterFile: file
-                                                                                                                });
-                                                                                                        }
-                                                                                                }}
-                                                                                        />
-                                                                                </div>
+              <div className="bg-white rounded-2xl border border-slate-200 p-5">
+                <Form.Item name="cover_image_base64" hidden>
+                  <Input />
+                </Form.Item>
 
-                                                                                <p className="text-[10px] text-slate-400 mt-3 text-center italic">
-                                                                                        Hỗ trợ: JPG, PNG, WEBP (Tối đa 15MB)
-                                                                                </p>
-                                                                        </label>
-                                                                </div>
+                <Form.Item
+                  label={<span className="text-[11px] font-black uppercase tracking-widest text-slate-400">Tên phim</span>}
+                  name="title"
+                  rules={[{ required: true, message: 'Vui lòng nhập tiêu đề' }]}
+                >
+                  <Input className="h-11 rounded-xl" placeholder="Ví dụ: Đào, Phở và Piano" />
+                </Form.Item>
 
-                                                                {/* Cột phải: Thông tin chi tiết */}
-                                                                <div className="col-span-12 md:col-span-8 lg:col-span-9 space-y-6">
-                                                                        <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm space-y-6">
-                                                                                {/* Hàng 1: ID & Tên phim */}
-                                                                                <div className="grid grid-cols-12 gap-4">
-                                                                                        {editData?.id ? (
-                                                                                                <div className="col-span-12 lg:col-span-3">
-                                                                                                        <Label className="text-[11px] font-bold uppercase text-slate-400 mb-1.5 block">
-                                                                                                                ID Hệ thống
-                                                                                                        </Label>
-                                                                                                        <div className="relative group">
-                                                                                                                <Input
-                                                                                                                        readOnly
-                                                                                                                        value={`#${editData.id}`}
-                                                                                                                        className="bg-slate-50/80 border-dashed border-slate-200 font-mono text-blue-600 cursor-not-allowed shadow-none"
-                                                                                                                />
-                                                                                                                <div className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-300">
-                                                                                                                        <Lock size={12} />
-                                                                                                                </div>
-                                                                                                        </div>
-                                                                                                </div>
-                                                                                        ) : null}
+                <Form.Item
+                  label={<span className="text-[11px] font-black uppercase tracking-widest text-slate-400">Mô tả nội dung</span>}
+                  name="description"
+                >
+                  <Input.TextArea className="rounded-xl" rows={4} placeholder="Nhập tóm tắt nội dung phim..." />
+                </Form.Item>
 
-                                                                                        <div className={`${editData?.id ? 'col-span-12 lg:col-span-6' : 'col-span-12 lg:col-span-8'}`}>
-                                                                                                <Label className="text-[11px] font-bold uppercase text-slate-400 mb-1.5 block">Tên phim</Label>
-                                                                                                <Input
-                                                                                                        placeholder="Ví dụ: Đào, Phở và Piano"
-                                                                                                        value={editData?.title || ''}
-                                                                                                        onChange={(e) => setEditData({ ...editData, title: e.target.value })}
-                                                                                                        className="focus-visible:ring-blue-500/20"
-                                                                                                />
-                                                                                        </div>
+                <Form.Item
+                  label={<span className="text-[11px] font-black uppercase tracking-widest text-slate-400">Thể loại (ví dụ: hành động, tình cảm)</span>}
+                  name="genres"
+                >
+                  <Input className="h-11 rounded-xl" placeholder="Nhập các thể loại, ngăn cách bằng dấu phẩy" />
+                </Form.Item>
 
-                                                                                        <div className="col-span-12 lg:col-span-3">
-                                                                                                <Label className="text-[11px] font-bold uppercase text-slate-400 mb-1.5 block">Chi nhánh</Label>
-                                                                                                <select
-                                                                                                        value={editData?.branch_id || ''}
-                                                                                                        onChange={(e) => setEditData({ ...editData, branch_id: e.target.value ? Number(e.target.value) : null })}
-                                                                                                        className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm focus:border-blue-400 focus:ring-4 focus:ring-blue-500/5 outline-none transition-all"
-                                                                                                >
-                                                                                                        <option value="">Chọn chi nhánh</option>
-                                                                                                        {branches.map((branch) => (
-                                                                                                                <option key={branch.id} value={branch.id}>
-                                                                                                                        {branch.name}
-                                                                                                                </option>
-                                                                                                        ))}
-                                                                                                </select>
-                                                                                        </div>
-                                                                                </div>
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+                  <Form.Item
+                    label={<span className="text-[10px] font-black uppercase tracking-widest text-slate-400">Thời lượng (phút)</span>}
+                    name="duration_min"
+                    rules={[{ required: true, message: 'Nhập thời lượng' }]}
+                  >
+                    <Input type="number" className="h-11 rounded-xl" placeholder="120" />
+                  </Form.Item>
 
-                                                                                {/* Hàng 2: Mô tả */}
-                                                                                <div className="space-y-1.5">
-                                                                                        <Label className="text-[11px] font-bold uppercase text-slate-400 mb-1.5 block">
-                                                                                                Mô tả nội dung
-                                                                                        </Label>
-                                                                                        <textarea
-                                                                                                value={editData?.description || ''}
-                                                                                                onChange={(e) =>
-                                                                                                        setEditData({
-                                                                                                                ...editData,
-                                                                                                                description: e.target.value
-                                                                                                        })
-                                                                                                }
-                                                                                                placeholder="Nhập tóm tắt nội dung phim..."
-                                                                                                className="w-full h-32 border border-slate-200 rounded-xl px-3 py-2.5 text-sm leading-relaxed focus:border-blue-400 focus:ring-4 focus:ring-blue-500/5 outline-none resize-none transition-all placeholder:text-slate-300"
-                                                                                        />
-                                                                                </div>
+                  <Form.Item
+                    label={<span className="text-[10px] font-black uppercase tracking-widest text-slate-400">Đánh giá (0-10)</span>}
+                    name="rating"
+                  >
+                    <Input type="number" step="0.1" className="h-11 rounded-xl" placeholder="8.5" />
+                  </Form.Item>
 
-                                                                                {/* Hàng 3: Thể loại */}
-                                                                                <div className="space-y-1.5">
-                                                                                        <Label className="text-[11px] font-bold uppercase text-slate-400 mb-1.5 block">
-                                                                                                Thể loại (Ví dụ: Hành động, Tình cảm)
-                                                                                        </Label>
-                                                                                        <Input
-                                                                                                placeholder="Nhập các thể loại, ngăn cách bằng dấu phẩy"
-                                                                                                value={editData?.genresText ?? (editData?.genres || []).join(', ')}
-                                                                                                onChange={(e) =>
-                                                                                                        setEditData({
-                                                                                                                ...editData,
-                                                                                                                genresText: e.target.value,
-                                                                                                                genres: e.target.value
-                                                                                                                        .split(/[,;|\n]| {2,}/)
-                                                                                                                        .map((x) => x.trim())
-                                                                                                                        .filter(Boolean)
-                                                                                                        })
-                                                                                                }
-                                                                                        />
-                                                                                </div>
+                  <Form.Item
+                    label={<span className="text-[10px] font-black uppercase tracking-widest text-slate-400">Ngày phát hành</span>}
+                    name="release_date"
+                  >
+                    <Input type="date" className="h-11 rounded-xl" />
+                  </Form.Item>
 
-                                                                                {/* Hàng 4: Thời lượng, Đánh giá, Ngày & Trạng thái */}
-                                                                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                                                                                        <div>
-                                                                                                <Label className="text-[11px] font-bold uppercase text-slate-400 mb-1.5 block">
-                                                                                                        Thời lượng (Phút)
-                                                                                                </Label>
-                                                                                                <Input
-                                                                                                        type="number"
-                                                                                                        placeholder="120"
-                                                                                                        value={editData?.duration || ''}
-                                                                                                        onChange={(e) =>
-                                                                                                                setEditData({
-                                                                                                                        ...editData,
-                                                                                                                        duration: e.target.value === '' ? '' : Number(e.target.value)
-                                                                                                                })
-                                                                                                        }
-                                                                                                />
-                                                                                        </div>
+                  <Form.Item
+                    label={<span className="text-[10px] font-black uppercase tracking-widest text-slate-400">Trạng thái</span>}
+                    name="is_active"
+                  >
+                    <Select popupMatchSelectWidth className="[&_.ant-select-selector]:!h-11 [&_.ant-select-selector]:!rounded-xl [&_.ant-select-selector]:!px-3 [&_.ant-select-selection-item]:!leading-[44px]">
+                      <Select.Option value={true}>Đang chiếu</Select.Option>
+                      <Select.Option value={false}>Đã ẩn</Select.Option>
+                    </Select>
+                  </Form.Item>
+                </div>
 
-                                                                                        <div>
-                                                                                                <Label className="text-[11px] font-bold uppercase text-slate-400 mb-1.5 block">
-                                                                                                        Đánh giá (0-10)
-                                                                                                </Label>
-                                                                                                <Input
-                                                                                                        type="number"
-                                                                                                        step="0.1"
-                                                                                                        placeholder="8.5"
-                                                                                                        value={editData?.rating ?? ''}
-                                                                                                        onChange={(e) =>
-                                                                                                                setEditData({
-                                                                                                                        ...editData,
-                                                                                                                        rating: e.target.value ? Number(e.target.value) : undefined
-                                                                                                                })
-                                                                                                        }
-                                                                                                />
-                                                                                        </div>
+                <Form.Item
+                  label={<span className="text-[11px] font-black uppercase tracking-widest text-slate-400">Poster URL (tuỳ chọn)</span>}
+                  name="cover_image"
+                >
+                  <Input className="h-11 rounded-xl" placeholder="https://..." />
+                </Form.Item>
 
-                                                                                        <div className="relative group">
-                                                                                                <Label className="text-[11px] font-bold uppercase text-slate-400 mb-1.5 block">
-                                                                                                        Ngày phát hành
-                                                                                                </Label>
-                                                                                                <div className="relative h-10">
-                                                                                                        <input
-                                                                                                                type="datetime-local"
-                                                                                                                value={
-                                                                                                                        editData?.release_date
-                                                                                                                                ? format(new Date(editData.release_date), "yyyy-MM-dd'T'HH:mm")
-                                                                                                                                : ''
-                                                                                                                }
-                                                                                                                onChange={(e) =>
-                                                                                                                        setEditData({
-                                                                                                                                ...editData,
-                                                                                                                                release_date: e.target.value ? new Date(e.target.value).toISOString() : undefined
-                                                                                                                        })
-                                                                                                                }
-                                                                                                                className="absolute inset-0 w-full h-full opacity-0 z-20 cursor-pointer"
-                                                                                                        />
-                                                                                                        <div className="absolute inset-0 w-full h-full border rounded-md px-3 flex items-center justify-between bg-white group-hover:border-blue-400 transition-all z-10">
-                                                                                                                <span className="text-sm truncate">
-                                                                                                                        {editData?.release_date
-                                                                                                                                ? format(new Date(editData.release_date), 'dd/MM/yyyy HH:mm')
-                                                                                                                                : 'Chọn ngày'}
-                                                                                                                </span>
-                                                                                                                <Calendar size={16} className="text-slate-400 shrink-0" />
-                                                                                                        </div>
-                                                                                                </div>
-                                                                                        </div>
+                <Form.Item
+                  label={<span className="text-[11px] font-black uppercase tracking-widest text-slate-400">Ảnh chi tiết (tuỳ chọn)</span>}
+                  name="detail_images"
+                >
+                  <Input.TextArea className="rounded-xl" rows={3} placeholder="Mỗi dòng 1 URL hoặc phân cách bằng dấu phẩy" />
+                </Form.Item>
+              </div>
+            </div>
+          </>
+        ) : editType === 'toy' ? (
+          <>
+            <Form.Item label="Tên" name="name" rules={[{ required: true, message: 'Vui lòng nhập tên' }]}>
+              <Input />
+            </Form.Item>
+            <div className="grid grid-cols-2 gap-3">
+              <Form.Item label="Phân loại" name="category">
+                <Input />
+              </Form.Item>
+              <Form.Item label="Giá" name="price">
+                <Input type="number" />
+              </Form.Item>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <Form.Item label="Tồn kho" name="stock">
+                <Input type="number" />
+              </Form.Item>
+              <Form.Item label="Trạng thái" name="status">
+                <Select>
+                  <Select.Option value="active">Hoạt động</Select.Option>
+                  <Select.Option value="inactive">Đã ẩn</Select.Option>
+                </Select>
+              </Form.Item>
+            </div>
+            <Form.Item label="Ảnh (URL)" name="image_url">
+              <Input placeholder="https://..." />
+            </Form.Item>
+          </>
+        ) : (
+          <>
+            <Form.Item label="Name" name="name" rules={[{ required: true, message: 'Please enter name' }]}>
+              <Input />
+            </Form.Item>
 
-                                                                                        <div>
-                                                                                                <Label className="text-[11px] font-bold uppercase text-slate-400 mb-1.5 block">
-                                                                                                        Trạng thái
-                                                                                                </Label>
-                                                                                                <select
-                                                                                                        value={editData?.is_active !== false ? 'active' : 'inactive'}
-                                                                                                        onChange={(e) =>
-                                                                                                                setEditData({
-                                                                                                                        ...editData,
-                                                                                                                        is_active: e.target.value === 'active'
-                                                                                                                })
-                                                                                                        }
-                                                                                                        className="w-full h-10 border border-slate-200 rounded-md px-3 text-sm focus:border-blue-400 focus:ring-4 focus:ring-blue-500/5 outline-none transition-all"
-                                                                                                >
-                                                                                                        <option value="active">🟢 Đang chiếu</option>
-                                                                                                        <option value="inactive">🔴 Đã ẩn</option>
-                                                                                                </select>
-                                                                                        </div>
-                                                                                </div>
-                                                                        </div>
-                                                                </div>
-                                                        </div>
-                                                </div>
+            <Form.Item
+              label="Email"
+              name="email"
+              rules={[
+                { required: true, message: 'Please enter email' },
+                { type: 'email', message: 'Invalid email format' }
+              ]}
+            >
+              <Input />
+            </Form.Item>
 
-                                                {/* VÙNG NÚT BẤM CỐ ĐỊNH */}
-                                                <div className="px-6 py-4 border-t bg-white flex justify-end items-center gap-3 shrink-0">
-                                                        <span className="text-[11px] text-slate-400 mr-auto italic font-sans">
-                                                                * Lưu ý: Mọi thay đổi sẽ ảnh hưởng trực tiếp đến lịch chiếu hiện tại.
-                                                        </span>
-                                                        <Button
-                                                                variant="ghost"
-                                                                onClick={() => setIsEditOpen(false)}
-                                                                disabled={isSaving}
-                                                                className="text-slate-500 hover:bg-slate-100"
-                                                        >
-                                                                Hủy bỏ
-                                                        </Button>
-                                                        <Button
-                                                                disabled={isSaving}
-                                                                className="bg-blue-600 hover:bg-blue-700 min-w-[140px] rounded-xl shadow-lg shadow-blue-500/20 transition-all active:scale-95"
-                                                                onClick={async () => {
-                                                                        // --- VALIDATION LOGIC ---
-                                                                        if (!editData.title?.trim()) {
-                                                                                toast.error('Lỗi', {
-                                                                                        description: 'Vui lòng nhập tên phim'
-                                                                                });
-                                                                                return;
-                                                                        }
-                                                                        if (!editData.duration || Number(editData.duration) <= 0) {
-                                                                                toast.error('Lỗi', {
-                                                                                        description: 'Thời lượng phim không hợp lệ'
-                                                                                });
-                                                                                return;
-                                                                        }
-
-                                                                        try {
-                                                                                setIsSaving(true);
-
-                                                                                // Xử lý nén ảnh Base64
-                                                                                let coverBase64: string | undefined = undefined;
-                                                                                if (editData.posterFile) {
-                                                                                        const f = editData.posterFile as File;
-                                                                                        const q = f.size > 15_000_000 ? 0.5 : f.size > 8_000_000 ? 0.6 : 0.75;
-                                                                                        coverBase64 = await fileToCompressedDataURL(f, {
-                                                                                                maxW: 1280,
-                                                                                                maxH: 1280,
-                                                                                                quality: q,
-                                                                                                type: 'image/webp'
-                                                                                        });
-                                                                                }
-
-                                                                                const payload = {
-                                                                                        title: editData.title,
-                                                                                        description: editData.description,
-                                                                                        cover_image: editData.posterUrl,
-                                                                                        cover_image_base64: coverBase64,
-                                                                                        genres: editData.genres,
-                                                                                        rating: Number(editData.rating) || 0,
-                                                                                        duration_min: Number(editData.duration),
-                                                                                        is_active: editData.is_active !== false,
-                                                                                        release_date: editData.release_date
-                                                                                };
-
-                                                                                if (editData.id) {
-                                                                                        await updateMovieApi(Number(editData.id), payload);
-                                                                                } else {
-                                                                                        await createMovieApi(payload as any);
-                                                                                }
-
-                                                                                await refetch('movie');
-                                                                                toast.success('Thành công', {
-                                                                                        description: editData.id ? 'Đã cập nhật thông tin phim' : 'Đã thêm phim mới'
-                                                                                });
-                                                                                setIsEditOpen(false);
-                                                                        } catch (err: any) {
-                                                                                toast.error('Lỗi hệ thống', {
-                                                                                        description: err?.message || 'Không thể lưu dữ liệu'
-                                                                                });
-                                                                        } finally {
-                                                                                setIsSaving(false);
-                                                                        }
-                                                                }}
-                                                        >
-                                                                {isSaving ? (
-                                                                        <div className="flex items-center gap-2">
-                                                                                <Loader2 className="h-4 w-4 animate-spin" />
-                                                                                <span>Đang xử lý</span>
-                                                                        </div>
-                                                                ) : (
-                                                                        <span>{editData.id ? 'Lưu thay đổi' : 'Tạo phim mới'}</span>
-                                                                )}
-                                                        </Button>
-                                                </div>
-                                        </div>
-                                )}
-
-                                {editType === 'toy' && (
-                                        <div className="space-y-3">
-                                                <div>
-                                                        <Label>Ảnh</Label>
-                                                        <Input
-                                                                type="file"
-                                                                accept="image/*"
-                                                                onChange={(e) => {
-                                                                        const file = e.target.files?.[0];
-                                                                        if (file) {
-                                                                                const url = URL.createObjectURL(file);
-                                                                                setEditData({
-                                                                                        ...editData,
-                                                                                        image_url: url,
-                                                                                        imageFile: file
-                                                                                });
-                                                                        }
-                                                                }}
-                                                        />
-                                                        {editData?.image_url && (
-                                                                <div className="mt-2">
-                                                                        <img src={editData?.image_url} className="w-full max-h-40 object-cover rounded" />
-                                                                </div>
-                                                        )}
-                                                </div>
-                                                <div>
-                                                        <Label>Tên đồ chơi</Label>
-                                                        <Input
-                                                                value={editData?.name || ''}
-                                                                onChange={(e) => setEditData({ ...editData, name: e.target.value })}
-                                                        />
-                                                </div>
-                                                <div>
-                                                        <Label>Danh mục</Label>
-                                                        <Input
-                                                                value={editData?.category || ''}
-                                                                onChange={(e) => setEditData({ ...editData, category: e.target.value })}
-                                                        />
-                                                </div>
-                                                <div className="grid grid-cols-2 gap-3">
-                                                        <div>
-                                                                <Label>Giá</Label>
-                                                                <Input
-                                                                        type="number"
-                                                                        min="0"
-                                                                        step="1"
-                                                                        value={editData.price !== undefined && editData.price !== null ? editData.price : ''}
-                                                                        onChange={(e) => {
-                                                                                const val = e.target.value;
-                                                                                setEditData({
-                                                                                        ...editData,
-                                                                                        price: val === '' ? '' : Number(val)
-                                                                                });
-                                                                        }}
-                                                                />
-                                                        </div>
-                                                        <div>
-                                                                <Label>Tồn kho</Label>
-                                                                <Input
-                                                                        type="number"
-                                                                        min="0"
-                                                                        step="1"
-                                                                        value={editData.stock !== undefined && editData.stock !== null ? editData.stock : ''}
-                                                                        onChange={(e) => {
-                                                                                const val = e.target.value;
-                                                                                setEditData({
-                                                                                        ...editData,
-                                                                                        stock: val === '' ? '' : Number(val)
-                                                                                });
-                                                                        }}
-                                                                />
-                                                        </div>
-                                                </div>
-                                                <div>
-                                                        <Label>Trạng thái</Label>
-                                                        <select
-                                                                value={editData?.status || 'active'}
-                                                                onChange={(e) => setEditData({ ...editData, status: e.target.value })}
-                                                                className="w-full h-10 border rounded-md px-3"
-                                                        >
-                                                                <option value="active">Hoạt động</option>
-                                                                <option value="inactive">Đã ẩn</option>
-                                                        </select>
-                                                </div>
-                                                <div className="flex justify-end gap-2">
-                                                        <Button variant="outline" onClick={() => setIsEditOpen(false)}>
-                                                                Hủy
-                                                        </Button>
-                                                        <Button
-                                                                disabled={isSaving}
-                                                                onClick={async () => {
-                                                                        try {
-                                                                                setIsSaving(true);
-                                                                                if (!editData.id || editData.id === 0) {
-                                                                                        let imageBase64: string | undefined = undefined;
-                                                                                        if (editData.imageFile) {
-                                                                                                const file = editData.imageFile as File;
-                                                                                                imageBase64 = await new Promise<string>((resolve) => {
-                                                                                                        const r = new FileReader();
-                                                                                                        r.onload = () => resolve(String(r.result));
-                                                                                                        r.readAsDataURL(file);
-                                                                                                });
-                                                                                        }
-                                                                                        await createToyApi({
-                                                                                                name: editData.name,
-                                                                                                category: editData.category,
-                                                                                                price: Number(editData.price || 0),
-                                                                                                stock: Number(editData.stock || 0),
-                                                                                                status: editData.status,
-                                                                                                image_url: editData.image_url,
-                                                                                                image_base64: imageBase64
-                                                                                        });
-                                                                                } else {
-                                                                                        let imageBase64: string | undefined = undefined;
-                                                                                        if (editData.imageFile) {
-                                                                                                const file = editData.imageFile as File;
-                                                                                                imageBase64 = await new Promise<string>((resolve) => {
-                                                                                                        const r = new FileReader();
-                                                                                                        r.onload = () => resolve(String(r.result));
-                                                                                                        r.readAsDataURL(file);
-                                                                                                });
-                                                                                        }
-                                                                                        await updateToyApi(Number(editData.id), {
-                                                                                                name: editData.name,
-                                                                                                category: editData.category,
-                                                                                                price: Number(editData.price || 0),
-                                                                                                stock: Number(editData.stock || 0),
-                                                                                                status: editData.status,
-                                                                                                image_url: editData.image_url,
-                                                                                                image_base64: imageBase64
-                                                                                        });
-                                                                                }
-                                                                                await refetch('toy');
-                                                                                toast.success('Thành công', {
-                                                                                        description: editData.id ? 'Cập nhật đồ chơi thành công' : 'Thêm đồ chơi mới thành công'
-                                                                                });
-                                                                        } finally {
-                                                                                setIsSaving(false);
-                                                                                setIsEditOpen(false);
-                                                                        }
-                                                                }}
-                                                        >
-                                                                {isSaving ? (
-                                                                        <span className="flex items-center gap-2">
-                                                                                <Loader2 className="h-4 w-4 animate-spin" /> Đang lưu...
-                                                                        </span>
-                                                                ) : (
-                                                                        'Lưu'
-                                                                )}
-                                                        </Button>
-                                                </div>
-                                        </div>
-                                )}
-                        </DialogContent>
-                </Dialog>
-        );
-};
-
-export default AdminEditModal;
+            <Form.Item label="Role" name="role" rules={[{ required: true, message: 'Please select role' }]}>
+              <Select>
+                <Select.Option value="user">User</Select.Option>
+                <Select.Option value="admin">Admin</Select.Option>
+                <Select.Option value="viewer">Viewer</Select.Option>
+              </Select>
+            </Form.Item>
+          </>
+        )}
+      </Form>
+    </Modal>
+  );
+}

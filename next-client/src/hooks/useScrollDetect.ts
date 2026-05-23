@@ -15,5 +15,3 @@ export function useScrollDetect(threshold: number = 50) {
 
   return isScrolled;
 }
-
-

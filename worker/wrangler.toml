@@ -7,6 +7,9 @@ workers_dev = true
 preview_urls = true
 
 [vars]
+SUPER_ADMIN_EMAIL = "superadmin@cinesphere.com.vn"
+SUPER_ADMIN_PASSWORD = "super123!"
+SUPER_ADMIN_NAME = "Super Admin"
 
 VITE_SERVER_BASE_URL = "https://cinesphere.com.vn"
 VITE_CLIENT_BASE_URL = "https://cinesphere.com.vn"

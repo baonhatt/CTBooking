@@ -9,49 +9,49 @@ const GMAIL_SENDER_EMAIL = process.env.GMAIL_SENDER_EMAIL || GMAIL_USER || 'no-r
 const GMAIL_SENDER_NAME = process.env.GMAIL_SENDER_NAME || 'CTBOOKING';
 
 const transporter =
-        GMAIL_USER && GMAIL_PASS
-                ? nodemailer.createTransport({
-                        host: GMAIL_HOST,
-                        port: GMAIL_PORT,
-                        secure: false,
-                        auth: { user: GMAIL_USER, pass: GMAIL_PASS }
-                })
-                : null;
+  GMAIL_USER && GMAIL_PASS
+    ? nodemailer.createTransport({
+        host: GMAIL_HOST,
+        port: GMAIL_PORT,
+        secure: false,
+        auth: { user: GMAIL_USER, pass: GMAIL_PASS }
+      })
+    : null;
 
 export async function sendMail(toEmail: string, subject: string, html: string) {
-        if (!transporter) {
-                throw new Error('Mail provider is not configured');
-        }
-        const info = await transporter.sendMail({
-                from: `${GMAIL_SENDER_NAME} <${GMAIL_SENDER_EMAIL}>`,
-                to: toEmail,
-                subject,
-                html
-        });
-        return info;
+  if (!transporter) {
+    throw new Error('Mail provider is not configured');
+  }
+  const info = await transporter.sendMail({
+    from: `${GMAIL_SENDER_NAME} <${GMAIL_SENDER_EMAIL}>`,
+    to: toEmail,
+    subject,
+    html
+  });
+  return info;
 }
 
 export function getMailConfig() {
-        return {
-                provider: 'gmail',
-                host: GMAIL_HOST,
-                port: GMAIL_PORT,
-                has_user: Boolean(GMAIL_USER),
-                has_pass: Boolean(GMAIL_PASS),
-                sender_email: GMAIL_SENDER_EMAIL,
-                sender_name: GMAIL_SENDER_NAME,
-                configured: Boolean(transporter)
-        };
+  return {
+    provider: 'gmail',
+    host: GMAIL_HOST,
+    port: GMAIL_PORT,
+    has_user: Boolean(GMAIL_USER),
+    has_pass: Boolean(GMAIL_PASS),
+    sender_email: GMAIL_SENDER_EMAIL,
+    sender_name: GMAIL_SENDER_NAME,
+    configured: Boolean(transporter)
+  };
 }
 
 export async function verifyMailProvider() {
-        if (!transporter) {
-                return { ok: false, message: 'Mail provider is not configured' };
-        }
-        try {
-                await transporter.verify();
-                return { ok: true };
-        } catch (err: any) {
-                return { ok: false, message: err?.message || String(err) };
-        }
+  if (!transporter) {
+    return { ok: false, message: 'Mail provider is not configured' };
+  }
+  try {
+    await transporter.verify();
+    return { ok: true };
+  } catch (err: any) {
+    return { ok: false, message: err?.message || String(err) };
+  }
 }

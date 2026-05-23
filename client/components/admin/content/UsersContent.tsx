@@ -1,29 +1,24 @@
-import React, { useState, useEffect } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
-import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
-import { Skeleton } from '@/components/ui/skeleton';
-import {
-  Pagination,
-  PaginationContent,
-  PaginationItem,
-  PaginationLink,
-  PaginationNext,
-  PaginationPrevious
-} from '@/components/ui/pagination';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
 import { getUserById } from '@/lib/api';
-import { Search, RefreshCw, Eye, TrendingUp, User } from 'lucide-react';
+import { Search, RefreshCw, Eye, TrendingUp, User, Edit } from 'lucide-react';
+import { Table as AntTable } from 'antd';
+import type { ColumnsType } from 'antd/es/table';
+import { useAdminPermissions } from '@/lib/useAdminPermissions';
 
 interface Props {
   data: any[];
   totalPages: number;
   currentPage: number;
   setPage: (p: number) => void;
+  pageSize?: number;
   userQuery: string;
   setUserQuery: (q: string) => void;
   onEdit: (type: 'user', data: any) => void;
+  onCreate?: () => void;
   usersLength: number;
   onRefresh: () => void;
   isLoading?: boolean;
@@ -34,13 +29,16 @@ export default function UsersContent({
   totalPages,
   currentPage,
   setPage,
+  pageSize,
   userQuery,
   setUserQuery,
   onEdit,
+  onCreate,
   usersLength,
   onRefresh,
   isLoading = false
 }: Props) {
+  const { isViewer, isSuperAdmin, hasPermission } = useAdminPermissions();
   const [isDetailsOpen, setIsDetailsOpen] = useState(false);
   const [selectedUserId, setSelectedUserId] = useState<number | null>(null);
   const [userDetails, setUserDetails] = useState<any>(null);
@@ -65,8 +63,10 @@ export default function UsersContent({
     }
   }, [isDetailsOpen, selectedUserId]);
 
-  const formatDateTime = (d: Date | string) => {
+  const formatDateTime = (d: Date | string | undefined | null) => {
+    if (!d) return 'N/A';
     const date = typeof d === 'string' ? new Date(d) : d;
+    if (isNaN(date.getTime())) return 'N/A';
     return date.toLocaleString('vi-VN', {
       year: 'numeric',
       month: '2-digit',
@@ -81,6 +81,143 @@ export default function UsersContent({
     setSelectedUserId(userId);
     setIsDetailsOpen(true);
   };
+
+  const resolvedPageSize = useMemo(() => {
+    if (pageSize && Number.isFinite(pageSize)) return pageSize;
+    if (usersLength > 0 && totalPages > 0) return Math.max(1, Math.ceil(usersLength / totalPages));
+    return 10;
+  }, [pageSize, totalPages, usersLength]);
+
+  const columns: ColumnsType<any> = useMemo(
+    () => [
+      {
+        title: 'ID',
+        dataIndex: 'id',
+        key: 'id',
+        width: 80,
+        align: 'center',
+        render: (v) => <span className="font-mono text-[11px] text-slate-400">{v}</span>
+      },
+      {
+        title: 'Người dùng',
+        key: 'fullname',
+        width: 220,
+        ellipsis: true,
+        render: (_: any, u: any) => (
+          <div className="flex items-center gap-3 min-w-0">
+            <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 font-bold text-xs shrink-0">
+              {u.fullname?.charAt(0).toUpperCase() || <User size={14} />}
+            </div>
+            <span className="font-bold text-slate-900 truncate" title={u.fullname}>
+              {u.fullname}
+            </span>
+          </div>
+        )
+      },
+      {
+        title: 'Email & SĐT',
+        key: 'contact',
+        width: 280,
+        ellipsis: true,
+        render: (_: any, u: any) => (
+          <div className="flex flex-col gap-0.5 min-w-0">
+            <span className="text-sm font-medium text-slate-700 truncate" title={u.email}>
+              {u.email}
+            </span>
+            <span className="text-[11px] text-slate-500 font-mono truncate" title={u.phone}>
+              {u.phone}
+            </span>
+          </div>
+        )
+      },
+      {
+        title: 'Role',
+        dataIndex: 'role',
+        key: 'role',
+        width: 130,
+        align: 'center',
+        render: (role) => (
+          <Badge
+            className={`text-[10px] px-2 py-0.5 rounded-lg border-none shadow-sm font-bold uppercase ${
+              role === 'super_admin'
+                ? 'bg-purple-100 text-purple-700'
+                : role === 'admin'
+                  ? 'bg-blue-100 text-blue-700'
+                  : 'bg-slate-100 text-slate-600'
+            }`}
+          >
+            {role || 'admin'}
+          </Badge>
+        )
+      },
+      {
+        title: 'Quyền',
+        key: 'permissions_count',
+        align: 'center',
+        width: 90,
+        render: (_: any, u: any) => <span className="text-xs font-bold text-slate-700">{u.permissions_count ?? 0}</span>
+      },
+      {
+        title: 'Trạng Thái',
+        key: 'is_active',
+        align: 'center',
+        width: 140,
+        render: (_: any, u: any) => (
+          <Badge
+            variant={u.is_active ? 'default' : 'secondary'}
+            className={`text-[10px] px-2 py-0.5 rounded-lg border-none shadow-sm font-bold ${
+              u.is_active
+                ? 'bg-emerald-100 text-emerald-700 hover:bg-emerald-200'
+                : 'bg-slate-100 text-slate-500 hover:bg-slate-200'
+            }`}
+          >
+            {u.is_active ? 'HOẠT ĐỘNG' : 'TẠM KHÓA'}
+          </Badge>
+        )
+      },
+      {
+        title: 'Ngày Tạo',
+        dataIndex: 'created_at',
+        key: 'created_at',
+        width: 180,
+        render: (v) => <span className="text-xs text-slate-600 font-medium">{formatDateTime(v)}</span>
+      },
+      {
+        title: 'Thao tác',
+        key: 'actions',
+        align: 'right',
+        width: 120,
+        render: (_: any, u: any) => {
+          const canEdit = !isViewer && (isSuperAdmin || hasPermission('users.edit'));
+          return (
+            <div className="flex items-center gap-1 justify-end pr-2">
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8 rounded-full hover:bg-blue-50 text-blue-600 transition-colors"
+                onClick={() => handleViewDetails(Number(u.id))}
+                title="Xem chi tiết"
+              >
+                <Eye size={16} />
+              </Button>
+              {canEdit && (
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-8 w-8 rounded-full hover:bg-green-50 text-green-600 transition-colors"
+                  onClick={() => onEdit('user', u)}
+                  title="Chỉnh sửa"
+                >
+                  <Edit size={16} />
+                </Button>
+              )}
+            </div>
+          );
+        }
+      }
+    ],
+    [formatDateTime, onEdit, isViewer, isSuperAdmin, hasPermission]
+  );
   return (
     <div className="space-y-6">
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-white p-4 rounded-2xl border shadow-sm">
@@ -108,140 +245,32 @@ export default function UsersContent({
           </Button>
         </div>
       </div>
-      <Card className="border-none shadow-xl shadow-slate-200/50 rounded-2xl overflow-hidden bg-white">
+      {!isViewer && (isSuperAdmin || hasPermission('users.create')) && (
+        <Button onClick={onCreate} disabled={!onCreate} className="rounded-xl shadow-sm shrink-0 h-10">
+          Tạo người dùng
+        </Button>
+      )}
+      <Card className="border-none shadow-xl shadow-slate-200/50 rounded-2xl overflow-hidden bg-white w-full min-w-0">
         <CardContent className="p-0">
-          <Table>
-            <TableHeader className="bg-slate-50/80">
-              <TableRow className="hover:bg-transparent border-none">
-                <TableHead className="w-16 text-center text-[10px] uppercase font-bold text-slate-400">ID</TableHead>
-                <TableHead className="text-[10px] uppercase font-bold text-slate-500">Người dùng</TableHead>
-                <TableHead className="text-[10px] uppercase font-bold text-slate-500">Email & SĐT</TableHead>
-                <TableHead className="text-center text-[10px] uppercase font-bold text-slate-500">Trạng Thái</TableHead>
-                <TableHead className="text-[10px] uppercase font-bold text-slate-500">Ngày Tạo</TableHead>
-                <TableHead className="text-right text-[10px] uppercase font-bold text-slate-500 pr-6">
-                  Thao tác
-                </TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {isLoading
-                ? Array.from({ length: 5 }).map((_, idx) => (
-                    <TableRow key={`sk-${idx}`}>
-                      <TableCell>
-                        <Skeleton className="h-4 w-16" />
-                      </TableCell>
-                      <TableCell>
-                        <Skeleton className="h-4 w-24" />
-                      </TableCell>
-                      <TableCell>
-                        <Skeleton className="h-4 w-40" />
-                      </TableCell>
-                      <TableCell>
-                        <Skeleton className="h-4 w-24" />
-                      </TableCell>
-                      <TableCell>
-                        <Skeleton className="h-5 w-20" />
-                      </TableCell>
-                      <TableCell>
-                        <Skeleton className="h-4 w-28" />
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <Skeleton className="h-8 w-16 ml-auto" />
-                      </TableCell>
-                    </TableRow>
-                  ))
-                : data.map((u) => (
-                    <TableRow
-                      key={u.id}
-                      className="group hover:bg-slate-50/80 transition-colors border-b last:border-0"
-                    >
-                      <TableCell className="text-center font-mono text-[11px] text-slate-400">{u.id}</TableCell>
-                      <TableCell>
-                        <div className="flex items-center gap-3">
-                          <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 font-bold text-xs shrink-0">
-                            {u.fullname?.charAt(0).toUpperCase() || <User size={14} />}
-                          </div>
-                          <span className="font-bold text-slate-900">{u.fullname}</span>
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex flex-col gap-0.5">
-                          <span className="text-sm font-medium text-slate-700">{u.email}</span>
-                          <span className="text-[11px] text-slate-500 font-mono">{u.phone}</span>
-                        </div>
-                      </TableCell>
-                      <TableCell className="text-center">
-                        <Badge
-                          variant={u.is_active ? 'default' : 'secondary'}
-                          className={`text-[10px] px-2 py-0.5 rounded-lg border-none shadow-sm font-bold ${
-                            u.is_active
-                              ? 'bg-emerald-100 text-emerald-700 hover:bg-emerald-200'
-                              : 'bg-slate-100 text-slate-500 hover:bg-slate-200'
-                          }`}
-                        >
-                          {u.is_active ? 'HOẠT ĐỘNG' : 'TẠM KHÓA'}
-                        </Badge>
-                      </TableCell>
-                      <TableCell>
-                        <span className="text-xs text-slate-600 font-medium">{formatDateTime(u.created_at)}</span>
-                      </TableCell>
-                      <TableCell className="text-right pr-6">
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-8 w-8 rounded-full hover:bg-blue-50 text-blue-600 transition-colors"
-                          onClick={() => handleViewDetails(Number(u.id))}
-                          title="Xem chi tiết"
-                        >
-                          <Eye size={16} />
-                        </Button>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-            </TableBody>
-          </Table>
+          <AntTable
+            rowKey="id"
+            columns={columns}
+            dataSource={data}
+            loading={isLoading}
+            tableLayout="fixed"
+            scroll={{ x: 980 }}
+            pagination={{
+              current: currentPage,
+              pageSize: resolvedPageSize,
+              total: usersLength,
+              showSizeChanger: false,
+              onChange: (p) => setPage(p)
+            }}
+            locale={{ emptyText: <div className="py-10 text-center text-slate-400">Không có dữ liệu</div> }}
+            className="[&_.ant-table]:rounded-none [&_.ant-table-thead>tr>th]:bg-slate-50/80"
+          />
         </CardContent>
       </Card>
-      <Pagination className="mt-4">
-        <PaginationContent>
-          <PaginationItem>
-            <PaginationPrevious
-              href="#"
-              onClick={(e) => {
-                e.preventDefault();
-                setPage(Math.max(1, currentPage - 1));
-              }}
-              aria-disabled={currentPage === 1}
-              className={currentPage === 1 ? 'pointer-events-none opacity-50' : ''}
-            />
-          </PaginationItem>
-          {Array.from({ length: totalPages }).map((_, i) => (
-            <PaginationItem key={i}>
-              <PaginationLink
-                href="#"
-                isActive={currentPage === i + 1}
-                onClick={(e) => {
-                  e.preventDefault();
-                  setPage(i + 1);
-                }}
-              >
-                {i + 1}
-              </PaginationLink>
-            </PaginationItem>
-          ))}
-          <PaginationItem>
-            <PaginationNext
-              href="#"
-              onClick={(e) => {
-                e.preventDefault();
-                setPage(Math.min(totalPages, currentPage + 1));
-              }}
-              aria-disabled={currentPage === totalPages}
-              className={currentPage === totalPages ? 'pointer-events-none opacity-50' : ''}
-            />
-          </PaginationItem>
-        </PaginationContent>
-      </Pagination>
 
       <Dialog open={isDetailsOpen} onOpenChange={setIsDetailsOpen}>
         <DialogContent className="max-w-2xl p-0 border-none shadow-2xl rounded-2xl flex flex-col font-sans overflow-hidden">

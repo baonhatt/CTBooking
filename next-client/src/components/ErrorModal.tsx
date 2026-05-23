@@ -33,5 +33,3 @@ export function ErrorModal({ open, title, message, onOpenChange }: ErrorModalPro
     </AlertDialog>
   );
 }
-
-

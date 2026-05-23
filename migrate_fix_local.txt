@@ -1,0 +1,66 @@
+-- Fix duplicate column role issue
+-- Check if column exists before adding
+-- SQLite doesn't support IF NOT EXISTS for ALTER TABLE, so we need to handle this differently
+
+-- Add created_by column if it doesn't exist
+-- This column might not exist yet
+ALTER TABLE users ADD COLUMN created_by INTEGER;
+
+-- Create permissions table if not exists
+CREATE TABLE IF NOT EXISTS permissions (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  key TEXT NOT NULL UNIQUE,
+  name TEXT NOT NULL,
+  "group" TEXT NOT NULL
+);
+
+-- Create user_permissions table if not exists
+CREATE TABLE IF NOT EXISTS user_permissions (
+  user_id INTEGER NOT NULL,
+  permission_id INTEGER NOT NULL,
+  granted_by INTEGER,
+  granted_at TEXT,
+  PRIMARY KEY (user_id, permission_id),
+  FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+  FOREIGN KEY (permission_id) REFERENCES permissions(id) ON DELETE CASCADE,
+  FOREIGN KEY (granted_by) REFERENCES users(id) ON DELETE SET NULL
+);
+
+-- Insert default permissions if they don't exist
+INSERT OR IGNORE INTO permissions (key, name, "group") VALUES
+('dashboard.view', 'Xem bảng điều khiển', 'dashboard'),
+('dashboard.stats', 'Xem thống kê tổng quan', 'dashboard'),
+('users.view', 'Xem danh sách người dùng', 'users'),
+('users.create', 'Tạo người dùng mới', 'users'),
+('users.edit', 'Sửa thông tin người dùng', 'users'),
+('users.delete', 'Xóa người dùng', 'users'),
+('movies.view', 'Xem danh sách phim', 'movies'),
+('movies.create', 'Thêm phim mới', 'movies'),
+('movies.edit', 'Sửa thông tin phim', 'movies'),
+('movies.delete', 'Xóa phim', 'movies'),
+('movies.publish', 'Xuất bản / Ẩn phim', 'movies'),
+('toys.view', 'Xem danh sách đồ chơi', 'toys'),
+('toys.create', 'Thêm đồ chơi mới', 'toys'),
+('toys.edit', 'Sửa thông tin đồ chơi', 'toys'),
+('toys.delete', 'Xóa đồ chơi', 'toys'),
+('posts.view', 'Xem danh sách bài viết', 'posts'),
+('posts.create', 'Tạo bài viết mới', 'posts'),
+('posts.edit', 'Sửa bài viết', 'posts'),
+('posts.delete', 'Xóa bài viết', 'posts'),
+('posts.publish', 'Xuất bản / Ẩn bài viết', 'posts'),
+('tickets.view', 'Xem danh sách gói vé', 'tickets'),
+('tickets.create', 'Tạo gói vé mới', 'tickets'),
+('tickets.edit', 'Sửa gói vé', 'tickets'),
+('tickets.delete', 'Xóa gói vé', 'tickets'),
+('transactions.view', 'Xem lịch sử giao dịch', 'transactions'),
+('transactions.refund', 'Hoàn tiền giao dịch', 'transactions'),
+('ticket_check.scan', 'Quét mã vé', 'ticket_check'),
+('ticket_check.validate', 'Xác thực vé', 'ticket_check'),
+('ticket_check.history', 'Xem lịch sử kiểm tra', 'ticket_check'),
+('uploads.view', 'Xem danh sách file', 'uploads'),
+('uploads.upload', 'Tải file lên', 'uploads'),
+('uploads.delete', 'Xóa file', 'uploads'),
+('email_logs.view', 'Xem lịch sử email', 'email_logs'),
+('email_logs.resend', 'Gửi lại email', 'email_logs'),
+('settings.manage', 'Quản lý cài đặt hệ thống', 'settings'),
+('reports.view', 'Xem báo cáo thống kê', 'reports');

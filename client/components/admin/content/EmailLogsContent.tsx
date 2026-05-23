@@ -1,19 +1,11 @@
-import React, { useState, useEffect } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
-import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
-import { Skeleton } from '@/components/ui/skeleton';
-import {
-  Pagination,
-  PaginationContent,
-  PaginationItem,
-  PaginationLink,
-  PaginationNext,
-  PaginationPrevious
-} from '@/components/ui/pagination';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
 import { getEmailLogsApi } from '@/lib/api';
+import { Table as AntTable } from 'antd';
+import type { ColumnsType } from 'antd/es/table';
 import {
   Search,
   RefreshCw,
@@ -124,6 +116,102 @@ export default function EmailLogsContent() {
     setIsDetailsOpen(true);
   };
 
+  const columns: ColumnsType<any> = useMemo(
+    () => [
+      {
+        title: 'ID',
+        dataIndex: 'id',
+        key: 'id',
+        width: 80,
+        align: 'center',
+        render: (v) => <span className="font-mono text-[11px] text-slate-400">{v}</span>
+      },
+      {
+        title: 'Người nhận & Tiêu đề',
+        key: 'recipient',
+        width: 340,
+        ellipsis: true,
+        render: (_: any, log: any) => (
+          <div className="flex flex-col gap-1 min-w-0">
+            <span className="font-black text-slate-900 text-sm truncate" title={log.recipient}>
+              {log.recipient}
+            </span>
+            <span className="text-[11px] text-slate-500 italic truncate" title={log.subject}>
+              {log.subject}
+            </span>
+          </div>
+        )
+      },
+      {
+        title: 'Loại email',
+        key: 'email_type',
+        width: 230,
+        ellipsis: true,
+        render: (_: any, log: any) => (
+          <div className="flex items-center gap-2">
+            <div className="p-2 bg-slate-100 rounded-lg group-hover:bg-white transition-colors">
+              {getTypeIcon(log.email_type)}
+            </div>
+            <span className="text-xs font-bold text-slate-700 uppercase tracking-tight">
+              {log.email_type === 'welcome'
+                ? 'Chào mừng'
+                : log.email_type === 'reset_password'
+                  ? 'Quên mật khẩu'
+                  : log.email_type === 'booking_confirmation'
+                    ? 'Xác nhận đặt vé'
+                    : log.email_type}
+            </span>
+          </div>
+        )
+      },
+      {
+        title: 'Trạng thái',
+        key: 'status',
+        align: 'center',
+        width: 160,
+        render: (_: any, log: any) => <div className="flex justify-center">{getStatusBadge(log.status)}</div>
+      },
+      {
+        title: 'Thời gian',
+        key: 'created_at',
+        width: 230,
+        render: (_: any, log: any) => (
+          <div className="flex flex-col gap-1">
+            <div className="flex items-center gap-1.5 text-[11px] font-bold text-slate-600">
+              <Clock size={10} className="text-slate-400" />
+              {formatDateTime(log.created_at)}
+            </div>
+            {log.sent_at && (
+              <div className="flex items-center gap-1.5 text-[10px] font-medium text-emerald-600">
+                <CheckCircle2 size={10} />
+                Gửi lúc: {formatDateTime(log.sent_at)}
+              </div>
+            )}
+          </div>
+        )
+      },
+      {
+        title: 'Thao tác',
+        key: 'actions',
+        align: 'right',
+        width: 110,
+        render: (_: any, log: any) => (
+          <div className="flex justify-end pr-2">
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-9 w-9 rounded-xl hover:bg-blue-600 hover:text-white text-blue-600 transition-all shadow-sm hover:shadow-lg hover:shadow-blue-200"
+              onClick={() => handleViewDetails(log)}
+            >
+              <Eye size={18} />
+            </Button>
+          </div>
+        )
+      }
+    ],
+    []
+  );
+
   return (
     <div className="space-y-6">
       {/* Header & Filters */}
@@ -188,163 +276,36 @@ export default function EmailLogsContent() {
       </div>
 
       {/* Table */}
-      <Card className="border-none shadow-xl shadow-slate-200/50 rounded-3xl overflow-hidden bg-white">
+      <Card className="border-none shadow-xl shadow-slate-200/50 rounded-3xl overflow-hidden bg-white w-full min-w-0">
         <CardContent className="p-0">
-          <Table>
-            <TableHeader className="bg-slate-50/80">
-              <TableRow className="hover:bg-transparent border-none">
-                <TableHead className="w-16 text-center text-[10px] uppercase font-bold text-slate-400">ID</TableHead>
-                <TableHead className="text-[10px] uppercase font-bold text-slate-500">Người nhận & Tiêu đề</TableHead>
-                <TableHead className="text-[10px] uppercase font-bold text-slate-500">Loại email</TableHead>
-                <TableHead className="text-center text-[10px] uppercase font-bold text-slate-500">Trạng thái</TableHead>
-                <TableHead className="text-[10px] uppercase font-bold text-slate-500">Thời gian</TableHead>
-                <TableHead className="text-right text-[10px] uppercase font-bold text-slate-500 pr-6">
-                  Thao tác
-                </TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {isLoading && data.length === 0 ? (
-                Array.from({ length: 5 }).map((_, idx) => (
-                  <TableRow key={`sk-${idx}`}>
-                    <TableCell>
-                      <Skeleton className="h-4 w-10 mx-auto" />
-                    </TableCell>
-                    <TableCell>
-                      <div className="space-y-2">
-                        <Skeleton className="h-4 w-40" />
-                        <Skeleton className="h-3 w-60" />
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <Skeleton className="h-5 w-32" />
-                    </TableCell>
-                    <TableCell>
-                      <Skeleton className="h-6 w-24 mx-auto" />
-                    </TableCell>
-                    <TableCell>
-                      <Skeleton className="h-4 w-32" />
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <Skeleton className="h-8 w-8 ml-auto rounded-full" />
-                    </TableCell>
-                  </TableRow>
-                ))
-              ) : data.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={6} className="h-40 text-center">
-                    <div className="flex flex-col items-center justify-center gap-2 text-slate-400">
-                      <Mail size={40} className="opacity-20" />
-                      <p className="font-bold text-sm">Không tìm thấy bản ghi email nào</p>
-                    </div>
-                  </TableCell>
-                </TableRow>
-              ) : (
-                data.map((log) => (
-                  <TableRow
-                    key={log.id}
-                    className="group hover:bg-slate-50/80 transition-colors border-b last:border-0 h-20"
-                  >
-                    <TableCell className="text-center font-mono text-[11px] text-slate-400">{log.id}</TableCell>
-                    <TableCell>
-                      <div className="flex flex-col gap-1">
-                        <span className="font-black text-slate-900 text-sm">{log.recipient}</span>
-                        <span className="text-[11px] text-slate-500 line-clamp-1 italic">{log.subject}</span>
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex items-center gap-2">
-                        <div className="p-2 bg-slate-100 rounded-lg group-hover:bg-white transition-colors">
-                          {getTypeIcon(log.email_type)}
-                        </div>
-                        <span className="text-xs font-bold text-slate-700 uppercase tracking-tight">
-                          {log.email_type === 'welcome'
-                            ? 'Chào mừng'
-                            : log.email_type === 'reset_password'
-                              ? 'Quên mật khẩu'
-                              : log.email_type === 'booking_confirmation'
-                                ? 'Xác nhận đặt vé'
-                                : log.email_type}
-                        </span>
-                      </div>
-                    </TableCell>
-                    <TableCell className="text-center">
-                      <div className="flex justify-center">{getStatusBadge(log.status)}</div>
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex flex-col gap-1">
-                        <div className="flex items-center gap-1.5 text-[11px] font-bold text-slate-600">
-                          <Clock size={10} className="text-slate-400" />
-                          {formatDateTime(log.created_at)}
-                        </div>
-                        {log.sent_at && (
-                          <div className="flex items-center gap-1.5 text-[10px] font-medium text-emerald-600">
-                            <CheckCircle2 size={10} />
-                            Gửi lúc: {formatDateTime(log.sent_at)}
-                          </div>
-                        )}
-                      </div>
-                    </TableCell>
-                    <TableCell className="text-right pr-6">
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-9 w-9 rounded-xl hover:bg-blue-600 hover:text-white text-blue-600 transition-all shadow-sm hover:shadow-lg hover:shadow-blue-200"
-                        onClick={() => handleViewDetails(log)}
-                      >
-                        <Eye size={18} />
-                      </Button>
-                    </TableCell>
-                  </TableRow>
-                ))
-              )}
-            </TableBody>
-          </Table>
+          <AntTable
+            rowKey="id"
+            columns={columns}
+            dataSource={data}
+            loading={isLoading}
+            tableLayout="fixed"
+            scroll={{ x: 1020 }}
+            pagination={{
+              current: page,
+              pageSize: limit,
+              total,
+              showSizeChanger: false,
+              onChange: (p) => setPage(p)
+            }}
+            locale={{
+              emptyText: (
+                <div className="py-10 text-center text-slate-400">
+                  <div className="flex flex-col items-center justify-center gap-2">
+                    <Mail size={40} className="opacity-20" />
+                    <p className="font-bold text-sm">Không tìm thấy bản ghi email nào</p>
+                  </div>
+                </div>
+              )
+            }}
+            className="[&_.ant-table]:rounded-none [&_.ant-table-thead>tr>th]:bg-slate-50/80"
+          />
         </CardContent>
       </Card>
-
-      {/* Pagination */}
-      {totalPages > 1 && (
-        <Pagination className="mt-4">
-          <PaginationContent>
-            <PaginationItem>
-              <PaginationPrevious
-                href="#"
-                onClick={(e) => {
-                  e.preventDefault();
-                  if (page > 1) setPage(page - 1);
-                }}
-                className={page === 1 ? 'pointer-events-none opacity-50' : 'cursor-pointer'}
-              />
-            </PaginationItem>
-            {Array.from({ length: totalPages }).map((_, i) => (
-              <PaginationItem key={i}>
-                <PaginationLink
-                  href="#"
-                  isActive={page === i + 1}
-                  onClick={(e) => {
-                    e.preventDefault();
-                    setPage(i + 1);
-                  }}
-                  className="cursor-pointer"
-                >
-                  {i + 1}
-                </PaginationLink>
-              </PaginationItem>
-            ))}
-            <PaginationItem>
-              <PaginationNext
-                href="#"
-                onClick={(e) => {
-                  e.preventDefault();
-                  if (page < totalPages) setPage(page + 1);
-                }}
-                className={page === totalPages ? 'pointer-events-none opacity-50' : 'cursor-pointer'}
-              />
-            </PaginationItem>
-          </PaginationContent>
-        </Pagination>
-      )}
 
       {/* Details Dialog */}
       <Dialog open={isDetailsOpen} onOpenChange={setIsDetailsOpen}>
