@@ -170,6 +170,7 @@ export async function createTicketPackageImpl(
                 is_member_only?: boolean; // Chỉ dành cho thành viên
                 is_active?: boolean; // Trạng thái hoạt động
                 display_order?: number; // Thứ tự hiển thị
+                branch_id?: number; // Chi nhánh
         },
         RUN_ENV: any
 ) {
@@ -185,7 +186,8 @@ export async function createTicketPackageImpl(
                 max_group_size,
                 is_member_only,
                 is_active,
-                display_order
+                display_order,
+                branch_id
         } = args;
 
         // 1. Chuẩn bị thời gian tạo và cập nhật
@@ -267,6 +269,7 @@ export async function createTicketPackageImpl(
                         is_active: is_active ?? true,
                         // Mặc định thứ tự hiển thị là 0 nếu không xác định
                         display_order: Number(display_order ?? 0),
+                        branch_id: branch_id || null,
                         // Thời gian tạo và cập nhật
                         created_at: formattedNow,
                         updated_at: formattedNow
@@ -321,6 +324,7 @@ export async function updateTicketPackageImpl(
                 is_member_only?: boolean; // Chỉ dành cho thành viên
                 is_active?: boolean; // Trạng thái hoạt động
                 display_order?: number; // Thứ tự hiển thị
+                branch_id?: number; // Chi nhánh
         },
         RUN_ENV: any
 ) {
@@ -336,7 +340,8 @@ export async function updateTicketPackageImpl(
                 max_group_size,
                 is_member_only,
                 is_active,
-                display_order
+                display_order,
+                branch_id
         } = args;
 
         const now = new Date();
@@ -354,6 +359,7 @@ export async function updateTicketPackageImpl(
         if (is_member_only !== undefined) data.is_member_only = Boolean(is_member_only);
         if (is_active !== undefined) data.is_active = Boolean(is_active);
         if (display_order !== undefined) data.display_order = Number(display_order);
+        if (branch_id !== undefined) data.branch_id = branch_id;
 
         // 2. Tối ưu xử lý Features
         if (features !== undefined) {

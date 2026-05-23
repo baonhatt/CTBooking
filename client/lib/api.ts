@@ -8,3 +8,4 @@ export * from './api/toys';
 export * from './api/posts';
 export * from './api/admin';
 export * from './api/users';
+export * from './api/branches';

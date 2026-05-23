@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import AdminLayout from '@/admin/layouts/AdminLayout';
 import TicketsContent from '@/components/admin/content/TicketsContent';
-import { getTickets, deleteTicketApi } from '@/lib/api';
+import { getTickets, deleteTicketApi, getBranches } from '@/lib/api';
 
 interface TicketPackage {
         id: number;
@@ -30,13 +30,28 @@ export default function TicketsPage() {
         const [editData, setEditData] = useState<any>(null);
         const [isLoading, setIsLoading] = useState(false);
         const [showActiveOnly, setShowActiveOnly] = useState(true);
+        const [selectedBranchId, setSelectedBranchId] = useState<number | null>(null);
+        const [branches, setBranches] = useState<any[]>([]);
+
+        // Load branches
+        useEffect(() => {
+                (async () => {
+                        try {
+                                const { items } = await getBranches({ includeInactive: true });
+                                setBranches(items);
+                        } catch (error) {
+                                console.error('Error loading branches:', error);
+                        }
+                })();
+        }, []);
 
         const handleRefresh = async () => {
                 setIsLoading(true);
                 const { items, total } = await getTickets({
                         page,
                         pageSize,
-                        includeInactive: !showActiveOnly
+                        includeInactive: !showActiveOnly,
+                        branch_id: selectedBranchId
                 });
                 setTickets(
                         items.map((t: any) => ({
@@ -63,7 +78,7 @@ export default function TicketsPage() {
 
         useEffect(() => {
                 handleRefresh();
-        }, [page, showActiveOnly]);
+        }, [page, showActiveOnly, selectedBranchId]);
 
         const openCreate = () => {
                 setEditData({ id: 0, name: '', price: 0, is_active: true, features: [] });
@@ -102,6 +117,9 @@ export default function TicketsPage() {
                                 onRefresh={handleRefresh}
                                 deleteTicketApi={deleteTicketApi as any}
                                 isLoading={isLoading}
+                                branches={branches}
+                                selectedBranchId={selectedBranchId}
+                                setSelectedBranchId={setSelectedBranchId}
                                 showActiveOnly={showActiveOnly}
                                 setShowActiveOnly={setShowActiveOnly}
                         />
