@@ -49,6 +49,7 @@ export default function BookingPage() {
         const [paymentMethod, setPaymentMethod] = useState<'momo' | 'vnpay' | 'vietqr'>('vietqr');
         const [isProcessing, setIsProcessing] = useState(false);
         const [showMovies, setShowMovies] = useState(false);
+        const [formErrors, setFormErrors] = useState<{[key: string]: string}>({});
         const countdownRef = useRef<NodeJS.Timeout | null>(null);
         const [countdown, setCountdown] = useState(600);
         const [confirmChecked, setConfirmChecked] = useState(false);
@@ -203,11 +204,71 @@ export default function BookingPage() {
                 } catch { }
         }, [email, name, phone]);
 
+        // Clear form errors when fields become valid
+        useEffect(() => {
+                if (phone.length === 10 && phone.startsWith('0') && /^\d+$/.test(phone) && formErrors.phone) {
+                        clearFormError('phone');
+                }
+        }, [phone, formErrors.phone]);
+
+        useEffect(() => {
+                if (email && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) && /@(gmail\.com|outlook\.com|hotmail\.com|yahoo\.com|icloud\.com)$/i.test(email) && formErrors.email) {
+                        clearFormError('email');
+                }
+        }, [email, formErrors.email]);
+
         const resolveImageUrl = (u: string | undefined | null) => {
                 if (!u) return '';
                 if (u.startsWith('http')) return u;
                 const path = u.startsWith('/') ? u : `/${u}`;
                 return `${API_BASE_URL}${path}`;
+        };
+
+        const clearFormError = (field: string) => {
+                if (formErrors[field]) {
+                        setFormErrors(prev => ({ ...prev, [field]: '' }));
+                }
+        };
+
+        const validateForm = () => {
+                const errors: {[key: string]: string} = {};
+                
+                if (!selectedPackage?.id) {
+                        errors.ticketPackage = 'Vui lòng chọn loại vé';
+                }
+                
+                if (activeMoviesFull.length > 0 && selectedMovieIds.length === 0) {
+                        errors.movies = 'Vui lòng chọn ít nhất một phim';
+                }
+                
+                if (!name.trim()) {
+                        errors.name = 'Vui lòng nhập họ và tên';
+                } else if (name.trim().length < 2) {
+                        errors.name = 'Họ và tên phải có ít nhất 2 ký tự';
+                }
+                
+                if (!phone.trim()) {
+                        errors.phone = 'Vui lòng nhập số điện thoại';
+                } else if (phone.length !== 10) {
+                        errors.phone = 'Số điện thoại phải có 10 số';
+                } else if (!phone.startsWith('0')) {
+                        errors.phone = 'Số điện thoại phải bắt đầu bằng số 0';
+                } else if (phoneError) {
+                        errors.phone = phoneError;
+                }
+                
+                if (!email.trim()) {
+                        errors.email = 'Vui lòng nhập email';
+                } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+                        errors.email = 'Email không hợp lệ';
+                } else if (!/@(gmail\.com|outlook\.com|hotmail\.com|yahoo\.com|icloud\.com)$/i.test(email)) {
+                        errors.email = 'Vui lòng dùng Gmail, Outlook, Yahoo hoặc iCloud';
+                } else if (emailError) {
+                        errors.email = emailError;
+                }
+                
+                setFormErrors(errors);
+                return Object.keys(errors).length === 0;
         };
 
         const handleCreateAndPay = async () => {
@@ -494,6 +555,7 @@ export default function BookingPage() {
                                                                                                                 setActiveMoviesFull([]);
                                                                                                         }
                                                                                                         setMovie('');
+                                        clearFormError('ticketPackage');
                                                                                                 }}
                                                                                         >
                                                                                                 <SelectTrigger className="w-full bg-white/10 border-white/20 hover:bg-white/15 h-12 rounded-xl transition-all text-sm sm:text-base">
@@ -518,6 +580,9 @@ export default function BookingPage() {
                                                                                                         ))}
                                                                                                 </SelectContent>
                                                                                         </Select>
+                                                                                        {formErrors.ticketPackage && (
+                                                                                                <p className="text-orange-400 text-[10px] mt-1 animate-pulse">{formErrors.ticketPackage}</p>
+                                                                                        )}
                                                                                 </section>
 
                                                                                 {/* PHẦN 2: DANH SÁCH PHIM - Dạng thu gọn */}
@@ -540,7 +605,7 @@ export default function BookingPage() {
                                                                                                         <div className="animate-in fade-in zoom-in-95 duration-200">
                                                                                                                 {activeMoviesFull && activeMoviesFull.length > 0 ? (
                                                                                                                         /* Sử dụng grid-cols-2 cho mobile và grid-cols-5 cho desktop */
-                                                                                                                        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3 sm:gap-4">
+                                                                                                                        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3 sm:gap-4">
                                                                                                                                 {activeMoviesFull.map((m: any) => (
                                                                                                                                         <div
                                                                                                                                                 key={m.id}
@@ -552,9 +617,10 @@ export default function BookingPage() {
                                                                                                                                                                 }
                                                                                                                                                                 return [...prev, m.id];
                                                                                                                                                         });
+                                                                                                                                                        clearFormError('movies');
                                                                                                                                                 }}
-                                                                                                                                                className={`group relative rounded-xl overflow-hidden cursor-pointer transition-all shadow-lg hover:shadow-blue-500/10 ${selectedMovieIds.includes(m.id)
-                                                                                                                                                        ? 'border-2 border-blue-500 ring-2 ring-blue-500/30 bg-blue-500/10'
+                                                                                                                                                className={`group relative rounded-xl overflow-hidden cursor-pointer transition-all duration-300 shadow-lg hover:shadow-xl hover:shadow-blue-500/20 transform hover:scale-105 ${selectedMovieIds.includes(m.id)
+                                                                                                                                                        ? 'border-2 border-blue-500 ring-2 ring-blue-500/30 bg-blue-500/10 scale-105'
                                                                                                                                                         : 'border border-white/10 bg-white/5 hover:border-blue-500/50'
                                                                                                                                                         }`}
                                                                                                                                         >
@@ -564,7 +630,7 @@ export default function BookingPage() {
                                                                                                                                                                 src={optimizeCloudinaryUrl(m.cover_image, 200)}
                                                                                                                                                                 alt={m.title}
                                                                                                                                                                 loading="lazy"
-                                                                                                                                                                className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                                                                                                                                                                className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
                                                                                                                                                         />
                                                                                                                                                         {selectedMovieIds.includes(m.id) && (
                                                                                                                                                                 <div className="absolute top-2 right-2 z-10 w-6 h-6 bg-blue-600 rounded-full flex items-center justify-center border-2 border-white shadow-lg">
@@ -582,7 +648,7 @@ export default function BookingPage() {
                                                                                                                                                                         <span className="px-1 py-0.5 rounded bg-blue-600 text-[9px] text-white font-black">
                                                                                                                                                                                 {m.duration_min ? `${m.duration_min}'` : '--'}
                                                                                                                                                                         </span>
-                                                                                                                                                                        <span className="text-[9px] text-gray-300/90 truncate font-light italic">
+                                                                                                                                                                        <span className="text-[9px] text-gray-300/90 truncate font-light italic hidden sm:block">
                                                                                                                                                                                 {m.description || 'Phim đặc sắc'}
                                                                                                                                                                         </span>
                                                                                                                                                                 </div>
@@ -599,6 +665,14 @@ export default function BookingPage() {
                                                                                                         </div>
                                                                                                 )}
                                                                                         </section>
+                                                                                )}
+                                                                                {formErrors.movies && (
+                                                                                        <div className="bg-orange-500/10 border border-orange-500/30 rounded-lg p-3 animate-in fade-in duration-200">
+                                                                                                <p className="text-orange-400 text-sm flex items-center gap-2">
+                                                                                                        <span className="w-1 h-1 bg-orange-400 rounded-full"></span>
+                                                                                                        {formErrors.movies}
+                                                                                                </p>
+                                                                                        </div>
                                                                                 )}
 
                                                                                 {/* TÓM TẮT TẠM TÍNH (Chỉ hiện trên Desktop ở phía trái) */}
@@ -649,11 +723,18 @@ export default function BookingPage() {
                                                                                                         <Input
                                                                                                                 className="bg-white/5 border-white/10 focus:border-blue-500/50 focus:ring-blue-500/10 h-12 rounded-lg placeholder:text-gray-400 text-sm"
                                                                                                                 value={name}
-                                                                                                                onChange={(e) => setName(e.target.value)}
+                                                                                                                onChange={(e) => {
+                                                        setName(e.target.value);
+                                                        // Clear name error when user starts typing
+                                                        if (formErrors.name && e.target.value.trim().length >= 2) {
+                                                                setFormErrors(prev => ({ ...prev, name: '' }));
+                                                        }
+                                                }}
                                                                                                                 placeholder="Nhập họ và tên"
                                                                                                                 minLength={2}
                                                                                                         />
                                                                                                 </div>
+                                                                                                {formErrors.name && <p className="text-orange-400 text-[10px] mt-1 animate-pulse">{formErrors.name}</p>}
                                                                                                 <div className="space-y-1.5">
                                                                                                         <Label className="text-sm font-medium text-gray-400 ml-1">Số Điện Thoại</Label>
                                                                                                         <Input
@@ -677,6 +758,7 @@ export default function BookingPage() {
                                                                                                                 }}
                                                                                                         />
                                                                                                         {phoneError && <p className="text-orange-400 text-[10px] mt-1 animate-pulse">{phoneError}</p>}
+                                                                                                        {formErrors.phone && !phoneError && <p className="text-orange-400 text-[10px] mt-1 animate-pulse">{formErrors.phone}</p>}
                                                                                                 </div>
                                                                                                 <div className="space-y-1.5">
                                                                                                         <Label className="text-sm font-medium text-gray-400 ml-1">Email Nhận Vé</Label>
@@ -702,6 +784,7 @@ export default function BookingPage() {
                                                                                                                 }}
                                                                                                         />
                                                                                                         {emailError && <p className="text-orange-400 text-[10px] mt-1">{emailError}</p>}
+                                                                                                        {formErrors.email && !emailError && <p className="text-orange-400 text-[10px] mt-1 animate-pulse">{formErrors.email}</p>}
                                                                                                 </div>
                                                                                                 <div className="space-y-1.5">
                                                                                                         <Label className="text-sm font-medium text-gray-400 ml-1">Số Lượng Vé</Label>
@@ -778,21 +861,12 @@ export default function BookingPage() {
                                                                                         </Button>
 
                                                                                         <Button
-                                                                                                className="w-full lg:w-48 bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-500 hover:to-blue-400 text-white font-bold h-14 rounded-2xl shadow-lg shadow-blue-500/10 disabled:opacity-50 transition-all duration-300 transform active:scale-[0.98] whitespace-nowrap text-base"
+                                                                                                className="w-full lg:w-48 bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-500 hover:to-blue-400 text-white font-bold h-14 rounded-2xl shadow-lg shadow-blue-500/10 transition-all duration-300 transform active:scale-[0.98] whitespace-nowrap text-base"
                                                                                                 onClick={() => {
-                                                                                                        setShowEmailConfirmDialog(true);
+                                                                                                        if (validateForm()) {
+                                                                                                                setShowEmailConfirmDialog(true);
+                                                                                                        }
                                                                                                 }}
-                                                                                                disabled={
-                                                                                                        !selectedPackage ||
-                                                                                                        (activeMoviesFull.length > 0 && selectedMovieIds.length === 0) ||
-                                                                                                        !name ||
-                                                                                                        !phone ||
-                                                                                                        !email ||
-                                                                                                        isProcessing ||
-                                                                                                        !!phoneError ||
-                                                                                                        !!emailError ||
-                                                                                                        phone.length !== 10
-                                                                                                }
                                                                                         >
                                                                                                 <span className="flex items-center justify-center gap-2">
                                                                                                         Tiếp tục <ArrowRight className="w-5 h-5" />
@@ -1043,21 +1117,12 @@ export default function BookingPage() {
                                         </Button>
 
                                         <Button
-                                                className="flex-1 bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-500 hover:to-blue-400 text-white font-bold h-14 rounded-2xl shadow-none disabled:opacity-50 transition-all duration-300 transform active:scale-[0.98] whitespace-nowrap text-base"
+                                                className="flex-1 bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-500 hover:to-blue-400 text-white font-bold h-14 rounded-2xl shadow-none transition-all duration-300 transform active:scale-[0.98] whitespace-nowrap text-base"
                                                 onClick={() => {
-                                                        setShowEmailConfirmDialog(true);
+                                                        if (validateForm()) {
+                                                                setShowEmailConfirmDialog(true);
+                                                        }
                                                 }}
-                                                disabled={
-                                                        !selectedPackage ||
-                                                        (activeMoviesFull.length > 0 && selectedMovieIds.length === 0) ||
-                                                        !name ||
-                                                        !phone ||
-                                                        !email ||
-                                                        isProcessing ||
-                                                        !!phoneError ||
-                                                        !!emailError ||
-                                                        phone.length !== 10
-                                                }
                                         >
                                                 <span className="flex items-center justify-center gap-2">
                                                         Tiếp tục <ArrowRight className="w-5 h-5" />

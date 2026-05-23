@@ -28,8 +28,7 @@ export function MobileMenu({
   return (
     <Sheet>
       <SheetTrigger asChild>
-        <Button variant="default" className="bg-opacity-20 border-white/20 text-white w-10 h-10">
-          <Menu className="h-6 w-6" />
+        <Button variant="default" className="bg-white/10 backdrop-blur-md border-white/20 text-white w-10 h-10 hover:bg-white/20">
         </Button>
       </SheetTrigger>
 
@@ -46,7 +45,7 @@ export function MobileMenu({
               <img
                 src={icon}
                 alt="CINESPHERE"
-                className="h-16 w-16 cursor-pointer drop-shadow-[0_0_20px_rgba(59,130,246,0.5)]"
+                className="h-50 w-50 cursor-pointer drop-shadow-[0_0_20px_rgba(59,130,246,0.5)]"
               />
             </div>
 
