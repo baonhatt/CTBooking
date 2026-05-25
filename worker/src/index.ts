@@ -6,7 +6,7 @@ import * as schema from './schema';
 import { eq, desc, asc, and, like, or, sql, count } from 'drizzle-orm';
 import type { D1Database, R2Bucket } from '@cloudflare/workers-types';
 import bcrypt from 'bcryptjs';
-import { requireAuth, superAdminOnly } from './middleware';
+import { requireAuth, superAdminOnly, checkPermission } from './middleware';
 import { getAllActiveMoviesToday, listMovies, getMovie } from '../../server/routes/user/movies';
 import {
   createMovieImpl,
@@ -49,6 +49,14 @@ import {
   updateTicketPackageImpl,
   deleteTicketPackageImpl
 } from '../../server/routes/admin/tickets';
+import {
+  listBranchesImpl,
+  getBranchImpl,
+  getDefaultBranchImpl,
+  createBranchImpl,
+  updateBranchImpl,
+  deleteBranchImpl
+} from '../../server/routes/admin/branches';
 import { getEmailLogsImpl } from '../../server/routes/admin/email-logs';
 import { listActiveTicketPackages } from '../../server/routes/user/tickets';
 import {
@@ -73,69 +81,78 @@ import {
   deletePostImpl
 } from '../../server/routes/admin/posts';
 
+const PERMISSION_SEEDS = [
+  // Dashboard
+  { key: 'dashboard.view', name: 'Xem bảng điều khiển', group: 'dashboard' },
+  { key: 'dashboard.stats', name: 'Xem thống kê tổng quan', group: 'dashboard' },
+
+  // Users Management
+  { key: 'users.view', name: 'Xem danh sách người dùng', group: 'users' },
+  { key: 'users.create', name: 'Tạo người dùng mới', group: 'users' },
+  { key: 'users.edit', name: 'Sửa thông tin người dùng', group: 'users' },
+  { key: 'users.delete', name: 'Xóa người dùng', group: 'users' },
+
+  // Movies Management
+  { key: 'movies.view', name: 'Xem danh sách phim', group: 'movies' },
+  { key: 'movies.create', name: 'Thêm phim mới', group: 'movies' },
+  { key: 'movies.edit', name: 'Sửa thông tin phim', group: 'movies' },
+  { key: 'movies.delete', name: 'Xóa phim', group: 'movies' },
+  { key: 'movies.publish', name: 'Xuất bản / Ẩn phim', group: 'movies' },
+
+  // Toys Management
+  { key: 'toys.view', name: 'Xem danh sách đồ chơi', group: 'toys' },
+  { key: 'toys.create', name: 'Thêm đồ chơi mới', group: 'toys' },
+  { key: 'toys.edit', name: 'Sửa thông tin đồ chơi', group: 'toys' },
+  { key: 'toys.delete', name: 'Xóa đồ chơi', group: 'toys' },
+
+  // Posts Management
+  { key: 'posts.view', name: 'Xem danh sách bài viết', group: 'posts' },
+  { key: 'posts.create', name: 'Tạo bài viết mới', group: 'posts' },
+  { key: 'posts.edit', name: 'Sửa bài viết', group: 'posts' },
+  { key: 'posts.delete', name: 'Xóa bài viết', group: 'posts' },
+  { key: 'posts.publish', name: 'Xuất bản / Ẩn bài viết', group: 'posts' },
+
+  // Branches Management
+  { key: 'branches.view', name: 'Xem danh sách chi nhánh', group: 'branches' },
+  { key: 'branches.create', name: 'Tạo chi nhánh mới', group: 'branches' },
+  { key: 'branches.edit', name: 'Sửa chi nhánh', group: 'branches' },
+  { key: 'branches.delete', name: 'Xóa chi nhánh', group: 'branches' },
+
+  // Tickets Management
+  { key: 'tickets.view', name: 'Xem danh sách gói vé', group: 'tickets' },
+  { key: 'tickets.create', name: 'Tạo gói vé mới', group: 'tickets' },
+  { key: 'tickets.edit', name: 'Sửa gói vé', group: 'tickets' },
+  { key: 'tickets.delete', name: 'Xóa gói vé', group: 'tickets' },
+
+  // Transactions
+  { key: 'transactions.view', name: 'Xem lịch sử giao dịch', group: 'transactions' },
+  { key: 'transactions.refund', name: 'Hoàn tiền giao dịch', group: 'transactions' },
+
+  // Ticket Check
+  { key: 'ticket_check.scan', name: 'Quét mã vé', group: 'ticket_check' },
+  { key: 'ticket_check.validate', name: 'Xác thực vé', group: 'ticket_check' },
+  { key: 'ticket_check.history', name: 'Xem lịch sử kiểm tra', group: 'ticket_check' },
+
+  // Uploads
+  { key: 'uploads.view', name: 'Xem danh sách file', group: 'uploads' },
+  { key: 'uploads.upload', name: 'Tải file lên', group: 'uploads' },
+  { key: 'uploads.delete', name: 'Xóa file', group: 'uploads' },
+
+  // Email Logs
+  { key: 'email_logs.view', name: 'Xem lịch sử email', group: 'email_logs' },
+  { key: 'email_logs.resend', name: 'Gửi lại email', group: 'email_logs' },
+
+  // System Settings
+  { key: 'settings.manage', name: 'Quản lý cài đặt hệ thống', group: 'settings' },
+  { key: 'reports.view', name: 'Xem báo cáo thống kê', group: 'reports' }
+];
+
 async function ensurePermissionsSeeded(db: any) {
-  const existing = await db.query.permissions.findFirst();
-  if (existing) return;
-
-  await db.insert(schema.permissions).values([
-    // Dashboard
-    { key: 'dashboard.view', name: 'Xem bảng điều khiển', group: 'dashboard' },
-    { key: 'dashboard.stats', name: 'Xem thống kê tổng quan', group: 'dashboard' },
-
-    // Users Management
-    { key: 'users.view', name: 'Xem danh sách người dùng', group: 'users' },
-    { key: 'users.create', name: 'Tạo người dùng mới', group: 'users' },
-    { key: 'users.edit', name: 'Sửa thông tin người dùng', group: 'users' },
-    { key: 'users.delete', name: 'Xóa người dùng', group: 'users' },
-
-    // Movies Management
-    { key: 'movies.view', name: 'Xem danh sách phim', group: 'movies' },
-    { key: 'movies.create', name: 'Thêm phim mới', group: 'movies' },
-    { key: 'movies.edit', name: 'Sửa thông tin phim', group: 'movies' },
-    { key: 'movies.delete', name: 'Xóa phim', group: 'movies' },
-    { key: 'movies.publish', name: 'Xuất bản / Ẩn phim', group: 'movies' },
-
-    // Toys Management
-    { key: 'toys.view', name: 'Xem danh sách đồ chơi', group: 'toys' },
-    { key: 'toys.create', name: 'Thêm đồ chơi mới', group: 'toys' },
-    { key: 'toys.edit', name: 'Sửa thông tin đồ chơi', group: 'toys' },
-    { key: 'toys.delete', name: 'Xóa đồ chơi', group: 'toys' },
-
-    // Posts Management
-    { key: 'posts.view', name: 'Xem danh sách bài viết', group: 'posts' },
-    { key: 'posts.create', name: 'Tạo bài viết mới', group: 'posts' },
-    { key: 'posts.edit', name: 'Sửa bài viết', group: 'posts' },
-    { key: 'posts.delete', name: 'Xóa bài viết', group: 'posts' },
-    { key: 'posts.publish', name: 'Xuất bản / Ẩn bài viết', group: 'posts' },
-
-    // Tickets Management
-    { key: 'tickets.view', name: 'Xem danh sách gói vé', group: 'tickets' },
-    { key: 'tickets.create', name: 'Tạo gói vé mới', group: 'tickets' },
-    { key: 'tickets.edit', name: 'Sửa gói vé', group: 'tickets' },
-    { key: 'tickets.delete', name: 'Xóa gói vé', group: 'tickets' },
-
-    // Transactions
-    { key: 'transactions.view', name: 'Xem lịch sử giao dịch', group: 'transactions' },
-    { key: 'transactions.refund', name: 'Hoàn tiền giao dịch', group: 'transactions' },
-
-    // Ticket Check
-    { key: 'ticket_check.scan', name: 'Quét mã vé', group: 'ticket_check' },
-    { key: 'ticket_check.validate', name: 'Xác thực vé', group: 'ticket_check' },
-    { key: 'ticket_check.history', name: 'Xem lịch sử kiểm tra', group: 'ticket_check' },
-
-    // Uploads
-    { key: 'uploads.view', name: 'Xem danh sách file', group: 'uploads' },
-    { key: 'uploads.upload', name: 'Tải file lên', group: 'uploads' },
-    { key: 'uploads.delete', name: 'Xóa file', group: 'uploads' },
-
-    // Email Logs
-    { key: 'email_logs.view', name: 'Xem lịch sử email', group: 'email_logs' },
-    { key: 'email_logs.resend', name: 'Gửi lại email', group: 'email_logs' },
-
-    // System Settings
-    { key: 'settings.manage', name: 'Quản lý cài đặt hệ thống', group: 'settings' },
-    { key: 'reports.view', name: 'Xem báo cáo thống kê', group: 'reports' }
-  ]);
+  const existing = await db.select({ key: schema.permissions.key }).from(schema.permissions);
+  const existingKeys = new Set((existing ?? []).map((row: any) => row.key));
+  const missing = PERMISSION_SEEDS.filter((perm) => !existingKeys.has(perm.key));
+  if (!missing.length) return;
+  await db.insert(schema.permissions).values(missing);
 }
 
 async function bootstrapSuperAdminIfNeeded(db: any, env: any, loginEmail: string) {
@@ -531,6 +548,123 @@ app.get('/api/admin/permissions', requireAuth, superAdminOnly, async (c) => {
       grouped[r.group].push({ key: r.key, name: r.name });
     }
     return c.json(grouped);
+  } catch (err: any) {
+    return c.json({ status: 'error', message: String(err?.message || 'Internal error') }, 500);
+  }
+});
+
+// Branch management (admin)
+app.get('/api/admin/branches', requireAuth, checkPermission('branches.view'), async (c) => {
+  try {
+    const pageRaw = Number(c.req.query('page') ?? 1);
+    const pageSizeRaw = Number(c.req.query('pageSize') ?? 10);
+    const page = Number.isFinite(pageRaw) && pageRaw > 0 ? pageRaw : 1;
+    const pageSize = Number.isFinite(pageSizeRaw) && pageSizeRaw > 0 ? pageSizeRaw : 10;
+    const qParam = c.req.query('q');
+    const includeInactive = c.req.query('includeInactive') === 'true';
+    const db = drizzle(c.env.cinema_db, { schema });
+    const result = await listBranchesImpl(
+      db,
+      {
+        branches: schema.branches,
+        movies: schema.movies,
+        ticket_packages: schema.ticket_packages,
+        bookings: schema.bookings
+      },
+      { page, pageSize, q: typeof qParam === 'string' ? qParam : '', includeInactive }
+    );
+    return c.json(result, 200);
+  } catch (err: any) {
+    return c.json({ status: 'error', message: String(err?.message || 'Internal error') }, 500);
+  }
+});
+
+app.get('/api/admin/branches/:id', requireAuth, checkPermission('branches.view'), async (c) => {
+  try {
+    const id = Number(c.req.param('id'));
+    if (Number.isNaN(id)) return c.json({ message: 'ID không hợp lệ' }, 400);
+    const db = drizzle(c.env.cinema_db, { schema });
+    const branch = await getBranchImpl(db, { branches: schema.branches }, id);
+    if (!branch) return c.json({ message: 'Không tìm thấy chi nhánh' }, 404);
+    return c.json({ branch }, 200);
+  } catch (err: any) {
+    return c.json({ status: 'error', message: String(err?.message || 'Internal error') }, 500);
+  }
+});
+
+app.post('/api/admin/branches', requireAuth, checkPermission('branches.create'), async (c) => {
+  try {
+    const db = drizzle(c.env.cinema_db, { schema });
+    const body = await c.req.json().catch(() => ({}));
+    const result = await createBranchImpl(db, { branches: schema.branches }, body);
+    return c.json({ status: 'success', branch: result.item }, 201);
+  } catch (err: any) {
+    return c.json({ status: 'error', message: String(err?.message || 'Internal error') }, 500);
+  }
+});
+
+app.put('/api/admin/branches/:id', requireAuth, checkPermission('branches.edit'), async (c) => {
+  try {
+    const id = Number(c.req.param('id'));
+    if (Number.isNaN(id)) return c.json({ message: 'ID không hợp lệ' }, 400);
+    const db = drizzle(c.env.cinema_db, { schema });
+    const body = await c.req.json().catch(() => ({}));
+    const result = await updateBranchImpl(db, { branches: schema.branches }, id, body);
+    if (!result) return c.json({ message: 'Không tìm thấy chi nhánh' }, 404);
+    return c.json({ status: 'success', branch: result }, 200);
+  } catch (err: any) {
+    return c.json({ status: 'error', message: String(err?.message || 'Internal error') }, 500);
+  }
+});
+
+app.delete('/api/admin/branches/:id', requireAuth, checkPermission('branches.delete'), async (c) => {
+  try {
+    const id = Number(c.req.param('id'));
+    if (Number.isNaN(id)) return c.json({ message: 'ID không hợp lệ' }, 400);
+    const db = drizzle(c.env.cinema_db, { schema });
+    const result = await deleteBranchImpl(
+      db,
+      {
+        branches: schema.branches,
+        movies: schema.movies,
+        ticket_packages: schema.ticket_packages,
+        bookings: schema.bookings
+      },
+      id
+    );
+    if (!result) return c.json({ message: 'Không tìm thấy chi nhánh' }, 404);
+    return c.json({ status: 'success', message: 'Đã xóa chi nhánh' }, 200);
+  } catch (err: any) {
+    return c.json({ status: 'error', message: String(err?.message || 'Internal error') }, 500);
+  }
+});
+
+// Branch public endpoints
+app.get('/api/branches/default', async (c) => {
+  try {
+    const db = drizzle(c.env.cinema_db, { schema });
+    const branch = await getDefaultBranchImpl(db, { branches: schema.branches });
+    if (!branch) return c.json({ message: 'Không tìm thấy chi nhánh mặc định' }, 404);
+    return c.json({ branch }, 200);
+  } catch (err: any) {
+    return c.json({ status: 'error', message: String(err?.message || 'Internal error') }, 500);
+  }
+});
+
+app.get('/api/branches', async (c) => {
+  try {
+    const db = drizzle(c.env.cinema_db, { schema });
+    const result = await listBranchesImpl(
+      db,
+      {
+        branches: schema.branches,
+        movies: schema.movies,
+        ticket_packages: schema.ticket_packages,
+        bookings: schema.bookings
+      },
+      { page: 1, pageSize: 100, q: '', includeInactive: false }
+    );
+    return c.json(result, 200);
   } catch (err: any) {
     return c.json({ status: 'error', message: String(err?.message || 'Internal error') }, 500);
   }

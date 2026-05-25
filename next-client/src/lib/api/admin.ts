@@ -177,3 +177,13 @@ export async function getEmailLogsApi(options?: {
     };
   }>(path, { signal: options?.signal });
 }
+
+export async function getAdminMe() {
+  return request<{
+    id: number;
+    name: string;
+    email: string;
+    role: string;
+    permissions: string[];
+  }>('/api/admin/me');
+}

@@ -18,6 +18,10 @@ import TicketsPage from '@/pages/admin/Tickets';
 import TicketCheckPage from '@/pages/admin/TicketCheck';
 import UploadsPage from '@/pages/admin/Uploads';
 import SettingsPage from '@/pages/admin/Settings';
+import BranchesPage from '@/pages/admin/Branches';
+import UserEditDetailPage from '@/pages/admin/UserEditDetail';
+import UserDetailPage from '@/pages/admin/UserDetail';
+import UserCreatePage from '@/pages/admin/UserCreate';
 // import { adminLoginApi } from "@/lib/api";
 import { adminLoginApi, getAdminMe } from '@/lib/api/admin';
 
@@ -220,6 +224,9 @@ export const AdminGate = () => {
     <Routes>
       <Route path="/" element={canAccess('/') ? <DashboardPage /> : <Navigate to={firstAllowedPath} replace />} />
       {canAccess('/users') && <Route path="/users" element={<UsersPage />} />}
+      {canAccess('/users') && <Route path="/users/create" element={<UserCreatePage />} />}
+      {canAccess('/users') && <Route path="/users/:id" element={<UserDetailPage />} />}
+      {canAccess('/users') && <Route path="/users/:id/edit" element={<UserEditDetailPage />} />}
       {canAccess('/movies') && <Route path="/movies" element={<MoviesPage />} />}
       {canAccess('/toys') && <Route path="/toys" element={<ToysPage />} />}
       {canAccess('/posts') && <Route path="/posts" element={<PostsPage />} />}
@@ -227,6 +234,7 @@ export const AdminGate = () => {
       {canAccess('/tickets') && <Route path="/tickets" element={<TicketsPage />} />}
       {canAccess('/transactions') && <Route path="/transactions" element={<TransactionsPage />} />}
       {canAccess('/ticket-check') && <Route path="/ticket-check" element={<TicketCheckPage />} />}
+      {canAccess('/branches') && <Route path="/branches" element={<BranchesPage />} />}
       {canAccess('/uploads') && <Route path="/uploads" element={<UploadsPage />} />}
       {canAccess('/email-logs') && <Route path="/email-logs" element={<EmailLogsPage />} />}
       {canAccess('/settings') && <Route path="/settings" element={<SettingsPage />} />}

@@ -84,7 +84,8 @@ export function checkPermission(requiredPermission: string) {
     }
 
     if (user.role === 'super_admin') {
-      return next();
+      await next();
+      return;
     }
 
     if (user.is_active === false) {
@@ -103,6 +104,6 @@ export function checkPermission(requiredPermission: string) {
       );
     }
 
-    return next();
+    await next();
   };
 }

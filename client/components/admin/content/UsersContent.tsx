@@ -1,4 +1,5 @@
 import React, { useMemo, useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -38,6 +39,7 @@ export default function UsersContent({
   onRefresh,
   isLoading = false
 }: Props) {
+  const navigate = useNavigate();
   const { isViewer, isSuperAdmin, hasPermission } = useAdminPermissions();
   const [isDetailsOpen, setIsDetailsOpen] = useState(false);
   const [selectedUserId, setSelectedUserId] = useState<number | null>(null);
@@ -195,7 +197,7 @@ export default function UsersContent({
                 variant="ghost"
                 size="icon"
                 className="h-8 w-8 rounded-full hover:bg-blue-50 text-blue-600 transition-colors"
-                onClick={() => handleViewDetails(Number(u.id))}
+                onClick={() => navigate(`/users/${u.id}`)}
                 title="Xem chi tiết"
               >
                 <Eye size={16} />
@@ -205,7 +207,7 @@ export default function UsersContent({
                   variant="ghost"
                   size="icon"
                   className="h-8 w-8 rounded-full hover:bg-green-50 text-green-600 transition-colors"
-                  onClick={() => onEdit('user', u)}
+                  onClick={() => navigate(`/users/${u.id}/edit`)}
                   title="Chỉnh sửa"
                 >
                   <Edit size={16} />
@@ -246,7 +248,7 @@ export default function UsersContent({
         </div>
       </div>
       {!isViewer && (isSuperAdmin || hasPermission('users.create')) && (
-        <Button onClick={onCreate} disabled={!onCreate} className="rounded-xl shadow-sm shrink-0 h-10">
+        <Button onClick={() => navigate('/users/create')} className="rounded-xl shadow-sm shrink-0 h-10">
           Tạo người dùng
         </Button>
       )}

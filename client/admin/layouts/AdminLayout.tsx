@@ -1,6 +1,20 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { Home, Users, Film, Puzzle, FileText, Ticket, Receipt, Scan, Upload, Mail, Settings, LogOut } from 'lucide-react';
+import {
+  Home,
+  Users,
+  Film,
+  Puzzle,
+  FileText,
+  Ticket,
+  Receipt,
+  Scan,
+  Upload,
+  Mail,
+  Settings,
+  LogOut,
+  Building2
+} from 'lucide-react';
 import { getAdminProfileFromStorage } from '@/lib/admin-profile-utils';
 
 interface AdminLayoutProps {
@@ -52,6 +66,12 @@ export const adminNavigationItems: NavigationItem[] = [
     url: '/ticket-check',
     icon: Scan,
     requiredPermissions: ['ticket_check.scan', 'ticket_check.validate', 'ticket_check.history']
+  },
+  {
+    title: 'Chi nhánh',
+    url: '/branches',
+    icon: Building2,
+    requiredPermissions: ['branches.view', 'branches.create', 'branches.edit', 'branches.delete']
   },
   { title: 'Tải lên', url: '/uploads', icon: Upload, requiredPermissions: ['uploads.view', 'uploads.upload', 'uploads.delete'] },
   { title: 'Nhật ký email', url: '/email-logs', icon: Mail, requiredPermissions: ['email_logs.view', 'email_logs.resend'] },

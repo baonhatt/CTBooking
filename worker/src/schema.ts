@@ -56,6 +56,19 @@ export const user_permissions = sqliteTable('user_permissions', {
   granted_at: text('granted_at')
 });
 
+export const branches = sqliteTable('branches', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  name: text('name').notNull(),
+  code: text('code').unique(),
+  address: text('address'),
+  phone: text('phone'),
+  email: text('email'),
+  is_default: integer('is_default', { mode: 'boolean' }).default(false),
+  is_active: integer('is_active', { mode: 'boolean' }).default(true),
+  created_at: text('created_at').notNull(),
+  updated_at: text('updated_at').notNull()
+});
+
 export const movies = sqliteTable('movies', {
   id: integer('id').primaryKey({ autoIncrement: true }),
   title: text('title').notNull(),
@@ -68,7 +81,8 @@ export const movies = sqliteTable('movies', {
   created_at: text('created_at').notNull(),
   updated_at: text('updated_at').notNull(),
   is_active: integer('is_active', { mode: 'boolean' }).default(true),
-  release_date: text('release_date')
+  release_date: text('release_date'),
+  branch_id: integer('branch_id').references(() => branches.id)
 });
 
 export const ticket_packages = sqliteTable('ticket_packages', {
@@ -86,7 +100,8 @@ export const ticket_packages = sqliteTable('ticket_packages', {
   is_active: integer('is_active', { mode: 'boolean' }).default(true),
   display_order: integer('display_order').default(0),
   created_at: text('created_at').notNull(),
-  updated_at: text('updated_at').notNull()
+  updated_at: text('updated_at').notNull(),
+  branch_id: integer('branch_id').references(() => branches.id)
 });
 
 export const bookings = sqliteTable('bookings', {
@@ -119,6 +134,7 @@ export const bookings = sqliteTable('bookings', {
     onDelete: 'cascade'
   }),
   ticket_package_id: integer('ticket_package_id').references(() => ticket_packages.id),
+  branch_id: integer('branch_id').references(() => branches.id),
   expiry_date: text('expiry_date'),
   checked_in_at: text('checked_in_at')
 });
@@ -228,7 +244,17 @@ export const userPermissionsRelations = relations(user_permissions, ({ one }) =>
   })
 }));
 
-export const moviesRelations = relations(movies, ({ many }) => ({
+export const branchesRelations = relations(branches, ({ many }) => ({
+  movies: many(movies),
+  ticket_packages: many(ticket_packages),
+  bookings: many(bookings)
+}));
+
+export const moviesRelations = relations(movies, ({ one, many }) => ({
+  branch: one(branches, {
+    fields: [movies.branch_id],
+    references: [branches.id]
+  }),
   bookings: many(bookings)
 }));
 
@@ -244,5 +270,9 @@ export const bookingsRelations = relations(bookings, ({ one }) => ({
   ticket_package: one(ticket_packages, {
     fields: [bookings.ticket_package_id],
     references: [ticket_packages.id]
+  }),
+  branch: one(branches, {
+    fields: [bookings.branch_id],
+    references: [branches.id]
   })
 }));
