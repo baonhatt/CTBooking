@@ -2,6 +2,8 @@ import React, { useEffect, useState } from 'react';
 import AdminLayout from '@/admin/layouts/AdminLayout';
 import TicketsContent from '@/components/admin/content/TicketsContent';
 import { getTickets, deleteTicketApi, getBranches } from '@/lib/api';
+import { useStaffStore } from '@/store/staffStore';
+import { useNavigate } from 'react-router-dom';
 
 interface TicketPackage {
         id: number;
@@ -20,6 +22,9 @@ interface TicketPackage {
 }
 
 export default function TicketsPage() {
+        const navigate = useNavigate();
+        const staff = useStaffStore((state) => state.staff);
+        const clearStaff = useStaffStore((state) => state.clearStaff);
         const [tickets, setTickets] = useState<TicketPackage[]>([]);
         const [page, setPage] = useState(1);
         const pageSize = 10;
@@ -90,17 +95,18 @@ export default function TicketsPage() {
                 setIsEditOpen(true);
         };
 
+        const handleLogout = () => {
+                localStorage.removeItem('staffToken');
+                clearStaff();
+                navigate('/login');
+        };
+
         return (
                 <AdminLayout
                         active={'tickets' as any}
                         setActive={(() => { }) as any}
-                        adminEmailState={localStorage.getItem('adminEmail') || 'admin@email.com'}
-                        handleLogout={() => {
-                                localStorage.removeItem('adminToken');
-                                localStorage.removeItem('adminEmail');
-                                window.dispatchEvent(new Event('admin-auth-changed'));
-                                window.location.href = '/';
-                        }}
+                        adminEmailState={staff?.email || 'admin@email.com'}
+                        handleLogout={handleLogout}
                 >
                         <TicketsContent
                                 data={tickets}

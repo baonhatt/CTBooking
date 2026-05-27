@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import AdminLayout from '@/admin/layouts/AdminLayout';
+import { useStaffStore } from '@/store/staffStore';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
@@ -37,6 +38,8 @@ const ALL_TABS = [
 
 export default function SettingsPage() {
         const navigate = useNavigate();
+        const staff = useStaffStore((state) => state.staff);
+        const clearStaff = useStaffStore((state) => state.clearStaff);
         const [adminEmail, setAdminEmail] = useState('');
         const [hiddenTabs, setHiddenTabs] = useState<string[]>(() => {
                 if (window.location.hostname !== 'localhost') return [];
@@ -55,7 +58,7 @@ export default function SettingsPage() {
         const isProd = window.location.hostname !== 'localhost';
 
         useEffect(() => {
-                setAdminEmail(localStorage.getItem('adminEmail') || 'admin@email.com');
+                setAdminEmail(staff?.email || 'admin@email.com');
 
                 // Sync with server if in production
                 if (isProd) {
@@ -87,13 +90,7 @@ export default function SettingsPage() {
         };
 
         const handleToggleTab = async (key: string) => {
-                if (key === 'posts' || key === 'posts-user') {
-                        const password = window.prompt("Nhập mật khẩu để thay đổi cài đặt Bài viết:");
-                        if (password !== 'nhat123') {
-                                alert("Mật khẩu không đúng!");
-                                return;
-                        }
-                }
+                // Password check removed - access is already protected by RBAC and staff authentication
 
                 const newHidden = hiddenTabs.includes(key) ? hiddenTabs.filter((k) => k !== key) : [...hiddenTabs, key];
 
@@ -133,14 +130,13 @@ export default function SettingsPage() {
         };
 
         const handleLogout = () => {
-                localStorage.removeItem('adminToken');
-                localStorage.removeItem('adminEmail');
-                window.dispatchEvent(new Event('admin-auth-changed'));
-                navigate('/');
+                localStorage.removeItem('staffToken');
+                clearStaff();
+                navigate('/login');
         };
 
         return (
-                <AdminLayout active="settings" setActive={() => { }} adminEmailState={adminEmail} handleLogout={handleLogout}>
+                <AdminLayout active="settings" setActive={() => { }} adminEmailState={staff?.email || 'admin@email.com'} handleLogout={handleLogout}>
                         <div className="space-y-6 max-w-5xl mx-auto">
                                 {/* Header */}
                                 <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-2">

@@ -2,8 +2,13 @@ import React, { useEffect, useState } from 'react';
 import AdminLayout from '@/admin/layouts/AdminLayout';
 import DashboardContent from '@/components/admin/content/DashboardContent';
 import { getDashboardMetrics, getRevenueByDate, getRevenue7Days, getRevenueByMonth, getTransactions, getBranches } from '@/lib/api';
+import { useStaffStore } from '@/store/staffStore';
+import { useNavigate } from 'react-router-dom';
 
 export default function DashboardPage() {
+        const navigate = useNavigate();
+        const staff = useStaffStore((state) => state.staff);
+        const clearStaff = useStaffStore((state) => state.clearStaff);
         const [metrics, setMetrics] = useState({
                 totalMovies: 0,
                 totalToys: 0,
@@ -161,17 +166,18 @@ export default function DashboardPage() {
                 })();
         }, [selectedYear, refreshKey]);
 
+        const handleLogout = () => {
+                localStorage.removeItem('staffToken');
+                clearStaff();
+                navigate('/login');
+        };
+
         return (
                 <AdminLayout
                         active={'dashboard' as any}
                         setActive={(() => { }) as any}
-                        adminEmailState={localStorage.getItem('adminEmail') || 'admin@email.com'}
-                        handleLogout={() => {
-                                localStorage.removeItem('adminToken');
-                                localStorage.removeItem('adminEmail');
-                                window.dispatchEvent(new Event('admin-auth-changed'));
-                                window.location.href = '/';
-                        }}
+                        adminEmailState={staff?.email || 'admin@email.com'}
+                        handleLogout={handleLogout}
                 >
                         <DashboardContent
                                 metrics={metrics}

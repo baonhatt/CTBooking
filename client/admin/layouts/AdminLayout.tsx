@@ -18,6 +18,7 @@ import {
         X
 } from 'lucide-react';
 import { buildUrl } from '@/lib/api/http';
+import { useStaffPermissions } from '@/hooks/useStaffPermission';
 
 interface Props {
         active:
@@ -32,7 +33,10 @@ interface Props {
         | 'uploads'
         | 'email-logs'
         | 'settings'
-        | 'branches';
+        | 'branches'
+        | 'staff'
+        | 'roles'
+        | 'audit-logs';
         setActive: (x: Props['active']) => void;
         adminEmailState: string;
         handleLogout: () => void;
@@ -42,14 +46,42 @@ interface Props {
 export default function AdminLayout({ active, setActive, adminEmailState, handleLogout, children }: Props) {
         const navigate = useNavigate();
         const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+        const permissions = useStaffPermissions();
+        const isSuperAdmin = permissions.some((p) => p.module === 'super_admin');
 
         function go(tab: Props['active']) {
                 setActive(tab);
                 setIsSidebarOpen(false); // Close sidebar on mobile when navigating
-                navigate(`/${tab === 'ticket-check' ? 'ticket-check' : tab}`);
+                const path = tab === 'ticket-check' ? 'ticket-check' : tab === 'audit-logs' ? 'audit-logs' : tab;
+                navigate(`/${path}`);
         }
         const itemClass = (isActive: boolean) =>
                 `w-full justify-start gap-2 rounded-md ${isActive ? 'bg-white/10 text-white' : 'text-white/90'} hover:bg-white/10`;
+
+        // Check if user has permission for a module/action
+        const hasPermission = (module: string, action: string) => {
+                if (isSuperAdmin) return true;
+                return permissions.some((p) => p.module === module && p.action === action);
+        };
+
+        // Map menu items to their required permissions
+        const menuPermissions: Record<string, { module: string; action: string }> = {
+                dashboard: { module: 'dashboard', action: 'view' },
+                users: { module: 'users', action: 'view' },
+                movies: { module: 'movies', action: 'view' },
+                toys: { module: 'toys', action: 'view' },
+                posts: { module: 'posts', action: 'view' },
+                tickets: { module: 'tickets', action: 'view' },
+                transactions: { module: 'transactions', action: 'view' },
+                'ticket-check': { module: 'ticket_check', action: 'scan' },
+                branches: { module: 'branches', action: 'view' },
+                staff: { module: 'staff', action: 'view' },
+                roles: { module: 'roles', action: 'view' },
+                'audit-logs': { module: 'audit_logs', action: 'view' },
+                uploads: { module: 'uploads', action: 'view' },
+                'email-logs': { module: 'email_logs', action: 'view' },
+                settings: { module: 'settings', action: 'view' },
+        };
 
         const [hiddenTabs, setHiddenTabs] = React.useState<string[] | { hidden_tabs: string[] }>(() => {
                 const stored = localStorage.getItem('admin_sidebar_hidden_tabs');
@@ -108,11 +140,16 @@ export default function AdminLayout({ active, setActive, adminEmailState, handle
                 { key: 'transactions' as const, label: 'Giao dịch', icon: <CreditCard className="h-4 w-4" /> },
                 { key: 'ticket-check' as const, label: 'Kiểm Tra Vé', icon: <ScanLine className="h-4 w-4" /> },
                 { key: 'branches' as const, label: 'Chi nhánh', icon: <Settings className="h-4 w-4" /> },
+                { key: 'staff' as const, label: 'Nhân viên', icon: <UsersIcon className="h-4 w-4" /> },
+                { key: 'roles' as const, label: 'Quyền & Vai trò', icon: <Settings className="h-4 w-4" /> },
+                { key: 'audit-logs' as const, label: 'Nhật ký', icon: <FileText className="h-4 w-4" /> },
                 { key: 'uploads' as const, label: 'Uploads', icon: <Clapperboard className="h-4 w-4" /> },
                 { key: 'email-logs' as const, label: 'Email Logs', icon: <Mail className="h-4 w-4" /> }
         ].filter((item) => {
                 const hiddenTabsArray = Array.isArray(hiddenTabs) ? hiddenTabs : (hiddenTabs?.hidden_tabs || []);
-                return !hiddenTabsArray.includes(item.key);
+                const perm = menuPermissions[item.key];
+                const hasPerm = perm ? hasPermission(perm.module, perm.action) : true;
+                return !hiddenTabsArray.includes(item.key) && hasPerm;
         });
 
         return (
@@ -164,9 +201,17 @@ export default function AdminLayout({ active, setActive, adminEmailState, handle
                                 </div>
 
                                 <div className="space-y-2 mt-auto pt-8 border-t border-white/5">
-                                        <Button variant="ghost" onClick={() => go('settings')} className={itemClass(active === 'settings')}>
-                                                <Settings className="h-4 w-4" /> Cấu hình
-                                        </Button>
+                                        {hasPermission('settings', 'view') && (
+                                                <Button variant="ghost" onClick={() => go('settings')} className={itemClass(active === 'settings')}>
+                                                        <Settings className="h-4 w-4" /> Cấu hình
+                                                </Button>
+                                        )}
+                                        <div className="px-3 py-2 flex items-center gap-2 text-white/60">
+                                                <div className="h-7 w-7 rounded-full bg-white/10 flex items-center justify-center text-xs font-bold text-white uppercase">
+                                                        {adminEmailState?.charAt(0) || 'A'}
+                                                </div>
+                                                <span className="text-xs truncate">{adminEmailState}</span>
+                                        </div>
                                         <Button
                                                 variant="destructive"
                                                 onClick={handleLogout}

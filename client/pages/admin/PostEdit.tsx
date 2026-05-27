@@ -44,7 +44,7 @@ export default function PostEditPage() {
         const { id } = useParams<{ id: string }>();
         const navigate = useNavigate();
         const [active, setActive] = useState<
-                'dashboard' | 'users' | 'movies' | 'toys' | 'posts' | 'transactions' | 'tickets' | 'ticket-check' | 'uploads' | 'email-logs' | 'settings' | 'branches'
+                'dashboard' | 'users' | 'movies' | 'toys' | 'posts' | 'transactions' | 'tickets' | 'ticket-check' | 'uploads' | 'email-logs' | 'settings' | 'branches' | 'staff' | 'roles' | 'audit-logs'
         >('posts');
         const [isLoading, setIsLoading] = useState(true);
         const [isSaving, setIsSaving] = useState(false);

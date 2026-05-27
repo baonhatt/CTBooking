@@ -15,6 +15,10 @@ export default function UploadsPage() {
                 | 'uploads'
                 | 'email-logs'
                 | 'settings'
+                | 'branches'
+		| 'staff'
+		| 'roles'
+		| 'audit-logs'
         >('uploads');
 
         const handleLogout = () => {

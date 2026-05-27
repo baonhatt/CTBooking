@@ -15,6 +15,10 @@ export default function TicketCheckPage() {
                 | 'uploads'
                 | 'email-logs'
                 | 'settings'
+                | 'branches'
+		| 'staff'
+		| 'roles'
+		| 'audit-logs'
         >('ticket-check');
 
         const handleLogout = () => {

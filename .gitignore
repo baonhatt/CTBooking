@@ -29,7 +29,7 @@ dist-ssr
 /generated/prisma
 
 # Wrangler local secrets — KHÔNG commit!
-worker/.dev.vars
+# worker/.dev.vars
 .wrangler/
 worker/.wrangler/
 

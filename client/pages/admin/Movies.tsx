@@ -4,8 +4,14 @@ import AdminLayout from '@/admin/layouts/AdminLayout';
 import MoviesContent from '@/components/admin/content/MoviesContent';
 import AdminEditModal from '@/components/admin/AdminEditModal';
 import { toast } from 'sonner';
+import { useStaffStore } from '@/store/staffStore';
+import { useNavigate } from 'react-router-dom';
 
 export default function MoviesPage() {
+        const navigate = useNavigate();
+        const staff = useStaffStore((state) => state.staff);
+        const clearStaff = useStaffStore((state) => state.clearStaff);
+
         const getInitialFilters = () => {
                 try {
                         const raw = localStorage.getItem('admin_movies_filters');
@@ -205,17 +211,18 @@ export default function MoviesPage() {
                 } finally {
                 }
         };
+        const handleLogout = () => {
+                localStorage.removeItem('staffToken');
+                clearStaff();
+                navigate('/login');
+        };
+
         return (
                 <AdminLayout
                         active={'movies' as any}
                         setActive={(() => { }) as any}
-                        adminEmailState={localStorage.getItem('adminEmail') || 'admin@email.com'}
-                        handleLogout={() => {
-                                localStorage.removeItem('adminToken');
-                                localStorage.removeItem('adminEmail');
-                                window.dispatchEvent(new Event('admin-auth-changed'));
-                                window.location.href = '/';
-                        }}
+                        adminEmailState={staff?.email || 'admin@email.com'}
+                        handleLogout={handleLogout}
                 >
                         <MoviesContent
                                 data={filteredMovies}

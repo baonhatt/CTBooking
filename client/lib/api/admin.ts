@@ -1,11 +1,6 @@
 import { request } from './http';
 
-export async function adminLoginApi(body: { email: string; password: string }) {
-        return request<{ token: string; exp: number; user: { email: string } }>('/api/admin/login', {
-                method: 'POST',
-                body: JSON.stringify(body)
-        });
-}
+// Note: adminLoginApi removed - login is handled via AdminGate.tsx using /api/admin/auth/login
 
 export async function getAdminRevenue(options?: {
         from?: string;

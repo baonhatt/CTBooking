@@ -23,6 +23,7 @@ import { toast } from 'sonner';
 import { createTicketApi, updateTicketApi, getBranches } from '@/lib/api';
 import { getMoviesAdmin } from '@/lib/api/movies';
 import { Skeleton } from '@/components/ui/skeleton';
+import { useStaffPermissions, useIsSuperAdmin } from '@/hooks/useStaffPermission';
 
 interface TicketPackage {
         id: number;
@@ -64,6 +65,14 @@ interface Props {
 }
 
 export default function TicketsContent(props: Props) {
+        const permissions = useStaffPermissions();
+        const isSuperAdmin = useIsSuperAdmin();
+
+        const hasPermission = (module: string, action: string) => {
+                if (isSuperAdmin) return true;
+                return permissions.some((p) => p.module === module && p.action === action);
+        };
+
         const {
                 data,
                 totalPages,
@@ -131,12 +140,14 @@ export default function TicketsContent(props: Props) {
                                         </select>
                                 )}
                                 <div className="flex gap-2 ml-auto">
-                                        <Button
-                                                onClick={onCreate}
-                                                className="h-10 px-6 rounded-xl text-sm font-bold bg-blue-600 hover:bg-blue-700 shadow-lg shadow-blue-200"
-                                        >
-                                                + Thêm gói vé
-                                        </Button>
+                                        {hasPermission('tickets', 'create') && (
+                                                <Button
+                                                        onClick={onCreate}
+                                                        className="h-10 px-6 rounded-xl text-sm font-bold bg-blue-600 hover:bg-blue-700 shadow-lg shadow-blue-200"
+                                                >
+                                                        + Thêm gói vé
+                                                </Button>
+                                        )}
                                         <Button
                                                 variant="outline"
                                                 size="icon"

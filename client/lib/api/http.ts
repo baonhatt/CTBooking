@@ -65,17 +65,29 @@ export function buildUrl(path: string) {
 export async function request<T>(path: string, init: RequestInit = {}) {
         const url = buildUrl(path);
 
-        // Get token from localStorage and send via Authorization header
-        const token = typeof window !== 'undefined' ? localStorage.getItem('userToken') : null;
+        // Get token from localStorage (user token or staff token)
+        const userToken = typeof window !== 'undefined' ? localStorage.getItem('userToken') : null;
+        const staffToken = typeof window !== 'undefined' ? localStorage.getItem('staffToken') : null;
+        const token = staffToken || userToken;
+
+        // Build headers
+        const headers: Record<string, string> = {
+                "Content-Type": "application/json",
+                ...(init.headers as Record<string, string> || {}),
+        };
+
+        // Send staff token via Authorization header for admin routes
+        // Middleware supports both cookie and Authorization header
+        if (staffToken && path.startsWith('/api/admin')) {
+                headers['Authorization'] = `Bearer ${staffToken}`;
+        } else if (token) {
+                headers['Authorization'] = `Bearer ${token}`;
+        }
 
         const res = await fetch(url, {
                 ...init,
                 credentials: 'include',
-                headers: {
-                        "Content-Type": "application/json",
-                        ...(token && { "Authorization": `Bearer ${token}` }),
-                        ...(init.headers || {}),
-                },
+                headers,
         });
         if (!res.ok) {
                 // Auto logout khi 401 Unauthorized (token hết hạn hoặc invalid)
