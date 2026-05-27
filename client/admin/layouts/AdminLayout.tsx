@@ -18,7 +18,7 @@ import {
         X
 } from 'lucide-react';
 import { buildUrl } from '@/lib/api/http';
-import { useStaffPermissions } from '@/hooks/useStaffPermission';
+import { useStaffPermissions, useIsSuperAdmin } from '@/hooks/useStaffPermission';
 
 interface Props {
         active:
@@ -47,7 +47,7 @@ export default function AdminLayout({ active, setActive, adminEmailState, handle
         const navigate = useNavigate();
         const [isSidebarOpen, setIsSidebarOpen] = useState(false);
         const permissions = useStaffPermissions();
-        const isSuperAdmin = permissions.some((p) => p.module === 'super_admin');
+        const isSuperAdmin = useIsSuperAdmin();
 
         function go(tab: Props['active']) {
                 setActive(tab);

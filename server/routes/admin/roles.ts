@@ -1,4 +1,5 @@
 import { eq, and, desc, count } from 'drizzle-orm';
+import { logAuditAction } from '../../lib/audit-logger';
 
 export async function listRolesImpl(db: any, tables: any, params?: { page?: number; pageSize?: number }) {
         const { roles, rolePermissions, permissions } = tables;
@@ -82,7 +83,8 @@ export async function createRoleImpl(
                 description: string;
                 level: number;
                 permissionIds: number[];
-        }
+        },
+        staffInfo?: { id: number; email: string; fullname: string }
 ) {
         const { roles, rolePermissions } = tables;
         const { name, description, level, permissionIds } = body;
@@ -115,6 +117,21 @@ export async function createRoleImpl(
                 });
         }
 
+        // Log audit action
+        if (staffInfo) {
+                await logAuditAction(
+                        db,
+                        tables.auditLogs,
+                        'create',
+                        'role',
+                        newRole.id,
+                        `Tạo role: ${name}`,
+                        staffInfo.id,
+                        staffInfo.email,
+                        staffInfo.fullname
+                );
+        }
+
         return {
                 status: 'success',
                 message: 'Đã tạo role thành công',
@@ -134,7 +151,8 @@ export async function updateRoleImpl(
                 description?: string;
                 level?: number;
                 permissionIds?: number[];
-        }
+        },
+        staffInfo?: { id: number; email: string; fullname: string }
 ) {
         const { roles, rolePermissions } = tables;
         const { name, description, level, permissionIds } = body;
@@ -175,13 +193,28 @@ export async function updateRoleImpl(
                 }
         }
 
+        // Log audit action
+        if (staffInfo) {
+                await logAuditAction(
+                        db,
+                        tables.auditLogs,
+                        'update',
+                        'role',
+                        id,
+                        `Cập nhật role: ${existing.name}`,
+                        staffInfo.id,
+                        staffInfo.email,
+                        staffInfo.fullname
+                );
+        }
+
         return {
                 status: 'success',
                 message: 'Đã cập nhật role thành công',
         };
 }
 
-export async function deleteRoleImpl(db: any, tables: any, id: number) {
+export async function deleteRoleImpl(db: any, tables: any, id: number, staffInfo?: { id: number; email: string; fullname: string }) {
         const { roles, staffRoles } = tables;
 
         // Check if role exists
@@ -208,6 +241,21 @@ export async function deleteRoleImpl(db: any, tables: any, id: number) {
 
         // Delete role
         await db.delete(roles).where(eq(roles.id, id));
+
+        // Log audit action
+        if (staffInfo) {
+                await logAuditAction(
+                        db,
+                        tables.auditLogs,
+                        'delete',
+                        'role',
+                        id,
+                        `Xóa role: ${existing.name}`,
+                        staffInfo.id,
+                        staffInfo.email,
+                        staffInfo.fullname
+                );
+        }
 
         return {
                 status: 'success',

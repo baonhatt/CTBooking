@@ -1,6 +1,10 @@
 import { eq, and, isNull, desc, count, sql } from 'drizzle-orm';
 import bcrypt from 'bcryptjs';
 import { hashPassword, invalidateStaffPermissionCache } from '../../lib/staff-auth';
+import { mailQueue } from '../../lib/mail-queue';
+import { getStaffAccountCreatedTemplate } from '../../lib/email-templates';
+import { sendMail } from '../../routes/mail-service';
+import { logAuditAction } from '../../lib/audit-logger';
 
 export async function listStaffImpl(
         db: any,
@@ -52,7 +56,7 @@ export async function listStaffImpl(
         const staffWithDetails = await Promise.all(
                 staffList.map(async (staff) => {
                         const roleData = await db
-                                .select({ role: roles.name })
+                                .select({ roleId: staffRoles.roleId, roleName: roles.name })
                                 .from(staffRoles)
                                 .innerJoin(roles, eq(staffRoles.roleId, roles.id))
                                 .where(eq(staffRoles.staffId, staff.id));
@@ -65,7 +69,10 @@ export async function listStaffImpl(
 
                         return {
                                 ...staff,
-                                roles: roleData.map((r) => r.role),
+                                roleIds: roleData.map((r) => r.roleId),
+                                roles: roleData.map((r) => r.roleName),
+                                branchIds: branchData.map((b) => b.branchId),
+                                branchNames: branchData.map((b) => b.branchName),
                                 branches: branchData.map((b) => ({ id: b.branchId, name: b.branchName })),
                         };
                 })
@@ -121,17 +128,22 @@ export async function createStaffImpl(
         kv: any,
         body: {
                 email: string;
-                password: string;
+                password?: string;
                 fullname: string;
                 phone?: string;
                 avatar?: string;
                 roleIds?: number[];
                 branchIds?: number[];
-        }
+                forcePasswordChange?: boolean;
+        },
+        env?: any,
+        context?: { waitUntil: (promise: Promise<any>) => void }
 ) {
-        const { staffs, staffRoles, staffBranches } = tables;
-        const { email, password, fullname, phone, avatar, roleIds = [], branchIds = [] } = body;
+        const { staffs, staffRoles, staffBranches, email_logs } = tables;
+        const { email, password, fullname, phone, avatar, roleIds = [], branchIds = [], forcePasswordChange = false } = body;
         const now = new Date().toISOString();
+
+        console.log('createStaffImpl forcePasswordChange:', forcePasswordChange, 'body:', body);
 
         // Check if email already exists
         const [existing] = await db.select().from(staffs).where(eq(staffs.email, email)).limit(1);
@@ -139,8 +151,11 @@ export async function createStaffImpl(
                 return { status: 'error', message: 'Email đã tồn tại' };
         }
 
+        // Auto-generate password if not provided
+        const generatedPassword = password || generateRandomPassword();
+
         // Hash password
-        const hashedPassword = await hashPassword(password);
+        const hashedPassword = await hashPassword(generatedPassword);
 
         // Create staff
         const [newStaff] = await db
@@ -153,7 +168,7 @@ export async function createStaffImpl(
                         avatar,
                         isSuperAdmin: false,
                         isActive: true,
-                        forcePasswordChange: true, // Force password change on first login
+                        forcePasswordChange,
                         createdAt: now,
                         updatedAt: now,
                 })
@@ -175,6 +190,49 @@ export async function createStaffImpl(
                 });
         }
 
+        // Send email with password
+        const loginUrl = (env?.VITE_CLIENT_BASE_URL || 'https://cinesphere.com.vn') + '/admin/login';
+        const emailHtml = getStaffAccountCreatedTemplate({
+                staffName: fullname,
+                email: email,
+                password: generatedPassword,
+                loginUrl: loginUrl,
+        });
+
+        mailQueue.add(
+                async () => {
+                        try {
+                                await sendMail(email, 'Tài khoản nhân viên CINESPHERE', emailHtml);
+                                console.log(`[Staff] Sent account creation email to ${email}`);
+                        } catch (e) {
+                                console.error(`[Staff] Failed to send email to ${email}:`, e);
+                        }
+                },
+                {
+                        db,
+                        recipient: email,
+                        subject: 'Tài khoản nhân viên CINESPHERE',
+                        emailType: 'welcome',
+                        userId: newStaff.id,
+                        emailLogsTable: email_logs,
+                        runtimeEnv: env?.RUNTIME_ENV,
+                },
+                context
+        );
+
+        // Log audit action
+        await logAuditAction(
+                db,
+                tables.auditLogs,
+                'create',
+                'staff',
+                newStaff.id,
+                `Tạo nhân viên: ${fullname} (${email})`,
+                null,
+                email,
+                fullname
+        );
+
         return {
                 status: 'success',
                 message: 'Đã tạo nhân viên thành công',
@@ -184,6 +242,15 @@ export async function createStaffImpl(
                         fullname: newStaff.fullname,
                 },
         };
+}
+
+function generateRandomPassword(length: number = 12): string {
+        const charset = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*';
+        let password = '';
+        for (let i = 0; i < length; i++) {
+                password += charset.charAt(Math.floor(Math.random() * charset.length));
+        }
+        return password;
 }
 
 export async function updateStaffImpl(
@@ -199,11 +266,16 @@ export async function updateStaffImpl(
                 isActive?: boolean;
                 roleIds?: number[];
                 branchIds?: number[];
-        }
+                forcePasswordChange?: boolean;
+        },
+        env?: any,
+        context?: { waitUntil: (promise: Promise<any>) => void }
 ) {
         const { staffs, staffRoles, staffBranches } = tables;
-        const { email, fullname, phone, avatar, isActive, roleIds, branchIds } = body;
+        const { email, fullname, phone, avatar, isActive, roleIds, branchIds, forcePasswordChange } = body;
         const now = new Date().toISOString();
+
+        console.log('updateStaffImpl body:', body);
 
         // Check if staff exists
         const [existing] = await db.select().from(staffs).where(eq(staffs.id, id)).limit(1);
@@ -231,6 +303,7 @@ export async function updateStaffImpl(
         if (phone !== undefined) updateData.phone = phone;
         if (avatar !== undefined) updateData.avatar = avatar;
         if (isActive !== undefined) updateData.isActive = isActive;
+        if (forcePasswordChange !== undefined) updateData.forcePasswordChange = forcePasswordChange;
 
         await db.update(staffs).set(updateData).where(eq(staffs.id, id));
 
@@ -252,6 +325,19 @@ export async function updateStaffImpl(
 
         // Invalidate permission cache
         await invalidateStaffPermissionCache(kv, id);
+
+        // Log audit action
+        await logAuditAction(
+                db,
+                tables.auditLogs,
+                'update',
+                'staff',
+                id,
+                `Cập nhật nhân viên: ${existing.fullname} (${existing.email})`,
+                null,
+                existing.email,
+                existing.fullname
+        );
 
         return {
                 status: 'success',
@@ -276,6 +362,19 @@ export async function deleteStaffImpl(db: any, tables: any, id: number) {
         // Soft delete by setting isActive to false
         await db.update(staffs).set({ isActive: false }).where(eq(staffs.id, id));
 
+        // Log audit action
+        await logAuditAction(
+                db,
+                tables.auditLogs,
+                'delete',
+                'staff',
+                id,
+                `Xóa nhân viên: ${existing.fullname} (${existing.email})`,
+                null,
+                existing.email,
+                existing.fullname
+        );
+
         return {
                 status: 'success',
                 message: 'Đã xóa nhân viên thành công',
@@ -287,16 +386,26 @@ export async function resetStaffPasswordImpl(
         tables: any,
         kv: any,
         id: number,
-        body: { newPassword: string }
+        body: { newPassword?: string },
+        env?: any,
+        context?: { waitUntil: (promise: Promise<any>) => void }
 ) {
-        const { staffs, staffTokens } = tables;
-        const { newPassword } = body;
+        const { staffs, staffTokens, email_logs } = tables;
+        const { newPassword: requestedPassword } = body;
         const now = new Date().toISOString();
 
         // Check if staff exists
         const [existing] = await db.select().from(staffs).where(eq(staffs.id, id)).limit(1);
         if (!existing) {
                 return { status: 'error', message: 'Staff not found' };
+        }
+
+        // Generate password if not provided
+        let newPassword = '';
+        if (!requestedPassword) {
+                newPassword = Math.random().toString(36).slice(-8);
+        } else {
+                newPassword = requestedPassword;
         }
 
         // Hash new password
@@ -321,8 +430,51 @@ export async function resetStaffPasswordImpl(
         // Invalidate permission cache
         await invalidateStaffPermissionCache(kv, id);
 
+        // Send email notification about password reset
+        const loginUrl = (env?.VITE_CLIENT_BASE_URL || 'https://cinesphere.com.vn') + '/admin/login';
+        const emailHtml = getStaffAccountCreatedTemplate({
+                staffName: existing.fullname,
+                email: existing.email,
+                password: newPassword,
+                loginUrl: loginUrl,
+        });
+
+        mailQueue.add(
+                async () => {
+                        try {
+                                await sendMail(existing.email, 'Reset Mật Khẩu Nhân Viên - CINESPHERE', emailHtml);
+                                console.log(`[Staff] Sent password reset email to ${existing.email}`);
+                        } catch (e) {
+                                console.error(`[Staff] Failed to send password reset email to ${existing.email}:`, e);
+                        }
+                },
+                {
+                        db,
+                        recipient: existing.email,
+                        subject: 'Reset Mật Khẩu Nhân Viên - CINESPHERE',
+                        emailType: 'welcome', // Re-use template for now since it has login details
+                        userId: id,
+                        emailLogsTable: email_logs,
+                        runtimeEnv: env?.RUNTIME_ENV,
+                },
+                context
+        );
+
+        // Log audit action
+        await logAuditAction(
+                db,
+                tables.auditLogs,
+                'reset_password',
+                'staff',
+                id,
+                `Reset mật khẩu nhân viên: ${existing.fullname} (${existing.email})`,
+                null,
+                existing.email,
+                existing.fullname
+        );
+
         return {
                 status: 'success',
-                message: 'Đã reset mật khẩu thành công',
+                message: 'Đã reset mật khẩu thành công và gửi email thông báo cho nhân viên',
         };
 }

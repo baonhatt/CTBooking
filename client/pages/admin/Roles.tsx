@@ -263,7 +263,7 @@ export default function RolesPage() {
         }, [selectedRoleData]);
 
         const roles = (rolesData as any)?.items || [];
-        let permissions = (permissionsData as any)?.items || [];
+        let permissions = (permissionsData as any)?.permissions || [];
         const selectedRole = (selectedRoleData as any)?.role;
 
         // Fallback: use permissions from selected role if global permissions list is empty
@@ -447,7 +447,11 @@ export default function RolesPage() {
                                                                                                                                                 {applicable ? (
                                                                                                                                                         <Checkbox
                                                                                                                                                                 checked={checked}
-                                                                                                                                                                onCheckedChange={() => typeof permissionId === "number" && togglePermission(permissionId)}
+                                                                                                                                                                onCheckedChange={(checked) => {
+                                                                                                                                                                        if (typeof permissionId === "number") {
+                                                                                                                                                                                togglePermission(permissionId);
+                                                                                                                                                                        }
+                                                                                                                                                                }}
                                                                                                                                                                 disabled={disabled}
                                                                                                                                                         />
                                                                                                                                                 ) : (

@@ -2,6 +2,7 @@
 import { eq, or, desc, asc, count, inArray, and, sql } from 'drizzle-orm';
 import { formatDateForDb } from '../../lib/date-utils';
 import { deleteCache } from '../../../worker/src/utils';
+import { logAuditAction } from '../../lib/audit-logger';
 
 /**
  * Hàm helper xử lý dữ liệu combo
@@ -156,7 +157,7 @@ export async function getTicketPackageImpl(anyDb: any, tables: { ticket_packages
  */
 export async function createTicketPackageImpl(
         anyDb: any,
-        tables: { ticket_packages: any; movies: any },
+        tables: { ticket_packages: any; movies: any; auditLogs: any },
         args: {
                 name: string; // Tên gói vé
                 code?: string; // Mã gói vé
@@ -172,7 +173,8 @@ export async function createTicketPackageImpl(
                 display_order?: number; // Thứ tự hiển thị
                 branch_id?: number; // Chi nhánh
         },
-        RUN_ENV: any
+        RUN_ENV: any,
+        staffInfo?: { id: number; email: string; fullname: string }
 ) {
         const {
                 name,
@@ -296,6 +298,21 @@ export async function createTicketPackageImpl(
                 await RUN_ENV.KV_BINDING.delete('activeTicketPackages');
         }
 
+        // Log audit action
+        if (staffInfo) {
+                await logAuditAction(
+                        anyDb,
+                        tables.auditLogs,
+                        'create',
+                        'ticket_package',
+                        item.id,
+                        `Tạo gói vé: ${name}`,
+                        staffInfo.id,
+                        staffInfo.email,
+                        staffInfo.fullname
+                );
+        }
+
         return { item };
 }
 
@@ -309,7 +326,7 @@ export async function createTicketPackageImpl(
  */
 export async function updateTicketPackageImpl(
         anyDb: any,
-        tables: { ticket_packages: any; movies: any },
+        tables: { ticket_packages: any; movies: any; auditLogs: any },
         id: number,
         args: {
                 name?: string; // Tên gói vé
@@ -326,7 +343,8 @@ export async function updateTicketPackageImpl(
                 display_order?: number; // Thứ tự hiển thị
                 branch_id?: number; // Chi nhánh
         },
-        RUN_ENV: any
+        RUN_ENV: any,
+        staffInfo?: { id: number; email: string; fullname: string }
 ) {
         const {
                 name,
@@ -418,6 +436,21 @@ export async function updateTicketPackageImpl(
                 await RUN_ENV.KV_BINDING.delete('activeTicketPackages');
         }
 
+        // Log audit action
+        if (staffInfo) {
+                await logAuditAction(
+                        anyDb,
+                        tables.auditLogs,
+                        'update',
+                        'ticket_package',
+                        id,
+                        `Cập nhật gói vé: ${name || id}`,
+                        staffInfo.id,
+                        staffInfo.email,
+                        staffInfo.fullname
+                );
+        }
+
         return item || null;
 }
 
@@ -430,9 +463,10 @@ export async function updateTicketPackageImpl(
  */
 export async function deleteTicketPackageImpl(
         anyDb: any,
-        tables: { ticket_packages: any; bookings: any },
+        tables: { ticket_packages: any; bookings: any; auditLogs: any },
         id: number,
-        RUN_ENV: any
+        RUN_ENV: any,
+        staffInfo?: { id: number; email: string; fullname: string }
 ) {
         try {
                 // 1. Kiểm tra gói vé có tồn tại không
@@ -454,6 +488,21 @@ export async function deleteTicketPackageImpl(
 
                 if (RUN_ENV && RUN_ENV.KV_BINDING) {
                         await RUN_ENV.KV_BINDING.delete('activeTicketPackages');
+                }
+
+                // Log audit action
+                if (staffInfo) {
+                        await logAuditAction(
+                                anyDb,
+                                tables.auditLogs,
+                                'delete',
+                                'ticket_package',
+                                id,
+                                `Xóa gói vé: ${existing.name}`,
+                                staffInfo.id,
+                                staffInfo.email,
+                                staffInfo.fullname
+                        );
                 }
 
                 return {

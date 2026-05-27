@@ -18,13 +18,12 @@ interface AuditLog {
         staffEmail: string;
         staffFullname: string;
         action: string;
-        module: string;
+        entityType: string;
         entityId: string;
-        details: string;
+        oldValues?: string;
+        newValues?: string;
         ipAddress?: string;
         createdAt: string;
-        oldValues?: any;
-        newValues?: any;
 }
 
 interface Staff {
@@ -57,6 +56,15 @@ const ENTITY_LABELS: Record<string, string> = {
         booking: 'Đặt vé',
         role: 'Vai trò',
         ticket_package: 'Gói vé',
+};
+
+// Fields to ignore for each module (auto-generated or system fields)
+const IGNORED_FIELDS: Record<string, string[]> = {
+        staff: ['id', 'created_at', 'updated_at'],
+        movie: ['id', 'created_at', 'updated_at'],
+        booking: ['id', 'created_at', 'updated_at'],
+        role: ['id', 'created_at', 'updated_at'],
+        ticket_package: ['id', 'created_at', 'updated_at'],
 };
 
 export default function AuditLogsPage() {
@@ -112,9 +120,13 @@ export default function AuditLogsPage() {
                 });
         };
 
-        const formatEntityLabel = (module: string, entityId: string) => {
-                const entityLabel = ENTITY_LABELS[module] || module;
+        const formatEntityLabel = (entityType: string, entityId: string) => {
+                const entityLabel = ENTITY_LABELS[entityType] || entityType;
                 return `${entityLabel} #${entityId}`;
+        };
+
+        const getStaffInfo = (staffId: number) => {
+                return staffList.find((s: Staff) => s.id === staffId);
         };
 
         const openDetailDialog = (log: AuditLog) => {
@@ -316,15 +328,15 @@ export default function AuditLogsPage() {
                                                                                 <tr key={log.id} className="border-b hover:bg-gray-50">
                                                                                         <td className="p-3">{formatDate(log.createdAt)}</td>
                                                                                         <td className="p-3">
-                                                                                                <div>{log.staffFullname}</div>
-                                                                                                <div className="text-xs text-gray-500">{log.staffEmail}</div>
+                                                                                                <div>{log.staffFullname || `Staff #${log.staffId}`}</div>
+                                                                                                <div className="text-xs text-gray-500">{log.staffEmail || '-'}</div>
                                                                                         </td>
                                                                                         <td className="p-3">
                                                                                                 <span className={`px-2 py-1 rounded text-xs ${ACTION_COLORS[log.action] || 'bg-gray-100'}`}>
                                                                                                         {ACTION_LABELS[log.action] || log.action}
                                                                                                 </span>
                                                                                         </td>
-                                                                                        <td className="p-3">{formatEntityLabel(log.module, log.entityId)}</td>
+                                                                                        <td className="p-3">{formatEntityLabel(log.entityType, log.entityId)}</td>
                                                                                         <td className="p-3">{log.ipAddress || '-'}</td>
                                                                                         <td className="p-3">
                                                                                                 <Button variant="ghost" size="sm" onClick={() => openDetailDialog(log)}>
@@ -376,7 +388,7 @@ export default function AuditLogsPage() {
                                                                         </div>
                                                                         <div>
                                                                                 <Label className="text-sm font-medium">Nhân viên</Label>
-                                                                                <div className="text-sm">{selectedLog.staffFullname} ({selectedLog.staffEmail})</div>
+                                                                                <div className="text-sm">{selectedLog.staffFullname || `Staff #${selectedLog.staffId}`} ({selectedLog.staffEmail || '-'})</div>
                                                                         </div>
                                                                         <div>
                                                                                 <Label className="text-sm font-medium">Hành động</Label>
@@ -384,11 +396,7 @@ export default function AuditLogsPage() {
                                                                         </div>
                                                                         <div>
                                                                                 <Label className="text-sm font-medium">Đối tượng</Label>
-                                                                                <div className="text-sm">{formatEntityLabel(selectedLog.module, selectedLog.entityId)}</div>
-                                                                        </div>
-                                                                        <div>
-                                                                                <Label className="text-sm font-medium">Chi tiết</Label>
-                                                                                <div className="text-sm">{selectedLog.details || '-'}</div>
+                                                                                <div className="text-sm">{formatEntityLabel(selectedLog.entityType, selectedLog.entityId)}</div>
                                                                         </div>
                                                                 </div>
 
@@ -404,11 +412,65 @@ export default function AuditLogsPage() {
                                                                                                 </tr>
                                                                                         </thead>
                                                                                         <tbody>
-                                                                                                {selectedLog.oldValues && selectedLog.newValues ? (
-                                                                                                        renderJsonDiff(selectedLog.oldValues, selectedLog.newValues)
-                                                                                                ) : selectedLog.newValues ? (
-                                                                                                        renderJsonValues(selectedLog.newValues)
-                                                                                                ) : null}
+                                                                                                {(() => {
+                                                                                                        let oldData: any = {};
+                                                                                                        let newData: any = {};
+                                                                                                        try {
+                                                                                                                oldData = selectedLog.oldValues ? JSON.parse(selectedLog.oldValues) : {};
+                                                                                                        } catch { }
+                                                                                                        try {
+                                                                                                                newData = selectedLog.newValues ? JSON.parse(selectedLog.newValues) : {};
+                                                                                                        } catch { }
+                                                                                                        const allKeys = new Set([...Object.keys(oldData || {}), ...Object.keys(newData || {})]);
+                                                                                                        const keys = Array.from(allKeys);
+
+                                                                                                        // Get ignored fields for this entity type
+                                                                                                        const ignoredFields = IGNORED_FIELDS[selectedLog.entityType] || ['id', 'created_at', 'updated_at'];
+
+                                                                                                        // Filter only changed fields (excluding ignored fields)
+                                                                                                        const changedKeys = keys.filter((key) => {
+                                                                                                                if (ignoredFields.includes(key)) return false;
+                                                                                                                const oldValue = oldData?.[key];
+                                                                                                                const newValue = newData?.[key];
+                                                                                                                // Treat null and undefined as the same
+                                                                                                                const normalizedOld = oldValue === null ? undefined : oldValue;
+                                                                                                                const normalizedNew = newValue === null ? undefined : newValue;
+                                                                                                                return JSON.stringify(normalizedOld) !== JSON.stringify(normalizedNew);
+                                                                                                        });
+
+                                                                                                        if (changedKeys.length === 0) {
+                                                                                                                return <tr><td colSpan={3} className="p-3 text-center text-gray-500">Không có thay đổi</td></tr>;
+                                                                                                        }
+
+                                                                                                        return changedKeys.map((key) => {
+                                                                                                                const oldValue = oldData?.[key];
+                                                                                                                const newValue = newData?.[key];
+
+                                                                                                                return (
+                                                                                                                        <tr key={key} className="border-b">
+                                                                                                                                <td className="p-3 font-medium text-sm">{key}</td>
+                                                                                                                                {selectedLog.oldValues && (
+                                                                                                                                        <td className="p-3 text-sm bg-red-50">
+                                                                                                                                                {oldValue !== undefined ? (
+                                                                                                                                                        typeof oldValue === 'object' ? JSON.stringify(oldValue, null, 2) : String(oldValue)
+                                                                                                                                                ) : (
+                                                                                                                                                        <span className="text-gray-400">-</span>
+                                                                                                                                                )}
+                                                                                                                                        </td>
+                                                                                                                                )}
+                                                                                                                                {selectedLog.newValues && (
+                                                                                                                                        <td className="p-3 text-sm bg-green-50">
+                                                                                                                                                {newValue !== undefined ? (
+                                                                                                                                                        typeof newValue === 'object' ? JSON.stringify(newValue, null, 2) : String(newValue)
+                                                                                                                                                ) : (
+                                                                                                                                                        <span className="text-gray-400">-</span>
+                                                                                                                                                )}
+                                                                                                                                        </td>
+                                                                                                                                )}
+                                                                                                                        </tr>
+                                                                                                                );
+                                                                                                        });
+                                                                                                })()}
                                                                                         </tbody>
                                                                                 </table>
                                                                         </div>

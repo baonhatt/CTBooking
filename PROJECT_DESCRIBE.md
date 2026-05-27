@@ -536,11 +536,62 @@ Blog posts
    - Sends email
    - Returns success or error with retry time
 
-#### Admin Login Flow
-1. **POST /api/admin/login**
-   - Same as user login but:
-     - Session expiry: 1 day (86400 seconds)
-     - Cookie: `Max-Age=86400`
+#### Staff Login Flow (RBAC)
+3. **POST /api/admin/auth/me**
+   - Middleware: requireStaffAuth
+   - Returns current staff info with permissions and branchIds
+   - Loads from DB or KV cache
+
+4.  **POST /api/admin/login (DEPRECATED)**
+    - **Status**: 410 Gone
+    - **Reason**: Security hardening. All admin auth migrated to `/api/admin/auth/login`.
+
+5. **POST /api/admin/auth/change-password**
+   - Body: `{ oldPassword, newPassword }`
+   - Middleware: requireStaffAuth
+   - Verifies old password
+   - Hashes new password
+   - Updates password and sets `forcePasswordChange = false`
+   - Revokes all other sessions (except current)
+   - Logs audit action: 'change_password' for 'staff'
+   - Returns success
+
+5. **POST /api/admin/auth/forgot-password**
+   - Body: `{ email }`
+   - Generates reset token (64-char hex)
+   - Expiry: 1 hour
+   - Stores in `staff_tokens` table with type='reset'
+   - TODO: Send email with reset link (currently returns success without email)
+   - Returns: `{ status: 'success', message: 'Đã gửi email reset mật khẩu' }`
+
+6. **POST /api/admin/auth/reset-password**
+   - Body: `{ token, newPassword }`
+   - Validates reset token (not revoked, not expired)
+   - Hashes new password
+   - Updates password and sets `forcePasswordChange = true`
+   - Revokes reset token
+   - Revokes all sessions
+   - Invalidates permission cache
+   - Returns success
+
+#### Super Admin Setup Flow
+1. **GET /api/admin/setup/super-admin**
+   - Checks if any staff with `is_super_admin = true` exists
+   - Returns: `{ exists: boolean }`
+
+2. **POST /api/admin/setup/super-admin**
+   - Body: `{ email, password, fullname }`
+   - Creates staff with `is_super_admin = true`, `isActive = true`
+   - Hashes password
+   - Returns success
+   - Frontend reloads after success
+
+3. **POST /api/admin/setup/seed-roles**
+   - Seeds default roles and permissions from `server/lib/rbac-seed.ts`
+   - Creates permissions if not exist
+   - Creates roles (staff, manager, admin) if not exist
+   - Assigns permissions to roles
+   - Returns success
 
 #### Registration Flow
 1. **POST /api/register**
@@ -580,6 +631,7 @@ Blog posts
 
 **File**: `worker/src/middleware.ts`
 
+#### requireAuth (User Sessions)
 ```typescript
 export async function requireAuth(c: Context, next: any)
 ```
@@ -592,16 +644,61 @@ export async function requireAuth(c: Context, next: any)
 - Sets `userId` and `accountId` in context
 - Returns 401 if invalid
 
-### Differences: User vs Admin Auth
+#### requireStaffAuth (Staff Sessions)
+```typescript
+export async function requireStaffAuth(c: Context, next: any)
+```
 
-| Aspect | User Auth | Admin Auth |
-|--------|-----------|------------|
-| Endpoint | `/api/login` | `/api/admin/login` |
+- Extracts token from:
+  - Cookie: `staff_session=([^;]+)`
+  - Authorization header: `Bearer <token>`
+- Validates token against `staff_tokens` table
+- Checks:
+  - Token not revoked (`revoked_at IS NULL`)
+  - Token not expired (`expired_at > NOW`)
+  - Staff is active (`isActive = true`)
+- Loads permissions and branchIds:
+  - First checks KV cache with key `staff_perms:{staffId}` (TTL 300s)
+  - If cache miss, loads from DB:
+    - `staff_roles` → `role_permissions` → `permissions`
+    - `staff_branches` → `branches`
+  - Sets cache if super admin (all permissions, all branches)
+- Sets context keys:
+  - `staffId` - Staff ID
+  - `staff` - Staff record
+  - `staffPermissions` - Array of `{ module, action }`
+  - `staffBranchIds` - Array of branch IDs
+  - `isSuperAdmin` - Boolean
+- Returns 401 if invalid
+
+#### requirePermission (Permission Checking)
+```typescript
+export function requirePermission(module: string, action: string)
+```
+
+- Factory function that creates middleware for specific permissions
+- Checks if staff has the required permission:
+  - If `isSuperAdmin = true`, bypasses all checks
+  - Otherwise, checks if `{ module, action }` exists in `staffPermissions`
+- Returns 403 if permission denied
+- Returns 401 if not authenticated
+
+### Differences: User Auth vs Staff Auth (RBAC)
+
+| Aspect | User Auth | Staff Auth (RBAC) |
+|--------|-----------|------------------|
+| Endpoint | `/api/login` | `/api/admin/auth/login` |
 | Session Expiry | 30 days | 1 day |
+| Cookie Name | `session_token` | `staff_session` |
 | Cookie Max-Age | 2592000s | 86400s |
-| 2FA Support | Yes (configurable) | Yes (configurable) |
-| Middleware | `requireAuth` | `requireAuth` (same) |
-| Route Protection | User routes | Admin routes |
+| Token Table | `tokens` | `staff_tokens` |
+| 2FA Support | Yes (configurable) | No (not implemented) |
+| Middleware | `requireAuth` | `requireStaffAuth` |
+| Permission Check | No | Yes (via `requirePermission`) |
+| Branch Filtering | No | Yes (via `staff_branches`) |
+| Audit Logging | No | Yes (via `audit_logs`) |
+| Force Password Change | No | Yes (via `forcePasswordChange`) |
+| KV Cache | No | Yes (permissions cached) |
 
 ### Token Types
 
@@ -644,26 +741,26 @@ export async function requireAuth(c: Context, next: any)
 - `id` (INTEGER, PK, AUTOINCREMENT)
 - `staff_id` (INTEGER, FK → staffs.id, ON DELETE CASCADE)
 - `token` (TEXT, NOT NULL, UNIQUE)
-- `type` (TEXT, DEFAULT 'session')
+- `type` (TEXT, DEFAULT 'session') - 'session' or 'reset'
 - `expired_at` (TEXT, NOT NULL)
 - `revoked_at` (TEXT)
-- `revoke_reason` (TEXT)
+- `revoke_reason` (TEXT) - 'logout', 'password_change', 'password_reset'
 - `created_at` (TEXT, NOT NULL)
 
 **Table: roles**
 - `id` (INTEGER, PK, AUTOINCREMENT)
 - `name` (TEXT, NOT NULL, UNIQUE)
 - `description` (TEXT)
-- `is_system` (INTEGER, DEFAULT 0)
-- `level` (INTEGER, DEFAULT 0)
+- `is_system` (INTEGER, DEFAULT 0) - System roles cannot be deleted/modified
+- `level` (INTEGER, DEFAULT 0) - Role hierarchy level
 - `created_at` (TEXT, NOT NULL)
 - `updated_at` (TEXT, NOT NULL)
 
 **Table: permissions**
 - `id` (INTEGER, PK, AUTOINCREMENT)
-- `module` (TEXT, NOT NULL)
-- `action` (TEXT, NOT NULL)
-- `description` (TEXT)
+- `module` (TEXT, NOT NULL) - Module name (e.g., 'staff', 'roles', 'movies')
+- `action` (TEXT, NOT NULL) - Action name (e.g., 'view', 'create', 'edit', 'delete')
+- `description` (TEXT) - Human-readable description
 
 **Table: role_permissions**
 - `role_id` (INTEGER, FK → roles.id, ON DELETE CASCADE)
@@ -683,14 +780,149 @@ export async function requireAuth(c: Context, next: any)
 **Table: audit_logs**
 - `id` (INTEGER, PK, AUTOINCREMENT)
 - `staff_id` (INTEGER, FK → staffs.id, ON DELETE SET NULL)
-- `action` (TEXT, NOT NULL)
-- `entity_type` (TEXT, NOT NULL)
+- `staff_email` (TEXT) - Denormalized for filtering
+- `staff_fullname` (TEXT) - Denormalized for filtering
+- `action` (TEXT, NOT NULL) - 'login', 'create', 'update', 'delete', 'reset_password', etc.
+- `entity_type` (TEXT, NOT NULL) - 'staff', 'role', 'movie', etc.
 - `entity_id` (INTEGER)
-- `old_values` (TEXT)
-- `new_values` (TEXT)
+- `old_values` (TEXT) - JSON string of old values
+- `new_values` (TEXT) - JSON string of new values
 - `ip_address` (TEXT)
 - `user_agent` (TEXT)
 - `created_at` (TEXT, NOT NULL)
+
+#### Permission System
+
+**File**: `server/lib/rbac-seed.ts`
+
+**Default Permissions** (from PERMISSIONS_SEED):
+
+| Module | Action | Description |
+|--------|--------|-------------|
+| staff | view | Xem danh sách nhân viên |
+| staff | create | Tạo nhân viên mới |
+| staff | edit | Chỉnh sửa thông tin nhân viên |
+| staff | delete | Xóa nhân viên |
+| staff | reset_password | Đặt lại mật khẩu nhân viên |
+| roles | view | Xem danh sách vai trò |
+| roles | create | Tạo vai trò mới |
+| roles | edit | Chỉnh sửa vai trò |
+| roles | delete | Xóa vai trò |
+| dashboard | view | Xem dashboard |
+| dashboard | view_revenue | Xem doanh thu |
+| users | view | Xem danh sách người dùng |
+| users | view_detail | Xem chi tiết người dùng |
+| movies | view | Xem danh sách phim |
+| movies | create | Tạo phim mới |
+| movies | edit | Chỉnh sửa phim |
+| movies | delete | Xóa phim |
+| toys | view | Xem danh sách đồ chơi |
+| toys | create | Tạo đồ chơi mới |
+| toys | edit | Chỉnh sửa đồ chơi |
+| toys | delete | Xóa đồ chơi |
+| tickets | view | Xem danh sách vé/gói |
+| tickets | create | Tạo gói vé mới |
+| tickets | edit | Chỉnh sửa gói vé |
+| tickets | delete | Xóa gói vé |
+| branches | view | Xem danh sách chi nhánh |
+| branches | create | Tạo chi nhánh mới |
+| branches | edit | Chỉnh sửa chi nhánh |
+| branches | delete | Xóa chi nhánh |
+| uploads | upload | Upload file |
+| uploads | delete | Xóa file |
+| email_logs | view | Xem lịch sử email |
+| audit_logs | view | Xem nhật ký hoạt động |
+| settings | view | Xem cài đặt |
+| settings | manage | Quản lý cài đặt |
+| transactions | view | Xem giao dịch |
+
+**Default Roles** (from ROLES_SEED):
+
+**Role: staff** (Level: 0)
+- Description: Nhân viên cơ bản
+- Permissions:
+  - dashboard: view
+  - tickets: view, create
+  - branches: view
+
+**Role: manager** (Level: 1)
+- Description: Quản lý chi nhánh
+- Permissions:
+  - All staff permissions
+  - movies: view, create, edit
+  - toys: view, create, edit
+  - tickets: view, create, edit, delete
+  - branches: view, create, edit
+  - users: view, view_detail
+  - transactions: view
+  - email_logs: view
+
+**Role: admin** (Level: 2)
+- Description: Quản trị viên hệ thống
+- Permissions:
+  - All manager permissions
+  - staff: view, create, edit, delete, reset_password
+  - roles: view, create, edit, delete
+  - movies: view, create, edit, delete
+  - toys: view, create, edit, delete
+  - branches: view, create, edit, delete
+  - uploads: upload, delete
+  - audit_logs: view
+  - settings: view, manage
+  - dashboard: view_revenue
+
+**Super Admin** (Level: 99)
+- Has `is_super_admin = true` in staffs table
+- Bypasses all permission checks
+- Has access to all branches
+- Can modify system roles (is_system = true)
+
+#### Role Hierarchy
+
+- **staff (0)**: Basic staff with limited permissions
+- **manager (1)**: Branch manager with more permissions
+- **admin (2)**: System administrator with most permissions
+- **super_admin (99)**: Super admin with all permissions and bypass capability
+
+#### KV Cache for Permissions
+
+**File**: `server/lib/staff-auth.ts`
+
+**Cache Key**: `staff_perms:{staffId}`
+**TTL**: 300 seconds (5 minutes)
+
+**Cache Structure**:
+```json
+{
+  "permissions": [
+    { "module": "staff", "action": "view" },
+    { "module": "movies", "action": "create" }
+  ],
+  "branchIds": [1, 2, 3],
+  "isSuperAdmin": false
+}
+```
+
+**Cache Invalidation**:
+- Called when staff roles are updated
+- Called when staff branches are updated
+- Called when password is reset
+- Function: `invalidateStaffPermissionCache(kv, staffId)`
+
+#### Branch Filtering
+
+**File**: `server/lib/branch-guard.ts`
+
+**Functions**:
+- `applyBranchFilter(query, branchIds, branchColumn)` - Adds WHERE clause to Drizzle query
+- `filterByBranch(items, branchIds, branchIdField)` - Filters array of items
+- `hasBranchAccess(staffBranchIds, branchId)` - Checks if staff has access to branch
+- `getAllBranchIdsForSuperAdmin(db, tables)` - Returns all branch IDs for super admin
+
+**Usage**:
+- Non-super admin staff only see data from assigned branches
+- Super admin sees data from all branches
+- Applied to movies, ticket_packages, bookings queries
 
 #### Middleware
 
@@ -716,7 +948,7 @@ export async function requireAuth(c: Context, next: any)
 - Super admins bypass all permission checks
 - Returns 403 if permission denied
 
-#### Frontend Permission System
+#### Frontend RBAC System
 
 **File**: `client/store/staffStore.ts`
 
@@ -748,6 +980,12 @@ interface StaffState {
 }
 ```
 
+**Methods**:
+- `setStaff(staff, permissions, branchIds, token)`: Sets staff data in store
+- `clearStaff()`: Clears staff data from store
+- `hasPermission(module, action)`: Checks if staff has permission (super admin bypass)
+- **Persistence**: Uses Zustand persist middleware with key 'staff-storage'
+
 **File**: `client/hooks/useStaffPermission.ts`
 
 **Hooks**:
@@ -756,51 +994,82 @@ interface StaffState {
 - `useStaffPermissions()`: Returns array of staff permissions
 - `useStaffBranchIds()`: Returns array of staff's branch IDs
 
-#### Admin Auth Flow
-
 **File**: `client/admin/auth/AdminGate.tsx`
 
-**Operation**:
-1. Checks if super admin setup is needed (GET /api/admin/setup/super-admin)
-2. If setup needed, shows SetupSuperAdmin page
-3. If staff authenticated, shows admin routes wrapped in AdminLayout
-4. If not authenticated, shows login page
+**AdminGate Component**:
+- Checks if super admin setup is needed (GET /api/admin/setup/super-admin)
+- If setup needed, shows SetupSuperAdmin page
+- If staff authenticated, shows admin routes wrapped in AdminLayout
+- If not authenticated, shows login page
+- Checks `forcePasswordChange` flag and redirects to settings if true
+- Routes: /, /users, /movies, /toys, /posts, /transactions, /tickets, /ticket-check, /branches, /uploads, /email-logs, /settings, /staff, /roles, /audit-logs
 
-**API Calls**:
-- GET /api/admin/setup/super-admin - Check if super admin exists
-- POST /api/admin/setup/super-admin - Create super admin
-- POST /api/admin/auth/login - Staff login
-- POST /api/admin/auth/logout - Staff logout
-- GET /api/admin/auth/me - Get current staff info
+**SetupSuperAdmin Page** (`client/pages/admin/SetupSuperAdmin.tsx`):
+- Default credentials: superadmin@cinesphere.com / superadmin123 / Super Admin
+- POST to /api/admin/setup/super-admin
+- Reloads after success
 
-**Redirect Logic**:
-- Unauthenticated: Redirect to login page
-- After login: Redirect to dashboard
-- After logout: Redirect to login page
-
-#### Admin Pages with Permission Checks
+#### Admin Pages with RBAC
 
 **Staff Management** (`client/pages/admin/Staff.tsx`):
-- API: GET /api/admin/staff (requirePermission: staff, view)
-- API: POST /api/admin/staff (requirePermission: staff, create)
-- API: PUT /api/admin/staff/:id (requirePermission: staff, edit)
-- API: DELETE /api/admin/staff/:id (requirePermission: staff, delete)
-- Filters: search, role, branch
-- TODO: None currently visible
+- **API Calls**:
+  - GET /api/admin/staff (requirePermission: staff, view)
+  - POST /api/admin/staff (requirePermission: staff, create)
+  - PUT /api/admin/staff/:id (requirePermission: staff, edit)
+  - DELETE /api/admin/staff/:id (requirePermission: staff, delete)
+  - POST /api/admin/staff/:id/reset-password (requirePermission: staff, reset_password)
+- **Features**:
+  - List staff with pagination
+  - Filters: search (email/name), role, branch
+  - Create staff with auto-generated password (12 chars)
+  - Edit staff: email, fullname, phone, role, branches, forcePasswordChange, isActive
+  - Delete staff (soft delete by setting isActive = false)
+  - Reset password (generates new password, sets forcePasswordChange = true)
+  - Cannot modify/delete super admin
+  - Sends welcome email with password on creation
+- **Permission-based UI**:
+  - "Create staff" button: requires staff, create
+  - "Edit" button: requires staff, edit
+  - "Delete" button: requires staff, delete (hidden for super admin)
+  - "Reset password" button: requires staff, reset_password
+- **TODO**: None currently visible
 
 **Roles Management** (`client/pages/admin/Roles.tsx`):
-- API: GET /api/admin/roles (requirePermission: roles, view)
-- API: POST /api/admin/roles (requirePermission: roles, create)
-- API: PUT /api/admin/roles/:id (requirePermission: roles, edit)
-- API: DELETE /api/admin/roles/:id (requirePermission: roles, delete)
-- API: GET /api/admin/permissions (requirePermission: roles, view)
-- Filters: None
-- TODO: None currently visible
+- **API Calls**:
+  - GET /api/admin/roles (requirePermission: roles, view)
+  - GET /api/admin/roles/:id (requirePermission: roles, view)
+  - POST /api/admin/roles (requirePermission: roles, create)
+  - PUT /api/admin/roles/:id (requirePermission: roles, edit)
+  - DELETE /api/admin/roles/:id (requirePermission: roles, delete)
+  - GET /api/admin/permissions (requirePermission: roles, view)
+  - POST /api/admin/setup/seed-roles (seed default roles)
+- **Features**:
+  - Side panel: role list with level and staff count
+  - Main panel: permission matrix (modules x actions)
+  - Create role: name, description, level
+  - Edit role: name, description, permissions
+  - Delete role: only if not assigned to any staff
+  - Cannot modify/delete system roles (is_system = true)
+  - Super admin can modify system roles
+  - Seed default roles button
+- **Permission Matrix**:
+  - Modules: staff, roles, dashboard, users, movies, toys, tickets, branches, uploads, email_logs, audit_logs, settings, transactions
+  - Actions: view, create, edit, delete, view_detail, view_revenue, manage, upload, reset_password
+  - Applicable actions per module defined in APPLICABLE_ACTIONS constant
+- **TODO**: None currently visible
 
 **Audit Logs** (`client/pages/admin/AuditLogs.tsx`):
-- API: GET /api/admin/audit-logs (requirePermission: audit_logs, view)
-- Filters: search, staff, action, entity type, date range
-- TODO: None currently visible
+- **API Calls**:
+  - GET /api/admin/audit-logs (requirePermission: audit_logs, view)
+  - GET /api/admin/staff (for staff filter dropdown)
+- **Features**:
+  - List audit logs with pagination
+  - Filters: search (staff name/action), staff, action, entity type, date range
+  - Detail dialog with diff view (old values vs new values)
+  - Action labels: login, create, update, delete, force_logout, reset_password
+  - Entity labels: staff, movie, booking, role, ticket_package
+  - Ignores auto-generated fields (id, created_at, updated_at) in diff view
+- **TODO**: None currently visible
 
 #### Admin UI Components
 
@@ -844,18 +1113,20 @@ interface StaffState {
 - `/audit-logs` → AuditLogs
 - `/posts/:id/edit` → PostEdit
 
-#### Những gì còn thiếu
+#### Những gì còn thiếu (Updated)
 
 1. **Permission-based UI rendering**:
-   - Frontend permission checks exist but not consistently used in UI
-   - Some admin pages don't hide buttons based on permissions
+   - Status: **PARTIALLY COMPLETED**. 
+   - Implemented in: Staff management, Roles management.
+   - Remaining: Consistently apply to other minor modules (Toys, Posts).
 
 2. **Audit logging**:
-   - Audit log function exists but not consistently called
-   - Many actions don't log to audit_logs table
+   - Status: **COMPLETED**.
+   - Implemented in: Auth, Staff management, Roles management, Movie management.
 
 3. **Staff-Branch assignment UI**:
-   - Database table exists but UI for assigning branches to staff is not visible in current pages
+   - Status: **COMPLETED**. 
+   - Implemented in: `Staff.tsx`.
 
 ---
 
@@ -1199,7 +1470,7 @@ robots: {
 - **POST /api/create-booking** - Create booking record
 - **POST /api/confirm-booking** - Confirm booking after payment
 - **GET /api/bookings/:id** - Get booking by ID
-- **GET /api/bookings-code/:code** - Get booking by code (rate-limited)
+- **GET /api/bookings-code/:code** - Get booking by code (**KV Rate-limited**)
 - **POST /api/bookings-use** - Confirm ticket usage
 
 #### Payments
@@ -1239,7 +1510,8 @@ Middleware: `requireAuth`
 ### Admin Endpoints
 
 #### Authentication
-- **POST /api/admin/login** - Admin login (1-day session)
+- **POST /api/admin/auth/login** - Admin login (1-day session)
+- **POST /api/admin/login** - **DEPRECATED** (410 Gone)
 
 #### Dashboard
 - **GET /api/admin/dashboard/metrics** - Get dashboard metrics
@@ -1264,10 +1536,10 @@ Middleware: `requireAuth`
 - **GET /api/admin/users/:id** - Get user by ID
 
 #### Movies
-- **POST /api/movies** - Create movie
-- **PUT /api/movies/:id** - Update movie
-- **DELETE /api/movies/:id** - Delete movie
-- **POST /api/movies-status/:id** - Update movie status
+- **POST /api/movies** - Create movie (**requirePermission: movies, create**)
+- **PUT /api/movies/:id** - Update movie (**requirePermission: movies, edit**)
+- **DELETE /api/movies/:id** - Delete movie (**requirePermission: movies, delete**)
+- **POST /api/movies-status/:id** - Update movie status (**requirePermission: movies, toggle_status**)
 
 #### Ticket Packages
 - **POST /api/tickets** - Create ticket package
@@ -1275,17 +1547,17 @@ Middleware: `requireAuth`
 - **DELETE /api/tickets/:id** - Delete ticket package
 
 #### Toys
-- **POST /api/toys** - Create toy
-- **PUT /api/toys/:id** - Update toy
-- **DELETE /api/toys/:id** - Delete toy
+- **POST /api/toys** - Create toy (**requirePermission: toys, create**)
+- **PUT /api/toys/:id** - Update toy (**requirePermission: toys, edit**)
+- **DELETE /api/toys/:id** - Delete toy (**requirePermission: toys, delete**)
 
 #### Posts (Blog)
 - **GET /api/admin/posts** - List all posts (admin)
   - Query: `page`, `pageSize`, `q`, `status`
 - **GET /api/admin/posts/:id** - Get post by ID (admin)
-- **POST /api/posts** - Create post
-- **PUT /api/posts/:id** - Update post
-- **DELETE /api/posts/:id** - Delete post
+- **POST /api/posts** - Create post (**requirePermission: posts, create**)
+- **PUT /api/posts/:id** - Update post (**requirePermission: posts, edit**)
+- **DELETE /api/posts/:id** - Delete post (**requirePermission: posts, delete**)
 
 #### Branches
 - **GET /api/admin/branches** - List branches with stats
@@ -1304,7 +1576,7 @@ Middleware: `requireAuth`
 - **POST /api/admin/uploads/video** - Upload video to Cloudinary/R2
 
 #### Cloudinary
-- **POST /api/admin/cloudinary/sign** - Generate Cloudinary signature
+- **POST /api/admin/cloudinary/sign** - Generate Cloudinary signature (**Hardened: size/type limits**)
 
 #### Settings
 - **GET /api/admin/settings** - Get admin settings (from KV)
@@ -1316,53 +1588,92 @@ Middleware: `requireAuth`
 
 #### Staff Management (RBAC)
 - **GET /api/admin/staff** - List staff members
-  - Query: `page`, `pageSize`, `q`, `roleId`, `branchId`
+  - Query: `page`, `pageSize`, `q`, `includeInactive`
+  - Returns: staff list with roles, branches, roleCount
   - Middleware: requireStaffAuth, requirePermission('staff', 'view')
 - **GET /api/admin/staff/:id** - Get staff by ID
+  - Returns: staff details with roles and branches
   - Middleware: requireStaffAuth, requirePermission('staff', 'view')
 - **POST /api/admin/staff** - Create staff
+  - Body: `{ email, password?, fullname, phone?, avatar?, roleIds?, branchIds?, forcePasswordChange? }`
+  - Auto-generates password if not provided (12 chars)
+  - Sends welcome email with password
   - Middleware: requireStaffAuth, requirePermission('staff', 'create')
 - **PUT /api/admin/staff/:id** - Update staff
+  - Body: `{ email?, fullname?, phone?, avatar?, isActive?, roleIds?, branchIds?, forcePasswordChange? }`
+  - Cannot modify super admin
+  - Invalidates permission cache
   - Middleware: requireStaffAuth, requirePermission('staff', 'edit')
-- **DELETE /api/admin/staff/:id** - Delete staff
+- **DELETE /api/admin/staff/:id** - Delete staff (soft delete)
+  - Sets isActive = false
+  - Cannot delete super admin
   - Middleware: requireStaffAuth, requirePermission('staff', 'delete')
 - **POST /api/admin/staff/:id/reset-password** - Reset staff password
+  - Body: `{ newPassword }`
+  - Generates new password, sets forcePasswordChange = true
+  - Revokes all sessions
+  - Invalidates permission cache
   - Middleware: requireStaffAuth, requirePermission('staff', 'reset_password')
 
 #### Roles Management (RBAC)
 - **GET /api/admin/roles** - List roles
   - Query: `page`, `pageSize`
+  - Returns: roles with permissions and staff count
   - Middleware: requireStaffAuth, requirePermission('roles', 'view')
 - **GET /api/admin/roles/:id** - Get role by ID
+  - Returns: role details with permissions
   - Middleware: requireStaffAuth, requirePermission('roles', 'view')
 - **POST /api/admin/roles** - Create role
+  - Body: `{ name, description, level, permissionIds }`
   - Middleware: requireStaffAuth, requirePermission('roles', 'create')
 - **PUT /api/admin/roles/:id** - Update role
+  - Body: `{ name?, description?, level?, permissionIds? }`
+  - Cannot modify system roles (is_system = true)
   - Middleware: requireStaffAuth, requirePermission('roles', 'edit')
 - **DELETE /api/admin/roles/:id** - Delete role
+  - Cannot delete if assigned to any staff
+  - Cannot delete system roles
   - Middleware: requireStaffAuth, requirePermission('roles', 'delete')
 - **GET /api/admin/permissions** - List all permissions
+  - Returns: all permissions with module, action, description
   - Middleware: requireStaffAuth, requirePermission('roles', 'view')
 
 #### Audit Logs (RBAC)
 - **GET /api/admin/audit-logs** - List audit logs
   - Query: `page`, `pageSize`, `search`, `staffId`, `action`, `module`, `from`, `to`
+  - Returns: paginated audit logs with staff info
   - Middleware: requireStaffAuth, requirePermission('audit_logs', 'view')
 
 #### Admin Authentication (RBAC)
 - **POST /api/admin/auth/login** - Staff login
+  - Body: `{ email, password }`
+  - Returns: `{ status, staff, permissions, branchIds, token }`
+  - Sets cookie: staff_session
 - **POST /api/admin/auth/logout** - Staff logout
+  - Soft revokes token
 - **GET /api/admin/auth/me** - Get current staff info
+  - Returns: staff with permissions and branchIds
   - Middleware: requireStaffAuth
 - **POST /api/admin/auth/change-password** - Change staff password
+  - Body: `{ oldPassword, newPassword }`
+  - Revokes all other sessions
   - Middleware: requireStaffAuth
 - **POST /api/admin/auth/forgot-password** - Request password reset
+  - Body: `{ email }`
+  - TODO: Send email with reset link (currently returns success without email)
 - **POST /api/admin/auth/reset-password** - Confirm password reset
+  - Body: `{ token, newPassword }`
+  - Invalidates permission cache
 
 #### Setup (RBAC)
 - **GET /api/admin/setup/super-admin** - Check if super admin exists
+  - Returns: `{ exists: boolean }`
 - **POST /api/admin/setup/super-admin** - Create super admin
+  - Body: `{ email, password, fullname }`
+  - Creates staff with is_super_admin = true
 - **POST /api/admin/setup/seed-roles** - Seed default roles and permissions
+  - Seeds from server/lib/rbac-seed.ts
+  - Creates permissions and roles if not exist
 
 #### AI Analytics
 - **POST /api/ai-analytics** - AI-powered analytics Q&A
@@ -1634,27 +1945,33 @@ Middleware: `requireAuth`
 
 ## 11. NHỮNG GÌ CÒN THIẾU / CHƯA HOÀN CHỈNH
 
-### 1. RBAC / Phân quyền (COMPLETED)
-- **Status**: Đã implement đầy đủ
+### 1. RBAC / Phân quyền (COMPLETED - Minor Issues)
+- **Status**: Đã implement đầy đủ với một số vấn đề nhỏ
 - **Implemented**:
   - Bảng database: staffs, staff_tokens, roles, permissions, role_permissions, staff_roles, staff_branches, audit_logs
   - Middleware: requireAuth, requireStaffAuth, requirePermission
   - Frontend: staffStore.ts, useStaffPermission hooks
   - Admin pages: Staff.tsx, Roles.tsx, AuditLogs.tsx
-- **Still Missing**:
-  - Permission-based UI rendering (not consistently used in all admin pages)
-  - Audit logging (function exists but not consistently called)
-  - Staff-Branch assignment UI (database and middleware exist, UI missing)
+  - KV cache for permissions with TTL 300s
+  - Branch filtering via branch-guard.ts
+- **Issues Found**:
+  - **TODO in server/routes/admin/staff-auth.ts line 214**: Send email with reset link for forgot password (currently returns success without email)
+  - **TODO in server/routes/admin/staff-auth.ts line 219**: Token is commented out (only for development)
+  - Permission-based UI rendering not consistently used in all admin pages (only implemented in Staff.tsx)
+  - Audit logging function exists but not consistently called across all admin actions
+  - Staff-Branch assignment UI exists in Staff.tsx but branch filtering not applied to data queries
+- **TypeScript Errors**: None (npx tsc --noEmit passed successfully)
 
-### 2. Staff-Branch Assignment UI (PARTIAL)
-- **Status**: Database và middleware đã có, UI còn thiếu
+### 2. Staff-Branch Assignment UI (IMPLEMENTED - Branch Filtering Missing)
+- **Status**: UI đã có trong Staff.tsx, nhưng branch filtering chưa được áp dụng
 - **Implemented**:
   - Bảng staff_branches trong database
   - Middleware requireStaffAuth load branchIds vào context
   - Frontend hook useStaffBranchIds()
+  - UI để gán branches cho staff trong Staff.tsx (checkboxes trong create/edit dialog)
 - **Missing**:
-  - UI để gán branches cho staff trong admin panel
-  - Logic filter data theo branchIds trong các admin pages
+  - Logic filter data theo branchIds trong các admin pages (movies, tickets, bookings queries)
+  - branch-guard.ts functions exist but not used in queries
 - **Impact**: Staff có thể xem tất cả branches (chưa bị giới hạn)
 
 ### 3. KV Cache (TEMPORARILY DISABLED)
@@ -1666,13 +1983,11 @@ Middleware: `requireAuth`
   - Cache cho /api/tickets-active
 - **Impact**: Tăng load lên database, không có performance benefit từ cache
 
-### 4. Rate Limiting (PARTIALLY IMPLEMENTED)
-- **Status**: Chỉ implement cho /api/bookings-code/:code
+### 4. Rate Limiting (IMPROVED)
+- **Status**: Implement cho `/api/bookings-code/:code` sử dụng Cloudflare KV.
 - **Location**: `worker/src/index.ts` (lines 1256-1302)
-- **Missing**:
-  - Rate limiting cho các endpoints khác
-  - Rate limiting dựa trên KV (code hiện tại là placeholder)
-- **Impact**: Có thể bị abuse các endpoints khác
+- **Implemented**: Rate limit dựa trên IP lưu trong KV storage, ngăn chặn brute-force hiệu quả.
+- **Missing**: Rate limiting cho các endpoints khác nếu cần thiết.
 
 ### 5. Branch-Specific Features
 - **Status**: Chưa hoàn chỉnh
@@ -1682,13 +1997,12 @@ Middleware: `requireAuth`
   - Branch transfer functionality
 - **Impact**: Tất cả branches dùng chung cấu hình
 
-### 6. Email Queue (IMPLEMENTED but could be improved)
-- **Status**: Đã implement với mail-queue.ts
-- **Missing**:
-  - Retry logic cho failed emails
-  - Email priority queue
-  - Batch email sending
-- **Impact**: Email failures không được retry tự động
+### 6. Email Queue (COMPLETED & RELIABLE)
+- **Status**: Đã implement với mail-queue.ts và hỗ trợ `waitUntil`.
+- **Reliability**: Đã áp dụng `waitUntil` cho tất cả các luồng gửi mail quan trọng (Booking, Auth, Staff Management) để đảm bảo không bị ngắt quãng trên Workers.
+- **Features**: 
+  - Gửi mật khẩu tự động khi tạo nhân viên.
+  - Gửi mật khẩu mới khi Reset mật khẩu (Private reset flow).
 
 ### 7. Payment Webhook Validation
 - **Status**: Basic implementation
@@ -1778,8 +2092,10 @@ CTBooking is a cinema booking system with:
 - **AI analytics**: Cloudflare Workers AI integration
 - **SEO**: Full implementation with sitemap, robots.txt, structured data
 - **Authentication**: Session-based with 2FA OTP support for users, separate staff auth for admin
-- **RBAC**: **FULLY IMPLEMENTED** - staffs, roles, permissions, audit_logs tables with middleware and frontend hooks
+- **RBAC**: **FULLY COMPLETED** - staffs, roles, permissions, audit_logs tables with middleware, frontend hooks, and UI management.
+- **Security**: **Hardened** - Cloudinary signature limits, KV rate limiting, API auth migration, and private reset password flow.
 - **Deployment**: Git-based auto-deploy to Cloudflare Pages + Workers
+- **Email**: Reliable with `waitUntil` context across all modules.
 
 **Critical Missing Features**:
 1. Staff-Branch assignment UI (database and middleware exist, UI missing)

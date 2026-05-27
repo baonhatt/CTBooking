@@ -303,6 +303,8 @@ export const staffBranches = sqliteTable('staff_branches', {
 export const auditLogs = sqliteTable('audit_logs', {
         id: integer('id').primaryKey({ autoIncrement: true }),
         staffId: integer('staff_id').references(() => staffs.id, { onDelete: 'set null' }),
+        staffEmail: text('staff_email'),
+        staffFullname: text('staff_fullname'),
         action: text('action').notNull(),
         entityType: text('entity_type').notNull(),
         entityId: integer('entity_id'),

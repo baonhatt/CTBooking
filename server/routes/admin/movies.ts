@@ -1,9 +1,10 @@
 import { eq, desc, and, inArray, sql, or } from 'drizzle-orm';
 import { formatDateForDb } from '../../lib/date-utils';
+import { logAuditAction } from '../../lib/audit-logger';
 
 export async function createMovieImpl(
         anyDb: any,
-        tables: { movies: any },
+        tables: { movies: any; auditLogs: any },
         data: {
                 title: string;
                 description?: string;
@@ -19,7 +20,8 @@ export async function createMovieImpl(
         },
         config?: any,
         RUN_ENV?: any,
-        uploader?: (base64: string, folder: string) => Promise<{ url: string }>
+        uploader?: (base64: string, folder: string) => Promise<{ url: string }>,
+        staffInfo?: { id: number; email: string; fullname: string }
 ) {
         if (config) {
                 process.env = config;
@@ -58,6 +60,21 @@ export async function createMovieImpl(
                         await RUN_ENV.KV_BINDING.delete('active_movies_v2');
                 }
 
+                // Log audit action
+                if (staffInfo) {
+                        await logAuditAction(
+                                anyDb,
+                                tables.auditLogs,
+                                'create',
+                                'movie',
+                                movie.id,
+                                `Tạo phim: ${data.title}`,
+                                staffInfo.id,
+                                staffInfo.email,
+                                staffInfo.fullname
+                        );
+                }
+
                 return { movie };
         } catch (err: any) {
                 throw err;
@@ -66,7 +83,7 @@ export async function createMovieImpl(
 
 export async function updateMovieImpl(
         anyDb: any,
-        tables: { movies: any; ticket_packages: any },
+        tables: { movies: any; ticket_packages: any; auditLogs: any },
         id: number,
         data: {
                 title?: string;
@@ -84,7 +101,8 @@ export async function updateMovieImpl(
         config?: any,
         RUN_ENV?: any,
         uploader?: (base64: string, folder: string) => Promise<{ url: string }>,
-        deleter?: (url: string) => Promise<void>
+        deleter?: (url: string) => Promise<void>,
+        staffInfo?: { id: number; email: string; fullname: string }
 ) {
         if (config) {
                 process.env = config;
@@ -172,6 +190,27 @@ export async function updateMovieImpl(
                 ) {
                         deleter(oldMovie.cover_image).catch((e) => console.error('Failed to delete old movie image:', e));
                 }
+
+                // Log audit action
+                if (staffInfo) {
+                        console.log('Logging audit action for movie update:', { staffInfo, id, title: oldMovie?.title });
+                        await logAuditAction(
+                                anyDb,
+                                tables.auditLogs,
+                                'update',
+                                'movie',
+                                id,
+                                `Cập nhật phim: ${oldMovie?.title || id}`,
+                                staffInfo.id,
+                                staffInfo.email,
+                                staffInfo.fullname,
+                                JSON.stringify(oldMovie),
+                                JSON.stringify(payload)
+                        );
+                } else {
+                        console.log('No staffInfo provided for audit log');
+                }
+
                 return { movie };
         } catch (err: any) {
                 throw err;
@@ -180,10 +219,11 @@ export async function updateMovieImpl(
 
 export async function deleteMovieImpl(
         anyDb: any,
-        tables: { movies: any },
+        tables: { movies: any; auditLogs: any },
         id: number,
         RUN_ENV: any,
-        deleter?: (url: string) => Promise<void>
+        deleter?: (url: string) => Promise<void>,
+        staffInfo?: { id: number; email: string; fullname: string }
 ) {
         // Check if movie exists before deleting
         const existing = await anyDb.query.movies.findFirst({
@@ -201,6 +241,21 @@ export async function deleteMovieImpl(
 
         if (RUN_ENV && RUN_ENV.KV_BINDING) {
                 await RUN_ENV.KV_BINDING.delete('active_movies_v2');
+        }
+
+        // Log audit action
+        if (staffInfo) {
+                await logAuditAction(
+                        anyDb,
+                        tables.auditLogs,
+                        'delete',
+                        'movie',
+                        id,
+                        `Xóa phim: ${existing.title}`,
+                        staffInfo.id,
+                        staffInfo.email,
+                        staffInfo.fullname
+                );
         }
 
         return { ok: true };

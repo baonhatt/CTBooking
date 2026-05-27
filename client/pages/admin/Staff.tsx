@@ -23,8 +23,9 @@ interface Staff {
         avatar?: string;
         isSuperAdmin: boolean;
         forcePasswordChange: boolean;
+        roleIds?: number[];
         roleId?: number;
-        roleName?: string;
+        roles?: string[];
         branchIds?: number[];
         branchNames?: string[];
         lastLoginAt?: string;
@@ -123,6 +124,7 @@ export default function StaffPage() {
                         setIsCreateDialogOpen(false);
                         resetForm();
                         queryClient.invalidateQueries({ queryKey: ['staff'] });
+                        queryClient.invalidateQueries({ queryKey: ['staff', page, pageSize, search, filterRole, filterBranch] });
                 },
                 onError: (err: any) => {
                         toast.error(err.message || 'Tạo nhân viên thất bại');
@@ -132,6 +134,7 @@ export default function StaffPage() {
         // Update staff mutation
         const updateMutation = useMutation({
                 mutationFn: async ({ id, data }: { id: number; data: any }) => {
+                        console.log('Update staff request:', { id, data });
                         return request(`/api/admin/staff/${id}`, {
                                 method: 'PUT',
                                 body: JSON.stringify(data),
@@ -175,7 +178,7 @@ export default function StaffPage() {
                         });
                 },
                 onSuccess: (data: any) => {
-                        toast.success(`Đặt lại mật khẩu thành công. Mật khẩu mới: ${data.newPassword}`);
+                        toast.success('Đặt lại mật khẩu thành công. Thông tin mật khẩu mới đã được gửi tới email của nhân viên.');
                         setIsResetPasswordDialogOpen(false);
                         setSelectedStaff(null);
                 },
@@ -196,14 +199,22 @@ export default function StaffPage() {
         };
 
         const handleCreate = () => {
-                createMutation.mutate(formData);
+                const dataToSend = {
+                        ...formData,
+                        roleIds: formData.roleId ? [parseInt(formData.roleId)] : [],
+                };
+                createMutation.mutate(dataToSend);
         };
 
         const handleUpdate = () => {
                 if (!selectedStaff) return;
+                const dataToSend = {
+                        ...formData,
+                        roleIds: formData.roleId ? [parseInt(formData.roleId)] : [],
+                };
                 updateMutation.mutate({
                         id: selectedStaff.id,
-                        data: formData,
+                        data: dataToSend,
                 });
         };
 
@@ -223,7 +234,7 @@ export default function StaffPage() {
                         email: staff.email,
                         fullname: staff.fullname,
                         phone: staff.phone || '',
-                        roleId: String(staff.roleId || ''),
+                        roleId: staff.roleIds && staff.roleIds.length > 0 ? String(staff.roleIds[0]) : '',
                         branchIds: staff.branchIds || [],
                         forcePasswordChange: staff.forcePasswordChange,
                 });
@@ -354,7 +365,7 @@ export default function StaffPage() {
                                                                                 <tr key={staff.id} className="border-b hover:bg-gray-50">
                                                                                         <td className="p-3">{staff.email}</td>
                                                                                         <td className="p-3">{staff.fullname}</td>
-                                                                                        <td className="p-3">{staff.roleName || '-'}</td>
+                                                                                        <td className="p-3">{staff.roles?.join(', ') || '-'}</td>
                                                                                         <td className="p-3">{staff.branchNames?.join(', ') || '-'}</td>
                                                                                         <td className="p-3">
                                                                                                 {staff.isSuperAdmin && <span className="bg-purple-100 text-purple-800 px-2 py-1 rounded text-xs">Super Admin</span>}
@@ -587,6 +598,6 @@ export default function StaffPage() {
                                         </DialogContent>
                                 </Dialog>
                         </div>
-                </AdminLayout>
+                </AdminLayout >
         );
 }

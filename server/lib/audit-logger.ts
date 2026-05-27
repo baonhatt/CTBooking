@@ -3,10 +3,9 @@ import { eq, and, gte, lte, desc, count, or, like } from 'drizzle-orm';
 /**
  * Log an audit action
  * Records staff actions for security and compliance
- * 
+ *
  * @param db - Drizzle database instance
- * @param tables - Database tables object
- * @param kv - KV namespace for caching
+ * @param auditLogsTable - Audit logs table
  * @param action - The action performed (e.g., 'create', 'update', 'delete')
  * @param module - The module affected (e.g., 'staff', 'roles', 'movies')
  * @param entityId - The ID of the entity affected
@@ -14,30 +13,34 @@ import { eq, and, gte, lte, desc, count, or, like } from 'drizzle-orm';
  * @param staffId - The ID of the staff performing the action
  * @param staffEmail - The email of the staff performing the action
  * @param staffFullname - The full name of the staff performing the action
+ * @param oldValues - Old values before change (JSON string)
+ * @param newValues - New values after change (JSON string)
  */
 export async function logAuditAction(
         db: any,
-        tables: any,
+        auditLogsTable: any,
         action: string,
         module: string,
         entityId: number | string | null,
         details: string,
         staffId: number,
         staffEmail: string,
-        staffFullname: string
+        staffFullname: string,
+        oldValues?: string,
+        newValues?: string
 ) {
-        const { auditLogs } = tables;
         const now = new Date().toISOString();
 
         try {
-                await db.insert(auditLogs).values({
+                await db.insert(auditLogsTable).values({
                         staffId,
                         staffEmail,
                         staffFullname,
                         action,
-                        module,
+                        entityType: module,
                         entityId: String(entityId),
-                        details,
+                        oldValues: oldValues || details,
+                        newValues: newValues,
                         createdAt: now,
                 });
         } catch (error) {
