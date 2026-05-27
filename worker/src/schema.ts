@@ -226,3 +226,153 @@ export const bookingsRelations = relations(bookings, ({ one }) => ({
                 references: [ticket_packages.id]
         })
 }));
+
+// RBAC Tables
+export const staffs = sqliteTable('staffs', {
+        id: integer('id').primaryKey({ autoIncrement: true }),
+        email: text('email').notNull().unique(),
+        password: text('password').notNull(),
+        fullname: text('fullname').notNull(),
+        phone: text('phone'),
+        avatar: text('avatar'),
+        isSuperAdmin: integer('is_super_admin', { mode: 'boolean' }).notNull().default(false),
+        isActive: integer('is_active', { mode: 'boolean' }).notNull().default(true),
+        forcePasswordChange: integer('force_password_change', { mode: 'boolean' }).notNull().default(false),
+        lastLoginAt: text('last_login_at'),
+        createdAt: text('created_at').notNull(),
+        updatedAt: text('updated_at').notNull()
+});
+
+export const staffTokens = sqliteTable('staff_tokens', {
+        id: integer('id').primaryKey({ autoIncrement: true }),
+        staffId: integer('staff_id')
+                .notNull()
+                .references(() => staffs.id, { onDelete: 'cascade' }),
+        token: text('token').notNull().unique(),
+        type: text('type').notNull().default('session'),
+        expiredAt: text('expired_at').notNull(),
+        revokedAt: text('revoked_at'),
+        revokeReason: text('revoke_reason'),
+        createdAt: text('created_at').notNull()
+});
+
+export const roles = sqliteTable('roles', {
+        id: integer('id').primaryKey({ autoIncrement: true }),
+        name: text('name').notNull().unique(),
+        description: text('description'),
+        isSystem: integer('is_system', { mode: 'boolean' }).notNull().default(false),
+        level: integer('level').notNull().default(0),
+        createdAt: text('created_at').notNull(),
+        updatedAt: text('updated_at').notNull()
+});
+
+export const permissions = sqliteTable('permissions', {
+        id: integer('id').primaryKey({ autoIncrement: true }),
+        module: text('module').notNull(),
+        action: text('action').notNull(),
+        description: text('description')
+});
+
+export const rolePermissions = sqliteTable('role_permissions', {
+        roleId: integer('role_id')
+                .notNull()
+                .references(() => roles.id, { onDelete: 'cascade' }),
+        permissionId: integer('permission_id')
+                .notNull()
+                .references(() => permissions.id, { onDelete: 'cascade' })
+});
+
+export const staffRoles = sqliteTable('staff_roles', {
+        staffId: integer('staff_id')
+                .notNull()
+                .references(() => staffs.id, { onDelete: 'cascade' }),
+        roleId: integer('role_id')
+                .notNull()
+                .references(() => roles.id, { onDelete: 'cascade' })
+});
+
+export const staffBranches = sqliteTable('staff_branches', {
+        staffId: integer('staff_id')
+                .notNull()
+                .references(() => staffs.id, { onDelete: 'cascade' }),
+        branchId: integer('branch_id')
+                .notNull()
+                .references(() => branches.id, { onDelete: 'cascade' })
+});
+
+export const auditLogs = sqliteTable('audit_logs', {
+        id: integer('id').primaryKey({ autoIncrement: true }),
+        staffId: integer('staff_id').references(() => staffs.id, { onDelete: 'set null' }),
+        action: text('action').notNull(),
+        entityType: text('entity_type').notNull(),
+        entityId: integer('entity_id'),
+        oldValues: text('old_values'),
+        newValues: text('new_values'),
+        ipAddress: text('ip_address'),
+        userAgent: text('user_agent'),
+        createdAt: text('created_at').notNull()
+});
+
+// RBAC Relations
+export const staffsRelations = relations(staffs, ({ many }) => ({
+        tokens: many(staffTokens),
+        roles: many(staffRoles),
+        branches: many(staffBranches),
+        auditLogs: many(auditLogs)
+}));
+
+export const staffTokensRelations = relations(staffTokens, ({ one }) => ({
+        staff: one(staffs, {
+                fields: [staffTokens.staffId],
+                references: [staffs.id]
+        })
+}));
+
+export const rolesRelations = relations(roles, ({ many }) => ({
+        permissions: many(rolePermissions),
+        staff: many(staffRoles)
+}));
+
+export const permissionsRelations = relations(permissions, ({ many }) => ({
+        roles: many(rolePermissions)
+}));
+
+export const rolePermissionsRelations = relations(rolePermissions, ({ one }) => ({
+        role: one(roles, {
+                fields: [rolePermissions.roleId],
+                references: [roles.id]
+        }),
+        permission: one(permissions, {
+                fields: [rolePermissions.permissionId],
+                references: [permissions.id]
+        })
+}));
+
+export const staffRolesRelations = relations(staffRoles, ({ one }) => ({
+        staff: one(staffs, {
+                fields: [staffRoles.staffId],
+                references: [staffs.id]
+        }),
+        role: one(roles, {
+                fields: [staffRoles.roleId],
+                references: [roles.id]
+        })
+}));
+
+export const staffBranchesRelations = relations(staffBranches, ({ one }) => ({
+        staff: one(staffs, {
+                fields: [staffBranches.staffId],
+                references: [staffs.id]
+        }),
+        branch: one(branches, {
+                fields: [staffBranches.branchId],
+                references: [branches.id]
+        })
+}));
+
+export const auditLogsRelations = relations(auditLogs, ({ one }) => ({
+        staff: one(staffs, {
+                fields: [auditLogs.staffId],
+                references: [staffs.id]
+        })
+}));

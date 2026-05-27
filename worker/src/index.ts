@@ -4,8 +4,8 @@ import { cors } from 'hono/cors';
 import { drizzle } from 'drizzle-orm/d1';
 import * as schema from './schema';
 import { eq, desc, asc, and, like, or, sql, count } from 'drizzle-orm';
-import type { D1Database, R2Bucket } from '@cloudflare/workers-types';
-import { requireAuth } from './middleware';
+import type { D1Database, R2Bucket, KVNamespace } from '@cloudflare/workers-types';
+import { requireAuth, requireStaffAuth, requirePermission } from './middleware';
 import { getAllActiveMoviesToday, listMovies, getMovie } from '../../server/routes/user/movies';
 import {
         createMovieImpl,
@@ -102,10 +102,21 @@ import {
         formatDateForDb
 } from './utils';
 
+type Variables = {
+        userId?: number;
+        accountId?: number;
+        staffId?: number;
+        staffEmail?: string;
+        staffFullname?: string;
+        isSuperAdmin?: boolean;
+        staffPermissions?: Array<{ module: string; action: string }>;
+        staffBranchIds?: number[];
+};
+
 type Bindings = {
         cinema_db: D1Database;
         r2_cinemastore: R2Bucket;
-        KV_BINDING: any;
+        KV_BINDING: KVNamespace;
         CLOUDINARY_CLOUD_NAME: string;
         CLOUDINARY_API_KEY: string;
         CLOUDINARY_API_SECRET: string;
@@ -127,7 +138,7 @@ type Bindings = {
         BREVO_SENDER_NAME: string;
         IS_PREVIEW?: string;
         VITE_RATE_LIMIT_BOOKING_CHECK_MAX: string;
-        VITE_RATE_LIMIT_BOOKING_CHECK_WINDOWMS: string;
+        VITE_RATE_LIMIT_BOOKING_CHECK_WINDOWMS: string; SUPER_ADMIN_EMAIL: string; SUPER_ADMIN_PASSWORD: string; SUPER_ADMIN_FULLNAME: string;
         AI: any; // Cloudflare Workers AI binding
 };
 
@@ -151,7 +162,7 @@ const getCloudHelpers = (c: Context, env: Bindings) => {
         };
 };
 
-const app = new Hono<{ Bindings: Bindings }>();
+const app = new Hono<{ Variables: Variables; Bindings: Bindings }>();
 
 // DEBUG: Global Request Logger
 app.use('*', async (c, next) => {
@@ -683,7 +694,7 @@ app.post('/api/admin/login', async (c) => {
 });
 
 
-app.get('/api/admin/revenue', async (c) => {
+app.get('/api/admin/revenue', requireStaffAuth, requirePermission('dashboard', 'view_revenue'), async (c) => {
         try {
                 const from = String(c.req.query('from') || '');
                 const to = String(c.req.query('to') || '');
@@ -696,7 +707,7 @@ app.get('/api/admin/revenue', async (c) => {
         }
 });
 
-app.get('/api/admin/transactions', async (c) => {
+app.get('/api/admin/transactions', requireStaffAuth, requirePermission('transactions', 'view'), async (c) => {
         try {
                 const page = Number(c.req.query('page') || 1);
                 const pageSize = Number(c.req.query('pageSize') || 20);
@@ -735,7 +746,7 @@ app.get('/api/admin/transactions', async (c) => {
         }
 });
 
-app.get('/api/admin/transactions/:id', async (c) => {
+app.get('/api/admin/transactions/:id', requireStaffAuth, requirePermission('transactions', 'view'), async (c) => {
         try {
                 const id = Number(c.req.param('id'));
                 const db = drizzle(c.env.cinema_db, { schema });
@@ -759,7 +770,7 @@ app.get('/api/admin/transactions/:id', async (c) => {
 
 // Get dashboard metrics (total users, movies, revenue, etc.)
 // GET /api/admin/dashboard/metrics
-app.get('/api/admin/dashboard/metrics', async (c) => {
+app.get('/api/admin/dashboard/metrics', requireStaffAuth, requirePermission('dashboard', 'view'), async (c) => {
         try {
                 const db = drizzle(c.env.cinema_db, { schema });
                 const period = c.req.query('period') || 'week';
@@ -785,7 +796,7 @@ app.get('/api/admin/dashboard/metrics', async (c) => {
 
 // Get revenue for a specific date
 // GET /api/admin/dashboard/revenue-date?date=YYYY-MM-DD&status=paid
-app.get('/api/admin/dashboard/revenue-date', async (c) => {
+app.get('/api/admin/dashboard/revenue-date', requireStaffAuth, requirePermission('dashboard', 'view_revenue'), async (c) => {
         try {
                 const date = String(c.req.query('date') || '');
                 const status = String(c.req.query('status') || 'paid');
@@ -801,7 +812,7 @@ app.get('/api/admin/dashboard/revenue-date', async (c) => {
 
 // Get revenue data for the last 7 days
 // GET /api/admin/dashboard/revenue-7days
-app.get('/api/admin/dashboard/revenue-7days', async (c) => {
+app.get('/api/admin/dashboard/revenue-7days', requireStaffAuth, requirePermission('dashboard', 'view_revenue'), async (c) => {
         try {
                 const yearParam = c.req.query('year');
                 const year = yearParam ? parseInt(yearParam) : undefined;
@@ -815,7 +826,7 @@ app.get('/api/admin/dashboard/revenue-7days', async (c) => {
 
 // Get monthly revenue data
 // GET /api/admin/dashboard/revenue-month?year=YYYY&month=MM&status=paid
-app.get('/api/admin/dashboard/revenue-month', async (c) => {
+app.get('/api/admin/dashboard/revenue-month', requireStaffAuth, requirePermission('dashboard', 'view_revenue'), async (c) => {
         try {
                 const year = String(c.req.query('year') || '');
                 const month = String(c.req.query('month') || '');
@@ -834,7 +845,7 @@ app.get('/api/admin/dashboard/revenue-month', async (c) => {
 
 // Get paginated list of users with optional search
 // GET /api/admin/users?page=1&pageSize=20&q=search_term
-app.get('/api/admin/users', async (c) => {
+app.get('/api/admin/users', requireStaffAuth, requirePermission('users', 'view'), async (c) => {
         try {
                 const page = Number(c.req.query('page') || 1);
                 const pageSize = Number(c.req.query('pageSize') || 20);
@@ -856,7 +867,7 @@ app.get('/api/admin/users', async (c) => {
 });
 
 // Admin settings endpoints
-app.get('/api/admin/settings', async (c) => {
+app.get('/api/admin/settings', requireStaffAuth, requirePermission('settings', 'view'), async (c) => {
         try {
                 const r = await getAdminSettingsImpl(c.env.KV_BINDING);
                 return c.json(r);
@@ -865,7 +876,7 @@ app.get('/api/admin/settings', async (c) => {
         }
 });
 
-app.post('/api/admin/settings', async (c) => {
+app.post('/api/admin/settings', requireStaffAuth, requirePermission('settings', 'manage'), async (c) => {
         try {
                 const body = await c.req.json().catch(() => ({}));
                 const r = await updateAdminSettingsImpl(c.env.KV_BINDING, body);
@@ -877,7 +888,7 @@ app.post('/api/admin/settings', async (c) => {
 
 // Get user details by ID
 // GET /api/admin/users/:id
-app.get('/api/admin/users/:id', async (c) => {
+app.get('/api/admin/users/:id', requireStaffAuth, requirePermission('users', 'view_detail'), async (c) => {
         try {
                 const id = Number(c.req.param('id'));
                 const db = drizzle(c.env.cinema_db, { schema });
@@ -901,7 +912,7 @@ app.get('/api/admin/users/:id', async (c) => {
 // Generate Cloudinary signature for direct uploads
 // POST /api/admin/cloudinary/sign
 // Body: { folder: string, resource_type: string }
-app.post('/api/admin/cloudinary/sign', async (c) => {
+app.post('/api/admin/cloudinary/sign', requireStaffAuth, requirePermission('uploads', 'upload'), async (c) => {
         try {
                 const env = c.env;
                 if (!hasCloudinary(env)) return c.json({ message: 'Thiếu cấu hình Cloudinary' }, 400);
@@ -931,7 +942,7 @@ app.post('/api/admin/cloudinary/sign', async (c) => {
 // Upload video file to Cloudinary or R2 storage
 // POST /api/admin/uploads/video
 // FormData: { file: File }
-app.post('/api/admin/uploads/video', async (c) => {
+app.post('/api/admin/uploads/video', requireStaffAuth, requirePermission('uploads', 'upload'), async (c) => {
         try {
                 const formData = await c.req.formData();
                 const file = formData.get('file');
@@ -1553,7 +1564,7 @@ app.get('/api/users', async (c) => {
 
 // Get email logs
 // GET /api/admin/email-logs
-app.get('/api/admin/email-logs', async (c) => {
+app.get('/api/admin/email-logs', requireStaffAuth, requirePermission('email_logs', 'view'), async (c) => {
         try {
                 const status = c.req.query('status') || 'all';
                 const email_type = c.req.query('email_type') || 'all';
@@ -2028,7 +2039,7 @@ app.delete('/api/tickets/:id', async (c) => {
 // Create site media
 // POST /api/admin/site-media
 // Body: { type: string, url: string, ... }
-app.post('/api/admin/site-media', async (c) => {
+app.post('/api/admin/site-media', requireStaffAuth, requirePermission('uploads', 'upload'), async (c) => {
         try {
                 const db = drizzle(c.env.cinema_db, { schema });
                 const body = await c.req.json().catch(() => ({}));
@@ -2044,7 +2055,7 @@ app.post('/api/admin/site-media', async (c) => {
 // Update site media
 // PUT /api/admin/site-media
 // Body: { type: string, url: string, ... }
-app.put('/api/admin/site-media', async (c) => {
+app.put('/api/admin/site-media', requireStaffAuth, requirePermission('uploads', 'upload'), async (c) => {
         try {
                 const db = drizzle(c.env.cinema_db, { schema });
                 const body = await c.req.json().catch(() => ({}));
@@ -2100,7 +2111,7 @@ app.get('/api/site-media', async (c) => {
 
 // Delete site media by ID
 // DELETE /api/admin/site-media/:id
-app.delete('/api/admin/site-media/:id', async (c) => {
+app.delete('/api/admin/site-media/:id', requireStaffAuth, requirePermission('uploads', 'delete'), async (c) => {
         try {
                 const id = Number(c.req.param('id'));
                 const db = drizzle(c.env.cinema_db, { schema });
@@ -2669,7 +2680,7 @@ app.get('/api/posts/:identifier', async (c) => {
 });
 
 // Admin: List all posts
-app.get('/api/admin/posts', async (c) => {
+app.get('/api/admin/posts', requireStaffAuth, requirePermission('posts', 'view'), async (c) => {
         try {
                 const page = Number(c.req.query('page') || 1);
                 const pageSize = Number(c.req.query('pageSize') || 10);
@@ -2688,7 +2699,7 @@ app.get('/api/admin/posts', async (c) => {
 });
 
 // Admin: Get post by ID (any status)
-app.get('/api/admin/posts/:id', async (c) => {
+app.get('/api/admin/posts/:id', requireStaffAuth, requirePermission('posts', 'view'), async (c) => {
         try {
                 const id = c.req.param('id');
                 const db = drizzle(c.env.cinema_db, { schema });
@@ -2755,7 +2766,7 @@ app.delete('/api/posts/:id', async (c) => {
 });
 
 // Admin: List branches
-app.get('/api/admin/branches', async (c) => {
+app.get('/api/admin/branches', requireStaffAuth, requirePermission('branches', 'view'), async (c) => {
         try {
                 const page = Number(c.req.query('page') || 1);
                 const pageSize = Number(c.req.query('pageSize') || 10);
@@ -2770,7 +2781,7 @@ app.get('/api/admin/branches', async (c) => {
 });
 
 // Admin: Get branch by ID
-app.get('/api/admin/branches/:id', async (c) => {
+app.get('/api/admin/branches/:id', requireStaffAuth, requirePermission('branches', 'view'), async (c) => {
         try {
                 const id = Number(c.req.param('id'));
                 const db = drizzle(c.env.cinema_db, { schema });
@@ -2806,7 +2817,7 @@ app.get('/api/branches', async (c) => {
 });
 
 // Admin: Create branch
-app.post('/api/admin/branches', async (c) => {
+app.post('/api/admin/branches', requireStaffAuth, requirePermission('branches', 'create'), async (c) => {
         try {
                 const db = drizzle(c.env.cinema_db, { schema });
                 const body = await c.req.json().catch(() => ({}));
@@ -2818,7 +2829,7 @@ app.post('/api/admin/branches', async (c) => {
 });
 
 // Admin: Update branch
-app.put('/api/admin/branches/:id', async (c) => {
+app.put('/api/admin/branches/:id', requireStaffAuth, requirePermission('branches', 'edit'), async (c) => {
         try {
                 const id = Number(c.req.param('id'));
                 const db = drizzle(c.env.cinema_db, { schema });
@@ -2832,13 +2843,392 @@ app.put('/api/admin/branches/:id', async (c) => {
 });
 
 // Admin: Delete branch
-app.delete('/api/admin/branches/:id', async (c) => {
+app.delete('/api/admin/branches/:id', requireStaffAuth, requirePermission('branches', 'delete'), async (c) => {
         try {
                 const id = Number(c.req.param('id'));
                 const db = drizzle(c.env.cinema_db, { schema });
                 const r = await deleteBranchImpl(db, { branches: schema.branches, movies: schema.movies, ticket_packages: schema.ticket_packages, bookings: schema.bookings }, id);
                 if (!r) return c.json({ message: 'Không tìm thấy chi nhánh' }, 404);
                 return c.json({ status: 'success', message: 'Đã xóa chi nhánh' });
+        } catch (err: any) {
+                return c.json({ status: 'error', message: String(err?.message || 'Internal error') }, 500);
+        }
+});
+
+// ===== SETUP ENDPOINTS (RBAC) =====
+
+// GET /api/admin/setup/super-admin - Check if super admin exists
+app.get('/api/admin/setup/super-admin', async (c) => {
+        try {
+                const { checkSuperAdminExists } = await import('../../server/routes/admin/setup');
+                const db = drizzle(c.env.cinema_db, { schema });
+                const exists = await checkSuperAdminExists(db, { staffs: schema.staffs });
+                return c.json({ exists });
+        } catch (err: any) {
+                return c.json({ status: 'error', message: String(err?.message || 'Internal error') }, 500);
+        }
+});
+
+// POST /api/admin/setup/super-admin - Create first super admin
+app.post('/api/admin/setup/super-admin', async (c) => {
+        try {
+                const { setupSuperAdminImpl } = await import('../../server/routes/admin/setup');
+                const body = await c.req.json().catch(() => ({}));
+                const db = drizzle(c.env.cinema_db, { schema });
+                const env = {
+                        SUPER_ADMIN_EMAIL: c.env.SUPER_ADMIN_EMAIL,
+                        SUPER_ADMIN_PASSWORD: c.env.SUPER_ADMIN_PASSWORD,
+                        SUPER_ADMIN_FULLNAME: c.env.SUPER_ADMIN_FULLNAME
+                };
+                const r = await setupSuperAdminImpl(db, { staffs: schema.staffs, permissions: schema.permissions, roles: schema.roles, rolePermissions: schema.rolePermissions }, body, env);
+                if (r.status === 'error') return c.json(r, 409);
+                return c.json(r);
+        } catch (err: any) {
+                return c.json({ status: 'error', message: String(err?.message || 'Internal error') }, 500);
+        }
+});
+
+// POST /api/admin/setup/seed-roles - Seed roles and permissions
+app.post('/api/admin/setup/seed-roles', async (c) => {
+        try {
+                const { seedRolesAndPermissionsImpl } = await import('../../server/routes/admin/setup');
+                const db = drizzle(c.env.cinema_db, { schema });
+                const r = await seedRolesAndPermissionsImpl(db, {
+                        permissions: schema.permissions,
+                        roles: schema.roles,
+                        rolePermissions: schema.rolePermissions,
+                });
+                return c.json(r);
+        } catch (err: any) {
+                return c.json({ status: 'error', message: String(err?.message || 'Internal error') }, 500);
+        }
+});
+
+// ===== STAFF AUTH ENDPOINTS =====
+
+// POST /api/admin/auth/login - Staff login
+app.post('/api/admin/auth/login', async (c) => {
+        try {
+                const { staffLoginImpl } = await import('../../server/routes/admin/staff-auth');
+                const body = await c.req.json().catch(() => ({}));
+                const db = drizzle(c.env.cinema_db, { schema });
+                const r = await staffLoginImpl(db, { staffs: schema.staffs, staffTokens: schema.staffTokens }, c.env.KV_BINDING, body);
+                if (r.status === 'error') return c.json(r, 400);
+                // Set cookie
+                c.header('Set-Cookie', `staff_session=${r.token}; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=86400`);
+                return c.json(r);
+        } catch (err: any) {
+                return c.json({ status: 'error', message: String(err?.message || 'Internal error') }, 500);
+        }
+});
+
+// POST /api/admin/auth/logout - Staff logout
+app.post('/api/admin/auth/logout', async (c) => {
+        try {
+                const { staffLogoutImpl } = await import('../../server/routes/admin/staff-auth');
+                const token = c.req.header('cookie')?.match(/staff_session=([^;]+)/)?.[1] ||
+                        c.req.header('Authorization')?.replace('Bearer ', '');
+                if (!token) return c.json({ status: 'error', message: 'Unauthorized' }, 401);
+                const db = drizzle(c.env.cinema_db, { schema });
+                const r = await staffLogoutImpl(db, { staffTokens: schema.staffTokens }, token);
+                // Clear cookie
+                c.header('Set-Cookie', 'staff_session=; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=0');
+                return c.json(r);
+        } catch (err: any) {
+                return c.json({ status: 'error', message: String(err?.message || 'Internal error') }, 500);
+        }
+});
+
+// GET /api/admin/auth/me - Get current staff info
+app.get('/api/admin/auth/me', requireStaffAuth, async (c) => {
+        try {
+                const { staffGetMeImpl } = await import('../../server/routes/admin/staff-auth');
+                const staffId = c.get('staffId');
+                const db = drizzle(c.env.cinema_db, { schema });
+                const r = await staffGetMeImpl(db, { staffs: schema.staffs }, c.env.KV_BINDING, staffId);
+                return c.json(r);
+        } catch (err: any) {
+                return c.json({ status: 'error', message: String(err?.message || 'Internal error') }, 500);
+        }
+});
+
+// POST /api/admin/auth/change-password - Change staff password
+app.post('/api/admin/auth/change-password', requireStaffAuth, async (c) => {
+        try {
+                const { staffChangePasswordImpl } = await import('../../server/routes/admin/staff-auth');
+                const staffId = c.get('staffId');
+                const body = await c.req.json().catch(() => ({}));
+                const db = drizzle(c.env.cinema_db, { schema });
+                const r = await staffChangePasswordImpl(db, { staffs: schema.staffs, staffTokens: schema.staffTokens }, c.env.KV_BINDING, staffId, body);
+                if (r.status === 'error') return c.json(r, 400);
+                return c.json(r);
+        } catch (err: any) {
+                return c.json({ status: 'error', message: String(err?.message || 'Internal error') }, 500);
+        }
+});
+
+// POST /api/admin/auth/forgot-password - Forgot password
+app.post('/api/admin/auth/forgot-password', async (c) => {
+        try {
+                const { staffForgotPasswordImpl } = await import('../../server/routes/admin/staff-auth');
+                const body = await c.req.json().catch(() => ({}));
+                const db = drizzle(c.env.cinema_db, { schema });
+                const r = await staffForgotPasswordImpl(db, { staffs: schema.staffs, staffTokens: schema.staffTokens }, body);
+                if (r.status === 'error') return c.json(r, 400);
+                return c.json(r);
+        } catch (err: any) {
+                return c.json({ status: 'error', message: String(err?.message || 'Internal error') }, 500);
+        }
+});
+
+// POST /api/admin/auth/reset-password - Reset password with token
+app.post('/api/admin/auth/reset-password', async (c) => {
+        try {
+                const { staffResetPasswordImpl } = await import('../../server/routes/admin/staff-auth');
+                const body = await c.req.json().catch(() => ({}));
+                const db = drizzle(c.env.cinema_db, { schema });
+                const r = await staffResetPasswordImpl(db, { staffs: schema.staffs, staffTokens: schema.staffTokens }, c.env.KV_BINDING, body);
+                if (r.status === 'error') return c.json(r, 400);
+                return c.json(r);
+        } catch (err: any) {
+                return c.json({ status: 'error', message: String(err?.message || 'Internal error') }, 500);
+        }
+});
+
+// ===== STAFF MANAGEMENT ENDPOINTS =====
+
+// GET /api/admin/staff - List staff
+app.get('/api/admin/staff', requireStaffAuth, requirePermission('staff', 'view'), async (c) => {
+        try {
+                const { listStaffImpl } = await import('../../server/routes/admin/staff-management');
+                const page = Number(c.req.query('page') || '1');
+                const pageSize = Number(c.req.query('pageSize') || '20');
+                const q = c.req.query('q') || '';
+                const includeInactive = c.req.query('includeInactive') === 'true';
+                const db = drizzle(c.env.cinema_db, { schema });
+                const r = await listStaffImpl(db, {
+                        staffs: schema.staffs,
+                        staffRoles: schema.staffRoles,
+                        roles: schema.roles,
+                        staffBranches: schema.staffBranches,
+                        branches: schema.branches,
+                }, { page, pageSize, q, includeInactive });
+                return c.json(r);
+        } catch (err: any) {
+                return c.json({ status: 'error', message: String(err?.message || 'Internal error') }, 500);
+        }
+});
+
+// GET /api/admin/staff/:id - Get staff by ID
+app.get('/api/admin/staff/:id', requireStaffAuth, requirePermission('staff', 'view'), async (c) => {
+        try {
+                const { getStaffByIdImpl } = await import('../../server/routes/admin/staff-management');
+                const id = Number(c.req.param('id'));
+                const db = drizzle(c.env.cinema_db, { schema });
+                const r = await getStaffByIdImpl(db, {
+                        staffs: schema.staffs,
+                        staffRoles: schema.staffRoles,
+                        roles: schema.roles,
+                        staffBranches: schema.staffBranches,
+                        branches: schema.branches,
+                }, id);
+                if (r.status === 'error') return c.json(r, 404);
+                return c.json(r);
+        } catch (err: any) {
+                return c.json({ status: 'error', message: String(err?.message || 'Internal error') }, 500);
+        }
+});
+
+// POST /api/admin/staff - Create staff
+app.post('/api/admin/staff', requireStaffAuth, requirePermission('staff', 'create'), async (c) => {
+        try {
+                const { createStaffImpl } = await import('../../server/routes/admin/staff-management');
+                const body = await c.req.json().catch(() => ({}));
+                const db = drizzle(c.env.cinema_db, { schema });
+                const r = await createStaffImpl(db, {
+                        staffs: schema.staffs,
+                        staffRoles: schema.staffRoles,
+                        staffBranches: schema.staffBranches,
+                }, c.env.KV_BINDING, body);
+                if (r.status === 'error') return c.json(r, 400);
+                return c.json(r);
+        } catch (err: any) {
+                return c.json({ status: 'error', message: String(err?.message || 'Internal error') }, 500);
+        }
+});
+
+// PUT /api/admin/staff/:id - Update staff
+app.put('/api/admin/staff/:id', requireStaffAuth, requirePermission('staff', 'edit'), async (c) => {
+        try {
+                const { updateStaffImpl } = await import('../../server/routes/admin/staff-management');
+                const id = Number(c.req.param('id'));
+                const body = await c.req.json().catch(() => ({}));
+                const db = drizzle(c.env.cinema_db, { schema });
+                const r = await updateStaffImpl(db, {
+                        staffs: schema.staffs,
+                        staffRoles: schema.staffRoles,
+                        staffBranches: schema.staffBranches,
+                }, c.env.KV_BINDING, id, body);
+                if (r.status === 'error') return c.json(r, 400);
+                return c.json(r);
+        } catch (err: any) {
+                return c.json({ status: 'error', message: String(err?.message || 'Internal error') }, 500);
+        }
+});
+
+// DELETE /api/admin/staff/:id - Delete staff
+app.delete('/api/admin/staff/:id', requireStaffAuth, requirePermission('staff', 'delete'), async (c) => {
+        try {
+                const { deleteStaffImpl } = await import('../../server/routes/admin/staff-management');
+                const id = Number(c.req.param('id'));
+                const db = drizzle(c.env.cinema_db, { schema });
+                const r = await deleteStaffImpl(db, { staffs: schema.staffs }, id);
+                if (r.status === 'error') return c.json(r, 400);
+                return c.json(r);
+        } catch (err: any) {
+                return c.json({ status: 'error', message: String(err?.message || 'Internal error') }, 500);
+        }
+});
+
+// POST /api/admin/staff/:id/reset-password - Reset staff password
+app.post('/api/admin/staff/:id/reset-password', requireStaffAuth, requirePermission('staff', 'reset_password'), async (c) => {
+        try {
+                const { resetStaffPasswordImpl } = await import('../../server/routes/admin/staff-management');
+                const id = Number(c.req.param('id'));
+                const body = await c.req.json().catch(() => ({}));
+                const db = drizzle(c.env.cinema_db, { schema });
+                const r = await resetStaffPasswordImpl(db, {
+                        staffs: schema.staffs,
+                        staffTokens: schema.staffTokens,
+                }, c.env.KV_BINDING, id, body);
+                if (r.status === 'error') return c.json(r, 400);
+                return c.json(r);
+        } catch (err: any) {
+                return c.json({ status: 'error', message: String(err?.message || 'Internal error') }, 500);
+        }
+});
+
+// ===== ROLES MANAGEMENT ENDPOINTS =====
+
+// GET /api/admin/roles - List roles
+app.get('/api/admin/roles', requireStaffAuth, requirePermission('roles', 'view'), async (c) => {
+        try {
+                const { listRolesImpl } = await import('../../server/routes/admin/roles');
+                const page = Number(c.req.query('page') || '1');
+                const pageSize = Number(c.req.query('pageSize') || '100');
+                const db = drizzle(c.env.cinema_db, { schema });
+                const r = await listRolesImpl(db, {
+                        roles: schema.roles,
+                        rolePermissions: schema.rolePermissions,
+                        permissions: schema.permissions,
+                }, { page, pageSize });
+                return c.json(r);
+        } catch (err: any) {
+                return c.json({ status: 'error', message: String(err?.message || 'Internal error') }, 500);
+        }
+});
+
+// GET /api/admin/roles/:id - Get role by ID
+app.get('/api/admin/roles/:id', requireStaffAuth, requirePermission('roles', 'view'), async (c) => {
+        try {
+                const { getRoleByIdImpl } = await import('../../server/routes/admin/roles');
+                const id = Number(c.req.param('id'));
+                const db = drizzle(c.env.cinema_db, { schema });
+                const r = await getRoleByIdImpl(db, {
+                        roles: schema.roles,
+                        rolePermissions: schema.rolePermissions,
+                        permissions: schema.permissions,
+                }, id);
+                if (r.status === 'error') return c.json(r, 404);
+                return c.json(r);
+        } catch (err: any) {
+                return c.json({ status: 'error', message: String(err?.message || 'Internal error') }, 500);
+        }
+});
+
+// POST /api/admin/roles - Create role
+app.post('/api/admin/roles', requireStaffAuth, requirePermission('roles', 'create'), async (c) => {
+        try {
+                const { createRoleImpl } = await import('../../server/routes/admin/roles');
+                const body = await c.req.json().catch(() => ({}));
+                const db = drizzle(c.env.cinema_db, { schema });
+                const r = await createRoleImpl(db, {
+                        roles: schema.roles,
+                        rolePermissions: schema.rolePermissions,
+                }, body);
+                if (r.status === 'error') return c.json(r, 400);
+                return c.json(r);
+        } catch (err: any) {
+                return c.json({ status: 'error', message: String(err?.message || 'Internal error') }, 500);
+        }
+});
+
+// PUT /api/admin/roles/:id - Update role
+app.put('/api/admin/roles/:id', requireStaffAuth, requirePermission('roles', 'edit'), async (c) => {
+        try {
+                const { updateRoleImpl } = await import('../../server/routes/admin/roles');
+                const id = Number(c.req.param('id'));
+                const body = await c.req.json().catch(() => ({}));
+                const db = drizzle(c.env.cinema_db, { schema });
+                const r = await updateRoleImpl(db, {
+                        roles: schema.roles,
+                        rolePermissions: schema.rolePermissions,
+                }, id, body);
+                if (r.status === 'error') return c.json(r, 400);
+                return c.json(r);
+        } catch (err: any) {
+                return c.json({ status: 'error', message: String(err?.message || 'Internal error') }, 500);
+        }
+});
+
+// DELETE /api/admin/roles/:id - Delete role
+app.delete('/api/admin/roles/:id', requireStaffAuth, requirePermission('roles', 'delete'), async (c) => {
+        try {
+                const { deleteRoleImpl } = await import('../../server/routes/admin/roles');
+                const id = Number(c.req.param('id'));
+                const db = drizzle(c.env.cinema_db, { schema });
+                const r = await deleteRoleImpl(db, {
+                        roles: schema.roles,
+                        staffRoles: schema.staffRoles,
+                }, id);
+                if (r.status === 'error') return c.json(r, 400);
+                return c.json(r);
+        } catch (err: any) {
+                return c.json({ status: 'error', message: String(err?.message || 'Internal error') }, 500);
+        }
+});
+
+// GET /api/admin/permissions - List all permissions
+app.get('/api/admin/permissions', requireStaffAuth, requirePermission('roles', 'view'), async (c) => {
+        try {
+                const { listPermissionsImpl } = await import('../../server/routes/admin/roles');
+                const db = drizzle(c.env.cinema_db, { schema });
+                const r = await listPermissionsImpl(db, { permissions: schema.permissions });
+                return c.json(r);
+        } catch (err: any) {
+                return c.json({ status: 'error', message: String(err?.message || 'Internal error') }, 500);
+        }
+});
+
+// ===== AUDIT LOGS ENDPOINTS =====
+
+// GET /api/admin/audit-logs - List audit logs
+app.get('/api/admin/audit-logs', requireStaffAuth, requirePermission('audit_logs', 'view'), async (c) => {
+        try {
+                const { getAuditLogsImpl } = await import('../../server/lib/audit-logger');
+                const page = Number(c.req.query('page') || '1');
+                const pageSize = Number(c.req.query('pageSize') || '20');
+                const module = c.req.query('module') || '';
+                const action = c.req.query('action') || '';
+                const staffId = c.req.query('staffId') ? Number(c.req.query('staffId')) : undefined;
+                const from = c.req.query('from') || '';
+                const to = c.req.query('to') || '';
+                const search = c.req.query('search') || '';
+                const db = drizzle(c.env.cinema_db, { schema });
+                const r = await getAuditLogsImpl(db, { auditLogs: schema.auditLogs }, {
+                        page, pageSize, module, action, staffId, from, to, search
+                });
+                return c.json(r);
         } catch (err: any) {
                 return c.json({ status: 'error', message: String(err?.message || 'Internal error') }, 500);
         }
