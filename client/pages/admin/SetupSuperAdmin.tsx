@@ -3,6 +3,7 @@ import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
+import { setupSuperAdmin } from '@/lib/api/admin';
 
 export default function SetupSuperAdminPage() {
         const [email, setEmail] = useState('');
@@ -30,13 +31,7 @@ export default function SetupSuperAdminPage() {
                         setLoading(true);
                         setError('');
 
-                        const response = await fetch('/api/admin/setup/super-admin', {
-                                method: 'POST',
-                                headers: { 'Content-Type': 'application/json' },
-                                body: JSON.stringify({ email, password, fullname }),
-                        });
-
-                        const data = await response.json();
+                        const data = await setupSuperAdmin({ email, password, fullname });
 
                         if (data.status === 'success') {
                                 setSuccess(true);

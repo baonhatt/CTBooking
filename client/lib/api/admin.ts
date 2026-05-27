@@ -175,3 +175,14 @@ export async function getEmailLogsApi(options?: {
                 };
         }>(path, { signal: options?.signal });
 }
+
+export async function checkSuperAdminSetup() {
+        return request<{ exists: boolean }>('/api/admin/setup/super-admin');
+}
+
+export async function setupSuperAdmin(body: any) {
+        return request<{ status: string; message?: string }>('/api/admin/setup/super-admin', {
+                method: 'POST',
+                body: JSON.stringify(body)
+        });
+}

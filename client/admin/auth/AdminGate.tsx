@@ -5,6 +5,9 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
 import { useStaffStore } from '@/store/staffStore';
+import { loginApi } from '@/lib/api/auth';
+import { request } from '@/lib/api/http';
+import { checkSuperAdminSetup } from '@/lib/api/admin';
 import AdminIndex from '@/pages/admin/AdminIndex';
 import DashboardPage from '@/pages/admin/Dashboard';
 import UsersPage from '@/pages/admin/Users';
@@ -40,13 +43,7 @@ const AdminLoginView = () => {
                         setLoading(true);
                         setError('');
 
-                        const response = await fetch('/api/admin/auth/login', {
-                                method: 'POST',
-                                headers: { 'Content-Type': 'application/json' },
-                                body: JSON.stringify({ email, password }),
-                        });
-
-                        const data = await response.json();
+                        const data = await loginApi({ email, password });
 
                         if (data.status === 'success') {
                                 localStorage.setItem('staffToken', data.token);
@@ -127,10 +124,7 @@ export const AdminGate = () => {
         useEffect(() => {
                 async function checkSetup() {
                         try {
-                                const response = await fetch('/api/admin/setup/super-admin', {
-                                        method: 'GET',
-                                });
-                                const data = await response.json();
+                                const data = await checkSuperAdminSetup();
                                 if (data.exists) {
                                         setNeedsSetup(false);
                                 } else {
@@ -147,7 +141,7 @@ export const AdminGate = () => {
 
         async function handleLogout() {
                 try {
-                        await fetch('/api/admin/auth/logout', { method: 'POST' });
+                        await request('/api/admin/auth/logout', { method: 'POST' });
                 } catch (err) {
                         console.error('Logout error:', err);
                 }

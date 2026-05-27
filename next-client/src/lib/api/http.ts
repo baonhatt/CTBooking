@@ -8,7 +8,7 @@ let API_BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? '';
 // Override for preview environment if env var not set
 if (!API_BASE_URL && typeof window !== 'undefined') {
         const hostname = window.location.hostname;
-        if (hostname.includes('preview.cinema-next.pages.dev') || hostname.endsWith('.cinema-next.pages.dev')) {
+        if (hostname.includes('preview') && hostname.endsWith('.pages.dev') && !hostname.includes('cinema-pages.pages.dev')) {
                 API_BASE_URL = 'https://cinema-worker-preview.baonhat20.workers.dev';
         }
 }
