@@ -1,14 +1,25 @@
-import React, { useState } from "react";
+import React, { useState } from 'react';
 import {
-  BarChart, Bar, LineChart, Line, PieChart, Pie, Cell,
-  XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
-} from "recharts";
-import { buildUrl } from "@/lib/api";
+  BarChart,
+  Bar,
+  LineChart,
+  Line,
+  PieChart,
+  Pie,
+  Cell,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  Legend,
+  ResponsiveContainer
+} from 'recharts';
+import { buildUrl } from '@/lib/api';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 interface UiConfig {
   title?: string;
-  chart_type?: "bar" | "line" | "pie";
+  chart_type?: 'bar' | 'line' | 'pie';
   x_axis_key?: string;
   y_axis_key?: string;
   y_axis_label?: string;
@@ -16,14 +27,14 @@ interface UiConfig {
 }
 
 interface AnalyticsResult {
-  display_type: "table" | "dynamic_chart" | "summary";
+  display_type: 'table' | 'dynamic_chart' | 'summary';
   analysis_summary: string;
   ui_config: UiConfig;
   processed_data: Record<string, any>[];
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
-const PIE_COLORS = ["#6366f1", "#22d3ee", "#f59e0b", "#34d399", "#f87171", "#a78bfa", "#fb923c", "#38bdf8"];
+const PIE_COLORS = ['#6366f1', '#22d3ee', '#f59e0b', '#34d399', '#f87171', '#a78bfa', '#fb923c', '#38bdf8'];
 
 function formatVnd(value: number) {
   if (value >= 1_000_000) return `${(value / 1_000_000).toFixed(1)}M`;
@@ -37,8 +48,8 @@ const VndTooltip = ({ active, payload, label }: any) => {
     <div className="ai-tooltip">
       <p className="ai-tooltip-label">{label}</p>
       {payload.map((p: any, i: number) => (
-        <p key={i} style={{ color: p.color ?? "#fff" }}>
-          {p.name}: {typeof p.value === "number" && p.value > 10000 ? p.value.toLocaleString("vi-VN") + "đ" : p.value}
+        <p key={i} style={{ color: p.color ?? '#fff' }}>
+          {p.name}: {typeof p.value === 'number' && p.value > 10000 ? p.value.toLocaleString('vi-VN') + 'đ' : p.value}
         </p>
       ))}
     </div>
@@ -53,16 +64,20 @@ function TableRenderer({ data, config }: { data: Record<string, any>[]; config: 
     <div className="ai-table-wrap">
       <table className="ai-table">
         <thead>
-          <tr>{headers.map(h => <th key={h}>{h}</th>)}</tr>
+          <tr>
+            {headers.map((h) => (
+              <th key={h}>{h}</th>
+            ))}
+          </tr>
         </thead>
         <tbody>
           {data.map((row, i) => (
             <tr key={i}>
-              {headers.map(h => (
+              {headers.map((h) => (
                 <td key={h}>
-                  {typeof row[h] === "number" && row[h] > 10000
-                    ? row[h].toLocaleString("vi-VN") + "đ"
-                    : String(row[h] ?? "")}
+                  {typeof row[h] === 'number' && row[h] > 10000
+                    ? row[h].toLocaleString('vi-VN') + 'đ'
+                    : String(row[h] ?? '')}
                 </td>
               ))}
             </tr>
@@ -75,35 +90,62 @@ function TableRenderer({ data, config }: { data: Record<string, any>[]; config: 
 
 function ChartRenderer({ data, config }: { data: Record<string, any>[]; config: UiConfig }) {
   if (!data.length) return <p className="ai-empty">Không có dữ liệu biểu đồ.</p>;
-  const chartType = config.chart_type ?? "bar";
+  const chartType = config.chart_type ?? 'bar';
   const xKey = config.x_axis_key ?? Object.keys(data[0])[0];
   const yKey = config.y_axis_key ?? Object.keys(data[0])[1];
-  const color = config.color ?? "#6366f1";
+  const color = config.color ?? '#6366f1';
 
-  if (chartType === "pie") {
+  if (chartType === 'pie') {
     return (
       <ResponsiveContainer width="100%" height={320}>
         <PieChart>
-          <Pie data={data} dataKey={yKey} nameKey={xKey} cx="50%" cy="50%" outerRadius={120} label={(e) => `${e[xKey]} (${e[yKey]})`}>
-            {data.map((_, i) => <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />)}
+          <Pie
+            data={data}
+            dataKey={yKey}
+            nameKey={xKey}
+            cx="50%"
+            cy="50%"
+            outerRadius={120}
+            label={(e) => `${e[xKey]} (${e[yKey]})`}
+          >
+            {data.map((_, i) => (
+              <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />
+            ))}
           </Pie>
-          <Tooltip formatter={(v: any) => typeof v === "number" && v > 10000 ? v.toLocaleString("vi-VN") + "đ" : v} />
+          <Tooltip formatter={(v: any) => (typeof v === 'number' && v > 10000 ? v.toLocaleString('vi-VN') + 'đ' : v)} />
           <Legend />
         </PieChart>
       </ResponsiveContainer>
     );
   }
 
-  if (chartType === "line") {
+  if (chartType === 'line') {
     return (
       <ResponsiveContainer width="100%" height={320}>
         <LineChart data={data} margin={{ top: 8, right: 16, left: 0, bottom: 8 }}>
           <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.08)" />
-          <XAxis dataKey={xKey} tick={{ fill: "#94a3b8", fontSize: 12 }} />
-          <YAxis tickFormatter={formatVnd} tick={{ fill: "#94a3b8", fontSize: 12 }} label={{ value: config.y_axis_label ?? "", angle: -90, position: "insideLeft", fill: "#64748b", fontSize: 11 }} />
+          <XAxis dataKey={xKey} tick={{ fill: '#94a3b8', fontSize: 12 }} />
+          <YAxis
+            tickFormatter={formatVnd}
+            tick={{ fill: '#94a3b8', fontSize: 12 }}
+            label={{
+              value: config.y_axis_label ?? '',
+              angle: -90,
+              position: 'insideLeft',
+              fill: '#64748b',
+              fontSize: 11
+            }}
+          />
           <Tooltip content={<VndTooltip />} />
           <Legend />
-          <Line type="monotone" dataKey={yKey} stroke={color} strokeWidth={2.5} dot={{ r: 4, fill: color }} activeDot={{ r: 6 }} />
+          <Line
+            type="monotone"
+            dataKey={yKey}
+            stroke={color}
+            strokeWidth={2.5}
+            dot={{ r: 4, fill: color }}
+            activeDot={{ r: 6 }}
+          />
         </LineChart>
       </ResponsiveContainer>
     );
@@ -114,8 +156,18 @@ function ChartRenderer({ data, config }: { data: Record<string, any>[]; config: 
     <ResponsiveContainer width="100%" height={320}>
       <BarChart data={data} margin={{ top: 8, right: 16, left: 0, bottom: 8 }}>
         <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.08)" />
-        <XAxis dataKey={xKey} tick={{ fill: "#94a3b8", fontSize: 12 }} />
-        <YAxis tickFormatter={formatVnd} tick={{ fill: "#94a3b8", fontSize: 12 }} label={{ value: config.y_axis_label ?? "", angle: -90, position: "insideLeft", fill: "#64748b", fontSize: 11 }} />
+        <XAxis dataKey={xKey} tick={{ fill: '#94a3b8', fontSize: 12 }} />
+        <YAxis
+          tickFormatter={formatVnd}
+          tick={{ fill: '#94a3b8', fontSize: 12 }}
+          label={{
+            value: config.y_axis_label ?? '',
+            angle: -90,
+            position: 'insideLeft',
+            fill: '#64748b',
+            fontSize: 11
+          }}
+        />
         <Tooltip content={<VndTooltip />} />
         <Legend />
         <Bar dataKey={yKey} fill={color} radius={[6, 6, 0, 0]} />
@@ -126,17 +178,17 @@ function ChartRenderer({ data, config }: { data: Record<string, any>[]; config: 
 
 // ─── Suggested Questions ──────────────────────────────────────────────────────
 const SUGGESTIONS = [
-  "Phim nào bán vé chạy nhất?",
-  "Doanh thu theo từng phương thức thanh toán",
-  "Khung giờ nào khách đặt vé nhiều nhất?",
-  "Doanh thu từng tháng trong năm nay",
-  "Gói vé nào được mua nhiều nhất?",
-  "Tóm tắt tổng quan kinh doanh",
+  'Phim nào bán vé chạy nhất?',
+  'Doanh thu theo từng phương thức thanh toán',
+  'Khung giờ nào khách đặt vé nhiều nhất?',
+  'Doanh thu từng tháng trong năm nay',
+  'Gói vé nào được mua nhiều nhất?',
+  'Tóm tắt tổng quan kinh doanh'
 ];
 
 // ─── Main Component ───────────────────────────────────────────────────────────
 export default function AIAnalyticsPanel() {
-  const [input, setInput] = useState("");
+  const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<AnalyticsResult | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -149,23 +201,23 @@ export default function AIAnalyticsPanel() {
     setError(null);
     setResult(null);
     try {
-      const res = await fetch(buildUrl("/api/ai-analytics"), {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ userMessage: msg }),
+      const res = await fetch(buildUrl('/api/ai-analytics'), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userMessage: msg })
       });
-      const data = await res.json() as any;
+      const data = (await res.json()) as any;
       if (!res.ok || data.error) throw new Error(data.error ?? `HTTP ${res.status}`);
       setResult(data.result as AnalyticsResult);
     } catch (e: any) {
-      setError(e?.message ?? "Lỗi không xác định");
+      setError(e?.message ?? 'Lỗi không xác định');
     } finally {
       setLoading(false);
     }
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === "Enter" && !loading) handleAnalyze();
+    if (e.key === 'Enter' && !loading) handleAnalyze();
   };
 
   return (
@@ -186,22 +238,18 @@ export default function AIAnalyticsPanel() {
           type="text"
           placeholder="Ví dụ: Phim nào bán chạy nhất? Doanh thu tháng này?"
           value={input}
-          onChange={e => setInput(e.target.value)}
+          onChange={(e) => setInput(e.target.value)}
           onKeyDown={handleKeyDown}
           disabled={loading}
         />
-        <button
-          className="ai-btn"
-          onClick={() => handleAnalyze()}
-          disabled={loading || !input.trim()}
-        >
-          {loading ? <span className="ai-spinner" /> : "Phân tích"}
+        <button className="ai-btn" onClick={() => handleAnalyze()} disabled={loading || !input.trim()}>
+          {loading ? <span className="ai-spinner" /> : 'Phân tích'}
         </button>
       </div>
 
       {/* Suggested questions */}
       <div className="ai-suggestions">
-        {SUGGESTIONS.map(s => (
+        {SUGGESTIONS.map((s) => (
           <button key={s} className="ai-chip" onClick={() => handleAnalyze(s)} disabled={loading}>
             {s}
           </button>
@@ -236,14 +284,14 @@ export default function AIAnalyticsPanel() {
           )}
 
           {/* Chart / Table / Summary */}
-          {result.display_type !== "summary" && result.processed_data?.length > 0 && (
+          {result.display_type !== 'summary' && result.processed_data?.length > 0 && (
             <div className="ai-viz-card">
-              {result.ui_config?.title && (
-                <h3 className="ai-viz-title">{result.ui_config.title}</h3>
+              {result.ui_config?.title && <h3 className="ai-viz-title">{result.ui_config.title}</h3>}
+              {result.display_type === 'dynamic_chart' ? (
+                <ChartRenderer data={result.processed_data} config={result.ui_config} />
+              ) : (
+                <TableRenderer data={result.processed_data} config={result.ui_config} />
               )}
-              {result.display_type === "dynamic_chart"
-                ? <ChartRenderer data={result.processed_data} config={result.ui_config} />
-                : <TableRenderer data={result.processed_data} config={result.ui_config} />}
             </div>
           )}
         </div>

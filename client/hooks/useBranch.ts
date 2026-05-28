@@ -5,74 +5,74 @@ const SELECTED_BRANCH_KEY = 'selected_branch_id';
 const DONT_SHOW_CONFIRM_KEY = 'dont_show_branch_confirm';
 
 interface Branch {
-        id: number;
-        name: string;
-        code: string;
-        is_default: boolean;
-        is_active: boolean;
+  id: number;
+  name: string;
+  code: string;
+  is_default: boolean;
+  is_active: boolean;
 }
 
 export function useBranch() {
-        const [selectedBranch, setSelectedBranch] = useState<Branch | null>(null);
-        const [branches, setBranches] = useState<Branch[]>([]);
-        const [isLoading, setIsLoading] = useState(true);
-        const [dontShowConfirm, setDontShowConfirm] = useState(false);
+  const [selectedBranch, setSelectedBranch] = useState<Branch | null>(null);
+  const [branches, setBranches] = useState<Branch[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [dontShowConfirm, setDontShowConfirm] = useState(false);
 
-        useEffect(() => {
-                loadBranches();
-        }, []);
+  useEffect(() => {
+    loadBranches();
+  }, []);
 
-        const loadBranches = async () => {
-                try {
-                        setIsLoading(true);
-                        
-                        // Load saved branch from localStorage
-                        const savedBranchId = localStorage.getItem(SELECTED_BRANCH_KEY);
-                        const savedDontShow = localStorage.getItem(DONT_SHOW_CONFIRM_KEY);
-                        setDontShowConfirm(savedDontShow === 'true');
+  const loadBranches = async () => {
+    try {
+      setIsLoading(true);
 
-                        // Load all branches
-                        const { items } = await getPublicBranches();
-                        setBranches(items);
+      // Load saved branch from localStorage
+      const savedBranchId = localStorage.getItem(SELECTED_BRANCH_KEY);
+      const savedDontShow = localStorage.getItem(DONT_SHOW_CONFIRM_KEY);
+      setDontShowConfirm(savedDontShow === 'true');
 
-                        if (savedBranchId) {
-                                const savedBranch = items.find((b: Branch) => b.id === Number(savedBranchId));
-                                if (savedBranch) {
-                                        setSelectedBranch(savedBranch);
-                                        setIsLoading(false);
-                                        return;
-                                }
-                        }
+      // Load all branches
+      const { items } = await getPublicBranches();
+      setBranches(items);
 
-                        // If no saved branch or saved branch not found, get default
-                        const { branch: defaultBranch } = await getDefaultBranch();
-                        if (defaultBranch) {
-                                setSelectedBranch(defaultBranch);
-                                localStorage.setItem(SELECTED_BRANCH_KEY, String(defaultBranch.id));
-                        }
-                } catch (error) {
-                        console.error('Error loading branches:', error);
-                } finally {
-                        setIsLoading(false);
-                }
-        };
+      if (savedBranchId) {
+        const savedBranch = items.find((b: Branch) => b.id === Number(savedBranchId));
+        if (savedBranch) {
+          setSelectedBranch(savedBranch);
+          setIsLoading(false);
+          return;
+        }
+      }
 
-        const selectBranch = (branch: Branch) => {
-                setSelectedBranch(branch);
-                localStorage.setItem(SELECTED_BRANCH_KEY, String(branch.id));
-        };
+      // If no saved branch or saved branch not found, get default
+      const { branch: defaultBranch } = await getDefaultBranch();
+      if (defaultBranch) {
+        setSelectedBranch(defaultBranch);
+        localStorage.setItem(SELECTED_BRANCH_KEY, String(defaultBranch.id));
+      }
+    } catch (error) {
+      console.error('Error loading branches:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
-        const toggleDontShowConfirm = (value: boolean) => {
-                setDontShowConfirm(value);
-                localStorage.setItem(DONT_SHOW_CONFIRM_KEY, String(value));
-        };
+  const selectBranch = (branch: Branch) => {
+    setSelectedBranch(branch);
+    localStorage.setItem(SELECTED_BRANCH_KEY, String(branch.id));
+  };
 
-        return {
-                selectedBranch,
-                branches,
-                isLoading,
-                selectBranch,
-                dontShowConfirm,
-                toggleDontShowConfirm
-        };
+  const toggleDontShowConfirm = (value: boolean) => {
+    setDontShowConfirm(value);
+    localStorage.setItem(DONT_SHOW_CONFIRM_KEY, String(value));
+  };
+
+  return {
+    selectedBranch,
+    branches,
+    isLoading,
+    selectBranch,
+    dontShowConfirm,
+    toggleDontShowConfirm
+  };
 }

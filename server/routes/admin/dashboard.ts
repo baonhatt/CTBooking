@@ -5,7 +5,8 @@ export async function getDashboardMetricsImpl(
   anyDb: any,
   tables: { movies: any; toys?: any; users: any; bookings: any; ticket_packages: any },
   topPeriod: string = 'week',
-  year?: number
+  year?: number,
+  restrictToBranchIds: number[] | null = null
 ) {
   // Use current year if not provided
   const selectedYear = year || new Date().getFullYear();
@@ -24,6 +25,8 @@ export async function getDashboardMetricsImpl(
       lte(tables.bookings.paid_at, formatDateForDb(yearEnd))
     )
   );
+  const branchCondition =
+    restrictToBranchIds && restrictToBranchIds.length > 0 ? inArray(tables.bookings.branch_id, restrictToBranchIds) : undefined;
 
   // Year-filtered counts based on created_at
   const [totalMoviesRes] = await anyDb
@@ -32,6 +35,7 @@ export async function getDashboardMetricsImpl(
     .where(
       and(
         eq(tables.movies.is_active, true),
+        ...(branchCondition ? [branchCondition] : []),
         gte(tables.movies.created_at, formatDateForDb(yearStart)),
         lte(tables.movies.created_at, formatDateForDb(yearEnd))
       )
@@ -45,10 +49,12 @@ export async function getDashboardMetricsImpl(
         .select({ count: count() })
         .from(tables.toys)
         .where(
-          and(
-            gte(tables.toys.created_at, formatDateForDb(yearStart)),
-            lte(tables.toys.created_at, formatDateForDb(yearEnd))
-          )
+        and(
+          gte(tables.toys.created_at, formatDateForDb(yearStart)),
+          lte(tables.toys.created_at, formatDateForDb(yearEnd))
+          ,
+          branchCondition
+        )
         );
       return r?.count || 0;
     } catch {
@@ -62,7 +68,8 @@ export async function getDashboardMetricsImpl(
     .where(
       and(
         gte(tables.users.created_at, formatDateForDb(yearStart)),
-        lte(tables.users.created_at, formatDateForDb(yearEnd))
+        lte(tables.users.created_at, formatDateForDb(yearEnd)),
+        branchCondition
       )
     );
   const totalUsers = totalUsersRes?.count || 0;
@@ -71,13 +78,13 @@ export async function getDashboardMetricsImpl(
   const [totalTransactionsRes] = await anyDb
     .select({ count: count() })
     .from(tables.bookings)
-    .where(and(inArray(tables.bookings.payment_status, ['paid']), yearCondition));
+    .where(and(inArray(tables.bookings.payment_status, ['paid']), yearCondition, branchCondition));
   const totalTransactions = totalTransactionsRes?.count || 0;
 
   const [revenueYearRes] = await anyDb
     .select({ sum: sum(tables.bookings.total_price) })
     .from(tables.bookings)
-    .where(and(inArray(tables.bookings.payment_status, ['paid']), yearCondition));
+    .where(and(inArray(tables.bookings.payment_status, ['paid']), yearCondition, branchCondition));
   const revenueTotal = Number(revenueYearRes?.sum || 0);
 
   // Revenue by method (year-filtered)
@@ -88,7 +95,8 @@ export async function getDashboardMetricsImpl(
       and(
         inArray(tables.bookings.payment_status, ['paid']),
         inArray(tables.bookings.payment_method, ['cash', 'Cash']),
-        yearCondition
+        yearCondition,
+        branchCondition
       )
     );
   const [revenueMomoYearAgg] = await anyDb
@@ -98,7 +106,8 @@ export async function getDashboardMetricsImpl(
       and(
         inArray(tables.bookings.payment_status, ['paid']),
         inArray(tables.bookings.payment_method, ['momo', 'MoMo']),
-        yearCondition
+        yearCondition,
+        branchCondition
       )
     );
   const [revenueVnpayYearAgg] = await anyDb
@@ -108,7 +117,8 @@ export async function getDashboardMetricsImpl(
       and(
         inArray(tables.bookings.payment_status, ['paid']),
         inArray(tables.bookings.payment_method, ['vnpay', 'VNPay']),
-        yearCondition
+        yearCondition,
+        branchCondition
       )
     );
   const [revenueVietqrYearAgg] = await anyDb
@@ -118,7 +128,8 @@ export async function getDashboardMetricsImpl(
       and(
         inArray(tables.bookings.payment_status, ['paid']),
         inArray(tables.bookings.payment_method, ['vietqr', 'VietQR']),
-        yearCondition
+        yearCondition,
+        branchCondition
       )
     );
 
@@ -137,7 +148,8 @@ export async function getDashboardMetricsImpl(
       and(
         inArray(tables.bookings.payment_status, ['paid']),
         inArray(tables.bookings.payment_method, ['cash', 'Cash']),
-        yearCondition
+        yearCondition,
+        branchCondition
       )
     );
   const [momoYearAgg] = await anyDb
@@ -147,7 +159,8 @@ export async function getDashboardMetricsImpl(
       and(
         inArray(tables.bookings.payment_status, ['paid']),
         inArray(tables.bookings.payment_method, ['momo', 'MoMo']),
-        yearCondition
+        yearCondition,
+        branchCondition
       )
     );
   const [vnpayYearAgg] = await anyDb
@@ -157,7 +170,8 @@ export async function getDashboardMetricsImpl(
       and(
         inArray(tables.bookings.payment_status, ['paid']),
         inArray(tables.bookings.payment_method, ['vnpay', 'VNPay']),
-        yearCondition
+        yearCondition,
+        branchCondition
       )
     );
   const [vietqrYearAgg] = await anyDb
@@ -167,7 +181,8 @@ export async function getDashboardMetricsImpl(
       and(
         inArray(tables.bookings.payment_status, ['paid']),
         inArray(tables.bookings.payment_method, ['vietqr', 'VietQR']),
-        yearCondition
+        yearCondition,
+        branchCondition
       )
     );
 
@@ -211,6 +226,7 @@ export async function getDashboardMetricsImpl(
     .where(
       and(
         inArray(tables.bookings.payment_status, ['paid']),
+        branchCondition,
         or(
           and(
             gte(tables.bookings.created_at, formatDateForDb(topStartDate)),
@@ -253,7 +269,7 @@ export async function getDashboardMetricsImpl(
       booking_count: count()
     })
     .from(tables.bookings)
-    .where(and(inArray(tables.bookings.payment_status, ['paid']), yearCondition))
+    .where(and(inArray(tables.bookings.payment_status, ['paid']), yearCondition, branchCondition))
     .groupBy(tables.bookings.user_id, tables.bookings.email)
     .orderBy(sql`sum(${tables.bookings.total_price}) DESC`)
     .limit(5);
@@ -543,3 +559,4 @@ export async function getRevenueByMonthImpl(
   }
   return { year: targetYear, data: months };
 }
+

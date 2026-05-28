@@ -134,3 +134,4 @@ export function ForgetPasswordDialog({ isOpen, onOpenChange, onBackToLogin, auth
   );
 }
 
+export default ForgetPasswordDialog;

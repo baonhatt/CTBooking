@@ -18,81 +18,85 @@ import { siteConfig } from '@/config/site';
 const SITE_URL = siteConfig.domain;
 
 export const metadata: Metadata = {
-        title: 'Cinesphere | Trải Nghiệm Điện Ảnh Đỉnh Cao',
-        description:
-                'Đặt vé xem phim trực tuyến tại Cinesphere. Khám phá các siêu phẩm bom tấn với công nghệ chiếu rạp hiện đại nhất.',
-        alternates: { canonical: SITE_URL },
-        openGraph: {
-                title: 'Cinesphere | Trải Nghiệm Điện Ảnh Đỉnh Cao',
-                description:
-                        'Đặt vé xem phim trực tuyến nhanh chóng, tiện lợi. Hệ thống rạp chiếu phim hiện đại với âm thanh hình ảnh sống động.',
-                type: 'website',
-                url: SITE_URL,
-                locale: 'vi_VN',
-                siteName: 'Cinesphere',
-                images: [
-                        {
-                                url: '/og-default.jpg',
-                                width: 1200,
-                                height: 630,
-                                alt: 'Cinesphere - Trải Nghiệm Điện Ảnh Đỉnh Cao',
-                        },
-                ],
-        },
-        twitter: {
-                card: 'summary_large_image',
-                title: 'Cinesphere | Trải Nghiệm Điện Ảnh Đỉnh Cao',
-                description:
-                        'Đặt vé xem phim trực tuyến nhanh chóng, tiện lợi. Hệ thống rạp chiếu phim hiện đại với âm thanh hình ảnh sống động.',
-                images: ['/og-default.jpg'],
-        },
+  title: 'Cinesphere | Trải Nghiệm Điện Ảnh Đỉnh Cao',
+  description:
+    'Đặt vé xem phim trực tuyến tại Cinesphere. Khám phá các siêu phẩm bom tấn với công nghệ chiếu rạp hiện đại nhất.',
+  alternates: { canonical: SITE_URL },
+  openGraph: {
+    title: 'Cinesphere | Trải Nghiệm Điện Ảnh Đỉnh Cao',
+    description:
+      'Đặt vé xem phim trực tuyến nhanh chóng, tiện lợi. Hệ thống rạp chiếu phim hiện đại với âm thanh hình ảnh sống động.',
+    type: 'website',
+    url: SITE_URL,
+    locale: 'vi_VN',
+    siteName: 'Cinesphere',
+    images: [
+      {
+        url: '/og-default.jpg',
+        width: 1200,
+        height: 630,
+        alt: 'Cinesphere - Trải Nghiệm Điện Ảnh Đỉnh Cao'
+      }
+    ]
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title: 'Cinesphere | Trải Nghiệm Điện Ảnh Đỉnh Cao',
+    description:
+      'Đặt vé xem phim trực tuyến nhanh chóng, tiện lợi. Hệ thống rạp chiếu phim hiện đại với âm thanh hình ảnh sống động.',
+    images: ['/og-default.jpg']
+  }
 };
 
-export const revalidate = 600; // 10 minutes default revalidation
+// Vô hiệu hóa cache ISR: trang chủ luôn render fresh từ server
+export const dynamic = 'force-dynamic';
 
-export default async function Home() {
-        // Fetch default branch for server-side rendering
-        let defaultBranchId: number | undefined = undefined;
-        try {
-                const { branch: defaultBranch } = await getDefaultBranch();
-                if (defaultBranch) {
-                        defaultBranchId = defaultBranch.id;
-                }
-        } catch (error) {
-                console.error('Error fetching default branch:', error);
-        }
+export default async function Home({ searchParams }: { searchParams: { branch_id?: string } }) {
+  // Fetch default branch for server-side rendering
+  let defaultBranchId: number | undefined = undefined;
+  try {
+    const { branch: defaultBranch } = await getDefaultBranch();
+    if (defaultBranch) {
+      defaultBranchId = defaultBranch.id;
+    }
+  } catch (error) {
+    console.error('Error fetching default branch:', error);
+  }
 
-        // Fetch all initial data in parallel with default branch filter
-        const [activeMovies, siteMediaRes, ticketsRes, toysRes] = await Promise.all([
-                getActiveMoviesToday(defaultBranchId).catch(() => []),
-                getSiteMediaApi({ active: true }).catch(() => ({ items: [] })),
-                getActiveTickets().catch(() => ({ items: [] })),
-                getActiveToys().catch(() => ({ items: [] }))
-        ]);
+  // Determine effective branch ID from URL or default
+  const effectiveBranchId = searchParams.branch_id ? Number(searchParams.branch_id) : defaultBranchId;
 
-        const items = siteMediaRes.items || [];
+  // Fetch all initial data in parallel with branch filter
+  const [activeMovies, siteMediaRes, ticketsRes, toysRes] = await Promise.all([
+    getActiveMoviesToday(effectiveBranchId).catch(() => []),
+    getSiteMediaApi({ active: true }).catch(() => ({ items: [] })),
+    getActiveTickets(effectiveBranchId).catch(() => ({ items: [] })),
+    getActiveToys().catch(() => ({ items: [] }))
+  ]);
 
-        // Hero section media
-        const heroMedia = items.find((i: any) => i.section === 'hero_section' && i.type === 'video');
+  const items = siteMediaRes.items || [];
 
-        // Tech section media
-        const techMainItem = items.find((i: any) => i.section === 'technology_section1' && i.type === 'video');
-        const techListItems = items.filter((i: any) => i.section === 'technology_section2' && i.type === 'video');
+  // Hero section media
+  const heroMedia = items.find((i: any) => i.section === 'hero_section' && i.type === 'video');
 
-        return (
-                <UserLayout>
-                        <main>
-                                <ClearStorageOnMount />
-                                <HeroSection initialMovies={activeMovies} heroMedia={heroMedia} />
+  // Tech section media
+  const techMainItem = items.find((i: any) => i.section === 'technology_section1' && i.type === 'video');
+  const techListItems = items.filter((i: any) => i.section === 'technology_section2' && i.type === 'video');
 
-                                <Suspense fallback={<div className="min-h-[200px]" />}>
-                                        {/* Pass initial data to the interactive Client Components */}
-                                        <FilmCarousel initialFilms={activeMovies} />
-                                        <PromotionShowcase initialCombos={ticketsRes.items || []} />
-                                        <TechnologyBanner initialMainItem={techMainItem} initialListItems={techListItems} />
-                                        <ProductSection initialProducts={toysRes.items || []} />
-                                </Suspense>
-                        </main>
-                </UserLayout>
-        );
+  return (
+    <UserLayout>
+      <main>
+        <ClearStorageOnMount />
+        <HeroSection initialMovies={activeMovies} heroMedia={heroMedia} />
+
+        <Suspense fallback={<div className="min-h-[200px]" />}>
+          {/* Pass initial data to the interactive Client Components */}
+          <FilmCarousel initialFilms={activeMovies} />
+          <PromotionShowcase initialCombos={ticketsRes.items || []} />
+          <TechnologyBanner initialMainItem={techMainItem} initialListItems={techListItems} />
+          <ProductSection initialProducts={toysRes.items || []} />
+        </Suspense>
+      </main>
+    </UserLayout>
+  );
 }

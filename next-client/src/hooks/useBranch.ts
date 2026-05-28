@@ -1,79 +1,115 @@
 'use client';
-import { useState, useEffect } from 'react';
+
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { getDefaultBranch, getPublicBranches } from '@/lib/api/branches';
+import { deleteCookie, getCookie, setCookie } from '@/lib/cookies';
 
 const SELECTED_BRANCH_KEY = 'selected_branch_id';
 const DONT_SHOW_CONFIRM_KEY = 'dont_show_branch_confirm';
 
 interface Branch {
-        id: number;
-        name: string;
-        code: string;
-        is_default: boolean;
-        is_active: boolean;
+  id: number;
+  name: string;
+  code: string;
+  is_default: boolean;
+  is_active: boolean;
+}
+
+async function fetchBranchData(branchId?: number | null): Promise<{ branches: Branch[]; selectedBranch: Branch | null }> {
+  const { items } = await getPublicBranches();
+
+  if (branchId !== undefined && branchId !== null) {
+    const selected = items.find((b: Branch) => b.id === Number(branchId));
+    if (selected) return { branches: items, selectedBranch: selected };
+  }
+
+  const savedBranchId =
+    typeof window !== 'undefined' ? getCookie(SELECTED_BRANCH_KEY) || localStorage.getItem(SELECTED_BRANCH_KEY) : null;
+  if (savedBranchId) {
+    const saved = items.find((b: Branch) => b.id === Number(savedBranchId));
+    if (saved) return { branches: items, selectedBranch: saved };
+  }
+
+  const { branch: defaultBranch } = await getDefaultBranch();
+  if (defaultBranch) {
+    if (typeof window !== 'undefined') {
+      setCookie(SELECTED_BRANCH_KEY, String(defaultBranch.id), 60 * 60 * 24 * 30);
+      localStorage.setItem(SELECTED_BRANCH_KEY, String(defaultBranch.id));
+    }
+    return { branches: items, selectedBranch: defaultBranch };
+  }
+
+  return { branches: items, selectedBranch: items[0] ?? null };
 }
 
 export function useBranch() {
-        const [selectedBranch, setSelectedBranch] = useState<Branch | null>(null);
-        const [branches, setBranches] = useState<Branch[]>([]);
-        const [isLoading, setIsLoading] = useState(true);
-        const [dontShowConfirm, setDontShowConfirm] = useState(false);
+  const queryClient = useQueryClient();
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const isPostsRoute = pathname === '/bai-viet' || pathname.startsWith('/bai-viet/');
 
-        useEffect(() => {
-                loadBranches();
-        }, []);
+  const urlBranchId = useMemo(() => {
+    const raw = searchParams.get('branch_id');
+    const parsed = raw ? Number(raw) : null;
+    return parsed && Number.isFinite(parsed) ? parsed : null;
+  }, [searchParams]);
 
-        const loadBranches = async () => {
-                try {
-                        setIsLoading(true);
-                        
-                        // Load saved branch from localStorage
-                        const savedBranchId = localStorage.getItem(SELECTED_BRANCH_KEY);
-                        const savedDontShow = localStorage.getItem(DONT_SHOW_CONFIRM_KEY);
-                        setDontShowConfirm(savedDontShow === 'true');
+  const [dontShowConfirm, setDontShowConfirmState] = useState<boolean>(() => {
+    if (typeof window === 'undefined') return false;
+    return localStorage.getItem(DONT_SHOW_CONFIRM_KEY) === 'true';
+  });
 
-                        // Load all branches
-                        const { items } = await getPublicBranches();
-                        setBranches(items);
+  const { data, isLoading } = useQuery({
+    queryKey: ['branches', urlBranchId],
+    queryFn: () => fetchBranchData(urlBranchId),
+    staleTime: 1000 * 60 * 5
+  });
 
-                        if (savedBranchId) {
-                                const savedBranch = items.find((b: Branch) => b.id === Number(savedBranchId));
-                                if (savedBranch) {
-                                        setSelectedBranch(savedBranch);
-                                        setIsLoading(false);
-                                        return;
-                                }
-                        }
+  useEffect(() => {
+    if (isPostsRoute || urlBranchId || !data?.selectedBranch) return;
+    const params = new URLSearchParams(searchParams.toString());
+    params.set('branch_id', String(data.selectedBranch.id));
+    router.replace(`${pathname}?${params.toString()}`);
+  }, [data?.selectedBranch, isPostsRoute, pathname, router, searchParams, urlBranchId]);
 
-                        // If no saved branch or saved branch not found, get default
-                        const { branch: defaultBranch } = await getDefaultBranch();
-                        if (defaultBranch) {
-                                setSelectedBranch(defaultBranch);
-                                localStorage.setItem(SELECTED_BRANCH_KEY, String(defaultBranch.id));
-                        }
-                } catch (error) {
-                        console.error('Error loading branches:', error);
-                } finally {
-                        setIsLoading(false);
-                }
-        };
+  const selectBranch = useCallback(
+    (branch: Branch) => {
+      setCookie(SELECTED_BRANCH_KEY, String(branch.id), 60 * 60 * 24 * 30);
+      localStorage.setItem(SELECTED_BRANCH_KEY, String(branch.id));
 
-        const selectBranch = (branch: Branch) => {
-                setSelectedBranch(branch);
-                localStorage.setItem(SELECTED_BRANCH_KEY, String(branch.id));
-        };
+      queryClient.setQueryData(['branches', branch.id], (old: typeof data) =>
+        old ? { ...old, selectedBranch: branch } : old
+      );
 
-        const toggleDontShowConfirm = (value: boolean) => {
-                setDontShowConfirm(value);
-                localStorage.setItem(DONT_SHOW_CONFIRM_KEY, String(value));
-        };
+      const params = new URLSearchParams(searchParams.toString());
+      params.set('branch_id', branch.id.toString());
+      if (isPostsRoute) {
+        router.push(pathname);
+      } else {
+        router.push(`${pathname}?${params.toString()}`);
+      }
 
-        return {
-                selectedBranch,
-                branches,
-                isLoading,
-                selectBranch,
-                dontShowConfirm,
-                toggleDontShowConfirm
-        };
+      queryClient.invalidateQueries({ queryKey: ['activeMovies'] });
+      queryClient.invalidateQueries({ queryKey: ['activeTickets'] });
+    },
+    [data, isPostsRoute, pathname, queryClient, router, searchParams]
+  );
+
+  const toggleDontShowConfirm = useCallback((value: boolean) => {
+    setDontShowConfirmState(value);
+    setCookie(DONT_SHOW_CONFIRM_KEY, String(value), 60 * 60 * 24 * 30);
+    localStorage.setItem(DONT_SHOW_CONFIRM_KEY, String(value));
+  }, []);
+
+  return {
+    selectedBranch: data?.selectedBranch ?? null,
+    branches: data?.branches ?? [],
+    isLoading,
+    selectBranch,
+    dontShowConfirm,
+    toggleDontShowConfirm
+  };
 }

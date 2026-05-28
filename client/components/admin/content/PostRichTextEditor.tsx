@@ -67,7 +67,9 @@ class CloudinaryUploadAdapter {
   async upload() {
     const file = await this.loader.file;
     const isLocal = typeof window !== 'undefined' && window.location.hostname === 'localhost';
-    const result = isLocal ? await uploadAdminImage(file, 'posts_editor') : await uploadDirectToCloudinary(file, 'posts');
+    const result = isLocal
+      ? await uploadAdminImage(file, 'posts_editor')
+      : await uploadDirectToCloudinary(file, 'posts');
 
     return {
       default: result.url
@@ -199,14 +201,7 @@ export function PostRichTextEditor({ value, onChange }: PostRichTextEditorProps)
         }
       },
       image: {
-        styles: [
-          'inline',
-          'block',
-          'side',
-          'alignLeft',
-          'alignCenter',
-          'alignRight'
-        ] as any,
+        styles: ['inline', 'block', 'side', 'alignLeft', 'alignCenter', 'alignRight'] as any,
         toolbar: [
           'imageTextAlternative',
           'toggleImageCaption',
@@ -224,14 +219,7 @@ export function PostRichTextEditor({ value, onChange }: PostRichTextEditorProps)
         ]
       },
       table: {
-        contentToolbar: [
-          'tableColumn',
-          'tableRow',
-          'mergeTableCells',
-          '|',
-          'tableProperties',
-          'tableCellProperties'
-        ]
+        contentToolbar: ['tableColumn', 'tableRow', 'mergeTableCells', '|', 'tableProperties', 'tableCellProperties']
       },
       extraPlugins: [cloudinaryUploadPlugin]
     }),
@@ -290,11 +278,7 @@ export function PostRichTextEditor({ value, onChange }: PostRichTextEditorProps)
         />
       </div>
       <p className="mt-2 text-xs text-slate-500">
-        {isUploadingImage
-          ? isLocal
-            ? 'Đang tải ảnh lên máy chủ (local)...'
-            : 'Đang tải ảnh lên Cloudinary...'
-          : ''}
+        {isUploadingImage ? (isLocal ? 'Đang tải ảnh lên máy chủ (local)...' : 'Đang tải ảnh lên Cloudinary...') : ''}
       </p>
     </div>
   );

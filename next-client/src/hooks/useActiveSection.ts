@@ -34,5 +34,3 @@ export function useActiveSection(disabled: boolean) {
 
   return activeSection;
 }
-
-

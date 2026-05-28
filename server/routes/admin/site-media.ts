@@ -18,6 +18,8 @@ export async function createSiteMediaImpl(
     display_order?: number;
     is_active?: boolean;
   }
+  ,
+  deleter?: (url: string, type?: string) => Promise<void>
 ) {
   const {
     section,
@@ -45,15 +47,11 @@ export async function createSiteMediaImpl(
 
   if (existing) {
     // Upsert: Update existing
-    return updateSiteMediaImpl(
-      anyDb,
-      tables,
-      {
-        ...args,
-        id: existing.id,
-        duration: args.duration !== undefined ? Number(args.duration) : undefined
-      }
-    );
+    return updateSiteMediaImpl(anyDb, tables, {
+      ...args,
+      id: existing.id,
+      duration: args.duration !== undefined ? Number(args.duration) : undefined
+    }, deleter);
   }
 
   // 2. Insert new
@@ -123,6 +121,8 @@ export async function updateSiteMediaImpl(
     display_order?: number;
     is_active?: boolean;
   }
+  ,
+  deleter?: (url: string, type?: string) => Promise<void>
 ) {
   const {
     id,
@@ -155,6 +155,8 @@ export async function updateSiteMediaImpl(
     payload.display_order = display_order !== null && display_order !== undefined ? Number(display_order) : 0;
   if (is_active !== undefined) payload.is_active = Boolean(is_active);
   // Try to use .returning() for update, fallback to query
+  const existing = await anyDb.query.site_media.findFirst({ where: eq(tables.site_media.id, Number(id)) });
+
   const updatedRes = await anyDb
     .update(tables.site_media)
     .set(payload)
@@ -164,6 +166,15 @@ export async function updateSiteMediaImpl(
   // if (!item) {
   //   item = await anyDb.query.site_media.findFirst({ where: eq(tables.site_media.id, Number(id)) });
   // }
+
+  if (existing && deleter) {
+    const oldChanged = existing.url && payload.url && existing.url !== payload.url;
+    const oldPublicIdChanged = existing.public_id && payload.public_id && existing.public_id !== payload.public_id;
+    if (oldChanged || oldPublicIdChanged) {
+      const resourceType = existing.type === 'video' ? 'video' : 'image';
+      deleter(existing.url, resourceType).catch((e) => console.error('Failed to delete old site media asset:', e));
+    }
+  }
 
   return { item, success: Boolean(item) };
 }
