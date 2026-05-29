@@ -4,14 +4,7 @@ import dynamic from 'next/dynamic';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/hooks/useAuth';
 import { useRouter, usePathname, useSearchParams } from 'next/navigation';
-import { buildUrl, request } from '@/lib/api/http';
 import { useBranch } from '@/hooks/useBranch';
-
-interface AdminSettingsResponse {
-        settings: {
-                hidden_tabs?: string[];
-        };
-}
 
 // Components
 
@@ -92,7 +85,6 @@ export default function Header({
         const [isLoginOpen, setIsLoginOpen] = useState(false);
         const [isRegisterOpen, setIsRegisterOpen] = useState(false);
         const [isForgetPassOpen, setIsForgetPassOpen] = useState(false);
-        const [isUserPostsEnabled, setIsUserPostsEnabled] = useState(true);
         const [errorModal, setErrorModal] = useState<ErrorModalState>({
                 open: false,
                 title: '',
@@ -155,41 +147,7 @@ export default function Header({
                 }
         };
 
-        useEffect(() => {
-                const applyFromStorage = () => {
-                        const stored = localStorage.getItem('admin_sidebar_hidden_tabs');
-                        const hiddenTabs = stored ? JSON.parse(stored) : [];
-                        const isAdminPostsEnabled = !hiddenTabs.includes('posts');
-                        const isUserPostsSettingEnabled = !hiddenTabs.includes('posts-user');
-                        setIsUserPostsEnabled(isAdminPostsEnabled && isUserPostsSettingEnabled);
-                };
-
-                const isProd = window.location.hostname !== 'localhost';
-                if (!isProd) {
-                        applyFromStorage();
-                }
-
-                window.addEventListener('storage', applyFromStorage);
-                window.addEventListener('admin_sidebar_update', applyFromStorage);
-
-                if (isProd) {
-                        request<AdminSettingsResponse>('/api/admin/settings')
-                                .then((data) => {
-                                        if (data && data.settings) {
-                                                localStorage.setItem('admin_sidebar_hidden_tabs', JSON.stringify(data.settings));
-                                                applyFromStorage();
-                                        }
-                                })
-                                .catch(() => { });
-                }
-
-                return () => {
-                        window.removeEventListener('storage', applyFromStorage);
-                        window.removeEventListener('admin_sidebar_update', applyFromStorage);
-                };
-        }, []);
-
-        const navItems = isUserPostsEnabled ? [...NAV_ITEMS, { label: 'Tin tức', target: 'posts' }] : NAV_ITEMS;
+        const navItems = [...NAV_ITEMS, { label: 'Tin tức', target: 'posts' }];
 
         return (
                 <header

@@ -41,7 +41,6 @@ const ALL_TABS = [
         { key: 'movies', label: 'Phim', icon: Clapperboard },
         { key: 'toys', label: 'Đồ chơi', icon: Package },
         { key: 'posts', label: 'Bài viết (Admin)', icon: FileText },
-        { key: 'posts-user', label: 'Bài viết ở User', icon: FileText },
         { key: 'tickets', label: 'Gói vé', icon: Ticket },
         { key: 'transactions', label: 'Giao dịch', icon: CreditCard },
         { key: 'ticket-check', label: 'Kiểm Tra Vé', icon: ScanLine },
