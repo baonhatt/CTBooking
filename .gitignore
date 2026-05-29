@@ -35,6 +35,7 @@ worker/.wrangler/
 
 # Next.js build output - KHÔNG commit!
 next-client/.next/
+next-client/.open-next/
 next-client/.vercel/
 
 # Media and Database - KHÔNG commit!
