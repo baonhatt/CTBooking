@@ -38,7 +38,7 @@ export const metadata: Metadata = {
   }
 };
 
-export const dynamic = 'force-dynamic';
+export const revalidate = 60;
 
 // ⚡ Server Component – HTML đầy đủ tại Edge, Google index ngay lập tức
 export default async function PostsPage() {
