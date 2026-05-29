@@ -20,7 +20,20 @@ import {
         Mail,
         FileText
 } from 'lucide-react';
-import { buildUrl } from '@/lib/api/http';
+import { buildUrl, request } from '@/lib/api/http';
+
+interface AdminSettingsResponse {
+        settings: {
+                hidden_tabs?: string[];
+                otp_settings?: {
+                        enable_2fa: boolean;
+                        otp_expiry_minutes: number;
+                        otp_length: number;
+                        otp_resend_cooldown_seconds: number;
+                        max_otp_attempts: number;
+                };
+        };
+}
 
 const ALL_TABS = [
         { key: 'dashboard', label: 'Bảng điều khiển', icon: LayoutDashboard },
@@ -68,8 +81,7 @@ export default function SettingsPage() {
 
         const fetchSettings = async () => {
                 try {
-                        const res = await fetch(buildUrl('/api/admin/settings'));
-                        const data = await res.json();
+                        const data = await request<AdminSettingsResponse>('/api/admin/settings');
                         if (data && data.settings) {
                                 if (Array.isArray(data.settings)) {
                                         // Old format: just hidden tabs
@@ -113,9 +125,8 @@ export default function SettingsPage() {
                 if (isProd) {
                         setIsSyncing(true);
                         try {
-                                await fetch(buildUrl('/api/admin/settings'), {
+                                await request('/api/admin/settings', {
                                         method: 'POST',
-                                        headers: { 'Content-Type': 'application/json' },
                                         body: JSON.stringify({
                                                 hidden_tabs: newHidden,
                                                 otp_settings: newOtpSettings

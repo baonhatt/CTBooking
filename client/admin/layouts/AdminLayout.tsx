@@ -17,8 +17,14 @@ import {
         Menu,
         X
 } from 'lucide-react';
-import { buildUrl } from '@/lib/api/http';
+import { buildUrl, request } from '@/lib/api/http';
 import { useStaffPermissions, useIsSuperAdmin } from '@/hooks/useStaffPermission';
+
+interface AdminSettingsData {
+        settings: {
+                hidden_tabs?: string[];
+        };
+}
 
 interface Props {
         active:
@@ -109,8 +115,7 @@ export default function AdminLayout({ active, setActive, adminEmailState, handle
                 // Initial sync from server if in production
                 const isProd = window.location.hostname !== 'localhost';
                 if (isProd) {
-                        fetch(buildUrl('/api/admin/settings'))
-                                .then((res) => res.json())
+                        request<AdminSettingsData>('/api/admin/settings')
                                 .then((data) => {
                                         if (data && data.settings) {
                                                 const settings = data.settings;
