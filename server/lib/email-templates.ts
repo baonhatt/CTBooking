@@ -1,38 +1,38 @@
 export function getBookingEmailTemplate(data: {
-  bookingCode: string;
-  customerName: string;
-  movieTitle: string; // Nhận chuỗi JSON: "["Phim A", "Phim B"]"
-  ticketCount: number;
-  totalPrice: string;
-  durationMin?: string; // Nhận chuỗi JSON: "[10, 12, 5]"
-  ticketPackageName?: string;
-  expiryDate?: string | Date;
+        bookingCode: string;
+        customerName: string;
+        movieTitle: string; // Nhận chuỗi JSON: "["Phim A", "Phim B"]"
+        ticketCount: number;
+        totalPrice: string;
+        durationMin?: string; // Nhận chuỗi JSON: "[10, 12, 5]"
+        ticketPackageName?: string;
+        expiryDate?: string | Date;
 }): string {
-  // 1. XỬ LÝ DỮ LIỆU JSON TỪ API
-  let movieTitles: string[] = [];
-  let durations: string[] = [];
-  try {
-    movieTitles = JSON.parse(data.movieTitle || '[]');
-    durations = JSON.parse(data.durationMin || '[]');
-  } catch (e) {
-    // Fallback nếu không phải JSON
-    movieTitles = data.movieTitle ? [data.movieTitle] : ['Chưa xác định'];
-    durations = data.durationMin ? [data.durationMin] : ['--'];
-  }
+        // 1. XỬ LÝ DỮ LIỆU JSON TỪ API
+        let movieTitles: string[] = [];
+        let durations: string[] = [];
+        try {
+                movieTitles = JSON.parse(data.movieTitle || '[]');
+                durations = JSON.parse(data.durationMin || '[]');
+        } catch (e) {
+                // Fallback nếu không phải JSON
+                movieTitles = data.movieTitle ? [data.movieTitle] : ['Chưa xác định'];
+                durations = data.durationMin ? [data.durationMin] : ['--'];
+        }
 
-  // 2. TẠO LIST PHIM THEO LAYOUT MỚI
-  const moviesHtml = movieTitles
-    .map(
-      (title, i) => `
+        // 2. TẠO LIST PHIM THEO LAYOUT MỚI
+        const moviesHtml = movieTitles
+                .map(
+                        (title, i) => `
     <div style="padding: 12px 0; border-bottom: 1px dashed #eee; display: flex; justify-content: space-between; align-items: center;">
       <span style="color: #333; font-weight: 600;">🎬 ${title}</span>
       <span style="color: #666; font-size: 12px; background: #f5f5f5; padding: 2px 8px; border-radius: 4px;">${durations[i] || '--'} ph</span>
     </div>
   `
-    )
-    .join('');
+                )
+                .join('');
 
-  return `
+        return `
 <!DOCTYPE html>
 <html lang="vi">
 <head>
@@ -92,22 +92,22 @@ export function getBookingEmailTemplate(data: {
             <div class="row">
                 <span class="label">Ngày hết hạn:</span>
                 <span class="value">${(function () {
-                  try {
-                    const d = new Date(String(data.expiryDate));
-                    return (
-                      d.getDate().toString().padStart(2, '0') +
-                      '/' +
-                      (d.getMonth() + 1).toString().padStart(2, '0') +
-                      '/' +
-                      d.getFullYear() +
-                      ' ' +
-                      d.getHours().toString().padStart(2, '0') +
-                      ':' +
-                      d.getMinutes().toString().padStart(2, '0')
-                    );
-                  } catch {
-                    return String(data.expiryDate);
-                  }
+                        try {
+                                const d = new Date(String(data.expiryDate));
+                                return (
+                                        d.getDate().toString().padStart(2, '0') +
+                                        '/' +
+                                        (d.getMonth() + 1).toString().padStart(2, '0') +
+                                        '/' +
+                                        d.getFullYear() +
+                                        ' ' +
+                                        d.getHours().toString().padStart(2, '0') +
+                                        ':' +
+                                        d.getMinutes().toString().padStart(2, '0')
+                                );
+                        } catch {
+                                return String(data.expiryDate);
+                        }
                 })()}</span>
             </div>
 
@@ -128,7 +128,7 @@ export function getBookingEmailTemplate(data: {
 }
 
 export function getResetPasswordEmailTemplate(link: string): string {
-  return `
+        return `
 <!DOCTYPE html>
 <html lang="vi">
 <head>
@@ -244,21 +244,21 @@ export function getResetPasswordEmailTemplate(link: string): string {
 }
 
 export function getWelcomeEmailTemplate(
-  data: {
-    customerName: string;
-    email: string;
-  },
-  baseUrlStr?: string
+        data: {
+                customerName: string;
+                email: string;
+        },
+        baseUrlStr?: string
 ): string {
-  // Use provided baseUrl or fallback to env or default
-  let baseUrl = baseUrlStr;
-  if (!baseUrl && typeof process !== 'undefined' && process.env) {
-    baseUrl = process.env.VITE_SERVER_BASE_URL;
-  }
-  if (!baseUrl) baseUrl = 'https://cinesphere.com.vn';
+        // Use provided baseUrl or fallback to env or default
+        let baseUrl = baseUrlStr;
+        if (!baseUrl && typeof process !== 'undefined' && process.env) {
+                baseUrl = process.env.VITE_SERVER_BASE_URL;
+        }
+        if (!baseUrl) baseUrl = 'https://cinesphere.com.vn';
 
-  const homeUrl = `${baseUrl}/`;
-  return `
+        const homeUrl = `${baseUrl}/`;
+        return `
 <!DOCTYPE html>
 <html lang="vi">
 <head>
@@ -329,12 +329,12 @@ export function getWelcomeEmailTemplate(
 }
 
 export function getOTPEmailTemplate(data: {
-  customerName: string;
-  email: string;
-  otp: string;
-  expiryMinutes: number;
+        customerName: string;
+        email: string;
+        otp: string;
+        expiryMinutes: number;
 }): string {
-  return `
+        return `
 <!DOCTYPE html>
 <html lang="vi">
 <head>
@@ -402,14 +402,9 @@ export function getOTPEmailTemplate(data: {
   `;
 }
 
-export function getStaffAccountCreatedTemplate(data: {
-  staffName: string;
-  email: string;
-  password: string;
-  loginUrl?: string;
-}): string {
-  const loginUrl = data.loginUrl || 'https://cinesphere.com.vn/admin/login';
-  return `
+// Shared mail layout for staff emails
+function getStaffEmailLayout(content: string, subtitle: string): string {
+        return `
 <!DOCTYPE html>
 <html lang="vi">
 <head>
@@ -440,10 +435,33 @@ export function getStaffAccountCreatedTemplate(data: {
   <div class="container">
     <div class="header">
       <h1>🎬 CINESPHERE</h1>
-      <p>Tài khoản nhân viên mới</p>
+      <p>${subtitle}</p>
     </div>
 
     <div class="content">
+      ${content}
+    </div>
+
+    <div class="footer">
+      <p><strong>CINESPHERE - Rạp chiếu phim hiện đại</strong></p>
+      <p>Email: cinesphere0629@gmail.com | Hotline: 1900-xxxx</p>
+      <p style="margin-top: 10px; opacity: 0.7;">Đây là email tự động, vui lòng không trả lời email này.</p>
+    </div>
+  </div>
+</body>
+</html>
+  `;
+}
+
+export function getStaffAccountCreatedTemplate(data: {
+        staffName: string;
+        email: string;
+        password: string;
+        loginUrl?: string;
+}): string {
+        const loginUrl = data.loginUrl || 'https://cinesphere.com.vn/admin/login';
+
+        const content = `
       <div class="greeting">
         Xin chào <strong>${data.staffName}</strong>,
       </div>
@@ -476,15 +494,89 @@ export function getStaffAccountCreatedTemplate(data: {
       <p style="font-size: 13px; color: #6b7280; margin-top: 20px;">
         Cần hỗ trợ? Vui lòng liên hệ quản trị viên hoặc đội ngũ hỗ trợ qua email: cinesphere0629@gmail.com
       </p>
-    </div>
-
-    <div class="footer">
-      <p><strong>CINESPHERE - Rạp chiếu phim hiện đại</strong></p>
-      <p>Email: cinesphere0629@gmail.com | Hotline: 1900-xxxx</p>
-      <p style="margin-top: 10px; opacity: 0.7;">Đây là email tự động, vui lòng không trả lời email này.</p>
-    </div>
-  </div>
-</body>
-</html>
   `;
+
+        return getStaffEmailLayout(content, 'Tài khoản nhân viên mới');
+}
+
+export function getStaffPasswordResetTemplate(data: {
+        staffName: string;
+        email: string;
+        newPassword: string;
+        loginUrl?: string;
+}): string {
+        const loginUrl = data.loginUrl || 'https://cinesphere.com.vn/admin/login';
+
+        const content = `
+      <div class="greeting">
+        Xin chào <strong>${data.staffName}</strong>,
+      </div>
+
+      <p style="font-size: 15px; line-height: 1.6;">
+        Mật khẩu của bạn đã được đặt lại. Dưới đây là thông tin đăng nhập mới:
+      </p>
+
+      <div class="info-box">
+        <div class="info-row">
+          <span class="info-label">Email:</span>
+          <span class="info-value">${data.email}</span>
+        </div>
+      </div>
+
+      <div class="password-box">
+        <div class="password-label">Mật khẩu mới của bạn</div>
+        <div class="password-value">${data.newPassword}</div>
+      </div>
+
+      <div class="warning">
+        ⚠️ <strong>Lưu ý quan trọng:</strong>
+        <ul style="margin: 10px 0 0 0; padding-left: 20px;">
+          <li>Vui lòng đổi mật khẩu ngay sau lần đăng nhập tiếp theo</li>
+          <li>Không chia sẻ mật khẩu này với bất kỳ ai</li>
+          <li>Đăng nhập tại: <a href="${loginUrl}" style="color: #667eea;">${loginUrl}</a></li>
+        </ul>
+      </div>
+
+      <p style="font-size: 13px; color: #6b7280; margin-top: 20px;">
+        Cần hỗ trợ? Vui lòng liên hệ quản trị viên hoặc đội ngũ hỗ trợ qua email: cinesphere0629@gmail.com
+      </p>
+  `;
+
+        return getStaffEmailLayout(content, 'Đặt lại mật khẩu nhân viên');
+}
+
+export function getStaffPasswordChangeOTPTemplate(data: {
+        staffName: string;
+        otp: string;
+        expiryMinutes: number;
+}): string {
+        const content = `
+      <div class="greeting">
+        Xin chào <strong>${data.staffName}</strong>,
+      </div>
+
+      <p style="font-size: 15px; line-height: 1.6;">
+        Chúng tôi nhận được yêu cầu thay đổi mật khẩu cho tài khoản của bạn. Để hoàn tất thay đổi, vui lòng nhập mã xác thực sau:
+      </p>
+
+      <div class="password-box">
+        <div class="password-label">Mã Xác Thực (OTP)</div>
+        <div class="password-value">${data.otp}</div>
+      </div>
+
+      <div class="warning">
+        ⚠️ <strong>Lưu ý quan trọng:</strong>
+        <ul style="margin: 10px 0 0 0; padding-left: 20px;">
+          <li>Mã này sẽ hết hạn sau <strong>${data.expiryMinutes} phút</strong></li>
+          <li>Không chia sẻ mã này với bất kỳ ai, kể cả nhân viên CINESPHERE</li>
+          <li>Nếu bạn không yêu cầu thay đổi mật khẩu, vui lòng bỏ qua email này</li>
+        </ul>
+      </div>
+
+      <p style="font-size: 13px; color: #6b7280; margin-top: 20px;">
+        Cần hỗ trợ? Vui lòng liên hệ quản trị viên hoặc đội ngũ hỗ trợ qua email: cinesphere0629@gmail.com
+      </p>
+  `;
+
+        return getStaffEmailLayout(content, 'Xác thực thay đổi mật khẩu');
 }

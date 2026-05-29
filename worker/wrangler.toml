@@ -96,6 +96,12 @@ mode = "smart"
 
 IS_PREVIEW = "true"
 
+SUPER_ADMIN_EMAIL = "superadmin@cinesphere.com"
+
+SUPER_ADMIN_PASSWORD = "superadmin123"
+
+SUPER_ADMIN_FULLNAME = "Super Admin"
+
 
 
 VITE_SERVER_BASE_URL = "https://api.cinesphere.com.vn"

@@ -189,3 +189,17 @@ export async function setupSuperAdmin(body: any) {
                 body: JSON.stringify(body)
         });
 }
+
+export async function requestStaffPasswordChangeOTP(body: { oldPassword: string }) {
+        return request<{ status: string; message: string }>('/api/admin/auth/request-password-change-otp', {
+                method: 'POST',
+                body: JSON.stringify(body)
+        });
+}
+
+export async function changeStaffPasswordWithOTP(body: { oldPassword: string; newPassword: string; otp: string }) {
+        return request<{ status: string; message: string }>('/api/admin/auth/change-password-with-otp', {
+                method: 'POST',
+                body: JSON.stringify(body)
+        });
+}

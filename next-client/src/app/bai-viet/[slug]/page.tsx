@@ -28,7 +28,7 @@ export async function generateStaticParams() {
                         if (fetchedItems.length < pageSize) break;
                 } while (posts.length < total);
 
-                return posts.map((post) => ({ slug: (post as any).slug_id }));
+                return posts.map((post) => ({ slug: post.slug ? `${post.slug}-${post.id}` : String(post.id) }));
         } catch {
                 return [];
         }

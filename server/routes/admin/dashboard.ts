@@ -1,4 +1,4 @@
-import { count, sum, eq, inArray, and, or, gte, lte, gt, sql } from 'drizzle-orm';
+import { count, sum, eq, inArray, and, or, gte, lte, gt, sql, isNull } from 'drizzle-orm';
 import { formatDateForDb } from '../../../server/lib/date-utils';
 
 export async function getDashboardMetricsImpl(
@@ -37,6 +37,7 @@ export async function getDashboardMetricsImpl(
                 .where(
                         and(
                                 eq(tables.movies.is_active, true),
+                                isNull(tables.movies.deleted_at),
                                 ...(branchConditionMovies ? [branchConditionMovies] : []),
                                 gte(tables.movies.created_at, formatDateForDb(yearStart)),
                                 lte(tables.movies.created_at, formatDateForDb(yearEnd))

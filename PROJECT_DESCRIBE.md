@@ -339,6 +339,8 @@ Movie information
 - `updated_at` (TEXT, NOT NULL)
 - `is_active` (BOOLEAN, DEFAULT true)
 - `release_date` (TEXT)
+- `deleted_at` (TEXT) - Soft delete timestamp
+- `deleted_by_staff_id` (INTEGER, FK → staffs.id, ON DELETE SET NULL) - Who deleted the record
 
 **Relations**:
 - One-to-many with `bookings`
@@ -362,6 +364,8 @@ Ticket/package pricing
 - `branch_id` (INTEGER, FK → branches.id, ON DELETE RESTRICT)
 - `created_at` (TEXT, NOT NULL)
 - `updated_at` (TEXT, NOT NULL)
+- `deleted_at` (TEXT) - Soft delete timestamp
+- `deleted_by_staff_id` (INTEGER, FK → staffs.id, ON DELETE SET NULL) - Who deleted the record
 
 **Relations**:
 - One-to-many with `bookings`
@@ -414,6 +418,7 @@ Merchandise/toys inventory
 - `image_url` (TEXT)
 - `created_at` (TEXT, NOT NULL)
 - `updated_at` (TEXT, NOT NULL)
+- `deleted_at` (TEXT) - Soft delete timestamp
 
 #### **email_logs**
 Email sending logs
@@ -452,6 +457,7 @@ Site media management (hero banners, promotions, etc.)
 - `is_active` (BOOLEAN, DEFAULT true)
 - `created_at` (TEXT, NOT NULL)
 - `updated_at` (TEXT, NOT NULL)
+- `deleted_at` (TEXT) - Soft delete timestamp
 
 #### **branches**
 Cinema branch locations
@@ -465,6 +471,8 @@ Cinema branch locations
 - `is_active` (BOOLEAN, DEFAULT true)
 - `created_at` (TEXT, NOT NULL)
 - `updated_at` (TEXT, NOT NULL)
+- `deleted_at` (TEXT) - Soft delete timestamp
+- `deleted_by_staff_id` (INTEGER, FK → staffs.id, ON DELETE SET NULL) - Who deleted the record
 
 **Relations**:
 - One-to-many with `movies`
@@ -736,6 +744,8 @@ export function requirePermission(module: string, action: string)
 - `last_login_at` (TEXT)
 - `created_at` (TEXT, NOT NULL)
 - `updated_at` (TEXT, NOT NULL)
+- `deleted_at` (TEXT) - Soft delete timestamp
+- `deleted_by_staff_id` (INTEGER, FK → staffs.id, ON DELETE SET NULL) - Who deleted the record (self-reference)
 
 **Table: staff_tokens**
 - `id` (INTEGER, PK, AUTOINCREMENT)
@@ -755,6 +765,8 @@ export function requirePermission(module: string, action: string)
 - `level` (INTEGER, DEFAULT 0) - Role hierarchy level
 - `created_at` (TEXT, NOT NULL)
 - `updated_at` (TEXT, NOT NULL)
+- `deleted_at` (TEXT) - Soft delete timestamp
+- `deleted_by_staff_id` (INTEGER, FK → staffs.id, ON DELETE SET NULL) - Who deleted the record
 
 **Table: permissions**
 - `id` (INTEGER, PK, AUTOINCREMENT)
@@ -803,11 +815,15 @@ export function requirePermission(module: string, action: string)
 | staff | create | Tạo nhân viên mới |
 | staff | edit | Chỉnh sửa thông tin nhân viên |
 | staff | delete | Xóa nhân viên |
+| staff | restore | Khôi phục nhân viên đã xóa |
+| staff | view_deleted | Xem danh sách nhân viên đã xóa |
 | staff | reset_password | Đặt lại mật khẩu nhân viên |
 | roles | view | Xem danh sách vai trò |
 | roles | create | Tạo vai trò mới |
 | roles | edit | Chỉnh sửa vai trò |
 | roles | delete | Xóa vai trò |
+| roles | restore | Khôi phục vai trò đã xóa |
+| roles | view_deleted | Xem danh sách vai trò đã xóa |
 | dashboard | view | Xem dashboard |
 | dashboard | view_revenue | Xem doanh thu |
 | users | view | Xem danh sách người dùng |
@@ -816,6 +832,8 @@ export function requirePermission(module: string, action: string)
 | movies | create | Tạo phim mới |
 | movies | edit | Chỉnh sửa phim |
 | movies | delete | Xóa phim |
+| movies | restore | Khôi phục phim đã xóa |
+| movies | view_deleted | Xem danh sách phim đã xóa |
 | toys | view | Xem danh sách đồ chơi |
 | toys | create | Tạo đồ chơi mới |
 | toys | edit | Chỉnh sửa đồ chơi |
@@ -824,10 +842,14 @@ export function requirePermission(module: string, action: string)
 | tickets | create | Tạo gói vé mới |
 | tickets | edit | Chỉnh sửa gói vé |
 | tickets | delete | Xóa gói vé |
+| tickets | restore | Khôi phục gói vé đã xóa |
+| tickets | view_deleted | Xem danh sách gói vé đã xóa |
 | branches | view | Xem danh sách chi nhánh |
 | branches | create | Tạo chi nhánh mới |
 | branches | edit | Chỉnh sửa chi nhánh |
 | branches | delete | Xóa chi nhánh |
+| branches | restore | Khôi phục chi nhánh đã xóa |
+| branches | view_deleted | Xem danh sách chi nhánh đã xóa |
 | uploads | upload | Upload file |
 | uploads | delete | Xóa file |
 | email_logs | view | Xem lịch sử email |
@@ -1397,7 +1419,7 @@ robots: {
 **Location**: `worker/migrations/`
 
 #### 0001_initial_schema.sql
-- Creates initial database schema for core tables:
+- Creates initial database schema for all core tables:
   - `users` - User profile information
   - `accounts` - User authentication accounts
   - `tokens` - Session and OTP tokens
@@ -1409,9 +1431,6 @@ robots: {
   - `email_logs` - Email sending logs
   - `site_media` - Site media management
   - `posts` - Blog posts
-
-#### 0002_rbac_system.sql
-- Creates RBAC system tables:
   - `staffs` - Staff accounts
   - `staff_tokens` - Staff session tokens
   - `roles` - Role definitions
@@ -1420,6 +1439,48 @@ robots: {
   - `staff_roles` - Staff-role junction table
   - `staff_branches` - Staff-branch junction table
   - `audit_logs` - Audit logging
+
+#### 0002_seed_rbac.sql
+- Seeds default permissions into `permissions` table:
+  - 50+ permissions across modules: dashboard, movies, tickets, toys, transactions, branches, posts, users, staff, roles, settings, email_logs, uploads, ticket_check, audit
+  - Each permission has module, action, and description (Vietnamese)
+- Seeds default roles into `roles` table:
+  - `staff` (Level 0) - Basic staff with limited permissions
+  - `manager` (Level 1) - Branch manager with more permissions
+  - `admin` (Level 2) - System administrator with most permissions
+- Assigns permissions to roles via `role_permissions` table:
+  - Staff: dashboard:view, transactions:view, ticket_check:scan/validate/history
+  - Manager: All staff permissions + movies/tickets/toys/posts/users management
+  - Admin: All manager permissions + staff/roles/branches management + audit logs
+
+#### 0003_add_soft_delete_columns.sql
+- Adds `deleted_at` columns for soft delete functionality:
+  - `movies.deleted_at`
+  - `ticket_packages.deleted_at`
+  - `toys.deleted_at`
+  - `site_media.deleted_at`
+  - `branches.deleted_at`
+  - `roles.deleted_at`
+  - `staffs.deleted_at`
+- Adds `confirmed_by_staff_id` column to `bookings` for tracking who confirmed the booking
+- Creates indexes for deleted_at columns to optimize queries:
+  - `idx_movies_deleted_at`
+  - `idx_ticket_packages_deleted_at`
+  - `idx_toys_deleted_at`
+  - `idx_site_media_deleted_at`
+  - `idx_branches_deleted_at`
+  - `idx_roles_deleted_at`
+  - `idx_staffs_deleted_at`
+  - `idx_bookings_confirmed_by_staff_id`
+
+#### 0004_add_deleted_by_staff_id.sql
+- Adds `deleted_by_staff_id` columns to track who deleted records:
+  - `movies.deleted_by_staff_id` → references staffs(id)
+  - `ticket_packages.deleted_by_staff_id` → references staffs(id)
+  - `branches.deleted_by_staff_id` → references staffs(id)
+  - `staffs.deleted_by_staff_id` → references staffs(id) (self-reference)
+  - `roles.deleted_by_staff_id` → references staffs(id)
+- All foreign keys have ON DELETE SET NULL to preserve audit trail
 
 ### Database Status
 
@@ -1538,13 +1599,17 @@ Middleware: `requireAuth`
 #### Movies
 - **POST /api/movies** - Create movie (**requirePermission: movies, create**)
 - **PUT /api/movies/:id** - Update movie (**requirePermission: movies, edit**)
-- **DELETE /api/movies/:id** - Delete movie (**requirePermission: movies, delete**)
+- **DELETE /api/movies/:id** - Delete movie (soft delete) (**requirePermission: movies, delete**)
 - **POST /api/movies-status/:id** - Update movie status (**requirePermission: movies, toggle_status**)
+- **POST /api/admin/movies/:id/restore** - Restore deleted movie (**requirePermission: movies, restore**)
+- **GET /api/admin/deleted/movies** - List deleted movies (**requirePermission: movies, view_deleted**)
 
 #### Ticket Packages
 - **POST /api/tickets** - Create ticket package
 - **PUT /api/tickets/:id** - Update ticket package
-- **DELETE /api/tickets/:id** - Delete ticket package
+- **DELETE /api/tickets/:id** - Delete ticket package (soft delete)
+- **POST /api/admin/tickets/:id/restore** - Restore deleted ticket package (**requirePermission: tickets, restore**)
+- **GET /api/admin/deleted/tickets** - List deleted ticket packages (**requirePermission: tickets, view_deleted**)
 
 #### Toys
 - **POST /api/toys** - Create toy (**requirePermission: toys, create**)
@@ -1565,7 +1630,9 @@ Middleware: `requireAuth`
 - **GET /api/admin/branches/:id** - Get branch by ID
 - **POST /api/admin/branches** - Create branch
 - **PUT /api/admin/branches/:id** - Update branch
-- **DELETE /api/admin/branches/:id** - Delete branch
+- **DELETE /api/admin/branches/:id** - Delete branch (soft delete)
+- **POST /api/admin/branches/:id/restore** - Restore deleted branch (**requirePermission: branches, restore**)
+- **GET /api/admin/deleted/branches** - List deleted branches (**requirePermission: branches, view_deleted**)
 
 #### Site Media
 - **POST /api/admin/site-media** - Create site media
@@ -1605,9 +1672,17 @@ Middleware: `requireAuth`
   - Invalidates permission cache
   - Middleware: requireStaffAuth, requirePermission('staff', 'edit')
 - **DELETE /api/admin/staff/:id** - Delete staff (soft delete)
-  - Sets isActive = false
+  - Sets deleted_at timestamp
   - Cannot delete super admin
   - Middleware: requireStaffAuth, requirePermission('staff', 'delete')
+- **POST /api/admin/staff/:id/restore** - Restore deleted staff
+  - Clears deleted_at timestamp
+  - Cannot restore super admin
+  - Middleware: requireStaffAuth, requirePermission('staff', 'restore')
+- **GET /api/admin/deleted/staff** - List deleted staff
+  - Query: `page`, `pageSize`, `search`
+  - Returns: deleted staff list with roles
+  - Middleware: requireStaffAuth, requirePermission('staff', 'view_deleted')
 - **POST /api/admin/staff/:id/reset-password** - Reset staff password
   - Body: `{ newPassword }`
   - Generates new password, sets forcePasswordChange = true
@@ -1630,10 +1705,18 @@ Middleware: `requireAuth`
   - Body: `{ name?, description?, level?, permissionIds? }`
   - Cannot modify system roles (is_system = true)
   - Middleware: requireStaffAuth, requirePermission('roles', 'edit')
-- **DELETE /api/admin/roles/:id** - Delete role
+- **DELETE /api/admin/roles/:id** - Delete role (soft delete)
   - Cannot delete if assigned to any staff
   - Cannot delete system roles
   - Middleware: requireStaffAuth, requirePermission('roles', 'delete')
+- **POST /api/admin/roles/:id/restore** - Restore deleted role
+  - Cannot restore if assigned to any staff
+  - Cannot restore system roles
+  - Middleware: requireStaffAuth, requirePermission('roles', 'restore')
+- **GET /api/admin/deleted/roles** - List deleted roles
+  - Query: `page`, `pageSize`
+  - Returns: deleted roles with permissions
+  - Middleware: requireStaffAuth, requirePermission('roles', 'view_deleted')
 - **GET /api/admin/permissions** - List all permissions
   - Returns: all permissions with module, action, description
   - Middleware: requireStaffAuth, requirePermission('roles', 'view')
@@ -1677,6 +1760,22 @@ Middleware: `requireAuth`
 
 #### AI Analytics
 - **POST /api/ai-analytics** - AI-powered analytics Q&A
+  - Body: `{ query: string }`
+  - Uses Cloudflare Workers AI (@cf/meta/llama-3-8b-instruct)
+  - Collects business data from database:
+    - Overall booking summary
+    - Revenue by payment method
+    - Top movies
+    - Peak booking hours
+    - Monthly revenue
+    - Top ticket packages
+    - Active movies
+    - Recent bookings
+    - Daily revenue (last 30 days)
+    - Top users with failed bookings
+  - Returns: JSON with `internal_thought`, `display_type`, `analysis_summary`, `ui_config`, `processed_data`
+  - Display types: `dynamic_chart`, `table`, `summary`
+  - Response in Vietnamese
 
 #### Webhooks
 - **POST /api/sepay/webhook** - SePay webhook handler
@@ -1696,6 +1795,7 @@ Middleware: `requireAuth`
 - **AdminIndex.tsx** - Admin dashboard index
 - **Dashboard.tsx** - Dashboard with metrics, charts
 - **Movies.tsx** - Movie management (CRUD)
+- **DeletedMovies.tsx** - Deleted movies management (restore, view deleted)
 - **Tickets.tsx** - Ticket package management
 - **Toys.tsx** - Toys inventory management
 - **Transactions.tsx** - Transaction/booking management
@@ -1707,6 +1807,13 @@ Middleware: `requireAuth`
 - **EmailLogs.tsx** - Email log viewer
 - **Settings.tsx** - Admin settings (2FA, OTP config)
 - **TicketCheck.tsx** - Ticket validation/check-in
+- **Staff.tsx** - Staff management (CRUD, role/branch assignment)
+- **DeletedStaff.tsx** - Deleted staff management (restore, view deleted)
+- **Roles.tsx** - Role management (permission matrix)
+- **RoleDetailPage.tsx** - Role detail page
+- **AuditLogs.tsx** - Audit log viewer
+- **Profile.tsx** - Staff profile page
+- **SetupSuperAdmin.tsx** - Super admin setup page
 
 #### Components
 **Location**: `client/components/`

@@ -1,0 +1,252 @@
+import React, { useEffect, useState } from 'react';
+import AdminLayout from '@/admin/layouts/AdminLayout';
+import { toast } from 'sonner';
+import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from '@/components/ui/table';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { Input } from '@/components/ui/input';
+import {
+        AlertDialog,
+        AlertDialogAction,
+        AlertDialogCancel,
+        AlertDialogContent,
+        AlertDialogDescription,
+        AlertDialogFooter,
+        AlertDialogHeader,
+        AlertDialogTitle
+} from '@/components/ui/alert-dialog';
+import { RefreshCw, RotateCcw, Shield } from 'lucide-react';
+
+interface Role {
+        id: number;
+        name: string;
+        description?: string;
+        deleted_at: string;
+        staff_count?: number;
+        deleted_by_staff_name?: string;
+}
+
+export default function DeletedRolesPage() {
+        const [roles, setRoles] = useState<Role[]>([]);
+        const [page, setPage] = useState(1);
+        const pageSize = 10;
+        const [total, setTotal] = useState(0);
+        const totalPages = Math.max(1, Math.ceil(total / pageSize));
+        const [isLoading, setIsLoading] = useState(false);
+        const [searchQuery, setSearchQuery] = useState('');
+        const [restoreDialogOpen, setRestoreDialogOpen] = useState(false);
+        const [roleToRestore, setRoleToRestore] = useState<number | null>(null);
+        const [sortField, setSortField] = useState<'name' | 'deleted_at'>('deleted_at');
+        const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc');
+
+        const fetchDeletedRoles = async () => {
+                setIsLoading(true);
+                try {
+                        const token = localStorage.getItem('staffToken');
+                        const params = new URLSearchParams({
+                                page: String(page),
+                                pageSize: String(pageSize),
+                                search: searchQuery
+                        });
+                        const response = await fetch(`/api/admin/deleted/roles?${params}`, {
+                                headers: {
+                                        Authorization: `Bearer ${token}`
+                                }
+                        });
+                        const data = await response.json();
+                        // Client-side sorting
+                        let sortedItems = data.items || [];
+                        sortedItems.sort((a: Role, b: Role) => {
+                                let valA: any, valB: any;
+                                if (sortField === 'name') {
+                                        valA = a.name.toLowerCase();
+                                        valB = b.name.toLowerCase();
+                                } else {
+                                        valA = new Date(a.deleted_at).getTime();
+                                        valB = new Date(b.deleted_at).getTime();
+                                }
+                                if (valA < valB) return sortDir === 'asc' ? -1 : 1;
+                                if (valA > valB) return sortDir === 'asc' ? 1 : -1;
+                                return 0;
+                        });
+                        setRoles(sortedItems);
+                        setTotal(data.total || 0);
+                } catch (error) {
+                        toast.error('Lỗi', {
+                                description: 'Không thể tải danh sách vai trò đã xóa'
+                        });
+                } finally {
+                        setIsLoading(false);
+                }
+        };
+
+        useEffect(() => {
+                fetchDeletedRoles();
+        }, [page, searchQuery, sortField, sortDir]);
+
+        const handleRestore = (id: number) => {
+                setRoleToRestore(id);
+                setRestoreDialogOpen(true);
+        };
+
+        const handleConfirmRestore = async () => {
+                if (!roleToRestore) return;
+                try {
+                        const token = localStorage.getItem('staffToken');
+                        const response = await fetch(`/api/admin/roles/${roleToRestore}/restore`, {
+                                method: 'POST',
+                                headers: {
+                                        Authorization: `Bearer ${token}`
+                                }
+                        });
+                        const data = await response.json();
+                        if (response.ok) {
+                                toast.success('Thành công', {
+                                        description: 'Đã khôi phục vai trò'
+                                });
+                                setRestoreDialogOpen(false);
+                                fetchDeletedRoles();
+                        } else {
+                                toast.error('Lỗi', {
+                                        description: data.message || 'Không thể khôi phục vai trò'
+                                });
+                        }
+                } catch (error) {
+                        toast.error('Lỗi', {
+                                description: 'Có lỗi xảy ra'
+                        });
+                }
+        };
+
+        return (
+                <AdminLayout
+                        active={'deleted-roles' as any}
+                        setActive={(() => { }) as any}
+                        adminEmailState={localStorage.getItem('adminEmail') || 'admin@email.com'}
+                        handleLogout={() => {
+                                localStorage.removeItem('adminToken');
+                                localStorage.removeItem('adminEmail');
+                                window.dispatchEvent(new Event('admin-auth-changed'));
+                                window.location.href = '/';
+                        }}
+                >
+                        <div className="p-6">
+                                <div className="flex justify-between items-center mb-6">
+                                        <h1 className="text-2xl font-bold">Vai trò đã xóa</h1>
+                                        <Button onClick={fetchDeletedRoles} variant="outline" size="sm">
+                                                <RefreshCw className="w-4 h-4 mr-2" />
+                                                Làm mới
+                                        </Button>
+                                </div>
+
+                                <div className="mb-4">
+                                        <Input
+                                                placeholder="Tìm kiếm theo tên vai trò..."
+                                                value={searchQuery}
+                                                onChange={(e) => setSearchQuery(e.target.value)}
+                                                className="w-64"
+                                        />
+                                </div>
+
+                                {isLoading ? (
+                                        <div className="text-center py-8">Đang tải...</div>
+                                ) : (
+                                        <div className="overflow-x-auto">
+                                                <Table>
+                                                        <TableHeader>
+                                                                <TableRow>
+                                                                        <TableHead className="cursor-pointer hover:bg-gray-100" onClick={() => { setSortField('name'); setSortDir(sortField === 'name' && sortDir === 'asc' ? 'desc' : 'asc'); }}>
+                                                                                Tên vai trò {sortField === 'name' && (sortDir === 'asc' ? '↑' : '↓')}
+                                                                        </TableHead>
+                                                                        <TableHead>Mô tả</TableHead>
+                                                                        <TableHead>Số nhân viên</TableHead>
+                                                                        <TableHead>Xóa bởi</TableHead>
+                                                                        <TableHead className="cursor-pointer hover:bg-gray-100" onClick={() => { setSortField('deleted_at'); setSortDir(sortField === 'deleted_at' && sortDir === 'asc' ? 'desc' : 'asc'); }}>
+                                                                                Ngày xóa {sortField === 'deleted_at' && (sortDir === 'asc' ? '↑' : '↓')}
+                                                                        </TableHead>
+                                                                        <TableHead className="text-right">Hành động</TableHead>
+                                                                </TableRow>
+                                                        </TableHeader>
+                                                        <TableBody>
+                                                                {roles.map((r) => (
+                                                                        <TableRow key={r.id}>
+                                                                                <TableCell className="font-medium">
+                                                                                        <div className="flex items-center gap-2">
+                                                                                                <Shield className="w-4 h-4 text-gray-500" />
+                                                                                                {r.name}
+                                                                                        </div>
+                                                                                </TableCell>
+                                                                                <TableCell className="text-gray-600">{r.description || '-'}</TableCell>
+                                                                                <TableCell>
+                                                                                        <Badge variant="outline">{r.staff_count || 0} nhân viên</Badge>
+                                                                                </TableCell>
+                                                                                <TableCell className="text-gray-600">{r.deleted_by_staff_name || '-'}</TableCell>
+                                                                                <TableCell>
+                                                                                        {r.deleted_at ? new Date(r.deleted_at).toLocaleString('vi-VN') : '-'}
+                                                                                </TableCell>
+                                                                                <TableCell className="text-right">
+                                                                                        <Button
+                                                                                                onClick={() => handleRestore(r.id)}
+                                                                                                variant="outline"
+                                                                                                size="sm"
+                                                                                        >
+                                                                                                <RotateCcw className="w-4 h-4 mr-2" />
+                                                                                                Khôi phục
+                                                                                        </Button>
+                                                                                </TableCell>
+                                                                        </TableRow>
+                                                                ))}
+                                                                {roles.length === 0 && (
+                                                                        <TableRow>
+                                                                                <TableCell colSpan={6} className="text-center py-8 text-gray-500">
+                                                                                        Không có vai trò nào đã xóa
+                                                                                </TableCell>
+                                                                        </TableRow>
+                                                                )}
+                                                        </TableBody>
+                                                </Table>
+                                        </div>
+                                )}
+
+                                <div className="flex justify-between items-center mt-4">
+                                        <div className="text-sm text-gray-600">
+                                                Trang {page} / {totalPages} (Tổng {total} vai trò)
+                                        </div>
+                                        <div className="flex gap-2">
+                                                <Button
+                                                        onClick={() => setPage(Math.max(1, page - 1))}
+                                                        disabled={page === 1}
+                                                        variant="outline"
+                                                        size="sm"
+                                                >
+                                                        Trước
+                                                </Button>
+                                                <Button
+                                                        onClick={() => setPage(Math.min(totalPages, page + 1))}
+                                                        disabled={page === totalPages}
+                                                        variant="outline"
+                                                        size="sm"
+                                                >
+                                                        Sau
+                                                </Button>
+                                        </div>
+                                </div>
+                        </div>
+
+                        <AlertDialog open={restoreDialogOpen} onOpenChange={setRestoreDialogOpen}>
+                                <AlertDialogContent>
+                                        <AlertDialogHeader>
+                                                <AlertDialogTitle>Xác nhận khôi phục</AlertDialogTitle>
+                                                <AlertDialogDescription>
+                                                        Bạn có chắc chắn muốn khôi phục vai trò này?
+                                                </AlertDialogDescription>
+                                        </AlertDialogHeader>
+                                        <AlertDialogFooter>
+                                                <AlertDialogCancel>Hủy</AlertDialogCancel>
+                                                <AlertDialogAction onClick={handleConfirmRestore}>Khôi phục</AlertDialogAction>
+                                        </AlertDialogFooter>
+                                </AlertDialogContent>
+                        </AlertDialog>
+                </AdminLayout>
+        );
+}
