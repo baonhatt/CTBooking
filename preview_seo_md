@@ -1,0 +1,985 @@
+Báo Cáo SEO Kỹ Thuật — Cinesphere (Next.js 14 App Router → Cloudflare Pages)
+Ngày tạo: 2026-05-29
+
+Mục tiêu: Tài liệu kỹ thuật mô tả hiện trạng SEO hiện tại, đánh giá từng route chính, checklist các thiếu sót ưu tiên theo ảnh hưởng tới ranking, và kế hoạch tối ưu (High/Medium/Low) có snippets cụ thể để dev implement.
+
+Nội dung:
+
+Inventory SEO per-route: /, /bai-viet, /bai-viet/[slug], /sitemap.xml
+Đánh giá từng route (✅/❌/⚠️)
+Checklist bị xót (theo mức ảnh hưởng)
+Kế hoạch tối ưu (High/Medium/Low) + code snippets
+Paste toàn bộ file nguồn liên quan để triển khai trực tiếp
+1) Inventory SEO hiện có (tóm tắt)
+Ghi chú: dữ liệu trích xuất từ next-client/src/app/*, next-client/next.config.mjs, next-client/src/app/layout.tsx, và public/robots.txt.
+
+Route: /
+File: next-client/src/app/page.tsx
+Metadata (export const metadata):
+title: "Cinesphere | Trải Nghiệm Điện Ảnh Đỉnh Cao"
+description: "Đặt vé xem phim trực tuyến tại Cinesphere..."
+alternates.canonical: siteConfig.domain (SITE_URL)
+openGraph: title, description, type: 'website', url: SITE_URL, locale: 'vi_VN', siteName: 'Cinesphere', images: ['/og-default.jpg']
+twitter: card summary_large_image, images ['/og-default.jpg']
+Canonical: alternates.canonical = SITE_URL
+JSON-LD: Organization & WebSite JSON-LD injected at root layout (see app/layout.tsx)
+Sitemap: included in app/sitemap.ts staticPages
+Robots: referenced by next-client/public/robots.txt and root public/robots.txt
+Rendering/caching:
+export const dynamic = 'force-dynamic' (homepage forced dynamic — SSR fresh)
+Fetches server-side data: movies, site media, products, default branch
+Route: /bai-viet
+File: next-client/src/app/bai-viet/page.tsx
+Metadata (export const metadata):
+title: 'Tin Tức Điện Ảnh | Cinesphere Blog'
+description: 'Cập nhật tin tức phim ảnh...'
+alternates.canonical: ${SITE_URL}/bai-viet
+openGraph/twitter similar to home with image '/og-default.jpg'
+JSON-LD: none per-page; site-level JSON-LD present
+Sitemap: included in app/sitemap.ts
+Robots: allowed in robots.txt
+Rendering/caching: Server Component (server-side fetches posts via getPublicPosts), no explicit revalidate in source; sitemap generator may assign priorities
+Route: /bai-viet/[slug]
+File: next-client/src/app/bai-viet/[slug]/page.tsx
+generateStaticParams: present — enumerates slugs via getPublicPosts({ pageSize: 100 })
+generateMetadata: present — builds per-post metadata (title, description, alternates.canonical using post.canonical_url if present), openGraph (type 'article' with publishedTime/modifiedTime), twitter
+JSON-LD: Article JSON-LD injected inline in page via <script type="application/ld+json">
+Sitemap: posts mapped by app/sitemap.ts and worker sitemap generator
+Robots: generateMetadata returns robots: { index:false, follow:false } when post not found
+Rendering/caching:
+Uses generateStaticParams (static path enumeration)
+No explicit revalidate in source, compiled artifacts show revalidate defaults like 3600 in worker sitemap; Cloudflare Worker sitemap sets Cache-Control: public, max-age=3600.
+Route: /sitemap.xml
+File: next-client/src/app/sitemap.ts (Next app-level sitemap; runtime='edge')
+Returns MetadataRoute.Sitemap array of static pages + post pages
+Calls getPublicPosts to produce post entries; includes url, lastModified, changeFrequency, priority
+Additionally a Cloudflare Worker (server/worker) provides a /sitemap.xml handler building XML and setting Cache-Control: public, max-age=3600.
+Robots.txt
+public/robots.txt (root) and next-client/public/robots.txt exist; both reference https://cinesphere.com.vn/sitemap.xml and include allow/disallow rules. Client robots disallows account, checkout, api, etc.
+next.config.mjs
+images.unoptimized = true (Cloudflare Pages doesn't support Next Image optimization)
+Rewrites: local dev rewrite /api/:path* → http://localhost:8787/api/:path*
+Root layout (next-client/src/app/layout.tsx)
+export const metadata with site-wide defaults (title templates, description, metadataBase, openGraph, twitter, robots with googleBot directives)
+Injects Organization and WebSite JSON-LD via inline <script type="application/ld+json">
+2) Đánh giá từng route (chi tiết)
+Các đánh giá chia làm ba nhãn: ✅ Đang làm đúng, ❌ Thiếu, ⚠️ Chưa tối ưu.
+
+/ (Home)
+✅ Metadata đầy đủ (title, description, openGraph, twitter)
+✅ Canonical alternates.canonical set to SITE_URL
+✅ Site-level JSON-LD (Organization, WebSite) injected in layout
+❌ Không có explicit structured data (HomePage schema) — optional but hữu ích
+⚠️ dynamic = 'force-dynamic' khiến trang luôn SSR — ảnh hưởng tới caching/performace (Core Web Vitals). Nếu trang có nhiều data tĩnh hoặc có ISR cần cân nhắc revalidate để giảm TTFB.
+⚠️ Hình ảnh sử dụng <img> (unoptimized) — phải đảm bảo kích thước/width/height/priority và alt rõ ràng.
+/bai-viet (Blog index)
+✅ Metadata tốt (title/description/OG/Twitter/canonical)
+✅ Server-rendered; posts được fetch server-side → tốt cho indexability
+❌ Thiếu per-page JSON-LD (ListPage/Collection schema) — giúp Google hiểu danh sách bài
+⚠️ Không rõ revalidate/ISR — nếu posts cập nhật thường xuyên, nên dùng ISR hoặc cache-control hợp lý cho tốc độ và tần suất cập nhật phù hợp.
+/bai-viet/[slug] (Post detail)
+✅ generateStaticParams enumerates slugs → hỗ trợ SSG
+✅ generateMetadata tạo metadata tùy bài: title, desc, OG (article), canonical
+✅ JSON-LD Article được thêm inline
+✅ 404/NotFound handling khi post không tồn tại (trả metadata robots: index:false,follow:false)
+❌ Một số chỗ trong code có placeholder trống (ví dụ const canonicalUrl = post.canonical_url || ; và const description = ... || ;) — lỗ hổng có thể gây metadata missing hoặc lỗi build
+⚠️ dangerouslySetInnerHTML được dùng để inject nội dung bài, có regex replace để thêm alt cho images nhưng snippet bị cắt/thiếu trong nguồn — cần hoàn chỉnh để đảm bảo tất cả <img> có alt.
+⚠️ Không rõ revalidate/ISR cho trang bài viết (được generate static params nhưng không có export revalidate) — nếu nội dung cập nhật thường xuyên, cần cấu hình revalidate hoặc webhook để rebuild.
+/sitemap.xml
+✅ Có hai cơ chế sitemap: Next app-level app/sitemap.ts (edge runtime, MetadataRoute.Sitemap) và Cloudflare Worker /sitemap.xml (trả XML với cache control)
+✅ Robots.txt tham chiếu sitemap URL
+❌ Trong app/sitemap.ts vài chỗ placeholder/trống trong map post URL (url: ,) — có thể gây lỗi build hoặc sitemap thiếu URL
+⚠️ Hai sitemap generators tồn tại — cần thống nhất một nơi xuất sitemap chính (prefer Cloudflare Worker XML hoặc Next sitemap.ts but avoid duplication)
+3) Checklist SEO bị xót (sắp xếp theo mức ảnh hưởng)
+High (ảnh hưởng lớn tới index/ranking):
+
+Fix các placeholder/bug trong app/bai-viet/[slug]/page.tsx (canonicalUrl, description, postUrl) — nếu metadata rỗng sẽ ảnh hưởng ranking và indexability. (File: app/bai-viet/[slug]/page.tsx)
+Đảm bảo sitemap trả đầy đủ URL (fix app/sitemap.ts post URL mapping). Nếu sitemap bị lỗi, Google có thể không crawl các bài. (File: app/sitemap.ts và Worker sitemap handler)
+Ensure all <img> trong bài có meaningful alt (automatic fix khi sanitizing post content server-side). (File: app/bai-viet/[slug]/page.tsx)
+Kiểm tra robots.txt: đảm bảo không vô tình chặn trang quan trọng; thống nhất 1 robots.txt cho deployment (Cloudflare Pages phục vụ từ next-client/public/robots.txt hoặc root public/robots.txt).
+Medium:
+
+Add ListPage / Breadcrumb structured data cho /bai-viet và BreadcrumbList for posts.
+Add og:article:published_time/modified_time tags explicitly (already in openGraph but validate format/consistency).
+Consider canonical fallback to SITE_URL + generated slug when canonical_url absent.
+Define revalidate/ISR strategy for posts and blog index (e.g., revalidate = 3600) or implement on-update webhook to revalidate.
+Low:
+
+Add image:width/image:height and loading hints; preconnect to critical hosts.
+Add hreflang if multi-locale planned.
+Improve Open Graph images: generate social preview images per post for better click-through.
+Technical SEO / Performance checklist:
+
+Core Web Vitals: measure LCP/CLS/FID; force-dynamic on home may harm LCP.
+Use Cache-Control and CDN edge caching for static pages and sitemap (worker uses max-age=3600 — OK but consider stale-while-revalidate).
+4) Kế hoạch tối ưu (High / Medium / Low) — kèm code snippets và file targets
+Ghi chú: các snippets dùng Next 14 Metadata API và server-side fixes. Replace placeholders in snippets with project's siteConfig.domain or helper buildPostHref.
+
+High priority
+Fix missing canonical/description placeholders in post page
+Problem: in app/bai-viet/[slug]/page.tsx:
+const canonicalUrl = post.canonical_url || ; // missing fallback
+const description = ... || ; // missing fallback
+Fix snippet (replace in file):
+// inside generateMetadata
+const canonicalUrl = post.canonical_url || `${SITE_URL}/bai-viet/${post.slug_id || post.id}`;
+const description = post.meta_description?.trim() || post.excerpt?.trim() || `${post.title} - Bài viết trên Cinesphere`;
+File to update: next-client/src/app/bai-viet/[slug]/page.tsx
+
+Ensure postUrl and sitemap url mapping are complete (fix app/sitemap.ts)
+Problem: postPages map uses url: , placeholder.
+Fix snippet:
+// in next-client/src/app/sitemap.ts
+postPages = posts.map((post) => ({
+  url: `${SITE_URL}/bai-viet/${post.slug_id || post.id}`,
+  lastModified: new Date(post.updated_at ?? post.published_at ?? post.created_at ?? Date.now()),
+  changeFrequency: 'weekly' as const,
+  priority: post.is_featured ? 0.85 : 0.7
+}));
+Ensure Worker sitemap and Next sitemap are consistent — pick one authoritative source
+Option A (recommended): Use Cloudflare Worker XML as canonical sitemap (it already sets Cache-Control). Update next-client/public/robots.txt to reference the worker sitemap if needed.
+Option B: Fix app/sitemap.ts and remove/disable worker sitemap.
+Ensure all <img> in post content have alt
+Problem: dangerouslySetInnerHTML has a regex replace but is incomplete.
+Server-side sanitize + add alt fallback snippet (replace in page rendering before dangerouslySetInnerHTML):
+const sanitizedContent = (post.content || '')
+  .replace(/<img([^>]*?)>/gi, (match, attr) => {
+    // if already has alt, keep
+    if (/\balt=/.test(attr)) return `<img${attr}>`;
+    // extract src
+    const srcMatch = /src=\"([^\"]+)\"/.exec(attr) || /src='([^']+)'/.exec(attr);
+    const src = srcMatch ? srcMatch[1].split('/').pop().replace(/\W+/g, ' ').replace(/\s+/g, ' ') : '';
+    const altText = src ? src : post.title;
+    return `<img${attr} alt="${altText}" />`;
+  });
+Then use dangerouslySetInnerHTML={{ __html: sanitizedContent }}.
+
+File to update: next-client/src/app/bai-viet/[slug]/page.tsx
+
+Medium priority
+Add ListPage JSON-LD and BreadcrumbList
+For /bai-viet add a small JSON-LD describing the collection and for posts add BreadcrumbList.
+Snippet for blog index (/bai-viet):
+
+const listSchema = {
+  '@context': 'https://schema.org',
+  '@type': 'CollectionPage',
+  'name': 'Tin tức Cinesphere',
+  'url': `${SITE_URL}/bai-viet`,
+  'mainEntity': posts.map(p => ({ '@type': 'Article', 'headline': p.title, 'url': `${SITE_URL}/bai-viet/${p.slug_id || p.id}` }))
+};
+
+// inject as inline script in page (server component):
+<script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(listSchema) }} />
+Add BreadcrumbList to post page JSON-LD
+jsonLd.breadcrumb = {
+  '@type': 'BreadcrumbList',
+  'itemListElement': [
+    { '@type': 'ListItem', 'position': 1, 'name': 'Trang chủ', 'item': SITE_URL },
+    { '@type': 'ListItem', 'position': 2, 'name': 'Tin tức', 'item': `${SITE_URL}/bai-viet` },
+    { '@type': 'ListItem', 'position': 3, 'name': post.title, 'item': postUrl }
+  ]
+};
+File: next-client/src/app/bai-viet/[slug]/page.tsx
+
+Add OpenGraph tags consistency: ensure publishedTime and modifiedTime are ISO 8601 strings. Use new Date(...).toISOString() if needed.
+Low priority
+Improve social preview: generate per-post OG image (sized 1200x630) or use dynamic image generation.
+Add explicit image width/height attributes where possible and loading="lazy" for non-critical images.
+Add stale-while-revalidate cache headers for sitemap and static pages to improve freshness without blocking.
+5) Implementation notes & file targets (quick map)
+Fix canonical/description placeholders: next-client/src/app/bai-viet/[slug]/page.tsx
+Fix sitemap post URL: next-client/src/app/sitemap.ts and worker sitemap handler (worker/src/index.ts or worker/src/sitemap_handler_snippet.ts)
+Sanitize post content + alt attributes: next-client/src/app/bai-viet/[slug]/page.tsx
+Add list schema: next-client/src/app/bai-viet/page.tsx
+Check robots.txt served on Cloudflare Pages: next-client/public/robots.txt (update if necessary)
+6) Full source files (as requested)
+Below là paste nguyên văn các file liên quan (dùng để copy/paste trực tiếp). Nếu cần tôi có thể tạo các commits patch cho từng thay đổi.
+
+File: next-client/src/app/page.tsx
+import { Suspense } from 'react';
+import type { Metadata } from 'next';
+import UserLayout from '@/layouts/UserLayout';
+import HeroSection from '@/components/user/home/HeroSection';
+import FilmCarousel from '@/components/user/home/FilmCarousel';
+import PromotionShowcase from '@/components/user/home/PromotionShowcase';
+import TechnologyBanner from '@/components/user/home/TechnologyBanner';
+import ProductSection from '@/components/user/home/ProductSection';
+import ClearStorageOnMount from '@/components/user/home/ClearStorageOnMount';
+
+import { getActiveMoviesToday } from '@/lib/api/movies';
+import { getSiteMediaApi } from '@/lib/api/uploads';
+import { getActiveTickets, getActiveToys } from '@/lib/api/products';
+import { getDefaultBranch } from '@/lib/api/branches';
+
+import { siteConfig } from '@/config/site';
+
+const SITE_URL = siteConfig.domain;
+
+export const metadata: Metadata = {
+  title: 'Cinesphere | Trải Nghiệm Điện Ảnh Đỉnh Cao',
+  description:
+    'Đặt vé xem phim trực tuyến tại Cinesphere. Khám phá các siêu phẩm bom tấn với công nghệ chiếu rạp hiện đại nhất.',
+  alternates: { canonical: SITE_URL },
+  openGraph: {
+    title: 'Cinesphere | Trải Nghiệm Điện Ảnh Đỉnh Cao',
+    description:
+      'Đặt vé xem phim trực tuyến nhanh chóng, tiện lợi. Hệ thống rạp chiếu phim hiện đại với âm thanh hình ảnh sống động.',
+    type: 'website',
+    url: SITE_URL,
+    locale: 'vi_VN',
+    siteName: 'Cinesphere',
+    images: [
+      {
+        url: '/og-default.jpg',
+        width: 1200,
+        height: 630,
+        alt: 'Cinesphere - Trải Nghiệm Điện Ảnh Đỉnh Cao'
+      }
+    ]
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title: 'Cinesphere | Trải Nghiệm Điện Ảnh Đỉnh Cao',
+    description:
+      'Đặt vé xem phim trực tuyến nhanh chóng, tiện lợi. Hệ thống rạp chiếu phim hiện đại với âm thanh hình ảnh sống động.',
+    images: ['/og-default.jpg']
+  }
+};
+
+// Vô hiệu hóa cache ISR: trang chủ luôn render fresh từ server
+export const dynamic = 'force-dynamic';
+
+export default async function Home({ searchParams }: { searchParams: { branch_id?: string } }) {
+  // Fetch default branch for server-side rendering
+  let defaultBranchId: number | undefined = undefined;
+  try {
+    const { branch: defaultBranch } = await getDefaultBranch();
+    if (defaultBranch) {
+      defaultBranchId = defaultBranch.id;
+    }
+  } catch (error) {
+    console.error('Error fetching default branch:', error);
+  }
+
+  // Determine effective branch ID from URL or default
+  const effectiveBranchId = searchParams.branch_id ? Number(searchParams.branch_id) : defaultBranchId;
+
+  // Fetch all initial data in parallel with branch filter
+  const [activeMovies, siteMediaRes, ticketsRes, toysRes] = await Promise.all([
+    getActiveMoviesToday(effectiveBranchId).catch(() => []),
+    getSiteMediaApi({ active: true }).catch(() => ({ items: [] })),
+    getActiveTickets(effectiveBranchId).catch(() => ({ items: [] })),
+    getActiveToys().catch(() => ({ items: [] }))
+  ]);
+
+  const items = siteMediaRes.items || [];
+
+  // Hero section media
+  const heroMedia = items.find((i: any) => i.section === 'hero_section' && i.type === 'video');
+
+  // Tech section media
+  const techMainItem = items.find((i: any) => i.section === 'technology_section1' && i.type === 'video');
+  const techListItems = items.filter((i: any) => i.section === 'technology_section2' && i.type === 'video');
+
+  return (
+    <UserLayout>
+      <main>
+        <ClearStorageOnMount />
+        <HeroSection initialMovies={activeMovies} heroMedia={heroMedia} />
+
+        <Suspense fallback={<div className="min-h-[200px]" />}>
+          {/* Pass initial data to the interactive Client Components */}
+          <FilmCarousel initialFilms={activeMovies} />
+          <PromotionShowcase initialCombos={ticketsRes.items || []} />
+          <TechnologyBanner initialMainItem={techMainItem} initialListItems={techListItems} />
+          <ProductSection initialProducts={toysRes.items || []} />
+        </Suspense>
+      </main>
+    </UserLayout>
+  );
+}
+File: next-client/src/app/bai-viet/page.tsx
+import type { Metadata } from 'next';
+import Link from 'next/link';
+import { getPublicPosts, type PostItem } from '@/lib/api/posts';
+import { buildPostHref, formatDate } from '@/lib/utils';
+import UserLayout from '@/layouts/UserLayout';
+import PostsSearchClient from '@/app/bai-viet/PostsSearchClient';
+
+import { siteConfig } from '@/config/site';
+
+const SITE_URL = siteConfig.domain;
+
+export const metadata: Metadata = {
+  title: 'Tin Tức Điện Ảnh | Cinesphere Blog',
+  description:
+    'Cập nhật tin tức phim ảnh, review đánh giá các siêu phẩm phòng vé và xu hướng công nghệ chiếu rạp mới nhất tại Cinesphere.',
+  alternates: { canonical: `${SITE_URL}/bai-viet` },
+  openGraph: {
+    title: 'Tin Tức Điện Ảnh | Cinesphere Blog',
+    description: 'Khám phá các tin tức điện ảnh độc quyền và review khách quan từ đội ngũ chuyên gia Cinesphere.',
+    type: 'website',
+    url: `${SITE_URL}/bai-viet`,
+    locale: 'vi_VN',
+    siteName: 'Cinesphere',
+    images: [
+      {
+        url: '/og-default.jpg',
+        width: 1200,
+        height: 630,
+        alt: 'Cinesphere Blog - Tin Tức Điện Ảnh'
+      }
+    ]
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title: 'Tin Tức Điện Ảnh | Cinesphere Blog',
+    description: 'Khám phá các tin tức điện ảnh độc quyền và review khách quan từ đội ngũ chuyên gia Cinesphere.',
+    images: ['/og-default.jpg']
+  }
+};
+
+
+// ⚡ Server Component – HTML đầy đủ tại Edge, Google index ngay lập tức
+export default async function PostsPage() {
+  let posts: PostItem[] = [];
+  try {
+    const res = await getPublicPosts({ page: 1, pageSize: 50 });
+    posts = (res.items ?? [])
+      .filter((p) => p.status === 'published')
+      .sort((a, b) => {
+        const fa = a.is_featured ? 1 : 0;
+        const fb = b.is_featured ? 1 : 0;
+        if (fa !== fb) return fb - fa;
+        return (
+          new Date(b.published_at ?? b.created_at ?? 0).getTime() -
+          new Date(a.published_at ?? a.created_at ?? 0).getTime()
+        );
+      });
+  } catch {
+    // Render trang trống nếu Worker lỗi tạm thời
+  }
+
+  const featured = posts.slice(0, 3);
+  const others = posts.slice(3);
+
+  return (
+    <UserLayout className="bg-[#0A192F]">
+      <main className="pt-20 md:pt-28 pb-12 md:pb-24 bg-[#0A192F] min-h-screen font-sans">
+        <section className="container my-6 mx-auto px-4 md:px-6 lg:px-8">
+          {/* Header + Search */}
+          <div className="flex flex-col lg:flex-row lg:items-end justify-between border-b border-white/10 pb-6 mb-10">
+            <div>
+              <p className="text-[#7BB1FF] text-xs md:text-sm font-bold uppercase tracking-[0.15em] mb-2">
+                Cinesphere Editorial
+              </p>
+              <h1 className="text-3xl md:text-4xl lg:text-5xl font-extrabold text-white tracking-tight">
+                Tin Tức Nổi Bật
+              </h1>
+            </div>
+            {/* Search: tách "use client" riêng để giữ phần còn lại là Server */}
+            <PostsSearchClient initialPosts={posts} />
+          </div>
+
+          {/* Featured Grid – Server rendered */}
+          {posts.length === 0 ? (
+            <div className="text-slate-400 text-center py-20 border border-white/10 rounded-2xl bg-white/5">
+              Chưa có bài viết.
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 xl:grid-cols-3 gap-8 xl:gap-8">
+              {/* Left Large Post */}
+              {featured[0] && (
+                <div className="xl:col-span-2 group block cursor-pointer">
+                  <Link href={buildPostHref(featured[0])}>
+                    <div className="relative aspect-[16/9] lg:aspect-[2/1] rounded-[1.25rem] overflow-hidden mb-6">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img
+                        src={
+                          featured[0].featured_image ??
+                          'https://images.unsplash.com/photo-1489599849927-2ee91cede3ba?q=80&w=1200'
+                        }
+                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700 ease-in-out"
+                        alt={featured[0].title}
+                      />
+                      {featured[0].is_featured && (
+                        <div className="absolute top-4 left-4 bg-[#00D2FF] text-[#0A192F] text-[11px] font-bold px-3 py-1.5 rounded uppercase tracking-wider">
+                          Nổi bật
+                        </div>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-3 text-xs sm:text-sm text-slate-400 mb-3">
+                      <span className="text-[#00D2FF] font-semibold">Cinesphere News</span>
+                      <span>•</span>
+                      <span>{formatDate(featured[0].published_at ?? featured[0].created_at)}</span>
+                    </div>
+                    <h2 className="text-white text-2xl sm:text-3xl lg:text-4xl font-bold leading-tight mb-4 group-hover:text-[#7BB1FF] transition-colors duration-300">
+                      {featured[0].title}
+                    </h2>
+                    <p className="text-slate-300 line-clamp-3 mb-5 text-sm sm:text-base">
+                      {featured[0].excerpt ?? 'Nhấp vào để đọc nội dung toàn diện từ đội ngũ Cinesphere.'}
+                    </p>
+                    <span className="text-[#00D2FF] font-semibold text-sm flex items-center gap-2 group-hover:underline">
+                      Xem chi tiết →
+                    </span>
+                  </Link>
+                </div>
+              )}
+
+              {/* Right Stacked Posts */}
+              <div className="xl:col-span-1 flex flex-col gap-8 justify-between">
+                {featured.slice(1, 3).map((post) => (
+                  <div key={post.id} className="group block flex-1">
+                    <Link href={buildPostHref(post)} className="flex flex-col h-full">
+                      <div className="relative aspect-[16/9] xl:aspect-[4/3] 2xl:aspect-[16/9] rounded-2xl overflow-hidden mb-4">
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img
+                          src={
+                            post.featured_image ??
+                            'https://images.unsplash.com/photo-1536440136628-849c177e76a1?q=80&w=800'
+                          }
+                          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700 ease-in-out"
+                          alt={post.title}
+                        />
+                      </div>
+                      <div className="flex items-center gap-2 text-xs text-slate-400 mb-2">
+                        <span className="text-[#00D2FF] font-semibold">Tin Tức</span>
+                        <span>•</span>
+                        <span>{formatDate(post.published_at ?? post.created_at)}</span>
+                      </div>
+                      <h3 className="text-white text-lg sm:text-xl font-bold leading-snug mb-3 group-hover:text-[#7BB1FF] transition-colors duration-300 line-clamp-2">
+                        {post.title}
+                      </h3>
+                      <p className="text-slate-400 text-sm line-clamp-2">
+                        {post.excerpt ?? 'Cập nhật diễn biến mới nhất tại hệ thống rạp Cinesphere.'}
+                      </p>
+                    </Link>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </section>
+
+        {/* Other Posts */}
+        {others.length > 0 && (
+          <section className="container mx-auto px-4 md:px-6 lg:px-8 mt-16 md:mt-24 pt-10 border-t border-white/10">
+            <div className="mb-10">
+              <h2 className="text-white text-2xl md:text-3xl font-bold tracking-tight">Góc Điện Ảnh Mới</h2>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 lg:gap-8">
+              {others.map((post) => (
+                <article key={post.id} className="group block">
+                  <Link href={buildPostHref(post)} className="flex flex-col h-full">
+                    <div className="relative aspect-[16/10] rounded-[1rem] overflow-hidden mb-4">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img
+                        src={
+                          post.featured_image ?? 'https://images.unsplash.com/photo-1542204165-65bf26472b9b?q=80&w=800'
+                        }
+                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500 ease-in-out"
+                        alt={post.title}
+                      />
+                    </div>
+                    <div className="flex items-center gap-2 text-[11px] text-slate-400 mb-2">
+                      <span className="text-[#7BB1FF] font-medium">Review</span>
+                      <span>•</span>
+                      <span>{formatDate(post.published_at ?? post.created_at)}</span>
+                    </div>
+                    <h3 className="text-white text-base md:text-lg font-bold leading-snug mb-2 group-hover:text-[#00D2FF] transition-colors duration-300 line-clamp-2">
+                      {post.title}
+                    </h3>
+                  </Link>
+                </article>
+              ))}
+            </div>
+          </section>
+        )}
+      </main>
+    </UserLayout>
+  );
+}
+File: next-client/src/app/bai-viet/[slug]/page.tsx
+import type { Metadata } from 'next';
+import Link from 'next/link';
+import { notFound } from 'next/navigation';
+import { ArrowLeft, Eye } from 'lucide-react';
+import UserLayout from '@/layouts/UserLayout';
+import { getPostBySlugId, getPublicPosts } from '@/lib/api/posts';
+import { buildPostHref } from '@/lib/utils';
+import PostSidebar from './PostSidebar';
+
+import { siteConfig } from '@/config/site';
+
+const SITE_URL = siteConfig.domain;
+
+export async function generateStaticParams() {
+        try {
+                const posts = await getPublicPosts({ page: 1, pageSize: 100 });
+                return posts.items
+                        .filter((p) => p.status === 'published')
+                        .map((post) => ({ slug: (post as any).slug_id }));
+        } catch {
+                return [];
+        }
+}
+
+export async function generateMetadata({ params }: { params: { slug: string } }): Promise<Metadata> {
+        const post = await getPostBySlugId(params.slug).catch(() => null);
+
+        if (!post || post.status !== 'published') {
+                return {
+                        title: 'Bài Viết Không Tồn Tại',
+                        robots: { index: false, follow: false }
+                };
+        }
+
+        const canonicalUrl = post.canonical_url || ;
+        const seoTitle = post.seo_title?.trim() || post.title;
+        const description =
+                post.meta_description?.trim() ||
+                post.excerpt?.trim() ||
+                ;
+        const ogImage = post.og_image || post.featured_image || `${SITE_URL}/logo.svg`;
+
+        return {
+                title: seoTitle,
+                description,
+                alternates: { canonical: canonicalUrl },
+                openGraph: {
+                        title: seoTitle,
+                        description,
+                        type: 'article',
+                        url: canonicalUrl,
+                        publishedTime: post.published_at,
+                        modifiedTime: post.updated_at,
+                        locale: 'vi_VN',
+                        siteName: 'Cinesphere',
+                        images: [{ url: ogImage, width: 1200, height: 630, alt: seoTitle }]
+                },
+                twitter: {
+                        card: 'summary_large_image',
+                        title: seoTitle,
+                        description,
+                        images: [ogImage]
+                }
+        };
+}
+
+export default async function PostDetailPage({ params }: { params: { slug: string } }) {
+        const post = await getPostBySlugId(params.slug).catch(() => null);
+
+        if (!post || post.status !== 'published') {
+                notFound();
+        }
+
+        const relatedPosts = await getPublicPosts({ page: 1, pageSize: 12 })
+                .then((r) => r.items.filter((p) => p.status === 'published' && p.id !== post.id).slice(0, 3))
+                .catch(() => []);
+
+        const postUrl = ;
+
+        const jsonLd = {
+                '@context': 'https://schema.org',
+                '@type': post.schema_type || 'Article',
+                headline: post.seo_title?.trim() || post.title,
+                description: post.meta_description?.trim() || post.excerpt?.trim() || '',
+                keywords: post.meta_keywords || '',
+                image: post.og_image || post.featured_image || `${SITE_URL}/logo.svg`,
+                datePublished: post.published_at || post.created_at,
+                dateModified: post.updated_at || post.published_at || post.created_at,
+                author: { '@type': 'Organization', name: 'Cinesphere', url: SITE_URL },
+                publisher: {
+                        '@type': 'Organization',
+                        name: 'Cinesphere',
+                        logo: { '@type': 'ImageObject', url: `${SITE_URL}/logo.svg` }
+                },
+                mainEntityOfPage: { '@type': 'WebPage', '@id': postUrl }
+        };
+
+        return (
+                <UserLayout className="bg-gradient-dark">
+                        <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
+                        <main className="pb-16">
+                                {/* Back button */}
+                                <div className="container mx-auto px-4 md:px-6 lg:px-8 pt-20 md:pt-24">
+                                        <Link
+                                                href="/bai-viet"
+                                                className="inline-flex items-center gap-2 text-slate-300 hover:text-white hover:bg-white/10 bg-transparent px-3 py-2 rounded-md transition-colors text-sm"
+                                        >
+                                                <ArrowLeft className="w-4 h-4" />
+                                                Quay lại danh sách bài viết
+                                        </Link>
+                                </div>
+
+                                {/* ── Hero Banner ── */}
+                                <section className="relative mt-4 w-full overflow-hidden" style={{ minHeight: '520px' }}>
+                                        {post.featured_image ? (
+                                                <img
+                                                        src={post.featured_image}
+                                                        alt={post.title}
+                                                        className="absolute inset-0 w-full h-full object-cover object-center"
+                                                />
+                                        ) : (
+                                                <div className="absolute inset-0 bg-gradient-to-b from-slate-800 to-slate-950" />
+                                        )}
+                                        <div className="absolute inset-0 bg-gradient-to-t from-black via-black/60 to-black/20" />
+                                        <div className="absolute inset-0 bg-gradient-to-b from-black/50 via-transparent to-transparent" />
+
+                                        <div
+                                                className="relative z-10 container mx-auto px-4 md:px-6 lg:px-8 flex flex-col justify-end h-full"
+                                                style={{ minHeight: '520px', paddingBottom: '3rem' }}
+                                        >
+                                                <div className="flex items-center gap-3 mb-4">
+                                                        <span className="bg-yellow-400 text-black text-[10px] font-black uppercase tracking-widest px-3 py-1 rounded-sm">
+                                                                Bài Viết
+                                                        </span>
+                                                        <span className="text-slate-300 text-xs uppercase tracking-widest font-semibold">
+                                                                {new Date(post.published_at || post.created_at || Date.now()).toLocaleDateString('vi-VN', {
+                                                                        month: 'long',
+                                                                        year: 'numeric'
+                                                                })}
+                                                        </span>
+                                                </div>
+
+                                                <h1 className="text-white font-black leading-[1.05] tracking-tight text-4xl sm:text-5xl md:text-6xl lg:text-7xl max-w-5xl">
+                                                        {post.title}
+                                                </h1>
+
+                                                {post.excerpt?.trim() && (
+                                                        <p className="mt-5 text-slate-300 italic text-base md:text-lg max-w-3xl leading-relaxed">
+                                                                &ldquo;{post.excerpt.trim()}&rdquo;
+                                                        </p>
+                                                )}
+
+                                                {(post.view_count ?? 0) >= 0 && (
+                                                        <div className="mt-4 inline-flex items-center gap-1.5 text-slate-400 text-xs">
+                                                                <Eye className="w-4 h-4 text-cyan-400" />
+                                                                {(post.view_count ?? 0).toLocaleString('vi-VN')} lượt xem
+                                                        </div>
+                                                )}
+                                        </div>
+                                </section>
+
+                                {/* ── Article + Sidebar ── */}
+                                <div className="container mx-auto px-4 md:px-6 lg:px-8 mt-10">
+                                        <div className="max-w-6xl mx-auto grid grid-cols-1 lg:grid-cols-12 gap-8">
+                                                <article className="lg:col-span-8">
+                                                        <div className="rounded-2xl md:rounded-3xl neon-border bg-white/5 p-6 md:p-10">
+                                                                <div
+                                                                        className="leading-7 text-slate-200 [&_h1]:text-white [&_h1]:font-black [&_h1]:text-3xl [&_h1]:mt-8 [&_h2]:text-white [&_h2]:font-extrabold [&_h2]:text-2xl [&_h2]:mt-8 [&_h3]:text-white [&_h3]:font-bold [&_h3]:text-xl [&_h3]:mt-6 [&_p]:text-slate-200 [&_p]:mb-4 [&_strong]:text-white [&_a]:text-cyan-300 [&_a]:underline [&_ol]:list-decimal [&_ol]:pl-6 [&_ol]:my-4 [&_ul]:list-disc [&_ul]:pl-6 [&_ul]:my-4 [&_li]:text-slate-200 [&_li]:mb-1 [&_img]:rounded-xl [&_img]:my-6 [&_img]:w-full [&_blockquote]:border-l-4 [&_blockquote]:border-cyan-400 [&_blockquote]:pl-4 [&_blockquote]:italic [&_blockquote]:text-slate-300 [&_blockquote]:my-4 [&_figure]:my-6 [&_figure]:text-center [&_figure_img]:rounded-xl [&_figure_img]:w-full [&_figure_img]:my-0 [&_figcaption]:mt-2 [&_figcaption]:text-xs [&_figcaption]:text-slate-400 [&_figcaption]:italic"
+                                                                        dangerouslySetInnerHTML={{
+                                                                                __html: (post.content || '').replace(
+                                                                                        /<img(?![^>]*\balt=)([^>]*)(\/?>>)/gi,
+                                                                                        
+                                                                                )
+                                                                        }}
+                                                                />
+                                                        </div>
+                                                </article>
+
+                                                <PostSidebar postId={post.id} postTitle={post.title} postUrl={postUrl} />
+                                        </div>
+                                </div>
+
+                                {/* ── Related Posts ── */}
+                                {relatedPosts.length > 0 && (
+                                        <section className="container mx-auto px-4 md:px-6 lg:px-8 mt-12">
+                                                <div className="max-w-6xl mx-auto">
+                                                        <h3 className="text-white text-2xl font-black">Bài viết liên quan</h3>
+                                                        <div className="mt-4 grid grid-cols-1 md:grid-cols-3 gap-4">
+                                                                {relatedPosts.map((item) => (
+                                                                        <Link
+                                                                                key={item.id}
+                                                                                href={buildPostHref(item)}
+                                                                                className="rounded-2xl neon-border bg-white/5 hover:bg-white/[0.1] transition-colors p-4"
+                                                                        >
+                                                                                {item.featured_image && (
+                                                                                        <img
+                                                                                                src={item.featured_image}
+                                                                                                alt={item.title}
+                                                                                                className="w-full h-36 object-cover rounded-xl mb-3"
+                                                                                        />
+                                                                                )}
+                                                                                <p className="text-white font-bold line-clamp-2">{item.title}</p>
+                                                                                <p className="text-slate-400 text-xs mt-2">
+                                                                                        {new Date(item.published_at || item.created_at || Date.now()).toLocaleDateString('vi-VN')}
+                                                                                </p>
+                                                                        </Link>
+                                                                ))}
+                                                        </div>
+                                                </div>
+                                        </section>
+                                )}
+                        </main>
+                </UserLayout>
+        );
+}
+File: next-client/src/app/sitemap.ts
+import type { MetadataRoute } from 'next';
+import { getPublicPosts } from '@/lib/api/posts';
+import { buildPostHref } from '@/lib/utils';
+
+export const runtime = 'edge';
+
+import { siteConfig } from '@/config/site';
+
+const SITE_URL = siteConfig.domain;
+
+export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
+  const staticPages: MetadataRoute.Sitemap = [
+    {
+      url: SITE_URL,
+      lastModified: new Date(),
+      changeFrequency: 'daily',
+      priority: 1.0
+    },
+    {
+      url: `${SITE_URL}/bai-viet`,
+      lastModified: new Date(),
+      changeFrequency: 'daily',
+      priority: 0.9
+    },
+    {
+      url: `${SITE_URL}/booking`,
+      lastModified: new Date(),
+      changeFrequency: 'weekly',
+      priority: 0.8
+    }
+  ];
+
+  let postPages: MetadataRoute.Sitemap = [];
+  try {
+    const res = await getPublicPosts({ page: 1, pageSize: 200 });
+    const posts = (res.items ?? []).filter((p) => p.status === 'published');
+    postPages = posts.map((post) => ({
+      url: ,
+      lastModified: new Date(post.updated_at ?? post.published_at ?? post.created_at ?? Date.now()),
+      changeFrequency: 'weekly' as const,
+      priority: post.is_featured ? 0.85 : 0.7
+    }));
+  } catch {
+    // silently fail - không có posts thì chỉ trả về static pages
+  }
+
+  return [...staticPages, ...postPages];
+}
+File: next-client/src/app/layout.tsx
+import type { Metadata } from 'next';
+import './globals.css';
+import Providers from '@/app/providers';
+import NextTopLoader from 'nextjs-toploader';
+
+import { siteConfig } from '@/config/site';
+
+const SITE_URL = siteConfig.domain;
+
+export const metadata: Metadata = {
+  title: {
+    default: 'Cinesphere | Trải Nghiệm Điện Ảnh Đỉnh Cao',
+    template: '%s | Cinesphere'
+  },
+  description:
+    'Đặt vé xem phim trực tuyến tại Cinesphere. Khám phá các siêu phẩm bom tấn với công nghệ chiếu rạp hiện đại nhất.',
+  metadataBase: new URL(SITE_URL),
+  icons: {
+    icon: '/icon.svg',
+    apple: '/logo.svg'
+  },
+  keywords: [
+    'đặt vé xem phim',
+    'rạp chiếu phim',
+    'cinesphere',
+    'vé xem phim trực tuyến',
+    'phim mới 2025',
+    'phim bom tấn',
+    'đặt vé nhanh'
+  ],
+  alternates: { canonical: '/' },
+  openGraph: {
+    siteName: 'Cinesphere',
+    type: 'website',
+    locale: 'vi_VN',
+    url: SITE_URL,
+    images: [
+      {
+        url: '/og-default.jpg',
+        width: 1200,
+        height: 630,
+        alt: 'Cinesphere - Trải Nghiệm Điện Ảnh Đỉnh Cao'
+      }
+    ]
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title: 'Cinesphere | Trải Nghiệm Điện Ảnh Đỉnh Cao',
+    description:
+      'Đặt vé xem phim trực tuyến tại Cinesphere. Khám phá các siêu phẩm bom tấn với công nghệ chiếu rạp hiện đại nhất.',
+    images: ['/og-default.jpg']
+  },
+  robots: {
+    index: true,
+    follow: true,
+    googleBot: {
+      index: true,
+      follow: true,
+      'max-video-preview': -1,
+      'max-image-preview': 'large',
+      'max-snippet': -1
+    }
+  }
+};
+
+const organizationSchema = {
+  '@context': 'https://schema.org',
+  '@type': 'Organization',
+  name: 'Cinesphere',
+  url: SITE_URL,
+  logo: `${SITE_URL}/logo.svg`,
+  contactPoint: {
+    '@type': 'ContactPoint',
+    telephone: '+84-036-643-1179',
+    contactType: 'customer service',
+    availableLanguage: 'Vietnamese'
+  }
+};
+
+const websiteSchema = {
+  '@context': 'https://schema.org',
+  '@type': 'WebSite',
+  name: 'Cinesphere',
+  url: SITE_URL,
+  potentialAction: {
+    '@type': 'SearchAction',
+    target: {
+      '@type': 'EntryPoint',
+      urlTemplate: `${SITE_URL}/bai-viet?q={search_term_string}`
+    },
+    'query-input': 'required name=search_term_string'
+  }
+};
+
+export default function RootLayout({ children }: { children: React.ReactNode }) {
+  return (
+    <html lang="vi">
+      <body className="bg-[#050915] text-white">
+        <NextTopLoader color="#22d3ee" height={3} showSpinner={false} />
+        <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(organizationSchema) }} />
+        <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(websiteSchema) }} />
+        <Providers>{children}</Providers>
+      </body>
+    </html>
+  );
+}
+File: next-client/next.config.mjs
+/** @type {import('next').NextConfig} */
+const nextConfig = {
+  images: {
+    // Cloudflare Pages không hỗ trợ Next.js Image Optimization
+    // Dùng <img> thuần hoặc set unoptimized
+    unoptimized: true,
+    remotePatterns: [
+      { protocol: 'https', hostname: 'res.cloudinary.com' },
+      { protocol: 'https', hostname: 'images.unsplash.com' },
+      { protocol: 'https', hostname: 'cinesphere.com.vn' }
+    ]
+  },
+  async rewrites() {
+    return [
+      {
+        source: '/api/:path*',
+        destination: 'http://localhost:8787/api/:path*'
+      }
+    ];
+  }
+};
+
+export default nextConfig;
+File: public/robots.txt
+User-agent: Googlebot
+Allow: /
+
+User-agent: Bingbot
+Allow: /
+
+User-agent: Twitterbot
+Allow: /
+
+User-agent: facebookexternalhit
+Allow: /
+
+User-agent: *
+Allow: /
+Disallow: /admin
+Disallow: /api/
+
+Sitemap: https://cinesphere.com.vn/sitemap.xml
+File: next-client/public/robots.txt
+User-agent: *
+Allow: /
+Allow: /bai-viet
+Allow: /booking
+
+Disallow: /account
+Disallow: /checkout
+Disallow: /qr-payment
+Disallow: /success-payment
+Disallow: /reset-password
+Disallow: /maintenance
+Disallow: /api/
+
+Sitemap: https://cinesphere.com.vn/sitemap.xml
+(Optional) Worker sitemap snippet found: worker/src/sitemap_handler_snippet.ts
+/*  — GET /sitemap.xml handler (snippet) */
+app.get('/sitemap.xml', async (c) => {
+        try {
+                const baseUrl = (c.env.VITE_CLIENT_BASE_URL || 'https://cinesphere.com.vn').replace(/\/$/, '');
+
+                const db = drizzle(c.env.cinema_db, { schema });
+
+                const r = await listPostsImpl(db, { posts: schema.posts }, { page: 1, pageSize: 1000, status: 'published' });
+
+                const posts = r.items as Array<{ id: number; slug?: string | null; updated_at?: string | null }>;
+
+                const now = new Date().toISOString().split('T')[0];
+
+                const staticPages = [
+                        { url: '/', priority: '1.0', changefreq: 'weekly' },
+
+                        { url: '/bai-viet', priority: '0.9', changefreq: 'daily' }
+                ];
+
+                const urlBlocks = [
+                        ...staticPages.map(
+                                (p) =>
+                                        
+                        ),
+
+                        ...posts.map((p) => {
+                                const slug = p.slug ?  : String(p.id);
+
+                                const lastmod = p.updated_at ? String(p.updated_at).split('T')[0] : now;
+
+                                return ;
+                        })
+                ];
+
+                const xml = ;
+
+                return new Response(xml, {
+                        headers: {
+                                'Content-Type': 'application/xml; charset=utf-8',
+
+                                'Cache-Control': 'public, max-age=3600'
+                        }
+                });
+        } catch {
+                return new Response('Error generating sitemap', { status: 500 });
+        }
+});
+Ghi chú: snippet Worker chứa nhiều placeholder — nếu bạn chọn Worker sitemap làm canonical, cần hoàn thiện mapping URL và XML string generation.
+
+7) Hành động tiếp theo (tôi có thể làm luôn nếu bạn đồng ý)
+Tôi có thể áp dụng các fix code (create patches) trong repo cho các file đã liệt kê: 1) sửa placeholders trong app/bai-viet/[slug]/page.tsx, 2) sửa app/sitemap.ts, 3) hoàn thiện dangerouslySetInnerHTML replacement để đảm bảo alt cho image. Muốn tôi tạo patch và run tests/TS checks không?
+Tôi đã dán toàn bộ các file yêu cầu ở trên. Nếu bạn muốn, tôi sẽ tiếp tục và tạo các patch apply_patch để tự động sửa các chỗ thiếu (High priority fixes). Bạn muốn bắt đầu từ fix nào trước? (gợi ý: fix generateMetadata placeholders cho /bai-viet/[slug] là ưu tiên nhất).

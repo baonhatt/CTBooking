@@ -3,7 +3,7 @@ import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { ArrowLeft, Eye } from 'lucide-react';
 import UserLayout from '@/layouts/UserLayout';
-import { getPostBySlugId, getPublicPosts } from '@/lib/api/posts';
+import { getPostBySlugId, getPublicPosts, type PostItem } from '@/lib/api/posts';
 import { buildPostHref } from '@/lib/utils';
 import PostSidebar from './PostSidebar';
 
@@ -13,10 +13,22 @@ const SITE_URL = siteConfig.domain;
 
 export async function generateStaticParams() {
         try {
-                const posts = await getPublicPosts({ page: 1, pageSize: 100 });
-                return posts.items
-                        .filter((p) => p.status === 'published')
-                        .map((post) => ({ slug: (post as any).slug_id }));
+                const pageSize = 100;
+                let page = 1;
+                let posts: Array<PostItem> = [];
+                let total = 0;
+
+                do {
+                        const res = await getPublicPosts({ page, pageSize });
+                        const fetchedItems = res.items ?? [];
+                        const filtered = fetchedItems.filter((p) => p.status === 'published');
+                        posts = [...posts, ...filtered];
+                        total = res.total;
+                        page += 1;
+                        if (fetchedItems.length < pageSize) break;
+                } while (posts.length < total);
+
+                return posts.map((post) => ({ slug: (post as any).slug_id }));
         } catch {
                 return [];
         }
@@ -49,8 +61,8 @@ export async function generateMetadata({ params }: { params: { slug: string } })
                         description,
                         type: 'article',
                         url: canonicalUrl,
-                        publishedTime: post.published_at,
-                        modifiedTime: post.updated_at,
+                        publishedTime: post.published_at ? new Date(post.published_at).toISOString() : undefined,
+                        modifiedTime: post.updated_at ? new Date(post.updated_at).toISOString() : undefined,
                         locale: 'vi_VN',
                         siteName: 'Cinesphere',
                         images: [{ url: ogImage, width: 1200, height: 630, alt: seoTitle }]
@@ -65,15 +77,18 @@ export async function generateMetadata({ params }: { params: { slug: string } })
 }
 
 export default async function PostDetailPage({ params }: { params: { slug: string } }) {
-        const post = await getPostBySlugId(params.slug).catch(() => null);
+        const [post, allPostsRes] = await Promise.all([
+                getPostBySlugId(params.slug).catch(() => null),
+                getPublicPosts({ page: 1, pageSize: 13 }).catch(() => null),
+        ]);
 
         if (!post || post.status !== 'published') {
                 notFound();
         }
 
-        const relatedPosts = await getPublicPosts({ page: 1, pageSize: 12 })
-                .then((r) => r.items.filter((p) => p.status === 'published' && p.id !== post.id).slice(0, 3))
-                .catch(() => []);
+        const relatedPosts = (allPostsRes?.items ?? [])
+                .filter((p) => p.status === 'published' && p.id !== post.id)
+                .slice(0, 3);
 
         const postUrl = `${SITE_URL}${buildPostHref(post)}`;
 
@@ -84,15 +99,31 @@ export default async function PostDetailPage({ params }: { params: { slug: strin
                 description: post.meta_description?.trim() || post.excerpt?.trim() || '',
                 keywords: post.meta_keywords || '',
                 image: post.og_image || post.featured_image || `${SITE_URL}/logo.svg`,
-                datePublished: post.published_at || post.created_at,
-                dateModified: post.updated_at || post.published_at || post.created_at,
+                datePublished: post.published_at
+                        ? new Date(post.published_at).toISOString()
+                        : post.created_at
+                                ? new Date(post.created_at).toISOString()
+                                : undefined,
+                dateModified: post.updated_at
+                        ? new Date(post.updated_at).toISOString()
+                        : post.published_at
+                                ? new Date(post.published_at).toISOString()
+                                : undefined,
                 author: { '@type': 'Organization', name: 'Cinesphere', url: SITE_URL },
                 publisher: {
                         '@type': 'Organization',
                         name: 'Cinesphere',
                         logo: { '@type': 'ImageObject', url: `${SITE_URL}/logo.svg` }
                 },
-                mainEntityOfPage: { '@type': 'WebPage', '@id': postUrl }
+                mainEntityOfPage: { '@type': 'WebPage', '@id': postUrl },
+                breadcrumb: {
+                        '@type': 'BreadcrumbList',
+                        itemListElement: [
+                                { '@type': 'ListItem', position: 1, name: 'Trang chủ', item: SITE_URL },
+                                { '@type': 'ListItem', position: 2, name: 'Tin tức', item: `${SITE_URL}/bai-viet` },
+                                { '@type': 'ListItem', position: 3, name: post.title, item: postUrl },
+                        ],
+                },
         };
 
         return (
