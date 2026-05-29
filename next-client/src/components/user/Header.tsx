@@ -7,6 +7,12 @@ import { useRouter, usePathname, useSearchParams } from 'next/navigation';
 import { buildUrl, request } from '@/lib/api/http';
 import { useBranch } from '@/hooks/useBranch';
 
+interface AdminSettingsResponse {
+        settings: {
+                hidden_tabs?: string[];
+        };
+}
+
 // Components
 
 // Assets
@@ -167,7 +173,7 @@ export default function Header({
                 window.addEventListener('admin_sidebar_update', applyFromStorage);
 
                 if (isProd) {
-                        request('/api/admin/settings')
+                        request<AdminSettingsResponse>('/api/admin/settings')
                                 .then((data) => {
                                         if (data && data.settings) {
                                                 localStorage.setItem('admin_sidebar_hidden_tabs', JSON.stringify(data.settings));
