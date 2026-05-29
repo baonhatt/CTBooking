@@ -6,7 +6,7 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "build:cf": "npx @cloudflare/next-on-pages",
+    "build:cf": "node scripts/inject-edge-runtime.mjs && npx @cloudflare/next-on-pages",
     "preview": "npx wrangler pages dev",
     "pages:deploy:preview": "npm run build:cf && npx wrangler pages deploy --env preview",
     "pages:deploy:prod": "npm run build:cf && npx wrangler pages deploy --env production",

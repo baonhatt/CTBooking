@@ -7,8 +7,6 @@ import { getPostBySlugId, getPublicPosts } from '@/lib/api/posts';
 import { buildPostHref } from '@/lib/utils';
 import PostSidebar from './PostSidebar';
 
-export const revalidate = 3600; // ISR - tốt nhất
-
 import { siteConfig } from '@/config/site';
 
 const SITE_URL = siteConfig.domain;

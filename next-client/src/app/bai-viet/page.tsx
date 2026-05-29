@@ -38,7 +38,6 @@ export const metadata: Metadata = {
   }
 };
 
-export const revalidate = 60;
 
 // ⚡ Server Component – HTML đầy đủ tại Edge, Google index ngay lập tức
 export default async function PostsPage() {
