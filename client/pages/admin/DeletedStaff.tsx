@@ -29,6 +29,7 @@ interface Staff {
 }
 
 export default function DeletedStaffPage() {
+        const [activeTab, setActiveTab] = useState('deleted-staff');
         const [staff, setStaff] = useState<Staff[]>([]);
         const [page, setPage] = useState(1);
         const pageSize = 10;
@@ -122,8 +123,8 @@ export default function DeletedStaffPage() {
 
         return (
                 <AdminLayout
-                        active={'deleted-staff' as any}
-                        setActive={(() => { }) as any}
+                        active={activeTab as any}
+                        setActive={setActiveTab as any}
                         adminEmailState={localStorage.getItem('adminEmail') || 'admin@email.com'}
                         handleLogout={() => {
                                 localStorage.removeItem('adminToken');

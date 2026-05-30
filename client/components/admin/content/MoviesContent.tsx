@@ -12,7 +12,7 @@ import {
         PaginationNext,
         PaginationPrevious
 } from '@/components/ui/pagination';
-import { Dialog, DialogContent } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
 import {
         Eye,
         Pencil,
@@ -157,8 +157,16 @@ export default function MoviesContent({
 
         return (
                 <div className="space-y-6 font-sans">
+                        {/* PAGE HEADER */}
+                        <div className="flex items-center justify-between">
+                                <div>
+                                        <h1 className="text-xl font-bold text-slate-800">Quản lý phim</h1>
+                                        <p className="text-sm text-slate-400 mt-0.5">Tổng cộng {moviesLength} phim trong hệ thống</p>
+                                </div>
+                        </div>
+
                         {/* TOOLBAR */}
-                        <div className="flex flex-col xl:flex-row justify-between items-start xl:items-center gap-4 bg-white p-4 rounded-2xl border shadow-sm">
+                        <div className="flex flex-col xl:flex-row justify-between items-start xl:items-center gap-4 bg-white p-4 rounded-2xl border border-gray-200 shadow-sm">
                                 <div className="flex flex-1 w-full gap-3">
                                         <div className="relative flex-1 max-w-md">
                                                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 w-4 h-4" />
@@ -416,7 +424,7 @@ export default function MoviesContent({
                                                                                                         <Button
                                                                                                                 variant="outline"
                                                                                                                 size="sm"
-                                                                                                                className="h-8 rounded-lg hover:bg-orange-50 text-orange-600"
+                                                                                                                className="h-8 rounded-lg hover:bg-yellow-50 text-yellow-600"
                                                                                                                 onClick={() => onEdit('movie', movie)}
                                                                                                                 title="Chỉnh sửa"
                                                                                                         >
@@ -489,6 +497,7 @@ export default function MoviesContent({
                         {/* MODAL CHI TIẾT */}
                         <Dialog open={isDetailsOpen} onOpenChange={setIsDetailsOpen}>
                                 <DialogContent className="max-w-[700px] rounded-xl p-0 overflow-hidden border border-gray-200 shadow-xl bg-white font-sans [&>button]:hidden">
+                                        <DialogTitle className="sr-only">Chi tiết phim</DialogTitle>
                                         {isLoadingDetails ? (
                                                 <div className="py-20 flex flex-col items-center gap-3">
                                                         <div className="w-8 h-8 border-2 border-blue-600 border-t-transparent rounded-full animate-spin" />
@@ -499,11 +508,12 @@ export default function MoviesContent({
                                                         {/* HEADER: White & Professional */}
                                                         <div className="bg-white px-6 py-4 flex items-center justify-between border-b">
                                                                 <div className="flex items-center gap-4">
-                                                                        <div className="bg-gray-100 p-1 rounded border border-gray-200 shadow-inner">
+                                                                        <div className="bg-gray-100 p-1 rounded border border-gray-200">
                                                                                 <img
                                                                                         src={optimizeCloudinaryUrl(movieDetails.cover_image, 400)}
                                                                                         className="w-10 h-14 object-cover rounded"
                                                                                         alt=""
+                                                                                        onError={(e) => { e.currentTarget.src = 'https://placehold.co/80x112?text=No+Image'; }}
                                                                                 />
                                                                         </div>
                                                                         <div className="flex-1">
@@ -536,17 +546,24 @@ export default function MoviesContent({
                                                                                                 <Pencil className="h-4 w-4" />
                                                                                         </Button>
                                                                                 </div>
-                                                                                {/* THỂ LOẠI: Hiển thị rõ ràng dạng Tag */}
+                                                                                {/* THỂ LOẠI: Hiển thị rõ ràng dạng Tag - max 4 tags */}
                                                                                 <div className="flex flex-wrap gap-1.5 mt-2.5">
-                                                                                        {Array.isArray(movieDetails.genres) ? (
-                                                                                                movieDetails.genres.map((genre: string) => (
-                                                                                                        <span
-                                                                                                                key={genre}
-                                                                                                                className="text-[9px] font-medium px-2 py-0.5 bg-gray-100 text-gray-600 rounded border border-gray-200"
-                                                                                                        >
-                                                                                                                {genre}
-                                                                                                        </span>
-                                                                                                ))
+                                                                                        {Array.isArray(movieDetails.genres) && movieDetails.genres.length > 0 ? (
+                                                                                                <>
+                                                                                                        {movieDetails.genres.slice(0, 4).map((genre: string) => (
+                                                                                                                <span
+                                                                                                                        key={genre}
+                                                                                                                        className="text-[9px] font-medium px-2 py-0.5 bg-gray-100 text-gray-600 rounded border border-gray-200"
+                                                                                                                >
+                                                                                                                        {genre}
+                                                                                                                </span>
+                                                                                                        ))}
+                                                                                                        {movieDetails.genres.length > 4 && (
+                                                                                                                <span className="text-[9px] font-medium px-2 py-0.5 bg-gray-200 text-gray-500 rounded border border-gray-300">
+                                                                                                                        +{movieDetails.genres.length - 4} more
+                                                                                                                </span>
+                                                                                                        )}
+                                                                                                </>
                                                                                         ) : (
                                                                                                 <span className="text-[9px] text-gray-500 italic">Chưa có thể loại</span>
                                                                                         )}
@@ -566,36 +583,49 @@ export default function MoviesContent({
 
                                                         {/* BODY SECTION */}
                                                         <div className="p-6 space-y-6">
-                                                                {/* ROW 1: Quick Stats & Metadata */}
-                                                                <div className="grid grid-cols-12 gap-6">
-                                                                        {/* LEFT: Stats & Ticket */}
-                                                                        <div className="col-span-8 space-y-6">
-                                                                                {/* Dashboard Stats */}
-                                                                                <div className="grid grid-cols-4 gap-4">
-                                                                                        {[
-                                                                                                {
-                                                                                                        label: 'Đánh giá',
-                                                                                                        val: `${movieDetails.rating}/10`,
-                                                                                                        icon: <Star size={12} />,
-                                                                                                        color: 'text-blue-600'
-                                                                                                },
-                                                                                                {
-                                                                                                        label: 'Trạng thái',
-                                                                                                        val: movieDetails.is_active === true ? 'Đang chiếu' : 'Đã ẩn',
-                                                                                                        color: movieDetails.is_active === true ? 'text-emerald-600' : 'text-slate-400'
-                                                                                                }
-                                                                                        ].map((stat, i) => (
-                                                                                                <div key={i} className="bg-white p-3 rounded-xl border border-slate-200 shadow-sm">
-                                                                                                        <div className="flex items-center gap-1.5 mb-1">
-                                                                                                                <span className="text-slate-400">{stat.icon}</span>
-                                                                                                                <p className="text-[9px] text-slate-400 uppercase font-black">{stat.label}</p>
-                                                                                                        </div>
-                                                                                                        <p className={`text-lg font-bold ${stat.color || 'text-slate-700'}`}>{stat.val}</p>
-                                                                                                </div>
-                                                                                        ))}
+                                                                {/* Stats Row - 4 cards flex */}
+                                                                <div className="flex gap-3 flex-wrap">
+                                                                        {[
+                                                                                {
+                                                                                        label: 'Đánh giá',
+                                                                                        val: `${movieDetails.rating}/10`,
+                                                                                        icon: <Star size={12} />,
+                                                                                        color: 'text-blue-600'
+                                                                                },
+                                                                                {
+                                                                                        label: 'Trạng thái',
+                                                                                        val: movieDetails.is_active === true ? 'Đang chiếu' : 'Đã ẩn',
+                                                                                        color: movieDetails.is_active === true ? 'text-emerald-600' : 'text-slate-400'
+                                                                                },
+                                                                                {
+                                                                                        label: 'Thời lượng',
+                                                                                        val: `${movieDetails.duration_min} phút`,
+                                                                                        icon: <Clock size={12} />,
+                                                                                        color: 'text-slate-700'
+                                                                                },
+                                                                                {
+                                                                                        label: 'Ngày phát hành',
+                                                                                        val: movieDetails.release_date
+                                                                                                ? format(new Date(movieDetails.release_date), 'dd/MM/yyyy')
+                                                                                                : '-',
+                                                                                        icon: <Calendar size={12} />,
+                                                                                        color: 'text-slate-700'
+                                                                                }
+                                                                        ].map((stat, i) => (
+                                                                                <div key={i} className="flex-1 min-w-[120px] bg-white p-3 rounded-xl border border-slate-200 shadow-sm">
+                                                                                        <div className="flex items-center gap-1.5 mb-1">
+                                                                                                <span className="text-slate-400">{stat.icon}</span>
+                                                                                                <p className="text-[9px] text-slate-400 uppercase font-black">{stat.label}</p>
+                                                                                        </div>
+                                                                                        <p className={`text-lg font-bold ${stat.color || 'text-slate-700'}`}>{stat.val}</p>
                                                                                 </div>
+                                                                        ))}
+                                                                </div>
 
-                                                                                {/* CẤU HÌNH VÉ (TICKET CONFIG) */}
+                                                                {/* Single row: Ticket packages | Metadata */}
+                                                                <div className="flex gap-6">
+                                                                        {/* LEFT: Ticket packages */}
+                                                                        <div className="flex-1">
                                                                                 <section className="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-sm">
                                                                                         <div className="bg-slate-50 px-4 py-2.5 border-b border-slate-200 flex items-center justify-between">
                                                                                                 <h3 className="text-[11px] font-bold text-slate-600 uppercase flex items-center gap-2 tracking-tight">
@@ -642,13 +672,13 @@ export default function MoviesContent({
                                                                                 </section>
                                                                         </div>
 
-                                                                        {/* RIGHT: Metadata */}
-                                                                        <div className="col-span-4">
-                                                                                <div className="bg-white rounded-xl p-5 border border-slate-200 shadow-sm space-y-4 h-full">
-                                                                                        <h3 className="text-[11px] font-bold text-slate-400 uppercase border-b pb-3 tracking-widest">
+                                                                        {/* RIGHT: Metadata - fixed width */}
+                                                                        <div className="w-[260px]">
+                                                                                <div className="bg-white rounded-xl p-5 border border-slate-200 shadow-sm space-y-3 h-full">
+                                                                                        <h3 className="text-[11px] font-bold text-slate-400 uppercase tracking-widest">
                                                                                                 Metadata
                                                                                         </h3>
-                                                                                        <div className="space-y-3.5">
+                                                                                        <div className="space-y-3">
                                                                                                 <div className="flex justify-between text-xs">
                                                                                                         <span className="text-slate-400">Thời lượng:</span>
                                                                                                         <span className="font-bold text-slate-700">{movieDetails.duration_min} phút</span>
@@ -661,9 +691,6 @@ export default function MoviesContent({
                                                                                                                         : '-'}
                                                                                                         </span>
                                                                                                 </div>
-                                                                                        </div>
-
-                                                                                        <div className="pt-4 border-t border-slate-100 space-y-3">
                                                                                                 <div className="flex items-center justify-between text-[11px]">
                                                                                                         <span className="text-slate-400 flex items-center gap-1.5">
                                                                                                                 <Calendar size={12} /> Ngày tạo:
@@ -689,34 +716,17 @@ export default function MoviesContent({
                                                                         </div>
                                                                 </div>
 
-                                                                {/* ROW 2: Description & Admin Notes */}
-                                                                <div className="grid grid-cols-12 gap-6 items-stretch">
-                                                                        <div className="col-span-8">
-                                                                                <section className="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-sm h-full">
-                                                                                        <div className="bg-slate-50 px-4 py-2 border-b border-slate-200">
-                                                                                                <h3 className="text-[11px] font-bold text-slate-500 uppercase tracking-widest flex items-center gap-2">
-                                                                                                        <FileText size={14} className="text-blue-500" /> Mô tả hệ thống
-                                                                                                </h3>
-                                                                                        </div>
-                                                                                        <div className="p-5 text-[13px] text-slate-600 leading-relaxed min-h-[140px]">
-                                                                                                {movieDetails.description || 'Chưa có mô tả nội dung cho phim này.'}
-                                                                                        </div>
-                                                                                </section>
+                                                                {/* Description - full width at bottom */}
+                                                                <section className="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-sm">
+                                                                        <div className="bg-slate-50 px-4 py-2 border-b border-slate-200">
+                                                                                <h3 className="text-[11px] font-bold text-slate-500 uppercase tracking-widest flex items-center gap-2">
+                                                                                        <FileText size={14} className="text-blue-500" /> Mô tả hệ thống
+                                                                                </h3>
                                                                         </div>
-
-                                                                        <div className="col-span-4 self-start">
-                                                                                {/* GHI CHÚ QUẢN TRỊ - Màu Amber trung tính */}
-                                                                                <div className="bg-amber-50 border border-amber-100 rounded-xl p-4 shadow-sm">
-                                                                                        <div className="flex items-center gap-2 mb-3 text-amber-700 font-bold uppercase text-[10px]">
-                                                                                                <AlertCircle size={14} /> Ghi chú quản trị
-                                                                                        </div>
-                                                                                        <p className="text-[11px] text-amber-800 leading-snug">
-                                                                                                Phim đang được đặt ở trạng thái <strong>Ưu tiên Slider</strong>. Hệ thống sẽ tự động cập nhật
-                                                                                                Cache sau 5 phút.
-                                                                                        </p>
-                                                                                </div>
+                                                                        <div className="p-5 text-[13px] text-slate-600 leading-relaxed min-h-[80px] line-clamp-6">
+                                                                                {movieDetails.description || 'Chưa có mô tả nội dung cho phim này.'}
                                                                         </div>
-                                                                </div>
+                                                                </section>
                                                         </div>
                                                 </div>
                                         ) : null}

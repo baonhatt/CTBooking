@@ -8,6 +8,7 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { toast } from 'sonner';
 import { Skeleton } from '@/components/ui/skeleton';
+import { X, Search, RefreshCw } from 'lucide-react';
 import { request } from '@/lib/api/http';
 import AdminLayout from '@/admin/layouts/AdminLayout';
 import { useStaffStore } from '@/store/staffStore';
@@ -32,6 +33,8 @@ export default function RolesPage() {
         const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
         const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
         const [roleToDelete, setRoleToDelete] = useState<Role | null>(null);
+        const [searchQuery, setSearchQuery] = useState('');
+        const [showSystemOnly, setShowSystemOnly] = useState(false);
 
         // Form state for create
         const [formData, setFormData] = useState({
@@ -42,9 +45,13 @@ export default function RolesPage() {
 
         // Fetch roles
         const { data: rolesData, isLoading: rolesLoading } = useQuery({
-                queryKey: ['roles'],
+                queryKey: ['roles', searchQuery, showSystemOnly],
                 queryFn: async () => {
-                        return request('/api/admin/roles?pageSize=100');
+                        const params = new URLSearchParams();
+                        params.set('pageSize', '100');
+                        if (searchQuery) params.set('q', searchQuery);
+                        if (showSystemOnly) params.set('isSystem', 'true');
+                        return request(`/api/admin/roles?${params.toString()}`);
                 }
         });
 
@@ -171,8 +178,34 @@ export default function RolesPage() {
                         <div className="p-6">
                                 <Card>
                                         <CardHeader>
-                                                <div className="flex justify-between items-center">
-                                                        <CardTitle>Quản lý vai trò</CardTitle>
+                                                <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+                                                        <div className="flex flex-col gap-1">
+                                                                <CardTitle>Quản lý vai trò</CardTitle>
+                                                                <p className="text-xs text-slate-500">Tổng cộng {roles.length} vai trò trong hệ thống</p>
+                                                        </div>
+                                                        <div className="flex flex-1 w-full md:max-w-md gap-2 ml-auto">
+                                                                <div className="relative flex-1">
+                                                                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 w-4 h-4" />
+                                                                        <input
+                                                                                className="w-full pl-10 pr-4 py-2 bg-slate-50 border-transparent focus:bg-white focus:ring-2 focus:ring-blue-500 rounded-xl transition-all outline-none text-sm border"
+                                                                                value={searchQuery}
+                                                                                onChange={(e) => setSearchQuery(e.target.value)}
+                                                                                placeholder="Tìm theo tên vai trò..."
+                                                                        />
+                                                                </div>
+                                                                <Button
+                                                                        variant="outline"
+                                                                        size="icon"
+                                                                        onClick={() => {
+                                                                                setSearchQuery('');
+                                                                                setShowSystemOnly(false);
+                                                                        }}
+                                                                        className="h-10 w-10"
+                                                                        title="Làm mới"
+                                                                >
+                                                                        <RefreshCw className="h-4 w-4" />
+                                                                </Button>
+                                                        </div>
                                                         <div className="flex gap-2">
                                                                 <Button variant="outline" onClick={handleSeed} disabled={seedMutation.isPending}>
                                                                         {seedMutation.isPending ? 'Đang seed...' : 'Seed vai trò mặc định'}
@@ -182,6 +215,7 @@ export default function RolesPage() {
                                                                                 resetForm();
                                                                                 setIsCreateDialogOpen(true);
                                                                         }}
+                                                                        className="bg-blue-600 hover:bg-blue-700"
                                                                 >
                                                                         Tạo vai trò mới
                                                                 </Button>
@@ -217,8 +251,8 @@ export default function RolesPage() {
                                                                                                 <div className="flex justify-end items-center gap-2 w-[120px] ml-auto">
                                                                                                         <Button
                                                                                                                 variant="outline"
-                                                                                                                size="sm"
-                                                                                                                className="h-8"
+                                                                                                                size="icon"
+                                                                                                                className="h-8 w-8 text-yellow-600 border-yellow-200 hover:bg-yellow-50 flex-shrink-0"
                                                                                                                 onClick={() => navigate(`/roles/${role.id}`)}
                                                                                                         >
                                                                                                                 <Pencil className="h-3.5 w-3.5" />
@@ -227,7 +261,7 @@ export default function RolesPage() {
                                                                                                                 <Button
                                                                                                                         variant="outline"
                                                                                                                         size="icon"
-                                                                                                                        className="h-8 w-8 text-red-500 border-red-200 hover:bg-red-50 flex-shrink-0"
+                                                                                                                        className="h-8 w-8 text-red-600 border-red-200 hover:bg-red-50 flex-shrink-0"
                                                                                                                         onClick={() => {
                                                                                                                                 if ((role.staffCount || 0) > 0) {
                                                                                                                                         toast.error(`Không thể xóa vai trò này vì đã được giao cho ${role.staffCount} nhân viên`);
@@ -254,9 +288,18 @@ export default function RolesPage() {
 
                                 {/* Create Dialog */}
                                 <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
-                                        <DialogContent>
-                                                <DialogHeader>
-                                                        <DialogTitle>Tạo vai trò mới</DialogTitle>
+                                        <DialogContent className="[&>button]:hidden">
+                                                <DialogHeader className="flex flex-row items-center gap-3 space-y-0 pb-4 border-b">
+                                                        <DialogTitle className="text-lg font-bold text-slate-800">Tạo vai trò mới</DialogTitle>
+                                                        <div className="flex-1" />
+                                                        <Button
+                                                                variant="ghost"
+                                                                size="icon"
+                                                                onClick={() => setIsCreateDialogOpen(false)}
+                                                                className="h-8 w-8 rounded-full hover:bg-slate-100 text-slate-400 transition-colors"
+                                                        >
+                                                                <X className="w-5 h-5" />
+                                                        </Button>
                                                 </DialogHeader>
                                                 <div className="space-y-4 py-4">
                                                         <div>
@@ -285,10 +328,10 @@ export default function RolesPage() {
                                                         </div>
                                                 </div>
                                                 <DialogFooter>
-                                                        <Button variant="outline" onClick={() => setIsCreateDialogOpen(false)}>
+                                                        <Button variant="ghost" onClick={() => setIsCreateDialogOpen(false)} className="text-slate-500 hover:bg-slate-100">
                                                                 Hủy
                                                         </Button>
-                                                        <Button onClick={handleCreate} disabled={createMutation.isPending}>
+                                                        <Button onClick={handleCreate} disabled={createMutation.isPending} className="bg-blue-600 hover:bg-blue-700 min-w-[140px] rounded-xl shadow-lg shadow-blue-500/20 transition-all active:scale-95">
                                                                 {createMutation.isPending ? 'Đang tạo...' : 'Tạo'}
                                                         </Button>
                                                 </DialogFooter>
@@ -297,21 +340,30 @@ export default function RolesPage() {
 
                                 {/* Delete Dialog */}
                                 <Dialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
-                                        <DialogContent>
-                                                <DialogHeader>
-                                                        <DialogTitle>Xác nhận xóa</DialogTitle>
+                                        <DialogContent className="[&>button]:hidden">
+                                                <DialogHeader className="flex flex-row items-center gap-3 space-y-0 pb-4 border-b">
+                                                        <DialogTitle className="text-lg font-bold text-slate-800">Xác nhận xóa</DialogTitle>
+                                                        <div className="flex-1" />
+                                                        <Button
+                                                                variant="ghost"
+                                                                size="icon"
+                                                                onClick={() => setIsDeleteDialogOpen(false)}
+                                                                className="h-8 w-8 rounded-full hover:bg-slate-100 text-slate-400 transition-colors"
+                                                        >
+                                                                <X className="w-5 h-5" />
+                                                        </Button>
                                                 </DialogHeader>
                                                 <p className="py-4">
                                                         Bạn có chắc chắn muốn xóa vai trò "{roleToDelete?.name}"? Hành động này không thể hoàn tác.
                                                 </p>
                                                 <DialogFooter>
-                                                        <Button variant="outline" onClick={() => setIsDeleteDialogOpen(false)}>
+                                                        <Button variant="ghost" onClick={() => setIsDeleteDialogOpen(false)} className="text-slate-500 hover:bg-slate-100">
                                                                 Hủy
                                                         </Button>
                                                         <Button
                                                                 onClick={handleDelete}
                                                                 disabled={deleteMutation.isPending}
-                                                                className="bg-red-600 hover:bg-red-700"
+                                                                className="bg-red-600 hover:bg-red-700 min-w-[140px] rounded-xl shadow-lg shadow-red-500/20 transition-all active:scale-95"
                                                         >
                                                                 {deleteMutation.isPending ? 'Đang xóa...' : 'Xóa'}
                                                         </Button>

@@ -14,7 +14,7 @@ import {
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
 import { getUserById } from '@/lib/api';
-import { Search, RefreshCw, Eye, Pencil, TrendingUp, User, X } from 'lucide-react';
+import { Search, RefreshCw, Eye, TrendingUp, User, X } from 'lucide-react';
 
 interface Props {
         data: any[];
@@ -83,12 +83,17 @@ export default function UsersContent({
         };
         return (
                 <div className="space-y-6">
-                        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-white p-4 rounded-2xl border shadow-sm">
-                                <div className="flex flex-col gap-1">
-                                        <h3 className="text-lg font-bold text-slate-900">Quản lý người dùng</h3>
-                                        <p className="text-xs text-slate-500">Tổng cộng {usersLength} người dùng trong hệ thống</p>
+                        {/* PAGE HEADER */}
+                        <div className="flex items-center justify-between">
+                                <div>
+                                        <h1 className="text-xl font-bold text-slate-800">Quản lý người dùng</h1>
+                                        <p className="text-sm text-slate-400 mt-0.5">Tổng cộng {usersLength} người dùng trong hệ thống</p>
                                 </div>
-                                <div className="flex flex-1 w-full md:max-w-md gap-2 ml-auto">
+                        </div>
+
+                        {/* TOOLBAR */}
+                        <div className="flex flex-col xl:flex-row justify-between items-start xl:items-center gap-4 bg-white p-4 rounded-2xl border border-gray-200 shadow-sm">
+                                <div className="flex flex-1 gap-3 max-w-xl">
                                         <div className="relative flex-1">
                                                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 w-4 h-4" />
                                                 <input
@@ -102,7 +107,7 @@ export default function UsersContent({
                                                 variant="outline"
                                                 size="icon"
                                                 onClick={onRefresh}
-                                                className="rounded-xl shadow-sm hover:rotate-180 transition-transform duration-500 shrink-0 h-10 w-10 flex items-center justify-center bg-white border-slate-200"
+                                                className="rounded-xl shadow-sm"
                                         >
                                                 <RefreshCw className={`w-4 h-4 ${isLoading ? 'animate-spin' : ''}`} />
                                         </Button>
@@ -195,15 +200,6 @@ export default function UsersContent({
                                                                                                 >
                                                                                                         <Eye className="h-3.5 w-3.5" />
                                                                                                 </Button>
-                                                                                                <Button
-                                                                                                        variant="outline"
-                                                                                                        size="sm"
-                                                                                                        className="h-8 rounded-lg hover:bg-orange-50 text-orange-600"
-                                                                                                        onClick={() => onEdit('user', u)}
-                                                                                                        title="Chỉnh sửa"
-                                                                                                >
-                                                                                                        <Pencil className="h-3.5 w-3.5" />
-                                                                                                </Button>
                                                                                         </div>
                                                                                 </TableCell>
                                                                         </TableRow>
@@ -222,23 +218,14 @@ export default function UsersContent({
                                                                 setPage(Math.max(1, currentPage - 1));
                                                         }}
                                                         aria-disabled={currentPage === 1}
-                                                        className={currentPage === 1 ? 'pointer-events-none opacity-50' : ''}
+                                                        className={currentPage === 1 ? 'pointer-events-none opacity-30' : 'cursor-pointer rounded-lg border shadow-sm'}
                                                 />
                                         </PaginationItem>
-                                        {Array.from({ length: totalPages }).map((_, i) => (
-                                                <PaginationItem key={i}>
-                                                        <PaginationLink
-                                                                href="#"
-                                                                isActive={currentPage === i + 1}
-                                                                onClick={(e) => {
-                                                                        e.preventDefault();
-                                                                        setPage(i + 1);
-                                                                }}
-                                                        >
-                                                                {i + 1}
-                                                        </PaginationLink>
-                                                </PaginationItem>
-                                        ))}
+                                        <PaginationItem>
+                                                <span className="flex items-center px-3 text-sm text-slate-600">
+                                                        Trang {currentPage} / {totalPages}
+                                                </span>
+                                        </PaginationItem>
                                         <PaginationItem>
                                                 <PaginationNext
                                                         href="#"
@@ -247,32 +234,42 @@ export default function UsersContent({
                                                                 setPage(Math.min(totalPages, currentPage + 1));
                                                         }}
                                                         aria-disabled={currentPage === totalPages}
-                                                        className={currentPage === totalPages ? 'pointer-events-none opacity-50' : ''}
+                                                        className={currentPage === totalPages ? 'pointer-events-none opacity-30' : 'cursor-pointer rounded-lg border shadow-sm'}
                                                 />
                                         </PaginationItem>
                                 </PaginationContent>
                         </Pagination>
 
                         <Dialog open={isDetailsOpen} onOpenChange={setIsDetailsOpen}>
-                                <DialogContent className="max-w-[600px] p-0 border border-gray-200 shadow-xl rounded-xl flex flex-col font-sans overflow-hidden bg-white">
-                                        <DialogHeader className="p-5 bg-white border-b border-gray-200">
-                                                <div className="flex items-center justify-between">
-                                                        <div className="flex items-center gap-4">
-                                                                <div className="w-12 h-12 rounded-full bg-blue-50 flex items-center justify-center text-blue-600 font-bold text-xl border border-blue-100">
-                                                                        {userDetails?.fullname?.charAt(0).toUpperCase() || <User size={24} />}
-                                                                </div>
-                                                                <div>
-                                                                        <DialogTitle className="text-lg font-semibold text-gray-900">Chi tiết người dùng</DialogTitle>
-                                                                        <p className="text-xs text-gray-500 mt-0.5">ID: {selectedUserId}</p>
+                                <DialogContent className="max-w-[700px] rounded-xl p-0 overflow-hidden border border-gray-200 shadow-xl bg-white font-sans [&>button]:hidden">
+                                        <DialogTitle className="sr-only">Chi tiết người dùng</DialogTitle>
+                                        <div className="bg-white px-6 py-4 flex items-center justify-between border-b">
+                                                <div className="flex items-center gap-4">
+                                                        <div className="w-12 h-12 rounded-full bg-blue-50 flex items-center justify-center text-blue-600 font-bold text-xl border border-blue-100">
+                                                                {userDetails?.fullname?.charAt(0).toUpperCase() || <User size={24} />}
+                                                        </div>
+                                                        <div className="flex-1">
+                                                                <div className="flex items-center gap-3">
+                                                                        <span className="font-mono text-[10px] bg-blue-50 text-blue-600 px-1.5 py-0.5 rounded border border-blue-100">
+                                                                                ID: {selectedUserId}
+                                                                        </span>
+                                                                        <h2 className="text-base font-semibold text-gray-900 tracking-tight leading-none">
+                                                                                {userDetails?.fullname || 'Người dùng'}
+                                                                        </h2>
                                                                 </div>
                                                         </div>
-                                                        <Button variant="ghost" size="icon" onClick={() => setIsDetailsOpen(false)} className="h-8 w-8 text-gray-500 hover:text-gray-700">
-                                                                <X className="h-4 w-4" />
-                                                        </Button>
                                                 </div>
-                                        </DialogHeader>
+                                                <Button
+                                                        variant="ghost"
+                                                        size="icon"
+                                                        onClick={() => setIsDetailsOpen(false)}
+                                                        className="h-8 w-8 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-full transition-colors mr-2"
+                                                >
+                                                        <X size={20} />
+                                                </Button>
+                                        </div>
 
-                                        <div className="flex-1 overflow-y-auto p-6 space-y-8 bg-slate-50 max-h-[70vh]">
+                                        <div className="flex-1 overflow-y-auto p-6 space-y-6 max-h-[70vh]">
                                                 {isLoadingDetails ? (
                                                         <div className="flex items-center justify-center py-20">
                                                                 <RefreshCw className="w-8 h-8 text-blue-500 animate-spin" />

@@ -21,6 +21,7 @@ export default function MoviesPage() {
         const navigate = useNavigate();
         const staff = useStaffStore((state) => state.staff);
         const clearStaff = useStaffStore((state) => state.clearStaff);
+        const [activeTab, setActiveTab] = useState('movies');
 
         const getInitialFilters = () => {
                 try {
@@ -252,8 +253,8 @@ export default function MoviesPage() {
 
         return (
                 <AdminLayout
-                        active={'movies' as any}
-                        setActive={(() => { }) as any}
+                        active={activeTab as any}
+                        setActive={setActiveTab as any}
                         adminEmailState={staff?.email || 'admin@email.com'}
                         handleLogout={handleLogout}
                 >
@@ -305,6 +306,7 @@ export default function MoviesPage() {
                                 setToys={() => { }}
                                 onViewDetails={handleViewDetails}
                                 onRefresh={handleRefresh}
+                                branches={branches}
                         />
                         <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
                                 <AlertDialogContent>

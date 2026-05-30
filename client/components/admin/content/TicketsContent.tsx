@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Clock, History, Loader2, RefreshCw, Pencil, Trash2, Info, Ticket as TicketIcon, X } from 'lucide-react';
+import { Clock, History, Loader2, RefreshCw, Pencil, Trash2, Info, Ticket as TicketIcon, X, Plus } from 'lucide-react';
 import { format, formatDistanceToNow } from 'date-fns';
 import { vi } from 'date-fns/locale';
 import { Switch } from '@/components/ui/switch';
@@ -116,11 +116,19 @@ export default function TicketsContent(props: Props) {
 
         return (
                 <div className="space-y-6">
-                        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-white p-4 rounded-2xl border shadow-sm">
-                                <div className="flex flex-col gap-1">
-                                        <h3 className="text-lg font-bold text-slate-900">Quản lý gói vé</h3>
-                                        <div className="flex items-center gap-2 px-3 py-1 bg-slate-50 rounded-lg border border-slate-200 w-fit">
-                                                <span className="text-xs font-medium text-slate-500">Chỉ hiện khả dụng</span>
+                        {/* PAGE HEADER */}
+                        <div className="flex items-center justify-between">
+                                <div>
+                                        <h1 className="text-xl font-bold text-slate-800">Quản lý gói vé</h1>
+                                        <p className="text-sm text-slate-400 mt-0.5">Tổng cộng {data.length} gói vé trong hệ thống</p>
+                                </div>
+                        </div>
+
+                        {/* TOOLBAR */}
+                        <div className="flex flex-col xl:flex-row justify-between items-start xl:items-center gap-4 bg-white p-4 rounded-2xl border border-gray-200 shadow-sm">
+                                <div className="flex flex-1 gap-3 max-w-xl">
+                                        <div className="flex items-center gap-2 px-3 py-1.5 bg-slate-50 rounded-xl border border-slate-200">
+                                                <span className="text-[10px] font-bold text-slate-500 uppercase">Chỉ hiện khả dụng</span>
                                                 <Switch
                                                         checked={showActiveOnly}
                                                         onCheckedChange={setShowActiveOnly}
@@ -128,34 +136,34 @@ export default function TicketsContent(props: Props) {
                                                 />
                                         </div>
                                 </div>
-                                {branches.length > 0 && (
-                                        <select
-                                                value={selectedBranchId || ''}
-                                                onChange={(e) => setSelectedBranchId(e.target.value ? Number(e.target.value) : null)}
-                                                className="bg-white border rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none shadow-sm cursor-pointer"
-                                        >
-                                                <option value="">Tất cả chi nhánh</option>
-                                                {branches.map((branch) => (
-                                                        <option key={branch.id} value={branch.id}>
-                                                                {branch.name}
-                                                        </option>
-                                                ))}
-                                        </select>
-                                )}
-                                <div className="flex gap-2 ml-auto">
+                                <div className="flex flex-wrap items-center gap-3">
+                                        {branches.length > 0 && (
+                                                <select
+                                                        value={selectedBranchId || ''}
+                                                        onChange={(e) => setSelectedBranchId(e.target.value ? Number(e.target.value) : null)}
+                                                        className="bg-white border rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none shadow-sm cursor-pointer h-10"
+                                                >
+                                                        <option value="">Tất cả chi nhánh</option>
+                                                        {branches.map((branch) => (
+                                                                <option key={branch.id} value={branch.id}>
+                                                                        {branch.name}
+                                                                </option>
+                                                        ))}
+                                                </select>
+                                        )}
                                         {hasPermission('tickets', 'create') && (
                                                 <Button
                                                         onClick={onCreate}
-                                                        className="h-10 px-5 rounded-lg text-sm font-medium bg-blue-600 hover:bg-blue-700 shadow-sm"
+                                                        className="bg-blue-600 hover:bg-blue-700 rounded-lg shadow-sm gap-2 text-white h-10 px-5 font-medium"
                                                 >
-                                                        + Thêm mới
+                                                        <Plus className="w-4 h-4" /> Thêm mới
                                                 </Button>
                                         )}
                                         <Button
                                                 variant="outline"
                                                 size="icon"
                                                 onClick={onRefresh}
-                                                className="h-10 w-10 rounded-lg shadow-sm hover:rotate-180 transition-transform duration-500 shrink-0"
+                                                className="rounded-xl shadow-sm"
                                         >
                                                 <RefreshCw className={`w-4 h-4 ${isLoading ? 'animate-spin' : ''}`} />
                                         </Button>
@@ -253,7 +261,7 @@ export default function TicketsContent(props: Props) {
                                                                                         <Button
                                                                                                 variant="outline"
                                                                                                 size="sm"
-                                                                                                className="h-8 rounded-lg hover:bg-gray-100 text-gray-600 border-gray-200"
+                                                                                                className="h-8 rounded-lg hover:bg-yellow-50 text-yellow-600 border-yellow-200"
                                                                                                 onClick={() => onEdit(t)}
                                                                                         >
                                                                                                 <Pencil className="h-4.5 w-4.5" />
@@ -284,23 +292,14 @@ export default function TicketsContent(props: Props) {
                                                                                 setPage(Math.max(1, currentPage - 1));
                                                                         }}
                                                                         aria-disabled={currentPage === 1}
-                                                                        className={currentPage === 1 ? 'pointer-events-none opacity-50' : ''}
+                                                                        className={currentPage === 1 ? 'pointer-events-none opacity-30' : 'cursor-pointer rounded-lg border shadow-sm'}
                                                                 />
                                                         </PaginationItem>
-                                                        {Array.from({ length: totalPages }).map((_, i) => (
-                                                                <PaginationItem key={i}>
-                                                                        <PaginationLink
-                                                                                href="#"
-                                                                                isActive={currentPage === i + 1}
-                                                                                onClick={(e) => {
-                                                                                        e.preventDefault();
-                                                                                        setPage(i + 1);
-                                                                                }}
-                                                                        >
-                                                                                {i + 1}
-                                                                        </PaginationLink>
-                                                                </PaginationItem>
-                                                        ))}
+                                                        <PaginationItem>
+                                                                <span className="flex items-center px-3 text-sm text-slate-600">
+                                                                        Trang {currentPage} / {totalPages}
+                                                                </span>
+                                                        </PaginationItem>
                                                         <PaginationItem>
                                                                 <PaginationNext
                                                                         href="#"
@@ -309,7 +308,7 @@ export default function TicketsContent(props: Props) {
                                                                                 setPage(Math.min(totalPages, currentPage + 1));
                                                                         }}
                                                                         aria-disabled={currentPage === totalPages}
-                                                                        className={currentPage === totalPages ? 'pointer-events-none opacity-50' : ''}
+                                                                        className={currentPage === totalPages ? 'pointer-events-none opacity-30' : 'cursor-pointer rounded-lg border shadow-sm'}
                                                                 />
                                                         </PaginationItem>
                                                 </PaginationContent>

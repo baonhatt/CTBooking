@@ -16,6 +16,7 @@ export default function DashboardPage() {
         const navigate = useNavigate();
         const staff = useStaffStore((state) => state.staff);
         const clearStaff = useStaffStore((state) => state.clearStaff);
+        const [activeTab, setActiveTab] = useState('dashboard');
         const [metrics, setMetrics] = useState({
                 totalMovies: 0,
                 totalToys: 0,
@@ -181,8 +182,8 @@ export default function DashboardPage() {
 
         return (
                 <AdminLayout
-                        active={'dashboard' as any}
-                        setActive={(() => { }) as any}
+                        active={activeTab as any}
+                        setActive={setActiveTab as any}
                         adminEmailState={staff?.email || 'admin@email.com'}
                         handleLogout={handleLogout}
                 >

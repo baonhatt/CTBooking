@@ -494,7 +494,7 @@ export const PostManagement = () => {
                                                                                                 variant="ghost"
                                                                                                 size="icon"
                                                                                                 onClick={() => handleEdit(post)}
-                                                                                                className="h-8 w-8 text-blue-600 hover:text-blue-700 hover:bg-blue-50 rounded-lg transition-colors"
+                                                                                                className="h-8 w-8 text-yellow-600 hover:text-yellow-700 hover:bg-yellow-50 rounded-lg transition-colors"
                                                                                                 title="Chỉnh sửa"
                                                                                         >
                                                                                                 <Edit3 size={16} />

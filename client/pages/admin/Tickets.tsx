@@ -7,6 +7,7 @@ import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
+import { X } from 'lucide-react';
 
 interface TicketPackage {
         id: number;
@@ -29,6 +30,7 @@ export default function TicketsPage() {
         const navigate = useNavigate();
         const staff = useStaffStore((state) => state.staff);
         const clearStaff = useStaffStore((state) => state.clearStaff);
+        const [activeTab, setActiveTab] = useState('tickets');
         const [tickets, setTickets] = useState<TicketPackage[]>([]);
         const [page, setPage] = useState(1);
         const pageSize = 10;
@@ -128,8 +130,8 @@ export default function TicketsPage() {
 
         return (
                 <AdminLayout
-                        active={'tickets' as any}
-                        setActive={(() => { }) as any}
+                        active={activeTab as any}
+                        setActive={setActiveTab as any}
                         adminEmailState={staff?.email || 'admin@email.com'}
                         handleLogout={handleLogout}
                 >
@@ -156,18 +158,27 @@ export default function TicketsPage() {
                                 setShowActiveOnly={setShowActiveOnly}
                         />
                         <Dialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
-                                <DialogContent>
-                                        <DialogHeader>
-                                                <DialogTitle>Xác nhận xóa</DialogTitle>
+                                <DialogContent className="[&>button]:hidden">
+                                        <DialogHeader className="flex flex-row items-center gap-3 space-y-0 pb-4 border-b">
+                                                <DialogTitle className="text-lg font-bold text-slate-800">Xác nhận xóa</DialogTitle>
+                                                <div className="flex-1" />
+                                                <Button
+                                                        variant="ghost"
+                                                        size="icon"
+                                                        onClick={() => setIsDeleteDialogOpen(false)}
+                                                        className="h-8 w-8 rounded-full hover:bg-slate-100 text-slate-400 transition-colors"
+                                                >
+                                                        <X className="w-5 h-5" />
+                                                </Button>
                                         </DialogHeader>
                                         <p className="py-4">
                                                 Bạn có chắc chắn muốn xóa gói vé "{ticketToDelete?.name}"? Hành động này không thể hoàn tác.
                                         </p>
                                         <DialogFooter>
-                                                <Button variant="outline" onClick={() => setIsDeleteDialogOpen(false)}>
+                                                <Button variant="ghost" onClick={() => setIsDeleteDialogOpen(false)} className="text-slate-500 hover:bg-slate-100">
                                                         Hủy
                                                 </Button>
-                                                <Button onClick={confirmDelete} className="bg-red-600 hover:bg-red-700">
+                                                <Button onClick={confirmDelete} className="bg-red-600 hover:bg-red-700 min-w-[140px] rounded-xl shadow-lg shadow-red-500/20 transition-all active:scale-95">
                                                         Xóa
                                                 </Button>
                                         </DialogFooter>

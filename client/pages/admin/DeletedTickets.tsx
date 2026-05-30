@@ -32,6 +32,7 @@ interface TicketPackage {
 }
 
 export default function DeletedTicketsPage() {
+        const [activeTab, setActiveTab] = useState('deleted-tickets');
         const [tickets, setTickets] = useState<TicketPackage[]>([]);
         const [page, setPage] = useState(1);
         const pageSize = 10;
@@ -125,8 +126,8 @@ export default function DeletedTicketsPage() {
 
         return (
                 <AdminLayout
-                        active={'deleted-tickets' as any}
-                        setActive={(() => { }) as any}
+                        active={activeTab as any}
+                        setActive={setActiveTab as any}
                         adminEmailState={localStorage.getItem('adminEmail') || 'admin@email.com'}
                         handleLogout={() => {
                                 localStorage.removeItem('adminToken');

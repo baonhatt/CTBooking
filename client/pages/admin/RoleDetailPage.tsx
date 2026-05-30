@@ -11,6 +11,7 @@ import { request } from '@/lib/api/http';
 import AdminLayout from '@/admin/layouts/AdminLayout';
 import { useStaffStore } from '@/store/staffStore';
 import { useIsSuperAdmin } from '@/hooks/useStaffPermission';
+import { X } from 'lucide-react';
 import { MODULES, ACTIONS, MODULE_LABELS, ACTION_LABELS, APPLICABLE_ACTIONS } from './roleConstants';
 
 interface Role {
@@ -325,21 +326,30 @@ export default function RoleDetailPage() {
 
                                 {/* Delete Dialog */}
                                 <Dialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
-                                        <DialogContent>
-                                                <DialogHeader>
-                                                        <DialogTitle>Xác nhận xóa</DialogTitle>
+                                        <DialogContent className="[&>button]:hidden">
+                                                <DialogHeader className="flex flex-row items-center gap-3 space-y-0 pb-4 border-b">
+                                                        <DialogTitle className="text-lg font-bold text-slate-800">Xác nhận xóa</DialogTitle>
+                                                        <div className="flex-1" />
+                                                        <Button
+                                                                variant="ghost"
+                                                                size="icon"
+                                                                onClick={() => setIsDeleteDialogOpen(false)}
+                                                                className="h-8 w-8 rounded-full hover:bg-slate-100 text-slate-400 transition-colors"
+                                                        >
+                                                                <X className="w-5 h-5" />
+                                                        </Button>
                                                 </DialogHeader>
                                                 <p className="py-4">
                                                         Bạn có chắc chắn muốn xóa vai trò "{role.name}"? Hành động này không thể hoàn tác.
                                                 </p>
                                                 <DialogFooter>
-                                                        <Button variant="outline" onClick={() => setIsDeleteDialogOpen(false)}>
+                                                        <Button variant="ghost" onClick={() => setIsDeleteDialogOpen(false)} className="text-slate-500 hover:bg-slate-100">
                                                                 Hủy
                                                         </Button>
                                                         <Button
                                                                 onClick={handleDelete}
                                                                 disabled={deleteMutation.isPending}
-                                                                className="bg-red-600 hover:bg-red-700"
+                                                                className="bg-red-600 hover:bg-red-700 min-w-[140px] rounded-xl shadow-lg shadow-red-500/20 transition-all active:scale-95"
                                                         >
                                                                 {deleteMutation.isPending ? 'Đang xóa...' : 'Xóa'}
                                                         </Button>
@@ -349,20 +359,30 @@ export default function RoleDetailPage() {
 
                                 {/* Save Confirm Dialog */}
                                 <Dialog open={isSaveDialogOpen} onOpenChange={setIsSaveDialogOpen}>
-                                        <DialogContent>
-                                                <DialogHeader>
-                                                        <DialogTitle>Xác nhận lưu thay đổi</DialogTitle>
+                                        <DialogContent className="[&>button]:hidden">
+                                                <DialogHeader className="flex flex-row items-center gap-3 space-y-0 pb-4 border-b">
+                                                        <DialogTitle className="text-lg font-bold text-slate-800">Xác nhận lưu thay đổi</DialogTitle>
+                                                        <div className="flex-1" />
+                                                        <Button
+                                                                variant="ghost"
+                                                                size="icon"
+                                                                onClick={() => setIsSaveDialogOpen(false)}
+                                                                className="h-8 w-8 rounded-full hover:bg-slate-100 text-slate-400 transition-colors"
+                                                        >
+                                                                <X className="w-5 h-5" />
+                                                        </Button>
                                                 </DialogHeader>
                                                 <p className="py-4">
                                                         Bạn có chắc chắn muốn lưu thay đổi quyền cho vai trò "{role.name}"?
                                                 </p>
                                                 <DialogFooter>
-                                                        <Button variant="outline" onClick={() => setIsSaveDialogOpen(false)}>
+                                                        <Button variant="ghost" onClick={() => setIsSaveDialogOpen(false)} className="text-slate-500 hover:bg-slate-100">
                                                                 Hủy
                                                         </Button>
                                                         <Button
                                                                 onClick={confirmUpdate}
                                                                 disabled={updateMutation.isPending}
+                                                                className="bg-blue-600 hover:bg-blue-700 min-w-[140px] rounded-xl shadow-lg shadow-blue-500/20 transition-all active:scale-95"
                                                         >
                                                                 {updateMutation.isPending ? 'Đang lưu...' : 'Lưu'}
                                                         </Button>

@@ -30,6 +30,7 @@ interface Branch {
 }
 
 export default function DeletedBranchesPage() {
+        const [activeTab, setActiveTab] = useState('deleted-branches');
         const [branches, setBranches] = useState<Branch[]>([]);
         const [page, setPage] = useState(1);
         const pageSize = 10;
@@ -123,8 +124,8 @@ export default function DeletedBranchesPage() {
 
         return (
                 <AdminLayout
-                        active={'deleted-branches' as any}
-                        setActive={(() => { }) as any}
+                        active={activeTab as any}
+                        setActive={setActiveTab as any}
                         adminEmailState={localStorage.getItem('adminEmail') || 'admin@email.com'}
                         handleLogout={() => {
                                 localStorage.removeItem('adminToken');

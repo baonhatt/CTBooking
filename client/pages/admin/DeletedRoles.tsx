@@ -27,6 +27,7 @@ interface Role {
 }
 
 export default function DeletedRolesPage() {
+        const [activeTab, setActiveTab] = useState('deleted-roles');
         const [roles, setRoles] = useState<Role[]>([]);
         const [page, setPage] = useState(1);
         const pageSize = 10;
@@ -120,8 +121,8 @@ export default function DeletedRolesPage() {
 
         return (
                 <AdminLayout
-                        active={'deleted-roles' as any}
-                        setActive={(() => { }) as any}
+                        active={activeTab as any}
+                        setActive={setActiveTab as any}
                         adminEmailState={localStorage.getItem('adminEmail') || 'admin@email.com'}
                         handleLogout={() => {
                                 localStorage.removeItem('adminToken');
