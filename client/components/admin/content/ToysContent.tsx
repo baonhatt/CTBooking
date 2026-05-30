@@ -1,10 +1,12 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Switch } from '@/components/ui/switch';
-import { Search, RefreshCw, Pencil, Trash2, Plus, Package } from 'lucide-react';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Label } from '@/components/ui/label';
+import { Search, RefreshCw, Pencil, Trash2, Plus, Package, Eye, X } from 'lucide-react';
 import {
         Pagination,
         PaginationContent,
@@ -22,6 +24,10 @@ interface ToyData {
         stock: number;
         status: string;
         image_url?: string;
+        created_at?: string;
+        updated_at?: string;
+        created_by_staff_name?: string;
+        updated_by_staff_name?: string;
 }
 interface Props {
         data: ToyData[];
@@ -58,6 +64,9 @@ export default function ToysContent({
         showActiveOnly = false,
         setShowActiveOnly = () => { }
 }: Props) {
+        const [isDetailDialogOpen, setIsDetailDialogOpen] = useState(false);
+        const [selectedToy, setSelectedToy] = useState<ToyData | null>(null);
+
         const handleDelete = async (id: number) => {
                 try {
                         // Soft delete: update status to inactive instead of deleting
@@ -228,6 +237,17 @@ export default function ToysContent({
                                                                                         <Button
                                                                                                 variant="outline"
                                                                                                 size="sm"
+                                                                                                className="h-8 rounded-lg hover:bg-blue-50 text-blue-600"
+                                                                                                onClick={() => {
+                                                                                                        setSelectedToy(x);
+                                                                                                        setIsDetailDialogOpen(true);
+                                                                                                }}
+                                                                                        >
+                                                                                                <Eye className="h-3.5 w-3.5" />
+                                                                                        </Button>
+                                                                                        <Button
+                                                                                                variant="outline"
+                                                                                                size="sm"
                                                                                                 onClick={() => onEdit('toy', x)}
                                                                                                 className="h-8 rounded-lg hover:bg-yellow-50 text-yellow-600"
                                                                                                 title="Chỉnh sửa"
@@ -282,6 +302,81 @@ export default function ToysContent({
                                         </PaginationItem>
                                 </PaginationContent>
                         </Pagination>
+
+                        {/* Detail Dialog */}
+                        <Dialog open={isDetailDialogOpen} onOpenChange={setIsDetailDialogOpen}>
+                                <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto [&>button]:hidden">
+                                        <DialogHeader className="flex flex-row items-center gap-3 space-y-0 pb-4 border-b">
+                                                <DialogTitle className="text-lg font-bold text-slate-800">Chi tiết đồ chơi</DialogTitle>
+                                                <div className="flex-1" />
+                                                <Button
+                                                        variant="ghost"
+                                                        size="icon"
+                                                        onClick={() => setIsDetailDialogOpen(false)}
+                                                        className="h-8 w-8 rounded-full hover:bg-slate-100 text-slate-400 transition-colors"
+                                                >
+                                                        <X className="w-5 h-5" />
+                                                </Button>
+                                        </DialogHeader>
+
+                                        {selectedToy && (
+                                                <div className="space-y-4">
+                                                        {/* Overview */}
+                                                        <div className="space-y-4 py-4">
+                                                                <div className="grid grid-cols-2 gap-4">
+                                                                        <div className="space-y-2">
+                                                                                <Label className="text-sm font-medium text-gray-500">Tên đồ chơi</Label>
+                                                                                <div className="text-sm font-medium">{selectedToy.name}</div>
+                                                                        </div>
+                                                                        <div className="space-y-2">
+                                                                                <Label className="text-sm font-medium text-gray-500">Danh mục</Label>
+                                                                                <div className="text-sm">{selectedToy.category || '-'}</div>
+                                                                        </div>
+                                                                        <div className="space-y-2">
+                                                                                <Label className="text-sm font-medium text-gray-500">Giá</Label>
+                                                                                <div className="text-sm font-medium">{new Intl.NumberFormat('vi-VN').format(selectedToy.price)} VNĐ</div>
+                                                                        </div>
+                                                                        <div className="space-y-2">
+                                                                                <Label className="text-sm font-medium text-gray-500">Tồn kho</Label>
+                                                                                <div className="text-sm">{selectedToy.stock}</div>
+                                                                        </div>
+                                                                        <div className="space-y-2">
+                                                                                <Label className="text-sm font-medium text-gray-500">Trạng thái</Label>
+                                                                                <div className="text-sm">{selectedToy.status === 'active' ? 'Hoạt động' : 'Ngừng'}</div>
+                                                                        </div>
+                                                                </div>
+                                                                {selectedToy.image_url && (
+                                                                        <div className="space-y-2">
+                                                                                <Label className="text-sm font-medium text-gray-500">Hình ảnh</Label>
+                                                                                <img src={selectedToy.image_url} alt={selectedToy.name} className="w-32 h-32 object-cover rounded-lg" />
+                                                                        </div>
+                                                                )}
+                                                        </div>
+                                                        <div className="border-t pt-4 mt-4">
+                                                                <h4 className="text-sm font-semibold mb-3">Thông tin tạo & cập nhật</h4>
+                                                                <div className="grid grid-cols-2 gap-4">
+                                                                        <div className="space-y-2">
+                                                                                <Label className="text-sm font-medium text-gray-500">Ngày tạo</Label>
+                                                                                <div className="text-sm">{selectedToy.created_at ? new Date(selectedToy.created_at).toLocaleString('vi-VN') : '-'}</div>
+                                                                        </div>
+                                                                        <div className="space-y-2">
+                                                                                <Label className="text-sm font-medium text-gray-500">Tạo bởi</Label>
+                                                                                <div className="text-sm">{selectedToy.created_by_staff_name || '-'}</div>
+                                                                        </div>
+                                                                        <div className="space-y-2">
+                                                                                <Label className="text-sm font-medium text-gray-500">Cập nhật lần cuối</Label>
+                                                                                <div className="text-sm">{selectedToy.updated_at ? new Date(selectedToy.updated_at).toLocaleString('vi-VN') : '-'}</div>
+                                                                        </div>
+                                                                        <div className="space-y-2">
+                                                                                <Label className="text-sm font-medium text-gray-500">Cập nhật bởi</Label>
+                                                                                <div className="text-sm">{selectedToy.updated_by_staff_name || '-'}</div>
+                                                                        </div>
+                                                                </div>
+                                                        </div>
+                                                </div>
+                                        )}
+                                </DialogContent>
+                        </Dialog>
                 </div>
         );
 }

@@ -54,6 +54,8 @@ interface Tx {
         updatedAt?: Date | null;
         expired: boolean;
         branch_id?: number | null;
+        created_by_staff_name?: string;
+        updated_by_staff_name?: string;
 }
 interface Props {
         data: Tx[];
@@ -981,6 +983,20 @@ export default function TransactionsContent({
                                                                 </div>
                                                         </div>
                                                 ) : null}
+
+                                                {/* Tracking Information */}
+                                                {txDetails?.tracking && (
+                                                        <div className="mt-4 p-4 bg-slate-50/30 rounded-xl border border-slate-200">
+                                                                <h4 className="text-xs font-semibold text-slate-700 mb-3 flex items-center gap-2">
+                                                                        <Clock size={14} />
+                                                                        Thông tin tạo & cập nhật
+                                                                </h4>
+                                                                <div className="grid grid-cols-2 gap-2">
+                                                                        <InfoRow label="Tạo bởi" value={txDetails.tracking.created_by_staff_name || '-'} />
+                                                                        <InfoRow label="Cập nhật bởi" value={txDetails.tracking.updated_by_staff_name || '-'} />
+                                                                </div>
+                                                        </div>
+                                                )}
                                         </div>
 
                                         {/* FOOTER CỐ ĐỊNH */}

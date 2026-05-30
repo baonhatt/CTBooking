@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Clock, History, Loader2, RefreshCw, Pencil, Trash2, Info, Ticket as TicketIcon, X, Plus } from 'lucide-react';
+import { Clock, History, Loader2, RefreshCw, Pencil, Trash2, Info, Ticket as TicketIcon, X, Plus, Eye } from 'lucide-react';
 import { format, formatDistanceToNow } from 'date-fns';
 import { vi } from 'date-fns/locale';
 import { Switch } from '@/components/ui/switch';
@@ -41,6 +41,9 @@ interface TicketPackage {
         display_order?: number;
         branch_id?: number;
         updated_at?: string;
+        created_at?: string;
+        created_by_staff_name?: string;
+        updated_by_staff_name?: string;
 }
 
 interface Props {
@@ -64,6 +67,7 @@ interface Props {
         selectedBranchId?: number | null;
         setSelectedBranchId?: (id: number | null) => void;
         onDelete?: (ticket: TicketPackage) => void;
+        onViewDetail?: (ticket: TicketPackage) => void;
 }
 
 export default function TicketsContent(props: Props) {
@@ -94,7 +98,8 @@ export default function TicketsContent(props: Props) {
                 branches = [],
                 selectedBranchId = null,
                 setSelectedBranchId = () => { },
-                onDelete
+                onDelete,
+                onViewDetail
         } = props;
         const { isLoading = false } = props as any;
 
@@ -102,6 +107,8 @@ export default function TicketsContent(props: Props) {
         const [isSaving, setIsSaving] = useState(false);
         const [movies, setMovies] = useState<any[]>([]);
         const [branchOptions, setBranchOptions] = useState<any[]>([]);
+        const [isDetailDialogOpen, setIsDetailDialogOpen] = useState(false);
+        const [selectedTicket, setSelectedTicket] = useState<TicketPackage | null>(null);
 
         React.useEffect(() => {
                 if (isEditOpen) {
@@ -258,6 +265,17 @@ export default function TicketsContent(props: Props) {
                                                                                         </Badge>
                                                                                 </TableCell>
                                                                                 <TableCell className="text-right pr-6 space-x-1">
+                                                                                        <Button
+                                                                                                variant="outline"
+                                                                                                size="sm"
+                                                                                                className="h-8 rounded-lg hover:bg-blue-50 text-blue-600 border-blue-200"
+                                                                                                onClick={() => {
+                                                                                                        setSelectedTicket(t);
+                                                                                                        setIsDetailDialogOpen(true);
+                                                                                                }}
+                                                                                        >
+                                                                                                <Eye className="h-4.5 w-4.5" />
+                                                                                        </Button>
                                                                                         <Button
                                                                                                 variant="outline"
                                                                                                 size="sm"
@@ -620,6 +638,87 @@ export default function TicketsContent(props: Props) {
                                                         )}
                                                 </Button>
                                         </div>
+                                </DialogContent>
+                        </Dialog>
+
+                        {/* Detail Dialog */}
+                        <Dialog open={isDetailDialogOpen} onOpenChange={setIsDetailDialogOpen}>
+                                <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto [&>button]:hidden">
+                                        <DialogHeader className="flex flex-row items-center gap-3 space-y-0 pb-4 border-b">
+                                                <DialogTitle className="text-lg font-bold text-slate-800">Chi tiết gói vé</DialogTitle>
+                                                <div className="flex-1" />
+                                                <Button
+                                                        variant="ghost"
+                                                        size="icon"
+                                                        onClick={() => setIsDetailDialogOpen(false)}
+                                                        className="h-8 w-8 rounded-full hover:bg-slate-100 text-slate-400 transition-colors"
+                                                >
+                                                        <X className="w-5 h-5" />
+                                                </Button>
+                                        </DialogHeader>
+
+                                        {selectedTicket && (
+                                                <div className="space-y-4">
+                                                        {/* Overview */}
+                                                        <div className="space-y-4 py-4">
+                                                                <div className="grid grid-cols-2 gap-4">
+                                                                        <div className="space-y-2">
+                                                                                <Label className="text-sm font-medium text-gray-500">Tên gói vé</Label>
+                                                                                <div className="text-sm font-medium">{selectedTicket.name}</div>
+                                                                        </div>
+                                                                        <div className="space-y-2">
+                                                                                <Label className="text-sm font-medium text-gray-500">Mã</Label>
+                                                                                <div className="text-sm">{selectedTicket.code || '-'}</div>
+                                                                        </div>
+                                                                        <div className="space-y-2">
+                                                                                <Label className="text-sm font-medium text-gray-500">Giá</Label>
+                                                                                <div className="text-sm font-medium">{new Intl.NumberFormat('vi-VN').format(selectedTicket.price)} VNĐ</div>
+                                                                        </div>
+                                                                        <div className="space-y-2">
+                                                                                <Label className="text-sm font-medium text-gray-500">Loại</Label>
+                                                                                <div className="text-sm">{selectedTicket.type || '-'}</div>
+                                                                        </div>
+                                                                        <div className="space-y-2">
+                                                                                <Label className="text-sm font-medium text-gray-500">Trạng thái</Label>
+                                                                                <div className="text-sm">{selectedTicket.is_active ? 'Hoạt động' : 'Ngừng'}</div>
+                                                                        </div>
+                                                                        <div className="space-y-2">
+                                                                                <Label className="text-sm font-medium text-gray-500">Chỉ thành viên</Label>
+                                                                                <div className="text-sm">{selectedTicket.is_member_only ? 'Có' : 'Không'}</div>
+                                                                        </div>
+                                                                </div>
+                                                                <div className="space-y-2">
+                                                                        <Label className="text-sm font-medium text-gray-500">Mô tả</Label>
+                                                                        <div className="text-sm">{selectedTicket.description || '-'}</div>
+                                                                </div>
+                                                                <div className="space-y-2">
+                                                                        <Label className="text-sm font-medium text-gray-500">Tính năng</Label>
+                                                                        <div className="text-sm">{selectedTicket.features?.join(', ') || '-'}</div>
+                                                                </div>
+                                                        </div>
+                                                        <div className="border-t pt-4 mt-4">
+                                                                <h4 className="text-sm font-semibold mb-3">Thông tin tạo & cập nhật</h4>
+                                                                <div className="grid grid-cols-2 gap-4">
+                                                                        <div className="space-y-2">
+                                                                                <Label className="text-sm font-medium text-gray-500">Ngày tạo</Label>
+                                                                                <div className="text-sm">{selectedTicket.created_at ? new Date(selectedTicket.created_at).toLocaleString('vi-VN') : '-'}</div>
+                                                                        </div>
+                                                                        <div className="space-y-2">
+                                                                                <Label className="text-sm font-medium text-gray-500">Tạo bởi</Label>
+                                                                                <div className="text-sm">{selectedTicket.created_by_staff_name || '-'}</div>
+                                                                        </div>
+                                                                        <div className="space-y-2">
+                                                                                <Label className="text-sm font-medium text-gray-500">Cập nhật lần cuối</Label>
+                                                                                <div className="text-sm">{selectedTicket.updated_at ? new Date(selectedTicket.updated_at).toLocaleString('vi-VN') : '-'}</div>
+                                                                        </div>
+                                                                        <div className="space-y-2">
+                                                                                <Label className="text-sm font-medium text-gray-500">Cập nhật bởi</Label>
+                                                                                <div className="text-sm">{selectedTicket.updated_by_staff_name || '-'}</div>
+                                                                        </div>
+                                                                </div>
+                                                        </div>
+                                                </div>
+                                        )}
                                 </DialogContent>
                         </Dialog>
                 </div >

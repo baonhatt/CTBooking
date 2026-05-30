@@ -147,7 +147,7 @@ export async function listTicketPackagesImpl(
  */
 export async function getTicketPackageImpl(
         anyDb: any,
-        tables: { ticket_packages: any },
+        tables: { ticket_packages: any; auditLogs: any },
         id: number,
         restrictToBranchIds: number[] | null = null
 ) {
@@ -157,9 +157,27 @@ export async function getTicketPackageImpl(
                         : eq(tables.ticket_packages.id, id);
         const [item] = await anyDb.select().from(tables.ticket_packages).where(whereClause).limit(1)
         if (!item) return null;
+
+        // Get tracking data from audit logs
+        const [createLog] = await anyDb
+                .select()
+                .from(tables.auditLogs)
+                .where(and(eq(tables.auditLogs.entityType, 'ticket_package'), eq(tables.auditLogs.entityId, String(id)), eq(tables.auditLogs.action, 'create')))
+                .orderBy(tables.auditLogs.createdAt)
+                .limit(1);
+
+        const [updateLog] = await anyDb
+                .select()
+                .from(tables.auditLogs)
+                .where(and(eq(tables.auditLogs.entityType, 'ticket_package'), eq(tables.auditLogs.entityId, String(id)), eq(tables.auditLogs.action, 'update')))
+                .orderBy(desc(tables.auditLogs.createdAt))
+                .limit(1);
+
         // Parse JSON strings to arrays (handle old data formats: JSON array or "1|2|3")
         return {
                 ...item,
+                created_by_staff_name: createLog?.staffFullname || null,
+                updated_by_staff_name: updateLog?.staffFullname || null,
                 combo: item.combo
                         ? Array.isArray(item.combo)
                                 ? item.combo

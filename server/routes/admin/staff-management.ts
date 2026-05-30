@@ -93,7 +93,7 @@ export async function listStaffImpl(
 }
 
 export async function getStaffByIdImpl(db: any, tables: any, id: number) {
-        const { staffs, staffRoles, roles, staffBranches, branches } = tables;
+        const { staffs, staffRoles, roles, staffBranches, branches, auditLogs } = tables;
 
         const [staff] = await db.select().from(staffs).where(eq(staffs.id, id)).limit(1);
         if (!staff) {
@@ -112,10 +112,27 @@ export async function getStaffByIdImpl(db: any, tables: any, id: number) {
                 .innerJoin(branches, eq(staffBranches.branchId, branches.id))
                 .where(eq(staffBranches.staffId, id));
 
+        // Get tracking data from audit logs
+        const [createLog] = await db
+                .select()
+                .from(auditLogs)
+                .where(and(eq(auditLogs.entityType, 'staff'), eq(auditLogs.entityId, String(id)), eq(auditLogs.action, 'create')))
+                .orderBy(auditLogs.createdAt)
+                .limit(1);
+
+        const [updateLog] = await db
+                .select()
+                .from(auditLogs)
+                .where(and(eq(auditLogs.entityType, 'staff'), eq(auditLogs.entityId, String(id)), eq(auditLogs.action, 'update')))
+                .orderBy(desc(auditLogs.createdAt))
+                .limit(1);
+
         return {
                 status: 'success',
                 staff: {
                         ...staff,
+                        created_by_staff_name: createLog?.staffFullname || null,
+                        updated_by_staff_name: updateLog?.staffFullname || null,
                         roles: roleData.map((r) => ({ id: r.roleId, name: r.roleName })),
                         branches: branchData.map((b) => ({ id: b.branchId, name: b.branchName }))
                 }
@@ -136,7 +153,7 @@ export async function createStaffImpl(
                 branchIds?: number[];
                 forcePasswordChange?: boolean;
         },
-        caller?: { isSuperAdmin?: boolean; branchIds?: number[] },
+        caller?: { isSuperAdmin?: boolean; branchIds?: number[]; id?: number; email?: string; fullname?: string },
         env?: any,
         context?: { waitUntil: (promise: Promise<any>) => void }
 ) {
@@ -284,7 +301,7 @@ export async function updateStaffImpl(
                 branchIds?: number[];
                 forcePasswordChange?: boolean;
         },
-        caller?: { isSuperAdmin?: boolean; branchIds?: number[] },
+        caller?: { isSuperAdmin?: boolean; branchIds?: number[]; id?: number; email?: string; fullname?: string },
         env?: any,
         context?: { waitUntil: (promise: Promise<any>) => void }
 ) {
@@ -366,9 +383,9 @@ export async function updateStaffImpl(
                 'staff',
                 id,
                 `Cập nhật nhân viên: ${existing.fullname} (${existing.email})`,
-                null,
-                existing.email,
-                existing.fullname
+                caller?.id || null,
+                caller?.email || existing.email,
+                caller?.fullname || existing.fullname
         );
 
         return {

@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import AdminLayout from '@/admin/layouts/AdminLayout';
 import { getBranches, deleteBranchApi } from '@/lib/api/branches';
 import { toast } from 'sonner';
-import { Edit2, X, Search, RefreshCw, Pencil, Trash2, Plus, Building2 } from 'lucide-react';
+import { Edit2, X, Search, RefreshCw, Pencil, Trash2, Plus, Building2, Eye } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from '@/components/ui/table';
@@ -25,6 +25,8 @@ import {
         AlertDialogHeader,
         AlertDialogTitle
 } from '@/components/ui/alert-dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Label } from '@/components/ui/label';
 
 interface Branch {
         id: number;
@@ -40,6 +42,8 @@ interface Branch {
         booking_count: number;
         created_at: string;
         updated_at: string;
+        created_by_staff_name?: string;
+        updated_by_staff_name?: string;
 }
 
 export default function BranchesPage() {
@@ -58,6 +62,8 @@ export default function BranchesPage() {
         const [isCodeEditable, setIsCodeEditable] = useState(false);
         const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
         const [branchToDelete, setBranchToDelete] = useState<number | null>(null);
+        const [isDetailDialogOpen, setIsDetailDialogOpen] = useState(false);
+        const [selectedBranch, setSelectedBranch] = useState<Branch | null>(null);
 
         const generateCode = () => {
                 const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
@@ -188,13 +194,9 @@ export default function BranchesPage() {
                                                                                 <TableHead className="text-xs font-semibold text-gray-600 uppercase py-3">Tên</TableHead>
                                                                                 <TableHead className="text-xs font-semibold text-gray-600 uppercase py-3">Mã</TableHead>
                                                                                 <TableHead className="text-xs font-semibold text-gray-600 uppercase py-3">Địa chỉ</TableHead>
-                                                                                <TableHead className="text-xs font-semibold text-gray-600 uppercase py-3">SĐT</TableHead>
-                                                                                <TableHead className="text-xs font-semibold text-gray-600 uppercase py-3">Email</TableHead>
                                                                                 <TableHead className="text-center text-xs font-semibold text-gray-600 uppercase py-3">Mặc định</TableHead>
                                                                                 <TableHead className="text-center text-xs font-semibold text-gray-600 uppercase py-3">Trạng thái</TableHead>
                                                                                 <TableHead className="text-center text-xs font-semibold text-gray-600 uppercase py-3">Phim</TableHead>
-                                                                                <TableHead className="text-center text-xs font-semibold text-gray-600 uppercase py-3">Gói vé</TableHead>
-                                                                                <TableHead className="text-center text-xs font-semibold text-gray-600 uppercase py-3">Booking</TableHead>
                                                                                 <TableHead className="text-right text-xs font-semibold text-gray-600 uppercase py-3 pr-6">
                                                                                         Thao tác
                                                                                 </TableHead>
@@ -209,8 +211,6 @@ export default function BranchesPage() {
                                                                                         <TableCell className="font-medium text-slate-900">{branch.name}</TableCell>
                                                                                         <TableCell className="font-mono text-xs text-slate-500">{branch.code}</TableCell>
                                                                                         <TableCell className="text-sm text-slate-600">{branch.address || '-'}</TableCell>
-                                                                                        <TableCell className="text-sm text-slate-600">{branch.phone || '-'}</TableCell>
-                                                                                        <TableCell className="text-sm text-slate-600">{branch.email || '-'}</TableCell>
                                                                                         <TableCell className="text-center">
                                                                                                 {branch.is_default && (
                                                                                                         <Badge className="bg-green-50 text-green-700 border-green-200 rounded-full px-2 py-0.5 text-xs font-medium">
@@ -229,23 +229,33 @@ export default function BranchesPage() {
                                                                                                 </Badge>
                                                                                         </TableCell>
                                                                                         <TableCell className="text-center text-sm text-slate-600">{branch.movie_count}</TableCell>
-                                                                                        <TableCell className="text-center text-sm text-slate-600">{branch.package_count}</TableCell>
-                                                                                        <TableCell className="text-center text-sm text-slate-600">{branch.booking_count}</TableCell>
                                                                                         <TableCell className="text-right pr-6">
-                                                                                                <div className="flex justify-end gap-2">
+                                                                                                <div className="flex justify-end gap-1">
                                                                                                         <Button
-                                                                                                                variant="outline"
-                                                                                                                size="sm"
-                                                                                                                className="h-8 rounded-lg hover:bg-yellow-50 text-yellow-600"
+                                                                                                                variant="ghost"
+                                                                                                                size="icon"
+                                                                                                                className="h-8 w-8 text-blue-600 hover:text-blue-700 hover:bg-blue-50"
+                                                                                                                onClick={() => {
+                                                                                                                        setSelectedBranch(branch);
+                                                                                                                        setIsDetailDialogOpen(true);
+                                                                                                                }}
+                                                                                                                title="Chi tiết"
+                                                                                                        >
+                                                                                                                <Eye className="h-3.5 w-3.5" />
+                                                                                                        </Button>
+                                                                                                        <Button
+                                                                                                                variant="ghost"
+                                                                                                                size="icon"
+                                                                                                                className="h-8 w-8 text-yellow-600 hover:text-yellow-700 hover:bg-yellow-50"
                                                                                                                 onClick={() => openEdit(branch)}
-                                                                                                                title="Chỉnh sửa"
+                                                                                                                title="Sửa"
                                                                                                         >
                                                                                                                 <Pencil className="h-3.5 w-3.5" />
                                                                                                         </Button>
                                                                                                         <Button
-                                                                                                                variant="outline"
-                                                                                                                size="sm"
-                                                                                                                className="h-8 rounded-lg hover:bg-red-50 text-red-600"
+                                                                                                                variant="ghost"
+                                                                                                                size="icon"
+                                                                                                                className="h-8 w-8 text-red-600 hover:text-red-700 hover:bg-red-50"
                                                                                                                 onClick={() => handleDelete(branch.id)}
                                                                                                                 title="Xóa"
                                                                                                         >
@@ -322,6 +332,94 @@ export default function BranchesPage() {
                                         </AlertDialogFooter>
                                 </AlertDialogContent>
                         </AlertDialog>
+
+                        {/* Detail Dialog */}
+                        <Dialog open={isDetailDialogOpen} onOpenChange={setIsDetailDialogOpen}>
+                                <DialogContent className="[&>button]:hidden max-w-2xl">
+                                        <DialogHeader className="flex flex-row items-center gap-3 space-y-0 pb-4 border-b">
+                                                <DialogTitle className="text-lg font-bold text-slate-800">Chi tiết chi nhánh</DialogTitle>
+                                                <div className="flex-1" />
+                                                <Button
+                                                        variant="ghost"
+                                                        size="icon"
+                                                        onClick={() => setIsDetailDialogOpen(false)}
+                                                        className="h-8 w-8 rounded-full hover:bg-slate-100 text-slate-400 transition-colors"
+                                                >
+                                                        <X className="w-5 h-5" />
+                                                </Button>
+                                        </DialogHeader>
+                                        {selectedBranch && (
+                                                <div className="space-y-4 py-4">
+                                                        <div className="grid grid-cols-2 gap-4">
+                                                                <div className="space-y-2">
+                                                                        <Label className="text-sm font-medium text-gray-500">Tên</Label>
+                                                                        <div className="text-sm font-medium">{selectedBranch.name}</div>
+                                                                </div>
+                                                                <div className="space-y-2">
+                                                                        <Label className="text-sm font-medium text-gray-500">Mã</Label>
+                                                                        <div className="text-sm font-mono">{selectedBranch.code}</div>
+                                                                </div>
+                                                                <div className="space-y-2">
+                                                                        <Label className="text-sm font-medium text-gray-500">Địa chỉ</Label>
+                                                                        <div className="text-sm">{selectedBranch.address || '-'}</div>
+                                                                </div>
+                                                                <div className="space-y-2">
+                                                                        <Label className="text-sm font-medium text-gray-500">Số điện thoại</Label>
+                                                                        <div className="text-sm">{selectedBranch.phone || '-'}</div>
+                                                                </div>
+                                                                <div className="space-y-2">
+                                                                        <Label className="text-sm font-medium text-gray-500">Email</Label>
+                                                                        <div className="text-sm">{selectedBranch.email || '-'}</div>
+                                                                </div>
+                                                                <div className="space-y-2">
+                                                                        <Label className="text-sm font-medium text-gray-500">Trạng thái</Label>
+                                                                        <div className="flex gap-2">
+                                                                                {selectedBranch.is_default && (
+                                                                                        <span className="bg-green-100 text-green-800 px-2 py-1 rounded text-xs">Mặc định</span>
+                                                                                )}
+                                                                                <span className={`px-2 py-1 rounded text-xs ${selectedBranch.is_active ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-600'}`}>
+                                                                                        {selectedBranch.is_active ? 'Hoạt động' : 'Ngừng'}
+                                                                                </span>
+                                                                        </div>
+                                                                </div>
+                                                                <div className="space-y-2">
+                                                                        <Label className="text-sm font-medium text-gray-500">Số phim</Label>
+                                                                        <div className="text-sm">{selectedBranch.movie_count}</div>
+                                                                </div>
+                                                                <div className="space-y-2">
+                                                                        <Label className="text-sm font-medium text-gray-500">Số gói vé</Label>
+                                                                        <div className="text-sm">{selectedBranch.package_count}</div>
+                                                                </div>
+                                                                <div className="space-y-2">
+                                                                        <Label className="text-sm font-medium text-gray-500">Số booking</Label>
+                                                                        <div className="text-sm">{selectedBranch.booking_count}</div>
+                                                                </div>
+                                                        </div>
+                                                        <div className="border-t pt-4 mt-4">
+                                                                <h4 className="text-sm font-semibold mb-3">Thông tin tạo & cập nhật</h4>
+                                                                <div className="grid grid-cols-2 gap-4">
+                                                                        <div className="space-y-2">
+                                                                                <Label className="text-sm font-medium text-gray-500">Ngày tạo</Label>
+                                                                                <div className="text-sm">{new Date(selectedBranch.created_at).toLocaleString('vi-VN')}</div>
+                                                                        </div>
+                                                                        <div className="space-y-2">
+                                                                                <Label className="text-sm font-medium text-gray-500">Tạo bởi</Label>
+                                                                                <div className="text-sm">{selectedBranch.created_by_staff_name || '-'}</div>
+                                                                        </div>
+                                                                        <div className="space-y-2">
+                                                                                <Label className="text-sm font-medium text-gray-500">Cập nhật lần cuối</Label>
+                                                                                <div className="text-sm">{new Date(selectedBranch.updated_at).toLocaleString('vi-VN')}</div>
+                                                                        </div>
+                                                                        <div className="space-y-2">
+                                                                                <Label className="text-sm font-medium text-gray-500">Cập nhật bởi</Label>
+                                                                                <div className="text-sm">{selectedBranch.updated_by_staff_name || '-'}</div>
+                                                                        </div>
+                                                                </div>
+                                                        </div>
+                                                </div>
+                                        )}
+                                </DialogContent>
+                        </Dialog>
                 </AdminLayout>
         );
 }
@@ -383,8 +481,8 @@ function BranchEditModal({ isOpen, onClose, data, onSave }: any) {
         if (!isOpen) return null;
 
         return (
-                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-                        <div className="bg-white rounded-lg p-6 w-full max-w-md relative">
+                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50" onClick={onClose}>
+                        <div className="bg-white rounded-lg p-6 w-full max-w-md relative" onClick={(e) => e.stopPropagation()}>
                                 <div className="flex justify-between items-center mb-4 pb-4 border-b">
                                         <h2 className="text-xl font-bold text-slate-800">{data.id === 0 ? 'Thêm chi nhánh mới' : 'Sửa chi nhánh'}</h2>
                                         <button

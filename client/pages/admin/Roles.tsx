@@ -8,12 +8,11 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { toast } from 'sonner';
 import { Skeleton } from '@/components/ui/skeleton';
-import { X, Search, RefreshCw } from 'lucide-react';
+import { X, Search, RefreshCw, Eye, Trash2 } from 'lucide-react';
 import { request } from '@/lib/api/http';
 import AdminLayout from '@/admin/layouts/AdminLayout';
 import { useStaffStore } from '@/store/staffStore';
 import { useNavigate } from 'react-router-dom';
-import { Pencil, Trash2 } from 'lucide-react';
 
 interface Role {
         id: number;
@@ -248,20 +247,21 @@ export default function RolesPage() {
                                                                                         <td className="p-3">Lv{role.level} · {role.staffCount || 0} nhân viên</td>
                                                                                         <td className="p-3 text-sm text-gray-600">{role.description || '-'}</td>
                                                                                         <td className="p-3" onClick={(e) => e.stopPropagation()}>
-                                                                                                <div className="flex justify-end items-center gap-2 w-[120px] ml-auto">
+                                                                                                <div className="flex justify-end items-center gap-1 w-[100px] ml-auto">
                                                                                                         <Button
-                                                                                                                variant="outline"
+                                                                                                                variant="ghost"
                                                                                                                 size="icon"
-                                                                                                                className="h-8 w-8 text-yellow-600 border-yellow-200 hover:bg-yellow-50 flex-shrink-0"
+                                                                                                                className="h-8 w-8 text-blue-600 hover:text-blue-700 hover:bg-blue-50 flex-shrink-0"
                                                                                                                 onClick={() => navigate(`/roles/${role.id}`)}
+                                                                                                                title="Chi tiết"
                                                                                                         >
-                                                                                                                <Pencil className="h-3.5 w-3.5" />
+                                                                                                                <Eye className="h-3.5 w-3.5" />
                                                                                                         </Button>
                                                                                                         {!role.isSystem ? (
                                                                                                                 <Button
-                                                                                                                        variant="outline"
+                                                                                                                        variant="ghost"
                                                                                                                         size="icon"
-                                                                                                                        className="h-8 w-8 text-red-600 border-red-200 hover:bg-red-50 flex-shrink-0"
+                                                                                                                        className="h-8 w-8 text-red-600 hover:text-red-700 hover:bg-red-50 flex-shrink-0"
                                                                                                                         onClick={() => {
                                                                                                                                 if ((role.staffCount || 0) > 0) {
                                                                                                                                         toast.error(`Không thể xóa vai trò này vì đã được giao cho ${role.staffCount} nhân viên`);
@@ -270,6 +270,7 @@ export default function RolesPage() {
                                                                                                                                 setRoleToDelete(role);
                                                                                                                                 setIsDeleteDialogOpen(true);
                                                                                                                         }}
+                                                                                                                        title="Xóa"
                                                                                                                 >
                                                                                                                         <Trash2 className="h-3.5 w-3.5" />
                                                                                                                 </Button>

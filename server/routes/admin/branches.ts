@@ -71,9 +71,30 @@ export async function listBranchesImpl(
         };
 }
 
-export async function getBranchImpl(anyDb: any, tables: { branches: any }, id: number) {
+export async function getBranchImpl(anyDb: any, tables: { branches: any; auditLogs: any }, id: number) {
         const [item] = await anyDb.select().from(tables.branches).where(eq(tables.branches.id, id)).limit(1);
-        return item || null;
+        if (!item) return null;
+
+        // Get tracking data from audit logs
+        const [createLog] = await anyDb
+                .select()
+                .from(tables.auditLogs)
+                .where(and(eq(tables.auditLogs.entityType, 'branch'), eq(tables.auditLogs.entityId, String(id)), eq(tables.auditLogs.action, 'create')))
+                .orderBy(tables.auditLogs.createdAt)
+                .limit(1);
+
+        const [updateLog] = await anyDb
+                .select()
+                .from(tables.auditLogs)
+                .where(and(eq(tables.auditLogs.entityType, 'branch'), eq(tables.auditLogs.entityId, String(id)), eq(tables.auditLogs.action, 'update')))
+                .orderBy(desc(tables.auditLogs.createdAt))
+                .limit(1);
+
+        return {
+                ...item,
+                created_by_staff_name: createLog?.staffFullname || null,
+                updated_by_staff_name: updateLog?.staffFullname || null
+        };
 }
 
 export async function getDefaultBranchImpl(anyDb: any, tables: { branches: any }) {
@@ -87,7 +108,7 @@ export async function getDefaultBranchImpl(anyDb: any, tables: { branches: any }
 
 export async function createBranchImpl(
         anyDb: any,
-        tables: { branches: any },
+        tables: { branches: any; auditLogs: any },
         args: {
                 name: string;
                 code: string;
@@ -96,7 +117,8 @@ export async function createBranchImpl(
                 email?: string;
                 is_default?: boolean;
                 is_active?: boolean;
-        }
+        },
+        staffInfo?: { id: number; email: string; fullname: string }
 ) {
         const { name, code, address, phone, email, is_default, is_active } = args;
         const now = new Date();
@@ -126,12 +148,27 @@ export async function createBranchImpl(
         const item = Array.isArray(inserted) ? inserted[0] : inserted;
         if (!item) throw new Error('Không thể tạo chi nhánh');
 
+        // Log audit action
+        if (staffInfo) {
+                await logAuditAction(
+                        anyDb,
+                        tables.auditLogs,
+                        'create',
+                        'branch',
+                        item.id,
+                        `Tạo chi nhánh: ${name} (${code})`,
+                        staffInfo.id,
+                        staffInfo.email,
+                        staffInfo.fullname
+                );
+        }
+
         return { item };
 }
 
 export async function updateBranchImpl(
         anyDb: any,
-        tables: { branches: any },
+        tables: { branches: any; auditLogs: any },
         id: number,
         args: {
                 name?: string;
@@ -141,7 +178,8 @@ export async function updateBranchImpl(
                 email?: string;
                 is_default?: boolean;
                 is_active?: boolean;
-        }
+        },
+        staffInfo?: { id: number; email: string; fullname: string }
 ) {
         const { name, code, address, phone, email, is_default, is_active } = args;
         const now = new Date();
@@ -165,12 +203,29 @@ export async function updateBranchImpl(
         const updatedRes = await anyDb.update(tables.branches).set(data).where(eq(tables.branches.id, id)).returning();
 
         const item = Array.isArray(updatedRes) ? updatedRes[0] : updatedRes;
-        return item || null;
+        if (!item) return null;
+
+        // Log audit action
+        if (staffInfo) {
+                await logAuditAction(
+                        anyDb,
+                        tables.auditLogs,
+                        'update',
+                        'branch',
+                        id,
+                        `Cập nhật chi nhánh: ${item.name} (${item.code})`,
+                        staffInfo.id,
+                        staffInfo.email,
+                        staffInfo.fullname
+                );
+        }
+
+        return item;
 }
 
 export async function deleteBranchImpl(
         anyDb: any,
-        tables: { branches: any; movies: any; ticket_packages: any; bookings: any; staff_branches: any },
+        tables: { branches: any; movies: any; ticket_packages: any; bookings: any; staff_branches: any; auditLogs: any },
         id: number,
         staffInfo?: { id: number; email: string; fullname: string }
 ) {
@@ -223,6 +278,21 @@ export async function deleteBranchImpl(
 
         // Soft delete by setting is_active = false and deleted_at
         await anyDb.update(tables.branches).set({ is_active: false, deleted_at: new Date().toISOString(), deleted_by_staff_id: staffInfo?.id }).where(eq(tables.branches.id, id));
+
+        // Log audit action
+        if (staffInfo) {
+                await logAuditAction(
+                        anyDb,
+                        tables.auditLogs,
+                        'delete',
+                        'branch',
+                        id,
+                        `Xóa chi nhánh: ${existing.name} (${existing.code})`,
+                        staffInfo.id,
+                        staffInfo.email,
+                        staffInfo.fullname
+                );
+        }
 
         return { ok: true };
 }

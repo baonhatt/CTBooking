@@ -62,6 +62,8 @@ interface MovieData {
         rating: number | null;
         updated_at: string;
         cover_image?: string;
+        created_by_staff_name?: string;
+        updated_by_staff_name?: string;
 }
 
 interface Props {
@@ -702,6 +704,10 @@ export default function MoviesContent({
                                                                                                         </span>
                                                                                                 </div>
                                                                                                 <div className="flex items-center justify-between text-[11px]">
+                                                                                                        <span className="text-slate-400">Tạo bởi:</span>
+                                                                                                        <span className="font-medium text-slate-700">{movieDetails.created_by_staff_name || '-'}</span>
+                                                                                                </div>
+                                                                                                <div className="flex items-center justify-between text-[11px]">
                                                                                                         <span className="text-slate-400 flex items-center gap-1.5">
                                                                                                                 <History size={12} /> Cập nhật:
                                                                                                         </span>
@@ -710,6 +716,10 @@ export default function MoviesContent({
                                                                                                                         ? format(new Date(movieDetails.updated_at), 'dd/MM/yyyy HH:mm')
                                                                                                                         : '-'}
                                                                                                         </span>
+                                                                                                </div>
+                                                                                                <div className="flex items-center justify-between text-[11px]">
+                                                                                                        <span className="text-slate-400">Cập nhật bởi:</span>
+                                                                                                        <span className="font-medium text-slate-700">{movieDetails.updated_by_staff_name || '-'}</span>
                                                                                                 </div>
                                                                                         </div>
                                                                                 </div>

@@ -2288,17 +2288,18 @@ app.post('/api/movies-status/:id', requireStaffAuth, requirePermission('movies',
 
                 const db = drizzle(c.env.cinema_db, { schema });
 
+                const staffId = c.get('staffId');
+                const staffEmail = c.get('staffEmail');
+                const staffFullname = c.get('staffFullname');
+
                 const r = await updateMovieStatusImpl(
                         db,
-
-                        { movies: schema.movies, ticket_packages: schema.ticket_packages },
-
+                        { movies: schema.movies, ticket_packages: schema.ticket_packages, auditLogs: schema.auditLogs },
                         id,
-
                         is_active,
-
                         c.env,
-                        getRestrictBranchIds(c)
+                        getRestrictBranchIds(c),
+                        { id: staffId, email: staffEmail, fullname: staffFullname }
                 );
 
                 const status = typeof (r as any).status === 'number' ? (r as any).status : 200;
@@ -2750,7 +2751,18 @@ app.post('/api/toys', requireStaffAuth, requirePermission('toys', 'create'), asy
 
                 const { uploader } = getCloudHelpers(c, c.env);
 
-                const r = await createToyImpl(db, { toys: schema.toys }, body as any, c.env, uploader);
+                const staffId = c.get('staffId');
+                const staffEmail = c.get('staffEmail');
+                const staffFullname = c.get('staffFullname');
+
+                const r = await createToyImpl(
+                        db,
+                        { toys: schema.toys, auditLogs: schema.auditLogs },
+                        body as any,
+                        c.env,
+                        uploader,
+                        { id: staffId, email: staffEmail, fullname: staffFullname }
+                );
 
                 // --- LOGIC XÓA CACHE BẮT ĐẦU ---
 
@@ -2806,7 +2818,20 @@ app.put('/api/toys/:id', requireStaffAuth, requirePermission('toys', 'edit'), as
 
                 const { uploader, deleter } = getCloudHelpers(c, c.env);
 
-                const r = await updateToyImpl(db, { toys: schema.toys }, id, body as any, c.env, uploader, deleter);
+                const staffId = c.get('staffId');
+                const staffEmail = c.get('staffEmail');
+                const staffFullname = c.get('staffFullname');
+
+                const r = await updateToyImpl(
+                        db,
+                        { toys: schema.toys, auditLogs: schema.auditLogs },
+                        id,
+                        body as any,
+                        c.env,
+                        uploader,
+                        deleter,
+                        { id: staffId, email: staffEmail, fullname: staffFullname }
+                );
 
                 if (!r) return c.json({ message: 'Không tìm thấy' }, 404);
 
@@ -2860,7 +2885,18 @@ app.delete('/api/toys/:id', requireStaffAuth, requirePermission('toys', 'delete'
 
                 const { deleter } = getCloudHelpers(c, c.env);
 
-                const r = await deleteToyImpl(db, { toys: schema.toys }, id, c.env, deleter);
+                const staffId = c.get('staffId');
+                const staffEmail = c.get('staffEmail');
+                const staffFullname = c.get('staffFullname');
+
+                const r = await deleteToyImpl(
+                        db,
+                        { toys: schema.toys, auditLogs: schema.auditLogs },
+                        id,
+                        c.env,
+                        deleter,
+                        { id: staffId, email: staffEmail, fullname: staffFullname }
+                );
 
                 if (!r) return c.json({ message: 'Không tìm thấy' }, 404);
 
@@ -3172,8 +3208,18 @@ app.post('/api/admin/site-media', requireStaffAuth, requirePermission('uploads',
 
                 const body = await c.req.json().catch(() => ({}));
 
+                const staffId = c.get('staffId');
+                const staffEmail = c.get('staffEmail');
+                const staffFullname = c.get('staffFullname');
+
                 const { deleter } = getCloudHelpers(c, c.env);
-                const r = await createSiteMediaImpl(db, { site_media: schema.site_media }, body as any, deleter);
+                const r = await createSiteMediaImpl(
+                        db,
+                        { site_media: schema.site_media, auditLogs: schema.auditLogs },
+                        body as any,
+                        deleter,
+                        { id: staffId, email: staffEmail, fullname: staffFullname }
+                );
 
                 return c.json(r, 201);
         } catch {
@@ -3195,8 +3241,18 @@ app.put('/api/admin/site-media', requireStaffAuth, requirePermission('uploads', 
 
                 const body = await c.req.json().catch(() => ({}));
 
+                const staffId = c.get('staffId');
+                const staffEmail = c.get('staffEmail');
+                const staffFullname = c.get('staffFullname');
+
                 const { deleter } = getCloudHelpers(c, c.env);
-                const r = await updateSiteMediaImpl(db, { site_media: schema.site_media }, body as any, deleter);
+                const r = await updateSiteMediaImpl(
+                        db,
+                        { site_media: schema.site_media, auditLogs: schema.auditLogs },
+                        body as any,
+                        deleter,
+                        { id: staffId, email: staffEmail, fullname: staffFullname }
+                );
 
                 const status = (r as any)?.item ? 200 : 404;
 
@@ -3278,9 +3334,19 @@ app.delete('/api/admin/site-media/:id', requireStaffAuth, requirePermission('upl
 
                 const db = drizzle(c.env.cinema_db, { schema });
 
+                const staffId = c.get('staffId');
+                const staffEmail = c.get('staffEmail');
+                const staffFullname = c.get('staffFullname');
+
                 const { deleter } = getCloudHelpers(c, c.env);
 
-                const r = await deleteSiteMediaImpl(db, { site_media: schema.site_media }, id, deleter);
+                const r = await deleteSiteMediaImpl(
+                        db,
+                        { site_media: schema.site_media, auditLogs: schema.auditLogs },
+                        id,
+                        deleter,
+                        { id: staffId, email: staffEmail, fullname: staffFullname }
+                );
 
                 // Manual deletion from cloud storage for Worker environment
 
@@ -4201,7 +4267,18 @@ app.post('/api/posts', requireStaffAuth, requirePermission('posts', 'create'), a
 
                 const body = await c.req.json().catch(() => ({}));
 
-                const r = await createPostImpl(db, { posts: schema.posts }, body, c.env, getCloudHelpers(c, c.env).uploader);
+                const staffId = c.get('staffId');
+                const staffEmail = c.get('staffEmail');
+                const staffFullname = c.get('staffFullname');
+
+                const r = await createPostImpl(
+                        db,
+                        { posts: schema.posts, auditLogs: schema.auditLogs },
+                        body,
+                        c.env,
+                        getCloudHelpers(c, c.env).uploader,
+                        { id: staffId, email: staffEmail, fullname: staffFullname }
+                );
 
                 if (r && r.status === 'published') {
                         const base = String(c.env.VITE_CLIENT_BASE_URL || 'https://cinesphere.com.vn').replace(/\/$/, '');
@@ -4230,7 +4307,20 @@ app.put('/api/posts/:id', requireStaffAuth, requirePermission('posts', 'edit'), 
 
                 const helpers = getCloudHelpers(c, c.env);
 
-                const r = await updatePostImpl(db, { posts: schema.posts }, id, body, c.env, helpers.uploader, helpers.deleter);
+                const staffId = c.get('staffId');
+                const staffEmail = c.get('staffEmail');
+                const staffFullname = c.get('staffFullname');
+
+                const r = await updatePostImpl(
+                        db,
+                        { posts: schema.posts, auditLogs: schema.auditLogs },
+                        id,
+                        body,
+                        c.env,
+                        helpers.uploader,
+                        helpers.deleter,
+                        { id: staffId, email: staffEmail, fullname: staffFullname }
+                );
 
                 if (!r) return c.json({ message: 'Không tìm thấy' }, 404);
 
@@ -4257,7 +4347,17 @@ app.delete('/api/posts/:id', requireStaffAuth, requirePermission('posts', 'delet
 
                 const db = drizzle(c.env.cinema_db, { schema });
 
-                const r = await deletePostImpl(db, { posts: schema.posts }, id, getCloudHelpers(c, c.env).deleter);
+                const staffId = c.get('staffId');
+                const staffEmail = c.get('staffEmail');
+                const staffFullname = c.get('staffFullname');
+
+                const r = await deletePostImpl(
+                        db,
+                        { posts: schema.posts, auditLogs: schema.auditLogs },
+                        id,
+                        getCloudHelpers(c, c.env).deleter,
+                        { id: staffId, email: staffEmail, fullname: staffFullname }
+                );
 
                 if (!r) return c.json({ message: 'Không tìm thấy' }, 404);
 
@@ -4363,7 +4463,16 @@ app.post('/api/admin/branches', requireStaffAuth, requirePermission('branches', 
 
                 const body = await c.req.json().catch(() => ({}));
 
-                const r = await createBranchImpl(db, { branches: schema.branches }, body);
+                const staffId = c.get('staffId');
+                const staffEmail = c.get('staffEmail');
+                const staffFullname = c.get('staffFullname');
+
+                const r = await createBranchImpl(
+                        db,
+                        { branches: schema.branches, auditLogs: schema.auditLogs },
+                        body,
+                        { id: staffId, email: staffEmail, fullname: staffFullname }
+                );
 
                 return c.json({ status: 'success', branch: r.item });
         } catch (err: any) {
@@ -4381,7 +4490,17 @@ app.put('/api/admin/branches/:id', requireStaffAuth, requirePermission('branches
 
                 const body = await c.req.json().catch(() => ({}));
 
-                const r = await updateBranchImpl(db, { branches: schema.branches }, id, body);
+                const staffId = c.get('staffId');
+                const staffEmail = c.get('staffEmail');
+                const staffFullname = c.get('staffFullname');
+
+                const r = await updateBranchImpl(
+                        db,
+                        { branches: schema.branches, auditLogs: schema.auditLogs },
+                        id,
+                        body,
+                        { id: staffId, email: staffEmail, fullname: staffFullname }
+                );
 
                 if (!r) return c.json({ message: 'Không tìm thấy chi nhánh' }, 404);
 
@@ -4410,7 +4529,8 @@ app.delete('/api/admin/branches/:id', requireStaffAuth, requirePermission('branc
                                 movies: schema.movies,
                                 ticket_packages: schema.ticket_packages,
                                 bookings: schema.bookings,
-                                staff_branches: schema.staffBranches
+                                staff_branches: schema.staffBranches,
+                                auditLogs: schema.auditLogs
                         },
                         id,
                         { id: staffId, email: staffEmail, fullname: staffFullname }
@@ -4849,7 +4969,13 @@ app.post('/api/admin/staff', requireStaffAuth, requirePermission('staff', 'creat
                         },
                         c.env.KV_BINDING,
                         body,
-                        { isSuperAdmin: c.get('isSuperAdmin'), branchIds: c.get('staffBranchIds') || [] },
+                        {
+                                isSuperAdmin: c.get('isSuperAdmin'),
+                                branchIds: c.get('staffBranchIds') || [],
+                                id: c.get('staffId'),
+                                email: c.get('staffEmail'),
+                                fullname: c.get('staffFullname')
+                        },
                         c.env,
                         { waitUntil: (p) => c.executionCtx.waitUntil(p) }
                 );
@@ -4884,7 +5010,13 @@ app.put('/api/admin/staff/:id', requireStaffAuth, requirePermission('staff', 'ed
                         c.env.KV_BINDING,
                         id,
                         body,
-                        { isSuperAdmin: c.get('isSuperAdmin'), branchIds: c.get('staffBranchIds') || [] },
+                        {
+                                isSuperAdmin: c.get('isSuperAdmin'),
+                                branchIds: c.get('staffBranchIds') || [],
+                                id: c.get('staffId'),
+                                email: c.get('staffEmail'),
+                                fullname: c.get('staffFullname')
+                        },
                         c.env,
                         { waitUntil: (p) => c.executionCtx.waitUntil(p) }
                 );

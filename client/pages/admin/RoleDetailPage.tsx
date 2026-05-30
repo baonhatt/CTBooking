@@ -5,13 +5,14 @@ import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Checkbox } from '@/components/ui/checkbox';
+import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
 import { Skeleton } from '@/components/ui/skeleton';
 import { request } from '@/lib/api/http';
 import AdminLayout from '@/admin/layouts/AdminLayout';
 import { useStaffStore } from '@/store/staffStore';
 import { useIsSuperAdmin } from '@/hooks/useStaffPermission';
-import { X } from 'lucide-react';
+import { X, FileText } from 'lucide-react';
 import { MODULES, ACTIONS, MODULE_LABELS, ACTION_LABELS, APPLICABLE_ACTIONS } from './roleConstants';
 
 interface Role {
@@ -22,6 +23,10 @@ interface Role {
         isSystem: boolean;
         staffCount?: number;
         permissionIds?: number[];
+        created_at?: string;
+        created_by_staff_name?: string;
+        updated_at?: string;
+        updated_by_staff_name?: string;
 }
 
 interface Permission {
@@ -40,6 +45,7 @@ export default function RoleDetailPage() {
         const isSuperAdmin = useIsSuperAdmin();
         const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
         const [isSaveDialogOpen, setIsSaveDialogOpen] = useState(false);
+        const [isEditMode, setIsEditMode] = useState(false);
         const [dirty, setDirty] = useState(false);
         const [permissionIds, setPermissionIds] = useState<number[]>([]);
         const headerRef = useRef<HTMLDivElement>(null);
@@ -122,11 +128,29 @@ export default function RoleDetailPage() {
         };
 
         const togglePermission = (permissionId: number) => {
+                if (!isEditMode) return;
                 setPermissionIds((prev) => {
                         const newIds = prev.includes(permissionId) ? prev.filter((id) => id !== permissionId) : [...prev, permissionId];
                         setDirty(true);
                         return newIds;
                 });
+        };
+
+        const handleEditMode = () => {
+                setIsEditMode(true);
+        };
+
+        const handleCancelEdit = () => {
+                setIsEditMode(false);
+                setDirty(false);
+                // Reset permissionIds to original
+                const role = (roleData as any)?.role;
+                if (role?.permissionIds) {
+                        setPermissionIds(role.permissionIds);
+                } else if (role?.permissions) {
+                        const ids = role.permissions.map((p: any) => p.id);
+                        setPermissionIds(ids);
+                }
         };
 
         // Update permissionIds when role data changes
@@ -260,14 +284,32 @@ export default function RoleDetailPage() {
                                                         </div>
                                                 </div>
                                                 <div className="flex gap-2">
-                                                        {(!role.isSystem || isSuperAdmin) && (
-                                                                <Button
-                                                                        variant={dirty ? 'default' : 'outline'}
-                                                                        onClick={handleUpdate}
-                                                                        disabled={!dirty || updateMutation.isPending}
-                                                                >
-                                                                        {updateMutation.isPending ? 'Đang lưu...' : 'Lưu thay đổi'}
-                                                                </Button>
+                                                        {isEditMode ? (
+                                                                <>
+                                                                        <Button
+                                                                                variant="outline"
+                                                                                onClick={handleCancelEdit}
+                                                                                disabled={updateMutation.isPending}
+                                                                        >
+                                                                                Hủy
+                                                                        </Button>
+                                                                        <Button
+                                                                                variant={dirty ? 'default' : 'outline'}
+                                                                                onClick={handleUpdate}
+                                                                                disabled={!dirty || updateMutation.isPending}
+                                                                        >
+                                                                                {updateMutation.isPending ? 'Đang lưu...' : 'Lưu thay đổi'}
+                                                                        </Button>
+                                                                </>
+                                                        ) : (
+                                                                (!role.isSystem || isSuperAdmin) && (
+                                                                        <Button
+                                                                                variant="outline"
+                                                                                onClick={handleEditMode}
+                                                                        >
+                                                                                Chỉnh sửa
+                                                                        </Button>
+                                                                )
                                                         )}
                                                 </div>
                                         </div>
@@ -297,7 +339,7 @@ export default function RoleDetailPage() {
                                                                                         const applicable = isActionApplicable(module, action);
                                                                                         const checked =
                                                                                                 typeof permissionId === 'number' ? permissionIds.includes(permissionId) : false;
-                                                                                        const disabled = (role.isSystem && !isSuperAdmin) || !applicable;
+                                                                                        const disabled = (role.isSystem && !isSuperAdmin) || !applicable || !isEditMode;
 
                                                                                         return (
                                                                                                 <td key={action} className="p-3 text-center">
@@ -323,6 +365,37 @@ export default function RoleDetailPage() {
                                                 </table>
                                         </div>
                                 </div>
+
+                                {/* Role Info Section - chỉ hiển thị khi ở chế độ view */}
+                                {!isEditMode && (
+                                        <Card className="mt-4">
+                                                <CardHeader>
+                                                        <CardTitle className="text-base flex items-center gap-2">
+                                                                <FileText className="w-4 h-4" /> Thông tin vai trò
+                                                        </CardTitle>
+                                                </CardHeader>
+                                                <CardContent>
+                                                        <div className="grid grid-cols-2 gap-4">
+                                                                <div className="space-y-2">
+                                                                        <Label className="text-sm font-medium text-gray-500">Ngày tạo</Label>
+                                                                        <div className="text-sm">{role.created_at ? new Date(role.created_at).toLocaleString('vi-VN') : '-'}</div>
+                                                                </div>
+                                                                <div className="space-y-2">
+                                                                        <Label className="text-sm font-medium text-gray-500">Tạo bởi</Label>
+                                                                        <div className="text-sm">{role.created_by_staff_name || '-'}</div>
+                                                                </div>
+                                                                <div className="space-y-2">
+                                                                        <Label className="text-sm font-medium text-gray-500">Cập nhật lần cuối</Label>
+                                                                        <div className="text-sm">{role.updated_at ? new Date(role.updated_at).toLocaleString('vi-VN') : '-'}</div>
+                                                                </div>
+                                                                <div className="space-y-2">
+                                                                        <Label className="text-sm font-medium text-gray-500">Cập nhật bởi</Label>
+                                                                        <div className="text-sm">{role.updated_by_staff_name || '-'}</div>
+                                                                </div>
+                                                        </div>
+                                                </CardContent>
+                                        </Card>
+                                )}
 
                                 {/* Delete Dialog */}
                                 <Dialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>

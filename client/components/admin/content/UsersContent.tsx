@@ -344,6 +344,18 @@ export default function UsersContent({
                                                                                                         {formatDateTime(userDetails.user_updated_at)}
                                                                                                 </p>
                                                                                         </div>
+                                                                                        <div className="flex justify-between items-center border-t pt-2 border-slate-50">
+                                                                                                <p className="text-[11px] text-slate-500 font-medium">Tạo bởi</p>
+                                                                                                <p className="text-[11px] font-mono text-slate-700">
+                                                                                                        {userDetails.created_by_staff_name || '-'}
+                                                                                                </p>
+                                                                                        </div>
+                                                                                        <div className="flex justify-between items-center border-t pt-2 border-slate-50">
+                                                                                                <p className="text-[11px] text-slate-500 font-medium">Cập nhật bởi</p>
+                                                                                                <p className="text-[11px] font-mono text-slate-700">
+                                                                                                        {userDetails.updated_by_staff_name || '-'}
+                                                                                                </p>
+                                                                                        </div>
                                                                                 </div>
                                                                         </div>
                                                                 </div>

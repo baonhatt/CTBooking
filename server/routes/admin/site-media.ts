@@ -1,9 +1,10 @@
 import { eq, and, asc, desc, isNull } from 'drizzle-orm';
 import { formatDateForDb } from '../../lib/date-utils';
+import { logAuditAction } from '../../lib/audit-logger';
 
 export async function createSiteMediaImpl(
         anyDb: any,
-        tables: { site_media: any },
+        tables: { site_media: any; auditLogs: any },
         args: {
                 section: string;
                 type: string;
@@ -19,7 +20,8 @@ export async function createSiteMediaImpl(
                 is_active?: boolean;
         }
         ,
-        deleter?: (url: string, type?: string) => Promise<void>
+        deleter?: (url: string, type?: string) => Promise<void>,
+        staffInfo?: { id: number; email: string; fullname: string }
 ) {
         const {
                 section,
@@ -83,6 +85,22 @@ export async function createSiteMediaImpl(
         // }
 
         if (!item) throw new Error('Không thể tạo site media');
+
+        // Log audit action
+        if (staffInfo) {
+                await logAuditAction(
+                        anyDb,
+                        tables.auditLogs,
+                        'create',
+                        'site_media',
+                        item.id,
+                        `Tạo site media: ${title || type} (${section})`,
+                        staffInfo.id,
+                        staffInfo.email,
+                        staffInfo.fullname
+                );
+        }
+
         return { item };
 }
 
@@ -105,7 +123,7 @@ export async function listSiteMediaImpl(
 
 export async function updateSiteMediaImpl(
         anyDb: any,
-        tables: { site_media: any },
+        tables: { site_media: any; auditLogs: any },
         args: {
                 id: number;
                 section?: string;
@@ -122,7 +140,8 @@ export async function updateSiteMediaImpl(
                 is_active?: boolean;
         }
         ,
-        deleter?: (url: string, type?: string) => Promise<void>
+        deleter?: (url: string, type?: string) => Promise<void>,
+        staffInfo?: { id: number; email: string; fullname: string }
 ) {
         const {
                 id,
@@ -176,14 +195,30 @@ export async function updateSiteMediaImpl(
                 }
         }
 
+        // Log audit action
+        if (staffInfo && item) {
+                await logAuditAction(
+                        anyDb,
+                        tables.auditLogs,
+                        'update',
+                        'site_media',
+                        id,
+                        `Cập nhật site media: ${title || type} (${section})`,
+                        staffInfo.id,
+                        staffInfo.email,
+                        staffInfo.fullname
+                );
+        }
+
         return { item, success: Boolean(item) };
 }
 
 export async function deleteSiteMediaImpl(
         anyDb: any,
-        tables: { site_media: any },
+        tables: { site_media: any; auditLogs: any },
         id: number,
-        deleter?: (url: string, type?: string) => Promise<void>
+        deleter?: (url: string, type?: string) => Promise<void>,
+        staffInfo?: { id: number; email: string; fullname: string }
 ) {
         const existing = await anyDb.query.site_media.findFirst({ where: eq(tables.site_media.id, Number(id)) });
         if (!existing) return { ok: false, message: 'Không tìm thấy media' };
@@ -195,6 +230,22 @@ export async function deleteSiteMediaImpl(
                 }
                 // Delete site media (tương thích với D1/SQLite không hỗ trợ .returning())
                 await anyDb.delete(tables.site_media).where(eq(tables.site_media.id, Number(id)));
+
+                // Log audit action
+                if (staffInfo) {
+                        await logAuditAction(
+                                anyDb,
+                                tables.auditLogs,
+                                'delete',
+                                'site_media',
+                                id,
+                                `Xóa site media: ${existing.title || existing.type} (${existing.section})`,
+                                staffInfo.id,
+                                staffInfo.email,
+                                staffInfo.fullname
+                        );
+                }
+
                 return { ok: true, item: existing };
         } catch (err: any) {
                 return { ok: false, message: err?.message || 'Xóa media thất bại' };

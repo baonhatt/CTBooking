@@ -63,6 +63,8 @@ interface PostData {
         og_image?: string;
         canonical_url?: string;
         schema_type?: string;
+        created_by_staff_name?: string;
+        updated_by_staff_name?: string;
 }
 
 function getPlainTextFromHtml(value?: string) {
@@ -1006,6 +1008,12 @@ export const PostManagement = () => {
                                                                                                 : 'Nháp'}
                                                                         </span>
                                                                         <span>{new Date().toLocaleDateString('vi-VN')}</span>
+                                                                        {editData.created_by_staff_name && (
+                                                                                <span>Tạo bởi: {editData.created_by_staff_name}</span>
+                                                                        )}
+                                                                        {editData.updated_by_staff_name && (
+                                                                                <span>Cập nhật bởi: {editData.updated_by_staff_name}</span>
+                                                                        )}
                                                                 </div>
                                                                 {editData.excerpt?.trim() && <p className="text-slate-600 leading-7">{editData.excerpt.trim()}</p>}
                                                         </header>

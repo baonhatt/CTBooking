@@ -14,7 +14,7 @@ import AdminLayout from '@/admin/layouts/AdminLayout';
 import { useStaffStore } from '@/store/staffStore';
 import { useNavigate } from 'react-router-dom';
 import { useStaffPermissions, useIsSuperAdmin } from '@/hooks/useStaffPermission';
-import { Info, X, Search, RefreshCw } from 'lucide-react';
+import { Info, X, Search, RefreshCw, Eye, FileText, Edit, Trash2, Key } from 'lucide-react';
 
 interface Staff {
         id: number;
@@ -25,12 +25,14 @@ interface Staff {
         isSuperAdmin: boolean;
         forcePasswordChange: boolean;
         roleIds?: number[];
-        roleId?: number;
         roles?: string[];
         branchIds?: number[];
         branchNames?: string[];
         lastLoginAt?: string;
         createdAt: string;
+        updatedAt: string;
+        created_by_staff_name?: string;
+        updated_by_staff_name?: string;
 }
 
 interface Role {
@@ -72,6 +74,7 @@ export default function StaffPage() {
         const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
         const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
         const [isResetPasswordDialogOpen, setIsResetPasswordDialogOpen] = useState(false);
+        const [isDetailDialogOpen, setIsDetailDialogOpen] = useState(false);
 
         // Permission helpers
         const hasPermission = (module: string, action: string) => {
@@ -406,35 +409,41 @@ export default function StaffPage() {
                                                                                                 )}
                                                                                         </td>
                                                                                         <td className="p-3">
-                                                                                                <div className="flex gap-2">
+                                                                                                <div className="flex gap-1">
+                                                                                                        <Button variant="ghost" size="icon" className="h-8 w-8 text-blue-600 hover:text-blue-700 hover:bg-blue-50" onClick={() => { setSelectedStaff(staff); setIsDetailDialogOpen(true); }} title="Chi tiết">
+                                                                                                                <Eye className="w-4 h-4" />
+                                                                                                        </Button>
                                                                                                         {hasPermission('staff', 'edit') && (
-                                                                                                                <Button variant="ghost" size="sm" className="text-yellow-600 hover:text-yellow-700" onClick={() => openEditDialog(staff)}>
-                                                                                                                        Sửa
+                                                                                                                <Button variant="ghost" size="icon" className="h-8 w-8 text-yellow-600 hover:text-yellow-700 hover:bg-yellow-50" onClick={() => openEditDialog(staff)} title="Sửa">
+                                                                                                                        <Edit className="w-4 h-4" />
                                                                                                                 </Button>
                                                                                                         )}
                                                                                                         {hasPermission('staff', 'reset_password') && (
                                                                                                                 <Button
                                                                                                                         variant="ghost"
-                                                                                                                        size="sm"
+                                                                                                                        size="icon"
+                                                                                                                        className="h-8 w-8 text-gray-600 hover:text-gray-700 hover:bg-gray-50"
                                                                                                                         onClick={() => {
                                                                                                                                 setSelectedStaff(staff);
                                                                                                                                 setIsResetPasswordDialogOpen(true);
                                                                                                                         }}
+                                                                                                                        title="Đặt lại mật khẩu"
                                                                                                                 >
-                                                                                                                        Đặt lại mật khẩu
+                                                                                                                        <Key className="w-4 h-4" />
                                                                                                                 </Button>
                                                                                                         )}
                                                                                                         {!staff.isSuperAdmin && hasPermission('staff', 'delete') && (
                                                                                                                 <Button
                                                                                                                         variant="ghost"
-                                                                                                                        size="sm"
-                                                                                                                        className="text-red-600 hover:text-red-700"
+                                                                                                                        size="icon"
+                                                                                                                        className="h-8 w-8 text-red-600 hover:text-red-700 hover:bg-red-50"
                                                                                                                         onClick={() => {
                                                                                                                                 setSelectedStaff(staff);
                                                                                                                                 setIsDeleteDialogOpen(true);
                                                                                                                         }}
+                                                                                                                        title="Xóa"
                                                                                                                 >
-                                                                                                                        Xóa
+                                                                                                                        <Trash2 className="w-4 h-4" />
                                                                                                                 </Button>
                                                                                                         )}
                                                                                                 </div>
@@ -689,6 +698,87 @@ export default function StaffPage() {
                                                                 {resetPasswordMutation.isPending ? 'Đang xử lý...' : 'Xác nhận'}
                                                         </Button>
                                                 </DialogFooter>
+                                        </DialogContent>
+                                </Dialog>
+
+                                {/* Detail Dialog */}
+                                <Dialog open={isDetailDialogOpen} onOpenChange={setIsDetailDialogOpen}>
+                                        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto [&>button]:hidden">
+                                                <DialogHeader className="flex flex-row items-center gap-3 space-y-0 pb-4 border-b">
+                                                        <DialogTitle className="text-lg font-bold text-slate-800">Chi tiết nhân viên</DialogTitle>
+                                                        <div className="flex-1" />
+                                                        <Button
+                                                                variant="ghost"
+                                                                size="icon"
+                                                                onClick={() => setIsDetailDialogOpen(false)}
+                                                                className="h-8 w-8 rounded-full hover:bg-slate-100 text-slate-400 transition-colors"
+                                                        >
+                                                                <X className="w-5 h-5" />
+                                                        </Button>
+                                                </DialogHeader>
+
+                                                {selectedStaff && (
+                                                        <div className="space-y-4">
+                                                                {/* Overview */}
+                                                                <div className="space-y-4 py-4">
+                                                                        <div className="grid grid-cols-2 gap-4">
+                                                                                <div className="space-y-2">
+                                                                                        <Label className="text-sm font-medium text-gray-500">Email</Label>
+                                                                                        <div className="text-sm font-medium">{selectedStaff.email}</div>
+                                                                                </div>
+                                                                                <div className="space-y-2">
+                                                                                        <Label className="text-sm font-medium text-gray-500">Họ tên</Label>
+                                                                                        <div className="text-sm font-medium">{selectedStaff.fullname}</div>
+                                                                                </div>
+                                                                                <div className="space-y-2">
+                                                                                        <Label className="text-sm font-medium text-gray-500">Số điện thoại</Label>
+                                                                                        <div className="text-sm">{selectedStaff.phone || '-'}</div>
+                                                                                </div>
+                                                                                <div className="space-y-2">
+                                                                                        <Label className="text-sm font-medium text-gray-500">Vai trò</Label>
+                                                                                        <div className="text-sm">{selectedStaff.roles?.join(', ') || '-'}</div>
+                                                                                </div>
+                                                                                <div className="space-y-2">
+                                                                                        <Label className="text-sm font-medium text-gray-500">Chi nhánh</Label>
+                                                                                        <div className="text-sm">{selectedStaff.branchNames?.join(', ') || '-'}</div>
+                                                                                </div>
+                                                                                <div className="space-y-2">
+                                                                                        <Label className="text-sm font-medium text-gray-500">Trạng thái</Label>
+                                                                                        <div className="flex gap-2">
+                                                                                                {selectedStaff.isSuperAdmin && (
+                                                                                                        <span className="bg-purple-100 text-purple-800 px-2 py-1 rounded text-xs">Super Admin</span>
+                                                                                                )}
+                                                                                                {selectedStaff.forcePasswordChange && (
+                                                                                                        <span className="bg-yellow-100 text-yellow-800 px-2 py-1 rounded text-xs">Đổi mật khẩu</span>
+                                                                                                )}
+                                                                                        </div>
+                                                                                </div>
+                                                                        </div>
+                                                                        <div className="border-t pt-4 mt-4">
+                                                                                <h4 className="text-sm font-semibold mb-3">Thông tin tạo & cập nhật</h4>
+                                                                                <div className="grid grid-cols-2 gap-4">
+                                                                                        <div className="space-y-2">
+                                                                                                <Label className="text-sm font-medium text-gray-500">Ngày tạo</Label>
+                                                                                                <div className="text-sm">{new Date(selectedStaff.createdAt).toLocaleString('vi-VN')}</div>
+                                                                                        </div>
+                                                                                        <div className="space-y-2">
+                                                                                                <Label className="text-sm font-medium text-gray-500">Tạo bởi</Label>
+                                                                                                <div className="text-sm">{selectedStaff.created_by_staff_name || '-'}</div>
+                                                                                        </div>
+                                                                                        <div className="space-y-2">
+                                                                                                <Label className="text-sm font-medium text-gray-500">Cập nhật lần cuối</Label>
+                                                                                                <div className="text-sm">{selectedStaff.updatedAt ? new Date(selectedStaff.updatedAt).toLocaleString('vi-VN') : '-'}</div>
+                                                                                        </div>
+                                                                                        <div className="space-y-2">
+                                                                                                <Label className="text-sm font-medium text-gray-500">Cập nhật bởi</Label>
+                                                                                                <div className="text-sm">{selectedStaff.updated_by_staff_name || '-'}</div>
+                                                                                        </div>
+                                                                                </div>
+                                                                        </div>
+                                                                </div>
+
+                                                        </div>
+                                                )}
                                         </DialogContent>
                                 </Dialog>
                         </div>

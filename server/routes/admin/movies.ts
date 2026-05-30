@@ -402,11 +402,12 @@ export async function listDeletedMoviesImpl(
 
 export async function updateMovieStatusImpl(
         anyDb: any,
-        tables: { movies: any; ticket_packages: any },
+        tables: { movies: any; ticket_packages: any; auditLogs: any },
         id: number,
         isActive: boolean,
         RUN_ENV?: any,
-        restrictToBranchIds: number[] | null = null
+        restrictToBranchIds: number[] | null = null,
+        staffInfo?: { id: number; email: string; fullname: string }
 ) {
         try {
                 if (typeof isActive !== 'boolean') {
@@ -477,6 +478,21 @@ export async function updateMovieStatusImpl(
                         throw new Error('Movie not found');
                 }
 
+                // Log audit action
+                if (staffInfo) {
+                        await logAuditAction(
+                                anyDb,
+                                tables.auditLogs,
+                                'update',
+                                'movie',
+                                id,
+                                `${isActive ? 'Kích hoạt' : 'Vô hiệu hóa'} phim: ${existingMovie.title}`,
+                                staffInfo.id,
+                                staffInfo.email,
+                                staffInfo.fullname
+                        );
+                }
+
                 return {
                         status: 200,
                         message: 'Đã thay đổi trạng thái thành công!',
@@ -494,7 +510,7 @@ export async function updateMovieStatusImpl(
 
 export async function getMovieByIdImpl(
         anyDb: any,
-        tables: { movies: any; bookings: any; ticket_packages: any },
+        tables: { movies: any; bookings: any; ticket_packages: any; auditLogs: any },
         movieId: number,
         restrictToBranchIds: number[] | null = null
 ) {
@@ -585,6 +601,21 @@ export async function getMovieByIdImpl(
                 return Array.isArray(comboArr) && comboArr.map(String).includes(searchId);
         });
 
+        // Get tracking data from audit logs
+        const [createLog] = await anyDb
+                .select()
+                .from(tables.auditLogs)
+                .where(and(eq(tables.auditLogs.entityType, 'movie'), eq(tables.auditLogs.entityId, String(movieId)), eq(tables.auditLogs.action, 'create')))
+                .orderBy(tables.auditLogs.createdAt)
+                .limit(1);
+
+        const [updateLog] = await anyDb
+                .select()
+                .from(tables.auditLogs)
+                .where(and(eq(tables.auditLogs.entityType, 'movie'), eq(tables.auditLogs.entityId, String(movieId)), eq(tables.auditLogs.action, 'update')))
+                .orderBy(desc(tables.auditLogs.createdAt))
+                .limit(1);
+
         return {
                 id: movie.id,
                 title: movie.title,
@@ -597,6 +628,8 @@ export async function getMovieByIdImpl(
                 release_date: safeDate(movie.release_date),
                 created_at: safeDate(movie.created_at),
                 updated_at: safeDate(movie.updated_at),
+                created_by_staff_name: createLog?.staffFullname || null,
+                updated_by_staff_name: updateLog?.staffFullname || null,
                 stats: { totalTicketsSold, totalRevenue, successfulBookings },
                 applicable_packages: applicablePackages || [],
                 detail_images: safeParseJson(movie.detail_images)

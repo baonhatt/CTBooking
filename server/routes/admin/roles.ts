@@ -45,7 +45,7 @@ export async function listRolesImpl(db: any, tables: any, params?: { page?: numb
 }
 
 export async function getRoleByIdImpl(db: any, tables: any, id: number) {
-        const { roles, rolePermissions, permissions } = tables;
+        const { roles, rolePermissions, permissions, auditLogs } = tables;
 
         const [role] = await db.select().from(roles).where(eq(roles.id, id)).limit(1);
         if (!role) {
@@ -62,10 +62,27 @@ export async function getRoleByIdImpl(db: any, tables: any, id: number) {
                 .innerJoin(permissions, eq(rolePermissions.permissionId, permissions.id))
                 .where(eq(rolePermissions.roleId, id));
 
+        // Get tracking data from audit logs
+        const [createLog] = await db
+                .select()
+                .from(auditLogs)
+                .where(and(eq(auditLogs.entityType, 'role'), eq(auditLogs.entityId, String(id)), eq(auditLogs.action, 'create')))
+                .orderBy(auditLogs.createdAt)
+                .limit(1);
+
+        const [updateLog] = await db
+                .select()
+                .from(auditLogs)
+                .where(and(eq(auditLogs.entityType, 'role'), eq(auditLogs.entityId, String(id)), eq(auditLogs.action, 'update')))
+                .orderBy(desc(auditLogs.createdAt))
+                .limit(1);
+
         return {
                 status: 'success',
                 role: {
                         ...role,
+                        created_by_staff_name: createLog?.staffFullname || null,
+                        updated_by_staff_name: updateLog?.staffFullname || null,
                         permissions: permData.map((p) => ({
                                 id: p.permissionId,
                                 module: p.module,

@@ -260,6 +260,24 @@ export async function staffResetPasswordImpl(
         // Invalidate permission cache
         await invalidateStaffPermissionCache(kv, tokenRecord.staffId);
 
+        // Get staff info for audit log
+        const [staff] = await db.select().from(staffs).where(eq(staffs.id, tokenRecord.staffId)).limit(1);
+
+        // Log audit action
+        if (staff) {
+                await logAuditAction(
+                        db,
+                        tables.auditLogs,
+                        'reset_password',
+                        'staff',
+                        tokenRecord.staffId,
+                        'Staff reset mật khẩu (qua forgot password)',
+                        staff.id,
+                        staff.email,
+                        staff.fullname
+                );
+        }
+
         return { status: 'success', message: 'Đặt lại mật khẩu thành công' };
 }
 
