@@ -1,4 +1,4 @@
-import { eq, desc, or, count, and, sql } from 'drizzle-orm';
+import { eq, desc, or, count, and, sql, isNotNull, like } from 'drizzle-orm';
 import { formatDateForDb } from '../../lib/date-utils';
 import { logAuditAction } from '../../lib/audit-logger';
 import { buildAuditPayload } from '../../lib/audit-utils';
@@ -237,8 +237,15 @@ export async function deleteToyImpl(
                 deleter(existing.image_url).catch((e) => console.error('Failed to delete toy image:', e));
         }
 
-        // Delete toy (tương thích với D1/SQLite không hỗ trợ .returning())
-        await anyDb.delete(tables.toys).where(eq(tables.toys.id, id));
+        // Soft delete by setting status to 'inactive' and deleted_at
+        await anyDb
+                .update(tables.toys)
+                .set({
+                        status: 'inactive',
+                        deleted_at: new Date().toISOString(),
+                        updated_at: formatDateForDb(new Date())
+                })
+                .where(eq(tables.toys.id, id));
 
         if (RUN_ENV && RUN_ENV.KV_BINDING) {
                 await RUN_ENV.KV_BINDING.delete('activeToys');
@@ -264,4 +271,97 @@ export async function deleteToyImpl(
         }
 
         return { ok: true };
+}
+
+export async function restoreToyImpl(
+        anyDb: any,
+        tables: { toys: any; auditLogs: any },
+        id: number,
+        staffInfo?: { id: number; email: string; fullname: string }
+) {
+        const { toys } = tables;
+
+        const existing = await anyDb.query.toys.findFirst({
+                where: and(eq(toys.id, id), isNotNull(toys.deleted_at))
+        });
+
+        if (!existing) {
+                const err: any = new Error('Không tìm thấy đồ chơi hoặc đồ chơi chưa bị xóa');
+                err.statusCode = 404;
+                throw err;
+        }
+
+        // Restore by setting status to 'active' and deleted_at to null
+        await anyDb
+                .update(toys)
+                .set({
+                        status: 'active',
+                        deleted_at: null,
+                        updated_at: formatDateForDb(new Date())
+                })
+                .where(eq(toys.id, id));
+
+        const auditOld = buildAuditPayload(existing);
+        const auditNew = buildAuditPayload({ ...existing, status: 'active', deleted_at: null });
+
+        // Log audit action
+        if (staffInfo) {
+                await logAuditAction(
+                        anyDb,
+                        tables.auditLogs,
+                        'restore',
+                        'toy',
+                        id,
+                        `Khôi phục đồ chơi: ${existing.name}`,
+                        staffInfo.id,
+                        staffInfo.email,
+                        staffInfo.fullname,
+                        auditOld,
+                        auditNew
+                );
+        }
+
+        return { ok: true };
+}
+
+export async function listDeletedToysImpl(
+        anyDb: any,
+        tables: { toys: any },
+        options: { page?: number; pageSize?: number; search?: string } = {}
+) {
+        const { toys } = tables;
+        const { page = 1, pageSize = 10, search = '' } = options;
+
+        const conditions = [];
+        if (search) {
+                conditions.push(
+                        or(
+                                like(toys.name, `%${search}%`),
+                                like(toys.category, `%${search}%`)
+                        )
+                );
+        }
+        conditions.push(isNotNull(toys.deleted_at));
+
+        const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
+
+        const items = await anyDb.query.toys.findMany({
+                where: whereClause,
+                orderBy: [desc(toys.deleted_at)],
+                limit: pageSize,
+                offset: (page - 1) * pageSize
+        });
+
+        const [countResult] = await anyDb
+                .select({ count: count() })
+                .from(toys)
+                .where(whereClause);
+
+        return {
+                status: 'success',
+                items,
+                total: countResult?.count || 0,
+                page,
+                pageSize
+        };
 }

@@ -74,7 +74,8 @@ import {
         updateTicketPackageImpl,
         deleteTicketPackageImpl,
         restoreTicketPackageImpl,
-        listDeletedTicketPackagesImpl
+        listDeletedTicketPackagesImpl,
+        toggleTicketStatusImpl
 } from '../../server/routes/admin/tickets';
 
 import { getEmailLogsImpl } from '../../server/routes/admin/email-logs';
@@ -117,6 +118,7 @@ import {
         updateBranchImpl,
         deleteBranchImpl,
         restoreBranchImpl,
+        toggleBranchStatusImpl,
         listDeletedBranchesImpl
 } from '../../server/routes/admin/branches';
 
@@ -1090,7 +1092,8 @@ app.get('/api/admin/transactions', requireStaffAuth, requirePermission('transact
                 const from = String(c.req.query('from') || '');
 
                 const to = String(c.req.query('to') || '');
-                const branch_id = c.req.query('branch_id') ? Number(c.req.query('branch_id')) : undefined;
+                const branch_id_raw = c.req.query('branch_id');
+                const branch_id = (branch_id_raw && branch_id_raw !== 'all') ? Number(branch_id_raw) : undefined;
 
                 const db = drizzle(c.env.cinema_db, { schema });
                 const restrictBranchIds = getRestrictBranchIds(c);
@@ -1191,9 +1194,9 @@ app.get('/api/admin/dashboard/metrics', requireStaffAuth, requirePermission('das
 
                 const year = yearParam ? parseInt(yearParam) : undefined;
                 const branchIdParam = c.req.query('branch_id');
-                const branchId = branchIdParam ? Number(branchIdParam) : undefined;
+                const branchId = (branchIdParam && branchIdParam !== 'all') ? Number(branchIdParam) : undefined;
                 const restrictBranchIds = getRestrictBranchIds(c);
-                const branchIds = branchId !== undefined && !Number.isNaN(branchId)
+                const branchIds = (branchId !== undefined && !Number.isNaN(branchId))
                         ? restrictBranchIds
                                 ? restrictBranchIds.filter((id) => id === branchId)
                                 : [branchId]
@@ -1244,9 +1247,9 @@ app.get(
 
                         const year = yearParam ? parseInt(yearParam) : undefined;
                         const branchIdParam = c.req.query('branch_id');
-                        const branchId = branchIdParam ? Number(branchIdParam) : undefined;
+                        const branchId = (branchIdParam && branchIdParam !== 'all') ? Number(branchIdParam) : undefined;
                         const restrictBranchIds = getRestrictBranchIds(c);
-                        const branchIds = branchId !== undefined && !Number.isNaN(branchId)
+                        const branchIds = (branchId !== undefined && !Number.isNaN(branchId))
                                 ? restrictBranchIds
                                         ? restrictBranchIds.filter((id) => id === branchId)
                                         : [branchId]
@@ -1277,9 +1280,9 @@ app.get(
 
                         const year = yearParam ? parseInt(yearParam) : undefined;
                         const branchIdParam = c.req.query('branch_id');
-                        const branchId = branchIdParam ? Number(branchIdParam) : undefined;
+                        const branchId = (branchIdParam && branchIdParam !== 'all') ? Number(branchIdParam) : undefined;
                         const restrictBranchIds = getRestrictBranchIds(c);
-                        const branchIds = branchId !== undefined && !Number.isNaN(branchId)
+                        const branchIds = (branchId !== undefined && !Number.isNaN(branchId))
                                 ? restrictBranchIds
                                         ? restrictBranchIds.filter((id) => id === branchId)
                                         : [branchId]
@@ -1312,9 +1315,9 @@ app.get(
 
                         const status = String(c.req.query('status') || 'paid');
                         const branchIdParam = c.req.query('branch_id');
-                        const branchId = branchIdParam ? Number(branchIdParam) : undefined;
+                        const branchId = (branchIdParam && branchIdParam !== 'all') ? Number(branchIdParam) : undefined;
                         const restrictBranchIds = getRestrictBranchIds(c);
-                        const branchIds = branchId !== undefined && !Number.isNaN(branchId)
+                        const branchIds = (branchId !== undefined && !Number.isNaN(branchId))
                                 ? restrictBranchIds
                                         ? restrictBranchIds.filter((id) => id === branchId)
                                         : [branchId]
@@ -2049,7 +2052,8 @@ app.get('/api/movies', async (c) => {
 
                 const status = String(c.req.query('status') || 'all');
 
-                const branchId = c.req.query('branch_id') ? Number(c.req.query('branch_id')) : undefined;
+                const branchIdRaw = c.req.query('branch_id');
+                const branchId = (branchIdRaw && branchIdRaw !== 'all') ? Number(branchIdRaw) : undefined;
 
                 const db = drizzle(c.env.cinema_db, { schema });
                 const restrictBranchIds = getRestrictBranchIds(c);
@@ -2746,6 +2750,51 @@ app.get('/api/toys/:id', async (c) => {
         }
 });
 
+// POST /api/toys/:id/restore
+app.post('/api/admin/toys/:id/restore', requireStaffAuth, requirePermission('toys', 'restore'), async (c) => {
+        try {
+                const { restoreToyImpl } = await import('../../server/routes/admin/toys');
+                const id = Number(c.req.param('id'));
+                const db = drizzle(c.env.cinema_db, { schema });
+                const staffId = c.get('staffId');
+                const staffEmail = c.get('staffEmail');
+                const staffFullname = c.get('staffFullname');
+
+                const r = await restoreToyImpl(
+                        db,
+                        { toys: schema.toys, auditLogs: schema.auditLogs },
+                        id,
+                        { id: staffId, email: staffEmail, fullname: staffFullname }
+                );
+
+                return c.json(r, 200);
+        } catch (err: any) {
+                return c.json({ status: 'error', message: err.message || 'Lỗi máy chủ nội bộ' }, err.statusCode || 500);
+        }
+});
+
+// GET /api/admin/deleted/toys
+app.get('/api/admin/deleted/toys', requireStaffAuth, requirePermission('toys', 'view_deleted'), async (c) => {
+        try {
+                const { listDeletedToysImpl } = await import('../../server/routes/admin/toys');
+                const page = Number(c.req.query('page') || 1);
+                const pageSize = Number(c.req.query('pageSize') || 10);
+                const search = String(c.req.query('search') || '');
+
+                const db = drizzle(c.env.cinema_db, { schema });
+
+                const r = await listDeletedToysImpl(
+                        db,
+                        { toys: schema.toys },
+                        { page, pageSize, search }
+                );
+
+                return c.json(r, 200);
+        } catch (err) {
+                return c.json({ status: 'error', message: 'Lỗi máy chủ nội bộ' }, 500);
+        }
+});
+
 // Create a new toy
 
 // POST /api/toys
@@ -2959,15 +3008,20 @@ app.get('/api/tickets', async (c) => {
 
                 const q = String(c.req.query('q') || '');
 
+                const includeInactive = c.req.query('includeInactive') === 'true';
+
                 const db = drizzle(c.env.cinema_db, { schema });
                 const restrictBranchIds = getRestrictBranchIds(c);
+
+                const branchIdRaw = c.req.query('branch_id');
+                const branchId = (branchIdRaw && branchIdRaw !== 'all') ? Number(branchIdRaw) : undefined;
 
                 const r = await listTicketPackagesImpl(
                         db,
 
                         { ticket_packages: schema.ticket_packages, movies: schema.movies },
 
-                        { page, pageSize, q, restrictToBranchIds: restrictBranchIds }
+                        { page, pageSize, q, includeInactive, branch_id: branchId, restrictToBranchIds: restrictBranchIds }
                 );
 
                 return c.json(r, 200);
@@ -3202,6 +3256,29 @@ app.get('/api/admin/deleted/tickets', requireStaffAuth, requirePermission('ticke
                 return c.json(r, 200);
         } catch (err) {
                 return c.json({ status: 'error', message: 'Lỗi máy chủ nội bộ' }, 500);
+        }
+});
+
+// POST /api/admin/tickets/:id/toggle-status
+app.post('/api/admin/tickets/:id/toggle-status', requireStaffAuth, requirePermission('tickets', 'edit'), async (c) => {
+        try {
+                const id = Number(c.req.param('id'));
+                const db = drizzle(c.env.cinema_db, { schema });
+                const staffId = c.get('staffId');
+                const staffEmail = c.get('staffEmail');
+                const staffFullname = c.get('staffFullname');
+
+                const r = await toggleTicketStatusImpl(
+                        db,
+                        { ticket_packages: schema.ticket_packages, auditLogs: schema.auditLogs },
+                        id,
+                        c.env,
+                        { id: staffId, email: staffEmail, fullname: staffFullname }
+                );
+
+                return c.json(r, 200);
+        } catch (err: any) {
+                return c.json({ status: 'error', message: err.message || 'Lỗi máy chủ nội bộ' }, err.statusCode || 500);
         }
 });
 
@@ -4571,6 +4648,34 @@ app.delete('/api/admin/branches/:id', requireStaffAuth, requirePermission('branc
         }
 });
 
+// Admin: Toggle branch status
+app.post('/api/admin/branches/:id/toggle-status', requireStaffAuth, requirePermission('branches', 'update'), async (c) => {
+        try {
+                const id = Number(c.req.param('id'));
+
+                const db = drizzle(c.env.cinema_db, { schema });
+
+                const staffId = c.get('staffId');
+                const staffEmail = c.get('staffEmail');
+                const staffFullname = c.get('staffFullname');
+
+                const r = await toggleBranchStatusImpl(
+                        db,
+                        {
+                                branches: schema.branches,
+                                auditLogs: schema.auditLogs,
+                                staff_branches: schema.staffBranches
+                        },
+                        id,
+                        { id: staffId, email: staffEmail, fullname: staffFullname }
+                );
+
+                return c.json(r, 200);
+        } catch (err: any) {
+                return c.json({ status: 'error', message: String(err?.message || 'Internal error') }, 500);
+        }
+});
+
 // POST /api/admin/branches/:id/restore
 app.post('/api/admin/branches/:id/restore', requireStaffAuth, requirePermission('branches', 'restore'), async (c) => {
         try {
@@ -5380,7 +5485,7 @@ app.get('/api/admin/deleted/roles', requireStaffAuth, requirePermission('roles',
 
                 const r = await listDeletedRolesImpl(
                         db,
-                        { roles: schema.roles },
+                        { roles: schema.roles, staffs: schema.staffs },
                         { page, pageSize, search }
                 );
 

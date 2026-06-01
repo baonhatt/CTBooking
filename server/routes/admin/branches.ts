@@ -360,6 +360,46 @@ export async function restoreBranchImpl(
         return { ok: true };
 }
 
+export async function toggleBranchStatusImpl(
+        anyDb: any,
+        tables: { branches: any; auditLogs: any; staff_branches: any },
+        id: number,
+        staffInfo?: { id: number; email: string; fullname: string }
+) {
+        const [existing] = await anyDb
+                .select()
+                .from(tables.branches)
+                .where(eq(tables.branches.id, id))
+                .limit(1);
+
+        if (!existing) {
+                throw new Error('Branch not found');
+        }
+
+        const newStatus = !existing.is_active;
+
+        await anyDb
+                .update(tables.branches)
+                .set({ is_active: newStatus, updated_at: new Date().toISOString() })
+                .where(eq(tables.branches.id, id));
+
+        if (staffInfo) {
+                await logAuditAction(
+                        anyDb,
+                        tables.auditLogs,
+                        'update',
+                        'branch',
+                        id,
+                        `${newStatus ? 'Kích hoạt' : 'Ẩn'} chi nhánh: ${existing.name}`,
+                        staffInfo.id,
+                        staffInfo.email,
+                        staffInfo.fullname
+                );
+        }
+
+        return { ok: true, is_active: newStatus };
+}
+
 export async function listDeletedBranchesImpl(
         anyDb: any,
         tables: { branches: any; staffs: any },

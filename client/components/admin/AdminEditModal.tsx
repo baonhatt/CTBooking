@@ -664,25 +664,6 @@ const AdminEditModal: React.FC<AdminEditModalProps> = (props) => {
                                                                                                                 className="w-full h-10 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:border-blue-600 focus:ring-2 focus:ring-blue-600/10 outline-none transition-all"
                                                                                                         />
                                                                                                 </div>
-
-                                                                                                <div className="col-span-12 lg:col-span-6">
-                                                                                                        <Label className="text-sm font-medium text-gray-900 mb-2 block">
-                                                                                                                Trạng thái
-                                                                                                        </Label>
-                                                                                                        <select
-                                                                                                                value={editData?.is_active !== false ? 'active' : 'inactive'}
-                                                                                                                onChange={(e) =>
-                                                                                                                        setEditData({
-                                                                                                                                ...editData,
-                                                                                                                                is_active: e.target.value === 'active'
-                                                                                                                        })
-                                                                                                                }
-                                                                                                                className="w-full h-10 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:border-blue-600 focus:ring-2 focus:ring-blue-600/10 outline-none transition-all"
-                                                                                                        >
-                                                                                                                <option value="active">🟢 Đang chiếu</option>
-                                                                                                                <option value="inactive">🔴 Đã ẩn</option>
-                                                                                                        </select>
-                                                                                                </div>
                                                                                         </div>
                                                                                 </div>
                                                                         </div>
@@ -692,12 +673,6 @@ const AdminEditModal: React.FC<AdminEditModalProps> = (props) => {
 
                                                 {/* VÙNG NÚT BẤM CỐ ĐỊNH */}
                                                 <div className="px-6 py-4 border-t bg-white flex justify-end items-center gap-3 shrink-0">
-                                                        <div className="flex items-center gap-2 mr-auto bg-blue-50 border border-blue-200 rounded-lg px-4 py-2">
-                                                                <span className="text-blue-600 text-sm font-medium">ℹ</span>
-                                                                <span className="text-sm text-blue-800">
-                                                                        Lưu ý: Mọi thay đổi sẽ ảnh hưởng trực tiếp đến lịch chiếu hiện tại.
-                                                                </span>
-                                                        </div>
                                                         <Button
                                                                 variant="ghost"
                                                                 onClick={handleClose}

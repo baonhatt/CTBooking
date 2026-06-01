@@ -54,10 +54,10 @@ function processComboInput(combo: any): number[] {
  */
 export async function listTicketPackagesImpl(
         anyDb: any,
-        tables: { ticket_packages: any; movies: any },
-        args: { page: number; pageSize: number; q: string; includeInactive?: boolean; restrictToBranchIds?: number[] | null }
+        tables: { ticket_packages: any; movies: any; branches?: any },
+        args: { page: number; pageSize: number; q: string; includeInactive?: boolean; branch_id?: number; restrictToBranchIds?: number[] | null }
 ) {
-        const { page, pageSize, q, includeInactive = false, restrictToBranchIds = null } = args;
+        const { page, pageSize, q, includeInactive = false, branch_id, restrictToBranchIds = null } = args;
 
         // 1. Xây dựng điều kiện where
         let whereCondition = includeInactive ? undefined : and(eq(tables.ticket_packages.is_active, true), isNull(tables.ticket_packages.deleted_at));
@@ -72,13 +72,15 @@ export async function listTicketPackagesImpl(
 
                 whereCondition = whereCondition ? and(whereCondition, searchCondition) : searchCondition;
         }
+        if (branch_id) {
+                whereCondition = whereCondition ? and(whereCondition, eq(tables.ticket_packages.branch_id, branch_id)) : eq(tables.ticket_packages.branch_id, branch_id);
+        }
         if (restrictToBranchIds && restrictToBranchIds.length > 0) {
                 whereCondition = whereCondition
                         ? and(whereCondition, inArray(tables.ticket_packages.branch_id, restrictToBranchIds))
                         : inArray(tables.ticket_packages.branch_id, restrictToBranchIds);
         }
-
-        // 2. Lấy dữ liệu phân trang
+        // 2. Lấy dữ liệu phân trang - tạm thời bỏ join branches
         const [totalResArray, pkgList] = await Promise.all([
                 anyDb.select({ count: count() }).from(tables.ticket_packages).where(whereCondition),
                 anyDb
@@ -148,7 +150,7 @@ export async function listTicketPackagesImpl(
  */
 export async function getTicketPackageImpl(
         anyDb: any,
-        tables: { ticket_packages: any; auditLogs: any },
+        tables: { ticket_packages: any; auditLogs: any; branches?: any },
         id: number,
         restrictToBranchIds: number[] | null = null
 ) {
@@ -156,7 +158,7 @@ export async function getTicketPackageImpl(
                 restrictToBranchIds && restrictToBranchIds.length > 0
                         ? and(eq(tables.ticket_packages.id, id), inArray(tables.ticket_packages.branch_id, restrictToBranchIds))
                         : eq(tables.ticket_packages.id, id);
-        const [item] = await anyDb.select().from(tables.ticket_packages).where(whereClause).limit(1)
+        const [item] = await anyDb.select().from(tables.ticket_packages).where(whereClause).limit(1);
         if (!item) return null;
 
         // Get tracking data from audit logs
@@ -722,4 +724,57 @@ export async function listDeletedTicketPackagesImpl(
                 page,
                 pageSize
         };
+}
+
+export async function toggleTicketStatusImpl(
+        anyDb: any,
+        tables: { ticket_packages: any; auditLogs: any },
+        id: number,
+        RUN_ENV: any,
+        staffInfo?: { id: number; email: string; fullname: string }
+) {
+        const existing = await anyDb.query.ticket_packages.findFirst({
+                where: eq(tables.ticket_packages.id, id)
+        });
+
+        if (!existing) {
+                const err: any = new Error('Gói vé không tồn tại');
+                err.statusCode = 404;
+                throw err;
+        }
+
+        const newStatus = !existing.is_active;
+
+        await anyDb
+                .update(tables.ticket_packages)
+                .set({
+                        is_active: newStatus,
+                        updated_at: formatDateForDb(new Date())
+                })
+                .where(eq(tables.ticket_packages.id, id));
+
+        if (RUN_ENV && RUN_ENV.KV_BINDING) {
+                await RUN_ENV.KV_BINDING.delete('activeTicketPackages');
+        }
+
+        const auditOld = buildAuditPayload(existing);
+        const auditNew = buildAuditPayload({ ...existing, is_active: newStatus });
+
+        if (staffInfo) {
+                await logAuditAction(
+                        anyDb,
+                        tables.auditLogs,
+                        'update',
+                        'ticket_package',
+                        id,
+                        `${newStatus ? 'Kích hoạt' : 'Ẩn'} gói vé: ${existing.name}`,
+                        staffInfo.id,
+                        staffInfo.email,
+                        staffInfo.fullname,
+                        auditOld,
+                        auditNew
+                );
+        }
+
+        return { ok: true, is_active: newStatus };
 }

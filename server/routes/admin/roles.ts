@@ -7,11 +7,17 @@ export async function listRolesImpl(db: any, tables: any, params?: { page?: numb
         const { page = 1, pageSize = 100 } = params || {};
         const offset = (page - 1) * pageSize;
 
-        const roleList = await db.select().from(roles).orderBy(desc(roles.level)).limit(pageSize).offset(offset);
+        const roleList = await db
+                .select()
+                .from(roles)
+                .where(isNull(roles.deleted_at))
+                .orderBy(desc(roles.level))
+                .limit(pageSize)
+                .offset(offset);
 
         // Get permissions for each role
         const rolesWithPerms = await Promise.all(
-                roleList.map(async (role) => {
+                roleList.map(async (role: any) => {
                         const permData = await db
                                 .select({
                                         permissionId: rolePermissions.permissionId,
@@ -24,8 +30,8 @@ export async function listRolesImpl(db: any, tables: any, params?: { page?: numb
 
                         return {
                                 ...role,
-                                permissionIds: permData.map((p) => p.permissionId),
-                                permissions: permData.map((p) => ({
+                                permissionIds: permData.map((p: any) => p.permissionId),
+                                permissions: permData.map((p: any) => ({
                                         id: p.permissionId,
                                         module: p.module,
                                         action: p.action
@@ -35,11 +41,61 @@ export async function listRolesImpl(db: any, tables: any, params?: { page?: numb
         );
 
         // Get total count
-        const [{ count }] = await db.select({ count: { count: roles.id } }).from(roles);
+        const [countResult] = await db
+                .select({ count: count() })
+                .from(roles)
+                .where(isNull(roles.deleted_at));
 
         return {
                 items: rolesWithPerms,
-                total: count,
+                total: countResult?.count || 0,
+                page,
+                pageSize
+        };
+}
+
+export async function listDeletedRolesImpl(
+        db: any,
+        tables: { roles: any; staffs: any },
+        options: { page?: number; pageSize?: number; search?: string } = {}
+) {
+        const { roles, staffs } = tables;
+        const { page = 1, pageSize = 10, search = '' } = options;
+
+        const conditions = [];
+        if (search) {
+                conditions.push(like(roles.name, `%${search}%`));
+        }
+        conditions.push(isNotNull(roles.deleted_at));
+
+        const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
+
+        const items = await db
+                .select({
+                        id: roles.id,
+                        name: roles.name,
+                        description: roles.description,
+                        isSystem: roles.isSystem,
+                        level: roles.level,
+                        deleted_at: roles.deleted_at,
+                        deleted_by_staff_name: staffs.fullname
+                })
+                .from(roles)
+                .leftJoin(staffs, eq(roles.deleted_by_staff_id, staffs.id))
+                .where(whereClause)
+                .limit(pageSize)
+                .offset((page - 1) * pageSize)
+                .orderBy(desc(roles.deleted_at));
+
+        const [countResult] = await db
+                .select({ count: count() })
+                .from(roles)
+                .where(whereClause);
+
+        return {
+                status: 'success',
+                items,
+                total: countResult?.count || 0,
                 page,
                 pageSize
         };
@@ -379,50 +435,3 @@ export async function listPermissionsImpl(db: any, tables: any) {
         };
 }
 
-export async function listDeletedRolesImpl(
-        db: any,
-        tables: any,
-        options: { page?: number; pageSize?: number; search?: string } = {}
-) {
-        const { roles, staffs } = tables;
-        const { page = 1, pageSize = 10, search = '' } = options;
-
-        const conditions = [];
-        if (search) {
-                conditions.push(like(roles.name, `%${search}%`));
-        }
-        conditions.push(isNotNull(roles.deleted_at));
-
-        const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
-
-        const items = await db
-                .select({
-                        id: roles.id,
-                        name: roles.name,
-                        description: roles.description,
-                        isSystem: roles.isSystem,
-                        level: roles.level,
-                        deleted_at: roles.deleted_at,
-                        deleted_by_staff_id: roles.deleted_by_staff_id,
-                        deleted_by_staff_name: staffs.fullname
-                })
-                .from(roles)
-                .leftJoin(staffs, eq(roles.deleted_by_staff_id, staffs.id))
-                .where(whereClause)
-                .limit(pageSize)
-                .offset((page - 1) * pageSize)
-                .orderBy(desc(roles.deleted_at));
-
-        const [countResult] = await db
-                .select({ count: count() })
-                .from(roles)
-                .where(whereClause);
-
-        return {
-                status: 'success',
-                items,
-                total: countResult?.count || 0,
-                page,
-                pageSize
-        };
-}

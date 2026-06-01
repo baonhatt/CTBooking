@@ -1,8 +1,11 @@
 import React, { useEffect, useState } from 'react';
 import AdminLayout from '@/admin/layouts/AdminLayout';
-import { getBranches, deleteBranchApi } from '@/lib/api/branches';
+import { getBranches, deleteBranchApi, toggleBranchStatusApi } from '@/lib/api/branches';
 import { toast } from 'sonner';
-import { Edit2, X, Search, RefreshCw, Pencil, Trash2, Plus, Building2, Eye } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { useStaffStore } from '@/store/staffStore';
+import { useStaffPermissions, useIsSuperAdmin } from '@/hooks/useStaffPermission';
+import { Edit2, X, Search, RefreshCw, Pencil, Trash2, Plus, Building2, Eye, EyeOff, Phone, Mail, MapPin, BarChart3, History, Info } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from '@/components/ui/table';
@@ -23,7 +26,8 @@ import {
         AlertDialogDescription,
         AlertDialogFooter,
         AlertDialogHeader,
-        AlertDialogTitle
+        AlertDialogTitle,
+        AlertDialogTrigger
 } from '@/components/ui/alert-dialog';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
@@ -47,8 +51,29 @@ interface Branch {
 }
 
 export default function BranchesPage() {
+        const navigate = useNavigate();
+        const staff = useStaffStore((state) => state.staff);
+        const clearStaff = useStaffStore((state) => state.clearStaff);
+        const permissions = useStaffPermissions();
+        const isSuperAdmin = useIsSuperAdmin();
+
+        const hasPermission = (module: string, action: string) => {
+                if (isSuperAdmin) return true;
+                return permissions.some((p) => p.module === module && p.action === action);
+        };
+
+        const getInitialFilters = () => {
+                try {
+                        const raw = localStorage.getItem('admin_branches_filters');
+                        if (raw) return JSON.parse(raw);
+                } catch { }
+                return {};
+        };
+
+        const initialFilters = getInitialFilters();
+
         const [branches, setBranches] = useState<Branch[]>([]);
-        const [page, setPage] = useState(1);
+        const [page, setPage] = useState(initialFilters.page || 1);
         const pageSize = 10;
         const [total, setTotal] = useState(0);
         const totalPages = Math.max(1, Math.ceil(total / pageSize));
@@ -57,13 +82,15 @@ export default function BranchesPage() {
         const [isEditOpen, setIsEditOpen] = useState(false);
         const [editData, setEditData] = useState<any>(null);
         const [isLoading, setIsLoading] = useState(false);
-        const [showActiveOnly, setShowActiveOnly] = useState(true);
-        const [searchQuery, setSearchQuery] = useState('');
+        const [showActiveOnly, setShowActiveOnly] = useState(initialFilters.showActiveOnly ?? true);
+        const [searchQuery, setSearchQuery] = useState(initialFilters.searchQuery || '');
         const [isCodeEditable, setIsCodeEditable] = useState(false);
         const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
         const [branchToDelete, setBranchToDelete] = useState<number | null>(null);
         const [isDetailDialogOpen, setIsDetailDialogOpen] = useState(false);
         const [selectedBranch, setSelectedBranch] = useState<Branch | null>(null);
+        const [toggleDialogOpen, setToggleDialogOpen] = useState(false);
+        const [branchToToggle, setBranchToToggle] = useState<{ id: number; currentStatus: boolean } | null>(null);
 
         const generateCode = () => {
                 const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
@@ -91,6 +118,13 @@ export default function BranchesPage() {
                 handleRefresh();
         }, [page, showActiveOnly, searchQuery]);
 
+        useEffect(() => {
+                try {
+                        const state = { page, showActiveOnly, searchQuery };
+                        localStorage.setItem('admin_branches_filters', JSON.stringify(state));
+                } catch { }
+        }, [page, showActiveOnly, searchQuery]);
+
         const openCreate = () => {
                 setEditData({ id: 0, name: '', code: generateCode(), is_default: false, is_active: true });
                 setIsCodeEditable(false);
@@ -113,6 +147,33 @@ export default function BranchesPage() {
                         await deleteBranchApi(branchToDelete);
                         toast.success('Đã xóa chi nhánh thành công');
                         setDeleteDialogOpen(false);
+                        handleRefresh();
+                } catch (e: any) {
+                        toast.error('Lỗi', {
+                                description: e?.message || 'Có lỗi xảy ra'
+                        });
+                }
+        };
+
+        const handleToggleStatus = (id: number, currentStatus: boolean) => {
+                // Find the branch to check if it's default
+                const branch = branches.find(b => b.id === id);
+                if (!currentStatus && branch?.is_default) {
+                        toast.error('Không thể ẩn chi nhánh mặc định', {
+                                description: 'Vui lòng bỏ chọn "Chi nhánh mặc định" trước khi ẩn chi nhánh này.'
+                        });
+                        return;
+                }
+                setBranchToToggle({ id, currentStatus });
+                setToggleDialogOpen(true);
+        };
+
+        const handleConfirmToggle = async () => {
+                if (!branchToToggle) return;
+                try {
+                        await toggleBranchStatusApi(branchToToggle.id);
+                        toast.success(branchToToggle.currentStatus ? 'Đã ẩn chi nhánh' : 'Đã kích hoạt chi nhánh');
+                        setToggleDialogOpen(false);
                         handleRefresh();
                 } catch (e: any) {
                         toast.error('Lỗi', {
@@ -168,13 +229,23 @@ export default function BranchesPage() {
 
                                         <div className="flex flex-wrap items-center gap-3">
                                                 <div className="flex items-center gap-2 px-3 py-1.5 bg-slate-50 rounded-xl border border-slate-200">
-                                                        <span className="text-[10px] font-bold text-slate-500 uppercase">Hoạt động</span>
+                                                        <span className="text-[10px] font-bold text-slate-500 uppercase">Chỉ hiện khả dụng</span>
                                                         <Switch
                                                                 checked={showActiveOnly}
                                                                 onCheckedChange={setShowActiveOnly}
                                                                 className="data-[state=checked]:bg-green-500 data-[state=unchecked]:bg-gray-300 cursor-pointer"
                                                         />
                                                 </div>
+                                                {hasPermission('branches', 'view_deleted') && (
+                                                        <Button
+                                                                variant="outline"
+                                                                onClick={() => navigate('/deleted/branches')}
+                                                                className="flex items-center gap-2 h-10 px-4"
+                                                        >
+                                                                <Trash2 className="w-4 h-4" />
+                                                                Xem đã xóa
+                                                        </Button>
+                                                )}
                                                 <Button
                                                         onClick={openCreate}
                                                         className="bg-blue-600 hover:bg-blue-700 rounded-lg shadow-sm gap-2 text-white h-10 px-5 font-medium"
@@ -197,7 +268,6 @@ export default function BranchesPage() {
                                                                                 <TableHead className="text-xs font-semibold text-gray-600 uppercase py-3">Địa chỉ</TableHead>
                                                                                 <TableHead className="text-center text-xs font-semibold text-gray-600 uppercase py-3">Mặc định</TableHead>
                                                                                 <TableHead className="text-center text-xs font-semibold text-gray-600 uppercase py-3">Trạng thái</TableHead>
-                                                                                <TableHead className="text-center text-xs font-semibold text-gray-600 uppercase py-3">Phim</TableHead>
                                                                                 <TableHead className="text-right text-xs font-semibold text-gray-600 uppercase py-3 pr-6">
                                                                                         Thao tác
                                                                                 </TableHead>
@@ -220,16 +290,48 @@ export default function BranchesPage() {
                                                                                                 )}
                                                                                         </TableCell>
                                                                                         <TableCell className="text-center">
-                                                                                                <Badge
-                                                                                                        className={`text-xs font-medium px-2 py-0.5 rounded-full border ${branch.is_active
-                                                                                                                ? 'bg-green-50 text-green-700 border-green-200'
-                                                                                                                : 'bg-gray-100 text-gray-500 border-gray-200'
-                                                                                                                }`}
-                                                                                                >
-                                                                                                        {branch.is_active ? 'Hoạt động' : 'Ngừng'}
-                                                                                                </Badge>
+                                                                                                <AlertDialog>
+                                                                                                        <AlertDialogTrigger asChild>
+                                                                                                                <Switch
+                                                                                                                        checked={branch.is_active}
+                                                                                                                        className="scale-100 transition-all border-2 border-transparent cursor-pointer"
+                                                                                                                        style={{
+                                                                                                                                opacity: 1,
+                                                                                                                                backgroundColor: branch.is_active ? '#10b981' : '#d1d5db',
+                                                                                                                                boxShadow: 'none'
+                                                                                                                        }}
+                                                                                                                />
+                                                                                                        </AlertDialogTrigger>
+                                                                                                        <AlertDialogContent>
+                                                                                                                <AlertDialogHeader>
+                                                                                                                        <AlertDialogTitle>Xác nhận thay đổi trạng thái</AlertDialogTitle>
+                                                                                                                        <AlertDialogDescription>
+                                                                                                                                Bạn có chắc chắn muốn {branch.is_active ? 'ẩn' : 'kích hoạt'} chi nhánh này?
+                                                                                                                        </AlertDialogDescription>
+                                                                                                                </AlertDialogHeader>
+                                                                                                                <AlertDialogFooter>
+                                                                                                                        <AlertDialogCancel onClick={() => setBranchToToggle(null)}>Hủy</AlertDialogCancel>
+                                                                                                                        <AlertDialogAction onClick={async () => {
+                                                                                                                                if (branch.is_active && branch.is_default) {
+                                                                                                                                        toast.error('Không thể ẩn chi nhánh mặc định', {
+                                                                                                                                                description: 'Vui lòng bỏ chọn "Chi nhánh mặc định" trước khi ẩn chi nhánh này.'
+                                                                                                                                        });
+                                                                                                                                        return;
+                                                                                                                                }
+                                                                                                                                try {
+                                                                                                                                        await toggleBranchStatusApi(branch.id);
+                                                                                                                                        toast.success(branch.is_active ? 'Đã ẩn chi nhánh' : 'Đã kích hoạt chi nhánh');
+                                                                                                                                        handleRefresh();
+                                                                                                                                } catch (e: any) {
+                                                                                                                                        toast.error('Lỗi', {
+                                                                                                                                                description: e?.message || 'Có lỗi xảy ra'
+                                                                                                                                        });
+                                                                                                                                }
+                                                                                                                        }}>Xác nhận</AlertDialogAction>
+                                                                                                                </AlertDialogFooter>
+                                                                                                        </AlertDialogContent>
+                                                                                                </AlertDialog>
                                                                                         </TableCell>
-                                                                                        <TableCell className="text-center text-sm text-slate-600">{branch.movie_count}</TableCell>
                                                                                         <TableCell className="text-right pr-6">
                                                                                                 <div className="flex justify-end gap-1">
                                                                                                         <Button
@@ -317,6 +419,7 @@ export default function BranchesPage() {
                                         onClose={() => setIsEditOpen(false)}
                                         data={editData}
                                         onSave={handleRefresh}
+                                        branches={branches}
                                 />
                         )}
                         <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
@@ -336,7 +439,7 @@ export default function BranchesPage() {
 
                         {/* Detail Dialog */}
                         <Dialog open={isDetailDialogOpen} onOpenChange={setIsDetailDialogOpen}>
-                                <DialogContent className="[&>button]:hidden max-w-2xl">
+                                <DialogContent className="[&>button]:hidden max-w-4xl">
                                         <DialogHeader className="flex flex-row items-center gap-3 space-y-0 pb-4 border-b">
                                                 <DialogTitle className="text-lg font-bold text-slate-800">Chi tiết chi nhánh</DialogTitle>
                                                 <div className="flex-1" />
@@ -350,72 +453,119 @@ export default function BranchesPage() {
                                                 </Button>
                                         </DialogHeader>
                                         {selectedBranch && (
-                                                <div className="space-y-4 py-4">
-                                                        <div className="grid grid-cols-2 gap-4">
-                                                                <div className="space-y-2">
-                                                                        <Label className="text-sm font-medium text-gray-500">Tên</Label>
-                                                                        <div className="text-sm font-medium">{selectedBranch.name}</div>
-                                                                </div>
-                                                                <div className="space-y-2">
-                                                                        <Label className="text-sm font-medium text-gray-500">Mã</Label>
-                                                                        <div className="text-sm font-mono">{selectedBranch.code}</div>
-                                                                </div>
-                                                                <div className="space-y-2">
-                                                                        <Label className="text-sm font-medium text-gray-500">Địa chỉ</Label>
-                                                                        <div className="text-sm">{selectedBranch.address || '-'}</div>
-                                                                </div>
-                                                                <div className="space-y-2">
-                                                                        <Label className="text-sm font-medium text-gray-500">Số điện thoại</Label>
-                                                                        <div className="text-sm">{selectedBranch.phone || '-'}</div>
-                                                                </div>
-                                                                <div className="space-y-2">
-                                                                        <Label className="text-sm font-medium text-gray-500">Email</Label>
-                                                                        <div className="text-sm">{selectedBranch.email || '-'}</div>
-                                                                </div>
-                                                                <div className="space-y-2">
-                                                                        <Label className="text-sm font-medium text-gray-500">Trạng thái</Label>
-                                                                        <div className="flex gap-2">
-                                                                                {selectedBranch.is_default && (
-                                                                                        <span className="bg-green-100 text-green-800 px-2 py-1 rounded text-xs">Mặc định</span>
-                                                                                )}
-                                                                                <span className={`px-2 py-1 rounded text-xs ${selectedBranch.is_active ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-600'}`}>
-                                                                                        {selectedBranch.is_active ? 'Hoạt động' : 'Ngừng'}
-                                                                                </span>
-                                                                        </div>
-                                                                </div>
-                                                                <div className="space-y-2">
-                                                                        <Label className="text-sm font-medium text-gray-500">Số phim</Label>
-                                                                        <div className="text-sm">{selectedBranch.movie_count}</div>
-                                                                </div>
-                                                                <div className="space-y-2">
-                                                                        <Label className="text-sm font-medium text-gray-500">Số gói vé</Label>
-                                                                        <div className="text-sm">{selectedBranch.package_count}</div>
-                                                                </div>
-                                                                <div className="space-y-2">
-                                                                        <Label className="text-sm font-medium text-gray-500">Số booking</Label>
-                                                                        <div className="text-sm">{selectedBranch.booking_count}</div>
-                                                                </div>
-                                                        </div>
-                                                        <div className="border-t pt-4 mt-4">
-                                                                <h4 className="text-sm font-semibold mb-3">Thông tin tạo & cập nhật</h4>
-                                                                <div className="grid grid-cols-2 gap-4">
-                                                                        <div className="space-y-2">
-                                                                                <Label className="text-sm font-medium text-gray-500">Ngày tạo</Label>
-                                                                                <div className="text-sm">{new Date(selectedBranch.created_at).toLocaleString('vi-VN')}</div>
-                                                                        </div>
-                                                                        <div className="space-y-2">
-                                                                                <Label className="text-sm font-medium text-gray-500">Tạo bởi</Label>
-                                                                                <div className="text-sm">{selectedBranch.created_by_staff_name || '-'}</div>
-                                                                        </div>
-                                                                        <div className="space-y-2">
-                                                                                <Label className="text-sm font-medium text-gray-500">Cập nhật lần cuối</Label>
-                                                                                <div className="text-sm">{new Date(selectedBranch.updated_at).toLocaleString('vi-VN')}</div>
-                                                                        </div>
-                                                                        <div className="space-y-2">
-                                                                                <Label className="text-sm font-medium text-gray-500">Cập nhật bởi</Label>
-                                                                                <div className="text-sm">{selectedBranch.updated_by_staff_name || '-'}</div>
-                                                                        </div>
-                                                                </div>
+                                                <div className="py-4 max-h-[85vh] overflow-y-auto pr-2 custom-scrollbar">
+                                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                                                {/* Basic Info */}
+                                                                <Card className="border-slate-200 shadow-none bg-slate-50/50 h-fit">
+                                                                        <CardContent className="p-4 space-y-4">
+                                                                                <div className="flex items-center gap-2 pb-2 border-b border-slate-200">
+                                                                                        <Info className="w-4 h-4 text-blue-500" />
+                                                                                        <h3 className="text-sm font-semibold text-slate-800">Thông tin cơ bản</h3>
+                                                                                </div>
+                                                                                <div className="grid grid-cols-2 gap-x-4 gap-y-4">
+                                                                                        <div className="space-y-1">
+                                                                                                <Label className="text-[11px] font-medium text-slate-500 uppercase tracking-wider">Tên chi nhánh</Label>
+                                                                                                <div className="text-sm font-semibold text-slate-900 leading-tight">{selectedBranch.name}</div>
+                                                                                        </div>
+                                                                                        <div className="space-y-1">
+                                                                                                <Label className="text-[11px] font-medium text-slate-500 uppercase tracking-wider">Mã chi nhánh</Label>
+                                                                                                <div className="text-sm font-mono text-blue-600 font-medium">{selectedBranch.code}</div>
+                                                                                        </div>
+                                                                                        <div className="space-y-1 col-span-2">
+                                                                                                <Label className="text-[11px] font-medium text-slate-500 uppercase tracking-wider">Trạng thái</Label>
+                                                                                                <div className="flex gap-2 pt-0.5">
+                                                                                                        {selectedBranch.is_default && (
+                                                                                                                <Badge className="bg-green-100 text-green-700 hover:bg-green-100 border-none rounded-full px-2 py-0 text-[10px] h-5">Mặc định</Badge>
+                                                                                                        )}
+                                                                                                        <Badge className={`${selectedBranch.is_active ? 'bg-blue-100 text-blue-700 hover:bg-blue-100' : 'bg-slate-100 text-slate-600 hover:bg-slate-100'} border-none rounded-full px-2 py-0 text-[10px] h-5`}>
+                                                                                                                {selectedBranch.is_active ? 'Hoạt động' : 'Ngừng'}
+                                                                                                        </Badge>
+                                                                                                </div>
+                                                                                        </div>
+                                                                                </div>
+                                                                        </CardContent>
+                                                                </Card>
+
+                                                                {/* Contact Info */}
+                                                                <Card className="border-slate-200 shadow-none bg-slate-50/50 h-fit">
+                                                                        <CardContent className="p-4 space-y-4">
+                                                                                <div className="flex items-center gap-2 pb-2 border-b border-slate-200">
+                                                                                        <MapPin className="w-4 h-4 text-orange-500" />
+                                                                                        <h3 className="text-sm font-semibold text-slate-800">Thông tin liên hệ</h3>
+                                                                                </div>
+                                                                                <div className="space-y-3">
+                                                                                        <div className="flex items-start gap-3">
+                                                                                                <MapPin className="w-3.5 h-3.5 text-slate-400 mt-0.5 shrink-0" />
+                                                                                                <div className="space-y-0.5">
+                                                                                                        <Label className="text-[10px] font-medium text-slate-500">Địa chỉ</Label>
+                                                                                                        <div className="text-sm text-slate-700 leading-tight">{selectedBranch.address || 'Chưa cập nhật'}</div>
+                                                                                                </div>
+                                                                                        </div>
+                                                                                        <div className="grid grid-cols-2 gap-4">
+                                                                                                <div className="flex items-start gap-3">
+                                                                                                        <Phone className="w-3.5 h-3.5 text-slate-400 mt-0.5 shrink-0" />
+                                                                                                        <div className="space-y-0.5">
+                                                                                                                <Label className="text-[10px] font-medium text-slate-500">Điện thoại</Label>
+                                                                                                                <div className="text-sm text-slate-700">{selectedBranch.phone || 'Chưa cập nhật'}</div>
+                                                                                                        </div>
+                                                                                                </div>
+                                                                                                <div className="flex items-start gap-3">
+                                                                                                        <Mail className="w-3.5 h-3.5 text-slate-400 mt-0.5 shrink-0" />
+                                                                                                        <div className="space-y-0.5">
+                                                                                                                <Label className="text-[10px] font-medium text-slate-500">Email</Label>
+                                                                                                                <div className="text-sm text-slate-700 break-all leading-tight">{selectedBranch.email || 'Chưa cập nhật'}</div>
+                                                                                                        </div>
+                                                                                                </div>
+                                                                                        </div>
+                                                                                </div>
+                                                                        </CardContent>
+                                                                </Card>
+
+                                                                {/* Statistics */}
+                                                                <Card className="border-slate-200 shadow-none bg-slate-50/50 h-fit">
+                                                                        <CardContent className="p-4 space-y-4">
+                                                                                <div className="flex items-center gap-2 pb-2 border-b border-slate-200">
+                                                                                        <BarChart3 className="w-4 h-4 text-purple-500" />
+                                                                                        <h3 className="text-sm font-semibold text-slate-800">Thống kê hoạt động</h3>
+                                                                                </div>
+                                                                                <div className="grid grid-cols-3 gap-3">
+                                                                                        <div className="bg-white p-3 rounded-xl border border-slate-100 shadow-sm text-center space-y-1">
+                                                                                                <div className="text-[10px] text-slate-500 uppercase font-bold tracking-tighter">Số phim</div>
+                                                                                                <div className="text-lg font-bold text-blue-600">{selectedBranch.movie_count}</div>
+                                                                                        </div>
+                                                                                        <div className="bg-white p-3 rounded-xl border border-slate-100 shadow-sm text-center space-y-1">
+                                                                                                <div className="text-[10px] text-slate-500 uppercase font-bold tracking-tighter">Số gói vé</div>
+                                                                                                <div className="text-lg font-bold text-purple-600">{selectedBranch.package_count}</div>
+                                                                                        </div>
+                                                                                        <div className="bg-white p-3 rounded-xl border border-slate-100 shadow-sm text-center space-y-1">
+                                                                                                <div className="text-[10px] text-slate-500 uppercase font-bold tracking-tighter">Booking</div>
+                                                                                                <div className="text-lg font-bold text-green-600">{selectedBranch.booking_count}</div>
+                                                                                        </div>
+                                                                                </div>
+                                                                        </CardContent>
+                                                                </Card>
+
+                                                                {/* System Info */}
+                                                                <Card className="border-slate-200 shadow-none bg-slate-50/50 h-fit">
+                                                                        <CardContent className="p-4 space-y-4">
+                                                                                <div className="flex items-center gap-2 pb-2 border-b border-slate-200">
+                                                                                        <History className="w-4 h-4 text-slate-500" />
+                                                                                        <h3 className="text-sm font-semibold text-slate-800">Thông tin hệ thống</h3>
+                                                                                </div>
+                                                                                <div className="grid grid-cols-2 gap-4">
+                                                                                        <div className="space-y-1">
+                                                                                                <Label className="text-[10px] font-medium text-slate-500 uppercase tracking-tighter">Ngày tạo</Label>
+                                                                                                <div className="text-xs text-slate-700 font-medium">{new Date(selectedBranch.created_at).toLocaleString('vi-VN')}</div>
+                                                                                                <div className="text-[10px] text-slate-400 font-medium italic">Bởi: {selectedBranch.created_by_staff_name || 'Hệ thống'}</div>
+                                                                                        </div>
+                                                                                        <div className="space-y-1">
+                                                                                                <Label className="text-[10px] font-medium text-slate-500 uppercase tracking-tighter">Cập nhật cuối</Label>
+                                                                                                <div className="text-xs text-slate-700 font-medium">{new Date(selectedBranch.updated_at).toLocaleString('vi-VN')}</div>
+                                                                                                <div className="text-[10px] text-slate-400 font-medium italic">Bởi: {selectedBranch.updated_by_staff_name || 'Hệ thống'}</div>
+                                                                                        </div>
+                                                                                </div>
+                                                                        </CardContent>
+                                                                </Card>
                                                         </div>
                                                 </div>
                                         )}
@@ -425,7 +575,7 @@ export default function BranchesPage() {
         );
 }
 
-function BranchEditModal({ isOpen, onClose, data, onSave }: any) {
+function BranchEditModal({ isOpen, onClose, data, onSave, branches }: any) {
         const [formData, setFormData] = useState({
                 name: '',
                 code: '',
@@ -449,7 +599,7 @@ function BranchEditModal({ isOpen, onClose, data, onSave }: any) {
                                 is_default: data.is_default || false,
                                 is_active: data.is_active ?? true
                         });
-                        setIsCodeEditable(data.id !== 0); // Allow edit for existing branches
+                        setIsCodeEditable(false); // Default to locked
                 }
         }, [data]);
 
@@ -458,6 +608,18 @@ function BranchEditModal({ isOpen, onClose, data, onSave }: any) {
                 setIsLoading(true);
 
                 try {
+                        // Check if setting as default and another branch is already default
+                        if (formData.is_default) {
+                                const existingDefault = branches.find(b => b.is_default && b.id !== data.id);
+                                if (existingDefault) {
+                                        toast.error('Không thể đặt làm mặc định', {
+                                                description: `Chi nhánh "${existingDefault.name}" đang là mặc định. Vui lòng bỏ mặc định của chi nhánh đó trước.`
+                                        });
+                                        setIsLoading(false);
+                                        return;
+                                }
+                        }
+
                         const { createBranchApi, updateBranchApi } = await import('@/lib/api/branches');
 
                         if (data.id === 0) {
@@ -513,17 +675,19 @@ function BranchEditModal({ isOpen, onClose, data, onSave }: any) {
                                                                         value={formData.code}
                                                                         onChange={(e) => setFormData({ ...formData, code: e.target.value })}
                                                                         disabled={!isCodeEditable}
-                                                                        className={`flex-1 px-3 py-2 border rounded ${!isCodeEditable ? 'bg-gray-100 text-gray-600' : ''}`}
+                                                                        className={`flex-1 px-3 py-2 border rounded ${!isCodeEditable ? 'bg-gray-100 text-gray-600 cursor-not-allowed' : ''}`}
                                                                         required
                                                                 />
-                                                                <button
-                                                                        type="button"
-                                                                        onClick={() => setIsCodeEditable(!isCodeEditable)}
-                                                                        className="px-3 py-2 bg-gray-200 hover:bg-gray-300 rounded"
-                                                                        title={isCodeEditable ? 'Khóa mã' : 'Sửa mã'}
-                                                                >
-                                                                        <Edit2 className="w-4 h-4" />
-                                                                </button>
+                                                                {data.id === 0 && (
+                                                                        <button
+                                                                                type="button"
+                                                                                onClick={() => setIsCodeEditable(!isCodeEditable)}
+                                                                                className="px-3 py-2 bg-gray-200 hover:bg-gray-300 rounded transition-colors"
+                                                                                title={isCodeEditable ? 'Khóa mã' : 'Sửa mã'}
+                                                                        >
+                                                                                <Edit2 className="w-4 h-4 text-slate-600" />
+                                                                        </button>
+                                                                )}
                                                         </div>
                                                 </div>
                                                 <div>
@@ -562,17 +726,6 @@ function BranchEditModal({ isOpen, onClose, data, onSave }: any) {
                                                         />
                                                         <label htmlFor="is_default" className="text-sm">
                                                                 Chi nhánh mặc định
-                                                        </label>
-                                                </div>
-                                                <div className="flex items-center gap-2">
-                                                        <input
-                                                                type="checkbox"
-                                                                id="is_active"
-                                                                checked={formData.is_active}
-                                                                onChange={(e) => setFormData({ ...formData, is_active: e.target.checked })}
-                                                        />
-                                                        <label htmlFor="is_active" className="text-sm">
-                                                                Hoạt động
                                                         </label>
                                                 </div>
                                         </div>

@@ -15,7 +15,9 @@ import {
         AlertDialogHeader,
         AlertDialogTitle
 } from '@/components/ui/alert-dialog';
-import { RefreshCw, RotateCcw } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { useStaffStore } from '@/store/staffStore';
+import { RefreshCw, RotateCcw, ArrowLeft } from 'lucide-react';
 
 interface Staff {
         id: number;
@@ -29,6 +31,8 @@ interface Staff {
 }
 
 export default function DeletedStaffPage() {
+        const navigate = useNavigate();
+        const staffStore = useStaffStore();
         const [activeTab, setActiveTab] = useState('deleted-staff');
         const [staff, setStaff] = useState<Staff[]>([]);
         const [page, setPage] = useState(1);
@@ -125,17 +129,26 @@ export default function DeletedStaffPage() {
                 <AdminLayout
                         active={activeTab as any}
                         setActive={setActiveTab as any}
-                        adminEmailState={localStorage.getItem('adminEmail') || 'admin@email.com'}
+                        adminEmailState={staffStore.staff?.email || 'admin@email.com'}
                         handleLogout={() => {
-                                localStorage.removeItem('adminToken');
-                                localStorage.removeItem('adminEmail');
-                                window.dispatchEvent(new Event('admin-auth-changed'));
-                                window.location.href = '/';
+                                staffStore.clearStaff();
+                                localStorage.removeItem('staffToken');
+                                navigate('/login');
                         }}
                 >
                         <div className="p-6">
-                                <div className="flex justify-between items-center mb-6">
+                                <div className="flex items-center gap-4 mb-6">
+                                        <Button
+                                                variant="ghost"
+                                                size="icon"
+                                                onClick={() => navigate('/staff')}
+                                                className="rounded-full"
+                                                title="Quay lại"
+                                        >
+                                                <ArrowLeft className="w-5 h-5" />
+                                        </Button>
                                         <h1 className="text-2xl font-bold">Nhân viên đã xóa</h1>
+                                        <div className="flex-1" />
                                         <Button onClick={fetchDeletedStaff} variant="outline" size="sm">
                                                 <RefreshCw className="w-4 h-4 mr-2" />
                                                 Làm mới

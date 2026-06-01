@@ -23,6 +23,7 @@ interface TicketPackage {
         is_active?: boolean;
         display_order?: number;
         branch_id?: number;
+        branch_name?: string;
         updated_at?: string;
 }
 
@@ -30,9 +31,20 @@ export default function TicketsPage() {
         const navigate = useNavigate();
         const staff = useStaffStore((state) => state.staff);
         const clearStaff = useStaffStore((state) => state.clearStaff);
+
+        const getInitialFilters = () => {
+                try {
+                        const raw = localStorage.getItem('admin_tickets_filters');
+                        if (raw) return JSON.parse(raw);
+                } catch { }
+                return {};
+        };
+
+        const initialFilters = getInitialFilters();
+
         const [activeTab, setActiveTab] = useState('tickets');
         const [tickets, setTickets] = useState<TicketPackage[]>([]);
-        const [page, setPage] = useState(1);
+        const [page, setPage] = useState(initialFilters.page || 1);
         const pageSize = 10;
         const [total, setTotal] = useState(0);
         const totalPages = Math.max(1, Math.ceil(total / pageSize));
@@ -40,11 +52,25 @@ export default function TicketsPage() {
         const [isEditOpen, setIsEditOpen] = useState(false);
         const [editData, setEditData] = useState<any>(null);
         const [isLoading, setIsLoading] = useState(false);
-        const [showActiveOnly, setShowActiveOnly] = useState(true);
-        const [selectedBranchId, setSelectedBranchId] = useState<number | null>(null);
+        const [showActiveOnly, setShowActiveOnly] = useState(initialFilters.showActiveOnly ?? true);
+        const [selectedBranchId, setSelectedBranchId] = useState<number | 'all' | null>(() => {
+                if (initialFilters.branchId !== undefined) return initialFilters.branchId;
+                if (staff?.isSuperAdmin) return 'all';
+                return null;
+        });
         const [branches, setBranches] = useState<any[]>([]);
         const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
         const [ticketToDelete, setTicketToDelete] = useState<any>(null);
+        const [isCodeEditable, setIsCodeEditable] = useState(false);
+
+        const generateCode = () => {
+                const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+                let code = '';
+                for (let i = 0; i < 5; i++) {
+                        code += chars.charAt(Math.floor(Math.random() * chars.length));
+                }
+                return code;
+        };
 
         // Load branches
         useEffect(() => {
@@ -52,11 +78,16 @@ export default function TicketsPage() {
                         try {
                                 const { items } = await getBranches({ includeInactive: true });
                                 setBranches(items);
+
+                                // If not superadmin and no branch selected, default to first branch
+                                if (!staff?.isSuperAdmin && selectedBranchId === null && items.length > 0) {
+                                        setSelectedBranchId(items[0].id);
+                                }
                         } catch (error) {
                                 console.error('Error loading branches:', error);
                         }
                 })();
-        }, []);
+        }, [staff]);
 
         const handleRefresh = async () => {
                 setIsLoading(true);
@@ -94,8 +125,16 @@ export default function TicketsPage() {
                 handleRefresh();
         }, [page, showActiveOnly, selectedBranchId]);
 
+        useEffect(() => {
+                try {
+                        const state = { page, showActiveOnly, branchId: selectedBranchId };
+                        localStorage.setItem('admin_tickets_filters', JSON.stringify(state));
+                } catch { }
+        }, [page, showActiveOnly, selectedBranchId]);
+
         const openCreate = () => {
-                setEditData({ id: 0, name: '', price: 0, is_active: true, features: [] });
+                setEditData({ id: 0, name: '', code: generateCode(), price: 0, is_active: true, features: [] });
+                setIsCodeEditable(false);
                 setIsEditOpen(true);
         };
 
@@ -119,6 +158,7 @@ export default function TicketsPage() {
 
         const openEdit = (data: any) => {
                 setEditData({ ...data });
+                setIsCodeEditable(false);
                 setIsEditOpen(true);
         };
 
@@ -156,6 +196,8 @@ export default function TicketsPage() {
                                 setSelectedBranchId={setSelectedBranchId}
                                 showActiveOnly={showActiveOnly}
                                 setShowActiveOnly={setShowActiveOnly}
+                                isCodeEditable={isCodeEditable}
+                                setIsCodeEditable={setIsCodeEditable}
                         />
                         <Dialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
                                 <DialogContent className="[&>button]:hidden">

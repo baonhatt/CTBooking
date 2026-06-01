@@ -8,6 +8,7 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { toast } from 'sonner';
 import { Skeleton } from '@/components/ui/skeleton';
+import { useStaffPermissions, useIsSuperAdmin } from '@/hooks/useStaffPermission';
 import { X, Search, RefreshCw, Eye, Trash2 } from 'lucide-react';
 import { request } from '@/lib/api/http';
 import AdminLayout from '@/admin/layouts/AdminLayout';
@@ -29,6 +30,14 @@ export default function RolesPage() {
         const navigate = useNavigate();
         const staff = useStaffStore((state) => state.staff);
         const clearStaff = useStaffStore((state) => state.clearStaff);
+        const permissions = useStaffPermissions();
+        const isSuperAdmin = useIsSuperAdmin();
+
+        const hasPermission = (module: string, action: string) => {
+                if (isSuperAdmin) return true;
+                return permissions.some((p) => p.module === module && p.action === action);
+        };
+
         const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
         const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
         const [roleToDelete, setRoleToDelete] = useState<Role | null>(null);
@@ -101,6 +110,7 @@ export default function RolesPage() {
                 onSuccess: () => {
                         toast.success('Seed vai trò mặc định thành công');
                         queryClient.invalidateQueries({ queryKey: ['roles'] });
+                        queryClient.invalidateQueries({ queryKey: ['permissions'] });
                 },
                 onError: (err: any) => {
                         toast.error(err.message || 'Seed vai trò thất bại');
@@ -207,6 +217,16 @@ export default function RolesPage() {
                                                                 </Button>
                                                         </div>
                                                         <div className="flex gap-2">
+                                                                {hasPermission('roles', 'view_deleted') && (
+                                                                        <Button
+                                                                                variant="outline"
+                                                                                onClick={() => navigate('/deleted/roles')}
+                                                                                className="flex items-center gap-2"
+                                                                        >
+                                                                                <Trash2 className="w-4 h-4" />
+                                                                                Xem đã xóa
+                                                                        </Button>
+                                                                )}
                                                                 <Button variant="outline" onClick={handleSeed} disabled={seedMutation.isPending}>
                                                                         {seedMutation.isPending ? 'Đang seed...' : 'Seed vai trò mặc định'}
                                                                 </Button>

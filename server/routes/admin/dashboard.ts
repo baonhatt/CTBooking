@@ -53,6 +53,7 @@ export async function getDashboardMetricsImpl(
                                 .from(tables.toys)
                                 .where(
                                         and(
+                                                isNull(tables.toys.deleted_at),
                                                 gte(tables.toys.created_at, formatDateForDb(yearStart)),
                                                 lte(tables.toys.created_at, formatDateForDb(yearEnd))
                                         )

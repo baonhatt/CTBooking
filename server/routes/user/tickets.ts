@@ -40,7 +40,11 @@ export async function listActiveTicketPackages(
         const moviesMap = new Map<number, any>();
         if (allMovieIds.size > 0) {
                 const movies = await anyDb.query.movies.findMany({
-                        where: inArray(tables.movies.id, Array.from(allMovieIds))
+                        where: and(
+                                inArray(tables.movies.id, Array.from(allMovieIds)),
+                                eq(tables.movies.is_active, true),
+                                isNull(tables.movies.deleted_at)
+                        )
                 });
 
                 movies.forEach((movie: any) => {

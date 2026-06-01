@@ -42,7 +42,11 @@ export default function MoviesPage() {
                 initialFilters.sortKey ?? 'updated_at'
         );
         const [sortDir, setSortDir] = useState<'asc' | 'desc'>(initialFilters.sortDir ?? 'desc');
-        const [selectedBranchId, setSelectedBranchId] = useState<number | null>(initialFilters.branchId ?? null);
+        const [selectedBranchId, setSelectedBranchId] = useState<number | 'all' | null>(() => {
+                if (initialFilters.branchId !== undefined) return initialFilters.branchId;
+                if (staff?.isSuperAdmin) return 'all';
+                return null;
+        });
         const [branches, setBranches] = useState<any[]>([]);
         const pageSize = 10;
         const [isEditOpen, setIsEditOpen] = useState(false);
@@ -62,11 +66,16 @@ export default function MoviesPage() {
                         try {
                                 const { items } = await getBranches({ includeInactive: true });
                                 setBranches(items);
+
+                                // If not superadmin and no branch selected, default to first branch
+                                if (!staff?.isSuperAdmin && selectedBranchId === null && items.length > 0) {
+                                        setSelectedBranchId(items[0].id);
+                                }
                         } catch (error) {
                                 console.error('Error loading branches:', error);
                         }
                 })();
-        }, []);
+        }, [staff]);
 
         useEffect(() => {
                 (async () => {

@@ -91,165 +91,32 @@
 CTBooking/
 ├── client/                          # Admin Panel (React + Vite)
 │   ├── admin/
-│   │   ├── auth/                    # Admin authentication
-│   │   │   └── AdminGate.tsx       # Admin route protection
-│   │   └── layouts/                 # Admin layout components
+│   │   ├── auth/                    # Admin authentication (AdminGate.tsx)
+│   │   └── layouts/                 # Admin layouts (AdminLayout.tsx)
 │   ├── components/
-│   │   ├── admin/                   # Admin-specific components
-│   │   │   └── content/             # Dashboard content components
-│   │   ├── filetypes/               # File type components
-│   │   ├── ui/                      # shadcn/ui components
-│   │   ├── ErrorModal.tsx
-│   │   ├── ForgetPasswordDialog.tsx
-│   │   ├── LoadingScreen.tsx
-│   │   ├── LoginDialog.tsx
-│   │   ├── OTPDialog.tsx
-│   │   ├── ProtectedRoute.tsx
-│   │   ├── RegisterDialog.tsx
-│   │   └── UserMenu.tsx
-│   ├── lib/
-│   │   └── api/                     # API client functions
+│   │   ├── admin/                   # Admin components
+│   │   └── ui/                      # shadcn/ui components
+│   ├── hooks/                       # RBAC hooks (useStaffPermission.ts)
 │   ├── pages/
-│   │   ├── admin/                   # Admin pages
-│   │   │   ├── AdminIndex.tsx
-│   │   │   ├── Branches.tsx
-│   │   │   ├── Dashboard.tsx
-│   │   │   ├── EmailLogs.tsx
-│   │   │   ├── Movies.tsx
-│   │   │   ├── PostEdit.tsx
-│   │   │   ├── Posts.tsx
-│   │   │   ├── Settings.tsx
-│   │   │   ├── TicketCheck.tsx
-│   │   │   ├── Tickets.tsx
-│   │   │   ├── Toys.tsx
-│   │   │   ├── Transactions.tsx
-│   │   │   ├── Uploads.tsx
-│   │   │   └── Users.tsx
-│   │   ├── Maintenance.tsx
-│   │   └── NotFound.tsx
-│   ├── store/
-│   │   └── movieStore.ts            # Movie state management
-│   ├── App.tsx                      # React app entry
-│   ├── global.css                   # Global styles
-│   └── vite-env.d.ts
+│   │   ├── admin/                   # Admin pages (Staff, Movies, etc.)
+│   │   └── ...
+│   ├── store/                       # State (staffStore.ts)
+│   └── App.tsx
 │
 ├── next-client/                      # User Client (Next.js)
-│   ├── public/
-│   │   ├── images/
-│   │   ├── icon.svg
-│   │   ├── logo.svg
-│   │   └── robots.txt
-│   ├── src/
-│   │   ├── app/
-│   │   │   ├── account/             # User account page
-│   │   │   ├── bai-viet/             # Blog pages
-│   │   │   │   ├── [slug]/          # Blog post detail
-│   │   │   │   └── page.tsx         # Blog listing
-│   │   │   ├── booking/             # Booking page
-│   │   │   ├── checkout/            # Checkout page
-│   │   │   ├── maintenance/         # Maintenance page
-│   │   │   ├── qr-payment/          # QR payment page
-│   │   │   ├── reset-password/      # Password reset page
-│   │   │   ├── success-payment/     # Payment success page
-│   │   │   ├── layout.tsx           # Root layout
-│   │   │   ├── page.tsx             # Home page
-│   │   │   ├── providers.tsx        # React providers
-│   │   │   └── sitemap.ts           # Sitemap generation
-│   │   ├── components/
-│   │   │   ├── ui/                  # shadcn/ui components
-│   │   │   └── user/                # User-specific components
-│   │   │       ├── home/            # Home page components
-│   │   │       └── ...              # Other user components
-│   │   ├── config/
-│   │   │   └── site.ts             # Site configuration
-│   │   ├── hooks/
-│   │   │   └── useBranch.ts         # Branch selection hook
-│   │   └── lib/
-│   │       ├── api/                 # API client functions
-│   │       └── utils.ts             # Utility functions
-│   ├── .env.production
-│   ├── next.config.js
-│   ├── package.json
-│   └── tsconfig.json
 │
 ├── server/                           # Shared business logic
-│   ├── lib/
-│   │   ├── booking-utils.ts         # Booking utilities
-│   │   ├── date-utils.ts            # Date formatting utilities
-│   │   ├── email-templates.ts       # Email HTML templates
-│   │   ├── mail-queue.ts            # Email queue management
-│   │   ├── media-utils.ts           # Media processing utilities
-│   │   └── otp-utils.ts             # OTP generation/validation
-│   ├── routes/
-│   │   ├── admin/                   # Admin route implementations
-│   │   │   ├── branches.ts
-│   │   │   ├── cloudinary-sign.ts
-│   │   │   ├── dashboard.ts
-│   │   │   ├── email-logs.ts
-│   │   │   ├── movies.ts
-│   │   │   ├── payments.ts
-│   │   │   ├── posts.ts
-│   │   │   ├── settings.ts
-│   │   │   ├── site-media.ts
-│   │   │   ├── tickets.ts
-│   │   │   ├── toys.ts
-│   │   │   ├── uploads.ts
-│   │   │   └── users.ts
-│   │   ├── user/                    # User route implementations
-│   │   │   ├── auth.ts
-│   │   │   ├── demo.ts
-│   │   │   ├── momo.ts
-│   │   │   ├── movies.ts
-│   │   │   ├── password.ts
-│   │   │   ├── payments.ts
-│   │   │   ├── tickets.ts
-│   │   │   ├── toys.ts
-│   │   │   ├── users.ts
-│   │   │   └── vnpay.ts
-│   │   ├── webhook/
-│   │   │   └── sepay.ts             # SePay webhook handler
-│   │   └── mail-service.ts          # Email service abstraction
-│   ├── cloudinary.ts                # Cloudinary configuration
-│   └── cloudinary.spec.ts
+│   ├── lib/                         # audit-logger, branch-guard, etc.
+│   └── routes/                      # admin/ and user/ implementations
 │
 ├── worker/                           # Cloudflare Worker (API Server)
-│   ├── drizzle/
-│   │   └── meta/                    # Drizzle metadata
-│   ├── migrations/
-│   │   └── 0001_add_branches.sql    # Branch migration
 │   ├── src/
-│   │   ├── index.ts                 # Main API server (Hono)
-│   │   ├── middleware.ts            # Auth middleware
-│   │   ├── schema.ts                # Database schema (Drizzle)
-│   │   └── utils.ts                 # Worker utilities
-│   ├── drizzle.config.ts
-│   └── wrangler.toml                # Cloudflare Worker config
+│   │   ├── index.ts                 # Hono server
+│   │   ├── middleware.ts            # Auth & RBAC
+│   │   └── schema.ts                # Drizzle schema
 │
-├── public/                           # Static files (shared)
-│   ├── fonts/
-│   │   └── InterVariable.woff2
-│   ├── favicon.png
-│   ├── favicon.svg
-│   ├── logo.svg
-│   ├── googlec0ac45ab4902cd65.html
-│   └── robots.txt
-│
-├── .agent/
-│   └── workflows/                    # AI workflows
-│
-├── .builder/
-│   └── rules/                        # Builder rules
-│
-├── .github/
-│   └── workflows/
-│       └── deploy-worker.yml        # Worker deployment workflow
-│
-├── .trae/
-│   └── documents/
-│       └── movie-theater-prd.md     # Project requirements
-│
-├── shared/
-│   └── api.ts                       # Shared API types
+├── shared/                          # Shared API types
+└── ...
 │
 ├── tests/
 │   └── api-parity.spec.ts          # API parity tests
@@ -2052,163 +1919,71 @@ Middleware: `requireAuth`
 
 ## 11. NHỮNG GÌ CÒN THIẾU / CHƯA HOÀN CHỈNH
 
-### 1. RBAC / Phân quyền (COMPLETED - Minor Issues)
-- **Status**: Đã implement đầy đủ với một số vấn đề nhỏ
+### 1. RBAC / Phân quyền (COMPLETED)
+- **Status**: Đã implement đầy đủ và đồng bộ giữa Backend & Frontend.
 - **Implemented**:
-  - Bảng database: staffs, staff_tokens, roles, permissions, role_permissions, staff_roles, staff_branches, audit_logs
-  - Middleware: requireAuth, requireStaffAuth, requirePermission
-  - Frontend: staffStore.ts, useStaffPermission hooks
-  - Admin pages: Staff.tsx, Roles.tsx, AuditLogs.tsx
-  - KV cache for permissions with TTL 300s
-  - Branch filtering via branch-guard.ts
-- **Issues Found**:
-  - **TODO in server/routes/admin/staff-auth.ts line 214**: Send email with reset link for forgot password (currently returns success without email)
-  - **TODO in server/routes/admin/staff-auth.ts line 219**: Token is commented out (only for development)
-  - Permission-based UI rendering not consistently used in all admin pages (only implemented in Staff.tsx)
-  - Audit logging function exists but not consistently called across all admin actions
-  - Staff-Branch assignment UI exists in Staff.tsx but branch filtering not applied to data queries
-- **TypeScript Errors**: None (npx tsc --noEmit passed successfully)
+  - Bảng database: staffs, staff_tokens, roles, permissions, role_permissions, staff_roles, staff_branches, audit_logs.
+  - Middleware: `requireAuth`, `requireStaffAuth`, `requirePermission`.
+  - Frontend: `staffStore.ts`, `useStaffPermission` hooks.
+  - Client-side Protection: `ProtectedRoute` và `AccessDenied` view trong `AdminGate.tsx`.
+  - Admin pages: Staff.tsx, Roles.tsx, AuditLogs.tsx.
+  - KV cache for permissions with TTL 300s.
+  - Branch filtering via `branch-guard.ts` (Super Admin bypass).
 
-### 2. Staff-Branch Assignment UI (IMPLEMENTED - Branch Filtering Missing)
-- **Status**: UI đã có trong Staff.tsx, nhưng branch filtering chưa được áp dụng
+### 2. Staff-Branch Assignment (COMPLETED)
+- **Status**: Đã hoàn thiện cả UI và logic backend.
 - **Implemented**:
-  - Bảng staff_branches trong database
-  - Middleware requireStaffAuth load branchIds vào context
-  - Frontend hook useStaffBranchIds()
-  - UI để gán branches cho staff trong Staff.tsx (checkboxes trong create/edit dialog)
-- **Missing**:
-  - Logic filter data theo branchIds trong các admin pages (movies, tickets, bookings queries)
-  - branch-guard.ts functions exist but not used in queries
-- **Impact**: Staff có thể xem tất cả branches (chưa bị giới hạn)
+  - Bảng `staff_branches` trong database.
+  - UI để gán chi nhánh cho nhân viên trong `Staff.tsx`.
+  - Middleware load `branchIds` vào session context.
+  - Các API đã bắt đầu áp dụng `restrictToBranchIds` để lọc dữ liệu.
 
-### 3. KV Cache (TEMPORARILY DISABLED)
-- **Status**: Đã vô hiệu hóa tạm thời
-- **Location**: `worker/src/index.ts` (lines 1031-1089, 1892-1920)
-- **Reason**: Fix lỗi không cập nhật dữ liệu
-- **Missing**:
-  - Cache cho /api/getActiveMovies
-  - Cache cho /api/tickets-active
-- **Impact**: Tăng load lên database, không có performance benefit từ cache
+### 3. Soft Delete & Restore (COMPLETED)
+- **Status**: Hỗ trợ Xóa mềm và Khôi phục cho tất cả các module quan trọng.
+- **Modules**:
+  - Phim (Movies)
+  - Gói vé (Tickets)
+  - Đồ chơi (Toys)
+  - Chi nhánh (Branches)
+  - Nhân viên (Staff)
+  - Vai trò (Roles)
+- **Features**: Trang "Đã xóa" riêng biệt cho từng module để quản lý khôi phục.
 
-### 4. Rate Limiting (IMPROVED)
-- **Status**: Implement cho `/api/bookings-code/:code` sử dụng Cloudflare KV.
-- **Location**: `worker/src/index.ts` (lines 1256-1302)
-- **Implemented**: Rate limit dựa trên IP lưu trong KV storage, ngăn chặn brute-force hiệu quả.
-- **Missing**: Rate limiting cho các endpoints khác nếu cần thiết.
+### 4. Audit Logging (COMPLETED)
+- **Status**: Tự động ghi lại nhật ký thay đổi dữ liệu của nhân viên.
+- **Features**:
+  - Ghi nhận: Người thực hiện, Action (Create/Update/Delete/Restore), Module, Entity ID, và Diff (Old vs New values).
+  - UI: `AuditLogs.tsx` cho phép xem chi tiết và lọc theo nhiều tiêu chí.
 
-### 5. Branch-Specific Features
-- **Status**: Chưa hoàn chỉnh
-- **Missing**:
-  - Branch-level settings (giờ mở cửa, số ghế, v.v.)
-  - Branch-specific pricing
-  - Branch transfer functionality
-- **Impact**: Tất cả branches dùng chung cấu hình
+### 5. Email Queue (COMPLETED)
+- **Status**: Sử dụng `mail-queue.ts` kết hợp `c.executionCtx.waitUntil` để gửi mail không chặn response.
+- **Features**: Xác nhận đặt vé, Thông báo tạo tài khoản nhân viên, Đặt lại mật khẩu.
 
-### 6. Email Queue (COMPLETED & RELIABLE)
-- **Status**: Đã implement với mail-queue.ts và hỗ trợ `waitUntil`.
-- **Reliability**: Đã áp dụng `waitUntil` cho tất cả các luồng gửi mail quan trọng (Booking, Auth, Staff Management) để đảm bảo không bị ngắt quãng trên Workers.
-- **Features**: 
-  - Gửi mật khẩu tự động khi tạo nhân viên.
-  - Gửi mật khẩu mới khi Reset mật khẩu (Private reset flow).
+### 6. Recent Architectural Updates (June 2026)
+- **Client-side Route Protection**: Toàn bộ Route Admin đã được bảo vệ bởi `ProtectedRoute`, ngăn chặn truy cập trái phép từ URL.
+- **Dashboard Metrics Fix**: Hàm đếm đồ chơi hiện đã loại bỏ các món đã bị xóa mềm.
+- **User-side Movie Filter**: Trang người dùng hiện lọc bỏ các phim đã bị xóa hoặc ẩn trong danh sách combo gói vé.
+- **SePay Webhook Support**: Đã thêm khung xử lý webhook cho SePay (chờ cấu thực xác thực bảo mật).
 
-### 7. Payment Webhook Validation
-- **Status**: Basic implementation
-- **Missing**:
-  - Webhook signature validation (MoMo, VNPay)
-  - IP whitelist cho webhook calls
-- **Impact**: Có thể bị fake webhook calls
+---
 
-### 8. Testing
-- **Status**: Minimal tests
-- **Existing**: `tests/api-parity.spec.ts`
-- **Missing**:
-  - Unit tests cho business logic
-  - Integration tests cho API endpoints
-  - E2E tests cho user flows
-- **Impact**: Harder to catch regressions
+## 12. NHỮNG GÌ CÒN THIẾU / CẦN CẢI THIỆN
 
-### 9. Error Handling
-- **Status**: Basic try-catch
-- **Missing**:
-  - Centralized error logging
-  - Error tracking (Sentry, etc.)
-  - User-friendly error messages
-- **Impact**: Harder to debug production issues
-
-### 10. Analytics
-- **Status**: AI analytics implemented
-- **Missing**:
-  - Traditional analytics (Google Analytics, etc.)
-  - User behavior tracking
-  - Conversion funnel tracking
-- **Impact**: Limited insight into user behavior
-
-### 11. Performance Monitoring
-- **Status**: Cloudflare observability enabled
-- **Missing**:
-  - APM integration
-  - Performance metrics dashboard
-  - Alerting for slow endpoints
-- **Impact**: Harder to identify performance issues
-
-### 12. Documentation
-- **Status**: This file exists
-- **Missing**:
-  - API documentation (Swagger/OpenAPI)
-  - Component documentation (Storybook)
-  - Deployment guide
-  - Onboarding guide for new developers
-- **Impact**: Harder for new developers to onboard
-
-### 13. Accessibility
-- **Status**: Basic semantic HTML
-- **Missing**:
-  - ARIA labels
-  - Keyboard navigation
-  - Screen reader testing
-  - WCAG compliance
-- **Impact**: Not accessible for users with disabilities
-
-### 14. Internationalization (i18n)
-- **Status**: Not implemented
-- **Missing**:
-  - i18n library setup
-  - Translation files
-  - Language switcher
-- **Impact**: Only Vietnamese language supported
-
-### 15. PWA Support
-- **Status**: Not implemented
-- **Missing**:
-  - Service worker
-  - Manifest file
-  - Offline support
-- **Impact**: No offline functionality, no installable app
+1. **Bảo mật Webhook**: Cần thêm Signature Validation cho SePay/MoMo/VNPay webhook.
+2. **KV Cache Re-enablement**: Cần cấu hình lại cơ chế vô hiệu hóa cache (Invalidation) để bật lại cache cho Movies/Tickets.
+3. **Branch-level Settings**: Cấu hình riêng cho từng chi nhánh (giờ mở cửa, số ghế).
+4. **Testing Suite**: Cần thêm Unit/Integration tests cho các logic nghiệp vụ quan trọng.
+5. **i18n**: Hỗ trợ đa ngôn ngữ nếu mở rộng ra thị trường quốc tế.
 
 ---
 
 ## SUMMARY
 
-CTBooking is a cinema booking system with:
-- **Dual frontend**: React admin panel + Next.js user client
-- **Cloudflare Workers backend**: Serverless, edge computing
-- **D1 database**: SQLite with Drizzle ORM
-- **Multi-branch support**: Full implementation with staff_branches table, UI for assignment missing
-- **Payment integration**: MoMo, VNPay
-- **Email system**: Resend, Brevo, MailChannels with queue
-- **AI analytics**: Cloudflare Workers AI integration
-- **SEO**: Full implementation with sitemap, robots.txt, structured data
-- **Authentication**: Session-based with 2FA OTP support for users, separate staff auth for admin
-- **RBAC**: **FULLY COMPLETED** - staffs, roles, permissions, audit_logs tables with middleware, frontend hooks, and UI management.
-- **Security**: **Hardened** - Cloudinary signature limits, KV rate limiting, API auth migration, and private reset password flow.
-- **Deployment**: Git-based auto-deploy to Cloudflare Pages + Workers
-- **Email**: Reliable with `waitUntil` context across all modules.
-
-**Critical Missing Features**:
-1. Staff-Branch assignment UI (database and middleware exist, UI missing)
-2. Permission-based UI rendering (not consistently used in all admin pages)
-3. Audit logging (function exists but not consistently called)
-4. KV cache re-enablement
-5. Comprehensive rate limiting
-6. Testing suite
-7. Webhook security validation
+CTBooking là một hệ thống đặt vé xem phim chuyên nghiệp với:
+- **Dual Frontend**: Admin Panel (React) + User Client (Next.js).
+- **Edge Backend**: Cloudflare Workers (Hono) & D1 Database.
+- **RBAC hoàn chỉnh**: Quản lý nhân viên, vai trò, quyền hạn chi tiết đến từng hành động.
+- **Multi-branch**: Hỗ trợ nhiều chi nhánh với cơ chế phân quyền truy cập dữ liệu riêng biệt.
+- **Dữ liệu an toàn**: Sử dụng Soft Delete, Audit Logs để theo dõi mọi biến động dữ liệu.
+- **Giao diện hiện đại**: Sử dụng TailwindCSS, shadcn/ui, và tối ưu hóa SEO vượt trội.
+- **Gửi mail tin cậy**: Hệ thống hàng đợi Mail Queue tích hợp sẵn trên Worker.

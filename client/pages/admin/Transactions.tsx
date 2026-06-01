@@ -32,7 +32,11 @@ export default function TransactionsPage() {
         const [paymentMethod, setPaymentMethod] = useState<string>(initialFilters.paymentMethod ?? '');
         const [fromDate, setFromDate] = useState<string>(initialFilters.fromDate ?? '');
         const [toDate, setToDate] = useState<string>(initialFilters.toDate ?? '');
-        const [selectedBranchId, setSelectedBranchId] = useState<number | null>(initialFilters.branchId ?? null);
+        const [selectedBranchId, setSelectedBranchId] = useState<number | 'all' | null>(() => {
+                if (initialFilters.branchId !== undefined) return initialFilters.branchId;
+                if (staff?.isSuperAdmin) return 'all';
+                return null;
+        });
         const [branches, setBranches] = useState<any[]>([]);
         const [isLoading, setIsLoading] = useState(false);
 
@@ -42,11 +46,16 @@ export default function TransactionsPage() {
                         try {
                                 const { items } = await getBranches({ includeInactive: true });
                                 setBranches(items);
+
+                                // If not superadmin and no branch selected, default to first branch
+                                if (!staff?.isSuperAdmin && selectedBranchId === null && items.length > 0) {
+                                        setSelectedBranchId(items[0].id);
+                                }
                         } catch (error) {
                                 console.error('Error loading branches:', error);
                         }
                 })();
-        }, []);
+        }, [staff]);
 
         useEffect(() => {
                 try {

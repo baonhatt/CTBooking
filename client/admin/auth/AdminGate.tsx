@@ -6,9 +6,11 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
 import { useStaffStore } from '@/store/staffStore';
+import { useStaffPermission, useIsSuperAdmin } from '@/hooks/useStaffPermission';
 import { loginApi } from '@/lib/api/auth';
 import { request } from '@/lib/api/http';
 import { checkSuperAdminSetup } from '@/lib/api/admin';
+import { AlertCircle, ShieldAlert } from 'lucide-react';
 import AdminIndex from '@/pages/admin/AdminIndex';
 import DashboardPage from '@/pages/admin/Dashboard';
 import UsersPage from '@/pages/admin/Users';
@@ -30,6 +32,39 @@ import RoleDetailPage from '@/pages/admin/RoleDetailPage';
 import AuditLogsPage from '@/pages/admin/AuditLogs';
 import SetupSuperAdminPage from '@/pages/admin/SetupSuperAdmin';
 import ProfilePage from '@/pages/admin/Profile';
+import DeletedMoviesPage from '@/pages/admin/DeletedMovies';
+import DeletedStaffPage from '@/pages/admin/DeletedStaff';
+import DeletedTicketsPage from '@/pages/admin/DeletedTickets';
+import DeletedRolesPage from '@/pages/admin/DeletedRoles';
+import DeletedBranchesPage from '@/pages/admin/DeletedBranches';
+
+const AccessDenied = () => {
+        const navigate = useNavigate();
+
+        return (
+                <div className="flex flex-col items-center justify-center min-h-[60vh] p-4 text-center">
+                        <div className="bg-rose-50 p-4 rounded-full mb-4">
+                                <ShieldAlert className="w-12 h-12 text-rose-500" />
+                        </div>
+                        <h2 className="text-2xl font-bold text-gray-900 mb-2">Truy cập bị từ chối</h2>
+                        <p className="text-gray-600 mb-6 max-w-md">
+                                Bạn không có quyền truy cập vào trang này. Vui lòng liên hệ với quản trị viên nếu bạn cho rằng đây là một sự nhầm lẫn.
+                        </p>
+                        <Button onClick={() => navigate('/')}>Quay lại trang chủ</Button>
+                </div>
+        );
+};
+
+const ProtectedRoute = ({ children, module, action }: { children: React.ReactNode; module: string; action: string }) => {
+        const hasPerm = useStaffPermission(module, action);
+        const isSuper = useIsSuperAdmin();
+
+        if (!isSuper && !hasPerm) {
+                return <AccessDenied />;
+        }
+
+        return <>{children}</>;
+};
 
 const AdminLoginView = () => {
         const navigate = useNavigate();
@@ -219,24 +254,32 @@ export const AdminGate = () => {
         return (
                 <div>
                         <Routes>
-                                <Route path="/" element={<DashboardPage />} />
-                                <Route path="/users" element={<UsersPage />} />
-                                <Route path="/movies" element={<MoviesPage />} />
-                                <Route path="/toys" element={<ToysPage />} />
-                                <Route path="/posts" element={<PostsPage />} />
-                                <Route path="/posts/new" element={<PostCreatePage />} />
-                                <Route path="/posts/:id/edit" element={<PostEditPage />} />
-                                <Route path="/tickets" element={<TicketsPage />} />
-                                <Route path="/transactions" element={<TransactionsPage />} />
-                                <Route path="/ticket-check" element={<TicketCheckPage />} />
-                                <Route path="/branches" element={<BranchesPage />} />
-                                <Route path="/uploads" element={<UploadsPage />} />
-                                <Route path="/email-logs" element={<EmailLogsPage />} />
-                                <Route path="/settings" element={<SettingsPage />} />
-                                <Route path="/staff" element={<StaffPage />} />
-                                <Route path="/roles" element={<RolesPage />} />
-                                <Route path="/roles/:id" element={<RoleDetailPage />} />
-                                <Route path="/audit-logs" element={<AuditLogsPage />} />
+                                <Route path="/" element={<ProtectedRoute module="dashboard" action="view"><DashboardPage /></ProtectedRoute>} />
+                                <Route path="/users" element={<ProtectedRoute module="users" action="view"><UsersPage /></ProtectedRoute>} />
+                                <Route path="/movies" element={<ProtectedRoute module="movies" action="view"><MoviesPage /></ProtectedRoute>} />
+                                <Route path="/toys" element={<ProtectedRoute module="toys" action="view"><ToysPage /></ProtectedRoute>} />
+                                <Route path="/posts" element={<ProtectedRoute module="posts" action="view"><PostsPage /></ProtectedRoute>} />
+                                <Route path="/posts/new" element={<ProtectedRoute module="posts" action="create"><PostCreatePage /></ProtectedRoute>} />
+                                <Route path="/posts/:id/edit" element={<ProtectedRoute module="posts" action="edit"><PostEditPage /></ProtectedRoute>} />
+                                <Route path="/tickets" element={<ProtectedRoute module="tickets" action="view"><TicketsPage /></ProtectedRoute>} />
+                                <Route path="/transactions" element={<ProtectedRoute module="transactions" action="view"><TransactionsPage /></ProtectedRoute>} />
+                                <Route path="/ticket-check" element={<ProtectedRoute module="ticket_check" action="scan"><TicketCheckPage /></ProtectedRoute>} />
+                                <Route path="/branches" element={<ProtectedRoute module="branches" action="view"><BranchesPage /></ProtectedRoute>} />
+                                <Route path="/uploads" element={<ProtectedRoute module="uploads" action="view"><UploadsPage /></ProtectedRoute>} />
+                                <Route path="/email-logs" element={<ProtectedRoute module="email_logs" action="view"><EmailLogsPage /></ProtectedRoute>} />
+                                <Route path="/settings" element={<ProtectedRoute module="settings" action="view"><SettingsPage /></ProtectedRoute>} />
+                                <Route path="/staff" element={<ProtectedRoute module="staff" action="view"><StaffPage /></ProtectedRoute>} />
+                                <Route path="/roles" element={<ProtectedRoute module="roles" action="view"><RolesPage /></ProtectedRoute>} />
+                                <Route path="/roles/:id" element={<ProtectedRoute module="roles" action="view_detail"><RoleDetailPage /></ProtectedRoute>} />
+                                <Route path="/audit-logs" element={<ProtectedRoute module="audit_logs" action="view"><AuditLogsPage /></ProtectedRoute>} />
+
+                                {/* Deleted Items Routes */}
+                                <Route path="/deleted/movies" element={<ProtectedRoute module="movies" action="view_deleted"><DeletedMoviesPage /></ProtectedRoute>} />
+                                <Route path="/deleted/staff" element={<ProtectedRoute module="staff" action="view_deleted"><DeletedStaffPage /></ProtectedRoute>} />
+                                <Route path="/deleted/tickets" element={<ProtectedRoute module="tickets" action="view_deleted"><DeletedTicketsPage /></ProtectedRoute>} />
+                                <Route path="/deleted/roles" element={<ProtectedRoute module="roles" action="view_deleted"><DeletedRolesPage /></ProtectedRoute>} />
+                                <Route path="/deleted/branches" element={<ProtectedRoute module="branches" action="view_deleted"><DeletedBranchesPage /></ProtectedRoute>} />
+
                                 <Route path="/profile" element={<ProfilePage active="profile" setActive={() => { }} adminEmailState={staff?.email || ''} handleLogout={handleLogout} />} />
                                 <Route path="*" element={<Navigate to="/" replace />} />
                         </Routes>

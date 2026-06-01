@@ -15,7 +15,9 @@ import {
         AlertDialogHeader,
         AlertDialogTitle
 } from '@/components/ui/alert-dialog';
-import { RefreshCw, RotateCcw, Shield } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { useStaffStore } from '@/store/staffStore';
+import { RefreshCw, RotateCcw, Shield, ArrowLeft } from 'lucide-react';
 
 interface Role {
         id: number;
@@ -27,6 +29,8 @@ interface Role {
 }
 
 export default function DeletedRolesPage() {
+        const navigate = useNavigate();
+        const staffStore = useStaffStore();
         const [activeTab, setActiveTab] = useState('deleted-roles');
         const [roles, setRoles] = useState<Role[]>([]);
         const [page, setPage] = useState(1);
@@ -123,17 +127,26 @@ export default function DeletedRolesPage() {
                 <AdminLayout
                         active={activeTab as any}
                         setActive={setActiveTab as any}
-                        adminEmailState={localStorage.getItem('adminEmail') || 'admin@email.com'}
+                        adminEmailState={staffStore.staff?.email || 'admin@email.com'}
                         handleLogout={() => {
-                                localStorage.removeItem('adminToken');
-                                localStorage.removeItem('adminEmail');
-                                window.dispatchEvent(new Event('admin-auth-changed'));
-                                window.location.href = '/';
+                                staffStore.clearStaff();
+                                localStorage.removeItem('staffToken');
+                                navigate('/login');
                         }}
                 >
                         <div className="p-6">
-                                <div className="flex justify-between items-center mb-6">
+                                <div className="flex items-center gap-4 mb-6">
+                                        <Button
+                                                variant="ghost"
+                                                size="icon"
+                                                onClick={() => navigate('/roles')}
+                                                className="rounded-full"
+                                                title="Quay lại"
+                                        >
+                                                <ArrowLeft className="w-5 h-5" />
+                                        </Button>
                                         <h1 className="text-2xl font-bold">Vai trò đã xóa</h1>
+                                        <div className="flex-1" />
                                         <Button onClick={fetchDeletedRoles} variant="outline" size="sm">
                                                 <RefreshCw className="w-4 h-4 mr-2" />
                                                 Làm mới

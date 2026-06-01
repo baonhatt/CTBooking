@@ -52,6 +52,9 @@ import {
 } from '@/components/ui/alert-dialog';
 import { optimizeCloudinaryUrl } from '@/lib/utils';
 
+import { useNavigate } from 'react-router-dom';
+import { useStaffPermissions, useIsSuperAdmin } from '@/hooks/useStaffPermission';
+
 interface MovieData {
         id: string | number;
         title: string;
@@ -91,8 +94,8 @@ interface Props {
         selectedMovieId: number | null;
         setSelectedMovieId: (id: number | null) => void;
         branches?: any[];
-        selectedBranchId?: number | null;
-        setSelectedBranchId?: (id: number | null) => void;
+        selectedBranchId?: number | 'all' | null;
+        setSelectedBranchId?: (id: number | 'all' | null) => void;
         onDelete?: (id: number) => void;
 }
 
@@ -125,6 +128,15 @@ export default function MoviesContent({
         setSelectedBranchId = () => { },
         onDelete
 }: Props) {
+        const navigate = useNavigate();
+        const permissions = useStaffPermissions();
+        const isSuperAdmin = useIsSuperAdmin();
+
+        const hasPermission = (module: string, action: string) => {
+                if (isSuperAdmin) return true;
+                return permissions.some((p) => p.module === module && p.action === action);
+        };
+
         console.log(data);
         const [movieDetails, setMovieDetails] = useState<any>(null);
         const [isLoadingDetails, setIsLoadingDetails] = useState(false);
@@ -213,11 +225,11 @@ export default function MoviesContent({
 
                                         {branches.length > 0 && (
                                                 <select
-                                                        value={selectedBranchId || ''}
-                                                        onChange={(e) => setSelectedBranchId(e.target.value ? Number(e.target.value) : null)}
+                                                        value={selectedBranchId || 'all'}
+                                                        onChange={(e) => setSelectedBranchId(e.target.value === 'all' ? 'all' : Number(e.target.value))}
                                                         className="bg-white border rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none shadow-sm cursor-pointer"
                                                 >
-                                                        <option value="">Tất cả chi nhánh</option>
+                                                        <option value="all">Tất cả chi nhánh</option>
                                                         {branches.map((branch) => (
                                                                 <option key={branch.id} value={branch.id}>
                                                                         {branch.name}
@@ -230,7 +242,7 @@ export default function MoviesContent({
                                                 variant="outline"
                                                 size="icon"
                                                 onClick={() => setSortDir?.(sortDir === 'asc' ? 'desc' : 'asc')}
-                                                className="rounded-xl border-slate-200 hover:bg-slate-50 active:scale-95 transition-all shadow-sm"
+                                                className="rounded-xl border-slate-200 hover:bg-slate-50 active:scale-95 transition-all shadow-sm h-10 w-10 shrink-0"
                                                 title={sortDir === 'asc' ? 'Tăng dần' : 'Giảm dần'}
                                         >
                                                 {sortDir === 'desc' ? (
@@ -239,11 +251,21 @@ export default function MoviesContent({
                                                         <SortAsc className="w-4 h-4 text-slate-600" />
                                                 )}
                                         </Button>
-                                        {/* KẾT THÚC BỔ SUNG */}
+
+                                        {hasPermission('movies', 'view_deleted') && (
+                                                <Button
+                                                        variant="outline"
+                                                        onClick={() => navigate('/deleted/movies')}
+                                                        className="rounded-xl flex items-center gap-2 h-10 px-4 shadow-sm"
+                                                >
+                                                        <Trash2 className="w-4 h-4" />
+                                                        <span className="hidden sm:inline text-sm text-slate-600 font-medium">Xem đã xóa</span>
+                                                </Button>
+                                        )}
 
                                         <Button
                                                 onClick={onCreate}
-                                                className="bg-blue-600 hover:bg-blue-700 rounded-lg shadow-sm gap-2 text-white h-10 px-5 font-medium"
+                                                className="bg-blue-600 hover:bg-blue-700 rounded-lg shadow-sm gap-2 text-white h-10 px-5 font-medium ml-auto"
                                         >
                                                 <Plus className="w-4 h-4" /> Thêm mới
                                         </Button>

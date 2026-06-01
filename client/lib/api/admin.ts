@@ -28,7 +28,7 @@ export async function getTransactions(options?: {
         to?: string;
         sort?: 'created_at' | 'paid_at';
         dir?: 'asc' | 'desc';
-        branch_id?: number;
+        branch_id?: number | 'all';
         signal?: AbortSignal;
 }) {
         const params = new URLSearchParams();
@@ -51,7 +51,7 @@ export async function getTransactions(options?: {
         }>(path, { signal: options?.signal });
 }
 
-export async function getDashboardMetrics(period: string = 'week', year?: number, branch_id?: number) {
+export async function getDashboardMetrics(period: string = 'week', year?: number, branch_id?: number | 'all') {
         const params = new URLSearchParams();
         params.append('period', period);
         if (year) params.append('year', String(year));
@@ -72,7 +72,7 @@ export async function getDashboardMetrics(period: string = 'week', year?: number
         }>(`/api/admin/dashboard/metrics?${params.toString()}`);
 }
 
-export async function getRevenueByDate(date?: string, status?: 'all' | 'paid', year?: number, branch_id?: number) {
+export async function getRevenueByDate(date?: string, status?: 'all' | 'paid', year?: number, branch_id?: number | 'all') {
         const params = new URLSearchParams();
         if (date) params.append('date', date);
         if (status) params.append('status', status);
@@ -86,7 +86,7 @@ export async function getRevenueByDate(date?: string, status?: 'all' | 'paid', y
         }>(`/api/admin/dashboard/revenue-date?${params.toString()}`);
 }
 
-export async function getRevenue7Days(year?: number, branch_id?: number) {
+export async function getRevenue7Days(year?: number, branch_id?: number | 'all') {
         const params = new URLSearchParams();
         if (year) params.append('year', String(year));
         if (branch_id) params.append('branch_id', String(branch_id));
@@ -95,7 +95,7 @@ export async function getRevenue7Days(year?: number, branch_id?: number) {
         }>(`/api/admin/dashboard/revenue-7days?${params.toString()}`);
 }
 
-export async function getRevenueByMonth(year?: number, month?: number, status?: 'all' | 'paid', branch_id?: number) {
+export async function getRevenueByMonth(year?: number, month?: number, status?: 'all' | 'paid', branch_id?: number | 'all') {
         const params = new URLSearchParams();
         if (year) params.append('year', String(year));
         if (month) params.append('month', String(month));

@@ -59,8 +59,8 @@ interface Props {
         setTopPeriod: (period: string) => void;
         onRefresh: () => void;
         branches?: any[];
-        selectedBranchId?: number | null;
-        setSelectedBranchId?: (id: number | null) => void;
+        selectedBranchId?: number | 'all' | null;
+        setSelectedBranchId?: (id: number | 'all' | null) => void;
 }
 
 export default function DashboardContent({
@@ -295,11 +295,11 @@ export default function DashboardContent({
 
                                         {branches.length > 0 && (
                                                 <select
-                                                        value={selectedBranchId || ''}
-                                                        onChange={(e) => setSelectedBranchId(e.target.value ? Number(e.target.value) : null)}
+                                                        value={selectedBranchId || 'all'}
+                                                        onChange={(e) => setSelectedBranchId(e.target.value === 'all' ? 'all' : Number(e.target.value))}
                                                         className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-900 rounded-xl font-bold text-sm border-none focus:ring-2 focus:ring-blue-500 transition-all cursor-pointer outline-none"
                                                 >
-                                                        <option value="">Tất cả chi nhánh</option>
+                                                        <option value="all">Tất cả chi nhánh</option>
                                                         {branches.map((branch) => (
                                                                 <option key={branch.id} value={branch.id}>
                                                                         {branch.name}

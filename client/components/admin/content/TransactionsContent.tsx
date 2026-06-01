@@ -80,8 +80,8 @@ interface Props {
         setToDate?: (v: string) => void;
         isLoading?: boolean;
         branches?: any[];
-        selectedBranchId?: number | null;
-        setSelectedBranchId?: (id: number | null) => void;
+        selectedBranchId?: number | 'all' | null;
+        setSelectedBranchId?: (id: number | 'all' | null) => void;
 }
 
 export default function TransactionsContent({
@@ -333,11 +333,11 @@ export default function TransactionsContent({
 
                                                         {branches.length > 0 && (
                                                                 <select
-                                                                        value={selectedBranchId || ''}
-                                                                        onChange={(e) => setSelectedBranchId(e.target.value ? Number(e.target.value) : null)}
+                                                                        value={selectedBranchId || 'all'}
+                                                                        onChange={(e) => setSelectedBranchId(e.target.value === 'all' ? 'all' : Number(e.target.value))}
                                                                         className="h-11 px-3 bg-white border rounded-xl text-xs w-40 cursor-pointer shadow-sm focus:ring-2 focus:ring-blue-500 outline-none"
                                                                 >
-                                                                        <option value="">Tất cả chi nhánh</option>
+                                                                        <option value="all">Tất cả chi nhánh</option>
                                                                         {branches.map((branch) => (
                                                                                 <option key={branch.id} value={branch.id}>
                                                                                         {branch.name}

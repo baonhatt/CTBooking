@@ -8,13 +8,14 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Checkbox } from '@/components/ui/checkbox';
 import { toast } from 'sonner';
+import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { request } from '@/lib/api/http';
 import AdminLayout from '@/admin/layouts/AdminLayout';
 import { useStaffStore } from '@/store/staffStore';
 import { useNavigate } from 'react-router-dom';
 import { useStaffPermissions, useIsSuperAdmin } from '@/hooks/useStaffPermission';
-import { Info, X, Search, RefreshCw, Eye, FileText, Edit, Trash2, Key } from 'lucide-react';
+import { Info, X, Search, RefreshCw, Eye, FileText, Edit, Trash2, Key, User, Mail, Phone, Shield, Building2, History } from 'lucide-react';
 
 interface Staff {
         id: number;
@@ -68,7 +69,7 @@ export default function StaffPage() {
         const [pageSize] = useState(20);
         const [search, setSearch] = useState('');
         const [filterRole, setFilterRole] = useState('');
-        const [filterBranch, setFilterBranch] = useState('');
+        const [filterBranch, setFilterBranch] = useState(isSuperAdmin ? 'all' : '');
         const [selectedStaff, setSelectedStaff] = useState<Staff | null>(null);
         const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
         const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
@@ -338,6 +339,16 @@ export default function StaffPage() {
                                                                 </Button>
                                                         </div>
                                                         <div className="flex gap-2">
+                                                                {hasPermission('staff', 'view_deleted') && (
+                                                                        <Button
+                                                                                variant="outline"
+                                                                                onClick={() => navigate('/deleted/staff')}
+                                                                                className="flex items-center gap-2"
+                                                                        >
+                                                                                <Trash2 className="w-4 h-4" />
+                                                                                Xem đã xóa
+                                                                        </Button>
+                                                                )}
                                                                 <Select value={filterRole} onValueChange={setFilterRole}>
                                                                         <SelectTrigger className="w-[180px] h-10">
                                                                                 <SelectValue placeholder="Vai trò" />
@@ -397,8 +408,20 @@ export default function StaffPage() {
                                                                                 <tr key={staff.id} className="border-b hover:bg-gray-50">
                                                                                         <td className="p-3">{staff.email}</td>
                                                                                         <td className="p-3">{staff.fullname}</td>
-                                                                                        <td className="p-3">{staff.roles?.join(', ') || '-'}</td>
-                                                                                        <td className="p-3">{staff.branchNames?.join(', ') || '-'}</td>
+                                                                                        <td className="p-3">
+                                                                                                {staff.isSuperAdmin ? (
+                                                                                                        <span className="font-semibold text-purple-700">Super Admin</span>
+                                                                                                ) : (
+                                                                                                        staff.roles?.join(', ') || '-'
+                                                                                                )}
+                                                                                        </td>
+                                                                                        <td className="p-3">
+                                                                                                {staff.isSuperAdmin ? (
+                                                                                                        <span className="text-slate-500 italic">Tất cả chi nhánh</span>
+                                                                                                ) : (
+                                                                                                        staff.branchNames?.join(', ') || '-'
+                                                                                                )}
+                                                                                        </td>
                                                                                         <td className="p-3">
                                                                                                 {staff.isSuperAdmin && (
                                                                                                         <span className="bg-purple-100 text-purple-800 px-2 py-1 rounded text-xs">Super Admin</span>
@@ -590,35 +613,49 @@ export default function StaffPage() {
                                                                 </div>
                                                                 <div>
                                                                         <Label>Vai trò</Label>
-                                                                        <Select value={formData.roleId} onValueChange={(v) => setFormData({ ...formData, roleId: v })}>
-                                                                                <SelectTrigger>
-                                                                                        <SelectValue placeholder="Chọn vai trò" />
-                                                                                </SelectTrigger>
-                                                                                <SelectContent>
-                                                                                        {roles.map((role: Role) => (
-                                                                                                <SelectItem key={role.id} value={String(role.id)}>
-                                                                                                        {role.name}
-                                                                                                </SelectItem>
-                                                                                        ))}
-                                                                                </SelectContent>
-                                                                        </Select>
+                                                                        {selectedStaff?.isSuperAdmin ? (
+                                                                                <div className="mt-2 p-2 bg-purple-50 border border-purple-100 rounded-lg text-purple-700 text-sm font-bold flex items-center gap-2">
+                                                                                        <Shield className="w-4 h-4" />
+                                                                                        SUPER ADMIN (Tất cả quyền)
+                                                                                </div>
+                                                                        ) : (
+                                                                                <Select value={formData.roleId} onValueChange={(v) => setFormData({ ...formData, roleId: v })}>
+                                                                                        <SelectTrigger>
+                                                                                                <SelectValue placeholder="Chọn vai trò" />
+                                                                                        </SelectTrigger>
+                                                                                        <SelectContent>
+                                                                                                {roles.map((role: Role) => (
+                                                                                                        <SelectItem key={role.id} value={String(role.id)}>
+                                                                                                                {role.name}
+                                                                                                        </SelectItem>
+                                                                                                ))}
+                                                                                        </SelectContent>
+                                                                                </Select>
+                                                                        )}
                                                                 </div>
                                                                 <div>
                                                                         <Label>Chi nhánh</Label>
-                                                                        <div className="grid grid-cols-2 gap-2 mt-2 max-h-40 overflow-y-auto border rounded p-2">
-                                                                                {branches.map((branch: Branch) => (
-                                                                                        <div key={branch.id} className="flex items-center space-x-2">
-                                                                                                <Checkbox
-                                                                                                        id={`edit-branch-${branch.id}`}
-                                                                                                        checked={formData.branchIds.includes(branch.id)}
-                                                                                                        onCheckedChange={() => toggleBranch(branch.id)}
-                                                                                                />
-                                                                                                <Label htmlFor={`edit-branch-${branch.id}`} className="text-sm">
-                                                                                                        {branch.name}
-                                                                                                </Label>
-                                                                                        </div>
-                                                                                ))}
-                                                                        </div>
+                                                                        {selectedStaff?.isSuperAdmin ? (
+                                                                                <div className="mt-2 p-2 bg-blue-50 border border-blue-100 rounded-lg text-blue-700 text-sm font-bold flex items-center gap-2">
+                                                                                        <Building2 className="w-4 h-4" />
+                                                                                        TẤT CẢ CHI NHÁNH
+                                                                                </div>
+                                                                        ) : (
+                                                                                <div className="grid grid-cols-2 gap-2 mt-2 max-h-40 overflow-y-auto border rounded p-2">
+                                                                                        {branches.map((branch: Branch) => (
+                                                                                                <div key={branch.id} className="flex items-center space-x-2">
+                                                                                                        <Checkbox
+                                                                                                                id={`edit-branch-${branch.id}`}
+                                                                                                                checked={formData.branchIds.includes(branch.id)}
+                                                                                                                onCheckedChange={() => toggleBranch(branch.id)}
+                                                                                                        />
+                                                                                                        <Label htmlFor={`edit-branch-${branch.id}`} className="text-sm">
+                                                                                                                {branch.name}
+                                                                                                        </Label>
+                                                                                                </div>
+                                                                                        ))}
+                                                                                </div>
+                                                                        )}
                                                                 </div>
                                                         </div>
                                                         <div className="flex items-start gap-2 text-xs text-gray-500 px-1">
@@ -708,7 +745,7 @@ export default function StaffPage() {
 
                                 {/* Detail Dialog */}
                                 <Dialog open={isDetailDialogOpen} onOpenChange={setIsDetailDialogOpen}>
-                                        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto [&>button]:hidden">
+                                        <DialogContent className="max-w-4xl max-h-[85vh] overflow-y-auto pr-2 custom-scrollbar [&>button]:hidden">
                                                 <DialogHeader className="flex flex-row items-center gap-3 space-y-0 pb-4 border-b">
                                                         <DialogTitle className="text-lg font-bold text-slate-800">Chi tiết nhân viên</DialogTitle>
                                                         <div className="flex-1" />
@@ -724,65 +761,126 @@ export default function StaffPage() {
                                                 </DialogHeader>
 
                                                 {selectedStaff && (
-                                                        <div className="space-y-4">
-                                                                {/* Overview */}
-                                                                <div className="space-y-4 py-4">
-                                                                        <div className="grid grid-cols-2 gap-4">
-                                                                                <div className="space-y-2">
-                                                                                        <Label className="text-sm font-medium text-gray-500">Email</Label>
-                                                                                        <div className="text-sm font-medium">{selectedStaff.email}</div>
-                                                                                </div>
-                                                                                <div className="space-y-2">
-                                                                                        <Label className="text-sm font-medium text-gray-500">Họ tên</Label>
-                                                                                        <div className="text-sm font-medium">{selectedStaff.fullname}</div>
-                                                                                </div>
-                                                                                <div className="space-y-2">
-                                                                                        <Label className="text-sm font-medium text-gray-500">Số điện thoại</Label>
-                                                                                        <div className="text-sm">{selectedStaff.phone || '-'}</div>
-                                                                                </div>
-                                                                                <div className="space-y-2">
-                                                                                        <Label className="text-sm font-medium text-gray-500">Vai trò</Label>
-                                                                                        <div className="text-sm">{selectedStaff.roles?.join(', ') || '-'}</div>
-                                                                                </div>
-                                                                                <div className="space-y-2">
-                                                                                        <Label className="text-sm font-medium text-gray-500">Chi nhánh</Label>
-                                                                                        <div className="text-sm">{selectedStaff.branchNames?.join(', ') || '-'}</div>
-                                                                                </div>
-                                                                                <div className="space-y-2">
-                                                                                        <Label className="text-sm font-medium text-gray-500">Trạng thái</Label>
-                                                                                        <div className="flex gap-2">
-                                                                                                {selectedStaff.isSuperAdmin && (
-                                                                                                        <span className="bg-purple-100 text-purple-800 px-2 py-1 rounded text-xs">Super Admin</span>
-                                                                                                )}
-                                                                                                {selectedStaff.forcePasswordChange && (
-                                                                                                        <span className="bg-yellow-100 text-yellow-800 px-2 py-1 rounded text-xs">Đổi mật khẩu</span>
-                                                                                                )}
+                                                        <div className="py-4 space-y-4">
+                                                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                                                        {/* Account Info */}
+                                                                        <Card className="border-slate-200 shadow-none bg-slate-50/50 h-fit">
+                                                                                <CardContent className="p-4 space-y-4">
+                                                                                        <div className="flex items-center gap-2 pb-2 border-b border-slate-200">
+                                                                                                <User className="w-4 h-4 text-blue-500" />
+                                                                                                <h3 className="text-sm font-semibold text-slate-800">Thông tin tài khoản</h3>
                                                                                         </div>
-                                                                                </div>
-                                                                        </div>
-                                                                        <div className="border-t pt-4 mt-4">
-                                                                                <h4 className="text-sm font-semibold mb-3">Thông tin tạo & cập nhật</h4>
-                                                                                <div className="grid grid-cols-2 gap-4">
-                                                                                        <div className="space-y-2">
-                                                                                                <Label className="text-sm font-medium text-gray-500">Ngày tạo</Label>
-                                                                                                <div className="text-sm">{new Date(selectedStaff.createdAt).toLocaleString('vi-VN')}</div>
+                                                                                        <div className="space-y-3">
+                                                                                                <div className="flex items-start gap-3">
+                                                                                                        <Mail className="w-3.5 h-3.5 text-slate-400 mt-1 shrink-0" />
+                                                                                                        <div className="space-y-0.5">
+                                                                                                                <Label className="text-[10px] font-medium text-slate-500 uppercase">Email</Label>
+                                                                                                                <div className="text-sm font-semibold text-slate-900 break-all">{selectedStaff.email}</div>
+                                                                                                        </div>
+                                                                                                </div>
+                                                                                                <div className="flex items-start gap-3">
+                                                                                                        <Info className="w-3.5 h-3.5 text-slate-400 mt-1 shrink-0" />
+                                                                                                        <div className="space-y-0.5">
+                                                                                                                <Label className="text-[10px] font-medium text-slate-500 uppercase">Họ tên</Label>
+                                                                                                                <div className="text-sm font-medium text-slate-700">{selectedStaff.fullname}</div>
+                                                                                                        </div>
+                                                                                                </div>
+                                                                                                <div className="flex items-start gap-3">
+                                                                                                        <Phone className="w-3.5 h-3.5 text-slate-400 mt-1 shrink-0" />
+                                                                                                        <div className="space-y-0.5">
+                                                                                                                <Label className="text-[10px] font-medium text-slate-500 uppercase">Số điện thoại</Label>
+                                                                                                                <div className="text-sm text-slate-700">{selectedStaff.phone || 'Chưa cập nhật'}</div>
+                                                                                                        </div>
+                                                                                                </div>
+                                                                                                <div className="flex items-center gap-2 pt-1">
+                                                                                                        {selectedStaff.isSuperAdmin && (
+                                                                                                                <Badge className="bg-purple-100 text-purple-700 hover:bg-purple-100 border-none rounded-full px-2 py-0 text-[10px] h-5">Super Admin</Badge>
+                                                                                                        )}
+                                                                                                        {selectedStaff.forcePasswordChange && (
+                                                                                                                <Badge className="bg-yellow-100 text-yellow-700 hover:bg-yellow-100 border-none rounded-full px-2 py-0 text-[10px] h-5">Yêu cầu đổi mật khẩu</Badge>
+                                                                                                        )}
+                                                                                                        {!selectedStaff.isSuperAdmin && !selectedStaff.forcePasswordChange && (
+                                                                                                                <Badge className="bg-blue-100 text-blue-700 hover:bg-blue-100 border-none rounded-full px-2 py-0 text-[10px] h-5">Hoạt động bình thường</Badge>
+                                                                                                        )}
+                                                                                                </div>
                                                                                         </div>
-                                                                                        <div className="space-y-2">
-                                                                                                <Label className="text-sm font-medium text-gray-500">Tạo bởi</Label>
-                                                                                                <div className="text-sm">{selectedStaff.created_by_staff_name || '-'}</div>
-                                                                                        </div>
-                                                                                        <div className="space-y-2">
-                                                                                                <Label className="text-sm font-medium text-gray-500">Cập nhật lần cuối</Label>
-                                                                                                <div className="text-sm">{selectedStaff.updatedAt ? new Date(selectedStaff.updatedAt).toLocaleString('vi-VN') : '-'}</div>
-                                                                                        </div>
-                                                                                        <div className="space-y-2">
-                                                                                                <Label className="text-sm font-medium text-gray-500">Cập nhật bởi</Label>
-                                                                                                <div className="text-sm">{selectedStaff.updated_by_staff_name || '-'}</div>
-                                                                                        </div>
-                                                                                </div>
-                                                                        </div>
-                                                                </div>
+                                                                                </CardContent>
+                                                                        </Card>
 
+                                                                        {/* Assignments */}
+                                                                        <Card className="border-slate-200 shadow-none bg-slate-50/50 h-fit">
+                                                                                <CardContent className="p-4 space-y-4">
+                                                                                        <div className="flex items-center gap-2 pb-2 border-b border-slate-200">
+                                                                                                <Shield className="w-4 h-4 text-purple-500" />
+                                                                                                <h3 className="text-sm font-semibold text-slate-800">Phân quyền & Chi nhánh</h3>
+                                                                                        </div>
+                                                                                        <div className="space-y-4">
+                                                                                                <div className="space-y-2">
+                                                                                                        <div className="flex items-center gap-2">
+                                                                                                                <Key className="w-3.5 h-3.5 text-slate-400" />
+                                                                                                                <Label className="text-[10px] font-medium text-slate-500 uppercase tracking-wider">Vai trò (Roles)</Label>
+                                                                                                        </div>
+                                                                                                        <div className="flex flex-wrap gap-1.5">
+                                                                                                                {selectedStaff.isSuperAdmin ? (
+                                                                                                                        <Badge variant="outline" className="bg-purple-50 text-purple-700 border-purple-200 font-bold px-2 py-0 text-[11px]">SUPER ADMIN</Badge>
+                                                                                                                ) : selectedStaff.roles && selectedStaff.roles.length > 0 ? (
+                                                                                                                        selectedStaff.roles.map((role, idx) => (
+                                                                                                                                <Badge key={idx} variant="outline" className="bg-white text-slate-700 border-slate-200 font-medium px-2 py-0 text-[11px]">{role}</Badge>
+                                                                                                                        ))
+                                                                                                                ) : (
+                                                                                                                        <span className="text-xs text-slate-400 italic">Chưa phân vai trò</span>
+                                                                                                                )}
+                                                                                                        </div>
+                                                                                                </div>
+                                                                                                <div className="space-y-2 pt-2">
+                                                                                                        <div className="flex items-center gap-2">
+                                                                                                                <Building2 className="w-3.5 h-3.5 text-slate-400" />
+                                                                                                                <Label className="text-[10px] font-medium text-slate-500 uppercase tracking-wider">Chi nhánh quản lý</Label>
+                                                                                                        </div>
+                                                                                                        <div className="flex flex-wrap gap-1.5">
+                                                                                                                {selectedStaff.isSuperAdmin ? (
+                                                                                                                        <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200 font-bold px-2 py-0 text-[11px]">TẤT CẢ CHI NHÁNH</Badge>
+                                                                                                                ) : selectedStaff.branchNames && selectedStaff.branchNames.length > 0 ? (
+                                                                                                                        selectedStaff.branchNames.map((branch, idx) => (
+                                                                                                                                <Badge key={idx} variant="outline" className="bg-white text-blue-600 border-blue-100 font-medium px-2 py-0 text-[11px]">{branch}</Badge>
+                                                                                                                        ))
+                                                                                                                ) : (
+                                                                                                                        <span className="text-xs text-slate-400 italic">Chưa phân chi nhánh</span>
+                                                                                                                )}
+                                                                                                        </div>
+                                                                                                </div>
+                                                                                        </div>
+                                                                                </CardContent>
+                                                                        </Card>
+
+                                                                        {/* System Info */}
+                                                                        <Card className="border-slate-200 shadow-none bg-slate-50/50 md:col-span-2 h-fit">
+                                                                                <CardContent className="p-4 space-y-4">
+                                                                                        <div className="flex items-center gap-2 pb-2 border-b border-slate-200">
+                                                                                                <History className="w-4 h-4 text-slate-500" />
+                                                                                                <h3 className="text-sm font-semibold text-slate-800">Thông tin hệ thống</h3>
+                                                                                        </div>
+                                                                                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
+                                                                                                <div className="space-y-1">
+                                                                                                        <Label className="text-[10px] font-medium text-slate-500 uppercase">Ngày tạo</Label>
+                                                                                                        <div className="text-xs text-slate-700 font-medium">{new Date(selectedStaff.createdAt).toLocaleString('vi-VN')}</div>
+                                                                                                        <div className="text-[10px] text-slate-400 font-medium italic">Bởi: {selectedStaff.created_by_staff_name || 'Hệ thống'}</div>
+                                                                                                </div>
+                                                                                                <div className="space-y-1">
+                                                                                                        <Label className="text-[10px] font-medium text-slate-500 uppercase">Cập nhật cuối</Label>
+                                                                                                        <div className="text-xs text-slate-700 font-medium">{selectedStaff.updatedAt ? new Date(selectedStaff.updatedAt).toLocaleString('vi-VN') : 'Chưa cập nhật'}</div>
+                                                                                                        <div className="text-[10px] text-slate-400 font-medium italic">Bởi: {selectedStaff.updated_by_staff_name || 'Hệ thống'}</div>
+                                                                                                </div>
+                                                                                                <div className="space-y-1">
+                                                                                                        <Label className="text-[10px] font-medium text-slate-500 uppercase">Đăng nhập cuối</Label>
+                                                                                                        <div className="text-xs text-slate-700 font-medium">
+                                                                                                                {selectedStaff.lastLoginAt ? new Date(selectedStaff.lastLoginAt).toLocaleString('vi-VN') : 'Chưa đăng nhập'}
+                                                                                                        </div>
+                                                                                                </div>
+                                                                                        </div>
+                                                                                </CardContent>
+                                                                        </Card>
+                                                                </div>
                                                         </div>
                                                 )}
                                         </DialogContent>

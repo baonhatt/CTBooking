@@ -1,4 +1,4 @@
-import { eq, and, or, like, isNull, isNotNull, desc, count, sql } from 'drizzle-orm';
+import { eq, and, or, like, isNull, isNotNull, desc, count, sql, aliasedTable } from 'drizzle-orm';
 import bcrypt from 'bcryptjs';
 import { hashPassword, invalidateStaffPermissionCache } from '../../lib/staff-auth';
 import { mailQueue } from '../../lib/mail-queue';
@@ -83,7 +83,10 @@ export async function listStaffImpl(
         const [totalResult] = await db
                 .select({ count: count() })
                 .from(staffs)
-                .where(includeInactive ? undefined : eq(staffs.isActive, true));
+                .where(and(
+                        includeInactive ? undefined : eq(staffs.isActive, true),
+                        isNull(staffs.deletedAt)
+                ));
 
         return {
                 items: staffWithDetails,
@@ -531,8 +534,8 @@ export async function listDeletedStaffImpl(
         const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
 
         // Self-join to get deleted_by staff info
-        const staffsAlias = staffs; // Alias for self-join
-        const [items] = await db
+        const staffsAlias = aliasedTable(staffs, 'deleted_by_staff');
+        const query = db
                 .select({
                         id: staffs.id,
                         email: staffs.email,
@@ -549,6 +552,8 @@ export async function listDeletedStaffImpl(
                 .limit(pageSize)
                 .offset((page - 1) * pageSize)
                 .orderBy(desc(staffs.deletedAt));
+
+        const items = await query;
 
         const [countResult] = await db
                 .select({ count: count() })

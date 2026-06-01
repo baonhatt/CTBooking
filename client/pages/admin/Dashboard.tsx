@@ -70,7 +70,10 @@ export default function DashboardPage() {
         const [refreshKey, setRefreshKey] = useState(0);
 
         // Branch filter
-        const [selectedBranchId, setSelectedBranchId] = useState<number | null>(null);
+        const [selectedBranchId, setSelectedBranchId] = useState<number | 'all' | null>(() => {
+                if (staff?.isSuperAdmin) return 'all';
+                return null;
+        });
         const [branches, setBranches] = useState<any[]>([]);
 
         // Load branches
@@ -79,11 +82,16 @@ export default function DashboardPage() {
                         try {
                                 const { items } = await getBranches({ includeInactive: true });
                                 setBranches(items);
+
+                                // If not superadmin, default to their first branch if none selected
+                                if (!staff?.isSuperAdmin && !selectedBranchId && items.length > 0) {
+                                        setSelectedBranchId(items[0].id);
+                                }
                         } catch (error) {
                                 console.error('Error loading branches:', error);
                         }
                 })();
-        }, []);
+        }, [staff]);
 
         const handleRefresh = () => {
                 setRefreshKey((prev) => prev + 1);

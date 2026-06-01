@@ -15,7 +15,9 @@ import {
         AlertDialogHeader,
         AlertDialogTitle
 } from '@/components/ui/alert-dialog';
-import { RefreshCw, RotateCcw, Image as ImageIcon } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { useStaffStore } from '@/store/staffStore';
+import { RefreshCw, RotateCcw, Image as ImageIcon, ArrowLeft } from 'lucide-react';
 
 interface Movie {
         id: number;
@@ -32,6 +34,8 @@ interface Movie {
 }
 
 export default function DeletedMoviesPage() {
+        const navigate = useNavigate();
+        const staffStore = useStaffStore();
         const [activeTab, setActiveTab] = useState('deleted-movies');
         const [movies, setMovies] = useState<Movie[]>([]);
         const [page, setPage] = useState(1);
@@ -128,17 +132,26 @@ export default function DeletedMoviesPage() {
                 <AdminLayout
                         active={activeTab as any}
                         setActive={setActiveTab as any}
-                        adminEmailState={localStorage.getItem('adminEmail') || 'admin@email.com'}
+                        adminEmailState={staffStore.staff?.email || 'admin@email.com'}
                         handleLogout={() => {
-                                localStorage.removeItem('adminToken');
-                                localStorage.removeItem('adminEmail');
-                                window.dispatchEvent(new Event('admin-auth-changed'));
-                                window.location.href = '/';
+                                staffStore.clearStaff();
+                                localStorage.removeItem('staffToken');
+                                navigate('/login');
                         }}
                 >
                         <div className="p-6">
-                                <div className="flex justify-between items-center mb-6">
+                                <div className="flex items-center gap-4 mb-6">
+                                        <Button
+                                                variant="ghost"
+                                                size="icon"
+                                                onClick={() => navigate('/movies')}
+                                                className="rounded-full"
+                                                title="Quay lại"
+                                        >
+                                                <ArrowLeft className="w-5 h-5" />
+                                        </Button>
                                         <h1 className="text-2xl font-bold">Phim đã xóa</h1>
+                                        <div className="flex-1" />
                                         <Button onClick={fetchDeletedMovies} variant="outline" size="sm">
                                                 <RefreshCw className="w-4 h-4 mr-2" />
                                                 Làm mới
