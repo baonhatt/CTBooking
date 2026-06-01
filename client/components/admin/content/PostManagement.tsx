@@ -24,7 +24,8 @@ import {
         Link,
         Calendar,
         Share2,
-        Globe
+        Globe,
+        Trash2
 } from 'lucide-react';
 import {
         Pagination,
@@ -39,10 +40,11 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { getPosts, createPostApi, updatePostApi } from '@/lib/api';
+import { getPosts, createPostApi, updatePostApi, deletePostApi } from '@/lib/api';
 import { uploadDirectToCloudinary } from '@/lib/api/uploads';
 import { PostRichTextEditor } from './PostRichTextEditor';
 import { toast } from 'sonner';
+import { useIsSuperAdmin } from '@/hooks/useStaffPermission';
 
 interface PostData {
         id: number;
@@ -82,6 +84,7 @@ function getPlainTextFromHtml(value?: string) {
 
 export const PostManagement = () => {
         const navigate = useNavigate();
+        const isSuperAdmin = useIsSuperAdmin();
         const [posts, setPosts] = useState<PostData[]>([]);
         const [totalPosts, setTotalPosts] = useState(0);
         const [currentPage, setCurrentPage] = useState(1);
@@ -90,6 +93,8 @@ export const PostManagement = () => {
         const [isLoading, setIsLoading] = useState(false);
         const [isEditOpen, setIsEditOpen] = useState(false);
         const [isPreviewOpen, setIsPreviewOpen] = useState(false);
+        const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+        const [postToDelete, setPostToDelete] = useState<PostData | null>(null);
         const [editData, setEditData] = useState<Partial<PostData> & { imageFile?: File; ogImageFile?: File }>({});
         const [isSaving, setIsSaving] = useState(false);
         const [activeTab, setActiveTab] = useState('content');
@@ -166,27 +171,34 @@ export const PostManagement = () => {
         const totalPages = useMemo(() => Math.max(1, Math.ceil(totalPosts / pageSize)), [totalPosts]);
 
         const handleCreate = () => {
-                const next = {
-                        id: 0,
-                        title: '',
-                        content: '',
-                        excerpt: '',
-                        status: 'draft',
-                        is_featured: false,
-                        meta_description: '',
-                        meta_keywords: '',
-                        seo_title: '',
-                        og_image: '',
-                        canonical_url: '',
-                        schema_type: 'Article'
-                };
-                setEditData(next);
-                initialSnapshotRef.current = snapshotEditData(next);
-                setIsEditOpen(true);
+                navigate('/posts/new');
         };
 
         const handleEdit = (post: PostData) => {
                 navigate(`/posts/${post.id}/edit`);
+        };
+
+        const handleDelete = (post: PostData) => {
+                // Check if post is published
+                if (post.status === 'published') {
+                        toast.error('Không thể xóa', { description: 'Bài viết đã xuất bản. Vui lòng gỡ xuất bản trước khi xóa.' });
+                        return;
+                }
+                setPostToDelete(post);
+                setIsDeleteDialogOpen(true);
+        };
+
+        const confirmDelete = async (hardDelete = false) => {
+                if (!postToDelete?.id) return;
+                try {
+                        await deletePostApi(postToDelete.id, hardDelete);
+                        toast.success(hardDelete ? 'Đã xóa vĩnh viễn' : 'Đã lưu trữ bài viết');
+                        setIsDeleteDialogOpen(false);
+                        setPostToDelete(null);
+                        fetchPosts();
+                } catch (error: any) {
+                        toast.error('Lỗi', { description: error?.message || 'Không thể xóa bài viết' });
+                }
         };
 
         const toggleSection = (key: 'publish' | 'images' | 'seo') => {
@@ -382,6 +394,7 @@ export const PostManagement = () => {
                                                         size="icon"
                                                         onClick={fetchPosts}
                                                         className="rounded-xl shadow-sm hover:rotate-180 transition-transform duration-500 shrink-0 h-10 w-10 flex items-center justify-center bg-white border-slate-200"
+                                                        title="Làm mới"
                                                 >
                                                         <RefreshCw className={`w-4 h-4 ${isLoading ? 'animate-spin' : ''}`} />
                                                 </Button>
@@ -501,6 +514,15 @@ export const PostManagement = () => {
                                                                                         >
                                                                                                 <Edit3 size={16} />
                                                                                         </Button>
+                                                                                        <Button
+                                                                                                variant="ghost"
+                                                                                                size="icon"
+                                                                                                onClick={() => handleDelete(post)}
+                                                                                                className="h-8 w-8 text-red-600 hover:text-red-700 hover:bg-red-50 rounded-lg transition-colors"
+                                                                                                title="Xóa"
+                                                                                        >
+                                                                                                <Trash2 size={16} />
+                                                                                        </Button>
                                                                                 </TableCell>
                                                                         </TableRow>
                                                                 ))
@@ -566,7 +588,7 @@ export const PostManagement = () => {
                                         <div className="sticky top-0 z-10 bg-white border-b shadow-sm shrink-0">
                                                 <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
                                                         <div className="flex items-center justify-between h-16">
-                                                                <div className="flex items-center gap-4">
+                                                                <div className="flex items-center gap-4"> title="Quay lại"
                                                                         <Button variant="ghost" size="icon" onClick={() => requestClose(false)} className="rounded-xl">
                                                                                 <ArrowLeft className="w-5 h-5" />
                                                                         </Button>
@@ -1024,6 +1046,31 @@ export const PostManagement = () => {
                                                                 }}
                                                         />
                                                 </article>
+                                        </div>
+                                </DialogContent>
+                        </Dialog>
+
+                        {/* ── Delete Confirmation Dialog ─────────────────────────────────────── */}
+                        <Dialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+                                <DialogContent className="max-w-md">
+                                        <DialogHeader>
+                                                <DialogTitle>Xác nhận xóa bài viết</DialogTitle>
+                                        </DialogHeader>
+                                        <p className="py-4 text-sm text-slate-600">
+                                                Bạn có chắc chắn muốn xóa bài viết "{postToDelete?.title}"? Bài viết sẽ được chuyển sang trạng thái lưu trữ.
+                                        </p>
+                                        <div className="flex justify-end gap-2">
+                                                <Button variant="outline" onClick={() => setIsDeleteDialogOpen(false)}>
+                                                        Hủy
+                                                </Button>
+                                                <Button variant="destructive" onClick={() => confirmDelete(false)}>
+                                                        Lưu trữ
+                                                </Button>
+                                                {isSuperAdmin && (
+                                                        <Button variant="destructive" onClick={() => confirmDelete(true)} className="bg-red-700 hover:bg-red-800">
+                                                                Xóa vĩnh viễn
+                                                        </Button>
+                                                )}
                                         </div>
                                 </DialogContent>
                         </Dialog>

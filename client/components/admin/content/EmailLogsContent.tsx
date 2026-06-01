@@ -146,6 +146,7 @@ export default function EmailLogsContent() {
                                                         size="icon"
                                                         onClick={fetchData}
                                                         className="rounded-xl hover:rotate-180 transition-all duration-500 h-10 w-10 border-slate-200"
+                                                        title="Làm mới"
                                                 >
                                                         <RefreshCw className={`w-4 h-4 ${isLoading ? 'animate-spin' : ''}`} />
                                                 </Button>

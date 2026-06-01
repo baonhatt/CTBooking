@@ -1,5 +1,6 @@
 import { eq, and, desc, count, isNull, isNotNull, like } from 'drizzle-orm';
 import { logAuditAction } from '../../lib/audit-logger';
+import { buildAuditPayload } from '../../lib/audit-utils';
 
 export async function listRolesImpl(db: any, tables: any, params?: { page?: number; pageSize?: number }) {
         const { roles, rolePermissions, permissions } = tables;
@@ -134,6 +135,8 @@ export async function createRoleImpl(
                 });
         }
 
+        const auditNew = buildAuditPayload({ ...newRole, permissionIds });
+
         // Log audit action
         if (staffInfo) {
                 await logAuditAction(
@@ -145,7 +148,9 @@ export async function createRoleImpl(
                         `Tạo role: ${name}`,
                         staffInfo.id,
                         staffInfo.email,
-                        staffInfo.fullname
+                        staffInfo.fullname,
+                        undefined,
+                        auditNew
                 );
         }
 
@@ -194,6 +199,13 @@ export async function updateRoleImpl(
                 }
         }
 
+        const existingPerms = await db
+                .select({ permissionId: rolePermissions.permissionId })
+                .from(rolePermissions)
+                .where(eq(rolePermissions.roleId, id));
+
+        const auditOld = buildAuditPayload({ ...existing, permissionIds: existingPerms.map((p) => p.permissionId) });
+
         // Update role
         const updateData: any = { updatedAt: now };
         if (name) updateData.name = name;
@@ -210,6 +222,14 @@ export async function updateRoleImpl(
                 }
         }
 
+        const [updatedRole] = await db.select().from(roles).where(eq(roles.id, id)).limit(1);
+        const newPerms = await db
+                .select({ permissionId: rolePermissions.permissionId })
+                .from(rolePermissions)
+                .where(eq(rolePermissions.roleId, id));
+
+        const auditNew = buildAuditPayload({ ...updatedRole, permissionIds: newPerms.map((p) => p.permissionId) });
+
         // Log audit action
         if (staffInfo) {
                 await logAuditAction(
@@ -221,7 +241,9 @@ export async function updateRoleImpl(
                         `Cập nhật role: ${existing.name}`,
                         staffInfo.id,
                         staffInfo.email,
-                        staffInfo.fullname
+                        staffInfo.fullname,
+                        auditOld,
+                        auditNew
                 );
         }
 
@@ -261,8 +283,13 @@ export async function deleteRoleImpl(
                 return { status: 'error', message: 'Role đang được gán cho nhân viên, không thể xóa' };
         }
 
+        const deletionTimestamp = new Date().toISOString();
+
         // Soft delete role by setting deleted_at
-        await db.update(roles).set({ deleted_at: new Date().toISOString(), deleted_by_staff_id: staffInfo?.id }).where(eq(roles.id, id));
+        await db.update(roles).set({ deleted_at: deletionTimestamp, deleted_by_staff_id: staffInfo?.id }).where(eq(roles.id, id));
+
+        const auditOld = buildAuditPayload(existing);
+        const auditNew = buildAuditPayload({ ...existing, deleted_at: deletionTimestamp, deleted_by_staff_id: staffInfo?.id });
 
         // Log audit action
         if (staffInfo) {
@@ -275,7 +302,9 @@ export async function deleteRoleImpl(
                         `Xóa role: ${existing.name}`,
                         staffInfo.id,
                         staffInfo.email,
-                        staffInfo.fullname
+                        staffInfo.fullname,
+                        auditOld,
+                        auditNew
                 );
         }
 
@@ -313,6 +342,9 @@ export async function restoreRoleImpl(
         // Restore by setting deleted_at to null
         await db.update(roles).set({ deleted_at: null }).where(eq(roles.id, id));
 
+        const auditOld = buildAuditPayload(existing);
+        const auditNew = buildAuditPayload({ ...existing, deleted_at: null });
+
         // Log audit action
         if (staffInfo) {
                 await logAuditAction(
@@ -324,7 +356,9 @@ export async function restoreRoleImpl(
                         `Restore role: ${existing.name}`,
                         staffInfo.id,
                         staffInfo.email,
-                        staffInfo.fullname
+                        staffInfo.fullname,
+                        auditOld,
+                        auditNew
                 );
         }
 

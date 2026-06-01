@@ -110,7 +110,8 @@ export default function ToysContent({
                                                 variant="outline"
                                                 size="icon"
                                                 onClick={onRefresh}
-                                                className="rounded-xl shadow-sm"
+                                                className="rounded-xl shadow-sm hover:rotate-180 transition-transform duration-500 shrink-0 h-10 w-10"
+                                                title="Làm mới"
                                         >
                                                 <RefreshCw className={`w-4 h-4 ${isLoading ? 'animate-spin' : ''}`} />
                                         </Button>
@@ -313,6 +314,7 @@ export default function ToysContent({
                                                         variant="ghost"
                                                         size="icon"
                                                         onClick={() => setIsDetailDialogOpen(false)}
+                                                        title="Đóng"
                                                         className="h-8 w-8 rounded-full hover:bg-slate-100 text-slate-400 transition-colors"
                                                 >
                                                         <X className="w-5 h-5" />

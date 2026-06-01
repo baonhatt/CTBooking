@@ -233,7 +233,7 @@ export default function TicketCheckContent() {
                         </div>
 
                         {error && (
-                                <Alert variant="destructive" className="max-w-md animate-in fade-in zoom-in duration-300">
+                                <Alert variant="error" className="max-w-md animate-in fade-in zoom-in duration-300">
                                         <AlertCircle className="h-4 w-4" />
                                         <AlertDescription>{error}</AlertDescription>
                                 </Alert>

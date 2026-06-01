@@ -1159,7 +1159,9 @@ app.get('/api/admin/transactions/:id', requireStaffAuth, requirePermission('tran
 
                                 ticket_packages: schema.ticket_packages,
 
-                                branches: schema.branches
+                                branches: schema.branches,
+
+                                auditLogs: schema.auditLogs
                         },
 
                         id,
@@ -1408,7 +1410,9 @@ app.get('/api/admin/users/:id', requireStaffAuth, requirePermission('users', 'vi
 
                                 movies: schema.movies,
 
-                                ticket_packages: schema.ticket_packages
+                                ticket_packages: schema.ticket_packages,
+
+                                auditLogs: schema.auditLogs
                         },
 
                         id
@@ -2170,7 +2174,9 @@ app.get('/api/movies-detail/:id', async (c) => {
 
                         bookings: schema.bookings,
 
-                        ticket_packages: schema.ticket_packages
+                        ticket_packages: schema.ticket_packages,
+
+                        auditLogs: schema.auditLogs
                 },
 
                 id,
@@ -2498,7 +2504,9 @@ app.get('/api/users/:id', async (c) => {
 
                                 movies: schema.movies,
 
-                                ticket_packages: schema.ticket_packages
+                                ticket_packages: schema.ticket_packages,
+
+                                auditLogs: schema.auditLogs
                         },
 
                         id
@@ -2721,7 +2729,7 @@ app.get('/api/toys/:id', async (c) => {
 
                 const db = drizzle(c.env.cinema_db, { schema });
 
-                const r = await getToyImpl(db, { toys: schema.toys }, id);
+                const r = await getToyImpl(db, { toys: schema.toys, auditLogs: schema.auditLogs }, id);
 
                 if (!r) return c.json({ message: 'Không tìm thấy' }, 404);
 
@@ -3023,7 +3031,7 @@ app.get('/api/tickets/:id', async (c) => {
                 const db = drizzle(c.env.cinema_db, { schema });
                 const restrictBranchIds = getRestrictBranchIds(c);
 
-                const r = await getTicketPackageImpl(db, { ticket_packages: schema.ticket_packages }, id, restrictBranchIds);
+                const r = await getTicketPackageImpl(db, { ticket_packages: schema.ticket_packages, auditLogs: schema.auditLogs }, id, restrictBranchIds);
 
                 if (!r) return c.json({ message: 'Không tìm thấy' }, 404);
 
@@ -4108,7 +4116,7 @@ app.get('/sitemap.xml', async (c) => {
 
                 const db = drizzle(c.env.cinema_db, { schema });
 
-                const r = await listPostsImpl(db, { posts: schema.posts }, { page: 1, pageSize: 1000, status: 'published' });
+                const r = await listPostsImpl(db, { posts: schema.posts, auditLogs: schema.auditLogs }, { page: 1, pageSize: 1000, status: 'published' });
 
                 const posts = r.items as Array<{ id: number; slug?: string | null; updated_at?: string | null }>;
 
@@ -4165,7 +4173,7 @@ app.get('/api/posts', async (c) => {
 
                 const db = drizzle(c.env.cinema_db, { schema });
 
-                const r = await listPostsImpl(db, { posts: schema.posts }, { page, pageSize, q, status });
+                const r = await listPostsImpl(db, { posts: schema.posts, auditLogs: schema.auditLogs }, { page, pageSize, q, status });
 
                 const parsedItems = (r.items || []).map((p: any) => ({
                         ...p,
@@ -4187,7 +4195,7 @@ app.get('/api/posts/:identifier', async (c) => {
 
                 const db = drizzle(c.env.cinema_db, { schema });
 
-                const post = await getPostImpl(db, { posts: schema.posts }, identifier, true);
+                const post = await getPostImpl(db, { posts: schema.posts, auditLogs: schema.auditLogs }, identifier, true);
 
                 if (!post) return c.json({ message: 'Không tìm thấy bài viết' }, 404);
 
@@ -4221,7 +4229,7 @@ app.get('/api/admin/posts', requireStaffAuth, requirePermission('posts', 'view')
 
                 const db = drizzle(c.env.cinema_db, { schema });
 
-                const r = await listPostsImpl(db, { posts: schema.posts }, { page, pageSize, q, status });
+                const r = await listPostsImpl(db, { posts: schema.posts, auditLogs: schema.auditLogs }, { page, pageSize, q, status });
 
                 const parsedItems = (r.items || []).map((p: any) => ({
                         ...p,
@@ -4243,7 +4251,7 @@ app.get('/api/admin/posts/:id', requireStaffAuth, requirePermission('posts', 'vi
 
                 const db = drizzle(c.env.cinema_db, { schema });
 
-                const post = await getPostImpl(db, { posts: schema.posts }, id, false);
+                const post = await getPostImpl(db, { posts: schema.posts, auditLogs: schema.auditLogs }, id, false);
 
                 if (!post) return c.json({ message: 'Không tìm thấy bài viết' }, 404);
 
@@ -4350,18 +4358,20 @@ app.delete('/api/posts/:id', requireStaffAuth, requirePermission('posts', 'delet
                 const staffId = c.get('staffId');
                 const staffEmail = c.get('staffEmail');
                 const staffFullname = c.get('staffFullname');
+                const isSuperAdmin = c.get('isSuperAdmin');
 
                 const r = await deletePostImpl(
                         db,
                         { posts: schema.posts, auditLogs: schema.auditLogs },
                         id,
                         getCloudHelpers(c, c.env).deleter,
-                        { id: staffId, email: staffEmail, fullname: staffFullname }
+                        { id: staffId, email: staffEmail, fullname: staffFullname },
+                        isSuperAdmin
                 );
 
                 if (!r) return c.json({ message: 'Không tìm thấy' }, 404);
 
-                return c.json({ status: 'success', message: 'Đã xóa' });
+                return c.json({ status: 'success', message: isSuperAdmin ? 'Đã xóa vĩnh viễn' : 'Đã lưu trữ bài viết' });
         } catch (err: any) {
                 return c.json({ status: 'error', message: String(err?.message || 'Internal error') }, 500);
         }
@@ -4406,7 +4416,7 @@ app.get('/api/admin/branches/:id', requireStaffAuth, requirePermission('branches
 
                 const db = drizzle(c.env.cinema_db, { schema });
 
-                const branch = await getBranchImpl(db, { branches: schema.branches }, id);
+                const branch = await getBranchImpl(db, { branches: schema.branches, auditLogs: schema.auditLogs }, id);
 
                 if (!branch) return c.json({ message: 'Không tìm thấy chi nhánh' }, 404);
 
@@ -4685,7 +4695,7 @@ app.post('/api/admin/auth/login', async (c) => {
 
                 const r = await staffLoginImpl(
                         db,
-                        { staffs: schema.staffs, staffTokens: schema.staffTokens },
+                        { staffs: schema.staffs, staffTokens: schema.staffTokens, auditLogs: schema.auditLogs },
                         c.env.KV_BINDING,
                         body
                 );
@@ -4760,7 +4770,7 @@ app.post('/api/admin/auth/change-password', requireStaffAuth, async (c) => {
 
                 const r = await staffChangePasswordImpl(
                         db,
-                        { staffs: schema.staffs, staffTokens: schema.staffTokens },
+                        { staffs: schema.staffs, staffTokens: schema.staffTokens, auditLogs: schema.auditLogs },
                         c.env.KV_BINDING,
                         staffId,
                         body
@@ -4862,7 +4872,7 @@ app.post('/api/admin/auth/reset-password', async (c) => {
 
                 const r = await staffResetPasswordImpl(
                         db,
-                        { staffs: schema.staffs, staffTokens: schema.staffTokens },
+                        { staffs: schema.staffs, staffTokens: schema.staffTokens, auditLogs: schema.auditLogs },
                         c.env.KV_BINDING,
                         body
                 );
@@ -4965,7 +4975,8 @@ app.post('/api/admin/staff', requireStaffAuth, requirePermission('staff', 'creat
                                 staffs: schema.staffs,
                                 staffRoles: schema.staffRoles,
                                 staffBranches: schema.staffBranches,
-                                email_logs: schema.email_logs
+                                email_logs: schema.email_logs,
+                                auditLogs: schema.auditLogs
                         },
                         c.env.KV_BINDING,
                         body,
@@ -5005,7 +5016,8 @@ app.put('/api/admin/staff/:id', requireStaffAuth, requirePermission('staff', 'ed
                         {
                                 staffs: schema.staffs,
                                 staffRoles: schema.staffRoles,
-                                staffBranches: schema.staffBranches
+                                staffBranches: schema.staffBranches,
+                                auditLogs: schema.auditLogs
                         },
                         c.env.KV_BINDING,
                         id,
@@ -5187,7 +5199,9 @@ app.get('/api/admin/roles/:id', requireStaffAuth, requirePermission('roles', 'vi
 
                                 rolePermissions: schema.rolePermissions,
 
-                                permissions: schema.permissions
+                                permissions: schema.permissions,
+
+                                auditLogs: schema.auditLogs
                         },
                         id
                 );
@@ -5221,7 +5235,9 @@ app.post('/api/admin/roles', requireStaffAuth, requirePermission('roles', 'creat
                         {
                                 roles: schema.roles,
 
-                                rolePermissions: schema.rolePermissions
+                                rolePermissions: schema.rolePermissions,
+
+                                auditLogs: schema.auditLogs
                         },
                         body,
                         { id: staffId, email: staffEmail, fullname: staffFullname }
@@ -5258,7 +5274,9 @@ app.put('/api/admin/roles/:id', requireStaffAuth, requirePermission('roles', 'ed
                         {
                                 roles: schema.roles,
 
-                                rolePermissions: schema.rolePermissions
+                                rolePermissions: schema.rolePermissions,
+
+                                auditLogs: schema.auditLogs
                         },
                         id,
                         body,
@@ -5294,7 +5312,9 @@ app.delete('/api/admin/roles/:id', requireStaffAuth, requirePermission('roles', 
                         {
                                 roles: schema.roles,
 
-                                staffRoles: schema.staffRoles
+                                staffRoles: schema.staffRoles,
+
+                                auditLogs: schema.auditLogs
                         },
                         id,
                         { id: staffId, email: staffEmail, fullname: staffFullname }

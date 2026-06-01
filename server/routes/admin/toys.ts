@@ -1,6 +1,7 @@
 import { eq, desc, or, count, and, sql } from 'drizzle-orm';
 import { formatDateForDb } from '../../lib/date-utils';
 import { logAuditAction } from '../../lib/audit-logger';
+import { buildAuditPayload } from '../../lib/audit-utils';
 
 export async function listToysImpl(
         anyDb: any,
@@ -118,6 +119,8 @@ export async function createToyImpl(
                 await RUN_ENV.KV_BINDING.delete('activeToys');
         }
 
+        const auditNew = buildAuditPayload(toy);
+
         // Log audit action
         if (staffInfo) {
                 await logAuditAction(
@@ -129,7 +132,9 @@ export async function createToyImpl(
                         `Tạo đồ chơi: ${name}`,
                         staffInfo.id,
                         staffInfo.email,
-                        staffInfo.fullname
+                        staffInfo.fullname,
+                        undefined,
+                        auditNew
                 );
         }
 
@@ -190,6 +195,9 @@ export async function updateToyImpl(
                 await RUN_ENV.KV_BINDING.delete('activeToys');
         }
 
+        const auditOld = buildAuditPayload(oldToy);
+        const auditNew = buildAuditPayload(toy || (await anyDb.query.toys.findFirst({ where: eq(tables.toys.id, id) })));
+
         // Log audit action
         if (staffInfo) {
                 await logAuditAction(
@@ -201,7 +209,9 @@ export async function updateToyImpl(
                         `Cập nhật đồ chơi: ${toy?.name || oldToy?.name}`,
                         staffInfo.id,
                         staffInfo.email,
-                        staffInfo.fullname
+                        staffInfo.fullname,
+                        auditOld,
+                        auditNew
                 );
         }
 
@@ -234,6 +244,8 @@ export async function deleteToyImpl(
                 await RUN_ENV.KV_BINDING.delete('activeToys');
         }
 
+        const auditOld = buildAuditPayload(existing);
+
         // Log audit action
         if (staffInfo) {
                 await logAuditAction(
@@ -245,7 +257,9 @@ export async function deleteToyImpl(
                         `Xóa đồ chơi: ${existing.name}`,
                         staffInfo.id,
                         staffInfo.email,
-                        staffInfo.fullname
+                        staffInfo.fullname,
+                        auditOld,
+                        undefined
                 );
         }
 

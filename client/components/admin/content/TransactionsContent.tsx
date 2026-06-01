@@ -251,6 +251,7 @@ export default function TransactionsContent({
                                                 size="icon"
                                                 onClick={onRefresh}
                                                 className="rounded-xl shadow-sm hover:rotate-180 transition-transform duration-500 shrink-0 h-10 w-10"
+                                                title="Làm mới"
                                         >
                                                 <RefreshCw className={`w-4 h-4 ${isLoading ? 'animate-spin' : ''}`} />
                                         </Button>

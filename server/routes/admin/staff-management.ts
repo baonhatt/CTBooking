@@ -5,6 +5,7 @@ import { mailQueue } from '../../lib/mail-queue';
 import { getStaffAccountCreatedTemplate, getStaffPasswordResetTemplate } from '../../lib/email-templates';
 import { sendMail } from '../../routes/mail-service';
 import { logAuditAction } from '../../lib/audit-logger';
+import { buildStaffAuditPayload } from './staff-audit-utils';
 
 export async function listStaffImpl(
         db: any,
@@ -253,6 +254,8 @@ export async function createStaffImpl(
                 context
         );
 
+        const auditNew = buildStaffAuditPayload(newStaff, { roleIds, branchIds });
+
         // Log audit action
         await logAuditAction(
                 db,
@@ -261,9 +264,11 @@ export async function createStaffImpl(
                 'staff',
                 newStaff.id,
                 `Tạo nhân viên: ${fullname} (${email})`,
-                null,
-                email,
-                fullname
+                caller?.id || null,
+                caller?.email || email,
+                caller?.fullname || fullname,
+                undefined,
+                auditNew
         );
 
         return {
@@ -345,6 +350,14 @@ export async function updateStaffImpl(
                 }
         }
 
+        const oldRoles = await db.select({ roleId: staffRoles.roleId }).from(staffRoles).where(eq(staffRoles.staffId, id));
+        const oldBranches = await db.select({ branchId: staffBranches.branchId }).from(staffBranches).where(eq(staffBranches.staffId, id));
+
+        const auditOld = buildStaffAuditPayload(existing, {
+                roleIds: oldRoles.map((r) => r.roleId),
+                branchIds: oldBranches.map((b) => b.branchId)
+        });
+
         // Update staff
         const updateData: any = { updatedAt: now };
         if (email) updateData.email = email;
@@ -375,6 +388,15 @@ export async function updateStaffImpl(
         // Invalidate permission cache
         await invalidateStaffPermissionCache(kv, id);
 
+        const [updatedStaff] = await db.select().from(staffs).where(eq(staffs.id, id)).limit(1);
+        const newRoles = await db.select({ roleId: staffRoles.roleId }).from(staffRoles).where(eq(staffRoles.staffId, id));
+        const newBranches = await db.select({ branchId: staffBranches.branchId }).from(staffBranches).where(eq(staffBranches.staffId, id));
+
+        const auditNew = buildStaffAuditPayload(updatedStaff, {
+                roleIds: newRoles.map((r) => r.roleId),
+                branchIds: newBranches.map((b) => b.branchId)
+        });
+
         // Log audit action
         await logAuditAction(
                 db,
@@ -385,7 +407,9 @@ export async function updateStaffImpl(
                 `Cập nhật nhân viên: ${existing.fullname} (${existing.email})`,
                 caller?.id || null,
                 caller?.email || existing.email,
-                caller?.fullname || existing.fullname
+                caller?.fullname || existing.fullname,
+                auditOld,
+                auditNew
         );
 
         return {
@@ -408,8 +432,21 @@ export async function deleteStaffImpl(db: any, tables: any, id: number, staffInf
                 return { status: 'error', message: 'Không thể xóa super admin' };
         }
 
+        const deletionTimestamp = new Date().toISOString();
+
         // Soft delete by setting isActive to false and deleted_at
-        await db.update(staffs).set({ isActive: false, deletedAt: new Date().toISOString(), deleted_by_staff_id: staffInfo?.id }).where(eq(staffs.id, id));
+        await db
+                .update(staffs)
+                .set({ isActive: false, deletedAt: deletionTimestamp, deleted_by_staff_id: staffInfo?.id })
+                .where(eq(staffs.id, id));
+
+        const auditOld = buildStaffAuditPayload(existing);
+        const auditNew = buildStaffAuditPayload({
+                ...existing,
+                isActive: false,
+                deletedAt: deletionTimestamp,
+                deleted_by_staff_id: staffInfo?.id
+        });
 
         // Log audit action
         await logAuditAction(
@@ -421,7 +458,9 @@ export async function deleteStaffImpl(db: any, tables: any, id: number, staffInf
                 `Xóa nhân viên: ${existing.fullname} (${existing.email})`,
                 staffInfo?.id || null,
                 staffInfo?.email || existing.email,
-                staffInfo?.fullname || existing.fullname
+                staffInfo?.fullname || existing.fullname,
+                auditOld,
+                auditNew
         );
 
         return {
@@ -446,6 +485,9 @@ export async function restoreStaffImpl(
         // Restore by setting isActive to true and deleted_at to null
         await db.update(staffs).set({ isActive: true, deletedAt: null }).where(eq(staffs.id, id));
 
+        const auditOld = buildStaffAuditPayload(existing);
+        const auditNew = buildStaffAuditPayload({ ...existing, isActive: true, deletedAt: null });
+
         // Log audit action
         await logAuditAction(
                 db,
@@ -456,7 +498,9 @@ export async function restoreStaffImpl(
                 `Restore nhân viên: ${existing.fullname} (${existing.email})`,
                 staffInfo?.id,
                 staffInfo?.email,
-                staffInfo?.fullname
+                staffInfo?.fullname,
+                auditOld,
+                auditNew
         );
 
         return {
@@ -599,6 +643,13 @@ export async function resetStaffPasswordImpl(
                 context
         );
 
+        const auditOld = buildStaffAuditPayload(existing);
+        const auditNew = buildStaffAuditPayload({
+                ...existing,
+                forcePasswordChange: true,
+                updatedAt: now
+        });
+
         // Log audit action
         await logAuditAction(
                 db,
@@ -609,7 +660,9 @@ export async function resetStaffPasswordImpl(
                 `Reset mật khẩu nhân viên: ${existing.fullname} (${existing.email})`,
                 null,
                 existing.email,
-                existing.fullname
+                existing.fullname,
+                auditOld,
+                auditNew
         );
 
         return {

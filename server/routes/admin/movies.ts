@@ -1,6 +1,7 @@
 import { eq, desc, and, inArray, sql, or, isNull, isNotNull, like, count } from 'drizzle-orm';
 import { formatDateForDb } from '../../lib/date-utils';
 import { logAuditAction } from '../../lib/audit-logger';
+import { buildAuditPayload } from '../../lib/audit-utils';
 
 export async function createMovieImpl(
         anyDb: any,
@@ -60,6 +61,8 @@ export async function createMovieImpl(
                         await RUN_ENV.KV_BINDING.delete('active_movies_v2');
                 }
 
+                const auditNew = buildAuditPayload(movie);
+
                 // Log audit action
                 if (staffInfo) {
                         await logAuditAction(
@@ -71,7 +74,9 @@ export async function createMovieImpl(
                                 `Tạo phim: ${data.title}`,
                                 staffInfo.id,
                                 staffInfo.email,
-                                staffInfo.fullname
+                                staffInfo.fullname,
+                                undefined,
+                                auditNew
                         );
                 }
 
@@ -202,9 +207,11 @@ export async function updateMovieImpl(
                         deleter(oldMovie.cover_image).catch((e) => console.error('Failed to delete old movie image:', e));
                 }
 
+                const auditOld = buildAuditPayload(oldMovie);
+                const auditNew = buildAuditPayload(movie);
+
                 // Log audit action
                 if (staffInfo) {
-                        console.log('Logging audit action for movie update:', { staffInfo, id, title: oldMovie?.title });
                         await logAuditAction(
                                 anyDb,
                                 tables.auditLogs,
@@ -215,11 +222,9 @@ export async function updateMovieImpl(
                                 staffInfo.id,
                                 staffInfo.email,
                                 staffInfo.fullname,
-                                JSON.stringify(oldMovie),
-                                JSON.stringify(payload)
+                                auditOld,
+                                auditNew
                         );
-                } else {
-                        console.log('No staffInfo provided for audit log');
                 }
 
                 return { movie };
@@ -287,6 +292,9 @@ export async function deleteMovieImpl(
                 await RUN_ENV.KV_BINDING.delete('active_movies_v2');
         }
 
+        const auditOld = buildAuditPayload(existing);
+        const auditNew = buildAuditPayload({ ...existing, is_active: false, deleted_at: new Date().toISOString(), deleted_by_staff_id: staffInfo?.id });
+
         // Log audit action
         if (staffInfo) {
                 await logAuditAction(
@@ -298,7 +306,9 @@ export async function deleteMovieImpl(
                         `Xóa phim: ${existing.title}`,
                         staffInfo.id,
                         staffInfo.email,
-                        staffInfo.fullname
+                        staffInfo.fullname,
+                        auditOld,
+                        auditNew
                 );
         }
 
@@ -324,6 +334,9 @@ export async function restoreMovieImpl(
         // Restore by setting is_active = true and deleted_at = null
         await anyDb.update(tables.movies).set({ is_active: true, deleted_at: null }).where(eq(tables.movies.id, id));
 
+        const auditOldRestore = buildAuditPayload(existing);
+        const auditNewRestore = buildAuditPayload({ ...existing, is_active: true, deleted_at: null });
+
         // Log audit action
         if (staffInfo) {
                 await logAuditAction(
@@ -335,7 +348,9 @@ export async function restoreMovieImpl(
                         `Restore phim: ${existing.title}`,
                         staffInfo.id,
                         staffInfo.email,
-                        staffInfo.fullname
+                        staffInfo.fullname,
+                        auditOldRestore,
+                        auditNewRestore
                 );
         }
 

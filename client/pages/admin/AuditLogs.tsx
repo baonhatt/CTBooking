@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -70,14 +70,20 @@ const ENTITY_LABELS: Record<string, string> = {
 
 // Fields to ignore for each module (auto-generated or system fields)
 const IGNORED_FIELDS: Record<string, string[]> = {
-        staff: ['id', 'created_at', 'updated_at'],
-        movie: ['id', 'created_at', 'updated_at'],
+        staff: ['id', 'created_at', 'updated_at', 'deleted_at', 'deleted_by_staff_id'],
+        movie: ['id', 'created_at', 'updated_at', 'deleted_at', 'deleted_by_staff_id'],
         booking: ['id', 'created_at', 'updated_at'],
-        role: ['id', 'created_at', 'updated_at'],
-        ticket_package: ['id', 'created_at', 'updated_at']
+        role: ['id', 'created_at', 'updated_at', 'deleted_at', 'deleted_by_staff_id'],
+        ticket_package: ['id', 'created_at', 'updated_at', 'deleted_at', 'deleted_by_staff_id'],
+        branch: ['id', 'created_at', 'updated_at', 'deleted_at', 'deleted_by_staff_id'],
+        site_media: ['id', 'created_at', 'updated_at', 'deleted_at'],
+        post: ['id', 'created_at', 'updated_at', 'deleted_at'],
+        toy: ['id', 'created_at', 'updated_at', 'deleted_at'],
+        users: ['id', 'created_at', 'updated_at']
 };
 
 export default function AuditLogsPage() {
+        const queryClient = useQueryClient();
         const navigate = useNavigate();
         const staff = useStaffStore((state) => state.staff);
         const clearStaff = useStaffStore((state) => state.clearStaff);
@@ -207,22 +213,29 @@ export default function AuditLogsPage() {
                 );
         };
 
-        const renderJsonValues = (values: any) => {
-                if (!values) return null;
-                const keys = Object.keys(values);
+        const parseAuditJson = (value?: string) => {
+                if (!value) return {};
+                try {
+                        return JSON.parse(value);
+                } catch {
+                        return {};
+                }
+        };
 
-                return (
-                        <div className="space-y-2">
-                                {keys.map((key) => (
-                                        <div key={key} className="flex">
-                                                <div className="w-1/3 p-2 font-medium text-sm">{key}</div>
-                                                <div className="w-2/3 p-2 text-sm">
-                                                        {typeof values[key] === 'object' ? JSON.stringify(values[key], null, 2) : String(values[key])}
-                                                </div>
-                                        </div>
-                                ))}
-                        </div>
-                );
+        const getDiffEntries = (log: AuditLog) => {
+                const oldData = parseAuditJson(log.oldValues);
+                const newData = parseAuditJson(log.newValues);
+                const allKeys = new Set([...Object.keys(oldData), ...Object.keys(newData)]);
+                const ignored = new Set(IGNORED_FIELDS[log.entityType] || ['id', 'created_at', 'updated_at']);
+
+                const normalize = (val: unknown) => (val === null ? undefined : val);
+
+                return Array.from(allKeys)
+                        .filter((key) => {
+                                if (ignored.has(key)) return false;
+                                return JSON.stringify(normalize(oldData[key])) !== JSON.stringify(normalize(newData[key]));
+                        })
+                        .map((key) => ({ key, oldValue: oldData[key], newValue: newData[key] }));
         };
 
         const logs = (logsData as any)?.items || [];
@@ -296,8 +309,11 @@ export default function AuditLogsPage() {
                                                 <Button
                                                         variant="outline"
                                                         size="icon"
-                                                        onClick={() => setPage(1)}
-                                                        className="rounded-xl shadow-sm"
+                                                        onClick={() => {
+                                                                setPage(1);
+                                                                queryClient.invalidateQueries(['audit-logs'] as any);
+                                                        }}
+                                                        className="rounded-xl shadow-sm hover:rotate-180 transition-transform duration-500 shrink-0 h-10 w-10"
                                                 >
                                                         <RefreshCw className="w-4 h-4" />
                                                 </Button>
@@ -499,36 +515,9 @@ export default function AuditLogsPage() {
                                                                                         </thead>
                                                                                         <tbody>
                                                                                                 {(() => {
-                                                                                                        let oldData: any = {};
-                                                                                                        let newData: any = {};
-                                                                                                        try {
-                                                                                                                oldData = selectedLog.oldValues ? JSON.parse(selectedLog.oldValues) : {};
-                                                                                                        } catch { }
-                                                                                                        try {
-                                                                                                                newData = selectedLog.newValues ? JSON.parse(selectedLog.newValues) : {};
-                                                                                                        } catch { }
-                                                                                                        const allKeys = new Set([...Object.keys(oldData || {}), ...Object.keys(newData || {})]);
-                                                                                                        const keys = Array.from(allKeys);
+                                                                                                        const diffEntries = getDiffEntries(selectedLog);
 
-                                                                                                        // Get ignored fields for this entity type
-                                                                                                        const ignoredFields = IGNORED_FIELDS[selectedLog.entityType] || [
-                                                                                                                'id',
-                                                                                                                'created_at',
-                                                                                                                'updated_at'
-                                                                                                        ];
-
-                                                                                                        // Filter only changed fields (excluding ignored fields)
-                                                                                                        const changedKeys = keys.filter((key) => {
-                                                                                                                if (ignoredFields.includes(key)) return false;
-                                                                                                                const oldValue = oldData?.[key];
-                                                                                                                const newValue = newData?.[key];
-                                                                                                                // Treat null and undefined as the same
-                                                                                                                const normalizedOld = oldValue === null ? undefined : oldValue;
-                                                                                                                const normalizedNew = newValue === null ? undefined : newValue;
-                                                                                                                return JSON.stringify(normalizedOld) !== JSON.stringify(normalizedNew);
-                                                                                                        });
-
-                                                                                                        if (changedKeys.length === 0) {
+                                                                                                        if (diffEntries.length === 0) {
                                                                                                                 return (
                                                                                                                         <tr>
                                                                                                                                 <td colSpan={3} className="p-3 text-center text-gray-500">
@@ -538,42 +527,29 @@ export default function AuditLogsPage() {
                                                                                                                 );
                                                                                                         }
 
-                                                                                                        return changedKeys.map((key) => {
-                                                                                                                const oldValue = oldData?.[key];
-                                                                                                                const newValue = newData?.[key];
-
-                                                                                                                return (
-                                                                                                                        <tr key={key} className="border-b">
-                                                                                                                                <td className="p-3 font-medium text-sm">{key}</td>
-                                                                                                                                {selectedLog.oldValues && (
-                                                                                                                                        <td className="p-3 text-sm bg-red-50">
-                                                                                                                                                {oldValue !== undefined ? (
-                                                                                                                                                        typeof oldValue === 'object' ? (
-                                                                                                                                                                JSON.stringify(oldValue, null, 2)
-                                                                                                                                                        ) : (
-                                                                                                                                                                String(oldValue)
-                                                                                                                                                        )
-                                                                                                                                                ) : (
-                                                                                                                                                        <span className="text-gray-400">-</span>
-                                                                                                                                                )}
-                                                                                                                                        </td>
-                                                                                                                                )}
-                                                                                                                                {selectedLog.newValues && (
-                                                                                                                                        <td className="p-3 text-sm bg-green-50">
-                                                                                                                                                {newValue !== undefined ? (
-                                                                                                                                                        typeof newValue === 'object' ? (
-                                                                                                                                                                JSON.stringify(newValue, null, 2)
-                                                                                                                                                        ) : (
-                                                                                                                                                                String(newValue)
-                                                                                                                                                        )
-                                                                                                                                                ) : (
-                                                                                                                                                        <span className="text-gray-400">-</span>
-                                                                                                                                                )}
-                                                                                                                                        </td>
-                                                                                                                                )}
-                                                                                                                        </tr>
-                                                                                                                );
-                                                                                                        });
+                                                                                                        return diffEntries.map(({ key, oldValue, newValue }) => (
+                                                                                                                <tr key={key} className="border-b">
+                                                                                                                        <td className="p-3 font-medium text-sm">{key}</td>
+                                                                                                                        {selectedLog.oldValues && (
+                                                                                                                                <td className="p-3 text-sm bg-red-50">
+                                                                                                                                        {oldValue !== undefined ? (
+                                                                                                                                                typeof oldValue === 'object' ? JSON.stringify(oldValue, null, 2) : String(oldValue)
+                                                                                                                                        ) : (
+                                                                                                                                                <span className="text-gray-400">-</span>
+                                                                                                                                        )}
+                                                                                                                                </td>
+                                                                                                                        )}
+                                                                                                                        {selectedLog.newValues && (
+                                                                                                                                <td className="p-3 text-sm bg-green-50">
+                                                                                                                                        {newValue !== undefined ? (
+                                                                                                                                                typeof newValue === 'object' ? JSON.stringify(newValue, null, 2) : String(newValue)
+                                                                                                                                        ) : (
+                                                                                                                                                <span className="text-gray-400">-</span>
+                                                                                                                                        )}
+                                                                                                                                </td>
+                                                                                                                        )}
+                                                                                                                </tr>
+                                                                                                        ));
                                                                                                 })()}
                                                                                         </tbody>
                                                                                 </table>
@@ -584,6 +560,6 @@ export default function AuditLogsPage() {
                                         </DialogContent>
                                 </Dialog>
                         </div>
-                </AdminLayout>
+                </AdminLayout >
         );
 }

@@ -185,6 +185,7 @@ export default function MoviesContent({
                                                 size="icon"
                                                 onClick={onRefresh}
                                                 className="rounded-xl shadow-sm hover:rotate-180 transition-transform duration-500"
+                                                title="Làm mới"
                                         >
                                                 <RefreshCw className={`w-4 h-4 ${isLoading ? 'animate-spin' : ''}`} />
                                         </Button>

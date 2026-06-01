@@ -44,7 +44,7 @@ interface Props {
         | 'roles'
         | 'audit-logs'
         | 'profile';
-        setActive: (x: Props['active']) => void;
+        setActive: React.Dispatch<React.SetStateAction<Props['active']>>;
         adminEmailState: string;
         handleLogout: () => void;
         children: React.ReactNode;

@@ -16,6 +16,7 @@ import MoviesPage from '@/pages/admin/Movies';
 import ToysPage from '@/pages/admin/Toys';
 import PostsPage from '@/pages/admin/Posts';
 import PostEditPage from '@/pages/admin/PostEdit';
+import PostCreatePage from '@/pages/admin/PostCreate';
 import TransactionsPage from '@/pages/admin/Transactions';
 import TicketsPage from '@/pages/admin/Tickets';
 import TicketCheckPage from '@/pages/admin/TicketCheck';
@@ -223,6 +224,7 @@ export const AdminGate = () => {
                                 <Route path="/movies" element={<MoviesPage />} />
                                 <Route path="/toys" element={<ToysPage />} />
                                 <Route path="/posts" element={<PostsPage />} />
+                                <Route path="/posts/new" element={<PostCreatePage />} />
                                 <Route path="/posts/:id/edit" element={<PostEditPage />} />
                                 <Route path="/tickets" element={<TicketsPage />} />
                                 <Route path="/transactions" element={<TransactionsPage />} />
@@ -235,7 +237,7 @@ export const AdminGate = () => {
                                 <Route path="/roles" element={<RolesPage />} />
                                 <Route path="/roles/:id" element={<RoleDetailPage />} />
                                 <Route path="/audit-logs" element={<AuditLogsPage />} />
-                                <Route path="/profile" element={<ProfilePage />} />
+                                <Route path="/profile" element={<ProfilePage active="profile" setActive={() => { }} adminEmailState={staff?.email || ''} handleLogout={handleLogout} />} />
                                 <Route path="*" element={<Navigate to="/" replace />} />
                         </Routes>
                 </div>

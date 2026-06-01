@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useRef } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import AdminLayout from '@/admin/layouts/AdminLayout';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -10,7 +10,6 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import {
         ArrowLeft,
         Save,
-        Eye,
         ChevronDown,
         ChevronUp,
         Copy,
@@ -25,7 +24,7 @@ import {
         RefreshCw
 } from 'lucide-react';
 import { PostRichTextEditor } from '@/components/admin/content/PostRichTextEditor';
-import { getPosts, updatePostApi, getPostById } from '@/lib/api';
+import { createPostApi } from '@/lib/api';
 import { uploadDirectToCloudinary } from '@/lib/api/uploads';
 import { toast } from 'sonner';
 
@@ -56,8 +55,7 @@ interface SectionState {
         seo: boolean;
 }
 
-export default function PostEditPage() {
-        const { id } = useParams<{ id: string }>();
+export default function PostCreatePage() {
         const navigate = useNavigate();
         const [active, setActive] = useState<
                 | 'dashboard'
@@ -76,9 +74,19 @@ export default function PostEditPage() {
                 | 'roles'
                 | 'audit-logs'
         >('posts');
-        const [isLoading, setIsLoading] = useState(true);
         const [isSaving, setIsSaving] = useState(false);
-        const [editData, setEditData] = useState<Partial<PostData> & { imageFile?: File; ogImageFile?: File }>({});
+        const [editData, setEditData] = useState<Partial<PostData> & { imageFile?: File; ogImageFile?: File }>({
+                title: '',
+                content: '',
+                excerpt: '',
+                status: 'draft',
+                is_featured: false,
+                meta_description: '',
+                meta_keywords: '',
+                seo_title: '',
+                canonical_url: '',
+                schema_type: 'Article'
+        });
         const [sections, setSections] = useState<SectionState>({ publish: true, images: true, seo: false });
         const initialSnapshotRef = useRef<string>('');
 
@@ -126,61 +134,10 @@ export default function PostEditPage() {
 
         const hasUnsavedChanges = () => initialSnapshotRef.current !== snapshotEditData(editData);
 
-        const getChangedFields = () => {
-                if (!initialSnapshotRef.current) return {};
-                const initial = JSON.parse(initialSnapshotRef.current);
-                const current = editData;
-                const changed: Record<string, boolean> = {};
-                const fields = [
-                        'title',
-                        'slug',
-                        'content',
-                        'excerpt',
-                        'featured_image',
-                        'status',
-                        'is_featured',
-                        'published_at',
-                        'meta_description',
-                        'meta_keywords',
-                        'seo_title',
-                        'og_image',
-                        'canonical_url',
-                        'schema_type'
-                ];
-                fields.forEach((field) => {
-                        if (initial[field] !== current[field]) {
-                                changed[field] = true;
-                        }
-                });
-                return changed;
-        };
-
-        const changedFields = getChangedFields();
-
-        const isFieldChanged = (field: string) => changedFields[field];
-
-        const fetchPost = async () => {
-                if (!id) return;
-                setIsLoading(true);
-                try {
-                        const { post } = await getPostById(id);
-                        if (post) {
-                                setEditData(post);
-                                initialSnapshotRef.current = snapshotEditData(post);
-                        } else {
-                                toast.error('Không tìm thấy bài viết');
-                                navigate('/posts');
-                        }
-                } catch (error: any) {
-                        toast.error('Lỗi', { description: error?.message || 'Không thể tải bài viết' });
-                } finally {
-                        setIsLoading(false);
-                }
-        };
-
+        // Initialize snapshot on mount
         useEffect(() => {
-                fetchPost();
-        }, [id]);
+                initialSnapshotRef.current = snapshotEditData(editData);
+        }, []);
 
         // Auto-generate slug from title
         useEffect(() => {
@@ -259,10 +216,15 @@ export default function PostEditPage() {
                                 schema_type: editData.schema_type
                         };
 
-                        await updatePostApi(parseInt(id!), payload);
-                        toast.success('Cập nhật bài viết thành công');
-                        initialSnapshotRef.current = snapshotEditData({ ...editData, imageFile: undefined, ogImageFile: undefined });
-                        fetchPost();
+                        const result = await createPostApi(payload);
+                        toast.success('Tạo bài viết thành công');
+
+                        // Navigate to edit page after successful creation
+                        if (result.post?.id) {
+                                navigate(`/posts/${result.post.id}/edit`);
+                        } else {
+                                navigate('/posts');
+                        }
                 } catch (error: any) {
                         toast.error('Lỗi', { description: error?.message || 'Có lỗi xảy ra' });
                 } finally {
@@ -281,37 +243,6 @@ export default function PostEditPage() {
                 return 'text-red-600';
         };
 
-        const StatusBadge = ({ status }: { status: string }) => {
-                if (status === 'published')
-                        return (
-                                <span className="inline-flex items-center gap-1 bg-emerald-100 text-emerald-700 border border-emerald-200 px-2 py-0.5 rounded-full text-[10px] font-bold uppercase">
-                                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                                        Đã xuất bản
-                                </span>
-                        );
-                if (status === 'draft')
-                        return (
-                                <span className="inline-flex items-center gap-1 bg-amber-100 text-amber-700 border border-amber-200 px-2 py-0.5 rounded-full text-[10px] font-bold uppercase">
-                                        Nháp
-                                </span>
-                        );
-                return (
-                        <span className="inline-flex items-center gap-1 bg-slate-100 text-slate-500 border border-slate-200 px-2 py-0.5 rounded-full text-[10px] font-bold uppercase">
-                                Lưu trữ
-                        </span>
-                );
-        };
-
-        if (isLoading) {
-                return (
-                        <AdminLayout active={active} setActive={setActive} adminEmailState={adminEmail} handleLogout={handleLogout}>
-                                <div className="flex items-center justify-center h-96">
-                                        <div className="text-slate-500">Đang tải...</div>
-                                </div>
-                        </AdminLayout>
-                );
-        }
-
         return (
                 <AdminLayout active={active} setActive={setActive} adminEmailState={adminEmail} handleLogout={handleLogout}>
                         <div className="min-h-screen bg-slate-50">
@@ -325,80 +256,31 @@ export default function PostEditPage() {
                                                                 </Button>
                                                                 <div className="min-w-0">
                                                                         <h1 className="text-lg font-bold text-slate-900 truncate">
-                                                                                {editData.title || 'Bài viết chưa có tiêu đề'}
+                                                                                {editData.title || 'Bài viết mới'}
                                                                         </h1>
                                                                         <div className="flex items-center gap-2 mt-0.5">
-                                                                                <StatusBadge status={editData.status || 'draft'} />
+                                                                                <span className="inline-flex items-center gap-1 bg-amber-100 text-amber-700 border border-amber-200 px-2 py-0.5 rounded-full text-[10px] font-bold uppercase">
+                                                                                        Nháp mới
+                                                                                </span>
                                                                         </div>
                                                                 </div>
                                                         </div>
                                                         <div className="flex items-center gap-2">
-                                                                {editData.status === 'published' ? (
-                                                                        <>
-                                                                                <Button
-                                                                                        onClick={() => handleSave('archived')}
-                                                                                        disabled={isSaving}
-                                                                                        variant="outline"
-                                                                                        className="rounded-xl"
-                                                                                >
-                                                                                        Gỡ xuất bản
-                                                                                </Button>
-                                                                                <Button
-                                                                                        onClick={() => handleSave()}
-                                                                                        disabled={isSaving}
-                                                                                        className="rounded-xl bg-blue-600 hover:bg-blue-700"
-                                                                                >
-                                                                                        <Save className="w-4 h-4 mr-2" />
-                                                                                        {isSaving ? 'Đang lưu...' : 'Lưu'}
-                                                                                </Button>
-                                                                        </>
-                                                                ) : editData.status === 'draft' ? (
-                                                                        <>
-                                                                                <Button
-                                                                                        onClick={() => handleSave('published')}
-                                                                                        disabled={isSaving}
-                                                                                        className="rounded-xl bg-emerald-600 hover:bg-emerald-700"
-                                                                                >
-                                                                                        Xuất bản
-                                                                                </Button>
-                                                                                <Button
-                                                                                        onClick={() => handleSave()}
-                                                                                        disabled={isSaving}
-                                                                                        variant="outline"
-                                                                                        className="rounded-xl"
-                                                                                >
-                                                                                        <Save className="w-4 h-4 mr-2" />
-                                                                                        {isSaving ? 'Đang lưu...' : 'Lưu'}
-                                                                                </Button>
-                                                                        </>
-                                                                ) : editData.status === 'archived' ? (
-                                                                        <>
-                                                                                <Button
-                                                                                        onClick={() => handleSave('draft')}
-                                                                                        disabled={isSaving}
-                                                                                        variant="outline"
-                                                                                        className="rounded-xl"
-                                                                                >
-                                                                                        Lưu nháp
-                                                                                </Button>
-                                                                                <Button
-                                                                                        onClick={() => handleSave('published')}
-                                                                                        disabled={isSaving}
-                                                                                        className="rounded-xl bg-emerald-600 hover:bg-emerald-700"
-                                                                                >
-                                                                                        Xuất bản
-                                                                                </Button>
-                                                                                <Button
-                                                                                        onClick={() => handleSave()}
-                                                                                        disabled={isSaving}
-                                                                                        variant="outline"
-                                                                                        className="rounded-xl"
-                                                                                >
-                                                                                        <Save className="w-4 h-4 mr-2" />
-                                                                                        {isSaving ? 'Đang lưu...' : 'Lưu'}
-                                                                                </Button>
-                                                                        </>
-                                                                ) : null}
+                                                                <Button
+                                                                        onClick={() => handleSave('published')}
+                                                                        disabled={isSaving}
+                                                                        className="rounded-xl bg-emerald-600 hover:bg-emerald-700"
+                                                                >
+                                                                        Xuất bản
+                                                                </Button>
+                                                                <Button
+                                                                        onClick={() => handleSave('draft')}
+                                                                        disabled={isSaving}
+                                                                        className="rounded-xl bg-blue-600 hover:bg-blue-700"
+                                                                >
+                                                                        <Save className="w-4 h-4 mr-2" />
+                                                                        {isSaving ? 'Đang lưu...' : 'Tạo nháp'}
+                                                                </Button>
                                                         </div>
                                                 </div>
                                         </div>
@@ -418,7 +300,7 @@ export default function PostEditPage() {
                                                                                         Tiêu đề bài viết
                                                                                 </Label>
                                                                                 <Input
-                                                                                        className={`mt-2 text-lg font-semibold ${isFieldChanged('title') ? 'border-amber-500 ring-1 ring-amber-500' : ''}`}
+                                                                                        className="mt-2 text-lg font-semibold"
                                                                                         value={editData.title || ''}
                                                                                         onChange={(e) => setEditData({ ...editData, title: e.target.value })}
                                                                                         placeholder="Nhập tiêu đề bài viết..."
@@ -434,7 +316,7 @@ export default function PostEditPage() {
                                                                                 <div className="mt-2 flex items-center gap-2">
                                                                                         <span className="text-slate-400 text-sm">/bai-viet/</span>
                                                                                         <Input
-                                                                                                className={`flex-1 font-mono text-sm ${isFieldChanged('slug') ? 'border-amber-500 ring-1 ring-amber-500' : ''}`}
+                                                                                                className="flex-1 font-mono text-sm"
                                                                                                 value={editData.slug || ''}
                                                                                                 onChange={(e) => setEditData({ ...editData, slug: e.target.value })}
                                                                                                 placeholder="tu-dong-tao-tu-tieu-de"
@@ -455,9 +337,7 @@ export default function PostEditPage() {
                                                                         {/* Rich Text Editor */}
                                                                         <div>
                                                                                 <Label>Nội dung</Label>
-                                                                                <div
-                                                                                        className={`mt-2 ${isFieldChanged('content') ? 'border-amber-500 ring-1 ring-amber-500 rounded-lg' : ''}`}
-                                                                                >
+                                                                                <div className="mt-2">
                                                                                         <PostRichTextEditor
                                                                                                 value={editData.content || ''}
                                                                                                 onChange={(content) => setEditData((prev) => ({ ...prev, content }))}
@@ -501,7 +381,7 @@ export default function PostEditPage() {
                                                                                         </Label>
                                                                                         <Input
                                                                                                 type="datetime-local"
-                                                                                                className={`mt-2 ${isFieldChanged('published_at') ? 'border-amber-500 ring-1 ring-amber-500' : ''}`}
+                                                                                                className="mt-2"
                                                                                                 value={editData.published_at ? new Date(editData.published_at).toISOString().slice(0, 16) : ''}
                                                                                                 onChange={(e) => setEditData({ ...editData, published_at: e.target.value })}
                                                                                         />
@@ -528,9 +408,7 @@ export default function PostEditPage() {
                                                                                                 <ImageIcon className="w-4 h-4 text-slate-500" />
                                                                                                 Ảnh đại diện
                                                                                         </Label>
-                                                                                        <div
-                                                                                                className={`mt-2 flex items-center gap-2 ${isFieldChanged('featured_image') ? 'border-amber-500 ring-1 ring-amber-500 p-2 rounded-lg' : ''}`}
-                                                                                        >
+                                                                                        <div className="mt-2 flex items-center gap-2">
                                                                                                 <Input
                                                                                                         type="file"
                                                                                                         accept="image/*"
@@ -568,7 +446,7 @@ export default function PostEditPage() {
                                                                                                 Tóm tắt
                                                                                         </Label>
                                                                                         <Textarea
-                                                                                                className={`mt-2 min-h-[80px] resize-y ${isFieldChanged('excerpt') ? 'border-amber-500 ring-1 ring-amber-500' : ''}`}
+                                                                                                className="mt-2 min-h-[80px] resize-y"
                                                                                                 value={editData.excerpt || ''}
                                                                                                 onChange={(e) => setEditData({ ...editData, excerpt: e.target.value })}
                                                                                                 placeholder="1-2 câu mô tả ngắn, hiển thị ngoài danh sách"
@@ -598,7 +476,7 @@ export default function PostEditPage() {
                                                                                         </Label>
                                                                                         <div className="mt-2 flex items-center gap-2">
                                                                                                 <Input
-                                                                                                        className={`flex-1 ${isFieldChanged('seo_title') ? 'border-amber-500 ring-1 ring-amber-500' : ''}`}
+                                                                                                        className="flex-1"
                                                                                                         value={editData.seo_title || ''}
                                                                                                         onChange={(e) => setEditData({ ...editData, seo_title: e.target.value })}
                                                                                                         placeholder="Ví dụ: Phim 8 Kỳ Quan | Cinesphere"
@@ -627,7 +505,7 @@ export default function PostEditPage() {
                                                                                         </Label>
                                                                                         <div className="mt-2 flex items-start gap-2">
                                                                                                 <Textarea
-                                                                                                        className={`flex-1 min-h-[80px] resize-y ${isFieldChanged('meta_description') ? 'border-amber-500 ring-1 ring-amber-500' : ''}`}
+                                                                                                        className="flex-1 min-h-[80px] resize-y"
                                                                                                         value={editData.meta_description || ''}
                                                                                                         onChange={(e) => setEditData({ ...editData, meta_description: e.target.value })}
                                                                                                         placeholder="Tóm tắt ngắn 120-160 ký tự giúp tăng click từ Google"
@@ -659,7 +537,7 @@ export default function PostEditPage() {
                                                                                                 </Button>
                                                                                         </div>
                                                                                         <div className="mt-1 flex items-center justify-between">
-                                                                                                <p className="text-[11px] text-amber-600">{editData.meta_description?.length || 0}/160 ký tự</p>
+                                                                                                <p className={`text-[11px] ${getMetaDescriptionColor()}`}>{editData.meta_description?.length || 0}/160 ký tự</p>
                                                                                                 <p className="text-[11px] text-slate-400">Ấn icon để sao chép từ tóm tắt bài viết</p>
                                                                                         </div>
                                                                                 </div>
@@ -669,7 +547,7 @@ export default function PostEditPage() {
                                                                                                 Từ khóa
                                                                                         </Label>
                                                                                         <Input
-                                                                                                className={`mt-2 ${isFieldChanged('meta_keywords') ? 'border-amber-500 ring-1 ring-amber-500' : ''}`}
+                                                                                                className="mt-2"
                                                                                                 value={editData.meta_keywords || ''}
                                                                                                 onChange={(e) => setEditData({ ...editData, meta_keywords: e.target.value })}
                                                                                                 placeholder="phim, rạp chiếu, review"
@@ -680,9 +558,7 @@ export default function PostEditPage() {
                                                                                                 <Share2 className="w-4 h-4 text-slate-500" />
                                                                                                 Ảnh khi chia sẻ Facebook/Zalo
                                                                                         </Label>
-                                                                                        <div
-                                                                                                className={`mt-2 flex items-center gap-2 ${isFieldChanged('og_image') ? 'border-amber-500 ring-1 ring-amber-500 p-2 rounded-lg' : ''}`}
-                                                                                        >
+                                                                                        <div className="mt-2 flex items-center gap-2">
                                                                                                 <Input
                                                                                                         type="file"
                                                                                                         accept="image/*"
@@ -709,7 +585,7 @@ export default function PostEditPage() {
                                                                                         </Label>
                                                                                         <div className="mt-2 flex items-center gap-2">
                                                                                                 <Input
-                                                                                                        className={`flex-1 ${isFieldChanged('canonical_url') ? 'border-amber-500 ring-1 ring-amber-500' : ''}`}
+                                                                                                        className="flex-1"
                                                                                                         value={editData.canonical_url || ''}
                                                                                                         onChange={(e) => setEditData({ ...editData, canonical_url: e.target.value })}
                                                                                                         placeholder="https://cinesphere.com.vn/bai-viet/ten-bai-viet"
@@ -738,7 +614,7 @@ export default function PostEditPage() {
                                                                                                 Loại nội dung
                                                                                         </Label>
                                                                                         <select
-                                                                                                className={`mt-2 w-full px-3 py-2 border border-slate-200 rounded-xl bg-white text-sm ${isFieldChanged('schema_type') ? 'border-amber-500 ring-1 ring-amber-500' : ''}`}
+                                                                                                className="mt-2 w-full px-3 py-2 border border-slate-200 rounded-xl bg-white text-sm"
                                                                                                 value={editData.schema_type || 'Article'}
                                                                                                 onChange={(e) => setEditData({ ...editData, schema_type: e.target.value })}
                                                                                         >

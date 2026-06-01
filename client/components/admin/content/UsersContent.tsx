@@ -107,7 +107,8 @@ export default function UsersContent({
                                                 variant="outline"
                                                 size="icon"
                                                 onClick={onRefresh}
-                                                className="rounded-xl shadow-sm"
+                                                className="rounded-xl shadow-sm hover:rotate-180 transition-transform duration-500 shrink-0 h-10 w-10"
+                                                title="Làm mới"
                                         >
                                                 <RefreshCw className={`w-4 h-4 ${isLoading ? 'animate-spin' : ''}`} />
                                         </Button>
@@ -264,6 +265,7 @@ export default function UsersContent({
                                                         size="icon"
                                                         onClick={() => setIsDetailsOpen(false)}
                                                         className="h-8 w-8 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-full transition-colors mr-2"
+                                                        title="Đóng"
                                                 >
                                                         <X size={20} />
                                                 </Button>

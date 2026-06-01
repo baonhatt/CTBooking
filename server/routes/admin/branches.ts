@@ -1,6 +1,7 @@
 import { eq, desc, asc, count, and, or, sql, isNull, isNotNull, like } from 'drizzle-orm';
 import { formatDateForDb } from '../../lib/date-utils';
 import { logAuditAction } from '../../lib/audit-logger';
+import { buildAuditPayload } from '../../lib/audit-utils';
 
 export async function listBranchesImpl(
         anyDb: any,
@@ -181,6 +182,11 @@ export async function updateBranchImpl(
         },
         staffInfo?: { id: number; email: string; fullname: string }
 ) {
+        const existing = await anyDb.query.branches.findFirst({ where: eq(tables.branches.id, id) });
+        if (!existing) {
+                return null;
+        }
+
         const { name, code, address, phone, email, is_default, is_active } = args;
         const now = new Date();
         const data: any = { updated_at: formatDateForDb(now) };
@@ -205,6 +211,9 @@ export async function updateBranchImpl(
         const item = Array.isArray(updatedRes) ? updatedRes[0] : updatedRes;
         if (!item) return null;
 
+        const auditOld = buildAuditPayload(existing);
+        const auditNew = buildAuditPayload(item);
+
         // Log audit action
         if (staffInfo) {
                 await logAuditAction(
@@ -216,7 +225,9 @@ export async function updateBranchImpl(
                         `Cập nhật chi nhánh: ${item.name} (${item.code})`,
                         staffInfo.id,
                         staffInfo.email,
-                        staffInfo.fullname
+                        staffInfo.fullname,
+                        auditOld,
+                        auditNew
                 );
         }
 
@@ -276,8 +287,16 @@ export async function deleteBranchImpl(
                 throw new Error(`Không thể xóa chi nhánh vì có ${staffCount.count} nhân viên đang được gán`);
         }
 
+        const deletionTimestamp = new Date().toISOString();
+
         // Soft delete by setting is_active = false and deleted_at
-        await anyDb.update(tables.branches).set({ is_active: false, deleted_at: new Date().toISOString(), deleted_by_staff_id: staffInfo?.id }).where(eq(tables.branches.id, id));
+        await anyDb
+                .update(tables.branches)
+                .set({ is_active: false, deleted_at: deletionTimestamp, deleted_by_staff_id: staffInfo?.id })
+                .where(eq(tables.branches.id, id));
+
+        const auditOld = buildAuditPayload(existing);
+        const auditNew = buildAuditPayload({ ...existing, is_active: false, deleted_at: deletionTimestamp, deleted_by_staff_id: staffInfo?.id });
 
         // Log audit action
         if (staffInfo) {
@@ -290,7 +309,9 @@ export async function deleteBranchImpl(
                         `Xóa chi nhánh: ${existing.name} (${existing.code})`,
                         staffInfo.id,
                         staffInfo.email,
-                        staffInfo.fullname
+                        staffInfo.fullname,
+                        auditOld,
+                        auditNew
                 );
         }
 
@@ -316,6 +337,9 @@ export async function restoreBranchImpl(
         // Restore by setting is_active = true and deleted_at = null
         await anyDb.update(tables.branches).set({ is_active: true, deleted_at: null }).where(eq(tables.branches.id, id));
 
+        const auditOld = buildAuditPayload(existing);
+        const auditNew = buildAuditPayload({ ...existing, is_active: true, deleted_at: null });
+
         // Log audit action
         if (staffInfo) {
                 await logAuditAction(
@@ -327,7 +351,9 @@ export async function restoreBranchImpl(
                         `Restore chi nhánh: ${existing.name}`,
                         staffInfo.id,
                         staffInfo.email,
-                        staffInfo.fullname
+                        staffInfo.fullname,
+                        auditOld,
+                        auditNew
                 );
         }
 

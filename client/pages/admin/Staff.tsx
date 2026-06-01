@@ -329,8 +329,9 @@ export default function StaffPage() {
                                                                                 setSearch('');
                                                                                 setFilterRole('');
                                                                                 setFilterBranch('');
+                                                                                queryClient.invalidateQueries({ queryKey: ['staff'] });
                                                                         }}
-                                                                        className="h-10 w-10"
+                                                                        className="h-10 w-10 hover:rotate-180 transition-transform duration-500"
                                                                         title="Làm mới"
                                                                 >
                                                                         <RefreshCw className="h-4 w-4" />
@@ -483,6 +484,7 @@ export default function StaffPage() {
                                                                 size="icon"
                                                                 onClick={() => setIsCreateDialogOpen(false)}
                                                                 className="h-8 w-8 rounded-full hover:bg-slate-100 text-slate-400 transition-colors"
+                                                                title="Đóng"
                                                         >
                                                                 <X className="w-5 h-5" />
                                                         </Button>
@@ -564,6 +566,7 @@ export default function StaffPage() {
                                                                 size="icon"
                                                                 onClick={() => setIsEditDialogOpen(false)}
                                                                 className="h-8 w-8 rounded-full hover:bg-slate-100 text-slate-400 transition-colors"
+                                                                title="Đóng"
                                                         >
                                                                 <X className="w-5 h-5" />
                                                         </Button>
@@ -649,6 +652,7 @@ export default function StaffPage() {
                                                                 size="icon"
                                                                 onClick={() => setIsDeleteDialogOpen(false)}
                                                                 className="h-8 w-8 rounded-full hover:bg-slate-100 text-slate-400 transition-colors"
+                                                                title="Đóng"
                                                         >
                                                                 <X className="w-5 h-5" />
                                                         </Button>
@@ -682,6 +686,7 @@ export default function StaffPage() {
                                                                 size="icon"
                                                                 onClick={() => setIsResetPasswordDialogOpen(false)}
                                                                 className="h-8 w-8 rounded-full hover:bg-slate-100 text-slate-400 transition-colors"
+                                                                title="Đóng"
                                                         >
                                                                 <X className="w-5 h-5" />
                                                         </Button>
@@ -712,6 +717,7 @@ export default function StaffPage() {
                                                                 size="icon"
                                                                 onClick={() => setIsDetailDialogOpen(false)}
                                                                 className="h-8 w-8 rounded-full hover:bg-slate-100 text-slate-400 transition-colors"
+                                                                title="Đóng"
                                                         >
                                                                 <X className="w-5 h-5" />
                                                         </Button>

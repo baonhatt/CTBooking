@@ -766,6 +766,7 @@ export default function UploadsContent() {
                                                                 size="icon"
                                                                 onClick={() => setOpenMediaModal(false)}
                                                                 className="hover:bg-white/10 text-gray-400"
+                                                                title="Đóng"
                                                         >
                                                                 <X className="w-5 h-5" />
                                                         </Button>

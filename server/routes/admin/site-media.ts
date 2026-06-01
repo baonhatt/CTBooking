@@ -1,6 +1,7 @@
 import { eq, and, asc, desc, isNull } from 'drizzle-orm';
 import { formatDateForDb } from '../../lib/date-utils';
 import { logAuditAction } from '../../lib/audit-logger';
+import { buildAuditPayload } from '../../lib/audit-utils';
 
 export async function createSiteMediaImpl(
         anyDb: any,
@@ -86,6 +87,8 @@ export async function createSiteMediaImpl(
 
         if (!item) throw new Error('Không thể tạo site media');
 
+        const auditNew = buildAuditPayload(item);
+
         // Log audit action
         if (staffInfo) {
                 await logAuditAction(
@@ -97,7 +100,9 @@ export async function createSiteMediaImpl(
                         `Tạo site media: ${title || type} (${section})`,
                         staffInfo.id,
                         staffInfo.email,
-                        staffInfo.fullname
+                        staffInfo.fullname,
+                        undefined,
+                        auditNew
                 );
         }
 
@@ -195,6 +200,9 @@ export async function updateSiteMediaImpl(
                 }
         }
 
+        const auditOld = buildAuditPayload(existing);
+        const auditNew = buildAuditPayload(item);
+
         // Log audit action
         if (staffInfo && item) {
                 await logAuditAction(
@@ -206,7 +214,9 @@ export async function updateSiteMediaImpl(
                         `Cập nhật site media: ${title || type} (${section})`,
                         staffInfo.id,
                         staffInfo.email,
-                        staffInfo.fullname
+                        staffInfo.fullname,
+                        auditOld,
+                        auditNew
                 );
         }
 
@@ -231,6 +241,8 @@ export async function deleteSiteMediaImpl(
                 // Delete site media (tương thích với D1/SQLite không hỗ trợ .returning())
                 await anyDb.delete(tables.site_media).where(eq(tables.site_media.id, Number(id)));
 
+                const auditOld = buildAuditPayload(existing);
+
                 // Log audit action
                 if (staffInfo) {
                         await logAuditAction(
@@ -242,7 +254,9 @@ export async function deleteSiteMediaImpl(
                                 `Xóa site media: ${existing.title || existing.type} (${existing.section})`,
                                 staffInfo.id,
                                 staffInfo.email,
-                                staffInfo.fullname
+                                staffInfo.fullname,
+                                auditOld,
+                                undefined
                         );
                 }
 

@@ -8,6 +8,7 @@ import {
         invalidateStaffPermissionCache
 } from '../../lib/staff-auth';
 import { logAuditAction } from '../../lib/audit-logger';
+import { buildStaffAuditPayload } from './staff-audit-utils';
 import { sendStaffPasswordChangeOTP, validateStaffOTP, deleteStaffOTP } from '../../lib/otp-utils';
 
 export async function staffLoginImpl(db: any, tables: any, kv: any, body: { email: string; password: string }) {
@@ -161,6 +162,9 @@ export async function staffChangePasswordImpl(
                 .set({ revokedAt: now, revokeReason: 'password_change' })
                 .where(and(eq(staffTokens.staffId, staffId), isNull(staffTokens.revokedAt)));
 
+        const auditOld = buildStaffAuditPayload(staff);
+        const auditNew = buildStaffAuditPayload({ ...staff, forcePasswordChange: false, updatedAt: now });
+
         // Log audit action
         await logAuditAction(
                 db,
@@ -171,7 +175,9 @@ export async function staffChangePasswordImpl(
                 'Staff đổi mật khẩu',
                 staffId,
                 staff.email,
-                staff.fullname
+                staff.fullname,
+                auditOld,
+                auditNew
         );
 
         return { status: 'success', message: 'Đổi mật khẩu thành công' };
@@ -232,6 +238,13 @@ export async function staffResetPasswordImpl(
                 return { status: 'error', message: 'Token không hợp lệ hoặc đã hết hạn' };
         }
 
+        const [staff] = await db.select().from(staffs).where(eq(staffs.id, tokenRecord.staffId)).limit(1);
+        if (!staff) {
+                return { status: 'error', message: 'Staff not found' };
+        }
+
+        const auditOld = buildStaffAuditPayload(staff);
+
         // Hash new password
         const hashedPassword = await hashPassword(newPassword);
 
@@ -260,23 +273,22 @@ export async function staffResetPasswordImpl(
         // Invalidate permission cache
         await invalidateStaffPermissionCache(kv, tokenRecord.staffId);
 
-        // Get staff info for audit log
-        const [staff] = await db.select().from(staffs).where(eq(staffs.id, tokenRecord.staffId)).limit(1);
+        const auditNew = buildStaffAuditPayload({ ...staff, forcePasswordChange: true, updatedAt: now });
 
         // Log audit action
-        if (staff) {
-                await logAuditAction(
-                        db,
-                        tables.auditLogs,
-                        'reset_password',
-                        'staff',
-                        tokenRecord.staffId,
-                        'Staff reset mật khẩu (qua forgot password)',
-                        staff.id,
-                        staff.email,
-                        staff.fullname
-                );
-        }
+        await logAuditAction(
+                db,
+                tables.auditLogs,
+                'reset_password',
+                'staff',
+                tokenRecord.staffId,
+                'Staff reset mật khẩu (qua forgot password)',
+                staff.id,
+                staff.email,
+                staff.fullname,
+                auditOld,
+                auditNew
+        );
 
         return { status: 'success', message: 'Đặt lại mật khẩu thành công' };
 }
@@ -375,6 +387,9 @@ export async function staffChangePasswordWithOTP(
         // Invalidate permission cache
         await invalidateStaffPermissionCache(kv, staffId);
 
+        const auditOld = buildStaffAuditPayload(staff);
+        const auditNew = buildStaffAuditPayload({ ...staff, forcePasswordChange: false, updatedAt: now });
+
         // Log audit action
         await logAuditAction(
                 db,
@@ -385,7 +400,9 @@ export async function staffChangePasswordWithOTP(
                 'Staff đổi mật khẩu với OTP',
                 staffId,
                 staff.email,
-                staff.fullname
+                staff.fullname,
+                auditOld,
+                auditNew
         );
 
         return { status: 'success', message: 'Đổi mật khẩu thành công' };

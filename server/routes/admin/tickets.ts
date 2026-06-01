@@ -3,6 +3,7 @@ import { eq, or, desc, asc, count, inArray, and, sql, isNull, isNotNull, like } 
 import { formatDateForDb } from '../../lib/date-utils';
 import { deleteCache } from '../../../worker/src/utils';
 import { logAuditAction } from '../../lib/audit-logger';
+import { buildAuditPayload } from '../../lib/audit-utils';
 
 /**
  * Hàm helper xử lý dữ liệu combo
@@ -360,6 +361,8 @@ export async function createTicketPackageImpl(
                 await RUN_ENV.KV_BINDING.delete('activeTicketPackages');
         }
 
+        const auditNew = buildAuditPayload(item);
+
         // Log audit action
         if (staffInfo) {
                 await logAuditAction(
@@ -371,7 +374,9 @@ export async function createTicketPackageImpl(
                         `Tạo gói vé: ${name}`,
                         staffInfo.id,
                         staffInfo.email,
-                        staffInfo.fullname
+                        staffInfo.fullname,
+                        undefined,
+                        auditNew
                 );
         }
 
@@ -408,6 +413,11 @@ export async function updateTicketPackageImpl(
         RUN_ENV: any,
         staffInfo?: { id: number; email: string; fullname: string }
 ) {
+        const existing = await anyDb.query.ticket_packages.findFirst({ where: eq(tables.ticket_packages.id, id) });
+        if (!existing) {
+                throw new Error('Không tìm thấy gói vé');
+        }
+
         const {
                 name,
                 code,
@@ -492,11 +502,17 @@ export async function updateTicketPackageImpl(
                 .returning();
 
         // D1/SQLite trả về array khi dùng .returning()
-        const item = Array.isArray(updatedRes) ? updatedRes[0] : updatedRes;
+        let item = Array.isArray(updatedRes) ? updatedRes[0] : updatedRes;
+        if (!item) {
+                item = await anyDb.query.ticket_packages.findFirst({ where: eq(tables.ticket_packages.id, id) });
+        }
 
         if (RUN_ENV && RUN_ENV.KV_BINDING) {
                 await RUN_ENV.KV_BINDING.delete('activeTicketPackages');
         }
+
+        const auditOld = buildAuditPayload(existing);
+        const auditNew = buildAuditPayload(item);
 
         // Log audit action
         if (staffInfo) {
@@ -509,7 +525,9 @@ export async function updateTicketPackageImpl(
                         `Cập nhật gói vé: ${name || id}`,
                         staffInfo.id,
                         staffInfo.email,
-                        staffInfo.fullname
+                        staffInfo.fullname,
+                        auditOld,
+                        auditNew
                 );
         }
 
@@ -618,6 +636,9 @@ export async function restoreTicketPackageImpl(
                         })
                         .where(eq(tables.ticket_packages.id, id));
 
+                const auditOld = buildAuditPayload(existing);
+                const auditNew = buildAuditPayload({ ...existing, is_active: true, deleted_at: null });
+
                 // Log audit action
                 if (staffInfo) {
                         await logAuditAction(
@@ -629,7 +650,9 @@ export async function restoreTicketPackageImpl(
                                 `Restore gói vé: ${existing.name}`,
                                 staffInfo.id,
                                 staffInfo.email,
-                                staffInfo.fullname
+                                staffInfo.fullname,
+                                auditOld,
+                                auditNew
                         );
                 }
 
