@@ -421,13 +421,13 @@ export const PostManagement = () => {
                                                                 <TableHead className="text-[10px] uppercase font-bold text-slate-500 text-center w-[110px] shrink-0">
                                                                         Trạng thái
                                                                 </TableHead>
-                                                                <TableHead className="text-[10px] uppercase font-bold text-slate-500 text-center w-[100px] hidden sm:table-cell shrink-0">
+                                                                <TableHead className="text-[10px] uppercase font-bold text-slate-500 text-center w-[90px] hidden sm:table-cell shrink-0">
                                                                         Xuất bản
                                                                 </TableHead>
-                                                                <TableHead className="text-[10px] uppercase font-bold text-slate-500 text-center w-[80px] hidden md:table-cell shrink-0">
+                                                                <TableHead className="text-[10px] uppercase font-bold text-slate-500 text-center w-[70px] hidden md:table-cell shrink-0">
                                                                         Lượt xem
                                                                 </TableHead>
-                                                                <TableHead className="text-right text-[10px] uppercase font-bold text-slate-500 pr-4 w-[70px] shrink-0">
+                                                                <TableHead className="text-right text-[10px] uppercase font-bold text-slate-500 pr-4 w-[100px] shrink-0">
                                                                         Thao tác
                                                                 </TableHead>
                                                         </TableRow>

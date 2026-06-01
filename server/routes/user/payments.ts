@@ -1,5 +1,5 @@
 import { PaymentRequest } from '@shared/api';
-import { eq, and, asc, desc, isNull, or, inArray } from 'drizzle-orm';
+import { eq, and, asc, desc, isNull, or, inArray, sql } from 'drizzle-orm';
 import { generateBookingCode, getBookingEmailTemplate } from '../../lib/booking-utils';
 import { sendMail } from '../mail-service';
 import { mailQueue } from '../../lib/mail-queue';
@@ -478,14 +478,20 @@ export async function getBookingByCodeImpl(anyDb: any, codeRaw: string, tables: 
         const code = String(codeRaw || '');
         if (!code || code.trim() === '') return { status: 400, message: 'Thiếu mã vé' };
         const normalizedCode = code.trim().toUpperCase();
+
+        // Extract exact CS + timestamp pattern if present
+        // Pattern: CS followed by 10 digits (timestamp in seconds) + 2 digits (random) = 12 digits total
+        const codeMatch = normalizedCode.match(/CS\d{12}/);
+        const exactCode = codeMatch ? codeMatch[0] : normalizedCode;
+
         const bookingsTable = tables.bookings;
         const booking = await anyDb.query.bookings.findFirst({
                 where: or(
                         // Điều kiện 1: booking_code khớp
-                        eq(bookingsTable.booking_code, normalizedCode),
+                        eq(bookingsTable.booking_code, exactCode),
 
                         // Điều kiện 2: pay_txt_code khớp VÀ method là vietqr
-                        and(eq(bookingsTable.pay_txt_code, normalizedCode), eq(bookingsTable.payment_method, 'vietqr'))
+                        and(eq(bookingsTable.pay_txt_code, exactCode), eq(bookingsTable.payment_method, 'vietqr'))
                 ),
                 with: {
                         user: {

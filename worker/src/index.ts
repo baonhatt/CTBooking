@@ -105,7 +105,8 @@ import {
         getPostImpl,
         createPostImpl,
         updatePostImpl,
-        deletePostImpl
+        deletePostImpl,
+        incrementPostViewImpl
 } from '../../server/routes/admin/posts';
 
 import {
@@ -4372,6 +4373,22 @@ app.delete('/api/posts/:id', requireStaffAuth, requirePermission('posts', 'delet
                 if (!r) return c.json({ message: 'Không tìm thấy' }, 404);
 
                 return c.json({ status: 'success', message: isSuperAdmin ? 'Đã xóa vĩnh viễn' : 'Đã lưu trữ bài viết' });
+        } catch (err: any) {
+                return c.json({ status: 'error', message: String(err?.message || 'Internal error') }, 500);
+        }
+});
+
+// Public: Increment post view count
+
+app.post('/api/posts/:id/view', async (c) => {
+        try {
+                const id = Number(c.req.param('id'));
+
+                const db = drizzle(c.env.cinema_db, { schema });
+
+                await incrementPostViewImpl(db, { posts: schema.posts, auditLogs: schema.auditLogs }, id);
+
+                return c.json({ status: 'success' });
         } catch (err: any) {
                 return c.json({ status: 'error', message: String(err?.message || 'Internal error') }, 500);
         }

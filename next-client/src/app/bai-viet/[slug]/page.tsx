@@ -6,6 +6,7 @@ import UserLayout from '@/layouts/UserLayout';
 import { getPostBySlugId, getPublicPosts, type PostItem } from '@/lib/api/posts';
 import { buildPostHref } from '@/lib/utils';
 import PostSidebar from './PostSidebar';
+import PostViewIncrementor from './PostViewIncrementor';
 
 import { siteConfig } from '@/config/site';
 
@@ -128,6 +129,7 @@ export default async function PostDetailPage({ params }: { params: { slug: strin
 
         return (
                 <UserLayout className="bg-gradient-dark">
+                        <PostViewIncrementor postId={post.id} />
                         <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
                         <main className="pb-16">
                                 {/* Back button */}
