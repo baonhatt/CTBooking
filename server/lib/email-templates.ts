@@ -7,6 +7,10 @@ export function getBookingEmailTemplate(data: {
         durationMin?: string; // Nhận chuỗi JSON: "[10, 12, 5]"
         ticketPackageName?: string;
         expiryDate?: string | Date;
+        branchName?: string;
+        branchAddress?: string;
+        branchPhone?: string;
+        branchSettings?: string;
 }): string {
         // 1. XỬ LÝ DỮ LIỆU JSON TỪ API
         let movieTitles: string[] = [];
@@ -18,6 +22,15 @@ export function getBookingEmailTemplate(data: {
                 // Fallback nếu không phải JSON
                 movieTitles = data.movieTitle ? [data.movieTitle] : ['Chưa xác định'];
                 durations = data.durationMin ? [data.durationMin] : ['--'];
+        }
+
+        // Parse branch settings for hotline
+        let hotline = data.branchPhone || '1900-xxxx';
+        if (data.branchSettings) {
+                try {
+                        const settings = JSON.parse(data.branchSettings);
+                        if (settings.hotline) hotline = settings.hotline;
+                } catch (e) { }
         }
 
         // 2. TẠO LIST PHIM THEO LAYOUT MỚI
@@ -77,6 +90,16 @@ export function getBookingEmailTemplate(data: {
             </div>
 
             <div class="section-title">CHI TIẾT ĐƠN HÀNG</div>
+            ${data.branchName ? `
+            <div class="row">
+                <span class="label">Chi nhánh:</span>
+                <span class="value">${data.branchName}</span>
+            </div>
+            <div class="row">
+                <span class="label">Địa chỉ:</span>
+                <span class="value" style="font-size: 12px;">${data.branchAddress || ''}</span>
+            </div>
+            ` : ''}
             <div class="row">
                 <span class="label">Số lượng vé:</span>
                 <span class="value">${data.ticketCount} vé</span>
@@ -118,7 +141,7 @@ export function getBookingEmailTemplate(data: {
 
         <div class="footer">
             <p><strong>CINESPHERE - Rạp chiếu phim hiện đại</strong></p>
-            <p>Email: cinesphere0629@gmail.com | Hotline: 1900-xxxx</p>
+            <p>Email: cinesphere0629@gmail.com | Hotline: ${hotline}</p>
             <p style="margin-top: 10px; opacity: 0.6;">Đây là email tự động, vui lòng không trả lời email này.</p>
         </div>
     </div>

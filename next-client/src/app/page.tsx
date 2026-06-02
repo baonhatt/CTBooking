@@ -11,7 +11,7 @@ import ClearStorageOnMount from '@/components/user/home/ClearStorageOnMount';
 import { getActiveMoviesToday } from '@/lib/api/movies';
 import { getSiteMediaApi } from '@/lib/api/uploads';
 import { getActiveTickets, getActiveToys } from '@/lib/api/products';
-import { getDefaultBranch } from '@/lib/api/branches';
+import { getDefaultBranch, getPublicBranches } from '@/lib/api/branches';
 
 import { siteConfig } from '@/config/site';
 
@@ -53,18 +53,24 @@ export const revalidate = 300;
 
 export default async function Home({ searchParams }: { searchParams: { branch_id?: string } }) {
         // Fetch default branch for server-side rendering
-        let defaultBranchId: number | undefined = undefined;
+        let effectiveBranchId: number | undefined = undefined;
         try {
-                const { branch: defaultBranch } = await getDefaultBranch();
-                if (defaultBranch) {
-                        defaultBranchId = defaultBranch.id;
+                const [{ branch: defaultBranch }, { items: publicBranches }] = await Promise.all([
+                        getDefaultBranch(),
+                        getPublicBranches()
+                ]);
+
+                if (searchParams.branch_id) {
+                        effectiveBranchId = Number(searchParams.branch_id);
+                } else if (defaultBranch) {
+                        effectiveBranchId = defaultBranch.id;
+                } else if (publicBranches && publicBranches.length > 0) {
+                        // Fallback to the first available open branch if no default or URL param
+                        effectiveBranchId = publicBranches[0].id;
                 }
         } catch (error) {
-                console.error('Error fetching default branch:', error);
+                console.error('Error fetching branches for home page:', error);
         }
-
-        // Determine effective branch ID from URL or default
-        const effectiveBranchId = searchParams.branch_id ? Number(searchParams.branch_id) : defaultBranchId;
 
         // Fetch all initial data in parallel with branch filter
         const [activeMovies, siteMediaRes, ticketsRes, toysRes] = await Promise.all([

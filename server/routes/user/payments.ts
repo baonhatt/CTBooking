@@ -31,7 +31,7 @@ type BookingValidationResult = {
 async function validateBookingInput(
         anyDb: any,
         body: PaymentRequest,
-        tables: { users: any; accounts: any; movies: any; ticket_packages: any }
+        tables: { users: any; accounts: any; movies: any; ticket_packages: any; branches: any }
 ): Promise<BookingValidationResult> {
         const { email, emailBook, phone, name, combo, ticketCount, ticketPackageId } = body;
 
@@ -49,6 +49,7 @@ async function validateBookingInput(
         const accountsTable = tables.accounts;
         const moviesTable = tables.movies;
         const ticketPackagesTable = tables.ticket_packages;
+        const branchesTable = tables.branches;
 
         const userResult = await anyDb
                 .select({
@@ -99,6 +100,29 @@ async function validateBookingInput(
                 }
         }
 
+        // Branch check: Ensure the branch is open
+        let branchSettings: any = {};
+        if (ticketPackage.branch_id) {
+                const branch = await anyDb.query.branches.findFirst({
+                        where: and(eq(branchesTable.id, ticketPackage.branch_id), isNull(branchesTable.deleted_at))
+                });
+                if (!branch) {
+                        throw new HttpError(404, 'Chi nhánh không tồn tại.');
+                }
+                if (!branch.is_active) {
+                        throw new HttpError(403, 'Chi nhánh hiện đang ngừng hoạt động.');
+                }
+                if (!branch.is_open) {
+                        throw new HttpError(403, 'Chi nhánh hiện đang đóng cửa. Vui lòng quay lại sau.');
+                }
+                // Parse branch settings
+                try {
+                        branchSettings = branch.settings ? JSON.parse(branch.settings) : {};
+                } catch (e) {
+                        branchSettings = {};
+                }
+        }
+
         const unitPrice = Number(ticketPackage.price || 0);
         if (!Number.isFinite(unitPrice) || unitPrice <= 0) {
                 throw new HttpError(400, 'Giá vé không hợp lệ.');
@@ -122,7 +146,7 @@ async function validateBookingInput(
 export async function validateBookingImpl(
         anyDb: any,
         payload: PaymentRequest,
-        tables: { users: any; accounts: any; movies: any; ticket_packages: any }
+        tables: { users: any; accounts: any; movies: any; ticket_packages: any; branches: any }
 ) {
         try {
                 const result = await validateBookingInput(anyDb, payload, tables);
@@ -160,6 +184,7 @@ export async function createPaymentImpl(
                 accounts: any;
                 movies: any;
                 ticket_packages: any;
+                branches: any;
         }
 ) {
         try {
@@ -254,6 +279,7 @@ export async function updatePaymentImpl(
                 accounts: any;
                 movies: any;
                 ticket_packages: any;
+                branches: any;
                 email_logs?: any;
         },
         context?: { waitUntil: (promise: Promise<any>) => void }
@@ -264,8 +290,8 @@ export async function updatePaymentImpl(
                         return { status: 400, message: 'Vui lòng nhập đầy đủ thông tin hợp lệ.' };
                 }
 
-                const { bookings: bookingsTable, movies: moviesTable, ticket_packages: pkgsTable } = tables || {};
-                if (!bookingsTable || !moviesTable || !pkgsTable) return { status: 500, message: 'Missing tables definition' };
+                const { bookings: bookingsTable, movies: moviesTable, ticket_packages: pkgsTable, branches: branchesTable } = tables || {};
+                if (!bookingsTable || !moviesTable || !pkgsTable || !branchesTable) return { status: 500, message: 'Missing tables definition' };
 
                 // 1. Tối ưu Query đầu tiên: Sử dụng Join thay vì 'with' để lấy data gửi mail sau này
                 const whereClause =
@@ -279,11 +305,17 @@ export async function updatePaymentImpl(
                                 duration_min: moviesTable.duration_min,
                                 package_name: pkgsTable.name,
                                 movie_title: bookingsTable.movie_title,
-                                movie_duration: bookingsTable.movie_duration
+                                movie_duration: bookingsTable.movie_duration,
+                                // Branch fields for email
+                                branch_name: branchesTable.name,
+                                branch_address: branchesTable.address,
+                                branch_phone: branchesTable.phone,
+                                branch_settings: branchesTable.settings
                         })
                         .from(bookingsTable)
                         .leftJoin(moviesTable, eq(bookingsTable.movie_id, moviesTable.id))
                         .leftJoin(pkgsTable, eq(bookingsTable.ticket_package_id, pkgsTable.id))
+                        .leftJoin(branchesTable, eq(bookingsTable.branch_id, branchesTable.id))
                         .where(whereClause)
                         .limit(1);
 
@@ -322,8 +354,25 @@ export async function updatePaymentImpl(
                         const paidAtDate = paid_at ? new Date(paid_at) : new Date();
                         const validPaidAt = isNaN(paidAtDate.getTime()) ? new Date() : paidAtDate;
 
+                        // Fetch branch settings for ticket expiry days
+                        let branchSettings: any = {};
+                        if (booking.branch_id) {
+                                const branch = await anyDb.query.branches.findFirst({
+                                        where: and(eq(branchesTable.id, booking.branch_id), isNull(branchesTable.deleted_at))
+                                });
+                                if (branch) {
+                                        try {
+                                                branchSettings = branch.settings ? JSON.parse(branch.settings) : {};
+                                        } catch (e) {
+                                                branchSettings = {};
+                                        }
+                                }
+                        }
+
+                        // Use branch ticket_expiry_days setting, default to 10 days if not set
+                        const expiryDays = branchSettings.ticket_expiry_days || 10;
                         updatePayload.paid_at = formatDateForDb(validPaidAt);
-                        updatePayload.expiry_date = formatDateForDb(new Date(validPaidAt.getTime() + 10 * 24 * 60 * 60 * 1000));
+                        updatePayload.expiry_date = formatDateForDb(new Date(validPaidAt.getTime() + expiryDays * 24 * 60 * 60 * 1000));
                         updatePayload.booking_code = bookingCode;
                 }
 
@@ -350,7 +399,12 @@ export async function updatePaymentImpl(
                                                         totalPrice: Number(booking.total_price).toLocaleString('vi-VN'),
                                                         durationMin: booking.movie_duration,
                                                         ticketPackageName: result.package_name,
-                                                        expiryDate: updatedBooking?.expiry_date
+                                                        expiryDate: updatedBooking?.expiry_date,
+                                                        // Pass branch info to email template
+                                                        branchName: result.branch_name,
+                                                        branchAddress: result.branch_address,
+                                                        branchPhone: result.branch_phone,
+                                                        branchSettings: result.branch_settings
                                                 };
 
                                                 const emailTemplate = getBookingEmailHtml
@@ -428,9 +482,9 @@ export async function getBookingImpl(anyDb: any, id: number, tables: { bookings:
 export async function getBookingByIdImpl(
         anyDb: any,
         id: number,
-        tables: { bookings: any; movies: any; ticket_packages: any }
+        tables: { bookings: any; movies: any; ticket_packages: any; branches: any }
 ) {
-        const { bookings, movies, ticket_packages } = tables;
+        const { bookings, movies, ticket_packages, branches } = tables;
 
         // Sử dụng Join để lấy tất cả dữ liệu trong 1 Query duy nhất
         const rows = await anyDb
@@ -457,9 +511,15 @@ export async function getBookingByIdImpl(
                         movie_image: bookings.movie_poster,
                         duration_min: bookings.movie_duration,
                         // Package fields
-                        ticket_package_name: bookings.ticket_package_name
+                        ticket_package_name: bookings.ticket_package_name,
+                        // Branch fields
+                        branch_name: branches.name,
+                        branch_address: branches.address,
+                        branch_phone: branches.phone,
+                        branch_settings: branches.settings
                 })
                 .from(bookings)
+                .leftJoin(branches, eq(bookings.branch_id, branches.id))
                 .where(eq(bookings.id, id))
                 .limit(1);
 

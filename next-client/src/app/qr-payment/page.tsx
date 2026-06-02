@@ -83,6 +83,8 @@ export default function QRPaymentPage() {
                                         if (res.ok) {
                                                 const json = await res.json();
                                                 setBookingDetails(json);
+                                                // Regenerate QR code with branch settings
+                                                generateQRCode(data);
                                         }
                                 } catch (error) {
                                         console.error('Error fetching booking details:', error);
@@ -172,7 +174,50 @@ export default function QRPaymentPage() {
                 const amount = data.totalAmount || data.amount || 0;
                 const orderId = data.orderId || data.booking_id || '';
                 const description = `${orderId} `;
-                const qrContent = `https://img.vietqr.io/image/${BANK_INFO.bankCode}-${BANK_INFO.accountNumber}-compact2.png?amount=${amount}&addInfo=${encodeURIComponent(description)}&accountName=${encodeURIComponent(BANK_INFO.accountName)}`;
+
+                // Use branch payment config if available, fallback to default BANK_INFO
+                let bankCode = BANK_INFO.bankCode;
+                let accountNumber = BANK_INFO.accountNumber;
+                let accountName = BANK_INFO.accountName;
+
+                if (bookingDetails?.branch?.settings) {
+                        try {
+                                const settings = JSON.parse(bookingDetails.branch.settings);
+                                if (settings.payment_config) {
+                                        const pc = settings.payment_config;
+                                        if (pc.qr_code_url) {
+                                                // Use custom QR URL if provided
+                                                setQrCodeUrl(pc.qr_code_url);
+                                                return;
+                                        }
+                                        if (pc.bank_name && pc.account_number) {
+                                                // Use custom bank_code if provided, otherwise map from bank name
+                                                if (pc.bank_code) {
+                                                        bankCode = pc.bank_code;
+                                                } else {
+                                                        // Map bank name to bank code (simplified mapping)
+                                                        const bankNameToCode: { [key: string]: string } = {
+                                                                'MB Bank': 'MB',
+                                                                'Vietcombank': 'VCB',
+                                                                'BIDV': 'BIDV',
+                                                                'Vietinbank': 'VCB',
+                                                                'Techcombank': 'TCB',
+                                                                'ACB': 'ACB',
+                                                                'Sacombank': 'SACOMBANK',
+                                                                'OCB': 'OCB'
+                                                        };
+                                                        bankCode = bankNameToCode[pc.bank_name] || BANK_INFO.bankCode;
+                                                }
+                                                accountNumber = pc.account_number;
+                                                accountName = pc.account_name || BANK_INFO.accountName;
+                                        }
+                                }
+                        } catch (e) {
+                                console.error('Error parsing branch settings:', e);
+                        }
+                }
+
+                const qrContent = `https://img.vietqr.io/image/${bankCode}-${accountNumber}-compact2.png?amount=${amount}&addInfo=${encodeURIComponent(description)}&accountName=${encodeURIComponent(accountName)}`;
                 setQrCodeUrl(qrContent);
         };
 

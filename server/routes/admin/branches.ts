@@ -1,4 +1,4 @@
-import { eq, desc, asc, count, and, or, sql, isNull, isNotNull, like } from 'drizzle-orm';
+import { eq, desc, asc, count, and, or, sql, isNull, isNotNull, like, gte } from 'drizzle-orm';
 import { formatDateForDb } from '../../lib/date-utils';
 import { logAuditAction } from '../../lib/audit-logger';
 import { buildAuditPayload } from '../../lib/audit-utils';
@@ -6,11 +6,16 @@ import { buildAuditPayload } from '../../lib/audit-utils';
 export async function listBranchesImpl(
         anyDb: any,
         tables: { branches: any; movies: any; ticket_packages: any; bookings: any },
-        args: { page: number; pageSize: number; q: string; includeInactive?: boolean }
+        args: { page: number; pageSize: number; q: string; includeInactive?: boolean; onlyOpen?: boolean }
 ) {
-        const { page, pageSize, q, includeInactive = false } = args;
+        const { page, pageSize, q, includeInactive = false, onlyOpen = false } = args;
 
         let whereCondition = includeInactive ? undefined : and(eq(tables.branches.is_active, true), isNull(tables.branches.deleted_at));
+
+        if (onlyOpen) {
+                const openCondition = eq(tables.branches.is_open, true);
+                whereCondition = whereCondition ? and(whereCondition, openCondition) : openCondition;
+        }
 
         if (q) {
                 const lowerSearch = q.toLowerCase();
@@ -37,6 +42,9 @@ export async function listBranchesImpl(
         const branches = branchList;
         const total = totalResult ? Number(totalResult.count) : 0;
 
+        const now = new Date();
+        const fifteenMinutesAgo = new Date(now.getTime() - 15 * 60 * 1000);
+
         const itemsWithStats = await Promise.all(
                 branches.map(async (branch: any) => {
                         const [movieCount] = await anyDb
@@ -54,11 +62,48 @@ export async function listBranchesImpl(
                                 .from(tables.bookings)
                                 .where(eq(tables.bookings.branch_id, branch.id));
 
+                        const [pendingBookingCount] = await anyDb
+                                .select({ count: count() })
+                                .from(tables.bookings)
+                                .where(
+                                        and(
+                                                eq(tables.bookings.branch_id, branch.id),
+                                                eq(tables.bookings.payment_status, 'pending'),
+                                                gte(tables.bookings.created_at, formatDateForDb(fifteenMinutesAgo))
+                                        )
+                                );
+
+                        const [paidUnusedCount] = await anyDb
+                                .select({ count: count() })
+                                .from(tables.bookings)
+                                .where(
+                                        and(
+                                                eq(tables.bookings.branch_id, branch.id),
+                                                eq(tables.bookings.payment_status, 'paid'),
+                                                eq(tables.bookings.is_used, false)
+                                        )
+                                );
+
+                        const paidUnusedCodesRes = await anyDb
+                                .select({ code: tables.bookings.booking_code })
+                                .from(tables.bookings)
+                                .where(
+                                        and(
+                                                eq(tables.bookings.branch_id, branch.id),
+                                                eq(tables.bookings.payment_status, 'paid'),
+                                                eq(tables.bookings.is_used, false)
+                                        )
+                                )
+                                .limit(50); // Chỉ lấy tối đa 50 mã để tránh quá tải UI
+
                         return {
                                 ...branch,
                                 movie_count: movieCount?.count || 0,
                                 package_count: packageCount?.count || 0,
-                                booking_count: bookingCount?.count || 0
+                                booking_count: bookingCount?.count || 0,
+                                pending_bookings_count: pendingBookingCount?.count || 0,
+                                paid_unused_count: paidUnusedCount?.count || 0,
+                                paid_unused_codes: paidUnusedCodesRes.map((r: any) => r.code).join(', ')
                         };
                 })
         );
@@ -102,7 +147,14 @@ export async function getDefaultBranchImpl(anyDb: any, tables: { branches: any }
         const [item] = await anyDb
                 .select()
                 .from(tables.branches)
-                .where(and(eq(tables.branches.is_default, true), eq(tables.branches.is_active, true), isNull(tables.branches.deleted_at)))
+                .where(
+                        and(
+                                eq(tables.branches.is_default, true),
+                                eq(tables.branches.is_active, true),
+                                eq(tables.branches.is_open, true),
+                                isNull(tables.branches.deleted_at)
+                        )
+                )
                 .limit(1);
         return item || null;
 }
@@ -118,13 +170,19 @@ export async function createBranchImpl(
                 email?: string;
                 is_default?: boolean;
                 is_active?: boolean;
+                is_open?: boolean;
+                settings?: string;
         },
         staffInfo?: { id: number; email: string; fullname: string }
 ) {
-        const { name, code, address, phone, email, is_default, is_active } = args;
+        const { name, code, address, phone, email, is_default, is_active, is_open, settings } = args;
         const now = new Date();
 
-        if (is_default) {
+        // Check if this is the first branch
+        const [existingCount] = await anyDb.select({ count: count() }).from(tables.branches).where(isNull(tables.branches.deleted_at));
+        const finalIsDefault = (existingCount?.count === 0) ? true : (is_default || false);
+
+        if (finalIsDefault) {
                 await anyDb
                         .update(tables.branches)
                         .set({ is_default: false, updated_at: formatDateForDb(now) })
@@ -139,8 +197,10 @@ export async function createBranchImpl(
                         address: address || null,
                         phone: phone || null,
                         email: email || null,
-                        is_default: is_default || false,
+                        is_default: finalIsDefault,
                         is_active: is_active ?? true,
+                        is_open: is_open ?? true,
+                        settings: settings || null,
                         created_at: formatDateForDb(now),
                         updated_at: formatDateForDb(now)
                 })
@@ -169,7 +229,7 @@ export async function createBranchImpl(
 
 export async function updateBranchImpl(
         anyDb: any,
-        tables: { branches: any; auditLogs: any },
+        tables: { branches: any; auditLogs: any; bookings: any },
         id: number,
         args: {
                 name?: string;
@@ -179,6 +239,8 @@ export async function updateBranchImpl(
                 email?: string;
                 is_default?: boolean;
                 is_active?: boolean;
+                is_open?: boolean;
+                settings?: string;
         },
         staffInfo?: { id: number; email: string; fullname: string }
 ) {
@@ -187,7 +249,7 @@ export async function updateBranchImpl(
                 return null;
         }
 
-        const { name, code, address, phone, email, is_default, is_active } = args;
+        const { name, code, address, phone, email, is_default, is_active, is_open, settings } = args;
         const now = new Date();
         const data: any = { updated_at: formatDateForDb(now) };
 
@@ -197,6 +259,32 @@ export async function updateBranchImpl(
         if (phone !== undefined) data.phone = phone;
         if (email !== undefined) data.email = email;
         if (is_active !== undefined) data.is_active = is_active;
+        if (is_open !== undefined) {
+                if (is_open === false) {
+                        if (existing.is_default) {
+                                throw new Error('Không thể đóng cửa chi nhánh mặc định. Vui lòng thiết lập chi nhánh khác làm mặc định trước.');
+                        }
+
+                        // Check for pending bookings within 15 minutes
+                        const fifteenMinutesAgo = new Date(now.getTime() - 15 * 60 * 1000);
+                        const [pending] = await anyDb
+                                .select({ count: count() })
+                                .from(tables.bookings)
+                                .where(
+                                        and(
+                                                eq(tables.bookings.branch_id, id),
+                                                eq(tables.bookings.payment_status, 'pending'),
+                                                gte(tables.bookings.created_at, formatDateForDb(fifteenMinutesAgo))
+                                        )
+                                );
+
+                        if (pending?.count > 0) {
+                                throw new Error(`Không thể đóng cửa ngay lúc này. Có ${pending.count} khách hàng đang thực hiện thanh toán. Vui lòng thử lại sau 15 phút hoặc khi các đơn hàng này hoàn tất/hết hạn.`);
+                        }
+                }
+                data.is_open = is_open;
+        }
+        if (settings !== undefined) data.settings = settings;
 
         if (is_default !== undefined && is_default === true) {
                 await anyDb
@@ -358,6 +446,70 @@ export async function restoreBranchImpl(
         }
 
         return { ok: true };
+}
+
+export async function toggleBranchOpenImpl(
+        anyDb: any,
+        tables: { branches: any; auditLogs: any; bookings: any },
+        id: number,
+        staffInfo?: { id: number; email: string; fullname: string }
+) {
+        const [existing] = await anyDb
+                .select()
+                .from(tables.branches)
+                .where(eq(tables.branches.id, id))
+                .limit(1);
+
+        if (!existing) {
+                throw new Error('Branch not found');
+        }
+
+        const newStatus = !existing.is_open;
+
+        if (newStatus === false) {
+                if (existing.is_default) {
+                        throw new Error('Không thể đóng cửa chi nhánh mặc định.');
+                }
+
+                // Check for pending bookings
+                const now = new Date();
+                const fifteenMinutesAgo = new Date(now.getTime() - 15 * 60 * 1000);
+                const [pending] = await anyDb
+                        .select({ count: count() })
+                        .from(tables.bookings)
+                        .where(
+                                and(
+                                        eq(tables.bookings.branch_id, id),
+                                        eq(tables.bookings.payment_status, 'pending'),
+                                        gte(tables.bookings.created_at, formatDateForDb(fifteenMinutesAgo))
+                                )
+                        );
+
+                if (pending?.count > 0) {
+                        throw new Error(`Không thể đóng cửa ngay lúc này. Có ${pending.count} khách hàng đang thực hiện thanh toán.`);
+                }
+        }
+
+        await anyDb
+                .update(tables.branches)
+                .set({ is_open: newStatus, updated_at: new Date().toISOString() })
+                .where(eq(tables.branches.id, id));
+
+        if (staffInfo) {
+                await logAuditAction(
+                        anyDb,
+                        tables.auditLogs,
+                        'update',
+                        'branch',
+                        id,
+                        `${newStatus ? 'Mở cửa' : 'Đóng cửa'} chi nhánh: ${existing.name}`,
+                        staffInfo.id,
+                        staffInfo.email,
+                        staffInfo.fullname
+                );
+        }
+
+        return { ok: true, is_open: newStatus };
 }
 
 export async function toggleBranchStatusImpl(

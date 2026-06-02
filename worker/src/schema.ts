@@ -168,6 +168,8 @@ export const branches = sqliteTable('branches', {
         email: text('email'),
         is_default: integer('is_default', { mode: 'boolean' }).default(false),
         is_active: integer('is_active', { mode: 'boolean' }).default(true),
+        is_open: integer('is_open', { mode: 'boolean' }).default(true),
+        settings: text('settings'),
         created_at: text('created_at').notNull(),
         updated_at: text('updated_at').notNull(),
         deleted_at: text('deleted_at'),

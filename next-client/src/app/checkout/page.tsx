@@ -19,7 +19,8 @@ import {
         Calendar,
         CreditCard,
         Hash,
-        Phone
+        Phone,
+        MapPin
 } from 'lucide-react';
 import UserLayout from '@/layouts/UserLayout';
 import { createMomoPaymentApi, API_BASE_URL, SERVER_BASE_URL, confirmBookingApi, getBookingByIdApi } from '@/lib/api';
@@ -552,6 +553,36 @@ export default function Checkout() {
                                                                         </div>
                                                                         <p className="text-xl md:text-2xl font-black text-white italic">x{order?.quantity || 1}</p>
                                                                 </div>
+
+                                                                {/* Branch Info */}
+                                                                {order?.branch_name && (
+                                                                        <div className="col-span-2 mt-2 pt-2 border-t border-white/5 space-y-2">
+                                                                                <div className="flex items-start gap-2">
+                                                                                        <div className="p-1.5 bg-blue-500/10 rounded-lg">
+                                                                                                <MapPin className="w-3.5 h-3.5 text-blue-400" />
+                                                                                        </div>
+                                                                                        <div>
+                                                                                                <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest leading-none mb-1">Chi nhánh</p>
+                                                                                                <p className="text-sm font-bold text-slate-100">{order.branch_name}</p>
+                                                                                                <p className="text-[11px] text-slate-400 leading-tight mt-0.5">{order.branch_address}</p>
+                                                                                        </div>
+                                                                                </div>
+
+                                                                                {(order.branch_phone || (order.branch_settings && JSON.parse(order.branch_settings).hotline)) && (
+                                                                                        <div className="flex items-center gap-2">
+                                                                                                <div className="p-1.5 bg-emerald-500/10 rounded-lg">
+                                                                                                        <Phone className="w-3.5 h-3.5 text-emerald-400" />
+                                                                                                </div>
+                                                                                                <div>
+                                                                                                        <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest leading-none mb-1">Hotline hỗ trợ</p>
+                                                                                                        <p className="text-sm font-bold text-slate-100">
+                                                                                                                {order.branch_phone || JSON.parse(order.branch_settings).hotline}
+                                                                                                        </p>
+                                                                                                </div>
+                                                                                        </div>
+                                                                                )}
+                                                                        </div>
+                                                                )}
                                                         </div>
 
                                                         {/* Customer Banner */}

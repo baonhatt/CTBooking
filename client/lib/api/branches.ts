@@ -83,6 +83,12 @@ export async function deleteBranchApi(id: number) {
         });
 }
 
+export async function toggleBranchOpenApi(id: number) {
+        return request<{ ok: boolean; is_open: boolean }>(`/api/admin/branches/${id}/toggle-open`, {
+                method: 'POST'
+        });
+}
+
 export async function toggleBranchStatusApi(id: number) {
         return request<{ ok: boolean; is_active: boolean }>(`/api/admin/branches/${id}/toggle-status`, {
                 method: 'POST'

@@ -20,6 +20,16 @@ import { NAV_ITEMS } from '@/components/constants';
 import { HeaderProps, ErrorModalState } from '@/components/filetypes/IType.model';
 import { MobileMenu } from '@/components/MobileMenu';
 import { getCookie } from '@/lib/cookies';
+import {
+        AlertDialog,
+        AlertDialogAction,
+        AlertDialogCancel,
+        AlertDialogContent,
+        AlertDialogDescription,
+        AlertDialogFooter,
+        AlertDialogHeader,
+        AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 const LoginDialog = dynamic(() => import('@/components/LoginDialog'), { ssr: false });
 const RegisterDialog = dynamic(() => import('@/components/RegisterDialog'), { ssr: false });
 const ForgetPasswordDialog = dynamic(() => import('@/components/ForgetPasswordDialog'), { ssr: false });
@@ -40,6 +50,7 @@ export default function Header({
         // Custom hooks
         const isScrolled = useScrollDetect(50);
         const isPostsRoute = pathname === '/bai-viet' || pathname.startsWith('/bai-viet/');
+        const isBookingFlow = ['/booking', '/checkout', '/qr-payment', '/success-payment'].some(route => pathname.startsWith(route));
         const { userName, setUserName } = useAuthState(false);
         const effectiveDisable = disableNav || (pathname !== '/' && !isPostsRoute);
         const activeSection = useActiveSection(effectiveDisable);
@@ -85,6 +96,8 @@ export default function Header({
         const [isLoginOpen, setIsLoginOpen] = useState(false);
         const [isRegisterOpen, setIsRegisterOpen] = useState(false);
         const [isForgetPassOpen, setIsForgetPassOpen] = useState(false);
+        const [pendingBranch, setPendingBranch] = useState<any>(null);
+        const [showBranchConfirm, setShowBranchConfirm] = useState(false);
         const [errorModal, setErrorModal] = useState<ErrorModalState>({
                 open: false,
                 title: '',
@@ -147,6 +160,37 @@ export default function Header({
                 }
         };
 
+        const handleBranchChange = (branchId: number) => {
+                const branch = branches.find((b) => b.id === branchId);
+                if (!branch) return;
+
+                const sensitiveRoutes = ['/booking', '/checkout', '/qr-payment'];
+                const isSensitive = sensitiveRoutes.some(route => pathname.startsWith(route));
+
+                if (isSensitive) {
+                        setPendingBranch(branch);
+                        setShowBranchConfirm(true);
+                } else {
+                        selectBranch(branch);
+                }
+        };
+
+        const confirmBranchChange = () => {
+                if (pendingBranch) {
+                        selectBranch(pendingBranch);
+
+                        const sensitiveRoutes = ['/booking', '/checkout', '/qr-payment'];
+                        const isSensitive = sensitiveRoutes.some(route => pathname.startsWith(route));
+
+                        if (isSensitive) {
+                                router.push(`/?branch_id=${pendingBranch.id}`);
+                        }
+
+                        setPendingBranch(null);
+                }
+                setShowBranchConfirm(false);
+        };
+
         const navItems = [...NAV_ITEMS, { label: 'Tin tức', target: 'posts' }];
 
         return (
@@ -191,16 +235,18 @@ export default function Header({
                                 <div className="flex items-center gap-3 md:gap-4 animate-fade-in delay-250">
                                         {/* Branch Selector */}
                                         {selectedBranch && branches.length > 1 && (
-                                                <div className="relative group">
+                                                <div className={cn(
+                                                        "relative group",
+                                                        isBookingFlow && "opacity-60 cursor-not-allowed"
+                                                )}>
                                                         <select
                                                                 value={selectedBranch.id}
-                                                                onChange={(e) => {
-                                                                        const branch = branches.find((b) => b.id === Number(e.target.value));
-                                                                        if (branch) {
-                                                                                selectBranch(branch);
-                                                                        }
-                                                                }}
-                                                                className="appearance-none bg-white/10 hover:bg-white/20 border border-white/20 rounded-lg px-3 py-2 pr-8 text-sm text-white/90 hover:text-white transition-colors cursor-pointer backdrop-blur-sm min-w-[140px] md:min-w-[160px]"
+                                                                onChange={(e) => handleBranchChange(Number(e.target.value))}
+                                                                disabled={isBookingFlow}
+                                                                className={cn(
+                                                                        "appearance-none bg-white/10 border border-white/20 rounded-lg px-3 py-2 pr-8 text-sm text-white/90 transition-colors backdrop-blur-sm min-w-[140px] md:min-w-[160px]",
+                                                                        isBookingFlow ? "cursor-not-allowed" : "hover:bg-white/20 hover:text-white cursor-pointer"
+                                                                )}
                                                         >
                                                                 {branches.map((branch) => (
                                                                         <option key={branch.id} value={branch.id} className="bg-gray-900 text-white">
@@ -229,7 +275,8 @@ export default function Header({
                                                         onRegister={() => setIsRegisterOpen(true)}
                                                         branches={branches}
                                                         selectedBranch={selectedBranch}
-                                                        selectBranch={selectBranch}
+                                                        selectBranch={handleBranchChange}
+                                                        isBookingFlow={isBookingFlow}
                                                 />
                                         </div>
 
@@ -290,6 +337,28 @@ export default function Header({
                                 message={errorModal.message}
                                 onOpenChange={(open) => setErrorModal((prev) => ({ ...prev, open }))}
                         />
+
+                        <AlertDialog open={showBranchConfirm} onOpenChange={setShowBranchConfirm}>
+                                <AlertDialogContent className="bg-slate-900 border-slate-800 text-white">
+                                        <AlertDialogHeader>
+                                                <AlertDialogTitle className="text-xl font-bold">Xác nhận chuyển chi nhánh?</AlertDialogTitle>
+                                                <AlertDialogDescription className="text-slate-400">
+                                                        Bạn đang trong quá trình đặt vé. Nếu chuyển sang chi nhánh khác, tiến trình đặt vé hiện tại sẽ bị hủy bỏ. Bạn có chắc chắn muốn tiếp tục?
+                                                </AlertDialogDescription>
+                                        </AlertDialogHeader>
+                                        <AlertDialogFooter>
+                                                <AlertDialogCancel className="bg-slate-800 border-slate-700 text-white hover:bg-slate-700 hover:text-white">
+                                                        Hủy bỏ
+                                                </AlertDialogCancel>
+                                                <AlertDialogAction
+                                                        onClick={confirmBranchChange}
+                                                        className="bg-cyan-600 hover:bg-cyan-700 text-white border-none"
+                                                >
+                                                        Tiếp tục chuyển
+                                                </AlertDialogAction>
+                                        </AlertDialogFooter>
+                                </AlertDialogContent>
+                        </AlertDialog>
                 </header>
         );
 }

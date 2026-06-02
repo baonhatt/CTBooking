@@ -119,6 +119,7 @@ import {
         deleteBranchImpl,
         restoreBranchImpl,
         toggleBranchStatusImpl,
+        toggleBranchOpenImpl,
         listDeletedBranchesImpl
 } from '../../server/routes/admin/branches';
 
@@ -1731,7 +1732,9 @@ const getD1Tables = (schema: any) => ({
 
         ticket_packages: schema.ticket_packages,
 
-        email_logs: schema.email_logs
+        email_logs: schema.email_logs,
+
+        branches: schema.branches
 });
 
 // Validate booking details before payment
@@ -1828,7 +1831,7 @@ app.post('/api/confirm-booking', async (c) => {
         try {
                 const db = drizzle(c.env.cinema_db, { schema });
 
-                const tables = { ...getD1Tables(schema), email_logs: schema.email_logs };
+                const tables = getD1Tables(schema);
 
                 body = await c.req.json().catch(() => ({}));
 
@@ -1882,7 +1885,7 @@ app.post('/api/sepay/webhook', async (c) => {
 
                 const db = drizzle(c.env.cinema_db, { schema });
 
-                const tables = { ...getD1Tables(schema), email_logs: schema.email_logs };
+                const tables = getD1Tables(schema);
 
                 const body = await c.req.json().catch(() => ({}));
 
@@ -4550,7 +4553,7 @@ app.get('/api/branches', async (c) => {
                                 ticket_packages: schema.ticket_packages,
                                 bookings: schema.bookings
                         },
-                        { page: 1, pageSize: 100, q: '', includeInactive: false }
+                        { page: 1, pageSize: 100, q: '', includeInactive: false, onlyOpen: true }
                 );
 
                 return c.json(r);
@@ -4600,7 +4603,7 @@ app.put('/api/admin/branches/:id', requireStaffAuth, requirePermission('branches
 
                 const r = await updateBranchImpl(
                         db,
-                        { branches: schema.branches, auditLogs: schema.auditLogs },
+                        { branches: schema.branches, auditLogs: schema.auditLogs, bookings: schema.bookings },
                         id,
                         body,
                         { id: staffId, email: staffEmail, fullname: staffFullname }
@@ -4665,6 +4668,32 @@ app.post('/api/admin/branches/:id/toggle-status', requireStaffAuth, requirePermi
                                 branches: schema.branches,
                                 auditLogs: schema.auditLogs,
                                 staff_branches: schema.staffBranches
+                        },
+                        id,
+                        { id: staffId, email: staffEmail, fullname: staffFullname }
+                );
+
+                return c.json(r, 200);
+        } catch (err: any) {
+                return c.json({ status: 'error', message: String(err?.message || 'Internal error') }, 500);
+        }
+});
+
+// Admin: Toggle branch open/close
+app.post('/api/admin/branches/:id/toggle-open', requireStaffAuth, requirePermission('branches', 'update'), async (c) => {
+        try {
+                const id = Number(c.req.param('id'));
+                const db = drizzle(c.env.cinema_db, { schema });
+                const staffId = c.get('staffId');
+                const staffEmail = c.get('staffEmail');
+                const staffFullname = c.get('staffFullname');
+
+                const r = await toggleBranchOpenImpl(
+                        db,
+                        {
+                                branches: schema.branches,
+                                auditLogs: schema.auditLogs,
+                                bookings: schema.bookings
                         },
                         id,
                         { id: staffId, email: staffEmail, fullname: staffFullname }

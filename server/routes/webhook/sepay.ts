@@ -3,7 +3,7 @@ import { updatePaymentImpl } from '../user/payments';
 
 export async function handleSePayWebhookImpl(
         db: any,
-        tables: { bookings: any; users: any; accounts: any; movies: any; ticket_packages: any },
+        tables: { bookings: any; users: any; accounts: any; movies: any; ticket_packages: any; branches: any },
         body: any,
         sendMailFn?: (to: string, subject: string, html: string) => Promise<any>,
         getBookingEmailHtml?: (data: any) => string,
