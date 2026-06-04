@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { getTransactions, getBranches } from '@/lib/api';
 import AdminLayout from '@/admin/layouts/AdminLayout';
 import TransactionsContent from '@/components/admin/content/TransactionsContent';
+import { useStaffPermission } from '@/hooks/useStaffPermission';
 import { useStaffStore } from '@/store/staffStore';
 import { useNavigate } from 'react-router-dom';
 
@@ -37,11 +38,17 @@ export default function TransactionsPage() {
                 if (staff?.isSuperAdmin) return 'all';
                 return null;
         });
+        const canViewBranches = useStaffPermission('branches', 'view');
         const [branches, setBranches] = useState<any[]>([]);
         const [isLoading, setIsLoading] = useState(false);
 
-        // Load branches
+        // Load branches only when branch viewing is allowed
         useEffect(() => {
+                if (!canViewBranches) {
+                        setBranches([]);
+                        return;
+                }
+
                 (async () => {
                         try {
                                 const { items } = await getBranches({ includeInactive: true });
@@ -55,7 +62,7 @@ export default function TransactionsPage() {
                                 console.error('Error loading branches:', error);
                         }
                 })();
-        }, [staff]);
+        }, [staff, canViewBranches, selectedBranchId]);
 
         useEffect(() => {
                 try {

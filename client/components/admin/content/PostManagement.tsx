@@ -44,7 +44,7 @@ import { getPosts, createPostApi, updatePostApi, deletePostApi } from '@/lib/api
 import { uploadDirectToCloudinary } from '@/lib/api/uploads';
 import { PostRichTextEditor } from './PostRichTextEditor';
 import { toast } from 'sonner';
-import { useIsSuperAdmin } from '@/hooks/useStaffPermission';
+import { useStaffPermissions, useIsSuperAdmin } from '@/hooks/useStaffPermission';
 
 interface PostData {
         id: number;
@@ -85,6 +85,12 @@ function getPlainTextFromHtml(value?: string) {
 export const PostManagement = () => {
         const navigate = useNavigate();
         const isSuperAdmin = useIsSuperAdmin();
+        const permissions = useStaffPermissions();
+
+        const hasPermission = (module: string, action: string) => {
+                if (isSuperAdmin) return true;
+                return permissions.some((p) => p.module === module && p.action === action);
+        };
         const [posts, setPosts] = useState<PostData[]>([]);
         const [totalPosts, setTotalPosts] = useState(0);
         const [currentPage, setCurrentPage] = useState(1);
@@ -398,12 +404,14 @@ export const PostManagement = () => {
                                                 >
                                                         <RefreshCw className={`w-4 h-4 ${isLoading ? 'animate-spin' : ''}`} />
                                                 </Button>
-                                                <Button
-                                                        onClick={handleCreate}
-                                                        className="bg-blue-600 hover:bg-blue-700 rounded-xl shadow-lg shadow-blue-200 gap-2 text-white font-bold h-10 px-4"
-                                                >
-                                                        <Plus className="w-4 h-4" /> Tạo bài viết
-                                                </Button>
+                                                {hasPermission('posts', 'create') && (
+                                                        <Button
+                                                                onClick={handleCreate}
+                                                                className="bg-blue-600 hover:bg-blue-700 rounded-xl shadow-lg shadow-blue-200 gap-2 text-white font-bold h-10 px-4"
+                                                        >
+                                                                <Plus className="w-4 h-4" /> Tạo bài viết
+                                                        </Button>
+                                                )}
                                         </div>
                                 </div>
                         </div>
@@ -505,6 +513,7 @@ export const PostManagement = () => {
                                                                                         </span>
                                                                                 </TableCell>
                                                                                 <TableCell className="text-right pr-4">
+                                                                                {hasPermission('posts', 'edit') && (
                                                                                         <Button
                                                                                                 variant="ghost"
                                                                                                 size="icon"
@@ -514,6 +523,8 @@ export const PostManagement = () => {
                                                                                         >
                                                                                                 <Edit3 size={16} />
                                                                                         </Button>
+                                                                                )}
+                                                                                {hasPermission('posts', 'delete') && (
                                                                                         <Button
                                                                                                 variant="ghost"
                                                                                                 size="icon"
@@ -523,6 +534,7 @@ export const PostManagement = () => {
                                                                                         >
                                                                                                 <Trash2 size={16} />
                                                                                         </Button>
+                                                                                )}
                                                                                 </TableCell>
                                                                         </TableRow>
                                                                 ))

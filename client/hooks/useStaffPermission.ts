@@ -1,3 +1,4 @@
+import { useCallback } from 'react';
 import { useStaffStore } from '../store/staffStore';
 
 /**
@@ -9,7 +10,22 @@ import { useStaffStore } from '../store/staffStore';
  */
 export function useStaffPermission(module: string, action: string): boolean {
   const hasPermission = useStaffStore((state) => state.hasPermission);
+  const isSuperAdmin = useStaffStore((state) => state.staff?.isSuperAdmin ?? false);
+  if (isSuperAdmin) return true;
   return hasPermission(module, action);
+}
+
+/** Checker có bypass super admin — dùng cho nút/hành động trong component */
+export function useHasStaffPermission() {
+  const hasPermission = useStaffStore((state) => state.hasPermission);
+  const isSuperAdmin = useStaffStore((state) => state.staff?.isSuperAdmin ?? false);
+  return useCallback(
+    (module: string, action: string) => {
+      if (isSuperAdmin) return true;
+      return hasPermission(module, action);
+    },
+    [hasPermission, isSuperAdmin]
+  );
 }
 
 /**

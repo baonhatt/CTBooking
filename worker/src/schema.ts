@@ -132,7 +132,9 @@ export const email_logs = sqliteTable('email_logs', {
         status: text('status').notNull().default('pending'), // 'pending', 'sent', 'failed'
         provider: text('provider'), // 'mailtrap', 'brevo', 'mailchannels', 'resend'
         error_message: text('error_message'),
+        recipient_type: text('recipient_type').default('user'), // 'user' or 'staff'
         user_id: integer('user_id').references(() => users.id, { onDelete: 'set null' }),
+        staff_id: integer('staff_id').references(() => staffs.id, { onDelete: 'set null' }),
         booking_id: integer('booking_id').references(() => bookings.id, { onDelete: 'set null' }),
         metadata: text('metadata'), // JSON string
         sent_at: text('sent_at'),

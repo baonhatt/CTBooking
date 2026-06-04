@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { getMoviesAdmin, updateMovieStatus, getBranches, deleteMovieApi } from '@/lib/api';
 import AdminLayout from '@/admin/layouts/AdminLayout';
 import MoviesContent from '@/components/admin/content/MoviesContent';
+import { useStaffPermission } from '@/hooks/useStaffPermission';
 import AdminEditModal from '@/components/admin/AdminEditModal';
 import { toast } from 'sonner';
 import { useStaffStore } from '@/store/staffStore';
@@ -47,6 +48,7 @@ export default function MoviesPage() {
                 if (staff?.isSuperAdmin) return 'all';
                 return null;
         });
+        const canViewBranches = useStaffPermission('branches', 'view');
         const [branches, setBranches] = useState<any[]>([]);
         const pageSize = 10;
         const [isEditOpen, setIsEditOpen] = useState(false);
@@ -60,8 +62,13 @@ export default function MoviesPage() {
         const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
         const [movieToDelete, setMovieToDelete] = useState<number | null>(null);
 
-        // Load branches
+        // Load branches only when branch viewing is allowed
         useEffect(() => {
+                if (!canViewBranches) {
+                        setBranches([]);
+                        return;
+                }
+
                 (async () => {
                         try {
                                 const { items } = await getBranches({ includeInactive: true });
@@ -75,7 +82,7 @@ export default function MoviesPage() {
                                 console.error('Error loading branches:', error);
                         }
                 })();
-        }, [staff]);
+        }, [staff, canViewBranches, selectedBranchId]);
 
         useEffect(() => {
                 (async () => {

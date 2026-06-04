@@ -1,7 +1,6 @@
 import { PaymentRequest } from '@shared/api';
 import { eq, and, asc, desc, isNull, or, inArray, sql } from 'drizzle-orm';
 import { generateBookingCode, getBookingEmailTemplate } from '../../lib/booking-utils';
-import { sendMail } from '../mail-service';
 import { mailQueue } from '../../lib/mail-queue';
 import { formatDateForDb } from '../../lib/date-utils';
 
@@ -410,10 +409,14 @@ export async function updatePaymentImpl(
                                                 const emailTemplate = getBookingEmailHtml
                                                         ? getBookingEmailHtml(templateData)
                                                         : getBookingEmailTemplate(templateData);
-                                                const mailer = sendMailFn || sendMail;
+                                                const mailer = sendMailFn;
 
-                                                await mailer(booking.email, `🎬 Xác nhận đặt vé - CINESPHERE`, emailTemplate);
-                                                console.log(`[MailQueue] Đã gửi mail xác nhận cho booking ${booking.id}`);
+                                                if (mailer) {
+                                                        await mailer(booking.email, `🎬 Xác nhận đặt vé - CINESPHERE`, emailTemplate);
+                                                        console.log(`[MailQueue] Đã gửi mail xác nhận cho booking ${booking.id}`);
+                                                } else {
+                                                        console.warn('[Payments] No mailer provided, skipping confirmation email');
+                                                }
                                         } catch (err) {
                                                 console.error(`[MailQueue] Lỗi gửi mail cho booking ${booking.id}:`, err);
                                                 throw err;

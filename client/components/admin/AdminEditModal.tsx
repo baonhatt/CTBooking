@@ -295,7 +295,8 @@ const AdminEditModal: React.FC<AdminEditModalProps> = (props) => {
                                                 variant="ghost"
                                                 size="icon"
                                                 onClick={handleClose}
-                                                className="h-8 w-8 rounded-full hover:bg-slate-100 text-slate-400 transition-colors"
+                                                className="h-8 w-8 rounded-full hover:bg-red-100 hover:text-red-600 text-slate-400 transition-all active:scale-95 -m-2 p-2"
+                                                title="Đóng"
                                         >
                                                 <X className="w-5 h-5" />
                                         </Button>

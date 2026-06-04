@@ -1,9 +1,7 @@
 import { eq, and, or, like, isNull, isNotNull, desc, count, sql, aliasedTable } from 'drizzle-orm';
 import bcrypt from 'bcryptjs';
 import { hashPassword, invalidateStaffPermissionCache } from '../../lib/staff-auth';
-import { mailQueue } from '../../lib/mail-queue';
 import { getStaffAccountCreatedTemplate, getStaffPasswordResetTemplate } from '../../lib/email-templates';
-import { sendMail } from '../../routes/mail-service';
 import { logAuditAction } from '../../lib/audit-logger';
 import { buildStaffAuditPayload } from './staff-audit-utils';
 
@@ -159,7 +157,8 @@ export async function createStaffImpl(
         },
         caller?: { isSuperAdmin?: boolean; branchIds?: number[]; id?: number; email?: string; fullname?: string },
         env?: any,
-        context?: { waitUntil: (promise: Promise<any>) => void }
+        context?: { waitUntil: (promise: Promise<any>) => void },
+        mailer?: (to: string, subject: string, html: string) => Promise<any>
 ) {
         const { staffs, staffRoles, staffBranches, email_logs } = tables;
         const { email, password, fullname, phone, avatar, roleIds = [], branchIds = [], forcePasswordChange = true } = body;
@@ -169,10 +168,17 @@ export async function createStaffImpl(
 
         console.log('createStaffImpl forcePasswordChange:', forcePasswordChange, 'body:', body);
 
-        // Check if email already exists
-        const [existing] = await db.select().from(staffs).where(eq(staffs.email, email)).limit(1);
-        if (existing) {
-                return { status: 'error', message: 'Email đã tồn tại' };
+        // Check if email already exists in staffs
+        const [existingStaff] = await db.select().from(staffs).where(eq(staffs.email, email)).limit(1);
+        if (existingStaff) {
+                return { status: 'error', message: 'Email đã tồn tại trong danh sách nhân viên' };
+        }
+
+        // Check if email already exists in accounts (Users)
+        const { accounts } = await import('../../../worker/src/schema');
+        const [existingUser] = await db.select().from(accounts).where(eq(accounts.email, email)).limit(1);
+        if (existingUser) {
+                return { status: 'error', message: 'Email này đang được sử dụng bởi một tài khoản khách hàng. Vui lòng dùng email khác.' };
         }
 
         if (!callerIsSuperAdmin) {
@@ -236,26 +242,32 @@ export async function createStaffImpl(
                 loginUrl: loginUrl
         });
 
-        mailQueue.add(
-                async () => {
-                        try {
-                                await sendMail(email, 'Tài khoản nhân viên CINESPHERE', emailHtml);
-                                console.log(`[Staff] Sent account creation email to ${email}`);
-                        } catch (e) {
-                                console.error(`[Staff] Failed to send email to ${email}:`, e);
-                        }
-                },
-                {
-                        db,
-                        recipient: email,
-                        subject: 'Tài khoản nhân viên CINESPHERE',
-                        emailType: 'welcome',
-                        userId: newStaff.id,
-                        emailLogsTable: email_logs,
-                        runtimeEnv: env?.RUNTIME_ENV
-                },
-                context
-        );
+        if (mailer) {
+                const { mailQueue } = await import('../../lib/mail-queue');
+                mailQueue.add(
+                        async () => {
+                                try {
+                                        await mailer(email, 'Tài khoản nhân viên CINESPHERE', emailHtml);
+                                        console.log(`[Staff] Sent account creation email to ${email}`);
+                                } catch (e) {
+                                        console.error(`[Staff] Failed to send email to ${email}:`, e);
+                                        throw e;
+                                }
+                        },
+                        {
+                                db,
+                                recipient: email,
+                                subject: 'Tài khoản nhân viên CINESPHERE',
+                                emailType: 'welcome',
+                                recipientType: 'staff',
+                                staffId: newStaff.id,
+                                emailLogsTable: email_logs
+                        },
+                        context
+                );
+        } else {
+                console.warn('[Staff] No mailer provided, skipping account creation email');
+        }
 
         const auditNew = buildStaffAuditPayload(newStaff, { roleIds, branchIds });
 
@@ -349,7 +361,14 @@ export async function updateStaffImpl(
         if (email && email !== existing.email) {
                 const [emailCheck] = await db.select().from(staffs).where(eq(staffs.email, email)).limit(1);
                 if (emailCheck) {
-                        return { status: 'error', message: 'Email đã tồn tại' };
+                        return { status: 'error', message: 'Email đã tồn tại trong danh sách nhân viên' };
+                }
+
+                // Check in accounts table
+                const { accounts } = await import('../../../worker/src/schema');
+                const [userCheck] = await db.select().from(accounts).where(eq(accounts.email, email)).limit(1);
+                if (userCheck) {
+                        return { status: 'error', message: 'Email này đang được sử dụng bởi một tài khoản khách hàng.' };
                 }
         }
 
@@ -576,7 +595,8 @@ export async function resetStaffPasswordImpl(
         id: number,
         body: { newPassword?: string },
         env?: any,
-        context?: { waitUntil: (promise: Promise<any>) => void }
+        context?: { waitUntil: (promise: Promise<any>) => void },
+        mailer?: (to: string, subject: string, html: string) => Promise<any>
 ) {
         const { staffs, staffTokens, email_logs } = tables;
         const { newPassword: requestedPassword } = body;
@@ -627,26 +647,32 @@ export async function resetStaffPasswordImpl(
                 loginUrl: loginUrl
         });
 
-        mailQueue.add(
-                async () => {
-                        try {
-                                await sendMail(existing.email, 'Reset Mật Khẩu Nhân Viên - CINESPHERE', emailHtml);
-                                console.log(`[Staff] Sent password reset email to ${existing.email}`);
-                        } catch (e) {
-                                console.error(`[Staff] Failed to send password reset email to ${existing.email}:`, e);
-                        }
-                },
-                {
-                        db,
-                        recipient: existing.email,
-                        subject: 'Reset Mật Khẩu Nhân Viên - CINESPHERE',
-                        emailType: 'welcome', // Re-use template for now since it has login details
-                        userId: id,
-                        emailLogsTable: email_logs,
-                        runtimeEnv: env?.RUNTIME_ENV
-                },
-                context
-        );
+        if (mailer) {
+                const { mailQueue } = await import('../../lib/mail-queue');
+                mailQueue.add(
+                        async () => {
+                                try {
+                                        await mailer(existing.email, 'Reset Mật Khẩu Nhân Viên - CINESPHERE', emailHtml);
+                                        console.log(`[Staff] Sent password reset email to ${existing.email}`);
+                                } catch (e) {
+                                        console.error(`[Staff] Failed to send password reset email to ${existing.email}:`, e);
+                                        throw e;
+                                }
+                        },
+                        {
+                                db,
+                                recipient: existing.email,
+                                subject: 'Reset Mật Khẩu Nhân Viên - CINESPHERE',
+                                emailType: 'reset_password',
+                                recipientType: 'staff',
+                                staffId: id,
+                                emailLogsTable: email_logs
+                        },
+                        context
+                );
+        } else {
+                console.warn('[Staff] No mailer provided, skipping password reset email');
+        }
 
         const auditOld = buildStaffAuditPayload(existing);
         const auditNew = buildStaffAuditPayload({

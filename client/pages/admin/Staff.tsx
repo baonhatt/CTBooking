@@ -107,12 +107,17 @@ export default function StaffPage() {
                 }
         });
 
+        // Permission helpers
+        const canViewBranches = useStaffPermission('branches', 'view');
+        const canViewRoles = useStaffPermission('roles', 'view');
+
         // Fetch roles
         const { data: rolesData } = useQuery({
                 queryKey: ['roles'],
                 queryFn: async () => {
                         return request('/api/admin/roles?pageSize=100');
-                }
+                },
+                enabled: canViewRoles
         });
 
         // Fetch branches
@@ -120,7 +125,8 @@ export default function StaffPage() {
                 queryKey: ['branches'],
                 queryFn: async () => {
                         return request('/api/admin/branches?pageSize=100');
-                }
+                },
+                enabled: canViewBranches
         });
 
         // Create staff mutation

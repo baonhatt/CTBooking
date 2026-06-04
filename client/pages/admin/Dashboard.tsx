@@ -10,12 +10,15 @@ import {
         getBranches
 } from '@/lib/api';
 import { useStaffStore } from '@/store/staffStore';
+import { useStaffPermission } from '@/hooks/useStaffPermission';
 import { useNavigate } from 'react-router-dom';
 
 export default function DashboardPage() {
         const navigate = useNavigate();
         const staff = useStaffStore((state) => state.staff);
         const clearStaff = useStaffStore((state) => state.clearStaff);
+        const canViewRevenue = useStaffPermission('dashboard', 'view_revenue');
+        const canViewBranches = useStaffPermission('branches', 'view');
         const [activeTab, setActiveTab] = useState('dashboard');
         const [metrics, setMetrics] = useState({
                 totalMovies: 0,
@@ -76,8 +79,13 @@ export default function DashboardPage() {
         });
         const [branches, setBranches] = useState<any[]>([]);
 
-        // Load branches
+        // Load branches when branch viewing is allowed
         useEffect(() => {
+                if (!canViewBranches) {
+                        setBranches([]);
+                        return;
+                }
+
                 (async () => {
                         try {
                                 const { items } = await getBranches({ includeInactive: true });
@@ -91,7 +99,7 @@ export default function DashboardPage() {
                                 console.error('Error loading branches:', error);
                         }
                 })();
-        }, [staff]);
+        }, [staff, canViewBranches, selectedBranchId]);
 
         const handleRefresh = () => {
                 setRefreshKey((prev) => prev + 1);
@@ -115,6 +123,7 @@ export default function DashboardPage() {
 
         // Load revenue for selected year on mount or refresh
         useEffect(() => {
+                if (!canViewRevenue) return;
                 (async () => {
                         try {
                                 setIsRevenueLoading(true);
@@ -126,10 +135,11 @@ export default function DashboardPage() {
                                 setIsRevenueLoading(false);
                         }
                 })();
-        }, [selectedYear, refreshKey, selectedBranchId]);
+        }, [selectedYear, refreshKey, selectedBranchId, canViewRevenue]);
 
         // Handle date filter apply
         const handleApplyDateFilter = async () => {
+                if (!canViewRevenue) return;
                 try {
                         setIsRevenueLoading(true);
                         if (dateFilterType === 'year') {
@@ -158,6 +168,8 @@ export default function DashboardPage() {
 
         // Load 7-day revenue for selected year
         useEffect(() => {
+                if (!canViewRevenue) return;
+
                 (async () => {
                         try {
                                 const data = await getRevenue7Days(selectedYear, selectedBranchId);
@@ -166,10 +178,11 @@ export default function DashboardPage() {
                                 console.error('Failed to load 7-day revenue:', err);
                         }
                 })();
-        }, [selectedYear, refreshKey, selectedBranchId]);
+        }, [selectedYear, refreshKey, selectedBranchId, canViewRevenue]);
 
         // Load monthly revenue when selectedYear or refreshKey changes
         useEffect(() => {
+                if (!canViewRevenue) return;
                 (async () => {
                         try {
                                 const data = await getRevenueByMonth(selectedYear, undefined, 'paid', selectedBranchId);
@@ -180,7 +193,7 @@ export default function DashboardPage() {
                                 console.error('Failed to load monthly revenue:', err);
                         }
                 })();
-        }, [selectedYear, refreshKey, selectedBranchId]);
+        }, [selectedYear, refreshKey, selectedBranchId, canViewRevenue]);
 
         const handleLogout = () => {
                 localStorage.removeItem('staffToken');
@@ -216,6 +229,7 @@ export default function DashboardPage() {
                                 topPeriod={topPeriod}
                                 setTopPeriod={setTopPeriod}
                                 onRefresh={handleRefresh}
+                                canViewRevenue={canViewRevenue}
                         />
                 </AdminLayout>
         );

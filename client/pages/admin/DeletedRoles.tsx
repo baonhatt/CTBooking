@@ -18,6 +18,8 @@ import {
 import { useNavigate } from 'react-router-dom';
 import { useStaffStore } from '@/store/staffStore';
 import { RefreshCw, RotateCcw, Shield, ArrowLeft } from 'lucide-react';
+import { buildUrl } from '@/lib/api/http';
+import { useHasStaffPermission } from '@/hooks/useStaffPermission';
 
 interface Role {
         id: number;
@@ -30,6 +32,7 @@ interface Role {
 
 export default function DeletedRolesPage() {
         const navigate = useNavigate();
+        const hasPermission = useHasStaffPermission();
         const staffStore = useStaffStore();
         const [activeTab, setActiveTab] = useState('deleted-roles');
         const [roles, setRoles] = useState<Role[]>([]);
@@ -53,7 +56,7 @@ export default function DeletedRolesPage() {
                                 pageSize: String(pageSize),
                                 search: searchQuery
                         });
-                        const response = await fetch(`/api/admin/deleted/roles?${params}`, {
+                        const response = await fetch(buildUrl(`/api/admin/deleted/roles?${params}`), {
                                 headers: {
                                         Authorization: `Bearer ${token}`
                                 }
@@ -98,7 +101,7 @@ export default function DeletedRolesPage() {
                 if (!roleToRestore) return;
                 try {
                         const token = localStorage.getItem('staffToken');
-                        const response = await fetch(`/api/admin/roles/${roleToRestore}/restore`, {
+                        const response = await fetch(buildUrl(`/api/admin/roles/${roleToRestore}/restore`), {
                                 method: 'POST',
                                 headers: {
                                         Authorization: `Bearer ${token}`
@@ -199,6 +202,7 @@ export default function DeletedRolesPage() {
                                                                                         {r.deleted_at ? new Date(r.deleted_at).toLocaleString('vi-VN') : '-'}
                                                                                 </TableCell>
                                                                                 <TableCell className="text-right">
+                                                                                        {hasPermission('roles', 'restore') && (
                                                                                         <Button
                                                                                                 onClick={() => handleRestore(r.id)}
                                                                                                 variant="outline"
@@ -207,6 +211,7 @@ export default function DeletedRolesPage() {
                                                                                                 <RotateCcw className="w-4 h-4 mr-2" />
                                                                                                 Khôi phục
                                                                                         </Button>
+                                                                                        )}
                                                                                 </TableCell>
                                                                         </TableRow>
                                                                 ))}

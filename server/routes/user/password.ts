@@ -1,7 +1,6 @@
 import { eq, and, gte } from 'drizzle-orm';
 // import crypto from "crypto";
 import bcrypt from 'bcryptjs';
-import { sendMail } from '../mail-service';
 import { mailQueue } from '../../lib/mail-queue';
 import 'dotenv/config';
 import { getResetPasswordEmailTemplate } from '../../lib/booking-utils';
@@ -52,12 +51,16 @@ export async function forgetPassImpl(
     contentMail = getResetPasswordEmailTemplate(resetLink);
   }
 
-  const mailer = sendMailFn || sendMail;
+  const mailer = sendMailFn;
   mailQueue.add(
     async () => {
       try {
-        await mailer(email, 'Đặt lại mật khẩu - Film', contentMail);
-        console.log(`[MailQueue] Sent password reset email to ${email}`);
+        if (mailer) {
+          await mailer(email, 'Đặt lại mật khẩu - Film', contentMail);
+          console.log(`[MailQueue] Sent password reset email to ${email}`);
+        } else {
+          console.warn('[ForgetPassword] No mailer provided, skipping email');
+        }
       } catch (e) {
         console.error(`[MailQueue] Failed to send password reset email to ${email}`, e);
         throw e;

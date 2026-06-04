@@ -18,6 +18,8 @@ import {
 import { useNavigate } from 'react-router-dom';
 import { useStaffStore } from '@/store/staffStore';
 import { RefreshCw, RotateCcw, ArrowLeft } from 'lucide-react';
+import { buildUrl } from '@/lib/api/http';
+import { useHasStaffPermission } from '@/hooks/useStaffPermission';
 
 interface Staff {
         id: number;
@@ -32,6 +34,7 @@ interface Staff {
 
 export default function DeletedStaffPage() {
         const navigate = useNavigate();
+        const hasPermission = useHasStaffPermission();
         const staffStore = useStaffStore();
         const [activeTab, setActiveTab] = useState('deleted-staff');
         const [staff, setStaff] = useState<Staff[]>([]);
@@ -55,7 +58,7 @@ export default function DeletedStaffPage() {
                                 pageSize: String(pageSize),
                                 search: searchQuery
                         });
-                        const response = await fetch(`/api/admin/deleted/staff?${params}`, {
+                        const response = await fetch(buildUrl(`/api/admin/deleted/staff?${params}`), {
                                 headers: {
                                         Authorization: `Bearer ${token}`
                                 }
@@ -100,7 +103,7 @@ export default function DeletedStaffPage() {
                 if (!staffToRestore) return;
                 try {
                         const token = localStorage.getItem('staffToken');
-                        const response = await fetch(`/api/admin/staff/${staffToRestore}/restore`, {
+                        const response = await fetch(buildUrl(`/api/admin/staff/${staffToRestore}/restore`), {
                                 method: 'POST',
                                 headers: {
                                         Authorization: `Bearer ${token}`
@@ -198,6 +201,7 @@ export default function DeletedStaffPage() {
                                                                                         {s.deleted_at ? new Date(s.deleted_at).toLocaleString('vi-VN') : '-'}
                                                                                 </TableCell>
                                                                                 <TableCell className="text-right">
+                                                                                        {hasPermission('staff', 'restore') && (
                                                                                         <Button
                                                                                                 onClick={() => handleRestore(s.id)}
                                                                                                 variant="outline"
@@ -206,6 +210,7 @@ export default function DeletedStaffPage() {
                                                                                                 <RotateCcw className="w-4 h-4 mr-2" />
                                                                                                 Khôi phục
                                                                                         </Button>
+                                                                                        )}
                                                                                 </TableCell>
                                                                         </TableRow>
                                                                 ))}

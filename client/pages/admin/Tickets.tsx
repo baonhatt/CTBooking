@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import AdminLayout from '@/admin/layouts/AdminLayout';
 import TicketsContent from '@/components/admin/content/TicketsContent';
 import { getTickets, deleteTicketApi, getBranches } from '@/lib/api';
+import { useStaffPermission } from '@/hooks/useStaffPermission';
 import { useStaffStore } from '@/store/staffStore';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
@@ -53,6 +54,7 @@ export default function TicketsPage() {
         const [editData, setEditData] = useState<any>(null);
         const [isLoading, setIsLoading] = useState(false);
         const [showActiveOnly, setShowActiveOnly] = useState(initialFilters.showActiveOnly ?? true);
+        const canViewBranches = useStaffPermission('branches', 'view');
         const [selectedBranchId, setSelectedBranchId] = useState<number | 'all' | null>(() => {
                 if (initialFilters.branchId !== undefined) return initialFilters.branchId;
                 if (staff?.isSuperAdmin) return 'all';
@@ -72,8 +74,13 @@ export default function TicketsPage() {
                 return code;
         };
 
-        // Load branches
+        // Load branches only when branch viewing is allowed
         useEffect(() => {
+                if (!canViewBranches) {
+                        setBranches([]);
+                        return;
+                }
+
                 (async () => {
                         try {
                                 const { items } = await getBranches({ includeInactive: true });
@@ -87,7 +94,7 @@ export default function TicketsPage() {
                                 console.error('Error loading branches:', error);
                         }
                 })();
-        }, [staff]);
+        }, [staff, canViewBranches, selectedBranchId]);
 
         const handleRefresh = async () => {
                 setIsLoading(true);

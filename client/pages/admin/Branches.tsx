@@ -257,12 +257,14 @@ export default function BranchesPage() {
                                                                 Xem đã xóa
                                                         </Button>
                                                 )}
+                                                {hasPermission('branches', 'create') && (
                                                 <Button
                                                         onClick={openCreate}
                                                         className="bg-blue-600 hover:bg-blue-700 rounded-lg shadow-sm gap-2 text-white h-10 px-5 font-medium"
                                                 >
                                                         <Plus className="w-4 h-4" /> Thêm mới
                                                 </Button>
+                                                )}
                                         </div>
                                 </div>
 
@@ -302,6 +304,7 @@ export default function BranchesPage() {
                                                                                                 )}
                                                                                         </TableCell>
                                                                                         <TableCell className="text-center">
+                                                                                                {hasPermission('branches', 'edit') ? (
                                                                                                 <AlertDialog>
                                                                                                         <AlertDialogTrigger asChild>
                                                                                                                 <Badge
@@ -373,8 +376,16 @@ export default function BranchesPage() {
                                                                                                                 </AlertDialogFooter>
                                                                                                         </AlertDialogContent>
                                                                                                 </AlertDialog>
+                                                                                                ) : (
+                                                                                                        <Badge
+                                                                                                                className={`${branch.is_open ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'} border-none rounded-full px-2 py-0.5 text-xs font-medium opacity-60`}
+                                                                                                        >
+                                                                                                                {branch.is_open ? 'Mở cửa' : 'Đóng cửa'}
+                                                                                                        </Badge>
+                                                                                                )}
                                                                                         </TableCell>
                                                                                         <TableCell className="text-center">
+                                                                                                {hasPermission('branches', 'toggle_status') ? (
                                                                                                 <AlertDialog>
                                                                                                         <AlertDialogTrigger asChild>
                                                                                                                 <Switch
@@ -416,6 +427,14 @@ export default function BranchesPage() {
                                                                                                                 </AlertDialogFooter>
                                                                                                         </AlertDialogContent>
                                                                                                 </AlertDialog>
+                                                                                                ) : (
+                                                                                                        <Switch
+                                                                                                                checked={branch.is_active}
+                                                                                                                disabled
+                                                                                                                className="scale-100 opacity-40 cursor-not-allowed"
+                                                                                                                style={{ backgroundColor: branch.is_active ? '#10b981' : '#d1d5db' }}
+                                                                                                        />
+                                                                                                )}
                                                                                         </TableCell>
                                                                                         <TableCell className="text-right pr-6">
                                                                                                 <div className="flex justify-end gap-1">
@@ -431,6 +450,7 @@ export default function BranchesPage() {
                                                                                                         >
                                                                                                                 <Eye className="h-3.5 w-3.5" />
                                                                                                         </Button>
+                                                                                                        {hasPermission('branches', 'edit') && (
                                                                                                         <Button
                                                                                                                 variant="ghost"
                                                                                                                 size="icon"
@@ -440,6 +460,8 @@ export default function BranchesPage() {
                                                                                                         >
                                                                                                                 <Pencil className="h-3.5 w-3.5" />
                                                                                                         </Button>
+                                                                                                        )}
+                                                                                                        {hasPermission('branches', 'delete') && (
                                                                                                         <Button
                                                                                                                 variant="ghost"
                                                                                                                 size="icon"
@@ -449,6 +471,7 @@ export default function BranchesPage() {
                                                                                                         >
                                                                                                                 <Trash2 className="h-3.5 w-3.5" />
                                                                                                         </Button>
+                                                                                                        )}
                                                                                                 </div>
                                                                                         </TableCell>
                                                                                 </TableRow>

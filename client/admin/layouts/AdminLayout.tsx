@@ -112,9 +112,9 @@ export default function AdminLayout({ active, setActive, adminEmailState, handle
                 // Custom event for same-window updates
                 window.addEventListener('admin_sidebar_update', handleStorageChange);
 
-                // Initial sync from server if in production
+                // Initial sync from server if in production and the user can view settings
                 const isProd = window.location.hostname !== 'localhost';
-                if (isProd) {
+                if (isProd && hasPermission('settings', 'view')) {
                         request<AdminSettingsData>('/api/admin/settings')
                                 .then((data) => {
                                         if (data && data.settings) {
@@ -136,7 +136,7 @@ export default function AdminLayout({ active, setActive, adminEmailState, handle
                 };
         }, []);
 
-        const menu = [
+        const visibleSidebarItems = [
                 { key: 'dashboard' as const, label: 'Bảng điều khiển', icon: <LayoutDashboard className="h-4 w-4" /> },
                 { key: 'users' as const, label: 'Người dùng', icon: <UsersIcon className="h-4 w-4" /> },
                 { key: 'movies' as const, label: 'Phim', icon: <Clapperboard className="h-4 w-4" /> },
@@ -158,73 +158,80 @@ export default function AdminLayout({ active, setActive, adminEmailState, handle
                 return !hiddenTabsArray.includes(item.key) && hasPerm;
         });
 
+        const showSidebar = visibleSidebarItems.length > 0 || hasPermission('settings', 'view');
+        const layoutClass = showSidebar
+                ? 'min-h-screen flex md:grid md:grid-cols-[260px_1fr] flex-col md:flex-row relative'
+                : 'min-h-screen flex flex-col relative';
+
         return (
-                <div className="min-h-screen flex md:grid md:grid-cols-[260px_1fr] flex-col md:flex-row relative">
+                <div className={layoutClass}>
                         {/* Mobile Overlay */}
                         {isSidebarOpen && (
                                 <div className="fixed inset-0 bg-black/60 z-40 md:hidden" onClick={() => setIsSidebarOpen(false)} />
                         )}
 
                         {/* Sidebar */}
-                        <aside
-                                className={`fixed inset-y-0 left-0 z-50 w-[260px] transform transition-transform duration-300 ease-in-out md:relative md:translate-x-0
+                        {showSidebar && (
+                                <aside
+                                        className={`fixed inset-y-0 left-0 z-50 w-[260px] transform transition-transform duration-300 ease-in-out md:relative md:translate-x-0
         ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'}
         bg-gradient-to-b from-[#0e1b3d] to-[#15325f] border-r border-white/10 p-4 text-white flex flex-col justify-between h-screen overflow-y-auto
       `}
-                        >
-                                <div>
-                                        <div className="flex flex-col mb-4 px-1 gap-1 relative">
-                                                {/* Mobile close button */}
-                                                <button
-                                                        className="absolute top-0 right-0 p-1 md:hidden text-white/70 hover:text-white"
-                                                        onClick={() => setIsSidebarOpen(false)}
-                                                >
-                                                        <X className="h-5 w-5" />
-                                                </button>
-                                                <div className="flex items-center gap-3">
-                                                        <img src={iconCine} alt="CINESPHERE" className="h-10 w-auto" />
-                                                        <div className="font-bold tracking-widest text-sm">CINESPHERE</div>
-                                                </div>
-                                                <div className="text-[10px] font-bold uppercase tracking-widest text-white/40 mb-2 mt-2">
-                                                        {adminEmailState}
-                                                </div>
-                                        </div>
-
-                                        <div className="space-y-1">
-                                                {menu.map((item) => (
-                                                        <Button
-                                                                key={item.key}
-                                                                variant="ghost"
-                                                                onClick={() => go(item.key)}
-                                                                className={itemClass(active === item.key)}
+                                >
+                                        <div>
+                                                <div className="flex flex-col mb-4 px-1 gap-1 relative">
+                                                        {/* Mobile close button */}
+                                                        <button
+                                                                className="absolute top-0 right-0 p-1 md:hidden text-white/70 hover:text-white"
+                                                                onClick={() => setIsSidebarOpen(false)}
                                                         >
-                                                                {item.icon} {item.label}
-                                                        </Button>
-                                                ))}
-                                        </div>
-                                </div>
-
-                                <div className="space-y-2 mt-auto pt-8 border-t border-white/5">
-                                        {hasPermission('settings', 'view') && (
-                                                <Button variant="ghost" onClick={() => go('settings')} className={itemClass(active === 'settings')}>
-                                                        <Settings className="h-4 w-4" /> Cấu hình
-                                                </Button>
-                                        )}
-                                        <div className="px-3 py-2 flex items-center gap-2 text-white/60">
-                                                <div className="h-7 w-7 rounded-full bg-white/10 flex items-center justify-center text-xs font-bold text-white uppercase">
-                                                        {adminEmailState?.charAt(0) || 'A'}
+                                                                <X className="h-5 w-5" />
+                                                        </button>
+                                                        <div className="flex items-center gap-3">
+                                                                <img src={iconCine} alt="CINESPHERE" className="h-10 w-auto" />
+                                                                <div className="font-bold tracking-widest text-sm">CINESPHERE</div>
+                                                        </div>
+                                                        <div className="text-[10px] font-bold uppercase tracking-widest text-white/40 mb-2 mt-2">
+                                                                {adminEmailState}
+                                                        </div>
                                                 </div>
-                                                <span className="text-xs truncate">{adminEmailState}</span>
+
+                                                <div className="space-y-1">
+                                                        {visibleSidebarItems.map((item) => (
+                                                                <Button
+                                                                        key={item.key}
+                                                                        variant="ghost"
+                                                                        onClick={() => go(item.key)}
+                                                                        className={itemClass(active === item.key)}
+                                                                >
+                                                                        {item.icon} {item.label}
+                                                                </Button>
+                                                        ))}
+                                                </div>
                                         </div>
-                                        <Button
-                                                variant="destructive"
-                                                onClick={handleLogout}
-                                                className="w-full justify-start gap-2 bg-rose-500/10 hover:bg-rose-500 text-rose-500 hover:text-white border border-rose-500/20 transition-all duration-300 rounded-md px-3"
-                                        >
-                                                <LogOut className="h-4 w-4" /> Đăng xuất
-                                        </Button>
-                                </div>
-                        </aside>
+
+                                        <div className="space-y-2 mt-auto pt-8 border-t border-white/5">
+                                                {hasPermission('settings', 'view') && (
+                                                        <Button variant="ghost" onClick={() => go('settings')} className={itemClass(active === 'settings')}>
+                                                                <Settings className="h-4 w-4" /> Cấu hình
+                                                        </Button>
+                                                )}
+                                                <div className="px-3 py-2 flex items-center gap-2 text-white/60">
+                                                        <div className="h-7 w-7 rounded-full bg-white/10 flex items-center justify-center text-xs font-bold text-white uppercase">
+                                                                {adminEmailState?.charAt(0) || 'A'}
+                                                        </div>
+                                                        <span className="text-xs truncate">{adminEmailState}</span>
+                                                </div>
+                                                <Button
+                                                        variant="destructive"
+                                                        onClick={handleLogout}
+                                                        className="w-full justify-start gap-2 bg-rose-500/10 hover:bg-rose-500 text-rose-500 hover:text-white border border-rose-500/20 transition-all duration-300 rounded-md px-3"
+                                                >
+                                                        <LogOut className="h-4 w-4" /> Đăng xuất
+                                                </Button>
+                                        </div>
+                                </aside>
+                        )}
 
                         <main className="flex-1 bg-[#f8fafc] md:overflow-y-auto h-screen flex flex-col">
                                 {/* Toggle Bar / Header for Mobile */}

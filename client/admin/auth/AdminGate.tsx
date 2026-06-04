@@ -11,6 +11,7 @@ import { loginApi } from '@/lib/api/auth';
 import { request } from '@/lib/api/http';
 import { checkSuperAdminSetup } from '@/lib/api/admin';
 import { AlertCircle, ShieldAlert } from 'lucide-react';
+import { forceChangePasswordApi } from '@/lib/api/auth';
 import AdminIndex from '@/pages/admin/AdminIndex';
 import DashboardPage from '@/pages/admin/Dashboard';
 import UsersPage from '@/pages/admin/Users';
@@ -236,19 +237,7 @@ export const AdminGate = () => {
 
         // Check if force password change is required
         if (staff?.forcePasswordChange) {
-                return (
-                        <div className="min-h-screen flex items-center justify-center bg-background">
-                                <Card className="w-full max-w-sm bg-white">
-                                        <CardHeader>
-                                                <CardTitle>Đổi mật khẩu</CardTitle>
-                                        </CardHeader>
-                                        <CardContent>
-                                                <p className="text-sm text-gray-600 mb-4">Bạn cần đổi mật khẩu để tiếp tục.</p>
-                                                <Button onClick={() => navigate('/settings')}>Đi đến trang cài đặt</Button>
-                                        </CardContent>
-                                </Card>
-                        </div>
-                );
+                return <ForcePasswordChangeView staff={staff} />;
         }
 
         return (
@@ -270,7 +259,7 @@ export const AdminGate = () => {
                                 <Route path="/settings" element={<ProtectedRoute module="settings" action="view"><SettingsPage /></ProtectedRoute>} />
                                 <Route path="/staff" element={<ProtectedRoute module="staff" action="view"><StaffPage /></ProtectedRoute>} />
                                 <Route path="/roles" element={<ProtectedRoute module="roles" action="view"><RolesPage /></ProtectedRoute>} />
-                                <Route path="/roles/:id" element={<ProtectedRoute module="roles" action="view_detail"><RoleDetailPage /></ProtectedRoute>} />
+                                <Route path="/roles/:id" element={<ProtectedRoute module="roles" action="view"><RoleDetailPage /></ProtectedRoute>} />
                                 <Route path="/audit-logs" element={<ProtectedRoute module="audit_logs" action="view"><AuditLogsPage /></ProtectedRoute>} />
 
                                 {/* Deleted Items Routes */}
@@ -286,3 +275,95 @@ export const AdminGate = () => {
                 </div>
         );
 };
+
+const ForcePasswordChangeView = ({ staff }: { staff: any }) => {
+        const [newPassword, setNewPassword] = useState('');
+        const [confirmPassword, setConfirmPassword] = useState('');
+        const [loading, setLoading] = useState(false);
+        const [error, setError] = useState('');
+        const setStaff = useStaffStore((state) => state.setStaff);
+        const permissions = useStaffStore((state) => state.permissions);
+        const branchIds = useStaffStore((state) => state.branchIds);
+        const token = useStaffStore((state) => state.token);
+
+        async function handleSubmit(e: React.FormEvent) {
+                e.preventDefault();
+                if (newPassword !== confirmPassword) {
+                        setError('Mật khẩu xác nhận không khớp');
+                        return;
+                }
+                if (newPassword.length < 6) {
+                        setError('Mật khẩu phải có ít nhất 6 ký tự');
+                        return;
+                }
+
+                try {
+                        setLoading(true);
+                        setError('');
+                        const res = await forceChangePasswordApi({ newPassword });
+                        if (res.status === 'success') {
+                                toast.success('Đổi mật khẩu thành công!');
+                                // Cập nhật store để clear forcePasswordChange
+                                if (token) {
+                                        setStaff({ ...staff, forcePasswordChange: false }, permissions, branchIds, token);
+                                }
+                        } else {
+                                setError(res.message || 'Có lỗi xảy ra');
+                        }
+                } catch (err) {
+                        setError('Lỗi kết nối server');
+                } finally {
+                        setLoading(false);
+                }
+        }
+
+        return (
+                <div className="min-h-screen flex items-center justify-center bg-background p-4">
+                        <Card className="w-full max-w-sm bg-white shadow-xl">
+                                <CardHeader>
+                                        <CardTitle className="text-xl font-bold">Đổi mật khẩu lần đầu</CardTitle>
+                                </CardHeader>
+                                <CardContent>
+                                        <p className="text-sm text-gray-600 mb-6">
+                                                Tài khoản của bạn vừa được khởi tạo hoặc reset. Vui lòng đặt mật khẩu mới để bắt đầu sử dụng hệ thống.
+                                        </p>
+                                        <form onSubmit={handleSubmit} className="space-y-4">
+                                                <div className="space-y-2">
+                                                        <Label htmlFor="new-password">Mật khẩu mới</Label>
+                                                        <Input
+                                                                id="new-password"
+                                                                type="password"
+                                                                value={newPassword}
+                                                                onChange={(e) => setNewPassword(e.target.value)}
+                                                                placeholder="Nhập mật khẩu mới"
+                                                                required
+                                                                autoFocus
+                                                        />
+                                                </div>
+                                                <div className="space-y-2">
+                                                        <Label htmlFor="confirm-password">Xác nhận mật khẩu mới</Label>
+                                                        <Input
+                                                                id="confirm-password"
+                                                                type="password"
+                                                                value={confirmPassword}
+                                                                onChange={(e) => setConfirmPassword(e.target.value)}
+                                                                placeholder="Nhập lại mật khẩu mới"
+                                                                required
+                                                        />
+                                                </div>
+                                                {error && (
+                                                        <div className="flex items-center gap-2 text-rose-500 text-xs font-medium bg-rose-50 p-2 rounded-lg border border-rose-100">
+                                                                <AlertCircle size={14} />
+                                                                {error}
+                                                        </div>
+                                                )}
+                                                <Button disabled={loading} type="submit" className="w-full">
+                                                        {loading ? 'Đang thực hiện...' : 'Đổi mật khẩu & Bắt đầu'}
+                                                </Button>
+                                        </form>
+                                </CardContent>
+                        </Card>
+                </div>
+        );
+};
+

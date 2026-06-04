@@ -298,6 +298,7 @@ export async function staffRequestPasswordChangeOTP(
         tables: any,
         staffId: number,
         body: { oldPassword: string },
+        sendMailFn?: (to: string, subject: string, html: string) => Promise<any>,
         context?: { waitUntil: (promise: Promise<any>) => void }
 ) {
         const { staffs } = tables;
@@ -323,6 +324,7 @@ export async function staffRequestPasswordChangeOTP(
                 staff.fullname,
                 staff.email,
                 5, // 5 minutes expiry
+                sendMailFn,
                 context
         );
 
@@ -407,3 +409,64 @@ export async function staffChangePasswordWithOTP(
 
         return { status: 'success', message: 'Đổi mật khẩu thành công' };
 }
+
+export async function staffForceChangePasswordImpl(
+        db: any,
+        tables: any,
+        kv: any,
+        staffId: number,
+        body: { newPassword: string }
+) {
+        const { staffs, staffTokens } = tables;
+        const { newPassword } = body;
+        const now = new Date().toISOString();
+
+        // Get staff
+        const [staff] = await db.select().from(staffs).where(eq(staffs.id, staffId)).limit(1);
+        if (!staff) {
+                return { status: 'error', message: 'Staff not found' };
+        }
+
+        // Double check if force change is required
+        if (!staff.forcePasswordChange) {
+                return { status: 'error', message: 'Tài khoản không ở trạng thái yêu cầu đổi mật khẩu bắt buộc' };
+        }
+
+        const auditOld = buildStaffAuditPayload(staff);
+
+        // Hash new password
+        const hashedPassword = await hashPassword(newPassword);
+
+        // Update password
+        await db
+                .update(staffs)
+                .set({
+                        password: hashedPassword,
+                        forcePasswordChange: false,
+                        updatedAt: now
+                })
+                .where(eq(staffs.id, staffId));
+
+        // Invalidate permission cache
+        await invalidateStaffPermissionCache(kv, staffId);
+
+        const auditNew = buildStaffAuditPayload({ ...staff, forcePasswordChange: false, updatedAt: now });
+
+        // Log audit action
+        await logAuditAction(
+                db,
+                tables.auditLogs,
+                'force_change_password',
+                'staff',
+                staffId,
+                'Staff hoàn tất đổi mật khẩu bắt buộc lần đầu',
+                staffId,
+                staff.email,
+                staff.fullname,
+                auditOld,
+                auditNew
+        );
+
+        return { status: 'success', message: 'Đổi mật khẩu thành công' };
+}
+

@@ -54,4 +54,11 @@ export async function resetPasswordApi(body: { token: string; newPassword: strin
   });
 }
 
+export async function forceChangePasswordApi(body: { newPassword: string }) {
+  return request<{ status: string; message: string }>('/api/admin/auth/force-change-password', {
+    method: 'POST',
+    body: JSON.stringify(body)
+  });
+}
+
 export type { Login, Register };

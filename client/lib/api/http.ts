@@ -78,7 +78,12 @@ export async function request<T>(path: string, init: RequestInit = {}) {
 
   // Send staff token via Authorization header for admin routes
   // Middleware supports both cookie and Authorization header
-  if (staffToken && path.startsWith('/api/admin')) {
+  const needsStaffAuth =
+    path.startsWith('/api/admin') ||
+    path.startsWith('/api/bookings-code/') ||
+    path === '/api/bookings-use' ||
+    path === '/api/confirm-booking';
+  if (staffToken && needsStaffAuth) {
     headers['Authorization'] = `Bearer ${staffToken}`;
   } else if (token) {
     headers['Authorization'] = `Bearer ${token}`;

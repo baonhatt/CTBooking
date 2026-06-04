@@ -33,8 +33,12 @@ import {
         RefreshCw,
         Info
 } from 'lucide-react';
+import { useHasStaffPermission } from '@/hooks/useStaffPermission';
 
 export default function UploadsContent() {
+        const hasPermission = useHasStaffPermission();
+        const canUpload = hasPermission('uploads', 'upload');
+        const canDelete = hasPermission('uploads', 'delete');
         const fileRef = useRef<HTMLInputElement | null>(null);
         const [files, setFiles] = useState<File[]>([]);
         const [openConfirm, setOpenConfirm] = useState(false);
@@ -460,7 +464,7 @@ export default function UploadsContent() {
 
                                                 <div className="flex items-center gap-3 pt-4 border-t border-gray-200">
                                                         <Button
-                                                                disabled={!files.length || uploads.some((u) => u.status === 'uploading' || u.status === 'pending')}
+                                                                disabled={!canUpload || !files.length || uploads.some((u) => u.status === 'uploading' || u.status === 'pending')}
                                                                 onClick={checkAndPrepareUpload}
                                                                 className="bg-blue-600 hover:bg-blue-700 h-11 px-8 rounded-xl font-bold shadow-lg shadow-blue-900/20 active:scale-95 transition-all flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
                                                         >
@@ -847,6 +851,7 @@ export default function UploadsContent() {
                                                                                                 >
                                                                                                         <ExternalLink className="w-4 h-4" />
                                                                                                 </Button>
+                                                                                                {canDelete && (
                                                                                                 <Button
                                                                                                         variant="destructive"
                                                                                                         size="sm"
@@ -873,6 +878,7 @@ export default function UploadsContent() {
                                                                                                 >
                                                                                                         <Trash2 className="w-4 h-4" />
                                                                                                 </Button>
+                                                                                                )}
                                                                                         </div>
                                                                                 </div>
 

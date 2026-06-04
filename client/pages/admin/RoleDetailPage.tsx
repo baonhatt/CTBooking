@@ -11,7 +11,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { request } from '@/lib/api/http';
 import AdminLayout from '@/admin/layouts/AdminLayout';
 import { useStaffStore } from '@/store/staffStore';
-import { useIsSuperAdmin } from '@/hooks/useStaffPermission';
+import { useIsSuperAdmin, useHasStaffPermission } from '@/hooks/useStaffPermission';
 import { X, FileText } from 'lucide-react';
 import { MODULES, ACTIONS, MODULE_LABELS, ACTION_LABELS, APPLICABLE_ACTIONS } from './roleConstants';
 
@@ -43,6 +43,8 @@ export default function RoleDetailPage() {
         const staff = useStaffStore((state) => state.staff);
         const clearStaff = useStaffStore((state) => state.clearStaff);
         const isSuperAdmin = useIsSuperAdmin();
+        const hasPermission = useHasStaffPermission();
+        const canEditRole = hasPermission('roles', 'edit');
         const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
         const [isSaveDialogOpen, setIsSaveDialogOpen] = useState(false);
         const [isEditMode, setIsEditMode] = useState(false);
@@ -302,7 +304,7 @@ export default function RoleDetailPage() {
                                                                         </Button>
                                                                 </>
                                                         ) : (
-                                                                (!role.isSystem || isSuperAdmin) && (
+                                                                canEditRole && (!role.isSystem || isSuperAdmin) && (
                                                                         <Button
                                                                                 variant="outline"
                                                                                 onClick={handleEditMode}

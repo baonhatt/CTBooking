@@ -18,6 +18,8 @@ import {
 import { useNavigate } from 'react-router-dom';
 import { useStaffStore } from '@/store/staffStore';
 import { RefreshCw, RotateCcw, Image as ImageIcon, ArrowLeft } from 'lucide-react';
+import { buildUrl } from '@/lib/api/http';
+import { useHasStaffPermission } from '@/hooks/useStaffPermission';
 
 interface Movie {
         id: number;
@@ -58,7 +60,7 @@ export default function DeletedMoviesPage() {
                                 pageSize: String(pageSize),
                                 search: searchQuery
                         });
-                        const response = await fetch(`/api/admin/deleted/movies?${params}`, {
+                        const response = await fetch(buildUrl(`/api/admin/deleted/movies?${params}`), {
                                 headers: {
                                         Authorization: `Bearer ${token}`
                                 }
@@ -103,7 +105,7 @@ export default function DeletedMoviesPage() {
                 if (!movieToRestore) return;
                 try {
                         const token = localStorage.getItem('staffToken');
-                        const response = await fetch(`/api/admin/movies/${movieToRestore}/restore`, {
+                        const response = await fetch(buildUrl(`/api/admin/movies/${movieToRestore}/restore`), {
                                 method: 'POST',
                                 headers: {
                                         Authorization: `Bearer ${token}`
@@ -240,6 +242,7 @@ export default function DeletedMoviesPage() {
                                                                                         {m.deleted_at ? new Date(m.deleted_at).toLocaleString('vi-VN') : '-'}
                                                                                 </TableCell>
                                                                                 <TableCell className="text-right">
+                                                                                        {hasPermission('movies', 'restore') && (
                                                                                         <Button
                                                                                                 onClick={() => handleRestore(m.id)}
                                                                                                 variant="outline"
@@ -248,6 +251,7 @@ export default function DeletedMoviesPage() {
                                                                                                 <RotateCcw className="w-4 h-4 mr-2" />
                                                                                                 Khôi phục
                                                                                         </Button>
+                                                                                        )}
                                                                                 </TableCell>
                                                                         </TableRow>
                                                                 ))}

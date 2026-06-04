@@ -21,6 +21,7 @@ import {
         FileText
 } from 'lucide-react';
 import { buildUrl, request } from '@/lib/api/http';
+import { useStaffPermission } from '@/hooks/useStaffPermission';
 
 interface AdminSettingsResponse {
         settings: {
@@ -66,6 +67,7 @@ export default function SettingsPage() {
                 max_otp_attempts: 5
         });
         const [isSyncing, setIsSyncing] = useState(false);
+        const canManageSettings = useStaffPermission('settings', 'manage');
 
         const isProd = window.location.hostname !== 'localhost';
 
@@ -101,7 +103,9 @@ export default function SettingsPage() {
         };
 
         const handleToggleTab = async (key: string) => {
-                // Password check removed - access is already protected by RBAC and staff authentication
+                if (!canManageSettings) {
+                        return;
+                }
 
                 const newHidden = hiddenTabs.includes(key) ? hiddenTabs.filter((k) => k !== key) : [...hiddenTabs, key];
 
@@ -116,6 +120,7 @@ export default function SettingsPage() {
         };
 
         const handleSaveOtpSettings = async () => {
+                if (!canManageSettings) return;
                 await saveSettings(hiddenTabs, otpSettings);
         };
 
@@ -232,6 +237,7 @@ export default function SettingsPage() {
                                                                                                 </div>
                                                                                                 <Switch
                                                                                                         checked={!isHidden}
+                                                                                                        disabled={!canManageSettings}
                                                                                                         onCheckedChange={() => handleToggleTab(tab.key)}
                                                                                                         className="data-[state=checked]:bg-blue-600"
                                                                                                         onClick={(e) => e.stopPropagation()}
@@ -278,6 +284,7 @@ export default function SettingsPage() {
                                                                         </div>
                                                                         <Switch
                                                                                 checked={otpSettings.enable_2fa}
+                                                                                disabled={!canManageSettings}
                                                                                 onCheckedChange={(checked) => setOtpSettings({ ...otpSettings, enable_2fa: checked })}
                                                                                 className="data-[state=checked]:bg-[#2563EB]"
                                                                         />
@@ -346,7 +353,7 @@ export default function SettingsPage() {
 
                                                                 <button
                                                                         onClick={handleSaveOtpSettings}
-                                                                        disabled={isSyncing}
+                                                                        disabled={isSyncing || !canManageSettings}
                                                                         className="w-full py-3 bg-[#2563EB] hover:bg-blue-700 text-white font-semibold rounded-xl transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                                                                 >
                                                                         {isSyncing ? 'Đang lưu...' : 'Lưu cài đặt OTP'}

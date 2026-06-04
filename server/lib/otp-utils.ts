@@ -2,7 +2,6 @@ import { eq, and, gte, lt, isNull } from 'drizzle-orm';
 import { mailQueue } from './mail-queue';
 import { getOTPEmailTemplate, getStaffPasswordChangeOTPTemplate } from './email-templates';
 import { formatDateForDb } from './date-utils';
-import { sendMail } from '../routes/mail-service';
 
 export function generateOTP(length: number = 6): string {
         const digits = '0123456789';
@@ -153,6 +152,7 @@ export async function sendStaffPasswordChangeOTP(
         staffName: string,
         staffEmail: string,
         expiryMinutes: number = 5,
+        sendMailFn?: (to: string, subject: string, html: string) => Promise<any>,
         context?: { waitUntil: (promise: Promise<any>) => void }
 ) {
         const otp = generateOTP();
@@ -184,8 +184,13 @@ export async function sendStaffPasswordChangeOTP(
                 await mailQueue.add(
                         async () => {
                                 try {
-                                        await sendMail(staffEmail, '🔐 Mã Xác Thực Thay Đổi Mật Khẩu - CINESPHERE', html);
-                                        console.log(`[Staff OTP] Sent OTP to ${staffEmail}`);
+                                        const mailer = sendMailFn;
+                                        if (mailer) {
+                                                await mailer(staffEmail, '🔐 Mã Xác Thực Thay Đổi Mật Khẩu - CINESPHERE', html);
+                                                console.log(`[Staff OTP] Sent OTP to ${staffEmail}`);
+                                        } else {
+                                                console.warn('[Staff OTP] No mailer provided, skipping email');
+                                        }
                                 } catch (e) {
                                         console.error(`[Staff OTP] Failed to send OTP to ${staffEmail}`, e);
                                         throw e;
@@ -196,6 +201,8 @@ export async function sendStaffPasswordChangeOTP(
                                 recipient: staffEmail,
                                 subject: '🔐 Mã Xác Thực Thay Đổi Mật Khẩu - CINESPHERE',
                                 emailType: 'staff_otp',
+                                recipientType: 'staff',
+                                staffId: staffId,
                                 emailLogsTable: tables.email_logs
                         },
                         context

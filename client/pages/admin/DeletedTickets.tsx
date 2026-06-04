@@ -18,6 +18,8 @@ import {
 import { useNavigate } from 'react-router-dom';
 import { useStaffStore } from '@/store/staffStore';
 import { RefreshCw, RotateCcw, Ticket as TicketIcon, ArrowLeft } from 'lucide-react';
+import { buildUrl } from '@/lib/api/http';
+import { useHasStaffPermission } from '@/hooks/useStaffPermission';
 
 interface TicketPackage {
         id: number;
@@ -58,7 +60,7 @@ export default function DeletedTicketsPage() {
                                 pageSize: String(pageSize),
                                 search: searchQuery
                         });
-                        const response = await fetch(`/api/admin/deleted/tickets?${params}`, {
+                        const response = await fetch(buildUrl(`/api/admin/deleted/tickets?${params}`), {
                                 headers: {
                                         Authorization: `Bearer ${token}`
                                 }
@@ -103,7 +105,7 @@ export default function DeletedTicketsPage() {
                 if (!ticketToRestore) return;
                 try {
                         const token = localStorage.getItem('staffToken');
-                        const response = await fetch(`/api/admin/tickets/${ticketToRestore}/restore`, {
+                        const response = await fetch(buildUrl(`/api/admin/tickets/${ticketToRestore}/restore`), {
                                 method: 'POST',
                                 headers: {
                                         Authorization: `Bearer ${token}`
@@ -223,6 +225,7 @@ export default function DeletedTicketsPage() {
                                                                                         {t.deleted_at ? new Date(t.deleted_at).toLocaleString('vi-VN') : '-'}
                                                                                 </TableCell>
                                                                                 <TableCell className="text-right">
+                                                                                        {hasPermission('tickets', 'restore') && (
                                                                                         <Button
                                                                                                 onClick={() => handleRestore(t.id)}
                                                                                                 variant="outline"
@@ -231,6 +234,7 @@ export default function DeletedTicketsPage() {
                                                                                                 <RotateCcw className="w-4 h-4 mr-2" />
                                                                                                 Khôi phục
                                                                                         </Button>
+                                                                                        )}
                                                                                 </TableCell>
                                                                         </TableRow>
                                                                 ))}

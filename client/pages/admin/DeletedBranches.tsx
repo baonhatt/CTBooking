@@ -18,6 +18,8 @@ import {
 import { useNavigate } from 'react-router-dom';
 import { useStaffStore } from '@/store/staffStore';
 import { RefreshCw, RotateCcw, Building2, ArrowLeft } from 'lucide-react';
+import { buildUrl } from '@/lib/api/http';
+import { useHasStaffPermission } from '@/hooks/useStaffPermission';
 
 interface Branch {
         id: number;
@@ -33,6 +35,7 @@ interface Branch {
 
 export default function DeletedBranchesPage() {
         const navigate = useNavigate();
+        const hasPermission = useHasStaffPermission();
         const staffStore = useStaffStore();
         const [activeTab, setActiveTab] = useState('deleted-branches');
         const [branches, setBranches] = useState<Branch[]>([]);
@@ -56,7 +59,7 @@ export default function DeletedBranchesPage() {
                                 pageSize: String(pageSize),
                                 search: searchQuery
                         });
-                        const response = await fetch(`/api/admin/deleted/branches?${params}`, {
+                        const response = await fetch(buildUrl(`/api/admin/deleted/branches?${params}`), {
                                 headers: {
                                         Authorization: `Bearer ${token}`
                                 }
@@ -101,7 +104,7 @@ export default function DeletedBranchesPage() {
                 if (!branchToRestore) return;
                 try {
                         const token = localStorage.getItem('staffToken');
-                        const response = await fetch(`/api/admin/branches/${branchToRestore}/restore`, {
+                        const response = await fetch(buildUrl(`/api/admin/branches/${branchToRestore}/restore`), {
                                 method: 'POST',
                                 headers: {
                                         Authorization: `Bearer ${token}`
@@ -214,6 +217,7 @@ export default function DeletedBranchesPage() {
                                                                                         {b.deleted_at ? new Date(b.deleted_at).toLocaleString('vi-VN') : '-'}
                                                                                 </TableCell>
                                                                                 <TableCell className="text-right">
+                                                                                        {hasPermission('branches', 'restore') && (
                                                                                         <Button
                                                                                                 onClick={() => handleRestore(b.id)}
                                                                                                 variant="outline"
@@ -222,6 +226,7 @@ export default function DeletedBranchesPage() {
                                                                                                 <RotateCcw className="w-4 h-4 mr-2" />
                                                                                                 Khôi phục
                                                                                         </Button>
+                                                                                        )}
                                                                                 </TableCell>
                                                                         </TableRow>
                                                                 ))}

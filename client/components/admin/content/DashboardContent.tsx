@@ -61,6 +61,7 @@ interface Props {
         branches?: any[];
         selectedBranchId?: number | 'all' | null;
         setSelectedBranchId?: (id: number | 'all' | null) => void;
+        canViewRevenue?: boolean;
 }
 
 export default function DashboardContent({
@@ -83,7 +84,8 @@ export default function DashboardContent({
         onRefresh,
         branches = [],
         selectedBranchId = null,
-        setSelectedBranchId = () => { }
+        setSelectedBranchId = () => { },
+        canViewRevenue = true
 }: Props) {
         const LoadingOverlay = () => (
                 <div className="absolute inset-0 z-50 flex items-center justify-center bg-white/60 backdrop-blur-[1px] rounded-2xl animate-in fade-in duration-300">
@@ -348,6 +350,8 @@ export default function DashboardContent({
                                 />
                         </div>
 
+                        {canViewRevenue && (
+                        <>
                         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
                                 {/* Revenue Focus Card */}
                                 <Card className="lg:col-span-2 bg-white border border-[#E5E7EB] shadow-[0_1px_3px_rgba(0,0,0,0.1)] rounded-xl overflow-hidden flex flex-col relative">
@@ -811,6 +815,8 @@ export default function DashboardContent({
                                         />
                                 </Card>
                         </div>
+                        </>
+                        )}
 
                         {/* AI Analytics Panel */}
                         <AIAnalyticsPanel />

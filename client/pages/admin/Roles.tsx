@@ -227,9 +227,12 @@ export default function RolesPage() {
                                                                                 Xem đã xóa
                                                                         </Button>
                                                                 )}
+                                                                {isSuperAdmin && (
                                                                 <Button variant="outline" onClick={handleSeed} disabled={seedMutation.isPending}>
                                                                         {seedMutation.isPending ? 'Đang seed...' : 'Seed vai trò mặc định'}
                                                                 </Button>
+                                                                )}
+                                                                {hasPermission('roles', 'create') && (
                                                                 <Button
                                                                         onClick={() => {
                                                                                 resetForm();
@@ -239,6 +242,7 @@ export default function RolesPage() {
                                                                 >
                                                                         Tạo vai trò mới
                                                                 </Button>
+                                                                )}
                                                         </div>
                                                 </div>
                                         </CardHeader>
@@ -278,7 +282,7 @@ export default function RolesPage() {
                                                                                                         >
                                                                                                                 <Eye className="h-3.5 w-3.5" />
                                                                                                         </Button>
-                                                                                                        {!role.isSystem ? (
+                                                                                                        {!role.isSystem && hasPermission('roles', 'delete') ? (
                                                                                                                 <Button
                                                                                                                         variant="ghost"
                                                                                                                         size="icon"

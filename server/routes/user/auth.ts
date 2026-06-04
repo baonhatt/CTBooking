@@ -1,7 +1,6 @@
 import type { Login, Register } from '@shared/api';
 import { eq, desc, and, sql } from 'drizzle-orm';
 import bcrypt from 'bcryptjs';
-import { sendMail } from '../mail-service';
 import { mailQueue } from '../../lib/mail-queue';
 import { getWelcomeEmailTemplate } from '../../lib/booking-utils';
 import { formatDateForDb } from '../../lib/date-utils';
@@ -277,6 +276,15 @@ export async function registerImpl(
       return { status: 400, message: 'Email đã tồn tại' };
     }
 
+    // Check if email already exists in staffs
+    const { staffs } = await import('../../../worker/src/schema');
+    const staffExist = await anyDb.query.staffs.findFirst({
+      where: eq(staffs.email, email)
+    });
+    if (staffExist) {
+      return { status: 400, message: 'Email này thuộc về hệ thống quản lý. Vui lòng dùng email khác.' };
+    }
+
     const hashedPassword = await bcrypt.hash(password, 10);
 
     let fullname = payload.name;
@@ -337,13 +345,17 @@ export async function registerImpl(
         html = getWelcomeEmailTemplate(templateData);
       }
 
-      const mailer = sendMailFn || sendMail;
+      const mailer = sendMailFn;
       // Sử dụng mailQueue để gửi mail ngầm
       mailQueue.add(
         async () => {
           try {
-            await mailer(email, '🎉 Chào mừng bạn đến CINESPHERE', html);
-            console.log(`[MailQueue] Sent welcome email to ${email}`);
+            if (mailer) {
+              await mailer(email, '🎉 Chào mừng bạn đến CINESPHERE', html);
+              console.log(`[MailQueue] Sent welcome email to ${email}`);
+            } else {
+              console.warn('[Register] No mailer provided, skipping welcome email');
+            }
           } catch (e) {
             console.error(`[MailQueue] Failed to send welcome email to ${email}`, e);
             throw e;
@@ -354,6 +366,7 @@ export async function registerImpl(
           recipient: email,
           subject: '🎉 Chào mừng bạn đến CINESPHERE',
           emailType: 'welcome',
+          recipientType: 'user',
           userId: newUser.id,
           emailLogsTable: tables.email_logs
         },

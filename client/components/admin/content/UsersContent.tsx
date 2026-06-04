@@ -15,6 +15,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Badge } from '@/components/ui/badge';
 import { getUserById } from '@/lib/api';
 import { Search, RefreshCw, Eye, TrendingUp, User, X } from 'lucide-react';
+import { useHasStaffPermission } from '@/hooks/useStaffPermission';
 
 interface Props {
         data: any[];
@@ -41,6 +42,7 @@ export default function UsersContent({
         onRefresh,
         isLoading = false
 }: Props) {
+        const hasPermission = useHasStaffPermission();
         const [isDetailsOpen, setIsDetailsOpen] = useState(false);
         const [selectedUserId, setSelectedUserId] = useState<number | null>(null);
         const [userDetails, setUserDetails] = useState<any>(null);
@@ -78,6 +80,7 @@ export default function UsersContent({
         };
 
         const handleViewDetails = (userId: number) => {
+                if (!hasPermission('users', 'view_detail')) return;
                 setSelectedUserId(userId);
                 setIsDetailsOpen(true);
         };
@@ -192,6 +195,7 @@ export default function UsersContent({
                                                                                 </TableCell>
                                                                                 <TableCell className="text-right pr-6">
                                                                                         <div className="flex justify-end gap-2">
+                                                                                                {hasPermission('users', 'view_detail') && (
                                                                                                 <Button
                                                                                                         variant="outline"
                                                                                                         size="sm"
@@ -201,6 +205,7 @@ export default function UsersContent({
                                                                                                 >
                                                                                                         <Eye className="h-3.5 w-3.5" />
                                                                                                 </Button>
+                                                                                                )}
                                                                                         </div>
                                                                                 </TableCell>
                                                                         </TableRow>

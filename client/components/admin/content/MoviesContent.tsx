@@ -263,12 +263,14 @@ export default function MoviesContent({
                                                 </Button>
                                         )}
 
+                                        {hasPermission('movies', 'create') && (
                                         <Button
                                                 onClick={onCreate}
                                                 className="bg-blue-600 hover:bg-blue-700 rounded-lg shadow-sm gap-2 text-white h-10 px-5 font-medium ml-auto"
                                         >
                                                 <Plus className="w-4 h-4" /> Thêm mới
                                         </Button>
+                                        )}
                                 </div>
                         </div>
 
@@ -366,56 +368,67 @@ export default function MoviesContent({
                                                                                         </TableCell>
                                                                                         <TableCell>
                                                                                                 <div className="flex items-center justify-center gap-4 py-2">
-                                                                                                        <div className="flex shrink-0 w-12 justify-center">
-                                                                                                                <AlertDialog>
-                                                                                                                        <AlertDialogTrigger asChild>
-                                                                                                                                <Switch
-                                                                                                                                        checked={isActive}
-                                                                                                                                        className="scale-100 transition-all border-2 border-transparent cursor-pointer"
-                                                                                                                                        style={{
-                                                                                                                                                opacity: 1,
-                                                                                                                                                backgroundColor: isActive ? '#10b981' : '#d1d5db',
-                                                                                                                                                boxShadow: 'none'
-                                                                                                                                        }}
-                                                                                                                                />
-                                                                                                                        </AlertDialogTrigger>
+												<div className="flex shrink-0 w-12 justify-center">
+													{hasPermission('movies', 'toggle_status') ? (
+														<AlertDialog>
+															<AlertDialogTrigger asChild>
+																<Switch
+																	checked={isActive}
+																	className="scale-100 transition-all border-2 border-transparent cursor-pointer"
+																	style={{
+																		opacity: 1,
+																		backgroundColor: isActive ? '#10b981' : '#d1d5db',
+																		boxShadow: 'none'
+																	}}
+																/>
+															</AlertDialogTrigger>
 
-                                                                                                                        {/* Phần nội dung Alert không còn rỗng */}
-                                                                                                                        <AlertDialogContent className="rounded-2xl font-sans bg-white">
-                                                                                                                                <AlertDialogHeader>
-                                                                                                                                        <AlertDialogTitle className="text-slate-900">
-                                                                                                                                                Xác nhận thay đổi trạng thái
-                                                                                                                                        </AlertDialogTitle>
-                                                                                                                                        <AlertDialogDescription className="text-slate-500 text-sm">
-                                                                                                                                                {isActive ? (
-                                                                                                                                                        <span>
-                                                                                                                                                                Bạn có muốn <strong>ẩn</strong> phim này không?
-                                                                                                                                                                <br />
-                                                                                                                                                                Hành động này sẽ khiến phim không xuất hiện trên giao diện người dùng.
-                                                                                                                                                        </span>
-                                                                                                                                                ) : (
-                                                                                                                                                        <span>
-                                                                                                                                                                Bạn có muốn <strong>kích hoạt</strong> phim này không?
-                                                                                                                                                                <br />
-                                                                                                                                                                Phim sẽ bắt đầu hiển thị công khai trên website.
-                                                                                                                                                        </span>
-                                                                                                                                                )}
-                                                                                                                                        </AlertDialogDescription>
-                                                                                                                                </AlertDialogHeader>
+															{/* Phần nội dung Alert không còn rỗng */}
+															<AlertDialogContent className="rounded-2xl font-sans bg-white">
+																<AlertDialogHeader>
+																	<AlertDialogTitle className="text-slate-900">
+																		Xác nhận thay đổi trạng thái
+																	</AlertDialogTitle>
+																	<AlertDialogDescription className="text-slate-500 text-sm">
+																		{isActive ? (
+																			<span>
+																				Bạn có muốn <strong>ẩn</strong> phim này không?
+																				<br />
+																				Hành động này sẽ khiến phim không xuất hiện trên giao diện người dùng.
+																			</span>
+																		) : (
+																			<span>
+																				Bạn có muốn <strong>kích hoạt</strong> phim này không?
+																				<br />
+																				Phim sẽ bắt đầu hiển thị công khai trên website.
+																			</span>
+																		)}
+																	</AlertDialogDescription>
+																</AlertDialogHeader>
 
-                                                                                                                                <AlertDialogFooter className="mt-4">
-                                                                                                                                        <AlertDialogCancel className="rounded-xl border-slate-200">Hủy</AlertDialogCancel>
-                                                                                                                                        <AlertDialogAction
-                                                                                                                                                onClick={() => onToggleStatus(movie.id, isActive)}
-                                                                                                                                                className={`rounded-xl text-white ${isActive ? 'bg-red-500 hover:bg-red-600' : 'bg-emerald-600 hover:bg-emerald-700'
-                                                                                                                                                        }`}
-                                                                                                                                        >
-                                                                                                                                                {isActive ? 'Đồng ý ẩn' : 'Đồng ý kích hoạt'}
-                                                                                                                                        </AlertDialogAction>
-                                                                                                                                </AlertDialogFooter>
-                                                                                                                        </AlertDialogContent>
-                                                                                                                </AlertDialog>
-                                                                                                        </div>
+																<AlertDialogFooter className="mt-4">
+																	<AlertDialogCancel className="rounded-xl border-slate-200">Hủy</AlertDialogCancel>
+																	<AlertDialogAction
+																		onClick={() => onToggleStatus(movie.id, isActive)}
+																		className={`rounded-xl text-white ${isActive ? 'bg-red-500 hover:bg-red-600' : 'bg-emerald-600 hover:bg-emerald-700'
+																			}`}
+																	>
+																		{isActive ? 'Đồng ý ẩn' : 'Đồng ý kích hoạt'}
+																	</AlertDialogAction>
+																</AlertDialogFooter>
+															</AlertDialogContent>
+														</AlertDialog>
+													) : (
+														<Switch
+															checked={isActive}
+															disabled
+															className="scale-100 opacity-40 cursor-not-allowed"
+															style={{
+																backgroundColor: isActive ? '#10b981' : '#d1d5db'
+															}}
+														/>
+													)}
+												</div>
 
                                                                                                         {/* Badge trạng thái */}
                                                                                                         <div className="w-20 flex shrink-0">
@@ -446,6 +459,7 @@ export default function MoviesContent({
                                                                                                         >
                                                                                                                 <Eye className="h-3.5 w-3.5" />
                                                                                                         </Button>
+                                                                                                        {hasPermission('movies', 'edit') && (
                                                                                                         <Button
                                                                                                                 variant="outline"
                                                                                                                 size="sm"
@@ -455,7 +469,8 @@ export default function MoviesContent({
                                                                                                         >
                                                                                                                 <Pencil className="h-3.5 w-3.5" />
                                                                                                         </Button>
-                                                                                                        {onDelete && (
+                                                                                                        )}
+                                                                                                        {onDelete && hasPermission('movies', 'delete') && (
                                                                                                                 <Button
                                                                                                                         variant="outline"
                                                                                                                         size="sm"
