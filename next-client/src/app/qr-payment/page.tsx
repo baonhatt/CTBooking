@@ -46,7 +46,7 @@ export default function QRPaymentPage() {
 
     const BANK_INFO = {
         bankName: 'Ngân Hàng OCB',
-        accountNumber: 'VRVPTH55408',
+        accountNumber: 'VRVPTH65408',
         accountName: 'CONG TY TNHH CONG NGHE VR VIET NAM',
         bankCode: 'OCB'
     };
