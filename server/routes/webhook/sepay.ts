@@ -34,8 +34,8 @@ export async function handleSePayWebhookImpl(
       return { success: false, message: 'No content' };
     }
 
-    // Extract Order ID (e.g. CINESPHERE1735140000000)
-    const match = finalContent.match(/CINESPHERE\d+/);
+    // Extract Order ID (e.g. CP1735140000000)
+    const match = finalContent.match(/CP\d{13}/);
     if (!match) {
       console.log('[SePay] No Order ID found in content:', finalContent);
       return { success: true, message: 'No order id found, ignored' };

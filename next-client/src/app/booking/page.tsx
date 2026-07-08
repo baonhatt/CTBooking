@@ -320,7 +320,7 @@ export default function BookingPage() {
                 try {
                         const comboData = ticketsData?.items.find((value) => value?.id === selectedPackage?.id);
                         setIsProcessing(true);
-                        const orderId = `CINESPHERE${Date.now()}`;
+                        const orderId = `CP${Date.now()}`;
                         const movieDetail = selectedMovie;
                         const ticketPackageId = selectedPackage?.id || defaultTicket?.id;
                         const finalCombo = selectedMovieIds.length > 0 ? selectedMovieIds : comboData.combo;
