@@ -237,10 +237,6 @@ export default function BookingPage() {
                         errors.ticketPackage = 'Vui lòng chọn loại vé';
                 }
                 
-                if (activeMoviesFull.length > 0 && selectedMovieIds.length === 0) {
-                        errors.movies = 'Vui lòng chọn ít nhất một phim';
-                }
-                
                 if (!name.trim()) {
                         errors.name = 'Vui lòng nhập họ và tên';
                 } else if (name.trim().length < 2) {
