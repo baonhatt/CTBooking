@@ -16,6 +16,11 @@ import { toast } from 'sonner';
 import { updateUserProfileApi, changePasswordApi, getUserTransactionsApi, getUserProfileByEmailApi } from '@/lib/api';
 import { DatePicker } from 'antd';
 import dayjs from 'dayjs';
+import weekday from 'dayjs/plugin/weekday';
+import localeData from 'dayjs/plugin/localeData';
+
+dayjs.extend(weekday);
+dayjs.extend(localeData);
 import {
         Pagination,
         PaginationContent,
