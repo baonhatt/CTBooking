@@ -29,7 +29,7 @@ export function MobileMenu({
   return (
     <Sheet>
       <SheetTrigger asChild>
-        <Button variant="default" className="bg-white/10 backdrop-blur-md border-white/20 text-white w-10 h-10 hover:bg-white/20">
+        <Button variant="default" className="bg-white/10 border-white/20 text-white w-10 h-10 hover:bg-white/20">
           <Menu className="h-6 w-6" />
         </Button>
       </SheetTrigger>

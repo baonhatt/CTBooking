@@ -53,6 +53,17 @@ interface MovieSchedulePanelProps {
 
 export default function MovieSchedulePanel({ isOpen, onClose }: MovieSchedulePanelProps) {
     const panelRef = useRef<HTMLDivElement | null>(null);
+    const [mounted, setMounted] = useState(isOpen);
+
+    useEffect(() => {
+        if (isOpen) {
+            setMounted(true);
+            return;
+        }
+
+        const timeout = window.setTimeout(() => setMounted(false), 300);
+        return () => window.clearTimeout(timeout);
+    }, [isOpen]);
 
     // Close on outside click
     useEffect(() => {
@@ -66,10 +77,17 @@ export default function MovieSchedulePanel({ isOpen, onClose }: MovieSchedulePan
         return () => document.removeEventListener('mousedown', onMouseDown);
     }, [isOpen, onClose]);
 
-    // Lock body scroll on mobile
+    // Prevent overscroll from leaking to the background while keeping inner scroll active
     useEffect(() => {
-        document.body.style.overflow = isOpen ? 'hidden' : '';
-        return () => { document.body.style.overflow = ''; };
+        const originalOverscrollBehavior = document.body.style.overscrollBehavior;
+
+        if (isOpen) {
+            document.body.style.overscrollBehavior = 'contain';
+        }
+
+        return () => {
+            document.body.style.overscrollBehavior = originalOverscrollBehavior;
+        };
     }, [isOpen]);
 
     const getSlotsForGroup = (group: typeof HOUR_GROUPS[0]) => {
@@ -78,6 +96,10 @@ export default function MovieSchedulePanel({ isOpen, onClose }: MovieSchedulePan
         return SHOWTIME_SCHEDULE.slice(startIdx, endIdx + 1);
     };
 
+    if (!mounted) {
+        return null;
+    }
+
     return (
         <>
             {/* Floating button removed — header dispatches `open-movie-schedule` now */}
@@ -85,7 +107,7 @@ export default function MovieSchedulePanel({ isOpen, onClose }: MovieSchedulePan
             {/* ─── BACKDROP ─── */}
             <div
                 aria-hidden="true"
-                className={`fixed inset-0 z-50 bg-black/60 backdrop-blur-sm transition-opacity duration-300 ${isOpen ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}
+                className={`fixed inset-0 z-50 bg-black/60 transition-opacity duration-300 will-change-[opacity] ${isOpen ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}
             />
 
             {/* ─── PANEL ─── */}
@@ -94,9 +116,9 @@ export default function MovieSchedulePanel({ isOpen, onClose }: MovieSchedulePan
                 ref={panelRef}
                 className={`
                     fixed z-50
-                    bottom-0 left-0 right-0 max-h-[88dvh]
+                    bottom-0 left-0 right-0 h-[88vh]
                     lg:bottom-auto lg:top-0 lg:left-auto lg:right-0 lg:h-screen lg:w-[380px] lg:max-h-screen
-                    transition-all duration-500 ease-[cubic-bezier(0.32,0.72,0,1)]
+                    transition-[transform,opacity] duration-300 ease-[cubic-bezier(0.32,0.72,0,1)] opacity-0 touch-pan-y
                     ${isOpen
                         ? 'translate-y-0 lg:translate-x-0 opacity-100'
                         : 'translate-y-full lg:translate-y-0 lg:translate-x-full opacity-0 pointer-events-none'}
@@ -157,7 +179,7 @@ export default function MovieSchedulePanel({ isOpen, onClose }: MovieSchedulePan
                     </div>
 
                     {/* ── SCHEDULE (scrollable) ── */}
-                    <div className="flex-1 overflow-y-auto overscroll-contain schedule-scroll px-4 lg:px-5 py-4 space-y-4">
+                    <div className="flex-1 min-h-0 overflow-y-scroll overscroll-y-contain schedule-scroll px-4 lg:px-5 py-4 space-y-4">
                         {HOUR_GROUPS.map((group) => {
                             const slots = getSlotsForGroup(group);
                             return (

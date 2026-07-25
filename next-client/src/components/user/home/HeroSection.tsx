@@ -246,9 +246,9 @@ export default function HeroSection({
                                         <div className="absolute inset-0 bg-gradient-to-b from-black/80 via-black/50 to-[#050915]/95" />
                                 </div>
 
-                                <div className="absolute -left-24 top-10 w-[520px] h-[520px] rounded-full bg-cyan-500/15 blur-[120px] animate-pulse pointer-events-none" />
+                                <div className="hidden lg:block absolute -left-24 top-10 w-[520px] h-[520px] rounded-full bg-cyan-500/15 blur-[120px] animate-pulse pointer-events-none" />
                                 <m.div
-                                        className="absolute -right-16 top-32 w-[420px] h-[420px] rounded-full bg-fuchsia-500/15 blur-[120px] pointer-events-none"
+                                        className="hidden lg:block absolute -right-16 top-32 w-[420px] h-[420px] rounded-full bg-fuchsia-500/15 blur-[120px] pointer-events-none"
                                         style={{ x: blobX, y: blobY, translateZ: 0 }}
                                 />
 

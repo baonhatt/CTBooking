@@ -663,6 +663,20 @@
     /* Ép chạy bằng phần cứng */
   }
 
+  @media (max-width: 768px) {
+    .glass-tile {
+      backdrop-filter: none !important;
+      -webkit-backdrop-filter: none !important;
+      box-shadow: 0 10px 25px rgba(15, 23, 42, 0.35);
+    }
+
+    *[class*="backdrop-blur"],
+    *[class*="backdrop-filter"] {
+      backdrop-filter: none !important;
+      -webkit-backdrop-filter: none !important;
+    }
+  }
+
   .neon-border {
     border: 1px solid rgba(59, 130, 246, 0.35);
     box-shadow:

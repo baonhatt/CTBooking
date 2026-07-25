@@ -192,9 +192,9 @@ export default function Header({
                         className={cn(
                                 'fixed top-0 left-0 right-0 z-50 transition-all duration-300',
                                 forceDark
-                                        ? 'bg-black/95 backdrop-blur-lg border-b border-white/10 shadow-[0_10px_40px_rgba(67,97,238,0.15)]'
+                                        ? 'bg-black/95 lg:backdrop-blur-lg border-b border-white/10 shadow-[0_10px_40px_rgba(67,97,238,0.15)]'
                                         : isScrolled
-                                                ? 'bg-black/80 backdrop-blur-lg border-b border-white/10 shadow-[0_10px_40px_rgba(67,97,238,0.15)]'
+                                                ? 'bg-black/80 lg:backdrop-blur-lg border-b border-white/10 shadow-[0_10px_40px_rgba(67,97,238,0.15)]'
                                                 : 'bg-gradient-to-b from-black/80 via-black/60 to-transparent border-b border-white/10'
                         )}
                 >
@@ -250,8 +250,8 @@ export default function Header({
                                                 data-text={"\u00A0Lịch chiếu Phim\u00A0"}
                                         >
                                                 <Calendar className="w-4 h-4 text-green-300" />
-                                                <span className="actual-text">{"\u00A0Lịch chiếu Phim\u00A0"}</span>
-                                                <span aria-hidden="true" className="hover-text">{"\u00A0Lịch chiếu Phim\u00A0"}</span>
+                                                <span className="hidden md:inline actual-text">{"\u00A0Lịch chiếu Phim\u00A0"}</span>
+                                                <span aria-hidden="true" className="hidden md:inline hover-text">{"\u00A0Lịch chiếu Phim\u00A0"}</span>
                                         </button>
 
                                         {/* Desktop User Menu or Login Button */}
