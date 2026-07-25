@@ -19,6 +19,8 @@ import { UserMenu } from '@/components/UserMenu';
 import { NAV_ITEMS } from '@/components/constants';
 import { HeaderProps, ErrorModalState } from '@/components/filetypes/IType.model';
 import { MobileMenu } from '@/components/MobileMenu';
+import MovieSchedulePanel from '@/components/MovieSchedulePanel';
+import { Calendar } from 'lucide-react';
 
 // Lazy load dialogs to reduce initial JS payload
 const LoginDialog = lazy(() => import('@/components/LoginDialog').then((m) => ({ default: m.LoginDialog })));
@@ -49,6 +51,7 @@ export default function Header({
 
         // Check login state from localStorage (userToken) - client-side only
         const [isLoggedIn, setIsLoggedIn] = useState(false);
+        const [isScheduleOpen, setIsScheduleOpen] = useState(false);
 
         useEffect(() => {
                 if (typeof window !== 'undefined') {
@@ -238,6 +241,19 @@ export default function Header({
                                                 />
                                         </div>
 
+                                        {/* Schedule Button (in header) */}
+                                        <button
+                                                type="button"
+                                                onClick={() => setIsScheduleOpen(true)}
+                                                aria-label="Xem lịch chiếu phim"
+                                                className="uiverse-schedule-btn inline-flex items-center gap-2 text-white/90 hover:text-white transition-colors duration-300 font-medium text-[15px] px-3 py-2 rounded-lg hover:bg-white/8 border border-white/10"
+                                                data-text={"\u00A0Lịch chiếu Phim\u00A0"}
+                                        >
+                                                <Calendar className="w-4 h-4 text-green-300" />
+                                                <span className="actual-text">{"\u00A0Lịch chiếu Phim\u00A0"}</span>
+                                                <span aria-hidden="true" className="hover-text">{"\u00A0Lịch chiếu Phim\u00A0"}</span>
+                                        </button>
+
                                         {/* Desktop User Menu or Login Button */}
                                         {isLoggedIn ? (
                                                 <div className="hidden md:flex items-center">
@@ -298,6 +314,11 @@ export default function Header({
                                         onOpenChange={(open) => setErrorModal((prev) => ({ ...prev, open }))}
                                 />
                         </Suspense>
+
+                        <MovieSchedulePanel
+                                isOpen={isScheduleOpen}
+                                onClose={() => setIsScheduleOpen(false)}
+                        />
                 </header>
         );
 }
