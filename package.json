@@ -12,7 +12,8 @@
   },
   "scripts": {
     "dev": "vite",
-    "dev:worker": "wrangler dev --local --config worker/wrangler.toml",
+    "dev:worker": "wrangler dev --env preview --port 8787 --config worker/wrangler.toml",
+    "dev:worker:local": "wrangler dev --local --config worker/wrangler.toml",
     "dev:all": "concurrently \"npm run dev\" \"npm run dev:worker\"",
     "dev:debug": "tsx --inspect=9229 --tsconfig tsconfig.json node_modules/vite/bin/vite.js",
     "build": "npm run build:client",
@@ -28,6 +29,7 @@
     "pages:deploy:prod": "npm run build:client && npx wrangler pages deploy dist/spa --project-name=cinema-admin-pages --branch=main",
     "pages:deploy:preview": "npm run build:client:preview && npx wrangler pages deploy dist/spa --project-name=cinema-admin-pages --branch=preview",
     "db:push": "drizzle-kit push",
+    "db:migrate:preview": "wrangler d1 migrations apply cinema_db --remote --env preview --config worker/wrangler.toml",
     "db:import-local": "npx wrangler d1 execute cinema-db --local --file=cinema_db_prod.sql --config worker/wrangler.toml"
   },
   "rollup": {

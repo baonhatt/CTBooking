@@ -66,6 +66,8 @@ database_name = "cinema-db"
 
 database_id = "9bae4fb3-570a-4ded-9a75-922ce4d6ef81"
 
+migrations_dir = "migrations"
+
 
 
 [[kv_namespaces]]
@@ -157,6 +159,11 @@ binding = "cinema_db"
 database_name = "cinema-db-preview"
 
 database_id = "fd9274ae-d1a3-42e2-b83d-2fc1bdc71caf"
+
+migrations_dir = "migrations"
+
+# Local dev (wrangler dev --env preview): connect to remote preview D1 instead of local SQLite
+remote = true
 
 
 
