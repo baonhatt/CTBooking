@@ -227,6 +227,7 @@ export default function TicketsContent(props: Props) {
                                 <TableHead className="text-xs font-semibold text-gray-600 uppercase py-3">Phân loại</TableHead>
                                 <TableHead className="text-xs font-semibold text-gray-600 uppercase py-3">Giá niêm yết</TableHead>
                                 <TableHead className="text-xs font-semibold text-gray-600 uppercase py-3">Cập nhật</TableHead>
+                                <TableHead className="text-xs font-semibold text-gray-600 uppercase py-3 min-w-[120px]">Chi nhánh</TableHead>
                                 <TableHead className="text-center text-xs font-semibold text-gray-600 uppercase py-3">Trạng thái</TableHead>
                                 <TableHead className="text-right text-xs font-semibold text-gray-600 uppercase py-3 pr-6">
                                     Thao tác
@@ -260,7 +261,9 @@ export default function TicketsContent(props: Props) {
                                         </TableCell>
                                     </TableRow>
                                 ))
-                                : data.map((t) => (
+                                : data.map((t) => {
+                                    const branchName = branches?.find(b => b.id === Number(t.branch_id))?.name;
+                                    return (
                                     <TableRow
                                         key={t.id}
                                         className="group hover:bg-gray-50 transition-colors border-b border-gray-200 h-[52px]"
@@ -296,6 +299,16 @@ export default function TicketsContent(props: Props) {
                                                         ? formatDistanceToNow(new Date(t.updated_at), { addSuffix: true, locale: vi })
                                                         : ''}
                                                 </span>
+                                            </div>
+                                        </TableCell>
+                                        <TableCell>
+                                            <div 
+                                                className="text-[13px] font-medium text-slate-700 max-w-[150px] truncate" 
+                                                title={branchName || 'Tất cả chi nhánh'}
+                                            >
+                                                {branchName || (
+                                                    <span className="text-slate-400 italic text-xs">Tất cả chi nhánh</span>
+                                                )}
                                             </div>
                                         </TableCell>
                                         <TableCell className="text-center">
@@ -362,7 +375,8 @@ export default function TicketsContent(props: Props) {
                                             )}
                                         </TableCell>
                                     </TableRow>
-                                ))}
+                                );
+                            })}
                         </TableBody>
                     </Table>
                     <Pagination className="mt-3">

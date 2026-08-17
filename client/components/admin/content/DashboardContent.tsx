@@ -1,5 +1,4 @@
 import React from 'react';
-import AIAnalyticsPanel from './AIAnalyticsPanel';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
@@ -236,7 +235,7 @@ export default function DashboardContent({
                         <CardContent className="p-5 relative">
                                 <div className="flex items-start justify-between relative z-10">
                                         <div className="space-y-1">
-                                                <p className="text-sm font-semibold text-[#6B7280] uppercase">{title}</p>
+                                                <span className="text-sm font-semibold text-[#6B7280] uppercase">{title}</span>
                                                 {isPageLoading ? (
                                                         <Skeleton className="h-8 w-24 rounded-lg" />
                                                 ) : (
@@ -460,13 +459,13 @@ export default function DashboardContent({
                                                                                         ? 'THÁNG NÀY'
                                                                                         : `NĂM ${selectedYear}`}
                                                                 </p>
-                                                                <p className="text-4xl font-black text-slate-900 tracking-tight">
+                                                                <div className="text-4xl font-black text-slate-900 tracking-tight">
                                                                         {isRevenueLoading ? (
                                                                                 <Skeleton className="h-12 w-48 rounded-xl" />
                                                                         ) : (
                                                                                 `${dateRevenue.total.toLocaleString()} đ`
                                                                         )}
-                                                                </p>
+                                                                </div>
                                                                 <p className="text-xs font-bold text-blue-600 bg-blue-50 inline-flex px-3 py-1 rounded-full uppercase tracking-widest">
                                                                         {dateRevenue.count} Giao dịch đã xác thực
                                                                 </p>
@@ -818,8 +817,7 @@ export default function DashboardContent({
                         </>
                         )}
 
-                        {/* AI Analytics Panel */}
-                        <AIAnalyticsPanel />
+
                 </div>
         );
 }

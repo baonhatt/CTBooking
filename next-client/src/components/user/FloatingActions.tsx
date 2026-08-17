@@ -57,6 +57,10 @@ export default function FloatingActions() {
         const hotline = branchSettings.hotline || selectedBranch?.phone || '0366431179';
         const zaloPhone = hotline.replace(/\./g, '').replace(/\s/g, '');
 
+        const showZalo = branchSettings.show_zalo_button ?? true;
+        const showPhone = branchSettings.show_phone_button ?? true;
+        const showContactGroup = showZalo || showPhone;
+
         return (
                 <div className="fixed bottom-6 right-6 z-[40] flex flex-col gap-4 items-end">
                         <AnimatePresence>
@@ -80,6 +84,7 @@ export default function FloatingActions() {
                                 </motion.button>
 
                                 {/* 2. CỤM NÚT LIÊN HỆ (Thu gọn/Mở rộng) */}
+                                {showContactGroup && (
                                 <div className="relative flex flex-col items-end gap-3">
                                         {/* Các nút con hiện ra khi bấm mở rộng */}
                                         <AnimatePresence>
@@ -91,6 +96,7 @@ export default function FloatingActions() {
                                                                 className="flex flex-col gap-3 mb-1"
                                                         >
                                                                 {/* Nút Zalo */}
+                                                                {showZalo && (
                                                                 <motion.a
                                                                         href={`https://zalo.me/${zaloPhone}`}
                                                                         target="_blank"
@@ -102,8 +108,10 @@ export default function FloatingActions() {
                                                                 >
                                                                         <MessageCircle className="w-6 h-6" />
                                                                 </motion.a>
+                                                                )}
 
                                                                 {/* Nút Hotline */}
+                                                                {showPhone && (
                                                                 <motion.a
                                                                         href={`tel:${hotline}`}
                                                                         whileHover={{ scale: 1.1 }}
@@ -113,6 +121,7 @@ export default function FloatingActions() {
                                                                 >
                                                                         <Phone className="w-6 h-6" />
                                                                 </motion.a>
+                                                                )}
                                                         </motion.div>
                                                 )}
                                         </AnimatePresence>
@@ -132,6 +141,7 @@ export default function FloatingActions() {
                                                 {isExpanded ? <X className="w-6 h-6" /> : <Headset className="w-6 h-6" />}
                                         </motion.button>
                                 </div>
+                                )}
                         </AnimatePresence>
                 </div>
         );

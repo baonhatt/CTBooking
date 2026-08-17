@@ -14,7 +14,7 @@ import { request } from '@/lib/api/http';
 import AdminLayout from '@/admin/layouts/AdminLayout';
 import { useStaffStore } from '@/store/staffStore';
 import { useNavigate } from 'react-router-dom';
-import { useStaffPermissions, useIsSuperAdmin } from '@/hooks/useStaffPermission';
+import { useStaffPermission, useStaffPermissions, useIsSuperAdmin } from '@/hooks/useStaffPermission';
 import { Info, X, Search, RefreshCw, Eye, FileText, Edit, Trash2, Key, User, Mail, Phone, Shield, Building2, History } from 'lucide-react';
 
 interface Staff {

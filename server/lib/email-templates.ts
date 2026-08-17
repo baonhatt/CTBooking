@@ -427,37 +427,37 @@ export function getOTPEmailTemplate(data: {
 
 // Shared mail layout for staff emails
 function getStaffEmailLayout(content: string, subtitle: string): string {
-        return `
+	return `
 <!DOCTYPE html>
 <html lang="vi">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Tài khoản nhân viên - CINESPHERE</title>
+  <title>CINESPHERE Admin System</title>
   <style>
     body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f5f7fb; margin: 0; padding: 0; }
-    .container { max-width: 600px; margin: 0 auto; background-color: #ffffff; border-radius: 10px; box-shadow: 0 4px 12px rgba(0,0,0,0.06); overflow: hidden; }
-    .header { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 30px 20px; text-align: center; }
-    .header h1 { margin: 0; font-size: 28px; font-weight: 700; }
-    .header p { margin: 8px 0 0 0; font-size: 14px; opacity: 0.95; }
-    .content { padding: 30px; color: #1f2937; }
-    .greeting { font-size: 16px; margin-bottom: 20px; }
-    .info-box { background: #f8f9fa; border: 1px solid #e5e7eb; border-left: 4px solid #667eea; border-radius: 8px; padding: 20px; margin: 20px 0; }
-    .info-row { display: flex; justify-content: space-between; padding: 10px 0; border-bottom: 1px dashed #e5e7eb; }
+    .container { max-width: 600px; margin: 20px auto; background-color: #ffffff; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.06); overflow: hidden; }
+    .header { background: linear-gradient(135deg, #1e293b 0%, #334155 100%); color: white; padding: 26px 20px; text-align: center; }
+    .header h1 { margin: 0; font-size: 22px; font-weight: 700; letter-spacing: 1px; }
+    .header p { margin: 6px 0 0 0; font-size: 13px; color: #94a3b8; }
+    .content { padding: 28px; color: #334155; }
+    .greeting { font-size: 15px; margin-bottom: 16px; color: #1e293b; }
+    .info-box { background: #f8fafc; border: 1px solid #e2e8f0; border-left: 4px solid #3b82f6; border-radius: 8px; padding: 16px; margin: 20px 0; }
+    .info-row { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px dashed #e2e8f0; }
     .info-row:last-child { border-bottom: none; }
-    .info-label { color: #6b7280; font-size: 14px; }
-    .info-value { font-weight: 600; color: #1f2937; font-size: 14px; }
-    .password-box { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border-radius: 12px; padding: 25px; text-align: center; margin: 25px 0; }
-    .password-label { font-size: 13px; color: rgba(255,255,255,0.9); text-transform: uppercase; font-weight: 600; margin-bottom: 12px; letter-spacing: 1px; }
-    .password-value { font-size: 32px; font-weight: 800; color: #ffffff; font-family: monospace; letter-spacing: 4px; line-height: 1; }
-    .warning { background: #fff3cd; border-left: 4px solid #ffc107; padding: 15px; border-radius: 6px; margin: 20px 0; font-size: 13px; color: #856404; }
-    .footer { background-color: #f9fafb; padding: 20px; text-align: center; font-size: 12px; color: #6b7280; border-top: 1px solid #e5e7eb; }
+    .info-label { color: #64748b; font-size: 13px; }
+    .info-value { font-weight: 600; color: #0f172a; font-size: 13px; }
+    .password-box { background: #f1f5f9; border: 2px dashed #cbd5e1; border-radius: 10px; padding: 20px; text-align: center; margin: 20px 0; }
+    .password-label { font-size: 12px; color: #64748b; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px; }
+    .password-value { font-size: 32px; font-weight: 800; color: #0f172a; font-family: monospace; letter-spacing: 4px; line-height: 1; }
+    .warning { background: #fffbeb; border-left: 4px solid #f59e0b; padding: 14px; border-radius: 6px; margin: 20px 0; font-size: 13px; color: #92400e; }
+    .footer { background-color: #f8fafc; padding: 16px; text-align: center; font-size: 12px; color: #94a3b8; border-top: 1px solid #e2e8f0; }
   </style>
 </head>
 <body>
   <div class="container">
     <div class="header">
-      <h1>🎬 CINESPHERE</h1>
+      <h1>🎬 CINESPHERE ADMIN</h1>
       <p>${subtitle}</p>
     </div>
 
@@ -466,9 +466,8 @@ function getStaffEmailLayout(content: string, subtitle: string): string {
     </div>
 
     <div class="footer">
-      <p><strong>CINESPHERE - Rạp chiếu phim hiện đại</strong></p>
-      <p>Email: cinesphere0629@gmail.com | Hotline: 1900-xxxx</p>
-      <p style="margin-top: 10px; opacity: 0.7;">Đây là email tự động, vui lòng không trả lời email này.</p>
+      <p><strong>CINESPHERE Admin Portal</strong> • Hệ thống quản trị nội bộ</p>
+      <p style="margin-top: 6px; opacity: 0.8;">Đây là email tự động từ hệ thống quản trị, vui lòng không trả lời.</p>
     </div>
   </div>
 </body>

@@ -67,6 +67,7 @@ interface MovieData {
         cover_image?: string;
         created_by_staff_name?: string;
         updated_by_staff_name?: string;
+        branch_id?: number | null;
 }
 
 interface Props {
@@ -286,6 +287,7 @@ export default function MoviesContent({
                                                                 </TableHead>
                                                                 <TableHead className="text-xs font-semibold text-gray-600 uppercase py-3 text-center">Đánh giá</TableHead>
                                                                 <TableHead className="text-xs font-semibold text-gray-600 uppercase py-3">Cập nhật</TableHead>
+                                                                <TableHead className="text-xs font-semibold text-gray-600 uppercase py-3 min-w-[120px]">Chi nhánh</TableHead>
                                                                 <TableHead className="text-center text-xs font-semibold text-gray-600 uppercase py-3">Trạng thái</TableHead>
                                                                 <TableHead className="text-right text-xs font-semibold text-gray-600 uppercase py-3 pr-8">
                                                                         Thao tác
@@ -296,14 +298,14 @@ export default function MoviesContent({
                                                         {isLoading ? (
                                                                 Array.from({ length: 5 }).map((_, idx) => (
                                                                         <TableRow key={idx}>
-                                                                                <TableCell colSpan={6}>
+                                                                                <TableCell colSpan={7}>
                                                                                         <Skeleton className="h-16 w-full rounded-xl" />
                                                                                 </TableCell>
                                                                         </TableRow>
                                                                 ))
                                                         ) : data.length === 0 ? (
                                                                 <TableRow>
-                                                                        <TableCell colSpan={6} className="h-64 text-center">
+                                                                        <TableCell colSpan={7} className="h-64 text-center">
                                                                                 <div className="flex flex-col items-center justify-center text-slate-400 gap-2">
                                                                                         <FilterX size={48} className="opacity-20 mb-2" />
                                                                                         <p className="text-sm font-medium text-slate-500">Không tìm thấy bộ phim nào phù hợp</p>
@@ -316,6 +318,7 @@ export default function MoviesContent({
                                                         ) : (
                                                                 data.map((movie) => {
                                                                         const isActive = movieStatus[movie.id] === 'active';
+                                                                        const branchName = branches?.find(b => b.id === Number(movie.branch_id))?.name;
                                                                         return (
                                                                                 <TableRow
                                                                                         key={movie.id}
@@ -339,7 +342,7 @@ export default function MoviesContent({
                                                                                                                 </div>
                                                                                                         </div>
                                                                                                         <div className="flex flex-col gap-0.5 min-w-0">
-                                                                                                                <h4 className="font-bold text-slate-900 leading-tight line-clamp-1">{movie.title}</h4>
+                                                                                                                <h4 className="font-bold text-slate-900 leading-tight line-clamp-1" title={movie.title}>{movie.title}</h4>
                                                                                                                 <p className="text-[11px] text-slate-500 line-clamp-1">{movie.genres.join(' • ')}</p>
                                                                                                         </div>
                                                                                                 </div>
@@ -364,6 +367,16 @@ export default function MoviesContent({
                                                                                                                         ? formatDistanceToNow(new Date(movie.updated_at), { addSuffix: true, locale: vi })
                                                                                                                         : ''}
                                                                                                         </span>
+                                                                                                </div>
+                                                                                        </TableCell>
+                                                                                        <TableCell>
+                                                                                                <div 
+                                                                                                        className="text-[13px] font-medium text-slate-700 max-w-[150px] truncate" 
+                                                                                                        title={branchName || 'Tất cả chi nhánh'}
+                                                                                                >
+                                                                                                        {branchName || (
+                                                                                                                <span className="text-slate-400 italic text-xs">Tất cả chi nhánh</span>
+                                                                                                        )}
                                                                                                 </div>
                                                                                         </TableCell>
                                                                                         <TableCell>

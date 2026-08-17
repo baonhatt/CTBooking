@@ -413,7 +413,7 @@ export default function TransactionsContent({
                                                         {isLoading
                                                                 ? Array.from({ length: 5 }).map((_, idx) => (
                                                                         <TableRow key={`sk-${idx}`}>
-                                                                                <TableCell colSpan={8}>
+                                                                                <TableCell colSpan={9}>
                                                                                         <Skeleton className="h-10 w-full" />
                                                                                 </TableCell>
                                                                         </TableRow>
@@ -498,9 +498,14 @@ export default function TransactionsContent({
                                                                                 <TableRow key={t.id} className="hover:bg-gray-50 transition-colors border-b border-gray-200 h-[52px]">
                                                                                         <TableCell className="font-mono text-xs text-gray-500">#{t.id}</TableCell>
                                                                                         <TableCell>
-                                                                                                <Badge variant="outline" className="bg-slate-50 text-slate-600 border-slate-200 text-[10px]">
-                                                                                                        {branches.find((b) => b.id === t.branch_id)?.name || 'Vãng lai'}
-                                                                                                </Badge>
+                                                                                                <div 
+                                                                                                        className="text-[12px] font-medium text-slate-600 max-w-[120px] truncate" 
+                                                                                                        title={branches.find((b) => b.id === t.branch_id)?.name || 'Tất cả chi nhánh'}
+                                                                                                >
+                                                                                                        {branches.find((b) => b.id === t.branch_id)?.name || (
+                                                                                                                <span className="italic text-slate-400">Tất cả chi nhánh</span>
+                                                                                                        )}
+                                                                                                </div>
                                                                                         </TableCell>
                                                                                         <TableCell>
                                                                                                 <div className="flex flex-col">
