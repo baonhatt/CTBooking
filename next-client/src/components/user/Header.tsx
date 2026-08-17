@@ -20,7 +20,6 @@ import { NAV_ITEMS } from '@/components/constants';
 import { HeaderProps, ErrorModalState } from '@/components/filetypes/IType.model';
 import { MobileMenu } from '@/components/MobileMenu';
 import { getCookie } from '@/lib/cookies';
-import MovieSchedulePanel from '@/components/MovieSchedulePanel';
 import {
         AlertDialog,
         AlertDialogAction,
@@ -36,6 +35,7 @@ const LoginDialog = dynamic(() => import('@/components/LoginDialog'), { ssr: fal
 const RegisterDialog = dynamic(() => import('@/components/RegisterDialog'), { ssr: false });
 const ForgetPasswordDialog = dynamic(() => import('@/components/ForgetPasswordDialog'), { ssr: false });
 const ErrorModal = dynamic(() => import('@/components/ErrorModal'), { ssr: false });
+const MovieSchedulePanel = dynamic(() => import('@/components/MovieSchedulePanel'), { ssr: false });
 
 export default function Header({
         onBookClick = () => { },
