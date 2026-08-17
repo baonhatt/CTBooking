@@ -36,9 +36,6 @@ export default function FloatingActions() {
                 return () => observer.disconnect();
         }, [isHome]);
 
-        // Nếu không phải trang chủ hoặc đang mở overlay thì không render
-        if (!isHome || isOverlayOpen) return null;
-
         // Parse branch settings to get specific hotline
         const branchSettings = useMemo(() => {
                 try {
@@ -48,6 +45,9 @@ export default function FloatingActions() {
                         return {};
                 }
         }, [selectedBranch]);
+
+        // Nếu không phải trang chủ hoặc đang mở overlay thì không render
+        if (!isHome || isOverlayOpen) return null;
 
         const handleQuickBook = () => {
                 const params = new URLSearchParams(searchParams.toString());

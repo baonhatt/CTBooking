@@ -12,6 +12,8 @@ import { siteConfig } from '@/config/site';
 
 const SITE_URL = siteConfig.domain;
 
+export const runtime = 'edge';
+
 export async function generateStaticParams() {
         try {
                 const pageSize = 100;

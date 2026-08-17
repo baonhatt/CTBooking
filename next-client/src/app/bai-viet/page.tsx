@@ -9,6 +9,8 @@ import { siteConfig } from '@/config/site';
 
 const SITE_URL = siteConfig.domain;
 
+export const runtime = 'edge';
+
 export const metadata: Metadata = {
         title: 'Tin Tức Điện Ảnh | Cinesphere Blog',
         description:
