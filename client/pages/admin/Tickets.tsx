@@ -121,6 +121,7 @@ export default function TicketsPage() {
                                 is_active: t.is_active ?? true,
                                 display_order: t.display_order ?? 0,
                                 branch_id: t.branch_id || undefined,
+                                branch_ids: Array.isArray(t.branch_ids) ? t.branch_ids : t.branch_ids ?? null,
                                 updated_at: t.updated_at ? new Date(t.updated_at).toISOString() : undefined
                         }))
                 );

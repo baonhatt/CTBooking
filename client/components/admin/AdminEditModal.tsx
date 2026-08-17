@@ -16,6 +16,8 @@ import {
 } from '@/lib/api';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
+import { BranchMultiSelect } from '@/components/admin/BranchMultiSelect';
+import { normalizeBranchIdsInput, parseBranchIdsFromApi } from '@/lib/branch-ids';
 
 interface AdminEditModalProps {
         isEditOpen: boolean;
@@ -186,6 +188,7 @@ const AdminEditModal: React.FC<AdminEditModalProps> = (props) => {
                                                                 : (m.duration_min ?? ''),
                                                 release_date: editData?.release_date ?? m.release_date ?? null,
                                                 branch_id: editData?.branch_id ?? m.branch_id ?? null,
+                                                branch_ids: editData?.branch_ids ?? parseBranchIdsFromApi(m.branch_ids ?? m.branch_id),
                                                 is_active: editData?.is_active ?? m.is_active ?? true
                                         });
                                 }
@@ -578,20 +581,17 @@ const AdminEditModal: React.FC<AdminEditModalProps> = (props) => {
                                                                                                 <div className="col-span-12 lg:col-span-6">
                                                                                                         <Label className="text-sm font-medium text-gray-900 mb-2 block">Chi nhánh</Label>
                                                                                                         {branches && branches.length > 0 ? (
-                                                                                                                <select
-                                                                                                                        value={editData?.branch_id || ''}
-                                                                                                                        onChange={(e) =>
-                                                                                                                                setEditData({ ...editData, branch_id: e.target.value ? Number(e.target.value) : null })
+                                                                                                                <BranchMultiSelect
+                                                                                                                        branches={branches}
+                                                                                                                        value={normalizeBranchIdsInput(editData?.branch_ids, editData?.branch_id)}
+                                                                                                                        onChange={(branch_ids) =>
+                                                                                                                                setEditData({
+                                                                                                                                        ...editData,
+                                                                                                                                        branch_ids,
+                                                                                                                                        branch_id: branch_ids && branch_ids.length === 1 ? branch_ids[0] : null
+                                                                                                                                })
                                                                                                                         }
-                                                                                                                        className="w-full h-10 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:border-blue-600 focus:ring-2 focus:ring-blue-600/10 outline-none transition-all"
-                                                                                                                >
-                                                                                                                        <option value="">Chọn chi nhánh</option>
-                                                                                                                        {branches.map((branch) => (
-                                                                                                                                <option key={branch.id} value={branch.id}>
-                                                                                                                                        {branch.name}
-                                                                                                                                </option>
-                                                                                                                        ))}
-                                                                                                                </select>
+                                                                                                                />
                                                                                                         ) : (
                                                                                                                 <div className="h-10 bg-slate-100 rounded-lg animate-pulse" />
                                                                                                         )}
@@ -716,6 +716,14 @@ const AdminEditModal: React.FC<AdminEditModalProps> = (props) => {
                                                                                         });
                                                                                 }
 
+                                                                                const branch_ids = normalizeBranchIdsInput(editData.branch_ids, editData.branch_id);
+                                                                                if (Array.isArray(branch_ids) && branch_ids.length === 0) {
+                                                                                        toast.error('Lỗi', {
+                                                                                                description: 'Vui lòng chọn ít nhất một chi nhánh hoặc "Tất cả chi nhánh"'
+                                                                                        });
+                                                                                        return;
+                                                                                }
+
                                                                                 const payload = {
                                                                                         title: editData.title,
                                                                                         description: editData.description,
@@ -724,7 +732,7 @@ const AdminEditModal: React.FC<AdminEditModalProps> = (props) => {
                                                                                         genres: editData.genres,
                                                                                         rating: Number(editData.rating) || 0,
                                                                                         duration_min: Number(editData.duration),
-                                                                                        branch_id: editData.branch_id || null, // Thêm branch_id
+                                                                                        branch_ids,
                                                                                         is_active: editData.is_active !== false,
                                                                                         release_date: editData.release_date
                                                                                 };

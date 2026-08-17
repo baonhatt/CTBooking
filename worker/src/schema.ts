@@ -46,6 +46,8 @@ export const movies = sqliteTable('movies', {
         rating: real('rating'),
         duration_min: integer('duration_min'),
         branch_id: integer('branch_id').references(() => branches.id, { onDelete: 'restrict' }),
+        // NULL => all branches; JSON array => specific branches; "[]" => not configured
+        branch_ids: text('branch_ids'),
         created_at: text('created_at').notNull(),
         updated_at: text('updated_at').notNull(),
         is_active: integer('is_active', { mode: 'boolean' }).default(true),
@@ -69,6 +71,8 @@ export const ticket_packages = sqliteTable('ticket_packages', {
         is_active: integer('is_active', { mode: 'boolean' }).default(true),
         display_order: integer('display_order').default(0),
         branch_id: integer('branch_id').references(() => branches.id, { onDelete: 'restrict' }),
+        // NULL => all branches; JSON array => specific branches; "[]" => not configured
+        branch_ids: text('branch_ids'),
         created_at: text('created_at').notNull(),
         updated_at: text('updated_at').notNull(),
         deleted_at: text('deleted_at'),
@@ -146,6 +150,10 @@ export const site_media = sqliteTable('site_media', {
         id: integer('id').primaryKey({ autoIncrement: true }),
         section: text('section').notNull(),
         type: text('type').notNull(),
+        // Branch targeting (v2 JSON approach)
+        // - NULL => applicable to all branches
+        // - JSON array string => applicable to selected branches only
+        branch_ids: text('branch_ids'),
         title: text('title'),
         description: text('description'),
         public_id: text('public_id'),
@@ -183,6 +191,10 @@ export const posts = sqliteTable('posts', {
         title: text('title').notNull(),
         slug: text('slug').unique(),
         content: text('content').notNull(),
+        // Branch targeting (v2 JSON approach)
+        // - NULL => applicable to all branches
+        // - JSON array string => applicable to selected branches only
+        branch_ids: text('branch_ids'),
         excerpt: text('excerpt'),
         featured_image: text('featured_image'),
         meta_description: text('meta_description'),

@@ -53,6 +53,7 @@ export async function createMovieApi(body: {
         is_active?: boolean;
         release_date?: string;
         branch_id?: number | null;
+        branch_ids?: number[] | null;
 }) {
         return request<{ movie: any }>('/api/movies', {
                 method: 'POST',
@@ -74,6 +75,7 @@ export async function updateMovieApi(
                 is_active?: boolean;
                 release_date?: string;
                 branch_id?: number | null;
+                branch_ids?: number[] | null;
         }
 ) {
         return request<{ movie: any }>(`/api/movies/${id}`, {
@@ -98,6 +100,7 @@ export async function getMovieById(id: number) {
                 price: number;
                 is_active: boolean;
                 branch_id: number | null;
+                branch_ids?: number[] | null;
                 branch?: any;
                 release_date: string | null;
                 created_at: string;

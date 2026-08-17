@@ -1,13 +1,15 @@
 import { eq, asc, inArray, and, isNull } from 'drizzle-orm';
+import { enrichItemsWithParsedBranchIds, sqlBranchIdsMatchFilter } from '../../lib/branch-ids';
 
 export async function listActiveTicketPackages(
         anyDb: any,
         tables: { ticket_packages: any; movies: any },
         branch_id?: number
 ) {
+        const baseCondition = and(eq(tables.ticket_packages.is_active, true), isNull(tables.ticket_packages.deleted_at));
         const whereCondition = branch_id
-                ? and(eq(tables.ticket_packages.is_active, true), isNull(tables.ticket_packages.deleted_at), eq(tables.ticket_packages.branch_id, branch_id))
-                : and(eq(tables.ticket_packages.is_active, true), isNull(tables.ticket_packages.deleted_at));
+                ? and(baseCondition, sqlBranchIdsMatchFilter(tables.ticket_packages.branch_ids, tables.ticket_packages.branch_id, branch_id))
+                : baseCondition;
 
         const items = await anyDb.query.ticket_packages.findMany({
                 where: whereCondition,
@@ -68,5 +70,5 @@ export async function listActiveTicketPackages(
                 };
         });
 
-        return { items: processedItems };
+        return { items: enrichItemsWithParsedBranchIds(processedItems) };
 }

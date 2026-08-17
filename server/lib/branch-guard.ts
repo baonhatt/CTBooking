@@ -1,4 +1,7 @@
 import { eq, and, inArray } from 'drizzle-orm';
+import { parseBranchIds, staffCanAccessBranchIds } from './branch-ids';
+
+export { staffCanAccessBranchIds, parseBranchIds, matchesBranchFilter } from './branch-ids';
 
 /**
  * Apply branch isolation filter to a query
@@ -58,17 +61,13 @@ export function hasBranchAccess(
  * @param isSuperAdmin - Whether the staff is a super admin
  * @returns Filtered array of items
  */
-export function filterItemsByBranch<T>(
-  items: T[],
-  branchIdGetter: (item: T) => number | undefined | null,
-  staffBranchIds: number[] | undefined,
-  isSuperAdmin: boolean | undefined
+export function filterItemsByBranchIds<T>(
+        items: T[],
+        branchIdsGetter: (item: T) => string | null | undefined,
+        staffBranchIds: number[] | undefined,
+        isSuperAdmin: boolean | undefined
 ): T[] {
-  if (isSuperAdmin) return items;
-  if (!staffBranchIds || staffBranchIds.length === 0) return [];
-
-  return items.filter((item) => {
-    const branchId = branchIdGetter(item);
-    return branchId !== undefined && branchId !== null && staffBranchIds.includes(branchId);
-  });
+        if (isSuperAdmin) return items;
+        if (!staffBranchIds || staffBranchIds.length === 0) return [];
+        return items.filter((item) => staffCanAccessBranchIds(branchIdsGetter(item), staffBranchIds, isSuperAdmin));
 }

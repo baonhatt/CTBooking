@@ -2402,7 +2402,7 @@ app.get('/api/admin/deleted/movies', requireStaffAuth, requirePermission('movies
     const r = await listDeletedMoviesImpl(
       db,
       { movies: schema.movies, staffs: schema.staffs },
-      { page, pageSize, search, branch_id: restrictBranchIds ? restrictBranchIds[0] : branch_id }
+      { page, pageSize, search, branch_id, restrictToBranchIds: restrictBranchIds }
     );
 
     return c.json(r, 200);
@@ -3241,7 +3241,7 @@ app.get('/api/admin/deleted/tickets', requireStaffAuth, requirePermission('ticke
     const r = await listDeletedTicketPackagesImpl(
       db,
       { ticket_packages: schema.ticket_packages, staffs: schema.staffs },
-      { page, pageSize, search, branch_id: restrictBranchIds ? restrictBranchIds[0] : branch_id }
+      { page, pageSize, search, branch_id, restrictToBranchIds: restrictBranchIds }
     );
 
     return c.json(r, 200);

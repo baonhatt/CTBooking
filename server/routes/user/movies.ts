@@ -1,15 +1,17 @@
 import type { RequestHandler } from 'express';
 import type { ActiveMoviesTodayResponse } from '@shared/api';
 import { eq, desc, asc, count, sql, and, inArray, isNull } from 'drizzle-orm';
+import { enrichItemsWithParsedBranchIds, parseBranchIds, sqlBranchIdsMatchFilter, sqlBranchIdsStaffAccessFilter } from '../../lib/branch-ids';
 
 export async function getAllActiveMoviesToday(
         anyDb: any,
         tables: { movies: any },
         branch_id?: number
 ): Promise<{ activeMovies: ActiveMoviesTodayResponse[] }> {
+        const baseCondition = and(eq(tables.movies.is_active, true), isNull(tables.movies.deleted_at));
         const whereCondition = branch_id
-                ? and(eq(tables.movies.is_active, true), isNull(tables.movies.deleted_at), eq(tables.movies.branch_id, branch_id))
-                : and(eq(tables.movies.is_active, true), isNull(tables.movies.deleted_at));
+                ? and(baseCondition, sqlBranchIdsMatchFilter(tables.movies.branch_ids, tables.movies.branch_id, branch_id))
+                : baseCondition;
 
         const active_movies = await anyDb.query.movies.findMany({
                 where: whereCondition,
@@ -82,10 +84,10 @@ export async function listMovies(
                 conditions.push(eq(tables.movies.is_active, false));
         }
         if (branch_id) {
-                conditions.push(eq(tables.movies.branch_id, branch_id));
+                conditions.push(sqlBranchIdsMatchFilter(tables.movies.branch_ids, tables.movies.branch_id, branch_id));
         }
         if (restrictToBranchIds && restrictToBranchIds.length > 0) {
-                conditions.push(inArray(tables.movies.branch_id, restrictToBranchIds));
+                conditions.push(sqlBranchIdsStaffAccessFilter(tables.movies.branch_ids, restrictToBranchIds));
         }
         const whereClause = conditions.length ? and(...conditions) : undefined;
         const totalResult = await anyDb.select({ count: count() }).from(tables.movies).where(whereClause);
@@ -112,31 +114,33 @@ export async function listMovies(
                 offset: (page - 1) * pageSize
         });
         // Parse JSON fields (handle old data formats)
-        const parsedItems = items.map((m: any) => ({
-                ...m,
-                detail_images: m.detail_images
-                        ? Array.isArray(m.detail_images)
-                                ? m.detail_images
-                                : (() => {
-                                        try {
-                                                return JSON.parse(m.detail_images);
-                                        } catch {
-                                                return [];
-                                        }
-                                })()
-                        : [],
-                genres: m.genres
-                        ? Array.isArray(m.genres)
-                                ? m.genres
-                                : (() => {
-                                        try {
-                                                return JSON.parse(m.genres);
-                                        } catch {
-                                                return [];
-                                        }
-                                })()
-                        : []
-        }));
+        const parsedItems = enrichItemsWithParsedBranchIds(
+                items.map((m: any) => ({
+                        ...m,
+                        detail_images: m.detail_images
+                                ? Array.isArray(m.detail_images)
+                                        ? m.detail_images
+                                        : (() => {
+                                                  try {
+                                                          return JSON.parse(m.detail_images);
+                                                  } catch {
+                                                          return [];
+                                                  }
+                                          })()
+                                : [],
+                        genres: m.genres
+                                ? Array.isArray(m.genres)
+                                        ? m.genres
+                                        : (() => {
+                                                  try {
+                                                          return JSON.parse(m.genres);
+                                                  } catch {
+                                                          return [];
+                                                  }
+                                          })()
+                                : []
+                }))
+        );
         return { items: parsedItems, page, pageSize, total };
 }
 
@@ -148,7 +152,7 @@ export async function getMovie(
 ) {
         const whereClause =
                 restrictToBranchIds && restrictToBranchIds.length > 0
-                        ? and(eq(tables.movies.id, id), inArray(tables.movies.branch_id, restrictToBranchIds))
+                        ? and(eq(tables.movies.id, id), sqlBranchIdsStaffAccessFilter(tables.movies.branch_ids, restrictToBranchIds))
                         : eq(tables.movies.id, id);
         const movie = await anyDb.query.movies.findFirst({
                 where: whereClause,
@@ -158,29 +162,31 @@ export async function getMovie(
         });
         if (!movie) return null;
         // Parse JSON fields (handle old data formats)
-        return {
-                ...movie,
-                detail_images: movie.detail_images
-                        ? Array.isArray(movie.detail_images)
-                                ? movie.detail_images
-                                : (() => {
-                                        try {
-                                                return JSON.parse(movie.detail_images);
-                                        } catch {
-                                                return [];
-                                        }
-                                })()
-                        : [],
-                genres: movie.genres
-                        ? Array.isArray(movie.genres)
-                                ? movie.genres
-                                : (() => {
-                                        try {
-                                                return JSON.parse(movie.genres);
-                                        } catch {
-                                                return [];
-                                        }
-                                })()
-                        : []
-        };
+        return enrichItemsWithParsedBranchIds([
+                {
+                        ...movie,
+                        detail_images: movie.detail_images
+                                ? Array.isArray(movie.detail_images)
+                                        ? movie.detail_images
+                                        : (() => {
+                                                  try {
+                                                          return JSON.parse(movie.detail_images);
+                                                  } catch {
+                                                          return [];
+                                                  }
+                                          })()
+                                : [],
+                        genres: movie.genres
+                                ? Array.isArray(movie.genres)
+                                        ? movie.genres
+                                        : (() => {
+                                                  try {
+                                                          return JSON.parse(movie.genres);
+                                                  } catch {
+                                                          return [];
+                                                  }
+                                          })()
+                                : []
+                }
+        ])[0];
 }

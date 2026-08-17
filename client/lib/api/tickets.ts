@@ -47,6 +47,7 @@ export async function createTicketApi(body: {
         is_active?: boolean;
         display_order?: number;
         branch_id?: number;
+        branch_ids?: number[] | null;
 }) {
         return request<{ item: any }>(`/api/tickets`, {
                 method: 'POST',
@@ -70,6 +71,7 @@ export async function updateTicketApi(
                 is_active?: boolean;
                 display_order?: number;
                 branch_id?: number;
+                branch_ids?: number[] | null;
         }
 ) {
         return request<{ item: any }>(`/api/tickets/${id}`, {

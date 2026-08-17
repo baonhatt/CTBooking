@@ -3,6 +3,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { BranchIdsBadge } from '@/components/admin/BranchIdsBadge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Switch } from '@/components/ui/switch';
 import {
@@ -68,6 +69,7 @@ interface MovieData {
         created_by_staff_name?: string;
         updated_by_staff_name?: string;
         branch_id?: number | null;
+        branch_ids?: number[] | null;
 }
 
 interface Props {
@@ -318,7 +320,6 @@ export default function MoviesContent({
                                                         ) : (
                                                                 data.map((movie) => {
                                                                         const isActive = movieStatus[movie.id] === 'active';
-                                                                        const branchName = branches?.find(b => b.id === Number(movie.branch_id))?.name;
                                                                         return (
                                                                                 <TableRow
                                                                                         key={movie.id}
@@ -370,14 +371,11 @@ export default function MoviesContent({
                                                                                                 </div>
                                                                                         </TableCell>
                                                                                         <TableCell>
-                                                                                                <div 
-                                                                                                        className="text-[13px] font-medium text-slate-700 max-w-[150px] truncate" 
-                                                                                                        title={branchName || 'Tất cả chi nhánh'}
-                                                                                                >
-                                                                                                        {branchName || (
-                                                                                                                <span className="text-slate-400 italic text-xs">Tất cả chi nhánh</span>
-                                                                                                        )}
-                                                                                                </div>
+                                                                                                <BranchIdsBadge
+                                                                                                        branch_ids={movie.branch_ids}
+                                                                                                        branch_id={movie.branch_id}
+                                                                                                        branches={branches || []}
+                                                                                                />
                                                                                         </TableCell>
                                                                                         <TableCell>
                                                                                                 <div className="flex items-center justify-center gap-4 py-2">

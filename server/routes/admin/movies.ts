@@ -2,6 +2,15 @@ import { eq, desc, and, inArray, sql, or, isNull, isNotNull, like, count } from 
 import { formatDateForDb } from '../../lib/date-utils';
 import { logAuditAction } from '../../lib/audit-logger';
 import { buildAuditPayload } from '../../lib/audit-utils';
+import {
+        enrichWithParsedBranchIds,
+        enrichItemsWithParsedBranchIds,
+        parseBranchIds,
+        resolveBranchIdsInput,
+        staffCanAccessBranchIds,
+        sqlBranchIdsMatchFilter,
+        sqlBranchIdsStaffAccessFilter
+} from '../../lib/branch-ids';
 
 export async function createMovieImpl(
         anyDb: any,
@@ -17,7 +26,8 @@ export async function createMovieImpl(
                 duration_min: number;
                 is_active?: boolean;
                 release_date: string | Date | null;
-                branch_id?: number;
+                branch_id?: number | null;
+                branch_ids?: number[] | null;
         },
         config?: any,
         RUN_ENV?: any,
@@ -38,6 +48,7 @@ export async function createMovieImpl(
                         throw error; // Throw lỗi khi upload ảnh
                 }
         }
+        const branchFields = resolveBranchIdsInput(data.branch_ids, data.branch_id);
         const baseData: any = {
                 title: data.title,
                 description: data.description,
@@ -46,7 +57,8 @@ export async function createMovieImpl(
                 genres: Array.isArray(data.genres) ? JSON.stringify(data.genres) : data.genres,
                 rating: data.rating ?? null,
                 duration_min: data.duration_min,
-                branch_id: data.branch_id || null,
+                branch_id: branchFields.branch_id ?? null,
+                branch_ids: branchFields.branch_ids ?? null,
                 is_active: data.is_active === undefined ? true : Boolean(data.is_active),
                 release_date: data.release_date ? formatDateForDb(data.release_date) : null,
                 created_at: formatDateForDb(now),
@@ -80,7 +92,7 @@ export async function createMovieImpl(
                         );
                 }
 
-                return { movie };
+                return { movie: enrichWithParsedBranchIds(movie) };
         } catch (err: any) {
                 throw err;
         }
@@ -101,7 +113,8 @@ export async function updateMovieImpl(
                 duration_min?: number;
                 is_active?: boolean;
                 release_date?: string | Date | null;
-                branch_id?: number;
+                branch_id?: number | null;
+                branch_ids?: number[] | null;
         },
         config?: any,
         RUN_ENV?: any,
@@ -118,7 +131,7 @@ export async function updateMovieImpl(
         const oldMovie = await anyDb.query.movies.findFirst({
                 where: eq(tables.movies.id, id)
         });
-        if (oldMovie && restrictToBranchIds && restrictToBranchIds.length > 0 && !restrictToBranchIds.includes(Number(oldMovie.branch_id))) {
+        if (oldMovie && restrictToBranchIds && restrictToBranchIds.length > 0 && !staffCanAccessBranchIds(oldMovie.branch_ids, restrictToBranchIds, false)) {
                 const err: any = new Error('Bạn không có quyền sửa phim thuộc chi nhánh khác');
                 err.statusCode = 403;
                 throw err;
@@ -145,7 +158,11 @@ export async function updateMovieImpl(
                 payload.genres = Array.isArray(data.genres) ? JSON.stringify(data.genres) : data.genres;
         if (data.rating !== undefined) payload.rating = data.rating ?? null;
         if (data.duration_min !== undefined) payload.duration_min = data.duration_min;
-        if (data.branch_id !== undefined) payload.branch_id = data.branch_id;
+        if (data.branch_ids !== undefined || data.branch_id !== undefined) {
+                const branchFields = resolveBranchIdsInput(data.branch_ids, data.branch_id);
+                if (branchFields.branch_ids !== undefined) payload.branch_ids = branchFields.branch_ids;
+                if (branchFields.branch_id !== undefined) payload.branch_id = branchFields.branch_id;
+        }
         if (data.is_active !== undefined) payload.is_active = data.is_active;
         if (data.release_date !== undefined) {
                 payload.release_date = data.release_date ? formatDateForDb(data.release_date) : null;
@@ -227,7 +244,7 @@ export async function updateMovieImpl(
                         );
                 }
 
-                return { movie };
+                return { movie: enrichWithParsedBranchIds(movie) };
         } catch (err: any) {
                 throw err;
         }
@@ -248,7 +265,7 @@ export async function deleteMovieImpl(
         });
 
         if (!existing) return null;
-        if (restrictToBranchIds && restrictToBranchIds.length > 0 && !restrictToBranchIds.includes(Number(existing.branch_id))) {
+        if (restrictToBranchIds && restrictToBranchIds.length > 0 && !staffCanAccessBranchIds(existing.branch_ids, restrictToBranchIds, false)) {
                 const err: any = new Error('Bạn không có quyền xóa phim thuộc chi nhánh khác');
                 err.statusCode = 403;
                 throw err;
@@ -360,17 +377,20 @@ export async function restoreMovieImpl(
 export async function listDeletedMoviesImpl(
         anyDb: any,
         tables: { movies: any; staffs: any },
-        options: { page?: number; pageSize?: number; search?: string; branch_id?: number | null } = {}
+        options: { page?: number; pageSize?: number; search?: string; branch_id?: number | null; restrictToBranchIds?: number[] | null } = {}
 ) {
         const { movies, staffs } = tables;
-        const { page = 1, pageSize = 10, search = '', branch_id } = options;
+        const { page = 1, pageSize = 10, search = '', branch_id, restrictToBranchIds = null } = options;
 
         const conditions = [];
         if (search) {
                 conditions.push(like(movies.title, `%${search}%`));
         }
         if (branch_id) {
-                conditions.push(eq(movies.branch_id, branch_id));
+                conditions.push(sqlBranchIdsMatchFilter(movies.branch_ids, movies.branch_id, branch_id));
+        }
+        if (restrictToBranchIds && restrictToBranchIds.length > 0) {
+                conditions.push(sqlBranchIdsStaffAccessFilter(movies.branch_ids, restrictToBranchIds));
         }
         conditions.push(isNotNull(movies.deleted_at));
 
@@ -386,6 +406,7 @@ export async function listDeletedMoviesImpl(
                         rating: movies.rating,
                         duration_min: movies.duration_min,
                         branch_id: movies.branch_id,
+                        branch_ids: movies.branch_ids,
                         created_at: movies.created_at,
                         updated_at: movies.updated_at,
                         is_active: movies.is_active,
@@ -408,7 +429,7 @@ export async function listDeletedMoviesImpl(
 
         return {
                 status: 'success',
-                items,
+                items: enrichItemsWithParsedBranchIds(items),
                 total: countResult?.count || 0,
                 page,
                 pageSize
@@ -437,7 +458,7 @@ export async function updateMovieStatusImpl(
                 if (
                         restrictToBranchIds &&
                         restrictToBranchIds.length > 0 &&
-                        !restrictToBranchIds.includes(Number(existingMovie.branch_id))
+                        !staffCanAccessBranchIds(existingMovie.branch_ids, restrictToBranchIds, false)
                 ) {
                         const err: any = new Error('Bạn không có quyền thay đổi trạng thái phim thuộc chi nhánh khác');
                         err.statusCode = 403;
@@ -551,11 +572,15 @@ export async function getMovieByIdImpl(
                 return isNaN(d.getTime()) ? null : d.toISOString();
         };
 
+        const movieWhere =
+                restrictToBranchIds && restrictToBranchIds.length > 0
+                        ? and(
+                                  eq(tables.movies.id, movieId),
+                                  sqlBranchIdsStaffAccessFilter(tables.movies.branch_ids, restrictToBranchIds)
+                          )
+                        : eq(tables.movies.id, movieId);
         const movie = await anyDb.query.movies.findFirst({
-                where:
-                        restrictToBranchIds && restrictToBranchIds.length > 0
-                                ? and(eq(tables.movies.id, movieId), inArray(tables.movies.branch_id, restrictToBranchIds))
-                                : eq(tables.movies.id, movieId),
+                where: movieWhere,
                 with: {
                         branch: true
                 }
@@ -590,7 +615,11 @@ export async function getMovieByIdImpl(
                 .from(tables.ticket_packages)
                 .where(
                         restrictToBranchIds && restrictToBranchIds.length > 0
-                                ? and(eq(tables.ticket_packages.is_active, true), isNull(tables.ticket_packages.deleted_at), inArray(tables.ticket_packages.branch_id, restrictToBranchIds))
+                                ? and(
+                                          eq(tables.ticket_packages.is_active, true),
+                                          isNull(tables.ticket_packages.deleted_at),
+                                          sqlBranchIdsStaffAccessFilter(tables.ticket_packages.branch_ids, restrictToBranchIds)
+                                  )
                                 : and(eq(tables.ticket_packages.is_active, true), isNull(tables.ticket_packages.deleted_at))
                 );
 
@@ -647,6 +676,8 @@ export async function getMovieByIdImpl(
                 updated_by_staff_name: updateLog?.staffFullname || null,
                 stats: { totalTicketsSold, totalRevenue, successfulBookings },
                 applicable_packages: applicablePackages || [],
-                detail_images: safeParseJson(movie.detail_images)
+                detail_images: safeParseJson(movie.detail_images),
+                branch_id: movie.branch_id,
+                branch_ids: parseBranchIds(movie.branch_ids)
         };
 }

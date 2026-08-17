@@ -108,7 +108,8 @@ export default function MoviesPage() {
                                 rating: m.rating ?? null,
                                 price: Number(m.price || 0),
                                 is_active: m.is_active,
-                                branch_id: m.branch_id
+                                branch_id: m.branch_id,
+                                branch_ids: Array.isArray(m.branch_ids) ? m.branch_ids : m.branch_ids ?? null
                         }));
                         setMoviesLocal(mapped);
                         setTotalMovies(total);
@@ -210,6 +211,7 @@ export default function MoviesPage() {
                         price: Number(m.price || 0),
                         is_active: m.is_active,
                         branch_id: m.branch_id,
+                        branch_ids: Array.isArray(m.branch_ids) ? m.branch_ids : m.branch_ids ?? null,
                         updated_at: m.updated_at ? new Date(m.updated_at).toISOString() : null
                 }));
                 setMoviesLocal(mapped);

@@ -30,6 +30,9 @@ import {
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
+import { BranchMultiSelect } from '@/components/admin/BranchMultiSelect';
+import { BranchIdsBadge } from '@/components/admin/BranchIdsBadge';
+import { normalizeBranchIdsInput } from '@/lib/branch-ids';
 import { toast } from 'sonner';
 import { useNavigate } from 'react-router-dom';
 import { createTicketApi, updateTicketApi, getBranches, toggleTicketStatusApi } from '@/lib/api';
@@ -52,6 +55,7 @@ interface TicketPackage {
     is_active?: boolean;
     display_order?: number;
     branch_id?: number;
+    branch_ids?: number[] | null;
     branch_name?: string;
     updated_at?: string;
     created_at?: string;
@@ -133,14 +137,14 @@ export default function TicketsContent(props: Props) {
     // Fetch movies when dialog opens or branch changes
     React.useEffect(() => {
         if (isEditOpen) {
-            getMoviesAdmin({ status: 'active', pageSize: 100, branch_id: editData?.branch_id || undefined }).then((res) => {
+            getMoviesAdmin({ status: 'active', pageSize: 100 }).then((res) => {
                 setMovies(res.items);
             });
             getBranches({ includeInactive: true }).then((res) => {
                 setBranchOptions(res.items);
             });
         }
-    }, [isEditOpen, editData?.branch_id]);
+    }, [isEditOpen]);
 
     const handleToggleStatus = async (id: number, currentStatus: boolean) => {
         try {
@@ -262,7 +266,6 @@ export default function TicketsContent(props: Props) {
                                     </TableRow>
                                 ))
                                 : data.map((t) => {
-                                    const branchName = branches?.find(b => b.id === Number(t.branch_id))?.name;
                                     return (
                                     <TableRow
                                         key={t.id}
@@ -302,14 +305,11 @@ export default function TicketsContent(props: Props) {
                                             </div>
                                         </TableCell>
                                         <TableCell>
-                                            <div 
-                                                className="text-[13px] font-medium text-slate-700 max-w-[150px] truncate" 
-                                                title={branchName || 'Tất cả chi nhánh'}
-                                            >
-                                                {branchName || (
-                                                    <span className="text-slate-400 italic text-xs">Tất cả chi nhánh</span>
-                                                )}
-                                            </div>
+                                            <BranchIdsBadge
+                                                branch_ids={t.branch_ids}
+                                                branch_id={t.branch_id}
+                                                branches={branches || []}
+                                            />
                                         </TableCell>
                                         <TableCell className="text-center">
                                             {hasPermission('tickets', 'toggle_status') ? (
@@ -536,20 +536,17 @@ export default function TicketsContent(props: Props) {
                                     </h3>
                                     <div>
                                         <Label className="text-sm font-medium text-gray-900 mb-2">Chi nhánh</Label>
-                                        <select
-                                            value={editData?.branch_id || ''}
-                                            onChange={(e) =>
-                                                setEditData({ ...editData, branch_id: e.target.value ? Number(e.target.value) : null })
+                                        <BranchMultiSelect
+                                            branches={branchOptions}
+                                            value={normalizeBranchIdsInput(editData?.branch_ids, editData?.branch_id)}
+                                            onChange={(branch_ids) =>
+                                                setEditData({
+                                                    ...editData,
+                                                    branch_ids,
+                                                    branch_id: branch_ids && branch_ids.length === 1 ? branch_ids[0] : undefined
+                                                })
                                             }
-                                            className="w-full h-10 border border-gray-300 rounded-lg px-3 focus:outline-none focus:ring-2 focus:ring-blue-500/10 focus:border-blue-500 bg-white"
-                                        >
-                                            <option value="">Chọn chi nhánh</option>
-                                            {branchOptions.map((branch) => (
-                                                <option key={branch.id} value={branch.id}>
-                                                    {branch.name}
-                                                </option>
-                                            ))}
-                                        </select>
+                                        />
                                     </div>
                                     <div>
                                         <Label className="text-sm font-medium text-gray-900 mb-2">Combo Phim ({editData?.combo?.length || 0})</Label>
@@ -695,6 +692,11 @@ export default function TicketsContent(props: Props) {
                             onClick={async () => {
                                 try {
                                     setIsSaving(true);
+                                    const branch_ids = normalizeBranchIdsInput(editData?.branch_ids, editData?.branch_id);
+                                    if (Array.isArray(branch_ids) && branch_ids.length === 0) {
+                                        toast.error('Vui lòng chọn ít nhất một chi nhánh hoặc "Tất cả chi nhánh"');
+                                        return;
+                                    }
                                     if (!editData?.id) {
                                         await createTicketApi({
                                             name: editData.name,
@@ -709,7 +711,7 @@ export default function TicketsContent(props: Props) {
                                             is_member_only: !!editData.is_member_only,
                                             is_active: !!editData.is_active,
                                             display_order: editData.display_order ? Number(editData.display_order) : 0,
-                                            branch_id: editData.branch_id ? Number(editData.branch_id) : undefined
+                                            branch_ids
                                         });
                                     } else {
                                         await updateTicketApi(Number(editData.id), {
@@ -725,7 +727,7 @@ export default function TicketsContent(props: Props) {
                                             is_member_only: !!editData.is_member_only,
                                             is_active: !!editData.is_active,
                                             display_order: editData.display_order ? Number(editData.display_order) : 0,
-                                            branch_id: editData.branch_id ? Number(editData.branch_id) : undefined
+                                            branch_ids
                                         });
                                     }
                                     await onRefresh();
@@ -830,7 +832,11 @@ export default function TicketsContent(props: Props) {
                                             </div>
                                             <div className="space-y-1">
                                                 <Label className="text-[11px] font-medium text-gray-500">Chi nhánh</Label>
-                                                <div className="text-sm">{selectedTicket.branch_id ?? 'Tất cả'}</div>
+                                                <BranchIdsBadge
+                                                        branch_ids={selectedTicket.branch_ids}
+                                                        branch_id={selectedTicket.branch_id}
+                                                        branches={branches || []}
+                                                />
                                             </div>
                                             <div className="space-y-1">
                                                 <Label className="text-[11px] font-medium text-gray-500">Số nhóm tối thiểu</Label>

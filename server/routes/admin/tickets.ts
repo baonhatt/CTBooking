@@ -1,9 +1,16 @@
-// Import các hàm cần thiết từ thư viện
 import { eq, or, desc, asc, count, inArray, and, sql, isNull, isNotNull, like } from 'drizzle-orm';
 import { formatDateForDb } from '../../lib/date-utils';
 import { deleteCache } from '../../../worker/src/utils';
 import { logAuditAction } from '../../lib/audit-logger';
 import { buildAuditPayload } from '../../lib/audit-utils';
+import {
+        enrichWithParsedBranchIds,
+        enrichItemsWithParsedBranchIds,
+        resolveBranchIdsInput,
+        staffCanAccessBranchIds,
+        sqlBranchIdsMatchFilter,
+        sqlBranchIdsStaffAccessFilter
+} from '../../lib/branch-ids';
 
 /**
  * Hàm helper xử lý dữ liệu combo
@@ -73,12 +80,12 @@ export async function listTicketPackagesImpl(
                 whereCondition = whereCondition ? and(whereCondition, searchCondition) : searchCondition;
         }
         if (branch_id) {
-                whereCondition = whereCondition ? and(whereCondition, eq(tables.ticket_packages.branch_id, branch_id)) : eq(tables.ticket_packages.branch_id, branch_id);
+                const branchFilter = sqlBranchIdsMatchFilter(tables.ticket_packages.branch_ids, tables.ticket_packages.branch_id, branch_id);
+                whereCondition = whereCondition ? and(whereCondition, branchFilter) : branchFilter;
         }
         if (restrictToBranchIds && restrictToBranchIds.length > 0) {
-                whereCondition = whereCondition
-                        ? and(whereCondition, inArray(tables.ticket_packages.branch_id, restrictToBranchIds))
-                        : inArray(tables.ticket_packages.branch_id, restrictToBranchIds);
+                const staffFilter = sqlBranchIdsStaffAccessFilter(tables.ticket_packages.branch_ids, restrictToBranchIds);
+                whereCondition = whereCondition ? and(whereCondition, staffFilter) : staffFilter;
         }
         // 2. Lấy dữ liệu phân trang - tạm thời bỏ join branches
         const [totalResArray, pkgList] = await Promise.all([
@@ -97,8 +104,9 @@ export async function listTicketPackagesImpl(
         const total = totalResult ? Number(totalResult.count) : 0;
 
         // 3. Xử lý combo và features cho từng gói vé
-        const items = packages.map((pkg: any) => ({
-                ...pkg,
+        const items = packages.map((pkg: any) =>
+                enrichWithParsedBranchIds({
+                        ...pkg,
                 // Parse JSON string to array (handle old data formats: JSON array or "1|2|3")
                 combo: pkg.combo
                         ? Array.isArray(pkg.combo)
@@ -129,7 +137,8 @@ export async function listTicketPackagesImpl(
                                         }
                                 })()
                         : []
-        }));
+                })
+        );
 
         // 4. Trả về kết quả phân trang
         return {
@@ -156,7 +165,10 @@ export async function getTicketPackageImpl(
 ) {
         const whereClause =
                 restrictToBranchIds && restrictToBranchIds.length > 0
-                        ? and(eq(tables.ticket_packages.id, id), inArray(tables.ticket_packages.branch_id, restrictToBranchIds))
+                        ? and(
+                                  eq(tables.ticket_packages.id, id),
+                                  sqlBranchIdsStaffAccessFilter(tables.ticket_packages.branch_ids, restrictToBranchIds)
+                          )
                         : eq(tables.ticket_packages.id, id);
         const [item] = await anyDb.select().from(tables.ticket_packages).where(whereClause).limit(1);
         if (!item) return null;
@@ -177,7 +189,7 @@ export async function getTicketPackageImpl(
                 .limit(1);
 
         // Parse JSON strings to arrays (handle old data formats: JSON array or "1|2|3")
-        return {
+        return enrichWithParsedBranchIds({
                 ...item,
                 created_by_staff_name: createLog?.staffFullname || null,
                 updated_by_staff_name: updateLog?.staffFullname || null,
@@ -210,7 +222,7 @@ export async function getTicketPackageImpl(
                                         }
                                 })()
                         : []
-        };
+        });
 }
 
 /**
@@ -236,7 +248,8 @@ export async function createTicketPackageImpl(
                 is_member_only?: boolean; // Chỉ dành cho thành viên
                 is_active?: boolean; // Trạng thái hoạt động
                 display_order?: number; // Thứ tự hiển thị
-                branch_id?: number; // Chi nhánh
+                branch_id?: number | null;
+                branch_ids?: number[] | null;
         },
         RUN_ENV: any,
         staffInfo?: { id: number; email: string; fullname: string }
@@ -254,8 +267,11 @@ export async function createTicketPackageImpl(
                 is_member_only,
                 is_active,
                 display_order,
-                branch_id
+                branch_id,
+                branch_ids
         } = args;
+
+        const branchFields = resolveBranchIdsInput(branch_ids, branch_id);
 
         // 1. Chuẩn bị thời gian tạo và cập nhật
         const now = new Date();
@@ -336,7 +352,8 @@ export async function createTicketPackageImpl(
                         is_active: is_active ?? true,
                         // Mặc định thứ tự hiển thị là 0 nếu không xác định
                         display_order: Number(display_order ?? 0),
-                        branch_id: branch_id || null,
+                        branch_id: branchFields.branch_id ?? null,
+                        branch_ids: branchFields.branch_ids ?? null,
                         // Thời gian tạo và cập nhật
                         created_at: formattedNow,
                         updated_at: formattedNow
@@ -382,7 +399,7 @@ export async function createTicketPackageImpl(
                 );
         }
 
-        return { item };
+        return { item: enrichWithParsedBranchIds(item) };
 }
 
 /**
@@ -410,7 +427,8 @@ export async function updateTicketPackageImpl(
                 is_member_only?: boolean; // Chỉ dành cho thành viên
                 is_active?: boolean; // Trạng thái hoạt động
                 display_order?: number; // Thứ tự hiển thị
-                branch_id?: number; // Chi nhánh
+                branch_id?: number | null;
+                branch_ids?: number[] | null;
         },
         RUN_ENV: any,
         staffInfo?: { id: number; email: string; fullname: string }
@@ -433,7 +451,8 @@ export async function updateTicketPackageImpl(
                 is_member_only,
                 is_active,
                 display_order,
-                branch_id
+                branch_id,
+                branch_ids
         } = args;
 
         const now = new Date();
@@ -451,7 +470,11 @@ export async function updateTicketPackageImpl(
         if (is_member_only !== undefined) data.is_member_only = Boolean(is_member_only);
         if (is_active !== undefined) data.is_active = Boolean(is_active);
         if (display_order !== undefined) data.display_order = Number(display_order);
-        if (branch_id !== undefined) data.branch_id = branch_id;
+        if (branch_ids !== undefined || branch_id !== undefined) {
+                const branchFields = resolveBranchIdsInput(branch_ids, branch_id);
+                if (branchFields.branch_ids !== undefined) data.branch_ids = branchFields.branch_ids;
+                if (branchFields.branch_id !== undefined) data.branch_id = branchFields.branch_id;
+        }
 
         // 2. Tối ưu xử lý Features
         if (features !== undefined) {
@@ -533,7 +556,8 @@ export async function updateTicketPackageImpl(
                 );
         }
 
-        return item || null;
+        if (!item) return null;
+        return enrichWithParsedBranchIds(item);
 }
 
 /**
@@ -667,17 +691,20 @@ export async function restoreTicketPackageImpl(
 export async function listDeletedTicketPackagesImpl(
         anyDb: any,
         tables: { ticket_packages: any; staffs: any },
-        options: { page?: number; pageSize?: number; search?: string; branch_id?: number | null } = {}
+        options: { page?: number; pageSize?: number; search?: string; branch_id?: number | null; restrictToBranchIds?: number[] | null } = {}
 ) {
         const { ticket_packages, staffs } = tables;
-        const { page = 1, pageSize = 10, search = '', branch_id } = options;
+        const { page = 1, pageSize = 10, search = '', branch_id, restrictToBranchIds = null } = options;
 
         const conditions = [];
         if (search) {
                 conditions.push(like(ticket_packages.name, `%${search}%`));
         }
         if (branch_id) {
-                conditions.push(eq(ticket_packages.branch_id, branch_id));
+                conditions.push(sqlBranchIdsMatchFilter(ticket_packages.branch_ids, ticket_packages.branch_id, branch_id));
+        }
+        if (restrictToBranchIds && restrictToBranchIds.length > 0) {
+                conditions.push(sqlBranchIdsStaffAccessFilter(ticket_packages.branch_ids, restrictToBranchIds));
         }
         conditions.push(isNotNull(ticket_packages.deleted_at));
 
@@ -699,6 +726,7 @@ export async function listDeletedTicketPackagesImpl(
                         is_active: ticket_packages.is_active,
                         display_order: ticket_packages.display_order,
                         branch_id: ticket_packages.branch_id,
+                        branch_ids: ticket_packages.branch_ids,
                         created_at: ticket_packages.created_at,
                         updated_at: ticket_packages.updated_at,
                         deleted_at: ticket_packages.deleted_at,
@@ -719,7 +747,7 @@ export async function listDeletedTicketPackagesImpl(
 
         return {
                 status: 'success',
-                items,
+                items: enrichItemsWithParsedBranchIds(items),
                 total: countResult?.count || 0,
                 page,
                 pageSize
