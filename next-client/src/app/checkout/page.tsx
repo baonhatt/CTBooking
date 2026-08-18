@@ -534,7 +534,7 @@ export default function Checkout() {
                                                         </div>
 
                                                         {/* Movie / VR List Section */}
-                                                        {!isVR ? (
+                                                        {movies.length > 0 && movies[0]?.title && (
                                                                 <div className="p-3 pb-1">
                                                                         <div className="flex items-center gap-2 mb-2">
                                                                                 <div className="p-2 bg-blue-500/10 rounded-lg">
@@ -558,13 +558,15 @@ export default function Checkout() {
                                                                                 ))}
                                                                         </div>
                                                                 </div>
-                                                        ) : (
+                                                        )}
+
+                                                        {(vrItems?.length > 0 || (order?.vr_items && order.vr_items.length > 0)) && (
                                                                 <div className="p-3 pb-1">
                                                                         <div className="flex items-center gap-2 mb-2">
                                                                                 <div className="p-2 bg-purple-500/10 rounded-lg">
                                                                                         <Gamepad2 className="w-4 h-4 text-purple-400" />
                                                                                 </div>
-                                                                                <h2 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Danh sách gói VR</h2>
+                                                                                <h2 className="text-[10px] font-bold text-purple-400 uppercase tracking-widest">Trải nghiệm VR kèm theo</h2>
                                                                         </div>
                                                                         <div className="space-y-2">
                                                                                 {(vrItems?.length ? vrItems : (order?.vr_items || [])).map((it: any, i: number) => {
@@ -574,14 +576,14 @@ export default function Checkout() {
                                                                                                         <div className="mt-1.5 w-1.5 h-1.5 rounded-full bg-purple-500 shadow-[0_0_8px_rgba(168,85,247,0.6)]" />
                                                                                                         <div className="flex-1">
                                                                                                                 <p className="text-slate-100 font-semibold leading-snug group-hover:text-purple-400 transition-colors">
-                                                                                                                        {it.package_name || 'Gói VR'}
+                                                                                                                        {it.package_name || it.name || 'Gói VR'}
                                                                                                                 </p>
                                                                                                                 <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 mt-0.5">
                                                                                                                         {it.duration_min && (
                                                                                                                                 <span className="text-[10px] text-slate-500 font-medium">{it.duration_min} phút</span>
                                                                                                                         )}
                                                                                                                         {it.quantity > 0 && (
-                                                                                                                                <span className="text-[10px] text-slate-500 font-medium">x{it.quantity}</span>
+                                                                                                                                <span className="text-[10px] text-slate-400 font-medium">x{it.quantity}</span>
                                                                                                                         )}
                                                                                                                         {lineTotal > 0 && (
                                                                                                                                 <span className="text-[10px] text-amber-400 font-bold">{formatMoney(lineTotal)}₫</span>

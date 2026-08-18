@@ -3,7 +3,7 @@ import { eq, and, asc, desc, isNull, or, inArray, sql } from 'drizzle-orm';
 import { generateBookingCode, getBookingEmailTemplate } from '../../lib/booking-utils';
 import { mailQueue } from '../../lib/mail-queue';
 import { formatDateForDb } from '../../lib/date-utils';
-import { redeemVoucherAfterPaymentImpl } from './vouchers';
+import { redeemVoucherAfterPaymentImpl, validateVoucherForVRImpl } from './vouchers';
 
 class HttpError extends Error {
         status: number;
@@ -25,15 +25,36 @@ type BookingValidationResult = {
         movies: any[];
         ticketPackage: any;
         unitPrice: number;
+        movieTotalPrice: number;
+        vrItemsDetails?: Array<{
+                vr_package_id: number;
+                quantity: number;
+                unit_price: number;
+                package_name: string;
+                line_total: number;
+                branch_id?: number | null;
+        }>;
+        vrTotalPrice: number;
+        voucherDetails?: any;
+        voucherDiscountAmount: number;
+        originalTotalPrice: number;
         totalPrice: number;
 };
 
 async function validateBookingInput(
         anyDb: any,
         body: PaymentRequest,
-        tables: { users: any; accounts: any; movies: any; ticket_packages: any; branches: any }
+        tables: {
+                users: any;
+                accounts: any;
+                movies: any;
+                ticket_packages: any;
+                branches: any;
+                vouchers?: any;
+                voucher_redemption_logs?: any;
+        }
 ): Promise<BookingValidationResult> {
-        const { email, emailBook, phone, name, combo, ticketCount, ticketPackageId } = body;
+        const { email, emailBook, phone, name, combo, ticketCount, ticketPackageId, vr_items, voucher_code, branch_id } = body;
 
         if (!email || !phone || !emailBook || !name || !ticketCount || ticketCount <= 0) {
                 throw new HttpError(400, 'Vui lòng nhập đầy đủ thông tin hợp lệ.');
@@ -92,7 +113,11 @@ async function validateBookingInput(
                 }
         } else {
                 ticketPackage = await anyDb.query.ticket_packages.findFirst({
-                        where: and(eq(ticketPackagesTable.is_active, true), isNull(ticketPackagesTable.deleted_at)),
+                        where: and(
+                                eq(ticketPackagesTable.is_active, true),
+                                isNull(ticketPackagesTable.deleted_at),
+                                sql`(${ticketPackagesTable.type} IS NULL OR ${ticketPackagesTable.type} != 'vr')`
+                        ),
                         orderBy: [asc(ticketPackagesTable.display_order), asc(ticketPackagesTable.price)]
                 });
                 if (!ticketPackage) {
@@ -102,9 +127,10 @@ async function validateBookingInput(
 
         // Branch check: Ensure the branch is open
         let branchSettings: any = {};
-        if (ticketPackage.branch_id) {
+        const targetBranchId = ticketPackage.branch_id || branch_id;
+        if (targetBranchId) {
                 const branch = await anyDb.query.branches.findFirst({
-                        where: and(eq(branchesTable.id, ticketPackage.branch_id), isNull(branchesTable.deleted_at))
+                        where: and(eq(branchesTable.id, targetBranchId), isNull(branchesTable.deleted_at))
                 });
                 if (!branch) {
                         throw new HttpError(404, 'Chi nhánh không tồn tại.');
@@ -127,7 +153,81 @@ async function validateBookingInput(
         if (!Number.isFinite(unitPrice) || unitPrice <= 0) {
                 throw new HttpError(400, 'Giá vé không hợp lệ.');
         }
-        const totalPrice = unitPrice * ticketCount;
+        const movieTotalPrice = unitPrice * ticketCount;
+
+        // Process VR Items (if any)
+        const vrItemsDetails: Array<{
+                vr_package_id: number;
+                quantity: number;
+                unit_price: number;
+                package_name: string;
+                line_total: number;
+                branch_id?: number | null;
+        }> = [];
+        let vrTotalPrice = 0;
+
+        if (vr_items && Array.isArray(vr_items) && vr_items.length > 0) {
+                const vrPackageIds = vr_items.map((i) => i.vr_package_id);
+                const vrPkgs = await anyDb.query.ticket_packages.findMany({
+                        where: and(
+                                inArray(ticketPackagesTable.id, vrPackageIds),
+                                eq(ticketPackagesTable.type, 'vr'),
+                                eq(ticketPackagesTable.is_active, true),
+                                isNull(ticketPackagesTable.deleted_at)
+                        )
+                });
+
+                if (vrPkgs.length !== vrPackageIds.length) {
+                        throw new HttpError(404, 'Một số gói VR không tồn tại hoặc đã ngừng hoạt động.');
+                }
+
+                const vrPkgMap = new Map(vrPkgs.map((p: any) => [p.id, p]));
+                for (const it of vr_items) {
+                        const pkg: any = vrPkgMap.get(it.vr_package_id);
+                        if (!pkg) continue;
+                        const qty = Math.max(1, Number(it.quantity || 1));
+                        const price = Number(pkg.price || 0);
+                        const lineTotal = price * qty;
+                        vrTotalPrice += lineTotal;
+                        vrItemsDetails.push({
+                                vr_package_id: pkg.id,
+                                quantity: qty,
+                                unit_price: price,
+                                package_name: pkg.name,
+                                line_total: lineTotal,
+                                branch_id: pkg.branch_id || targetBranchId || null
+                        });
+                }
+        }
+
+        const originalTotalPrice = movieTotalPrice + vrTotalPrice;
+        let voucherDiscountAmount = 0;
+        let voucherDetails: any = null;
+
+        // Validate Voucher (if provided and vouchers table exists)
+        if (voucher_code && tables.vouchers) {
+                try {
+                        const vRes = await validateVoucherForVRImpl(
+                                anyDb,
+                                tables as any,
+                                {
+                                        code: voucher_code,
+                                        vr_items: vr_items || [],
+                                        branch_id: targetBranchId,
+                                        user_id: user?.id ?? undefined,
+                                        order_total_before: originalTotalPrice
+                                }
+                        );
+                        if (vRes.valid && vRes.discount_amount) {
+                                voucherDiscountAmount = Math.min(originalTotalPrice, vRes.discount_amount);
+                                voucherDetails = vRes.voucher_details;
+                        }
+                } catch (vErr) {
+                        console.warn('Voucher validation ignored error:', vErr);
+                }
+        }
+
+        const totalPrice = Math.max(0, originalTotalPrice - voucherDiscountAmount);
 
         return {
                 user: {
@@ -139,6 +239,12 @@ async function validateBookingInput(
                 movies,
                 ticketPackage,
                 unitPrice,
+                movieTotalPrice,
+                vrItemsDetails,
+                vrTotalPrice,
+                voucherDetails,
+                voucherDiscountAmount,
+                originalTotalPrice,
                 totalPrice
         };
 }
@@ -146,7 +252,15 @@ async function validateBookingInput(
 export async function validateBookingImpl(
         anyDb: any,
         payload: PaymentRequest,
-        tables: { users: any; accounts: any; movies: any; ticket_packages: any; branches: any }
+        tables: {
+                users: any;
+                accounts: any;
+                movies: any;
+                ticket_packages: any;
+                branches: any;
+                vouchers?: any;
+                voucher_redemption_logs?: any;
+        }
 ) {
         try {
                 const result = await validateBookingInput(anyDb, payload, tables);
@@ -166,6 +280,12 @@ export async function validateBookingImpl(
                                 price: Number(result.ticketPackage.price || 0)
                         },
                         unitPrice: result.unitPrice,
+                        movieTotalPrice: result.movieTotalPrice,
+                        vrItems: result.vrItemsDetails || [],
+                        vrTotalPrice: result.vrTotalPrice,
+                        originalTotalPrice: result.originalTotalPrice,
+                        voucherDiscountAmount: result.voucherDiscountAmount,
+                        voucherDetails: result.voucherDetails,
                         totalPrice: result.totalPrice
                 };
         } catch (err: any) {
@@ -185,12 +305,15 @@ export async function createPaymentImpl(
                 movies: any;
                 ticket_packages: any;
                 branches: any;
+                booking_vr_items?: any;
+                vouchers?: any;
+                voucher_redemption_logs?: any;
         }
 ) {
         try {
                 const validation = await validateBookingInput(anyDb, payload, tables);
-                const { user, movies, totalPrice } = validation;
-                const { emailBook, phone, name, ticketCount, paymentMethod, pay_txt_code, combo } = payload;
+                const { user, movies, totalPrice, vrItemsDetails, originalTotalPrice, voucherDiscountAmount, voucherDetails } = validation;
+                const { emailBook, phone, name, ticketCount, paymentMethod, pay_txt_code, combo, voucher_code, branch_id } = payload;
                 const userId = user?.id ? Number(user.id) : null;
 
                 const bookingsTable = tables.bookings;
@@ -206,6 +329,11 @@ export async function createPaymentImpl(
                 if (pay_txt_code) {
                         pay_txt_code_dt = pay_txt_code;
                 }
+
+                const hasVR = vrItemsDetails && vrItemsDetails.length > 0;
+                const bookingType = hasVR ? 'combo_vr' : 'movie';
+                const branchIdToSave = validation.ticketPackage?.branch_id || branch_id || null;
+
                 // Try to use .returning() to get the inserted row when supported (Postgres).
                 // Fallback to the existing query approach for DBs that don't support returning (D1/SQLite).
                 const insertedBooking = await anyDb
@@ -216,6 +344,11 @@ export async function createPaymentImpl(
                                 ticket_package_id: validation.ticketPackage?.id ? Number(validation.ticketPackage.id) : null,
                                 ticket_count: ticketCount,
                                 total_price: Number(totalPrice),
+                                original_total_price: Number(originalTotalPrice || totalPrice),
+                                voucher_id: voucherDetails?.id || null,
+                                voucher_code_snapshot: voucher_code || null,
+                                voucher_discount_amount: Number(voucherDiscountAmount || 0),
+                                booking_type: bookingType,
                                 payment_method: (paymentMethod || 'cash').toLowerCase(),
                                 phone,
                                 name,
@@ -226,7 +359,7 @@ export async function createPaymentImpl(
                                 movie_poster: moviePosters,
                                 ticket_package_name: validation.ticketPackage?.name || null,
                                 ticket_unit_price: validation.ticketPackage?.price ? Number(validation.ticketPackage.price) : null,
-                                branch_id: validation.ticketPackage?.branch_id || null,
+                                branch_id: branchIdToSave,
                                 pay_txt_code: pay_txt_code_dt,
                                 created_at: formatDateForDb(nowIso),
                                 updated_at: formatDateForDb(nowIso)
@@ -237,6 +370,26 @@ export async function createPaymentImpl(
                 if (!bookingRow) {
                         return { status: 500, message: 'Không thể tạo đặt vé' };
                 }
+
+                // Insert VR items into booking_vr_items if present
+                if (hasVR && tables.booking_vr_items) {
+                        for (const item of vrItemsDetails!) {
+                                await anyDb.insert(tables.booking_vr_items).values({
+                                        booking_id: bookingRow.id,
+                                        vr_ticket_package_id: item.vr_package_id,
+                                        quantity: item.quantity,
+                                        unit_price: item.unit_price,
+                                        package_name: item.package_name,
+                                        voucher_id: voucherDetails?.id || null,
+                                        discounted_unit_price: item.unit_price,
+                                        line_total: item.line_total,
+                                        voucher_discount_amount: 0,
+                                        branch_id: item.branch_id || branchIdToSave,
+                                        created_at: formatDateForDb(nowIso)
+                                });
+                        }
+                }
+
                 return {
                         status: 201,
                         message: 'Khởi tạo đặt vé thành công',
@@ -247,12 +400,16 @@ export async function createPaymentImpl(
                                 ticket_package_id: bookingRow.ticket_package_id,
                                 ticket_count: bookingRow.ticket_count,
                                 total_price: bookingRow.total_price,
+                                original_total_price: bookingRow.original_total_price,
+                                voucher_discount_amount: bookingRow.voucher_discount_amount,
+                                booking_type: bookingRow.booking_type,
                                 payment_method: bookingRow.payment_method,
                                 phone: bookingRow.phone,
                                 name: bookingRow.name,
                                 email: bookingRow.email,
                                 payment_status: bookingRow.payment_status,
-                                created_at: bookingRow.created_at
+                                created_at: bookingRow.created_at,
+                                vr_items: vrItemsDetails || []
                         }
                 };
         } catch (err: any) {
@@ -592,6 +749,10 @@ export async function getBookingByIdImpl(
                         email: bookings.email,
                         ticket_count: bookings.ticket_count,
                         total_price: bookings.total_price,
+                        original_total_price: bookings.original_total_price,
+                        voucher_discount_amount: bookings.voucher_discount_amount,
+                        voucher_code_snapshot: bookings.voucher_code_snapshot,
+                        booking_type: bookings.booking_type,
                         movie_id: bookings.movie_id,
                         ticket_package_id: bookings.ticket_package_id,
                         expiry_date: bookings.expiry_date,
@@ -621,9 +782,22 @@ export async function getBookingByIdImpl(
                 return { status: 404, message: 'Không tìm thấy thông tin đặt vé' };
         }
 
+        let vr_items: any[] = [];
+        if ((tables as any).booking_vr_items) {
+                try {
+                        vr_items = await anyDb
+                                .select()
+                                .from((tables as any).booking_vr_items)
+                                .where(eq((tables as any).booking_vr_items.booking_id, id));
+                } catch (e) {
+                        console.warn('Could not load booking_vr_items:', e);
+                }
+        }
+
         return {
                 status: 200,
-                ...booking
+                ...booking,
+                vr_items
         };
 }
 
@@ -663,6 +837,16 @@ export async function getBookingByCodeImpl(anyDb: any, codeRaw: string, tables: 
         const valid = Boolean(isPaid && paidAt && expiryAt && !expired && !booking.is_used);
         const can_use = Boolean(valid);
         const daysLeft = expiryAt ? Math.ceil((expiryAt.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)) : null;
+        let vr_items: any[] = [];
+        if ((tables as any).booking_vr_items) {
+                try {
+                        vr_items = await anyDb
+                                .select()
+                                .from((tables as any).booking_vr_items)
+                                .where(eq((tables as any).booking_vr_items.booking_id, booking.id));
+                } catch {}
+        }
+
         return {
                 status: 200,
                 id: booking.id,
@@ -674,6 +858,10 @@ export async function getBookingByCodeImpl(anyDb: any, codeRaw: string, tables: 
                 email: booking.email,
                 ticket_count: Number(booking.ticket_count),
                 total_price: Number(booking.total_price),
+                original_total_price: booking.original_total_price,
+                voucher_discount_amount: booking.voucher_discount_amount,
+                voucher_code_snapshot: booking.voucher_code_snapshot,
+                booking_type: booking.booking_type,
                 movie_id: booking.movie_id,
                 ticket_package_id: booking.ticket_package_id,
                 created_at: booking.created_at,
@@ -692,7 +880,8 @@ export async function getBookingByCodeImpl(anyDb: any, codeRaw: string, tables: 
                 pay_txt_code: booking.pay_txt_code,
                 validity_days: daysLeft,
                 expired,
-                checked_in_at: booking.checked_in_at
+                checked_in_at: booking.checked_in_at,
+                vr_items
         };
 }
 

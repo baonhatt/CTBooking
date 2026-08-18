@@ -70,25 +70,47 @@ export default function VRBookingPage() {
   const [confirmChecked, setConfirmChecked] = useState(false);
   const [showPaymentConfirmDialog, setShowPaymentConfirmDialog] = useState(false);
 
+  const urlBranchId = useMemo(() => {
+    const raw = searchParams.get('branch_id');
+    const parsed = raw ? Number(raw) : null;
+    return parsed && Number.isFinite(parsed) ? parsed : null;
+  }, [searchParams]);
+
+  const activeBranchId = urlBranchId ?? selectedBranch?.id;
+
   const { data: vrData, isLoading: isLoadingVR } = useQuery({
-    queryKey: ['vrPackages', selectedBranch?.id],
-    queryFn: ({ signal }) => getVRPackages(selectedBranch?.id, { signal }),
+    queryKey: ['vrPackages', activeBranchId],
+    queryFn: ({ signal }) => getVRPackages(activeBranchId ?? undefined, { signal }),
     staleTime: 0
   });
 
-  const vrPackages = useMemo(() => (vrData?.items || []).map((t: any) => ({
-    id: t.id,
-    name: t.name,
-    description: t.description || '',
-    price: Number(t.price || 0),
-    cover_image: t.cover_image,
-    duration_min: Number(t.duration_min || 0),
-    vr_genre: t.vr_genre,
-    min_players: Number(t.min_players || 1),
-    max_players: Number(t.max_players || 1),
-    type: t.type,
-    display_order: t.display_order || 0
-  })), [vrData]);
+  const vrPackages = useMemo(() => {
+    const rawList = Array.isArray(vrData)
+      ? vrData
+      : Array.isArray(vrData?.items)
+      ? vrData.items
+      : Array.isArray((vrData as any)?.data)
+      ? (vrData as any).data
+      : Array.isArray((vrData as any)?.data?.items)
+      ? (vrData as any).data.items
+      : [];
+
+    return rawList
+      .filter((t: any) => t && t.is_active !== false && t.is_active !== 0)
+      .map((t: any) => ({
+        id: t.id,
+        name: t.name,
+        description: t.description || '',
+        price: Number(t.price || 0),
+        cover_image: t.cover_image,
+        duration_min: Number(t.duration_min || 0),
+        vr_genre: t.vr_genre,
+        min_players: Number(t.min_players || 1),
+        max_players: Number(t.max_players || 1),
+        type: t.type,
+        display_order: t.display_order || 0
+      }));
+  }, [vrData]);
 
   const selectedVRItems = useMemo(() => Object.entries(quantities)
     .filter(([_, qty]) => qty > 0)

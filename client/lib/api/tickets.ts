@@ -4,6 +4,7 @@ export async function getTickets(options?: {
         page?: number;
         pageSize?: number;
         q?: string;
+        type?: 'all' | 'movie' | 'vr';
         includeInactive?: boolean;
         branch_id?: number | 'all';
         signal?: AbortSignal;
@@ -12,6 +13,7 @@ export async function getTickets(options?: {
         if (options?.page) params.set('page', String(options.page));
         if (options?.pageSize) params.set('pageSize', String(options.pageSize));
         if (options?.q) params.set('q', options.q);
+        if (options?.type && options.type !== 'all') params.set('type', options.type);
         if (options?.includeInactive) params.set('includeInactive', 'true');
         if (options?.branch_id) params.set('branch_id', String(options.branch_id));
         const path = `/api/tickets${params.toString() ? `?${params.toString()}` : ''}`;
@@ -40,7 +42,7 @@ export async function createTicketApi(body: {
         price: number;
         features?: string[];
         type?: string;
-        combo: string[];
+        combo?: string[] | number[];
         min_group_size?: number;
         max_group_size?: number;
         is_member_only?: boolean;
@@ -48,6 +50,11 @@ export async function createTicketApi(body: {
         display_order?: number;
         branch_id?: number;
         branch_ids?: number[] | null;
+        cover_image?: string;
+        duration_min?: number;
+        vr_genre?: string;
+        min_players?: number;
+        max_players?: number;
 }) {
         return request<{ item: any }>(`/api/tickets`, {
                 method: 'POST',
@@ -64,7 +71,7 @@ export async function updateTicketApi(
                 price?: number;
                 features?: string[] | string;
                 type?: string;
-                combo?: string[];
+                combo?: string[] | number[];
                 min_group_size?: number;
                 max_group_size?: number;
                 is_member_only?: boolean;
@@ -72,6 +79,11 @@ export async function updateTicketApi(
                 display_order?: number;
                 branch_id?: number;
                 branch_ids?: number[] | null;
+                cover_image?: string;
+                duration_min?: number;
+                vr_genre?: string;
+                min_players?: number;
+                max_players?: number;
         }
 ) {
         return request<{ item: any }>(`/api/tickets/${id}`, {

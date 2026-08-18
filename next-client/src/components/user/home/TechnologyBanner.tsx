@@ -44,7 +44,7 @@ export default function TechnologyBanner({
     }));
   }, [initialListItems]);
 
-  const [playingVideo, setPlayingVideo] = useState<string | null>(null);
+  const [hasMainVideoStarted, setHasMainVideoStarted] = useState(false);
   const videoRefs = useRef<HTMLVideoElement[]>([]);
   const carouselItemRefs = useRef<(HTMLDivElement | null)[]>([]);
   const mainVideoRef = useRef<HTMLVideoElement | null>(null);
@@ -203,12 +203,6 @@ export default function TechnologyBanner({
   }, []);
 
   useEffect(() => {
-    if (playingVideo === 'main') {
-      mainVideoRef.current?.play().catch(() => {});
-    }
-  }, [playingVideo]);
-
-  useEffect(() => {
     const el = mainVideoRef.current;
     if (el && el.readyState >= 1) {
       el.currentTime = 0.5;
@@ -216,16 +210,19 @@ export default function TechnologyBanner({
   }, [mainVisual.src]);
 
   const toggleMainVideo = () => {
-    if (!isMainVideoPlaying) {
+    if (!hasMainVideoStarted) {
+      setHasMainVideoStarted(true);
       setIsMainVideoPlaying(true);
       notifyGlobalPlay('main');
-    } else {
-      const el = mainVideoRef.current;
-      if (el) {
-        if (el.paused) {
-          el.play().catch(() => {});
-          notifyGlobalPlay('main');
-        } else el.pause();
+      return;
+    }
+    const el = mainVideoRef.current;
+    if (el) {
+      if (el.paused) {
+        el.play().catch(() => {});
+        notifyGlobalPlay('main');
+      } else {
+        el.pause();
       }
     }
   };
@@ -369,10 +366,10 @@ export default function TechnologyBanner({
               <div
                 ref={mainVideoContainerRef}
                 className="relative w-full aspect-[9/13] rounded-3xl overflow-hidden border border-white/10 bg-slate-900 shadow-2xl group cursor-pointer"
-                onClick={!isMainVideoPlaying ? toggleMainVideo : undefined}
+                onClick={!hasMainVideoStarted ? toggleMainVideo : undefined}
               >
                 <AnimatePresence>
-                  {!isMainVideoPlaying ? (
+                  {!hasMainVideoStarted ? (
                     <motion.div
                       key="main-placeholder"
                       initial={{ opacity: 1 }}

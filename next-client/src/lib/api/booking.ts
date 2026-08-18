@@ -1,4 +1,5 @@
 import { request } from '@/lib/api/http';
+import { VRPackageItem } from './vr-packages';
 
 export async function createBookingApi(body: {
   email: string;
@@ -12,6 +13,9 @@ export async function createBookingApi(body: {
   ticketPackageId?: number;
   pay_txt_code: string;
   combo: string[];
+  vr_items?: VRPackageItem[];
+  voucher_code?: string;
+  branch_id?: number;
 }) {
   return request<{ message: string; booking: any }>('/api/create-booking', {
     method: 'POST',
@@ -28,6 +32,9 @@ export async function validateBookingApi(body: {
   ticketCount: number;
   ticketPackageId?: number;
   combo: string[];
+  vr_items?: VRPackageItem[];
+  voucher_code?: string;
+  branch_id?: number;
 }) {
   return request<{
     status: string;
@@ -41,7 +48,12 @@ export async function validateBookingApi(body: {
     };
     ticketPackage?: { id: number; name: string; price: number };
     unitPrice?: number;
+    movieTotalPrice?: number;
+    vrTotalPrice?: number;
+    originalTotalPrice?: number;
+    voucherDiscountAmount?: number;
     totalPrice?: number;
+    vr_items?: any[];
   }>('/api/validate-booking', {
     method: 'POST',
     body: JSON.stringify(body)
@@ -64,6 +76,7 @@ export async function confirmBookingApi(body: {
 export async function getBookingByIdApi(bookingId: number) {
   return request<{
     id: number;
+    booking_code: string;
     payment_status: string;
     user_id: number;
     name: string;
@@ -71,7 +84,17 @@ export async function getBookingByIdApi(bookingId: number) {
     email: string;
     ticket_count: number;
     total_price: number;
+    original_total_price?: number;
+    voucher_discount_amount?: number;
+    voucher_code_snapshot?: string;
+    booking_type?: string;
     payment_method?: string;
+    ticket_package_name?: string;
+    ticket_unit_price?: number;
+    movie_title?: string;
+    movie_duration?: string;
+    movie_poster?: string;
+    vr_items?: any[];
   }>(`/api/bookings/${bookingId}`);
 }
 
@@ -86,17 +109,27 @@ export async function getBookingByCodeApi(code: string) {
     email: string;
     ticket_count: number;
     total_price: number;
+    original_total_price?: number;
+    voucher_discount_amount?: number;
+    voucher_code_snapshot?: string;
+    booking_type?: string;
     created_at: string;
     paid_at: string | null;
     expiry_date: string | null;
     checked_in_at: string | null;
     payment_method: string | null;
     userName: string;
+    ticket_package_name?: string;
+    ticket_unit_price?: number;
+    movie_title?: string;
+    movie_duration?: string;
+    movie_poster?: string;
     is_used: boolean;
     valid: boolean;
     can_use: boolean;
     validity_days: number | null;
     expired: boolean;
+    vr_items?: any[];
   }>(`/api/bookings-code/${code}`);
 }
 

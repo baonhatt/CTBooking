@@ -1,7 +1,13 @@
 import type { Metadata } from 'next';
+import { Inter } from 'next/font/google';
 import './globals.css';
 import Providers from '@/app/providers';
 import NextTopLoader from 'nextjs-toploader';
+
+const inter = Inter({
+  subsets: ['latin', 'vietnamese'],
+  display: 'swap',
+});
 
 import { siteConfig } from '@/config/site';
 
@@ -95,7 +101,7 @@ const websiteSchema = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="vi">
-      <body className="bg-[#050915] text-white">
+      <body className={`${inter.className} bg-[#050915] text-white`}>
         <NextTopLoader color="#22d3ee" height={3} showSpinner={false} />
         <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(organizationSchema) }} />
         <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(websiteSchema) }} />

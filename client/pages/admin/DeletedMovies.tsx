@@ -38,6 +38,7 @@ interface Movie {
 export default function DeletedMoviesPage() {
         const navigate = useNavigate();
         const staffStore = useStaffStore();
+        const hasPermission = useHasStaffPermission();
         const [activeTab, setActiveTab] = useState('deleted-movies');
         const [movies, setMovies] = useState<Movie[]>([]);
         const [page, setPage] = useState(1);

@@ -383,10 +383,7 @@ export default function FilmCarousel({ initialFilms = [], onSelectFilm }: FilmCa
                                                                                                 <p className="text-xs uppercase tracking-[0.18em] text-cyan-200">{film.genre}</p>
                                                                                                 <h3 className="text-xl font-semibold text-white drop-shadow-lg">{film.title}</h3>
                                                                                                 <div
-                                                                                                        onClick={() => {
-                                                                                                                handleOpen(film);
-                                                                                                        }}
-                                                                                                        className="inline-flex hover:bg-white/20 items-center gap-2 px-3 py-1 rounded-full bg-white/10 border border-white/20 text-sm text-white"
+                                                                                                        className="inline-flex hover:bg-white/20 items-center gap-2 px-3 py-1 rounded-full bg-white/10 border border-white/20 text-sm text-white transition-colors"
                                                                                                 >
                                                                                                         <Play className="h-4 w-4 text-cyan-300" />
                                                                                                         Mở chi tiết

@@ -22,6 +22,8 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { toast } from 'sonner';
 import {
         getActiveTickets,
+        getVRPackages,
+        VRPackageItem,
         createBookingApi,
         createMomoPaymentApi,
         createVnpayPaymentApi,
@@ -31,7 +33,7 @@ import {
 } from '@/lib/api';
 import { optimizeCloudinaryUrl } from '@/lib/utils';
 import UserLayout from '@/layouts/UserLayout';
-import { ArrowLeft, ArrowRight, CreditCard, ChevronRight, X, Loader2 } from 'lucide-react';
+import { ArrowLeft, ArrowRight, CreditCard, ChevronRight, X, Loader2, Gamepad2, Plus, Minus, Users, Clock, Sparkles, Film } from 'lucide-react';
 import { useBranch } from '@/hooks/useBranch';
 import { getCookie } from '@/lib/cookies';
 
@@ -45,6 +47,7 @@ export default function BookingPage() {
         const [movie, setMovie] = useState<string>(''); // Keep for backward compatibility
         const [ticketCount, setTicketCount] = useState<number>(1);
         const [selectedPackage, setSelectedPackage] = useState<any | null>(null);
+        const [selectedVrQuantities, setSelectedVrQuantities] = useState<{ [id: number]: number }>({});
         const [name, setName] = useState<string>('');
         const [phone, setPhone] = useState<string>('');
         const [phoneError, setPhoneError] = useState<string>('');
@@ -85,7 +88,48 @@ export default function BookingPage() {
                 queryFn: ({ signal }) => getActiveTickets(selectedBranch?.id, { signal }),
                 staleTime: 0
         });
-        const isLoadingPage = isLoadingTickets;
+
+        const urlBranchId = useMemo(() => {
+                const raw = searchParams.get('branch_id');
+                const parsed = raw ? Number(raw) : null;
+                return parsed && Number.isFinite(parsed) ? parsed : null;
+        }, [searchParams]);
+
+        const activeBranchId = urlBranchId ?? selectedBranch?.id;
+
+        const { data: vrPackagesData, isLoading: isLoadingVrPackages } = useQuery({
+                queryKey: ['vrPackages', activeBranchId],
+                queryFn: ({ signal }) => getVRPackages(activeBranchId ?? undefined, { signal }),
+                staleTime: 60000
+        });
+        const vrPackages = useMemo(() => {
+                const rawList = Array.isArray(vrPackagesData)
+                        ? vrPackagesData
+                        : Array.isArray(vrPackagesData?.items)
+                        ? vrPackagesData.items
+                        : Array.isArray((vrPackagesData as any)?.data)
+                        ? (vrPackagesData as any).data
+                        : Array.isArray((vrPackagesData as any)?.data?.items)
+                        ? (vrPackagesData as any).data.items
+                        : [];
+
+                return rawList.filter((item: any) => item && item.is_active !== false && item.is_active !== 0);
+        }, [vrPackagesData]);
+
+        const updateVrQuantity = (pkgId: number, delta: number) => {
+                setSelectedVrQuantities((prev) => {
+                        const cur = prev[pkgId] || 0;
+                        const next = Math.max(0, Math.min(20, cur + delta));
+                        if (next === 0) {
+                                const copy = { ...prev };
+                                delete copy[pkgId];
+                                return copy;
+                        }
+                        return { ...prev, [pkgId]: next };
+                });
+        };
+
+        const isLoadingPage = isLoadingTickets || isLoadingVrPackages;
 
         const [activeMoviesFull, setActiveMoviesFull] = useState<any[]>([]);
         const [selectedMovieIds, setSelectedMovieIds] = useState<number[]>([]);
@@ -103,7 +147,12 @@ export default function BookingPage() {
         }));
         const defaultTicket = ticketPackages.sort((a, b) => a.display_order - b.display_order)[0];
         const unitPrice = Number(selectedPackage?.price || 0);
-        const totalPrice = unitPrice * ticketCount;
+        const movieTotalPrice = unitPrice * ticketCount;
+        const vrTotalPrice = Object.entries(selectedVrQuantities).reduce((acc, [pkgId, qty]) => {
+                const p = vrPackages.find((item: any) => Number(item.id) === Number(pkgId));
+                return acc + (p ? Number(p.price || 0) * qty : 0);
+        }, 0);
+        const totalPrice = movieTotalPrice + vrTotalPrice;
         const MIN_TICKETS = 1;
         const MAX_TICKETS = 10;
         const [combo, setCombo] = useState<any>();
@@ -341,7 +390,23 @@ export default function BookingPage() {
                         const orderId = `CS${String(timestampSeconds).padStart(10, '0')}${randomSuffix}`;
                         const movieDetail = selectedMovie;
                         const ticketPackageId = selectedPackage?.id || defaultTicket?.id;
-                        const finalCombo = selectedMovieIds.length > 0 ? selectedMovieIds : comboData.combo;
+                        const finalCombo = selectedMovieIds.length > 0 ? selectedMovieIds : comboData?.combo || [];
+
+                        const vr_items: VRPackageItem[] = Object.entries(selectedVrQuantities)
+                                .filter(([_, qty]) => qty > 0)
+                                .map(([pkgId, qty]) => ({ vr_package_id: Number(pkgId), quantity: qty }));
+
+                        const selectedVrList = vr_items.map((it) => {
+                                const p = vrPackages.find((pkg: any) => Number(pkg.id) === it.vr_package_id);
+                                return {
+                                        ...it,
+                                        package_name: p?.name || 'Gói VR',
+                                        unit_price: Number(p?.price || 0),
+                                        duration_min: p?.duration_min,
+                                        cover_image: p?.cover_image,
+                                        line_total: Number(p?.price || 0) * it.quantity
+                                };
+                        });
 
                         const validation = await validateBookingApi({
                                 email,
@@ -351,7 +416,9 @@ export default function BookingPage() {
                                 movieId: selectedMovie?.id,
                                 ticketCount,
                                 ticketPackageId: selectedPackage?.id,
-                                combo: finalCombo
+                                combo: finalCombo,
+                                vr_items,
+                                branch_id: selectedBranch?.id
                         });
 
                         if (!validation?.status) {
@@ -369,11 +436,18 @@ export default function BookingPage() {
                                 emailBook: email,
                                 quantity: ticketCount,
                                 amount: canonicalTotal,
+                                movieTotalPrice,
+                                vrTotalPrice,
+                                vr_items: selectedVrList,
+                                booking_type: vr_items.length > 0 ? 'combo_vr' : 'movie',
                                 method: paymentMethod,
                                 poster: movieDetail?.cover_image || '',
                                 duration: movieDetail?.duration_min ? `${movieDetail.duration_min}` : '',
                                 genres: movieDetail?.genres || '',
-                                ticketPackageId: selectedPackage?.id
+                                ticketPackageId: selectedPackage?.id,
+                                ticketPackageName: selectedPackage?.name,
+                                branch_id: selectedBranch?.id,
+                                branch_name: selectedBranch?.name
                         };
 
                         countdownRef.current = setInterval(() => setCountdown((c) => c - 1), 1000);
@@ -389,7 +463,9 @@ export default function BookingPage() {
                                 totalPrice: canonicalTotal,
                                 ticketPackageId: selectedPackage?.id,
                                 pay_txt_code: orderId,
-                                combo: finalCombo
+                                combo: finalCombo,
+                                vr_items,
+                                branch_id: selectedBranch?.id
                         });
 
                         localStorage.setItem(
@@ -699,30 +775,142 @@ export default function BookingPage() {
                                                                                         </div>
                                                                                 )}
 
+                                                                                {/* PHẦN 3: GÓI TRẢI NGHIỆM VR KÈM THEO (TÙY CHỌN) */}
+                                                                                {vrPackages && vrPackages.length > 0 && (
+                                                                                        <section className="space-y-3 pt-2 animate-in fade-in slide-in-from-top-2 duration-300">
+                                                                                                <div className="flex items-center justify-between">
+                                                                                                        <div className="flex items-center gap-2 text-[13px] font-semibold text-purple-400 uppercase tracking-wider">
+                                                                                                                <Gamepad2 className="w-4 h-4 text-purple-400" />
+                                                                                                                Trải nghiệm VR kèm theo (Tùy chọn)
+                                                                                                        </div>
+                                                                                                        {Object.keys(selectedVrQuantities).length > 0 && (
+                                                                                                                <span className="text-[11px] bg-purple-500/20 text-purple-300 px-2 py-0.5 rounded-full border border-purple-500/30 font-medium">
+                                                                                                                        +{Object.values(selectedVrQuantities).reduce((a, b) => a + b, 0)} gói VR
+                                                                                                                </span>
+                                                                                                        )}
+                                                                                                </div>
+
+                                                                                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                                                                                        {vrPackages.map((vrPkg: any) => {
+                                                                                                                const qty = selectedVrQuantities[vrPkg.id] || 0;
+                                                                                                                const isSelected = qty > 0;
+                                                                                                                return (
+                                                                                                                        <div
+                                                                                                                                key={vrPkg.id}
+                                                                                                                                className={`relative rounded-xl p-3 border transition-all duration-300 flex flex-col justify-between gap-2.5 ${isSelected
+                                                                                                                                        ? 'bg-purple-950/40 border-purple-500/60 ring-1 ring-purple-500/30 shadow-[0_0_15px_rgba(168,85,247,0.15)]'
+                                                                                                                                        : 'bg-white/5 border-white/10 hover:border-white/20'
+                                                                                                                                        }`}
+                                                                                                                        >
+                                                                                                                                <div className="flex gap-3 items-start">
+                                                                                                                                        {vrPkg.cover_image && (
+                                                                                                                                                <div className="w-16 h-16 rounded-lg overflow-hidden shrink-0 relative bg-black/40 border border-white/10">
+                                                                                                                                                        <img
+                                                                                                                                                                src={optimizeCloudinaryUrl(vrPkg.cover_image, 160)}
+                                                                                                                                                                alt={vrPkg.name}
+                                                                                                                                                                className="w-full h-full object-cover"
+                                                                                                                                                        />
+                                                                                                                                                        {vrPkg.duration_min && (
+                                                                                                                                                                <span className="absolute bottom-1 right-1 bg-black/80 backdrop-blur-xs text-[9px] font-bold text-white px-1 py-0.2 rounded">
+                                                                                                                                                                        {vrPkg.duration_min}'
+                                                                                                                                                                </span>
+                                                                                                                                                        )}
+                                                                                                                                                </div>
+                                                                                                                                        )}
+                                                                                                                                        <div className="flex-1 min-w-0">
+                                                                                                                                                <div className="flex items-center gap-1.5 flex-wrap">
+                                                                                                                                                        <h5 className="text-white font-bold text-xs sm:text-sm truncate">
+                                                                                                                                                                {vrPkg.name}
+                                                                                                                                                        </h5>
+                                                                                                                                                        {vrPkg.vr_genre && (
+                                                                                                                                                                <span className="text-[9px] bg-purple-500/20 text-purple-300 font-semibold px-1.5 py-0.2 rounded border border-purple-500/20">
+                                                                                                                                                                        {vrPkg.vr_genre}
+                                                                                                                                                                </span>
+                                                                                                                                                        )}
+                                                                                                                                                </div>
+                                                                                                                                                {vrPkg.description && (
+                                                                                                                                                        <p className="text-[11px] text-gray-400 line-clamp-1 mt-0.5">
+                                                                                                                                                                {vrPkg.description}
+                                                                                                                                                        </p>
+                                                                                                                                                )}
+                                                                                                                                                <div className="text-purple-400 font-extrabold text-xs sm:text-sm mt-1">
+                                                                                                                                                        {Number(vrPkg.price || 0).toLocaleString('vi-VN')}₫
+                                                                                                                                                        <span className="text-[10px] text-gray-400 font-normal"> / lượt</span>
+                                                                                                                                                </div>
+                                                                                                                                        </div>
+                                                                                                                                </div>
+
+                                                                                                                                {/* Counter */}
+                                                                                                                                <div className="flex items-center justify-between pt-2 border-t border-white/5">
+                                                                                                                                        <span className="text-[11px] text-gray-400 font-medium">
+                                                                                                                                                {qty > 0 ? `Thành tiền: ${(qty * Number(vrPkg.price || 0)).toLocaleString('vi-VN')}₫` : 'Thêm vào giỏ'}
+                                                                                                                                        </span>
+                                                                                                                                        <div className="flex items-center gap-2">
+                                                                                                                                                <Button
+                                                                                                                                                        type="button"
+                                                                                                                                                        variant="outline"
+                                                                                                                                                        size="sm"
+                                                                                                                                                        disabled={qty <= 0}
+                                                                                                                                                        className="h-7 w-7 p-0 bg-white/5 border-white/10 text-white hover:bg-purple-500/20 hover:text-purple-300 disabled:opacity-30 rounded-lg"
+                                                                                                                                                        onClick={() => updateVrQuantity(vrPkg.id, -1)}
+                                                                                                                                                >
+                                                                                                                                                        <Minus className="w-3 h-3" />
+                                                                                                                                                </Button>
+                                                                                                                                                <span className="text-xs font-bold text-white min-w-[1.25rem] text-center">
+                                                                                                                                                        {qty}
+                                                                                                                                                </span>
+                                                                                                                                                <Button
+                                                                                                                                                        type="button"
+                                                                                                                                                        variant="outline"
+                                                                                                                                                        size="sm"
+                                                                                                                                                        className="h-7 w-7 p-0 bg-white/5 border-white/10 text-white hover:bg-purple-500/20 hover:text-purple-300 rounded-lg"
+                                                                                                                                                        onClick={() => updateVrQuantity(vrPkg.id, 1)}
+                                                                                                                                                >
+                                                                                                                                                        <Plus className="w-3 h-3" />
+                                                                                                                                                </Button>
+                                                                                                                                        </div>
+                                                                                                                                </div>
+                                                                                                                        </div>
+                                                                                                                );
+                                                                                                        })}
+                                                                                                </div>
+                                                                                        </section>
+                                                                                )}
+
                                                                                 {/* TÓM TẮT TẠM TÍNH (Chỉ hiện trên Desktop ở phía trái) */}
                                                                                 {selectedPackage && (
                                                                                         <div className="mt-auto pt-6 hidden lg:block">
-                                                                                                <div className="overflow-hidden rounded-xl border border-blue-500/30 bg-blue-500/5 p-3 flex flex-col justify-between gap-2 animate-in fade-in slide-in-from-bottom-2 duration-400">
-                                                                                                        <div className="flex justify-between items-start">
-                                                                                                                <div>
-                                                                                                                        <h4 className="text-white font-bold text-base sm:text-lg">{selectedPackage.name}</h4>
-                                                                                                                        <p className="text-[13px] text-gray-400">
-                                                                                                                                {selectedPackage.description || `Gói vé ${selectedPackage.type || 'tiêu chuẩn'}`}
-                                                                                                                        </p>
+                                                                                                <div className="overflow-hidden rounded-xl border border-blue-500/30 bg-blue-500/5 p-3.5 flex flex-col justify-between gap-2.5 animate-in fade-in slide-in-from-bottom-2 duration-400">
+                                                                                                        <div className="space-y-2">
+                                                                                                                <div className="flex justify-between items-start">
+                                                                                                                        <div>
+                                                                                                                                <h4 className="text-white font-bold text-sm sm:text-base">{selectedPackage.name}</h4>
+                                                                                                                                <p className="text-[12px] text-gray-400">
+                                                                                                                                        {selectedPackage.description || `Gói vé ${selectedPackage.type || 'tiêu chuẩn'}`}
+                                                                                                                                </p>
+                                                                                                                        </div>
+                                                                                                                        <div className="text-right">
+                                                                                                                                <p className="text-sm font-bold text-white">x{ticketCount}</p>
+                                                                                                                                <p className="text-xs text-blue-300">{movieTotalPrice.toLocaleString('vi-VN')}₫</p>
+                                                                                                                        </div>
                                                                                                                 </div>
-                                                                                                                <div className="text-right">
-                                                                                                                        <p className="text-[11px] text-gray-400 uppercase tracking-widest">Đơn giá</p>
-                                                                                                                        <p className="text-sm font-bold text-white">{unitPrice.toLocaleString('vi-VN')}₫</p>
-                                                                                                                </div>
+
+                                                                                                                {vrTotalPrice > 0 && (
+                                                                                                                        <div className="pt-2 border-t border-white/10 flex justify-between items-center text-xs">
+                                                                                                                                <div className="flex items-center gap-1.5 text-purple-300 font-medium">
+                                                                                                                                        <Gamepad2 className="w-3.5 h-3.5" />
+                                                                                                                                        <span>Gói trải nghiệm VR ({Object.values(selectedVrQuantities).reduce((a, b) => a + b, 0)} lượt)</span>
+                                                                                                                                </div>
+                                                                                                                                <span className="font-bold text-purple-400">{vrTotalPrice.toLocaleString('vi-VN')}₫</span>
+                                                                                                                        </div>
+                                                                                                                )}
                                                                                                         </div>
 
-                                                                                                        <div className="pt-3 border-t border-white/10 flex justify-between items-end">
+                                                                                                        <div className="pt-2.5 border-t border-white/10 flex justify-between items-end">
                                                                                                                 <div>
-                                                                                                                        <p className="text-[11px] text-gray-400 uppercase tracking-widest">Số lượng</p>
-                                                                                                                        <p className="text-lg font-bold text-white">x{ticketCount}</p>
+                                                                                                                        <p className="text-[11px] text-gray-400 uppercase tracking-widest">Tổng cộng tạm tính</p>
                                                                                                                 </div>
                                                                                                                 <div className="text-right">
-                                                                                                                        <p className="text-[11px] text-gray-400 uppercase tracking-widest">Tổng cộng tạm tính</p>
                                                                                                                         <p className="text-2xl font-black text-blue-400 drop-shadow-[0_0_10px_rgba(96,165,250,0.3)]">
                                                                                                                                 {totalPrice.toLocaleString('vi-VN')}₫
                                                                                                                         </p>
@@ -849,26 +1037,34 @@ export default function BookingPage() {
                                                                                                 <div className="overflow-hidden rounded-xl border border-blue-500/30 bg-blue-500/5 p-4 flex flex-col justify-between gap-3 animate-in fade-in slide-in-from-bottom-2 duration-400">
                                                                                                         <div className="flex justify-between items-start">
                                                                                                                 <div>
-                                                                                                                        <h4 className="text-white font-bold text-base sm:text-lg">{selectedPackage.name}</h4>
-                                                                                                                        <p className="text-[13px] text-gray-400 leading-relaxed">
+                                                                                                                        <h4 className="text-white font-bold text-base">{selectedPackage.name}</h4>
+                                                                                                                        <p className="text-[12px] text-gray-400 leading-relaxed">
                                                                                                                                 {selectedPackage.description || `Gói vé ${selectedPackage.type || 'tiêu chuẩn'}`}
                                                                                                                         </p>
                                                                                                                 </div>
                                                                                                                 <div className="text-right shrink-0">
-                                                                                                                        <p className="text-[11px] text-gray-400 uppercase tracking-widest mb-0.5">Đơn giá</p>
-                                                                                                                        <p className="text-sm font-bold text-white">{unitPrice.toLocaleString('vi-VN')}₫</p>
+                                                                                                                        <p className="text-sm font-bold text-white">x{ticketCount}</p>
+                                                                                                                        <p className="text-xs text-blue-300">{movieTotalPrice.toLocaleString('vi-VN')}₫</p>
                                                                                                                 </div>
                                                                                                         </div>
 
-                                                                                                        <div className="pt-3 border-t border-white/10 flex justify-between items-end">
+                                                                                                        {vrTotalPrice > 0 && (
+                                                                                                                <div className="pt-2 border-t border-white/10 flex justify-between items-center text-xs">
+                                                                                                                        <span className="text-purple-300 font-medium flex items-center gap-1">
+                                                                                                                                <Gamepad2 className="w-3 h-3" />
+                                                                                                                                Gói VR ({Object.values(selectedVrQuantities).reduce((a, b) => a + b, 0)} lượt)
+                                                                                                                        </span>
+                                                                                                                        <span className="font-bold text-purple-400">{vrTotalPrice.toLocaleString('vi-VN')}₫</span>
+                                                                                                                </div>
+                                                                                                        )}
+
+                                                                                                        <div className="pt-2.5 border-t border-white/10 flex justify-between items-end">
                                                                                                                 <div>
-                                                                                                                        <p className="text-[11px] text-gray-400 uppercase tracking-widest mb-0.5">Số lượng</p>
-                                                                                                                        <p className="text-xl font-bold text-white">x{ticketCount}</p>
+                                                                                                                        <p className="text-[11px] text-gray-400 uppercase tracking-widest mb-0.5">
+                                                                                                                                Tổng tạm tính
+                                                                                                                        </p>
                                                                                                                 </div>
                                                                                                                 <div className="text-right">
-                                                                                                                        <p className="text-[11px] text-gray-400 uppercase tracking-widest mb-0.5">
-                                                                                                                                Tổng cộng tạm tính
-                                                                                                                        </p>
                                                                                                                         <p className="text-2xl font-black text-blue-400 drop-shadow-[0_0_12px_rgba(96,165,250,0.4)]">
                                                                                                                                 {totalPrice.toLocaleString('vi-VN')}₫
                                                                                                                         </p>
@@ -964,6 +1160,43 @@ export default function BookingPage() {
                                                                                         </section>
                                                                                 )}
 
+                                                                                {/* DANH SÁCH GÓI VR ĐÃ CHỌN TRONG BƯỚC 1 */}
+                                                                                {Object.entries(selectedVrQuantities).filter(([_, q]) => q > 0).length > 0 && (
+                                                                                        <section>
+                                                                                                <h3 className="text-xs sm:text-sm font-semibold text-purple-400 uppercase tracking-wider mb-2 sm:mb-3 flex items-center gap-1.5">
+                                                                                                        <Gamepad2 className="w-4 h-4 text-purple-400" />
+                                                                                                        Gói trải nghiệm VR kèm theo ({Object.values(selectedVrQuantities).reduce((a, b) => a + b, 0)} lượt)
+                                                                                                </h3>
+                                                                                                <div className="space-y-2">
+                                                                                                        {Object.entries(selectedVrQuantities)
+                                                                                                                .filter(([_, q]) => q > 0)
+                                                                                                                .map(([pkgId, qty]) => {
+                                                                                                                        const vrPkg = vrPackages.find((p: any) => Number(p.id) === Number(pkgId));
+                                                                                                                        if (!vrPkg) return null;
+                                                                                                                        const lineTotal = Number(vrPkg.price || 0) * qty;
+                                                                                                                        return (
+                                                                                                                                <div
+                                                                                                                                        key={pkgId}
+                                                                                                                                        className="bg-purple-500/10 border border-purple-500/20 p-2.5 sm:p-3 rounded-xl flex items-center justify-between text-xs sm:text-sm"
+                                                                                                                                >
+                                                                                                                                        <div className="flex items-center gap-2">
+                                                                                                                                                <span className="w-1.5 h-1.5 rounded-full bg-purple-400"></span>
+                                                                                                                                                <span className="font-bold text-white">{vrPkg.name}</span>
+                                                                                                                                                {vrPkg.duration_min && (
+                                                                                                                                                        <span className="text-[11px] text-gray-400">({vrPkg.duration_min} phút)</span>
+                                                                                                                                                )}
+                                                                                                                                        </div>
+                                                                                                                                        <div className="flex items-center gap-3">
+                                                                                                                                                <span className="text-purple-300 font-medium">x{qty}</span>
+                                                                                                                                                <span className="font-bold text-white">{lineTotal.toLocaleString('vi-VN')}₫</span>
+                                                                                                                                        </div>
+                                                                                                                                </div>
+                                                                                                                        );
+                                                                                                                })}
+                                                                                                </div>
+                                                                                        </section>
+                                                                                )}
+
                                                                                 {/* LƯU Ý GỌN GÀNG HƠN */}
                                                                                 <div className="p-3 sm:p-4 rounded-xl border border-amber-500/20 bg-amber-500/5">
                                                                                         <h4 className="text-amber-500 font-bold text-xs sm:text-sm mb-2 flex items-center gap-2">
@@ -1003,19 +1236,27 @@ export default function BookingPage() {
                                                                                                 </h3>
                                                                                                 <div className="bg-white/5 rounded-xl p-3 sm:p-4 border border-white/10 space-y-2 sm:space-y-3 text-xs sm:text-sm">
                                                                                                         <div className="flex justify-between">
-                                                                                                                <span className="text-gray-400">Loại vé</span>
+                                                                                                                <span className="text-gray-400">Vé xem phim</span>
                                                                                                                 <span className="text-white font-medium">
                                                                                                                         {selectedPackage?.name || defaultTicket?.name || 'Vé tiêu chuẩn'}
                                                                                                                 </span>
                                                                                                         </div>
                                                                                                         <div className="flex justify-between">
-                                                                                                                <span className="text-gray-400">Đơn giá</span>
-                                                                                                                <span className="text-white font-medium">{unitPrice.toLocaleString('vi-VN')}₫</span>
-                                                                                                        </div>
-                                                                                                        <div className="flex justify-between pb-2 sm:pb-3 border-b border-white/10">
-                                                                                                                <span className="text-gray-400">Số lượng</span>
+                                                                                                                <span className="text-gray-400">Số lượng vé</span>
                                                                                                                 <span className="text-white font-medium">x{ticketCount}</span>
                                                                                                         </div>
+                                                                                                        <div className="flex justify-between pb-2 border-b border-white/10">
+                                                                                                                <span className="text-gray-400">Tiền vé</span>
+                                                                                                                <span className="text-white font-medium">{movieTotalPrice.toLocaleString('vi-VN')}₫</span>
+                                                                                                        </div>
+
+                                                                                                        {vrTotalPrice > 0 && (
+                                                                                                                <div className="flex justify-between pb-2 border-b border-white/10 text-purple-300">
+                                                                                                                        <span>Gói trải nghiệm VR ({Object.values(selectedVrQuantities).reduce((a, b) => a + b, 0)} lượt)</span>
+                                                                                                                        <span className="font-bold text-purple-400">{vrTotalPrice.toLocaleString('vi-VN')}₫</span>
+                                                                                                                </div>
+                                                                                                        )}
+
                                                                                                         <div className="flex justify-between pt-1">
                                                                                                                 <span className="text-white font-bold text-base sm:text-lg">Tổng tiền</span>
                                                                                                                 <span className="text-blue-400 font-black text-lg sm:text-xl">

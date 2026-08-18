@@ -38,6 +38,7 @@ interface TicketPackage {
 export default function DeletedTicketsPage() {
         const navigate = useNavigate();
         const staffStore = useStaffStore();
+        const hasPermission = useHasStaffPermission();
         const [activeTab, setActiveTab] = useState('deleted-tickets');
         const [tickets, setTickets] = useState<TicketPackage[]>([]);
         const [page, setPage] = useState(1);

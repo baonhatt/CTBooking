@@ -2,6 +2,7 @@ import { eq, and, inArray, isNull, sql } from 'drizzle-orm';
 import type { VRBookingRequest, VRBookingResponse, VRPackageLineItem } from '../../../shared/api';
 import { formatDateForDb } from '../../lib/date-utils';
 import { validateVoucherForVRImpl, matchesBranch } from './vouchers';
+import { sqlBranchIdsMatchFilter } from '../../lib/branch-ids';
 
 // =============== 1. List VR Packages for user booking page ===============
 export async function listActiveVRPackagesImpl(
@@ -10,11 +11,6 @@ export async function listActiveVRPackagesImpl(
         branch_id?: number
 ) {
         const pkgs = tables.ticket_packages;
-        const baseCond = and(
-                eq(pkgs.is_active, true),
-                isNull(pkgs.deleted_at),
-                sql`(${pkgs.type} = 'vr' OR ${pkgs.type} IS NOT NULL AND ${pkgs.type} = 'vr')`
-        );
         // Safe version using OR logic fallback in case SQL stringify is tricky:
         const whereClause = branch_id
                 ? and(
@@ -30,21 +26,8 @@ export async function listActiveVRPackagesImpl(
 		orderBy: [sql`CAST(${pkgs.display_order} AS INTEGER) ASC`, sql`CAST(${pkgs.price} AS REAL) ASC`]
 	});
 
-        return { items: enrichWithParsedBranchIds(items) };
-}
-
-// Small helpers (tự viết để không cần import tickets.ts nếu cyclic):
-function sqlBranchIdsMatchFilter(fieldBranchIds: any, fieldSingleBranchId: any, targetBranchId: number | undefined) {
-        if (!targetBranchId) return sql`1=1`;
-        // same logic as branch-ids lib.
-        return sql`(
-          (${fieldBranchIds} IS NULL AND (${fieldSingleBranchId} IS NULL OR ${fieldSingleBranchId} = ${targetBranchId}))
-          OR (${fieldBranchIds} IS NOT NULL AND (${fieldBranchIds} = 'null' OR ${fieldBranchIds} = '' OR instr(${fieldBranchIds}, '"' || ${targetBranchId} || '"') > 0))
-        )`;
-}
-
-function enrichWithParsedBranchIds(items: any[]) {
-        return items.map((it) => {
+        // Enrich with branch_ids_parsed for backward compat
+        const enriched = items.map((it: any) => {
                 let bIds: number[] | null = null;
                 if (it.branch_ids) {
                         try {
@@ -52,8 +35,10 @@ function enrichWithParsedBranchIds(items: any[]) {
                                 if (Array.isArray(parsed)) bIds = parsed.map((x: any) => Number(x)).filter((x: number) => !isNaN(x));
                         } catch {}
                 }
-                return { ...it, branch_ids_parsed: bIds };
+                return { ...it, branch_ids: bIds, branch_ids_parsed: bIds };
         });
+
+        return { items: enriched };
 }
 
 // =============== 2. Validate VR booking (pre-checkout) ===============

@@ -18,13 +18,21 @@ interface TicketPackage {
         price: number;
         features?: string[];
         type?: string;
+        combo?: number[];
+        movies?: any[];
         min_group_size?: number;
         max_group_size?: number;
         is_member_only?: boolean;
         is_active?: boolean;
         display_order?: number;
         branch_id?: number;
+        branch_ids?: number[] | null;
         branch_name?: string;
+        cover_image?: string;
+        duration_min?: number;
+        vr_genre?: string;
+        min_players?: number;
+        max_players?: number;
         updated_at?: string;
 }
 
@@ -50,6 +58,7 @@ export default function TicketsPage() {
         const [total, setTotal] = useState(0);
         const totalPages = Math.max(1, Math.ceil(total / pageSize));
 
+        const [typeFilter, setTypeFilter] = useState<'all' | 'movie' | 'vr'>(initialFilters.typeFilter || 'all');
         const [isEditOpen, setIsEditOpen] = useState(false);
         const [editData, setEditData] = useState<any>(null);
         const [isLoading, setIsLoading] = useState(false);
@@ -101,6 +110,7 @@ export default function TicketsPage() {
                 const { items, total } = await getTickets({
                         page,
                         pageSize,
+                        type: typeFilter,
                         includeInactive: !showActiveOnly,
                         branch_id: selectedBranchId
                 });
@@ -122,6 +132,11 @@ export default function TicketsPage() {
                                 display_order: t.display_order ?? 0,
                                 branch_id: t.branch_id || undefined,
                                 branch_ids: Array.isArray(t.branch_ids) ? t.branch_ids : t.branch_ids ?? null,
+                                cover_image: t.cover_image || undefined,
+                                duration_min: t.duration_min !== null && t.duration_min !== undefined ? Number(t.duration_min) : undefined,
+                                vr_genre: t.vr_genre || undefined,
+                                min_players: t.min_players !== null && t.min_players !== undefined ? Number(t.min_players) : undefined,
+                                max_players: t.max_players !== null && t.max_players !== undefined ? Number(t.max_players) : undefined,
                                 updated_at: t.updated_at ? new Date(t.updated_at).toISOString() : undefined
                         }))
                 );
@@ -131,14 +146,14 @@ export default function TicketsPage() {
 
         useEffect(() => {
                 handleRefresh();
-        }, [page, showActiveOnly, selectedBranchId]);
+        }, [page, showActiveOnly, selectedBranchId, typeFilter]);
 
         useEffect(() => {
                 try {
-                        const state = { page, showActiveOnly, branchId: selectedBranchId };
+                        const state = { page, showActiveOnly, branchId: selectedBranchId, typeFilter };
                         localStorage.setItem('admin_tickets_filters', JSON.stringify(state));
                 } catch { }
-        }, [page, showActiveOnly, selectedBranchId]);
+        }, [page, showActiveOnly, selectedBranchId, typeFilter]);
 
         const openCreate = () => {
                 setEditData({ id: 0, name: '', code: generateCode(), price: 0, is_active: true, features: [] });
@@ -204,6 +219,8 @@ export default function TicketsPage() {
                                 setSelectedBranchId={setSelectedBranchId}
                                 showActiveOnly={showActiveOnly}
                                 setShowActiveOnly={setShowActiveOnly}
+                                typeFilter={typeFilter}
+                                setTypeFilter={setTypeFilter}
                                 isCodeEditable={isCodeEditable}
                                 setIsCodeEditable={setIsCodeEditable}
                         />

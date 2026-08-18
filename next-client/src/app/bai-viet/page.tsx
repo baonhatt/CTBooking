@@ -7,6 +7,8 @@ import PostsSearchClient from '@/app/bai-viet/PostsSearchClient';
 
 import { siteConfig } from '@/config/site';
 
+export const runtime = 'edge';
+
 const SITE_URL = siteConfig.domain;
 
 export const metadata: Metadata = {

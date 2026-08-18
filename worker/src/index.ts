@@ -1748,18 +1748,15 @@ app.get('/api/getActiveMovies', async (c) => {
 
 const getD1Tables = (schema: any) => ({
   bookings: schema.bookings,
-
   users: schema.users,
-
   accounts: schema.accounts,
-
   movies: schema.movies,
-
   ticket_packages: schema.ticket_packages,
-
   email_logs: schema.email_logs,
-
-  branches: schema.branches
+  branches: schema.branches,
+  booking_vr_items: schema.booking_vr_items,
+  vouchers: schema.vouchers,
+  voucher_redemption_logs: schema.voucher_redemption_logs
 });
 
 // Validate booking details before payment
@@ -3319,7 +3316,8 @@ app.put('/api/tickets/:id', requireStaffAuth, requirePermission('tickets', 'edit
     // Không cần xóa cache: KV cache cho vé đã bị vô hiệu hóa hoàn toàn
 
     return c.json(r, 200);
-  } catch {
+  } catch (err: any) {
+    console.error('Error updating ticket package:', err);
     return c.json({ status: 'error', message: 'Lỗi máy chủ nội bộ' }, 500);
   }
 });

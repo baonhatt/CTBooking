@@ -521,6 +521,41 @@ export default function QRPaymentPage() {
                                                                                                         </div>
                                                                                                 </div>
 
+                                                                                                {/* Danh sách gói VR nếu có */}
+                                                                                                {((bookingDetails?.vr_items && bookingDetails.vr_items.length > 0) ||
+                                                                                                        (paymentData?.vr_items && paymentData.vr_items.length > 0)) && (
+                                                                                                        <div className="space-y-2 p-3.5 rounded-2xl bg-purple-500/10 border border-purple-500/20 shadow-inner">
+                                                                                                                <div className="text-[11px] text-purple-300 font-black uppercase tracking-widest flex items-center justify-between">
+                                                                                                                        <span>Gói trải nghiệm VR</span>
+                                                                                                                        <span className="text-[10px] bg-purple-500/20 px-1.5 py-0.5 rounded">
+                                                                                                                                {(bookingDetails?.vr_items || paymentData?.vr_items || []).length} gói
+                                                                                                                        </span>
+                                                                                                                </div>
+                                                                                                                <div className="space-y-2 pt-1">
+                                                                                                                        {(bookingDetails?.vr_items || paymentData?.vr_items || []).map((it: any, idx: number) => {
+                                                                                                                                const lineTotal = Number(it.line_total || it.unit_price * it.quantity || 0);
+                                                                                                                                return (
+                                                                                                                                        <div key={idx} className="flex justify-between items-center text-[13px]">
+                                                                                                                                                <div className="flex items-center gap-2">
+                                                                                                                                                        <span className="text-purple-400 font-bold">•</span>
+                                                                                                                                                        <span className="text-white font-medium">{it.name || it.package_name || 'Gói VR'}</span>
+                                                                                                                                                        {it.duration_min && (
+                                                                                                                                                                <span className="text-[11px] text-gray-400">({it.duration_min}')</span>
+                                                                                                                                                        )}
+                                                                                                                                                </div>
+                                                                                                                                                <div className="flex items-center gap-2">
+                                                                                                                                                        <span className="text-gray-400 text-xs">x{it.quantity}</span>
+                                                                                                                                                        {lineTotal > 0 && (
+                                                                                                                                                                <span className="text-purple-300 font-bold">{lineTotal.toLocaleString('vi-VN')}₫</span>
+                                                                                                                                                        )}
+                                                                                                                                                </div>
+                                                                                                                                        </div>
+                                                                                                                                );
+                                                                                                                        })}
+                                                                                                                </div>
+                                                                                                        </div>
+                                                                                                )}
+
                                                                                                 {/* Tổng thanh toán */}
                                                                                                 <div className="px-1 pt-4 border-t border-white/10">
                                                                                                         <div className="flex justify-between items-center">

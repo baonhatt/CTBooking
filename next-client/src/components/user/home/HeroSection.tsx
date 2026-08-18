@@ -24,10 +24,6 @@ import { Button } from '@/components/ui/button';
 import { useBranch } from '@/hooks/useBranch';
 import { setCookie } from '@/lib/cookies';
 
-// Local static assets served from Next.js public/ folder
-const heroImage1 = '/images/1.webp';
-const heroImage9 = '/images/9.webp';
-
 export default function HeroSection({
         initialMovies = [],
         heroMedia = null
@@ -67,7 +63,6 @@ export default function HeroSection({
                 pointerY.set(y);
         };
 
-        const [currentPosterIndex, setCurrentPosterIndex] = useState(0);
         const videoRef = useRef<HTMLVideoElement>(null);
         const videoContainerRef = useRef<HTMLDivElement>(null);
         const [isVideoPlaying, setIsVideoPlaying] = useState(false);
@@ -106,7 +101,6 @@ export default function HeroSection({
         );
 
         const [hasStarted, setHasStarted] = useState(false);
-        const moviePosters = useMemo(() => [heroImage1, heroImage9], []);
 
         const { data: movies = initialMovies } = useQuery({
                 queryKey: ['activeMovies', selectedBranch?.id],
@@ -114,41 +108,6 @@ export default function HeroSection({
                 initialData: initialMovies,
                 staleTime: 0 // Fetch real-time data when branch changes
         });
-
-        // Preload first poster immediately, second on idle — mirrors React implementation
-        useEffect(() => {
-                const first = moviePosters[0];
-                if (!first) return;
-                const img = new Image();
-                img.src = first;
-                if (moviePosters.length < 2) return;
-                let cancelled = false;
-                const loadSecond = () => {
-                        if (cancelled) return;
-                        const img2 = new Image();
-                        img2.src = moviePosters[1];
-                };
-                let idleId: number | undefined;
-                let timeoutId: number | undefined;
-                if (typeof requestIdleCallback !== 'undefined') {
-                        idleId = requestIdleCallback(loadSecond) as unknown as number;
-                } else {
-                        timeoutId = window.setTimeout(loadSecond, 400) as unknown as number;
-                }
-                return () => {
-                        cancelled = true;
-                        if (idleId !== undefined) cancelIdleCallback(idleId);
-                        if (timeoutId !== undefined) clearTimeout(timeoutId);
-                };
-        }, [moviePosters]);
-
-        useEffect(() => {
-                if (moviePosters.length <= 1) return;
-                const interval = setInterval(() => {
-                        setCurrentPosterIndex((prev) => (prev + 1) % moviePosters.length);
-                }, 5000);
-                return () => clearInterval(interval);
-        }, [moviePosters.length]);
 
         useEffect(() => {
                 const video = videoRef.current;

@@ -65,6 +65,9 @@ export interface PaymentRequest {
   totalPrice?: number;
   ticketPackageId?: number;
   pay_txt_code?: string;
+  vr_items?: VRPackageItem[];
+  voucher_code?: string;
+  branch_id?: number;
 }
 
 // =====================================================================
