@@ -92,7 +92,16 @@ export const PERMISSIONS_SEED = [
   { module: 'settings', action: 'manage', description: 'Quản lý cài đặt hệ thống' },
 
   // Transactions
-  { module: 'transactions', action: 'view', description: 'Xem giao dịch' }
+  { module: 'transactions', action: 'view', description: 'Xem giao dịch' },
+
+  // Vouchers (VR / giảm giá)
+  { module: 'vouchers', action: 'view', description: 'Xem danh sách vouchers' },
+  { module: 'vouchers', action: 'create', description: 'Tạo voucher mới' },
+  { module: 'vouchers', action: 'edit', description: 'Sửa voucher' },
+  { module: 'vouchers', action: 'toggle_status', description: 'Bật/tắt trạng thái voucher' },
+  { module: 'vouchers', action: 'delete', description: 'Xóa voucher' },
+  { module: 'vouchers', action: 'view_deleted', description: 'Xem voucher đã xóa' },
+  { module: 'vouchers', action: 'restore', description: 'Khôi phục voucher đã xóa' }
 ];
 
 export const ROLES_SEED = [
@@ -131,6 +140,10 @@ export const ROLES_SEED = [
       'toys:view',
       'toys:create',
       'toys:edit',
+      'vouchers:view',
+      'vouchers:create',
+      'vouchers:edit',
+      'vouchers:toggle_status',
       'transactions:view',
       'posts:view',
       'posts:create',
@@ -179,6 +192,13 @@ export const ROLES_SEED = [
       'toys:delete',
       'toys:view_deleted',
       'toys:restore',
+      'vouchers:view',
+      'vouchers:create',
+      'vouchers:edit',
+      'vouchers:toggle_status',
+      'vouchers:delete',
+      'vouchers:view_deleted',
+      'vouchers:restore',
       'transactions:view',
       'branches:view',
       'branches:edit',

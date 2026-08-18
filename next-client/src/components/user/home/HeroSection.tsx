@@ -2,7 +2,7 @@
 
 import { useMemo, useState, useEffect, useRef, useCallback } from 'react';
 import { LazyMotion, domAnimation, m, AnimatePresence, useMotionValue, useSpring, useTransform } from 'framer-motion';
-import { Play, Sparkles, Waves, Clock, Star, Calendar, Ticket } from 'lucide-react';
+import { Play, Sparkles, Waves, Clock, Star, Calendar, Ticket, Gamepad2 } from 'lucide-react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import {
@@ -84,6 +84,7 @@ export default function HeroSection({
         // Prefetch booking page để tránh lag khi user bấm đặt vé
         useEffect(() => {
                 router.prefetch('/booking');
+                router.prefetch('/vr-booking');
         }, [router]);
 
         const [isDesktopHero, setIsDesktopHero] = useState(false);
@@ -331,6 +332,19 @@ export default function HeroSection({
                                                                         <span className="flex items-center gap-2">
                                                                                 Đặt vé ngay
                                                                                 <Play className="h-5 w-5 group-hover:translate-x-1 transition-transform" />
+                                                                        </span>
+                                                                </Button>
+                                                                <Button
+                                                                        className="group rounded-2xl px-9 py-8 text-base md:text-lg font-semibold bg-gradient-to-r from-purple-600 via-fuchsia-600 to-pink-600 hover:from-pink-600 hover:via-purple-600 hover:to-fuchsia-600 text-white shadow-[0_0_40px_rgba(168,85,247,0.6)] transition-all duration-500 hover:shadow-[0_0_60px_rgba(236,72,153,0.8)] hover:scale-105"
+                                                                        onClick={() => {
+                                                                                const params = new URLSearchParams(searchParams.toString());
+                                                                                const branchParam = selectedBranch?.id ? `?branch_id=${selectedBranch.id}` : (params.toString() ? `?${params.toString()}` : '');
+                                                                                router.push(`/vr-booking${branchParam}`);
+                                                                        }}
+                                                                >
+                                                                        <span className="flex items-center gap-2">
+                                                                                <Gamepad2 className="h-5 w-5" />
+                                                                                Trải nghiệm VR
                                                                         </span>
                                                                 </Button>
                                                         </m.div>

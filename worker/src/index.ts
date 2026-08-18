@@ -133,6 +133,26 @@ import {
 
 import { getPublicScheduleImpl } from '../../server/routes/user/showtimes';
 
+import {
+  listActiveVRPackagesImpl,
+  validateVRBookingImpl,
+  createVRBookingImpl,
+  getVRBookingByIdImpl,
+} from '../../server/routes/user/vr-bookings';
+
+import { validateVoucherForVRImpl } from '../../server/routes/user/vouchers';
+
+import {
+  listVouchersImpl,
+  listDeletedVouchersImpl,
+  getVoucherImpl,
+  createVoucherImpl,
+  updateVoucherImpl,
+  toggleVoucherStatusImpl,
+  deleteVoucherImpl,
+  restoreVoucherImpl,
+} from '../../server/routes/admin/vouchers';
+
 // import { getMailConfig, verifyMailProvider } from "../../server/routes/mail-service";
 
 import {
@@ -3128,6 +3148,9 @@ app.get('/api/tickets', async (c) => {
 
     const includeInactive = c.req.query('includeInactive') === 'true';
 
+    const typeRaw = c.req.query('type') || 'all';
+    const type = (typeRaw === 'movie' || typeRaw === 'vr') ? typeRaw : 'all';
+
     const db = drizzle(c.env.cinema_db, { schema });
     const restrictBranchIds = getRestrictBranchIds(c);
 
@@ -3139,7 +3162,7 @@ app.get('/api/tickets', async (c) => {
 
       { ticket_packages: schema.ticket_packages, movies: schema.movies },
 
-      { page, pageSize, q, includeInactive, branch_id: branchId, restrictToBranchIds: restrictBranchIds }
+      { page, pageSize, q, includeInactive, branch_id: branchId, restrictToBranchIds: restrictBranchIds, type }
     );
 
     return c.json(r, 200);
@@ -5791,6 +5814,322 @@ app.get('/api/admin/audit-logs', requireStaffAuth, requirePermission('audit_logs
     return c.json(r);
   } catch (err: any) {
     return c.json({ status: 'error', message: String(err?.message || 'Internal error') }, 500);
+  }
+});
+
+// ============================================================
+// ===== VR BOOKING ENDPOINTS (USER PUBLIC) ==================
+// ============================================================
+
+// GET /api/vr/packages - List active VR packages for booking page
+app.get('/api/vr/packages', async (c) => {
+  try {
+    const branchId = c.req.query('branch_id') ? Number(c.req.query('branch_id')) : undefined;
+    const db = drizzle(c.env.cinema_db, { schema });
+
+    const r = await listActiveVRPackagesImpl(
+      db,
+      { ticket_packages: schema.ticket_packages },
+      branchId
+    );
+
+    return c.json(r, 200 as any);
+  } catch (err: any) {
+    return c.json({ status: 'error', message: String(err?.message || 'Internal error') }, 500 as any);
+  }
+});
+
+// POST /api/vr/voucher/validate - Validate a voucher code for VR cart
+app.post('/api/vr/voucher/validate', async (c) => {
+  try {
+    const body = await c.req.json().catch(() => ({}));
+    const db = drizzle(c.env.cinema_db, { schema });
+
+    const r = await validateVoucherForVRImpl(
+      db,
+      {
+        vouchers: schema.vouchers,
+        voucher_redemption_logs: schema.voucher_redemption_logs,
+        ticket_packages: schema.ticket_packages
+      },
+      body
+    );
+
+    return c.json(r, 200 as any);
+  } catch (err: any) {
+    const errStatus = Number(err?.statusCode) || 500;
+    return c.json(
+      { valid: false, message: String(err?.message || 'Internal error') },
+      errStatus as any
+    );
+  }
+});
+
+// POST /api/vr/validate-booking - Validate VR booking input (pre-checkout)
+app.post('/api/vr/validate-booking', async (c) => {
+  try {
+    const body = await c.req.json().catch(() => ({}));
+    const db = drizzle(c.env.cinema_db, { schema });
+
+    const r = await validateVRBookingImpl(
+      db,
+      body,
+      {
+        ticket_packages: schema.ticket_packages,
+        vouchers: schema.vouchers,
+        voucher_redemption_logs: schema.voucher_redemption_logs,
+        users: schema.users
+      }
+    );
+
+    const status = Number(r.status) || 200;
+    const clone = { ...r };
+    delete clone.status;
+    return c.json(clone, status as any);
+  } catch (err: any) {
+    return c.json({ status: 'error', message: String(err?.message || 'Internal error') }, 500 as any);
+  }
+});
+
+// POST /api/vr/create-booking - Create VR booking + insert booking_vr_items
+app.post('/api/vr/create-booking', async (c) => {
+  try {
+    const body = await c.req.json().catch(() => ({}));
+    const db = drizzle(c.env.cinema_db, { schema });
+
+    const r = await createVRBookingImpl(
+      db,
+      body,
+      {
+        ticket_packages: schema.ticket_packages,
+        vouchers: schema.vouchers,
+        voucher_redemption_logs: schema.voucher_redemption_logs,
+        users: schema.users,
+        bookings: schema.bookings,
+        booking_vr_items: schema.booking_vr_items
+      }
+    );
+
+    const status = Number(r.status) || 200;
+    const clone: any = { ...r };
+    delete clone.status;
+    return c.json(clone, status as any);
+  } catch (err: any) {
+    return c.json({ success: false, error: String(err?.message || 'Internal error') }, 500 as any);
+  }
+});
+
+// GET /api/vr/bookings/:id - Get VR booking by ID (with vr_items list)
+app.get('/api/vr/bookings/:id', async (c) => {
+  try {
+    const id = Number(c.req.param('id'));
+    const db = drizzle(c.env.cinema_db, { schema });
+
+    const r = await getVRBookingByIdImpl(
+      db,
+      {
+        bookings: schema.bookings,
+        booking_vr_items: schema.booking_vr_items,
+        voucher_redemption_logs: schema.voucher_redemption_logs
+      },
+      id
+    );
+
+    if (!r) return c.json({ message: 'Không tìm thấy booking VR' }, 404 as any);
+    return c.json(r, 200 as any);
+  } catch (err: any) {
+    return c.json({ status: 'error', message: String(err?.message || 'Internal error') }, 500 as any);
+  }
+});
+
+// ============================================================
+// ===== ADMIN VOUCHER ENDPOINTS (Staff Auth + RBAC) =========
+// ============================================================
+
+// GET /api/admin/vouchers - List vouchers (pagination, search, filter)
+app.get('/api/admin/vouchers', requireStaffAuth, requirePermission('vouchers', 'view'), async (c) => {
+  try {
+    const page = Number(c.req.query('page') || 1);
+    const pageSize = Number(c.req.query('pageSize') || 20);
+    const q = String(c.req.query('q') || '');
+    const scope = c.req.query('scope') || '';
+    const is_active = c.req.query('is_active');
+
+    const db = drizzle(c.env.cinema_db, { schema });
+
+    const r = await listVouchersImpl(
+      db,
+      { vouchers: schema.vouchers },
+      { page, pageSize, q, scope, is_active }
+    );
+
+    return c.json(r, 200 as any);
+  } catch (err: any) {
+    return c.json({ status: 'error', message: String(err?.message || 'Internal error') }, 500 as any);
+  }
+});
+
+// GET /api/admin/vouchers/:id - Get voucher detail
+app.get('/api/admin/vouchers/:id', requireStaffAuth, requirePermission('vouchers', 'view'), async (c) => {
+  try {
+    const id = Number(c.req.param('id'));
+    const db = drizzle(c.env.cinema_db, { schema });
+
+    const r = await getVoucherImpl(
+      db,
+      {
+        vouchers: schema.vouchers,
+        auditLogs: schema.auditLogs,
+        voucher_redemption_logs: schema.voucher_redemption_logs
+      },
+      id
+    );
+
+    if (!r) return c.json({ message: 'Voucher không tồn tại' }, 404 as any);
+    return c.json(r, 200 as any);
+  } catch (err: any) {
+    return c.json({ status: 'error', message: String(err?.message || 'Internal error') }, 500 as any);
+  }
+});
+
+// POST /api/admin/vouchers - Create new voucher
+app.post('/api/admin/vouchers', requireStaffAuth, requirePermission('vouchers', 'create'), async (c) => {
+  try {
+    const body = await c.req.json().catch(() => ({}));
+    const db = drizzle(c.env.cinema_db, { schema });
+
+    const staffId = c.get('staffId');
+    const staffEmail = c.get('staffEmail');
+    const staffFullname = c.get('staffFullname');
+
+    const r = await createVoucherImpl(
+      db,
+      { vouchers: schema.vouchers, auditLogs: schema.auditLogs },
+      body,
+      { id: staffId, email: staffEmail, fullname: staffFullname }
+    );
+
+    return c.json(r, 201 as any);
+  } catch (err: any) {
+    return c.json({ status: 'error', message: String(err?.message || 'Internal error') }, 500 as any);
+  }
+});
+
+// PUT /api/admin/vouchers/:id - Update voucher
+app.put('/api/admin/vouchers/:id', requireStaffAuth, requirePermission('vouchers', 'edit'), async (c) => {
+  try {
+    const id = Number(c.req.param('id'));
+    const body = await c.req.json().catch(() => ({}));
+    const db = drizzle(c.env.cinema_db, { schema });
+
+    const staffId = c.get('staffId');
+    const staffEmail = c.get('staffEmail');
+    const staffFullname = c.get('staffFullname');
+
+    const r = await updateVoucherImpl(
+      db,
+      { vouchers: schema.vouchers, auditLogs: schema.auditLogs },
+      id,
+      body,
+      { id: staffId, email: staffEmail, fullname: staffFullname }
+    );
+
+    return c.json(r, 200 as any);
+  } catch (err: any) {
+    return c.json({ status: 'error', message: String(err?.message || 'Internal error') }, 500 as any);
+  }
+});
+
+// POST /api/admin/vouchers/:id/toggle-status - Toggle active status
+app.post('/api/admin/vouchers/:id/toggle-status', requireStaffAuth, requirePermission('vouchers', 'toggle_status'), async (c) => {
+  try {
+    const id = Number(c.req.param('id'));
+    const db = drizzle(c.env.cinema_db, { schema });
+
+    const staffId = c.get('staffId');
+    const staffEmail = c.get('staffEmail');
+    const staffFullname = c.get('staffFullname');
+
+    const r = await toggleVoucherStatusImpl(
+      db,
+      { vouchers: schema.vouchers, auditLogs: schema.auditLogs },
+      id,
+      { id: staffId, email: staffEmail, fullname: staffFullname }
+    );
+
+    return c.json(r, 200 as any);
+  } catch (err: any) {
+    const errStatus = Number(err?.statusCode) || 500;
+    return c.json({ status: 'error', message: String(err?.message || 'Internal error') }, errStatus as any);
+  }
+});
+
+// DELETE /api/admin/vouchers/:id - Soft delete voucher
+app.delete('/api/admin/vouchers/:id', requireStaffAuth, requirePermission('vouchers', 'delete'), async (c) => {
+  try {
+    const id = Number(c.req.param('id'));
+    const db = drizzle(c.env.cinema_db, { schema });
+
+    const staffId = c.get('staffId');
+    const staffEmail = c.get('staffEmail');
+    const staffFullname = c.get('staffFullname');
+
+    const r = await deleteVoucherImpl(
+      db,
+      { vouchers: schema.vouchers, auditLogs: schema.auditLogs },
+      id,
+      { id: staffId, email: staffEmail, fullname: staffFullname }
+    );
+
+    if (!r) return c.json({ status: 'error', message: 'Voucher không tồn tại' }, 404 as any);
+    return c.json(r, 200 as any);
+  } catch (err: any) {
+    return c.json({ status: 'error', message: String(err?.message || 'Internal error') }, 500 as any);
+  }
+});
+
+// POST /api/admin/vouchers/:id/restore - Restore deleted voucher
+app.post('/api/admin/vouchers/:id/restore', requireStaffAuth, requirePermission('vouchers', 'restore'), async (c) => {
+  try {
+    const id = Number(c.req.param('id'));
+    const db = drizzle(c.env.cinema_db, { schema });
+
+    const staffId = c.get('staffId');
+    const staffEmail = c.get('staffEmail');
+    const staffFullname = c.get('staffFullname');
+
+    const r = await restoreVoucherImpl(
+      db,
+      { vouchers: schema.vouchers, auditLogs: schema.auditLogs },
+      id,
+      { id: staffId, email: staffEmail, fullname: staffFullname }
+    );
+
+    return c.json(r, 200 as any);
+  } catch (err: any) {
+    const errStatus = Number(err?.statusCode) || 500;
+    return c.json({ status: 'error', message: String(err?.message || 'Internal error') }, errStatus as any);
+  }
+});
+
+// GET /api/admin/deleted/vouchers - List deleted vouchers (trash)
+app.get('/api/admin/deleted/vouchers', requireStaffAuth, requirePermission('vouchers', 'view_deleted'), async (c) => {
+  try {
+    const page = Number(c.req.query('page') || 1);
+    const pageSize = Number(c.req.query('pageSize') || 10);
+    const search = String(c.req.query('q') || c.req.query('search') || '');
+
+    const db = drizzle(c.env.cinema_db, { schema });
+
+    const r = await listDeletedVouchersImpl(
+      db,
+      { vouchers: schema.vouchers },
+      { page, pageSize, search }
+    );
+
+    return c.json(r, 200 as any);
+  } catch (err: any) {
+    return c.json({ status: 'error', message: String(err?.message || 'Internal error') }, 500 as any);
   }
 });
 

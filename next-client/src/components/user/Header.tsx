@@ -30,7 +30,7 @@ import {
         AlertDialogHeader,
         AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Calendar } from 'lucide-react';
+import { Calendar, Gamepad2 } from 'lucide-react';
 const LoginDialog = dynamic(() => import('@/components/LoginDialog'), { ssr: false });
 const RegisterDialog = dynamic(() => import('@/components/RegisterDialog'), { ssr: false });
 const ForgetPasswordDialog = dynamic(() => import('@/components/ForgetPasswordDialog'), { ssr: false });
@@ -52,7 +52,7 @@ export default function Header({
         // Custom hooks
         const isScrolled = useScrollDetect(50);
         const isPostsRoute = pathname === '/bai-viet' || pathname.startsWith('/bai-viet/');
-        const isBookingFlow = ['/booking', '/checkout', '/qr-payment', '/success-payment'].some(route => pathname.startsWith(route));
+        const isBookingFlow = ['/booking', '/checkout', '/qr-payment', '/success-payment', '/vr-booking'].some(route => pathname.startsWith(route));
         const { userName, setUserName } = useAuthState(false);
         const effectiveDisable = disableNav || (pathname !== '/' && !isPostsRoute);
         const activeSection = useActiveSection(effectiveDisable);
@@ -93,6 +93,7 @@ export default function Header({
                 router.prefetch('/booking');
                 router.prefetch('/bai-viet');
                 router.prefetch('/account');
+                router.prefetch('/vr-booking');
         }, [router]);
 
         // Dialog states
@@ -167,7 +168,7 @@ export default function Header({
                 const branch = branches.find((b) => b.id === branchId);
                 if (!branch) return;
 
-                const sensitiveRoutes = ['/booking', '/checkout', '/qr-payment'];
+                const sensitiveRoutes = ['/booking', '/checkout', '/qr-payment', '/vr-booking'];
                 const isSensitive = sensitiveRoutes.some(route => pathname.startsWith(route));
 
                 if (isSensitive) {
@@ -182,7 +183,7 @@ export default function Header({
                 if (pendingBranch) {
                         selectBranch(pendingBranch);
 
-                        const sensitiveRoutes = ['/booking', '/checkout', '/qr-payment'];
+                        const sensitiveRoutes = ['/booking', '/checkout', '/qr-payment', '/vr-booking'];
                         const isSensitive = sensitiveRoutes.some(route => pathname.startsWith(route));
 
                         if (isSensitive) {
@@ -282,6 +283,23 @@ export default function Header({
                                                         isBookingFlow={isBookingFlow}
                                                 />
                                         </div>
+
+                                        {/* VR Booking Button (in header) */}
+                                        <button
+                                                type="button"
+                                                onClick={() => {
+                                                        const params = new URLSearchParams(searchParams.toString());
+                                                        const branchParam = selectedBranch?.id ? `?branch_id=${selectedBranch.id}` : (params.toString() ? `?${params.toString()}` : '');
+                                                        router.push(`/vr-booking${branchParam}`);
+                                                }}
+                                                aria-label="Đặt trải nghiệm VR"
+                                                className="uiverse-schedule-btn inline-flex items-center gap-2 text-white/90 hover:text-white transition-colors duration-300 font-medium text-[15px] px-3 py-2 rounded-lg hover:bg-white/8 border border-white/10 hover:border-purple-400/40 hover:shadow-[0_0_20px_rgba(168,85,247,0.25)]"
+                                                data-text={"\u00A0Trải nghiệm VR\u00A0"}
+                                        >
+                                                <Gamepad2 className="w-4 h-4 text-purple-300" />
+                                                <span className="actual-text">{"\u00A0Trải nghiệm VR\u00A0"}</span>
+                                                <span aria-hidden="true" className="hover-text">{"\u00A0Trải nghiệm VR\u00A0"}</span>
+                                        </button>
 
                                         {/* Schedule Button (in header) */}
                                         <button

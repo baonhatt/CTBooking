@@ -76,7 +76,13 @@ export const ticket_packages = sqliteTable('ticket_packages', {
         created_at: text('created_at').notNull(),
         updated_at: text('updated_at').notNull(),
         deleted_at: text('deleted_at'),
-        deleted_by_staff_id: integer('deleted_by_staff_id').references(() => staffs.id, { onDelete: 'set null' })
+        deleted_by_staff_id: integer('deleted_by_staff_id').references(() => staffs.id, { onDelete: 'set null' }),
+        // ===== VR-specific columns (ignored for type='movie') =====
+        cover_image: text('cover_image'),
+        duration_min: integer('duration_min'),
+        vr_genre: text('vr_genre'),
+        min_players: integer('min_players').default(1),
+        max_players: integer('max_players').default(1)
 });
 
 export const bookings = sqliteTable('bookings', {
@@ -112,7 +118,13 @@ export const bookings = sqliteTable('bookings', {
         expiry_date: text('expiry_date'),
         checked_in_at: text('checked_in_at'),
         branch_id: integer('branch_id').references(() => branches.id, { onDelete: 'restrict' }),
-        confirmed_by_staff_id: integer('confirmed_by_staff_id').references(() => staffs.id, { onDelete: 'set null' })
+        confirmed_by_staff_id: integer('confirmed_by_staff_id').references(() => staffs.id, { onDelete: 'set null' }),
+        // ===== VR + Voucher columns =====
+        voucher_id: integer('voucher_id').references(() => vouchers.id, { onDelete: 'set null' }),
+        voucher_code_snapshot: text('voucher_code_snapshot'),
+        voucher_discount_amount: real('voucher_discount_amount').default(0),
+        booking_type: text('booking_type').default('movie'), // 'movie' | 'vr'
+        original_total_price: real('original_total_price')
 });
 
 export const toys = sqliteTable('toys', {
@@ -226,6 +238,61 @@ export const posts = sqliteTable('posts', {
         updated_at: text('updated_at')
 });
 
+// ==================== VR + VOUCHER TABLES (migration 0012, 0013) ====================
+
+export const vouchers = sqliteTable('vouchers', {
+        id: integer('id').primaryKey({ autoIncrement: true }),
+        code: text('code').notNull().unique(),
+        name: text('name').notNull(),
+        description: text('description'),
+        scope: text('scope').notNull().default('vr'), // 'vr' | 'movie' | 'all'
+        discount_type: text('discount_type').notNull(), // 'percent' | 'fixed'
+        discount_value: real('discount_value').notNull(),
+        min_order_value: real('min_order_value').default(0),
+        max_discount: real('max_discount'),
+        usage_limit: integer('usage_limit'),
+        per_user_limit: integer('per_user_limit').default(1),
+        used_count: integer('used_count').notNull().default(0),
+        is_active: integer('is_active', { mode: 'boolean' }).notNull().default(true),
+        valid_from: text('valid_from'),
+        valid_until: text('valid_until'),
+        applicable_ticket_package_ids: text('applicable_ticket_package_ids'), // JSON array of package IDs | NULL = all
+        applicable_user_ids: text('applicable_user_ids'),                 // JSON array | NULL = all
+        excluded_ticket_package_ids: text('excluded_ticket_package_ids'), // JSON array
+        branch_ids: text('branch_ids'),
+        created_at: text('created_at').notNull(),
+        updated_at: text('updated_at').notNull(),
+        deleted_at: text('deleted_at'),
+        deleted_by_staff_id: integer('deleted_by_staff_id').references(() => staffs.id, { onDelete: 'set null' })
+});
+
+export const voucher_redemption_logs = sqliteTable('voucher_redemption_logs', {
+        id: integer('id').primaryKey({ autoIncrement: true }),
+        voucher_id: integer('voucher_id').notNull().references(() => vouchers.id, { onDelete: 'restrict' }),
+        booking_id: integer('booking_id').notNull().references(() => bookings.id, { onDelete: 'cascade' }),
+        user_id: integer('user_id').references(() => users.id, { onDelete: 'set null' }),
+        redeemed_at: text('redeemed_at').notNull(),
+        discount_amount_applied: real('discount_amount_applied').notNull(),
+        order_total_before_discount: real('order_total_before_discount').notNull(),
+        order_total_after_discount: real('order_total_after_discount').notNull(),
+        staff_id: integer('staff_id').references(() => staffs.id, { onDelete: 'set null' })
+});
+
+export const booking_vr_items = sqliteTable('booking_vr_items', {
+        id: integer('id').primaryKey({ autoIncrement: true }),
+        booking_id: integer('booking_id').notNull().references(() => bookings.id, { onDelete: 'cascade' }),
+        vr_ticket_package_id: integer('vr_ticket_package_id').notNull().references(() => ticket_packages.id, { onDelete: 'restrict' }),
+        quantity: integer('quantity').notNull().default(1),
+        unit_price: real('unit_price').notNull(),
+        package_name: text('package_name').notNull(),
+        voucher_id: integer('voucher_id').references(() => vouchers.id, { onDelete: 'set null' }),
+        discounted_unit_price: real('discounted_unit_price'),
+        line_total: real('line_total').notNull(),
+        voucher_discount_amount: real('voucher_discount_amount').default(0),
+        branch_id: integer('branch_id').references(() => branches.id, { onDelete: 'restrict' }),
+        created_at: text('created_at')
+});
+
 // Relations
 export const usersRelations = relations(users, ({ many }) => ({
         accounts: many(accounts),
@@ -267,7 +334,7 @@ export const showtimesRelations = relations(showtimes, ({ one }) => ({
         })
 }));
 
-export const bookingsRelations = relations(bookings, ({ one }) => ({
+export const bookingsRelations = relations(bookings, ({ one, many }) => ({
         user: one(users, {
                 fields: [bookings.user_id],
                 references: [users.id]
@@ -279,6 +346,65 @@ export const bookingsRelations = relations(bookings, ({ one }) => ({
         ticket_package: one(ticket_packages, {
                 fields: [bookings.ticket_package_id],
                 references: [ticket_packages.id]
+        }),
+        booking_vr_items: many(booking_vr_items),
+        voucher: one(vouchers, {
+                fields: [bookings.voucher_id],
+                references: [vouchers.id]
+        }),
+        voucher_redemption_logs: many(voucher_redemption_logs)
+}));
+
+export const ticketPackagesRelations = relations(ticket_packages, ({ many }) => ({
+        bookings: many(bookings),
+        vr_booking_items: many(booking_vr_items)
+}));
+
+export const vouchersRelations = relations(vouchers, ({ one, many }) => ({
+        bookings: many(bookings),
+        booking_vr_items: many(booking_vr_items),
+        redemption_logs: many(voucher_redemption_logs),
+        deleted_by_staff: one(staffs, {
+                fields: [vouchers.deleted_by_staff_id],
+                references: [staffs.id]
+        })
+}));
+
+export const voucherRedemptionLogsRelations = relations(voucher_redemption_logs, ({ one }) => ({
+        voucher: one(vouchers, {
+                fields: [voucher_redemption_logs.voucher_id],
+                references: [vouchers.id]
+        }),
+        booking: one(bookings, {
+                fields: [voucher_redemption_logs.booking_id],
+                references: [bookings.id]
+        }),
+        user: one(users, {
+                fields: [voucher_redemption_logs.user_id],
+                references: [users.id]
+        }),
+        staff: one(staffs, {
+                fields: [voucher_redemption_logs.staff_id],
+                references: [staffs.id]
+        })
+}));
+
+export const bookingVRItemsRelations = relations(booking_vr_items, ({ one }) => ({
+        booking: one(bookings, {
+                fields: [booking_vr_items.booking_id],
+                references: [bookings.id]
+        }),
+        vr_package: one(ticket_packages, {
+                fields: [booking_vr_items.vr_ticket_package_id],
+                references: [ticket_packages.id]
+        }),
+        voucher: one(vouchers, {
+                fields: [booking_vr_items.voucher_id],
+                references: [vouchers.id]
+        }),
+        branch: one(branches, {
+                fields: [booking_vr_items.branch_id],
+                references: [branches.id]
         })
 }));
 

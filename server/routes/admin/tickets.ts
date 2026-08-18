@@ -62,12 +62,21 @@ function processComboInput(combo: any): number[] {
 export async function listTicketPackagesImpl(
         anyDb: any,
         tables: { ticket_packages: any; movies: any; branches?: any },
-        args: { page: number; pageSize: number; q: string; includeInactive?: boolean; branch_id?: number; restrictToBranchIds?: number[] | null }
+        args: { page: number; pageSize: number; q: string; includeInactive?: boolean; branch_id?: number; restrictToBranchIds?: number[] | null; type?: 'all' | 'movie' | 'vr' }
 ) {
-        const { page, pageSize, q, includeInactive = false, branch_id, restrictToBranchIds = null } = args;
+        const { page, pageSize, q, includeInactive = false, branch_id, restrictToBranchIds = null, type = 'all' } = args;
 
         // 1. Xây dựng điều kiện where
         let whereCondition = includeInactive ? undefined : and(eq(tables.ticket_packages.is_active, true), isNull(tables.ticket_packages.deleted_at));
+
+        // Type filter
+        if (type === 'movie') {
+                const movieCond = sql`(${tables.ticket_packages.type} IS NULL OR ${tables.ticket_packages.type} != 'vr')`;
+                whereCondition = whereCondition ? and(whereCondition, movieCond) : movieCond;
+        } else if (type === 'vr') {
+                const vrCond = eq(tables.ticket_packages.type, 'vr');
+                whereCondition = whereCondition ? and(whereCondition, vrCond) : vrCond;
+        }
 
         if (q) {
                 const lowerSearch = q.toLowerCase();
@@ -250,6 +259,12 @@ export async function createTicketPackageImpl(
                 display_order?: number; // Thứ tự hiển thị
                 branch_id?: number | null;
                 branch_ids?: number[] | null;
+                // ===== VR-specific fields =====
+                cover_image?: string;
+                duration_min?: number;
+                vr_genre?: string;
+                min_players?: number;
+                max_players?: number;
         },
         RUN_ENV: any,
         staffInfo?: { id: number; email: string; fullname: string }
@@ -268,7 +283,12 @@ export async function createTicketPackageImpl(
                 is_active,
                 display_order,
                 branch_id,
-                branch_ids
+                branch_ids,
+                cover_image,
+                duration_min,
+                vr_genre,
+                min_players,
+                max_players
         } = args;
 
         const branchFields = resolveBranchIdsInput(branch_ids, branch_id);
@@ -354,6 +374,12 @@ export async function createTicketPackageImpl(
                         display_order: Number(display_order ?? 0),
                         branch_id: branchFields.branch_id ?? null,
                         branch_ids: branchFields.branch_ids ?? null,
+                        // ===== VR-specific fields =====
+                        cover_image: cover_image || null,
+                        duration_min: duration_min !== undefined ? Number(duration_min) : null,
+                        vr_genre: vr_genre || null,
+                        min_players: min_players !== undefined ? Number(min_players) : null,
+                        max_players: max_players !== undefined ? Number(max_players) : null,
                         // Thời gian tạo và cập nhật
                         created_at: formattedNow,
                         updated_at: formattedNow
@@ -429,6 +455,12 @@ export async function updateTicketPackageImpl(
                 display_order?: number; // Thứ tự hiển thị
                 branch_id?: number | null;
                 branch_ids?: number[] | null;
+                // ===== VR-specific fields =====
+                cover_image?: string;
+                duration_min?: number;
+                vr_genre?: string;
+                min_players?: number;
+                max_players?: number;
         },
         RUN_ENV: any,
         staffInfo?: { id: number; email: string; fullname: string }
@@ -452,7 +484,12 @@ export async function updateTicketPackageImpl(
                 is_active,
                 display_order,
                 branch_id,
-                branch_ids
+                branch_ids,
+                cover_image,
+                duration_min,
+                vr_genre,
+                min_players,
+                max_players
         } = args;
 
         const now = new Date();
@@ -475,6 +512,12 @@ export async function updateTicketPackageImpl(
                 if (branchFields.branch_ids !== undefined) data.branch_ids = branchFields.branch_ids;
                 if (branchFields.branch_id !== undefined) data.branch_id = branchFields.branch_id;
         }
+        // ===== VR-specific fields =====
+        if (cover_image !== undefined) data.cover_image = cover_image || null;
+        if (duration_min !== undefined) data.duration_min = duration_min !== null ? Number(duration_min) : null;
+        if (vr_genre !== undefined) data.vr_genre = vr_genre || null;
+        if (min_players !== undefined) data.min_players = min_players !== null ? Number(min_players) : null;
+        if (max_players !== undefined) data.max_players = max_players !== null ? Number(max_players) : null;
 
         // 2. Tối ưu xử lý Features
         if (features !== undefined) {

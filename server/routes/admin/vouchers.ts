@@ -1,0 +1,421 @@
+import { eq, desc, or, count, and, isNull, isNotNull, like, sql } from 'drizzle-orm';
+import { formatDateForDb } from '../../lib/date-utils';
+import { logAuditAction } from '../../lib/audit-logger';
+import { buildAuditPayload } from '../../lib/audit-utils';
+
+function parseJsonArrayNullable(value: any): string | undefined {
+        if (value === undefined || value === null) return undefined;
+        if (Array.isArray(value)) return JSON.stringify(value);
+        if (typeof value === 'string') return value;
+        return undefined;
+}
+
+export async function listVouchersImpl(
+        anyDb: any,
+        tables: { vouchers: any },
+        args: { page: number; pageSize: number; q: string; scope?: string; is_active?: string }
+) {
+        const { page, pageSize, q, scope, is_active } = args;
+        const conditions = [] as any[];
+        conditions.push(isNull(tables.vouchers.deleted_at));
+
+        if (q) {
+                const lowerQ = q.toLowerCase();
+                conditions.push(
+                        or(
+                                sql`LOWER(${tables.vouchers.code}) LIKE ${`%${lowerQ}%`}`,
+                                sql`LOWER(${tables.vouchers.name}) LIKE ${`%${lowerQ}%`}`,
+                                sql`LOWER(${tables.vouchers.description}) LIKE ${`%${lowerQ}%`}`
+                        )
+                );
+        }
+
+        if (scope && scope !== 'all') {
+                conditions.push(eq(tables.vouchers.scope, scope));
+        }
+
+        if (is_active !== undefined && is_active !== 'all' && is_active !== '') {
+                const val = is_active === 'true' || is_active === '1' ? 1 : 0;
+                conditions.push(eq(tables.vouchers.is_active, val));
+        }
+
+        const whereCondition = conditions.length > 0 ? and(...conditions) : undefined;
+
+        const [totalRes] = await anyDb.select({ count: count() }).from(tables.vouchers).where(whereCondition);
+        const total = totalRes?.count || 0;
+        const items = await anyDb.query.vouchers.findMany({
+                where: whereCondition,
+                orderBy: [desc(tables.vouchers.created_at)],
+                limit: pageSize,
+                offset: (page - 1) * pageSize
+        });
+        return { items, page, pageSize, total };
+}
+
+export async function listDeletedVouchersImpl(
+        anyDb: any,
+        tables: { vouchers: any },
+        options: { page?: number; pageSize?: number; search?: string } = {}
+) {
+        const { vouchers } = tables;
+        const { page = 1, pageSize = 10, search = '' } = options;
+        const conditions = [] as any[];
+        if (search) {
+                const lowerQ = search.toLowerCase();
+                conditions.push(
+                        or(
+                                sql`LOWER(${vouchers.code}) LIKE ${`%${lowerQ}%`}`,
+                                sql`LOWER(${vouchers.name}) LIKE ${`%${lowerQ}%`}`
+                        )
+                );
+        }
+        conditions.push(isNotNull(vouchers.deleted_at));
+
+        const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
+        const items = await anyDb.query.vouchers.findMany({
+                where: whereClause,
+                orderBy: [desc(vouchers.deleted_at)],
+                limit: pageSize,
+                offset: (page - 1) * pageSize
+        });
+        const [countResult] = await anyDb.select({ count: count() }).from(vouchers).where(whereClause);
+        return { status: 'success', items, total: countResult?.count || 0, page, pageSize };
+}
+
+export async function getVoucherImpl(
+        anyDb: any,
+        tables: { vouchers: any; auditLogs: any; voucher_redemption_logs: any },
+        id: number
+) {
+        const voucher = await anyDb.query.vouchers.findFirst({ where: eq(tables.vouchers.id, id) });
+        if (!voucher) return null;
+
+        const [redemptionCountRes] = await anyDb
+                .select({ count: count() })
+                .from(tables.voucher_redemption_logs)
+                .where(eq(tables.voucher_redemption_logs.voucher_id, id));
+
+        const recent_redemptions = await anyDb.query.voucher_redemption_logs.findMany({
+                where: eq(tables.voucher_redemption_logs.voucher_id, id),
+                orderBy: [desc(tables.voucher_redemption_logs.redeemed_at)],
+                limit: 20
+        });
+
+        const [createLog] = await anyDb
+                .select()
+                .from(tables.auditLogs)
+                .where(
+                        and(
+                                eq(tables.auditLogs.entityType, 'voucher'),
+                                eq(tables.auditLogs.entityId, String(id)),
+                                eq(tables.auditLogs.action, 'create')
+                        )
+                )
+                .orderBy(tables.auditLogs.createdAt)
+                .limit(1);
+
+        const [updateLog] = await anyDb
+                .select()
+                .from(tables.auditLogs)
+                .where(
+                        and(
+                                eq(tables.auditLogs.entityType, 'voucher'),
+                                eq(tables.auditLogs.entityId, String(id)),
+                                eq(tables.auditLogs.action, 'update')
+                        )
+                )
+                .orderBy(desc(tables.auditLogs.createdAt))
+                .limit(1);
+
+        return {
+                ...voucher,
+                redemption_total_count: redemptionCountRes?.count || 0,
+                recent_redemptions,
+                created_by_staff_name: createLog?.staffFullname || null,
+                updated_by_staff_name: updateLog?.staffFullname || null
+        };
+}
+
+export async function createVoucherImpl(
+        anyDb: any,
+        tables: { vouchers: any; auditLogs: any },
+        args: {
+                code: string;
+                name: string;
+                description?: string;
+                scope?: string;
+                discount_type: string;
+                discount_value: number;
+                min_order_value?: number;
+                max_discount?: number;
+                usage_limit?: number;
+                per_user_limit?: number;
+                is_active?: boolean;
+                valid_from?: string;
+                valid_until?: string;
+                applicable_ticket_package_ids?: any;
+                applicable_user_ids?: any;
+                excluded_ticket_package_ids?: any;
+                branch_ids?: any;
+        },
+        staffInfo?: { id: number; email: string; fullname: string }
+) {
+        const cleanCode = (args.code || '').trim().toUpperCase();
+        if (!cleanCode) throw new Error('Mã voucher không được trống');
+        if (!args.discount_type) throw new Error('Thiếu loại giảm giá');
+        const dValue = Number(args.discount_value);
+        if (!dValue || dValue <= 0) throw new Error('Giá trị giảm giá không hợp lệ');
+        if (args.discount_type === 'percent' && dValue > 100) throw new Error('Phần trăm giảm không được vượt quá 100%');
+
+        const nowIso = new Date();
+        const payload: any = {
+                code: cleanCode,
+                name: args.name,
+                description: args.description || null,
+                scope: args.scope || 'vr',
+                discount_type: args.discount_type,
+                discount_value: String(dValue),
+                min_order_value: String(Number(args.min_order_value ?? 0)),
+                max_discount: args.max_discount !== undefined ? String(Number(args.max_discount)) : null,
+                usage_limit: args.usage_limit !== undefined && args.usage_limit !== null ? Number(args.usage_limit) : null,
+                per_user_limit: args.per_user_limit !== undefined && args.per_user_limit !== null ? Number(args.per_user_limit) : 1,
+                is_active: args.is_active !== undefined ? (args.is_active ? 1 : 0) : 1,
+                valid_from: args.valid_from || null,
+                valid_until: args.valid_until || null,
+                applicable_ticket_package_ids: parseJsonArrayNullable(args.applicable_ticket_package_ids),
+                applicable_user_ids: parseJsonArrayNullable(args.applicable_user_ids),
+                excluded_ticket_package_ids: parseJsonArrayNullable(args.excluded_ticket_package_ids),
+                branch_ids: parseJsonArrayNullable(args.branch_ids),
+                created_at: formatDateForDb(nowIso),
+                updated_at: formatDateForDb(nowIso)
+        };
+
+        try {
+                const inserted = await anyDb.insert(tables.vouchers).values(payload).returning();
+                let voucher: any = Array.isArray(inserted) ? inserted[0] : inserted;
+                if (!voucher) {
+                        voucher = await anyDb.query.vouchers.findFirst({ where: eq(tables.vouchers.code, cleanCode) });
+                }
+                if (!voucher) throw new Error('Không thể tạo voucher');
+
+                const auditNew = buildAuditPayload(voucher);
+                if (staffInfo) {
+                        await logAuditAction(
+                                anyDb,
+                                tables.auditLogs,
+                                'create',
+                                'voucher',
+                                voucher.id,
+                                `Tạo voucher: ${cleanCode}`,
+                                staffInfo.id,
+                                staffInfo.email,
+                                staffInfo.fullname,
+                                undefined,
+                                auditNew
+                        );
+                }
+                return { voucher };
+        } catch (err: any) {
+                if (String(err.message || err).toLowerCase().includes('unique') || String(err.message || err).includes('UNIQUE')) {
+                        throw new Error(`Mã voucher "${cleanCode}" đã tồn tại, vui lòng chọn mã khác`);
+                }
+                throw err;
+        }
+}
+
+export async function updateVoucherImpl(
+        anyDb: any,
+        tables: { vouchers: any; auditLogs: any },
+        id: number,
+        args: {
+                code?: string;
+                name?: string;
+                description?: string;
+                scope?: string;
+                discount_type?: string;
+                discount_value?: number;
+                min_order_value?: number;
+                max_discount?: number;
+                usage_limit?: number;
+                per_user_limit?: number;
+                is_active?: boolean;
+                valid_from?: string;
+                valid_until?: string;
+                applicable_ticket_package_ids?: any;
+                applicable_user_ids?: any;
+                excluded_ticket_package_ids?: any;
+                branch_ids?: any;
+        },
+        staffInfo?: { id: number; email: string; fullname: string }
+) {
+        const existing = await anyDb.query.vouchers.findFirst({ where: eq(tables.vouchers.id, id) });
+        if (!existing) {
+                const err: any = new Error('Voucher không tồn tại');
+                err.statusCode = 404;
+                throw err;
+        }
+
+        const data: any = { updated_at: formatDateForDb(new Date()) };
+        if (args.code !== undefined) data.code = (args.code || '').trim().toUpperCase();
+        if (args.name !== undefined) data.name = args.name;
+        if (args.description !== undefined) data.description = args.description || null;
+        if (args.scope !== undefined) data.scope = args.scope;
+        if (args.discount_type !== undefined) data.discount_type = args.discount_type;
+        if (args.discount_value !== undefined) data.discount_value = String(Number(args.discount_value));
+        if (args.min_order_value !== undefined) data.min_order_value = String(Number(args.min_order_value ?? 0));
+        if (args.max_discount !== undefined)
+                data.max_discount = args.max_discount !== null ? String(Number(args.max_discount)) : null;
+        if (args.usage_limit !== undefined)
+                data.usage_limit = args.usage_limit !== null ? Number(args.usage_limit) : null;
+        if (args.per_user_limit !== undefined)
+                data.per_user_limit = args.per_user_limit !== null ? Number(args.per_user_limit) : null;
+        if (args.is_active !== undefined) data.is_active = args.is_active ? 1 : 0;
+        if (args.valid_from !== undefined) data.valid_from = args.valid_from || null;
+        if (args.valid_until !== undefined) data.valid_until = args.valid_until || null;
+        if (args.applicable_ticket_package_ids !== undefined)
+                data.applicable_ticket_package_ids = parseJsonArrayNullable(args.applicable_ticket_package_ids);
+        if (args.applicable_user_ids !== undefined) data.applicable_user_ids = parseJsonArrayNullable(args.applicable_user_ids);
+        if (args.excluded_ticket_package_ids !== undefined)
+                data.excluded_ticket_package_ids = parseJsonArrayNullable(args.excluded_ticket_package_ids);
+        if (args.branch_ids !== undefined) data.branch_ids = parseJsonArrayNullable(args.branch_ids);
+
+        const updatedRes = await anyDb.update(tables.vouchers).set(data).where(eq(tables.vouchers.id, id)).returning();
+        let updatedVoucher: any = Array.isArray(updatedRes) ? updatedRes[0] : updatedRes;
+        if (!updatedVoucher) {
+                updatedVoucher = await anyDb.query.vouchers.findFirst({ where: eq(tables.vouchers.id, id) });
+        }
+
+        const auditOld = buildAuditPayload(existing);
+        const auditNew = buildAuditPayload(updatedVoucher);
+        if (staffInfo) {
+                await logAuditAction(
+                        anyDb,
+                        tables.auditLogs,
+                        'update',
+                        'voucher',
+                        id,
+                        `Cập nhật voucher: ${existing.code}`,
+                        staffInfo.id,
+                        staffInfo.email,
+                        staffInfo.fullname,
+                        auditOld,
+                        auditNew
+                );
+        }
+        return updatedVoucher || null;
+}
+
+export async function toggleVoucherStatusImpl(
+        anyDb: any,
+        tables: { vouchers: any; auditLogs: any },
+        id: number,
+        staffInfo?: { id: number; email: string; fullname: string }
+) {
+        const existing = await anyDb.query.vouchers.findFirst({ where: eq(tables.vouchers.id, id) });
+        if (!existing) {
+                const err: any = new Error('Voucher không tồn tại');
+                err.statusCode = 404;
+                throw err;
+        }
+        const newStatus = !existing.is_active;
+        await anyDb
+                .update(tables.vouchers)
+                .set({ is_active: newStatus, updated_at: formatDateForDb(new Date()) })
+                .where(eq(tables.vouchers.id, id));
+
+        const auditOld = buildAuditPayload(existing);
+        const auditNew = buildAuditPayload({ ...existing, is_active: newStatus });
+        if (staffInfo) {
+                await logAuditAction(
+                        anyDb,
+                        tables.auditLogs,
+                        'update',
+                        'voucher',
+                        id,
+                        `${newStatus ? 'Kích hoạt' : 'Vô hiệu hóa'} voucher: ${existing.code}`,
+                        staffInfo.id,
+                        staffInfo.email,
+                        staffInfo.fullname,
+                        auditOld,
+                        auditNew
+                );
+        }
+        return { ok: true, is_active: newStatus };
+}
+
+export async function deleteVoucherImpl(
+        anyDb: any,
+        tables: { vouchers: any; auditLogs: any },
+        id: number,
+        staffInfo?: { id: number; email: string; fullname: string }
+) {
+        const existing = await anyDb.query.vouchers.findFirst({ where: eq(tables.vouchers.id, id) });
+        if (!existing) return null;
+        await anyDb
+                .update(tables.vouchers)
+                .set({
+                        is_active: 0,
+                        deleted_at: new Date().toISOString(),
+                        deleted_by_staff_id: staffInfo?.id || null,
+                        updated_at: formatDateForDb(new Date())
+                })
+                .where(eq(tables.vouchers.id, id));
+
+        const auditOld = buildAuditPayload(existing);
+        if (staffInfo) {
+                await logAuditAction(
+                        anyDb,
+                        tables.auditLogs,
+                        'delete',
+                        'voucher',
+                        id,
+                        `Xóa voucher: ${existing.code}`,
+                        staffInfo.id,
+                        staffInfo.email,
+                        staffInfo.fullname,
+                        auditOld,
+                        undefined
+                );
+        }
+        return { ok: true };
+}
+
+export async function restoreVoucherImpl(
+        anyDb: any,
+        tables: { vouchers: any; auditLogs: any },
+        id: number,
+        staffInfo?: { id: number; email: string; fullname: string }
+) {
+        const { vouchers } = tables;
+        const existing = await anyDb.query.vouchers.findFirst({
+                where: and(eq(vouchers.id, id), isNotNull(vouchers.deleted_at))
+        });
+        if (!existing) {
+                const err: any = new Error('Không tìm thấy voucher hoặc voucher chưa bị xóa');
+                err.statusCode = 404;
+                throw err;
+        }
+        await anyDb
+                .update(vouchers)
+                .set({ deleted_at: null, deleted_by_staff_id: null, is_active: 0, updated_at: formatDateForDb(new Date()) })
+                .where(eq(vouchers.id, id));
+
+        const auditOld = buildAuditPayload(existing);
+        const auditNew = buildAuditPayload({ ...existing, deleted_at: null, deleted_by_staff_id: null, is_active: 0 });
+        if (staffInfo) {
+                await logAuditAction(
+                        anyDb,
+                        tables.auditLogs,
+                        'restore',
+                        'voucher',
+                        id,
+                        `Khôi phục voucher: ${existing.code}`,
+                        staffInfo.id,
+                        staffInfo.email,
+                        staffInfo.fullname,
+                        auditOld,
+                        auditNew
+                );
+        }
+        return { ok: true };
+}

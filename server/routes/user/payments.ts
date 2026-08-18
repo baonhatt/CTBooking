@@ -3,6 +3,7 @@ import { eq, and, asc, desc, isNull, or, inArray, sql } from 'drizzle-orm';
 import { generateBookingCode, getBookingEmailTemplate } from '../../lib/booking-utils';
 import { mailQueue } from '../../lib/mail-queue';
 import { formatDateForDb } from '../../lib/date-utils';
+import { redeemVoucherAfterPaymentImpl } from './vouchers';
 
 class HttpError extends Error {
         status: number;
@@ -289,7 +290,7 @@ export async function updatePaymentImpl(
                         return { status: 400, message: 'Vui lòng nhập đầy đủ thông tin hợp lệ.' };
                 }
 
-                const { bookings: bookingsTable, movies: moviesTable, ticket_packages: pkgsTable, branches: branchesTable } = tables || {};
+                const { bookings: bookingsTable, movies: moviesTable, ticket_packages: pkgsTable, branches: branchesTable, vouchers: vouchersTable, voucher_redemption_logs: logsTable, booking_vr_items: vrItemsTable } = tables || ({} as any);
                 if (!bookingsTable || !moviesTable || !pkgsTable || !branchesTable) return { status: 500, message: 'Missing tables definition' };
 
                 // 1. Tối ưu Query đầu tiên: Sử dụng Join thay vì 'with' để lấy data gửi mail sau này
@@ -384,38 +385,127 @@ export async function updatePaymentImpl(
 
                 const updatedBooking = Array.isArray(updatedRes) ? updatedRes[0] : updatedRes;
 
+                // 5b. Redeem Voucher + VR booking logic (only if paid)
+                if (isPaid && !isAlreadyPaid) {
+                        // Redeem voucher (if used)
+                        if (booking.voucher_id && vouchersTable && logsTable) {
+                                try {
+                                        const originalTotal = Number(booking.original_total_price || booking.total_price || 0);
+                                        const finalTotal = Number(booking.total_price || 0);
+                                        const discAmt = Number(booking.voucher_discount_amount || 0);
+                                        await redeemVoucherAfterPaymentImpl(anyDb, { vouchers: vouchersTable, voucher_redemption_logs: logsTable, bookings: bookingsTable }, {
+                                                voucher_id: Number(booking.voucher_id),
+                                                booking_id: booking.id,
+                                                user_id: booking.user_id ? Number(booking.user_id) : undefined,
+                                                discount_amount_applied: discAmt > 0 ? discAmt : Math.max(0, originalTotal - finalTotal),
+                                                order_total_before_discount: originalTotal > 0 ? originalTotal : finalTotal + discAmt,
+                                                order_total_after_discount: finalTotal
+                                        });
+                                } catch (e) {
+                                        console.error('[updatePayment] Redeem voucher lỗi (không rollback, booking đã paid)', e);
+                                }
+                        }
+                }
+
                 // 5. Gửi mail (Chỉ khi thanh toán thành công)
                 if (isPaid) {
+                        // Determine booking_type
+                        const isVR = booking.booking_type === 'vr';
                         // Sử dụng mailQueue để gửi mail ngầm, không chặn response
                         mailQueue.add(
                                 async () => {
                                         try {
-                                                const templateData = {
-                                                        bookingCode: bookingCode || '',
-                                                        customerName: booking.name || 'Khách hàng',
-                                                        movieTitle: booking.movie_title || '',
-                                                        ticketCount: booking.ticket_count,
-                                                        totalPrice: Number(booking.total_price).toLocaleString('vi-VN'),
-                                                        durationMin: booking.movie_duration,
-                                                        ticketPackageName: result.package_name,
-                                                        expiryDate: updatedBooking?.expiry_date,
-                                                        // Pass branch info to email template
-                                                        branchName: result.branch_name,
-                                                        branchAddress: result.branch_address,
-                                                        branchPhone: result.branch_phone,
-                                                        branchSettings: result.branch_settings
-                                                };
+                                                let vr_items: any[] = [];
+                                                if (isVR && vrItemsTable) {
+                                                        try {
+                                                                vr_items = await anyDb.query.booking_vr_items.findMany({
+                                                                        where: eq(vrItemsTable.booking_id, booking.id)
+                                                                });
+                                                        } catch {}
+                                                }
 
-                                                const emailTemplate = getBookingEmailHtml
-                                                        ? getBookingEmailHtml(templateData)
-                                                        : getBookingEmailTemplate(templateData);
-                                                const mailer = sendMailFn;
-
-                                                if (mailer) {
-                                                        await mailer(booking.email, `🎬 Xác nhận đặt vé - CINESPHERE`, emailTemplate);
-                                                        console.log(`[MailQueue] Đã gửi mail xác nhận cho booking ${booking.id}`);
+                                                if (isVR) {
+                                                        // === VR-specific email ===
+                                                        const originalTotal = Number(booking.original_total_price || booking.total_price || 0);
+                                                        const discountAmt = Number(booking.voucher_discount_amount || 0);
+                                                        const totalVR = Number(booking.total_price || 0);
+                                                        const listVRHtml = (vr_items.length > 0 ? vr_items : []).map((it: any) => `
+                                                                <tr>
+                                                                        <td style="padding:10px;border-bottom:1px solid #eee;">${it.package_name || 'Gói VR'}</td>
+                                                                        <td style="padding:10px;border-bottom:1px solid #eee;text-align:center;">${it.quantity || 1}</td>
+                                                                        <td style="padding:10px;border-bottom:1px solid #eee;text-align:right;">${(Number(it.unit_price) * (it.quantity || 1)).toLocaleString('vi-VN')}đ</td>
+                                                                        <td style="padding:10px;border-bottom:1px solid #eee;text-align:right;">${Number(it.line_total || (Number(it.discounted_unit_price || it.unit_price) * (it.quantity || 1))).toLocaleString('vi-VN')}đ</td>
+                                                                </tr>
+                                                        `).join('');
+                                                        const html = `
+                                                                <div style="font-family:Arial,sans-serif;max-width:640px;margin:auto;padding:20px;color:#222;">
+                                                                        <h2 style="color:#7c3aed;text-align:center;">🎮 CINESPHERE - XÁC NHẬN ĐẶT TRẢI NGHIỆM VR</h2>
+                                                                        <p>Xin chào <b>${booking.name || 'Khách hàng'}</b>, cảm ơn bạn đã trải nghiệm VR tại CineSphere!</p>
+                                                                        <div style="background:#f8fafc;padding:15px;border-radius:8px;margin:15px 0;">
+                                                                                <p style="margin:6px 0;"><b>Mã đơn:</b> ${bookingCode || ''}</p>
+                                                                                <p style="margin:6px 0;"><b>Liên hệ:</b> ${booking.phone} / ${booking.email}</p>
+                                                                                <p style="margin:6px 0;"><b>Ngày đặt:</b> ${new Date(booking.created_at).toLocaleString('vi-VN')}</p>
+                                                                                ${booking.voucher_code_snapshot ? `<p style="margin:6px 0;"><b>Voucher đã áp:</b> ${booking.voucher_code_snapshot} (giảm ${discountAmt.toLocaleString('vi-VN')}đ)</p>` : ''}
+                                                                                ${result.branch_name ? `<p style="margin:6px 0;"><b>Chi nhánh:</b> ${result.branch_name}${result.branch_address ? ' - ' + result.branch_address : ''}</p>` : ''}
+                                                                                ${updatedBooking?.expiry_date ? `<p style="margin:6px 0;"><b>Vui lòng sử dụng trước:</b> ${new Date(updatedBooking.expiry_date).toLocaleDateString('vi-VN')}</p>` : ''}
+                                                                        </div>
+                                                                        <h3 style="margin-top:20px;">Danh sách gói VR đã đặt</h3>
+                                                                        <table style="width:100%;border-collapse:collapse;margin-top:10px;">
+                                                                                <thead>
+                                                                                        <tr style="background:#f1f5f9;">
+                                                                                                <th style="padding:10px;text-align:left;">Gói</th>
+                                                                                                <th style="padding:10px;text-align:center;">SL</th>
+                                                                                                <th style="padding:10px;text-align:right;">Giá gốc</th>
+                                                                                                <th style="padding:10px;text-align:right;">Thành tiền</th>
+                                                                                        </tr>
+                                                                                </thead>
+                                                                                <tbody>
+                                                                                        ${listVRHtml}
+                                                                                </tbody>
+                                                                        </table>
+                                                                        <div style="margin-top:20px;text-align:right;">
+                                                                                ${discountAmt > 0 ? `<p style="margin:4px;">Tổng gốc: <b>${originalTotal.toLocaleString('vi-VN')}đ</b></p>` : ''}
+                                                                                ${discountAmt > 0 ? `<p style="margin:4px;color:#16a34a;">Giảm voucher: <b>- ${discountAmt.toLocaleString('vi-VN')}đ</b></p>` : ''}
+                                                                                <h3 style="color:#7c3aed;">Tổng thanh toán: ${totalVR.toLocaleString('vi-VN')}đ</h3>
+                                                                        </div>
+                                                                        <hr style="border:none;border-top:1px dashed #cbd5e1;margin:25px 0;">
+                                                                        <p style="font-size:13px;color:#64748b;text-align:center;">Hãy mang theo mã đơn hàng khi đến chi nhánh. Trân trọng!</p>
+                                                                </div>
+                                                        `;
+                                                        const mailer = sendMailFn;
+                                                        if (mailer) {
+                                                                await mailer(booking.email, `🎮 Xác nhận đặt trải nghiệm VR - CINESPHERE`, html);
+                                                                console.log(`[MailQueue] Đã gửi VR mail xác nhận cho booking ${booking.id}`);
+                                                        }
                                                 } else {
-                                                        console.warn('[Payments] No mailer provided, skipping confirmation email');
+                                                        // === Original MOVIE email ===
+                                                        const templateData = {
+                                                                bookingCode: bookingCode || '',
+                                                                customerName: booking.name || 'Khách hàng',
+                                                                movieTitle: booking.movie_title || '',
+                                                                ticketCount: booking.ticket_count,
+                                                                totalPrice: Number(booking.total_price).toLocaleString('vi-VN'),
+                                                                durationMin: booking.movie_duration,
+                                                                ticketPackageName: result.package_name,
+                                                                expiryDate: updatedBooking?.expiry_date,
+                                                                // Pass branch info to email template
+                                                                branchName: result.branch_name,
+                                                                branchAddress: result.branch_address,
+                                                                branchPhone: result.branch_phone,
+                                                                branchSettings: result.branch_settings
+                                                        };
+
+                                                        const emailTemplate = getBookingEmailHtml
+                                                                ? getBookingEmailHtml(templateData)
+                                                                : getBookingEmailTemplate(templateData);
+                                                        const mailer = sendMailFn;
+
+                                                        if (mailer) {
+                                                                await mailer(booking.email, `🎬 Xác nhận đặt vé - CINESPHERE`, emailTemplate);
+                                                                console.log(`[MailQueue] Đã gửi mail xác nhận cho booking ${booking.id}`);
+                                                        } else {
+                                                                console.warn('[Payments] No mailer provided, skipping confirmation email');
+                                                        }
                                                 }
                                         } catch (err) {
                                                 console.error(`[MailQueue] Lỗi gửi mail cho booking ${booking.id}:`, err);
@@ -425,7 +515,7 @@ export async function updatePaymentImpl(
                                 {
                                         db: anyDb,
                                         recipient: booking.email,
-                                        subject: '🎬 Xác nhận đặt vé - CINESPHERE',
+                                        subject: booking.booking_type === 'vr' ? '🎮 Xác nhận đặt trải nghiệm VR - CINESPHERE' : '🎬 Xác nhận đặt vé - CINESPHERE',
                                         emailType: 'booking_confirmation',
                                         userId: booking.user_id || undefined,
                                         bookingId: booking.id,

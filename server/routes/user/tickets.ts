@@ -1,4 +1,4 @@
-import { eq, asc, inArray, and, isNull } from 'drizzle-orm';
+import { eq, asc, inArray, and, isNull, sql } from 'drizzle-orm';
 import { enrichItemsWithParsedBranchIds, sqlBranchIdsMatchFilter } from '../../lib/branch-ids';
 
 export async function listActiveTicketPackages(
@@ -6,7 +6,8 @@ export async function listActiveTicketPackages(
         tables: { ticket_packages: any; movies: any },
         branch_id?: number
 ) {
-        const baseCondition = and(eq(tables.ticket_packages.is_active, true), isNull(tables.ticket_packages.deleted_at));
+        const movieOnlyCondition = sql`(${tables.ticket_packages.type} IS NULL OR ${tables.ticket_packages.type} != 'vr')`;
+        const baseCondition = and(eq(tables.ticket_packages.is_active, true), isNull(tables.ticket_packages.deleted_at), movieOnlyCondition);
         const whereCondition = branch_id
                 ? and(baseCondition, sqlBranchIdsMatchFilter(tables.ticket_packages.branch_ids, tables.ticket_packages.branch_id, branch_id))
                 : baseCondition;

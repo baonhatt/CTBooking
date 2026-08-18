@@ -4,6 +4,7 @@ export * from '@/lib/api/movies';
 export * from '@/lib/api/booking';
 export * from '@/lib/api/payments';
 export * from '@/lib/api/tickets';
+export * from '@/lib/api/vr-packages';
 export * from '@/lib/api/toys';
 export * from '@/lib/api/posts';
 export * from '@/lib/api/admin';
