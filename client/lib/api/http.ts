@@ -80,6 +80,7 @@ export async function request<T>(path: string, init: RequestInit = {}) {
   // Middleware supports both cookie and Authorization header
   const needsStaffAuth =
     path.startsWith('/api/admin') ||
+    path.startsWith('/api/showtimes') ||
     path.startsWith('/api/bookings-code/') ||
     path === '/api/bookings-use' ||
     path === '/api/confirm-booking';

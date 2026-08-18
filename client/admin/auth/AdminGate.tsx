@@ -16,6 +16,7 @@ import AdminIndex from '@/pages/admin/AdminIndex';
 import DashboardPage from '@/pages/admin/Dashboard';
 import UsersPage from '@/pages/admin/Users';
 import MoviesPage from '@/pages/admin/Movies';
+import ShowtimesPage from '@/pages/admin/Showtimes';
 import ToysPage from '@/pages/admin/Toys';
 import PostsPage from '@/pages/admin/Posts';
 import PostEditPage from '@/pages/admin/PostEdit';
@@ -246,6 +247,7 @@ export const AdminGate = () => {
                                 <Route path="/" element={<ProtectedRoute module="dashboard" action="view"><DashboardPage /></ProtectedRoute>} />
                                 <Route path="/users" element={<ProtectedRoute module="users" action="view"><UsersPage /></ProtectedRoute>} />
                                 <Route path="/movies" element={<ProtectedRoute module="movies" action="view"><MoviesPage /></ProtectedRoute>} />
+                                <Route path="/showtimes" element={<ProtectedRoute module="showtimes" action="view"><ShowtimesPage /></ProtectedRoute>} />
                                 <Route path="/toys" element={<ProtectedRoute module="toys" action="view"><ToysPage /></ProtectedRoute>} />
                                 <Route path="/posts" element={<ProtectedRoute module="posts" action="view"><PostsPage /></ProtectedRoute>} />
                                 <Route path="/posts/new" element={<ProtectedRoute module="posts" action="create"><PostCreatePage /></ProtectedRoute>} />

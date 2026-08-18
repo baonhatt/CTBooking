@@ -1,60 +1,55 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
-import { X, Clock, Clapperboard, Star, Calendar } from 'lucide-react';
-
-const SHOWTIME_SCHEDULE = [
-    { time: '10:00', titles: ['Vũ Trụ', '8 Kỳ Quan Thế Giới'] },
-    { time: '10:30', titles: ['Đại Dương', 'Khủng Long'] },
-    { time: '11:00', titles: ['Vũ Trụ', 'Khủng Long'] },
-    { time: '11:30', titles: ['Lòng Đất', 'Vùng Đất Ma'] },
-    { time: '12:00', titles: ['Vũ Trụ', '8 Kỳ Quan Thế Giới'] },
-    { time: '12:30', titles: ['Đại Dương', 'Khủng Long'] },
-    { time: '13:00', titles: ['Vũ Trụ', 'Khủng Long'] },
-    { time: '13:30', titles: ['Lòng Đất', 'Vùng Đất Ma'] },
-    { time: '14:00', titles: ['Vũ Trụ', '8 Kỳ Quan Thế Giới'] },
-    { time: '14:30', titles: ['Đại Dương', 'Khủng Long'] },
-    { time: '15:00', titles: ['Vũ Trụ', 'Khủng Long'] },
-    { time: '15:30', titles: ['Lòng Đất', 'Vùng Đất Ma'] },
-    { time: '16:00', titles: ['Vũ Trụ', '8 Kỳ Quan Thế Giới'] },
-    { time: '16:30', titles: ['Đại Dương', 'Khủng Long'] },
-    { time: '17:00', titles: ['Vũ Trụ', 'Khủng Long'] },
-    { time: '17:30', titles: ['Lòng Đất', 'Vùng Đất Ma'] },
-    { time: '18:00', titles: ['Vũ Trụ', '8 Kỳ Quan Thế Giới'] },
-    { time: '18:30', titles: ['Đại Dương', 'Khủng Long'] },
-    { time: '19:00', titles: ['Vũ Trụ', 'Khủng Long'] },
-    { time: '19:30', titles: ['Lòng Đất', 'Vùng Đất Ma'] },
-    { time: '20:00', titles: ['Vũ Trụ', '8 Kỳ Quan Thế Giới'] },
-    { time: '20:30', titles: ['Đại Dương', 'Khủng Long'] },
-    { time: '21:00', titles: ['Vũ Trụ', 'Khủng Long'] },
-    { time: '21:30', titles: ['Lòng Đất', 'Vùng Đất Ma'] },
-];
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { X, Clock, Calendar, Loader2 } from 'lucide-react';
+import { getPublicSchedule, type PublicShowtime } from '@/lib/api/schedule';
 
 const HOUR_GROUPS = [
-    { label: 'Buổi Sáng', icon: '🌅', range: ['10:00', '11:30'], headerClass: 'from-amber-500/20 to-orange-500/5', badgeClass: 'text-amber-400 bg-amber-500/15 border-amber-500/30' },
-    { label: 'Buổi Trưa', icon: '☀️', range: ['12:00', '13:30'], headerClass: 'from-yellow-500/20 to-amber-500/5', badgeClass: 'text-yellow-400 bg-yellow-500/15 border-yellow-500/30' },
-    { label: 'Buổi Chiều', icon: '🌤️', range: ['14:00', '17:30'], headerClass: 'from-blue-500/20 to-cyan-500/5', badgeClass: 'text-cyan-400 bg-cyan-500/15 border-cyan-500/30' },
-    { label: 'Buổi Tối', icon: '🌙', range: ['18:00', '21:30'], headerClass: 'from-purple-500/20 to-indigo-500/5', badgeClass: 'text-purple-400 bg-purple-500/15 border-purple-500/30' },
+    { label: 'Buổi Sáng', icon: '🌅', startHour: 0, endHour: 12, headerClass: 'from-amber-500/20 to-orange-500/5', badgeClass: 'text-amber-400 bg-amber-500/15 border-amber-500/30' },
+    { label: 'Buổi Trưa', icon: '☀️', startHour: 12, endHour: 14, headerClass: 'from-yellow-500/20 to-amber-500/5', badgeClass: 'text-yellow-400 bg-yellow-500/15 border-yellow-500/30' },
+    { label: 'Buổi Chiều', icon: '🌤️', startHour: 14, endHour: 18, headerClass: 'from-blue-500/20 to-cyan-500/5', badgeClass: 'text-cyan-400 bg-cyan-500/15 border-cyan-500/30' },
+    { label: 'Buổi Tối', icon: '🌙', startHour: 18, endHour: 24, headerClass: 'from-purple-500/20 to-indigo-500/5', badgeClass: 'text-purple-400 bg-purple-500/15 border-purple-500/30' },
 ];
 
-const MOVIE_BADGE_COLORS: Record<string, string> = {
-    'Vũ Trụ': 'bg-blue-600/70 text-blue-100',
-    '8 Kỳ Quan Thế Giới': 'bg-cyan-700/70 text-cyan-100',   
-    'Đại Dương': 'bg-teal-700/70 text-teal-100',
-    'Khủng Long': 'bg-emerald-700/70 text-emerald-100',
-    'Lòng Đất': 'bg-orange-700/70 text-orange-100',
-    'Vùng Đất Ma': 'bg-red-800/70 text-red-100',
-};
+const MOVIE_BADGE_PALETTE = [
+    'bg-blue-600/70 text-blue-100',
+    'bg-cyan-700/70 text-cyan-100',
+    'bg-teal-700/70 text-teal-100',
+    'bg-emerald-700/70 text-emerald-100',
+    'bg-orange-700/70 text-orange-100',
+    'bg-red-800/70 text-red-100',
+    'bg-violet-700/70 text-violet-100',
+    'bg-pink-700/70 text-pink-100',
+];
+
+function badgeClassForMovie(movieId: number) {
+    return MOVIE_BADGE_PALETTE[Math.abs(movieId) % MOVIE_BADGE_PALETTE.length];
+}
+
+function nowInVietnam(): string {
+    return new Date().toLocaleTimeString('en-GB', {
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: false,
+        timeZone: 'Asia/Ho_Chi_Minh',
+    });
+}
 
 interface MovieSchedulePanelProps {
     isOpen: boolean;
     onClose: () => void;
+    branchId?: number | null;
+    branchName?: string | null;
 }
 
-export default function MovieSchedulePanel({ isOpen, onClose }: MovieSchedulePanelProps) {
+export default function MovieSchedulePanel({ isOpen, onClose, branchId, branchName }: MovieSchedulePanelProps) {
     const panelRef = useRef<HTMLDivElement | null>(null);
+    const [items, setItems] = useState<PublicShowtime[]>([]);
+    const [opensAt, setOpensAt] = useState<string | null>(null);
+    const [closesAt, setClosesAt] = useState<string | null>(null);
+    const [isLoading, setIsLoading] = useState(false);
+    const [now, setNow] = useState(nowInVietnam);
 
-    // Close on outside click
     useEffect(() => {
         if (!isOpen) return;
         const onMouseDown = (e: MouseEvent) => {
@@ -66,30 +61,62 @@ export default function MovieSchedulePanel({ isOpen, onClose }: MovieSchedulePan
         return () => document.removeEventListener('mousedown', onMouseDown);
     }, [isOpen, onClose]);
 
-    // Lock body scroll on mobile
     useEffect(() => {
         document.body.style.overflow = isOpen ? 'hidden' : '';
         return () => { document.body.style.overflow = ''; };
     }, [isOpen]);
 
-    const getSlotsForGroup = (group: typeof HOUR_GROUPS[0]) => {
-        const startIdx = SHOWTIME_SCHEDULE.findIndex(s => s.time === group.range[0]);
-        const endIdx   = SHOWTIME_SCHEDULE.findIndex(s => s.time === group.range[1]);
-        return SHOWTIME_SCHEDULE.slice(startIdx, endIdx + 1);
-    };
+    useEffect(() => {
+        if (!isOpen) return;
+        const timer = window.setInterval(() => setNow(nowInVietnam()), 30000);
+        setNow(nowInVietnam());
+        return () => window.clearInterval(timer);
+    }, [isOpen]);
+
+    useEffect(() => {
+        if (!isOpen) return;
+        let cancelled = false;
+        (async () => {
+            setIsLoading(true);
+            try {
+                const data = await getPublicSchedule(branchId ?? undefined);
+                if (cancelled) return;
+                setItems(data.items);
+                setOpensAt(data.opens_at);
+                setClosesAt(data.closes_at);
+            } finally {
+                if (!cancelled) setIsLoading(false);
+            }
+        })();
+        return () => { cancelled = true; };
+    }, [isOpen, branchId]);
+
+    const legend = useMemo(() => {
+        const map = new Map<number, string>();
+        for (const slot of items) {
+            if (!map.has(slot.movie_id)) map.set(slot.movie_id, slot.movie_title);
+        }
+        return Array.from(map, ([id, title]) => ({ id, title }));
+    }, [items]);
+
+    const nextSlotId = useMemo(() => {
+        const upcoming = items.find((slot) => slot.start_time > now);
+        return upcoming?.id ?? null;
+    }, [items, now]);
+
+    const getSlotsForGroup = (startHour: number, endHour: number) =>
+        items.filter((slot) => {
+            const hour = Number(slot.start_time.slice(0, 2));
+            return hour >= startHour && hour < endHour;
+        });
 
     return (
         <>
-            {/* Floating button removed — header dispatches `open-movie-schedule` now */}
-
-            {/* ─── BACKDROP ─── */}
             <div
                 aria-hidden="true"
                 className={`fixed inset-0 z-50 bg-black/60 backdrop-blur-sm transition-opacity duration-300 ${isOpen ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}
             />
 
-            {/* ─── PANEL ─── */}
-            {/* Desktop: right sidebar | Mobile: bottom sheet */}
             <div
                 ref={panelRef}
                 className={`
@@ -103,13 +130,9 @@ export default function MovieSchedulePanel({ isOpen, onClose }: MovieSchedulePan
                 `}
             >
                 <div className="h-full flex flex-col bg-gradient-to-b from-[#070d1e] via-[#09112a] to-[#0b1432] border-t lg:border-t-0 lg:border-l border-white/10 shadow-2xl rounded-t-3xl lg:rounded-none overflow-hidden">
-
-                    {/* ── HEADER ── */}
                     <div className="relative shrink-0 px-5 py-4 lg:pt-7 lg:pb-5 border-b border-white/10">
-                        {/* Rainbow top bar */}
                         <div className="absolute top-0 left-0 right-0 h-[3px] bg-gradient-to-r from-blue-500 via-purple-500 to-cyan-400" />
 
-                        {/* Mobile drag handle */}
                         <div className="lg:hidden flex justify-center mb-4">
                             <div className="w-10 h-1 bg-white/20 rounded-full" />
                         </div>
@@ -124,9 +147,18 @@ export default function MovieSchedulePanel({ isOpen, onClose }: MovieSchedulePan
                                 </div>
                                 <p className="text-xs text-gray-400 flex items-center gap-1">
                                     <Clock className="w-3 h-3 shrink-0" />
-                                    Hoạt động:&nbsp;
-                                    <span className="font-semibold text-cyan-400">10:00 – 22:00</span>
+                                    {opensAt && closesAt ? (
+                                        <>
+                                            Hoạt động:&nbsp;
+                                            <span className="font-semibold text-cyan-400">{opensAt} – {closesAt}</span>
+                                        </>
+                                    ) : (
+                                        <span>Lặp lại mỗi ngày</span>
+                                    )}
                                 </p>
+                                {branchName && (
+                                    <p className="text-[11px] text-gray-500 mt-1">{branchName}</p>
+                                )}
                             </div>
                             <button
                                 onClick={onClose}
@@ -136,97 +168,96 @@ export default function MovieSchedulePanel({ isOpen, onClose }: MovieSchedulePan
                                 <X className="w-4 h-4" />
                             </button>
                         </div>
+                    </div>
 
-                        {/* Combo badge */}
-                        <div className="mt-3">
-                            <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-gradient-to-r from-purple-600/25 to-blue-600/25 border border-purple-500/35 text-purple-300 text-[11px] font-bold tracking-wide uppercase">
-                                <Star className="w-3 h-3 fill-purple-400 text-purple-400" />
-                                Combo Thám Hiểm
-                            </span>
+                    {legend.length > 0 && (
+                        <div className="shrink-0 px-5 py-2.5 border-b border-white/5 flex flex-wrap gap-x-3 gap-y-1.5">
+                            {legend.map((movie) => (
+                                <span key={movie.id} className="flex items-center gap-1 text-[10px] text-gray-400">
+                                    <span className={`w-2.5 h-2.5 rounded-sm flex-shrink-0 ${badgeClassForMovie(movie.id).split(' ')[0]}`} />
+                                    {movie.title}
+                                </span>
+                            ))}
                         </div>
-                    </div>
+                    )}
 
-                    {/* ── LEGEND ── */}
-                    <div className="shrink-0 px-5 py-2.5 border-b border-white/5 flex flex-wrap gap-x-3 gap-y-1.5">
-                        {Object.entries(MOVIE_BADGE_COLORS).map(([name, cls]) => (
-                            <span key={name} className="flex items-center gap-1 text-[10px] text-gray-400">
-                                <span className={`w-2.5 h-2.5 rounded-sm flex-shrink-0 ${cls.split(' ')[0]}`} />
-                                {name}
-                            </span>
-                        ))}
-                    </div>
-
-                    {/* ── SCHEDULE (scrollable) ── */}
                     <div className="flex-1 overflow-y-auto overscroll-contain schedule-scroll px-4 lg:px-5 py-4 space-y-4">
-                        {HOUR_GROUPS.map((group) => {
-                            const slots = getSlotsForGroup(group);
-                            return (
-                                <div key={group.label}>
-                                    {/* Group header */}
-                                    <div className={`flex items-center gap-2 px-3 py-1.5 rounded-xl bg-gradient-to-r ${group.headerClass} mb-2`}>
-                                        <span className="text-sm">{group.icon}</span>
-                                        <span className={`text-[10px] font-bold uppercase tracking-widest px-2 py-0.5 rounded-full border ${group.badgeClass}`}>
-                                            {group.label}
-                                        </span>
-                                        <span className="ml-auto text-[10px] text-gray-600">{slots.length} suất</span>
-                                    </div>
+                        {isLoading ? (
+                            <div className="flex items-center justify-center py-16 text-gray-400 gap-2 text-sm">
+                                <Loader2 className="w-4 h-4 animate-spin" />
+                                Đang tải lịch chiếu...
+                            </div>
+                        ) : items.length === 0 ? (
+                            <div className="text-center py-16 px-4">
+                                <p className="text-sm font-semibold text-white">Chưa có lịch chiếu</p>
+                                <p className="text-xs text-gray-500 mt-1">
+                                    {branchName ? `${branchName} chưa cấu hình lịch chiếu.` : 'Vui lòng chọn chi nhánh.'}
+                                </p>
+                            </div>
+                        ) : (
+                            HOUR_GROUPS.map((group) => {
+                                const slots = getSlotsForGroup(group.startHour, group.endHour);
+                                if (!slots.length) return null;
+                                return (
+                                    <div key={group.label}>
+                                        <div className={`flex items-center gap-2 px-3 py-1.5 rounded-xl bg-gradient-to-r ${group.headerClass} mb-2`}>
+                                            <span className="text-sm">{group.icon}</span>
+                                            <span className={`text-[10px] font-bold uppercase tracking-widest px-2 py-0.5 rounded-full border ${group.badgeClass}`}>
+                                                {group.label}
+                                            </span>
+                                            <span className="ml-auto text-[10px] text-gray-600">{slots.length} suất</span>
+                                        </div>
 
-                                    {/* Slot rows */}
-                                    <div className="space-y-1">
-                                        {slots.map((slot) => {
-                                            return (
-                                                <div
-                                                    key={slot.time}
-                                                    className="flex items-center gap-3 px-3 py-2.5 rounded-xl bg-white/3 border border-white/6 hover:bg-white/5 transition-colors"
-                                                >
-                                                    {/* Time */}
-                                                    <div className="shrink-0 w-12 text-right">
-                                                        <span className="text-sm font-black tabular-nums text-blue-300">
-                                                            {slot.time}
-                                                        </span>
-                                                    </div>
-
-                                                    {/* Separator */}
-                                                    <div className="shrink-0 w-px h-7 bg-white/10" />
-
-                                                    {/* Info */}
-                                                    <div className="flex-1 min-w-0">
-                                                        <div className="text-[10px] mb-1 leading-none text-gray-500">
-                                                            Thám hiểm:
+                                        <div className="space-y-1">
+                                            {slots.map((slot) => {
+                                                const isLive = now >= slot.start_time && now < slot.end_time;
+                                                const isNext = !isLive && slot.id === nextSlotId;
+                                                return (
+                                                    <div
+                                                        key={slot.id}
+                                                        className={`flex items-center gap-3 px-3 py-2.5 rounded-xl border transition-colors ${
+                                                            isLive
+                                                                ? 'bg-cyan-500/10 border-cyan-400/40'
+                                                                : isNext
+                                                                    ? 'bg-white/5 border-blue-400/25'
+                                                                    : 'bg-white/3 border-white/6 hover:bg-white/5'
+                                                        }`}
+                                                    >
+                                                        <div className="shrink-0 w-12 text-right">
+                                                            <span className="text-sm font-black tabular-nums text-blue-300">
+                                                                {slot.start_time}
+                                                            </span>
                                                         </div>
-                                                        <div className="flex flex-wrap gap-1">
-                                                            {slot.titles.map((title, i) => (
-                                                                <span
-                                                                    key={i}
-                                                                    className={`text-[9px] font-bold px-1.5 py-0.5 rounded ${MOVIE_BADGE_COLORS[title] ?? 'bg-slate-600/70 text-slate-100'}`}
-                                                                >
-                                                                    {title}
+                                                        <div className="shrink-0 w-px h-7 bg-white/10" />
+                                                        <div className="flex-1 min-w-0">
+                                                            <div className="flex items-center gap-2 mb-1">
+                                                                <span className="text-[10px] leading-none text-gray-500">
+                                                                    {slot.start_time} – {slot.end_time}
                                                                 </span>
-                                                            ))}
+                                                                {isLive && (
+                                                                    <span className="text-[9px] font-bold uppercase tracking-wide text-cyan-300 bg-cyan-500/20 px-1.5 py-0.5 rounded">
+                                                                        Đang chiếu
+                                                                    </span>
+                                                                )}
+                                                                {isNext && (
+                                                                    <span className="text-[9px] font-bold uppercase tracking-wide text-blue-300 bg-blue-500/20 px-1.5 py-0.5 rounded">
+                                                                        Suất kế
+                                                                    </span>
+                                                                )}
+                                                            </div>
+                                                            <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded ${badgeClassForMovie(slot.movie_id)}`}>
+                                                                {slot.movie_title}
+                                                            </span>
                                                         </div>
                                                     </div>
-                                                </div>
-                                            );
-                                        })}
+                                                );
+                                            })}
+                                        </div>
                                     </div>
-                                </div>
-                            );
-                        })}
+                                );
+                            })
+                        )}
                         <div className="h-2" />
-                    </div>
-
-                    {/* ── FOOTER ── */}
-                    <div className="shrink-0 px-5 py-3 border-t border-white/8 bg-black/20 flex items-center justify-between gap-3">
-                        {/* <p className="text-[11px] text-gray-500 leading-tight">
-                            Lịch chiếu mang tính chất tham khảo.<br />
-                            Vui lòng chọn ngày giờ khi đặt vé.
-                        </p>
-                        <button
-                            onClick={() => setIsOpen(false)}
-                            className="shrink-0 px-4 py-2 rounded-xl bg-white/8 hover:bg-white/15 text-gray-300 hover:text-white text-xs font-semibold transition-colors"
-                        >
-                            Đóng
-                        </button> */}
                     </div>
                 </div>
             </div>

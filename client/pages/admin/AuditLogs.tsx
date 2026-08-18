@@ -48,7 +48,8 @@ const ACTION_LABELS: Record<string, string> = {
         update: 'Cập nhật',
         delete: 'Xóa',
         force_logout: 'Đăng xuất',
-        reset_password: 'Đặt lại mật khẩu'
+        reset_password: 'Đặt lại mật khẩu',
+        copy: 'Sao chép'
 };
 
 const ACTION_COLORS: Record<string, string> = {
@@ -57,7 +58,8 @@ const ACTION_COLORS: Record<string, string> = {
         update: 'bg-yellow-50 text-yellow-700 border-yellow-200',
         delete: 'bg-red-50 text-red-600 border-red-200',
         force_logout: 'bg-orange-100 text-orange-800 border-orange-200',
-        reset_password: 'bg-purple-100 text-purple-800 border-purple-200'
+        reset_password: 'bg-purple-100 text-purple-800 border-purple-200',
+        copy: 'bg-blue-50 text-blue-700 border-blue-200'
 };
 
 const ENTITY_LABELS: Record<string, string> = {
@@ -65,7 +67,8 @@ const ENTITY_LABELS: Record<string, string> = {
         movie: 'Phim',
         booking: 'Đặt vé',
         role: 'Vai trò',
-        ticket_package: 'Gói vé'
+        ticket_package: 'Gói vé',
+        showtimes: 'Lịch chiếu'
 };
 
 // Fields to ignore for each module (auto-generated or system fields)

@@ -186,6 +186,20 @@ export const branches = sqliteTable('branches', {
         deleted_by_staff_id: integer('deleted_by_staff_id').references(() => staffs.id, { onDelete: 'set null' })
 });
 
+export const showtimes = sqliteTable('showtimes', {
+        id: integer('id').primaryKey({ autoIncrement: true }),
+        branch_id: integer('branch_id')
+                .notNull()
+                .references(() => branches.id, { onDelete: 'restrict' }),
+        movie_id: integer('movie_id')
+                .notNull()
+                .references(() => movies.id, { onDelete: 'restrict' }),
+        start_time: text('start_time').notNull(),
+        end_time: text('end_time').notNull(),
+        created_at: text('created_at').notNull(),
+        updated_at: text('updated_at').notNull()
+});
+
 export const posts = sqliteTable('posts', {
         id: integer('id').primaryKey({ autoIncrement: true }),
         title: text('title').notNull(),
@@ -235,9 +249,21 @@ export const tokensRelations = relations(tokens, ({ one }) => ({
 
 export const moviesRelations = relations(movies, ({ one, many }) => ({
         bookings: many(bookings),
+        showtimes: many(showtimes),
         branch: one(branches, {
                 fields: [movies.branch_id],
                 references: [branches.id]
+        })
+}));
+
+export const showtimesRelations = relations(showtimes, ({ one }) => ({
+        branch: one(branches, {
+                fields: [showtimes.branch_id],
+                references: [branches.id]
+        }),
+        movie: one(movies, {
+                fields: [showtimes.movie_id],
+                references: [movies.id]
         })
 }));
 

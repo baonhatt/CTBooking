@@ -357,6 +357,8 @@ export default function Header({
                         <MovieSchedulePanel
                                 isOpen={isScheduleOpen}
                                 onClose={() => setIsScheduleOpen(false)}
+                                branchId={selectedBranch?.id}
+                                branchName={selectedBranch?.name}
                         />
 
                         <AlertDialog open={showBranchConfirm} onOpenChange={setShowBranchConfirm}>

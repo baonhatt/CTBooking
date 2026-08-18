@@ -16,7 +16,8 @@ import {
 	Mail,
 	User,
 	Menu,
-	X
+	X,
+	CalendarClock
 } from 'lucide-react';
 import { buildUrl, request } from '@/lib/api/http';
 import { useStaffPermissions, useIsSuperAdmin } from '@/hooks/useStaffPermission';
@@ -33,6 +34,7 @@ interface Props {
 	| 'dashboard'
 	| 'users'
 	| 'movies'
+	| 'showtimes'
 	| 'toys'
 	| 'posts'
 	| 'transactions'
@@ -82,6 +84,7 @@ export default function AdminLayout({ active, setActive, handleLogout, children 
 		dashboard: { module: 'dashboard', action: 'view' },
 		users: { module: 'users', action: 'view' },
 		movies: { module: 'movies', action: 'view' },
+		showtimes: { module: 'showtimes', action: 'view' },
 		toys: { module: 'toys', action: 'view' },
 		posts: { module: 'posts', action: 'view' },
 		tickets: { module: 'tickets', action: 'view' },
@@ -146,6 +149,7 @@ export default function AdminLayout({ active, setActive, handleLogout, children 
 		{ key: 'dashboard' as const, label: 'Bảng điều khiển', icon: <LayoutDashboard className="h-4 w-4" /> },
 		{ key: 'users' as const, label: 'Người dùng', icon: <UsersIcon className="h-4 w-4" /> },
 		{ key: 'movies' as const, label: 'Phim', icon: <Clapperboard className="h-4 w-4" /> },
+		{ key: 'showtimes' as const, label: 'Lịch chiếu', icon: <CalendarClock className="h-4 w-4" /> },
 		{ key: 'toys' as const, label: 'Đồ chơi', icon: <Package className="h-4 w-4" /> },
 		{ key: 'posts' as const, label: 'Bài viết', icon: <FileText className="h-4 w-4" /> },
 		{ key: 'tickets' as const, label: 'Gói vé', icon: <TicketIcon className="h-4 w-4" /> },

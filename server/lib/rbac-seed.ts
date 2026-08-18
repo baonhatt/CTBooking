@@ -33,6 +33,12 @@ export const PERMISSIONS_SEED = [
   { module: 'movies', action: 'view_deleted', description: 'Xem phim đã xóa' },
   { module: 'movies', action: 'restore', description: 'Khôi phục phim đã xóa' },
 
+  // Showtimes
+  { module: 'showtimes', action: 'view', description: 'Xem lịch chiếu' },
+  { module: 'showtimes', action: 'create', description: 'Thêm suất chiếu' },
+  { module: 'showtimes', action: 'edit', description: 'Sửa suất chiếu' },
+  { module: 'showtimes', action: 'delete', description: 'Xóa suất chiếu' },
+
   // Toys
   { module: 'toys', action: 'view', description: 'Xem merchandise' },
   { module: 'toys', action: 'create', description: 'Thêm merchandise' },
@@ -115,6 +121,9 @@ export const ROLES_SEED = [
       'movies:create',
       'movies:edit',
       'movies:toggle_status',
+      'showtimes:view',
+      'showtimes:create',
+      'showtimes:edit',
       'tickets:view',
       'tickets:create',
       'tickets:edit',
@@ -153,6 +162,10 @@ export const ROLES_SEED = [
       'movies:toggle_status',
       'movies:view_deleted',
       'movies:restore',
+      'showtimes:view',
+      'showtimes:create',
+      'showtimes:edit',
+      'showtimes:delete',
       'tickets:view',
       'tickets:create',
       'tickets:edit',
