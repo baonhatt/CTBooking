@@ -112,6 +112,7 @@ import {
 
 import {
   listBranchesImpl,
+  listBranchOptionsImpl,
   getBranchImpl,
   getDefaultBranchImpl,
   createBranchImpl,
@@ -4665,6 +4666,27 @@ app.get('/api/admin/branches', requireStaffAuth, requirePermission('branches', '
   }
 });
 
+// Admin: Get branch options (fast dropdown returning branch_id and name)
+
+app.get('/api/admin/branches/options', requireStaffAuth, async (c) => {
+  try {
+    const includeInactive = c.req.query('includeInactive') === 'true';
+    const onlyOpen = c.req.query('onlyOpen') === 'true';
+
+    const db = drizzle(c.env.cinema_db, { schema });
+
+    const r = await listBranchOptionsImpl(
+      db,
+      { branches: schema.branches },
+      { includeInactive, onlyOpen }
+    );
+
+    return c.json(r);
+  } catch (err: any) {
+    return c.json({ status: 'error', message: String(err?.message || 'Internal error') }, 500);
+  }
+});
+
 // Admin: Get branch by ID
 
 app.get('/api/admin/branches/:id', requireStaffAuth, requirePermission('branches', 'view'), async (c) => {
@@ -4699,24 +4721,43 @@ app.get('/api/branches/default', async (c) => {
   }
 });
 
+// Public: Fast branch options (returns branch_id and name for clients)
+
+app.get('/api/branches/options', async (c) => {
+  try {
+    const db = drizzle(c.env.cinema_db, { schema });
+
+    const r = await listBranchOptionsImpl(
+      db,
+      { branches: schema.branches },
+      { includeInactive: false, onlyOpen: true }
+    );
+
+    return c.json(r);
+  } catch (err: any) {
+    return c.json({ status: 'error', message: String(err?.message || 'Internal error') }, 500);
+  }
+});
+
 // Public: List all active branches (for dropdown)
 
 app.get('/api/branches', async (c) => {
   try {
     const db = drizzle(c.env.cinema_db, { schema });
 
-    const r = await listBranchesImpl(
+    const r = await listBranchOptionsImpl(
       db,
-      {
-        branches: schema.branches,
-        movies: schema.movies,
-        ticket_packages: schema.ticket_packages,
-        bookings: schema.bookings
-      },
-      { page: 1, pageSize: 100, q: '', includeInactive: false, onlyOpen: true }
+      { branches: schema.branches },
+      { includeInactive: false, onlyOpen: true }
     );
 
-    return c.json(r);
+    return c.json({
+      items: r.items,
+      page: 1,
+      pageSize: r.items.length,
+      total: r.items.length,
+      totalPages: 1
+    });
   } catch (err: any) {
     return c.json({ status: 'error', message: String(err?.message || 'Internal error') }, 500);
   }

@@ -1,4 +1,4 @@
-import { eq, desc, asc, count, and, or, sql, isNull, isNotNull, like, gte } from 'drizzle-orm';
+import { eq, desc, asc, count, and, or, sql, isNull, isNotNull, like, gte, inArray } from 'drizzle-orm';
 import { formatDateForDb } from '../../lib/date-utils';
 import { logAuditAction } from '../../lib/audit-logger';
 import { buildAuditPayload } from '../../lib/audit-utils';
@@ -42,71 +42,113 @@ export async function listBranchesImpl(
         const branches = branchList;
         const total = totalResult ? Number(totalResult.count) : 0;
 
+        if (branches.length === 0) {
+                return {
+                        items: [],
+                        page,
+                        pageSize,
+                        total,
+                        totalPages: Math.ceil(total / pageSize)
+                };
+        }
+
+        const branchIds = branches.map((b: any) => b.id);
         const now = new Date();
         const fifteenMinutesAgo = new Date(now.getTime() - 15 * 60 * 1000);
+        const fifteenMinutesAgoStr = formatDateForDb(fifteenMinutesAgo);
 
-        const itemsWithStats = await Promise.all(
-                branches.map(async (branch: any) => {
-                        const [movieCount] = await anyDb
-                                .select({ count: count() })
-                                .from(tables.movies)
-                                .where(and(eq(tables.movies.branch_id, branch.id), eq(tables.movies.is_active, true), isNull(tables.movies.deleted_at)));
+        // Tối ưu hóa triệt để: Gom 6N queries riêng lẻ thành 4 truy vấn batch GROUP BY
+        const [movieStats, packageStats, bookingStats, paidUnusedCodes] = await Promise.all([
+                // 1. Movie stats theo branch
+                anyDb
+                        .select({
+                                branch_id: tables.movies.branch_id,
+                                count: count()
+                        })
+                        .from(tables.movies)
+                        .where(
+                                and(
+                                        inArray(tables.movies.branch_id, branchIds),
+                                        eq(tables.movies.is_active, true),
+                                        isNull(tables.movies.deleted_at)
+                                )
+                        )
+                        .groupBy(tables.movies.branch_id),
 
-                        const [packageCount] = await anyDb
-                                .select({ count: count() })
-                                .from(tables.ticket_packages)
-                                .where(and(eq(tables.ticket_packages.branch_id, branch.id), eq(tables.ticket_packages.is_active, true), isNull(tables.ticket_packages.deleted_at)));
+                // 2. Package stats theo branch
+                anyDb
+                        .select({
+                                branch_id: tables.ticket_packages.branch_id,
+                                count: count()
+                        })
+                        .from(tables.ticket_packages)
+                        .where(
+                                and(
+                                        inArray(tables.ticket_packages.branch_id, branchIds),
+                                        eq(tables.ticket_packages.is_active, true),
+                                        isNull(tables.ticket_packages.deleted_at)
+                                )
+                        )
+                        .groupBy(tables.ticket_packages.branch_id),
 
-                        const [bookingCount] = await anyDb
-                                .select({ count: count() })
-                                .from(tables.bookings)
-                                .where(eq(tables.bookings.branch_id, branch.id));
+                // 3. Tổng hợp toàn bộ số liệu booking trong 1 truy vấn duy nhất
+                anyDb
+                        .select({
+                                branch_id: tables.bookings.branch_id,
+                                booking_count: count(),
+                                pending_bookings_count: sql<number>`SUM(CASE WHEN ${tables.bookings.payment_status} = 'pending' AND ${tables.bookings.created_at} >= ${fifteenMinutesAgoStr} THEN 1 ELSE 0 END)`,
+                                paid_unused_count: sql<number>`SUM(CASE WHEN ${tables.bookings.payment_status} = 'paid' AND (${tables.bookings.is_used} = 0 OR ${tables.bookings.is_used} = false OR ${tables.bookings.is_used} IS NULL) THEN 1 ELSE 0 END)`
+                        })
+                        .from(tables.bookings)
+                        .where(inArray(tables.bookings.branch_id, branchIds))
+                        .groupBy(tables.bookings.branch_id),
 
-                        const [pendingBookingCount] = await anyDb
-                                .select({ count: count() })
-                                .from(tables.bookings)
-                                .where(
-                                        and(
-                                                eq(tables.bookings.branch_id, branch.id),
-                                                eq(tables.bookings.payment_status, 'pending'),
-                                                gte(tables.bookings.created_at, formatDateForDb(fifteenMinutesAgo))
-                                        )
-                                );
-
-                        const [paidUnusedCount] = await anyDb
-                                .select({ count: count() })
-                                .from(tables.bookings)
-                                .where(
-                                        and(
-                                                eq(tables.bookings.branch_id, branch.id),
-                                                eq(tables.bookings.payment_status, 'paid'),
-                                                eq(tables.bookings.is_used, false)
-                                        )
-                                );
-
-                        const paidUnusedCodesRes = await anyDb
-                                .select({ code: tables.bookings.booking_code })
-                                .from(tables.bookings)
-                                .where(
-                                        and(
-                                                eq(tables.bookings.branch_id, branch.id),
-                                                eq(tables.bookings.payment_status, 'paid'),
-                                                eq(tables.bookings.is_used, false)
+                // 4. Lấy mã đơn paid chưa dùng (giới hạn 100 mã tổng)
+                anyDb
+                        .select({
+                                branch_id: tables.bookings.branch_id,
+                                code: tables.bookings.booking_code
+                        })
+                        .from(tables.bookings)
+                        .where(
+                                and(
+                                        inArray(tables.bookings.branch_id, branchIds),
+                                        eq(tables.bookings.payment_status, 'paid'),
+                                        or(
+                                                eq(tables.bookings.is_used, false),
+                                                isNull(tables.bookings.is_used)
                                         )
                                 )
-                                .limit(50); // Chỉ lấy tối đa 50 mã để tránh quá tải UI
+                        )
+                        .limit(100)
+        ]);
 
-                        return {
-                                ...branch,
-                                movie_count: movieCount?.count || 0,
-                                package_count: packageCount?.count || 0,
-                                booking_count: bookingCount?.count || 0,
-                                pending_bookings_count: pendingBookingCount?.count || 0,
-                                paid_unused_count: paidUnusedCount?.count || 0,
-                                paid_unused_codes: paidUnusedCodesRes.map((r: any) => r.code).join(', ')
-                        };
-                })
-        );
+        const movieMap = new Map<number, number>(movieStats.map((r: any) => [r.branch_id, Number(r.count || 0)]));
+        const packageMap = new Map<number, number>(packageStats.map((r: any) => [r.branch_id, Number(r.count || 0)]));
+        const bookingMap = new Map<number, any>(bookingStats.map((r: any) => [r.branch_id, r]));
+
+        const codesByBranch = new Map<number, string[]>();
+        paidUnusedCodes.forEach((r: any) => {
+                if (!codesByBranch.has(r.branch_id)) {
+                        codesByBranch.set(r.branch_id, []);
+                }
+                if (r.code && (codesByBranch.get(r.branch_id)?.length || 0) < 50) {
+                        codesByBranch.get(r.branch_id)!.push(r.code);
+                }
+        });
+
+        const itemsWithStats = branches.map((branch: any) => {
+                const bStat = bookingMap.get(branch.id);
+                return {
+                        ...branch,
+                        movie_count: movieMap.get(branch.id) || 0,
+                        package_count: packageMap.get(branch.id) || 0,
+                        booking_count: Number(bStat?.booking_count || 0),
+                        pending_bookings_count: Number(bStat?.pending_bookings_count || 0),
+                        paid_unused_count: Number(bStat?.paid_unused_count || 0),
+                        paid_unused_codes: (codesByBranch.get(branch.id) || []).join(', ')
+                };
+        });
 
         return {
                 items: itemsWithStats,
@@ -114,6 +156,41 @@ export async function listBranchesImpl(
                 pageSize,
                 total,
                 totalPages: Math.ceil(total / pageSize)
+        };
+}
+
+export async function listBranchOptionsImpl(
+        anyDb: any,
+        tables: { branches: any },
+        args?: { includeInactive?: boolean; onlyOpen?: boolean }
+) {
+        const { includeInactive = false, onlyOpen = false } = args || {};
+
+        let whereCondition = includeInactive
+                ? isNull(tables.branches.deleted_at)
+                : and(eq(tables.branches.is_active, true), isNull(tables.branches.deleted_at));
+
+        if (onlyOpen) {
+                const openCondition = eq(tables.branches.is_open, true);
+                whereCondition = whereCondition ? and(whereCondition, openCondition) : openCondition;
+        }
+
+        const branches = await anyDb
+                .select({
+                        branch_id: tables.branches.id,
+                        id: tables.branches.id,
+                        name: tables.branches.name,
+                        code: tables.branches.code,
+                        is_default: tables.branches.is_default,
+                        is_open: tables.branches.is_open,
+                        is_active: tables.branches.is_active
+                })
+                .from(tables.branches)
+                .where(whereCondition)
+                .orderBy(desc(tables.branches.is_default), asc(tables.branches.name));
+
+        return {
+                items: branches
         };
 }
 

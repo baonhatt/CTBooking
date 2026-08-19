@@ -746,8 +746,8 @@ export default function BookingPage() {
 																	) : (
 																		<div
 																			className={`w-full h-full flex items-center justify-center ${isMovie
-																					? 'bg-gradient-to-br from-blue-900/60 to-cyan-900/60 text-cyan-400'
-																					: 'bg-gradient-to-br from-purple-900/60 to-pink-900/60 text-purple-400'
+																				? 'bg-gradient-to-br from-blue-900/60 to-cyan-900/60 text-cyan-400'
+																				: 'bg-gradient-to-br from-purple-900/60 to-pink-900/60 text-purple-400'
 																				}`}
 																		>
 																			{isMovie ? <Film className="w-7 h-7" /> : <Gamepad2 className="w-7 h-7" />}
@@ -767,8 +767,8 @@ export default function BookingPage() {
 																		</h4>
 																		<span
 																			className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${isMovie
-																					? 'bg-cyan-500/15 border-cyan-500/30 text-cyan-300'
-																					: 'bg-purple-500/15 border-purple-500/30 text-purple-300'
+																				? 'bg-cyan-500/15 border-cyan-500/30 text-cyan-300'
+																				: 'bg-purple-500/15 border-purple-500/30 text-purple-300'
 																				}`}
 																		>
 																			{isMovie ? 'Vé Xem Phim 8K' : item.vr_genre || 'Gói VR'}
@@ -862,8 +862,8 @@ export default function BookingPage() {
 																	}
 																}}
 																className={`group relative rounded-xl overflow-hidden cursor-pointer transition-all duration-300 shadow-md ${isSelected
-																		? 'ring-2 ring-cyan-400 border-2 border-cyan-400 bg-cyan-500/15 scale-[1.02] shadow-[0_0_20px_rgba(6,182,212,0.3)]'
-																		: 'border border-white/10 bg-white/5 hover:border-cyan-400/50 hover:bg-white/10'
+																	? 'ring-2 ring-cyan-400 border-2 border-cyan-400 bg-cyan-500/15 scale-[1.02] shadow-[0_0_20px_rgba(6,182,212,0.3)]'
+																	: 'border border-white/10 bg-white/5 hover:border-cyan-400/50 hover:bg-white/10'
 																	}`}
 															>
 																<div className="aspect-[2/3] relative overflow-hidden bg-slate-950">
@@ -1108,8 +1108,8 @@ export default function BookingPage() {
 													type="button"
 													onClick={() => setPaymentMethod('vietqr')}
 													className={`p-3.5 rounded-xl border flex items-center justify-between text-left transition-all ${paymentMethod === 'vietqr'
-															? 'bg-red-500/15 border-red-500/60 ring-1 ring-red-500/30 text-white'
-															: 'bg-white/5 border-white/10 text-slate-300 hover:bg-white/10'
+														? 'bg-red-500/15 border-red-500/60 ring-1 ring-red-500/30 text-white'
+														: 'bg-white/5 border-white/10 text-slate-300 hover:bg-white/10'
 														}`}
 												>
 													<div className="flex items-center gap-3">
