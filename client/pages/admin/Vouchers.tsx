@@ -164,7 +164,7 @@ export default function VouchersPage() {
                         valid_until: null,
                         applicable_ticket_package_ids: [],
                         excluded_ticket_package_ids: [],
-                        branch_ids: [],
+                        branch_ids: null,
                         is_active: true
                 });
                 setIsEditOpen(true);

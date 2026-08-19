@@ -1189,7 +1189,7 @@ export default function VouchersContent(props: Props) {
                                         </Label>
                                         <BranchMultiSelect
                                             branches={branchOptions.length > 0 ? branchOptions : branches}
-                                            value={editData?.branch_ids || []}
+                                            value={editData?.branch_ids ?? null}
                                             onChange={(ids) => setEditData({ ...editData, branch_ids: ids })}
                                             className="rounded-lg text-xs"
                                         />

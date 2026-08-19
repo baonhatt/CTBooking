@@ -3,8 +3,9 @@ import { formatDateForDb } from '../../lib/date-utils';
 import { logAuditAction } from '../../lib/audit-logger';
 import { buildAuditPayload } from '../../lib/audit-utils';
 
-function parseJsonArrayNullable(value: any): string | undefined {
-        if (value === undefined || value === null) return undefined;
+function parseJsonArrayNullable(value: any): string | null | undefined {
+        if (value === undefined) return undefined;
+        if (value === null) return null;
         if (Array.isArray(value)) return JSON.stringify(value);
         if (typeof value === 'string') return value;
         return undefined;
