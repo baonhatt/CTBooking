@@ -135,7 +135,7 @@ function VRPackageCardItem({
       </div>
 
       {/* Content Card Body */}
-      <CardContent className="p-5 flex-1 flex flex-col justify-between space-y-4">
+      <div className="p-5 sm:p-6 pb-6 sm:pb-6 flex-1 flex flex-col justify-between space-y-4">
         <div className="space-y-3">
           <h3 className="font-extrabold text-white text-lg tracking-wide line-clamp-1 group-hover:text-purple-300 transition-colors">
             {pkg.name}
@@ -167,19 +167,22 @@ function VRPackageCardItem({
         </div>
 
         {/* Price & Action footer */}
-        <div className="pt-4 mt-2 border-t border-white/10 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-          <div>
-            <p className="text-[10px] text-slate-400 uppercase font-extrabold tracking-wider">Giá vé trọn gói</p>
-            <p className="text-xl md:text-2xl font-black text-white flex items-baseline gap-1">
-              {formatMoney(pkg.price)}<span className="text-xs text-slate-400 font-normal">₫/vé</span>
-            </p>
+        <div className="pt-4 mt-auto border-t border-white/10 space-y-3">
+          <div className="flex items-center justify-between">
+            <span className="text-[11px] text-slate-400 font-extrabold uppercase tracking-wider">Giá trọn gói</span>
+            <div className="text-right">
+              <span className="text-xl font-black text-white">
+                {formatMoney(pkg.price)}
+              </span>
+              <span className="text-xs text-slate-400 font-medium ml-1">₫/vé</span>
+            </div>
           </div>
 
-          <div className="flex items-center gap-2 shrink-0">
+          <div className="flex items-center gap-2 w-full">
             <Button
               variant="outline"
               onClick={onDetail}
-              className="h-9 md:h-10 text-xs px-3 border-white/15 bg-white/5 hover:bg-white/10 text-slate-200 hover:text-white rounded-xl font-bold transition-all"
+              className="flex-1 h-9 text-xs border-white/15 bg-white/5 hover:bg-white/10 text-slate-200 hover:text-white rounded-xl font-bold transition-all"
             >
               Chi tiết
             </Button>
@@ -187,19 +190,19 @@ function VRPackageCardItem({
               variant="outline"
               onClick={onAddToCart}
               title="Thêm gói VR vào giỏ hàng"
-              className="h-9 md:h-10 text-xs px-3 border-purple-500/30 bg-purple-500/10 hover:bg-purple-500/20 text-purple-300 hover:text-white rounded-xl font-bold transition-all"
+              className="h-9 w-9 p-0 text-xs border-purple-500/30 bg-purple-500/10 hover:bg-purple-500/20 text-purple-300 hover:text-white rounded-xl font-bold transition-all flex items-center justify-center shrink-0"
             >
               <ShoppingCart className="w-4 h-4" />
             </Button>
             <Button
               onClick={onBook}
-              className="h-9 md:h-10 text-xs px-4 bg-gradient-to-r from-purple-500 to-blue-500 hover:from-purple-600 hover:to-blue-600 text-white rounded-xl font-bold tracking-wide shadow-md shadow-purple-500/20 active:scale-95 transition-all"
+              className="flex-1 h-9 text-xs bg-gradient-to-r from-purple-500 to-blue-500 hover:from-purple-600 hover:to-blue-600 text-white rounded-xl font-bold tracking-wide shadow-md shadow-purple-500/20 active:scale-95 transition-all shrink-0"
             >
               Mua vé
             </Button>
           </div>
         </div>
-      </CardContent>
+      </div>
     </Card>
   );
 }
