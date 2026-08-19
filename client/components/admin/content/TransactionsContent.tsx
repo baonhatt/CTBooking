@@ -534,7 +534,7 @@ export default function TransactionsContent({
                                                                                                         modalIcon: <Clock size={14} />,
                                                                                                         ticketText: 'Đã Quá Hạn',
                                                                                                         ticketStyle: 'bg-slate-600 text-white border-slate-700 font-bold'
-                                                                                                };
+                                                                                        };
                                                                                         }
 
                                                                                         // Còn lại là Đang đợi dùng
@@ -703,14 +703,15 @@ export default function TransactionsContent({
 
                         {/* --- MODAL CHI TIẾT GIAO DỊCH (TỐI ƯU TOÀN DIỆN) --- */}
                         <Dialog open={isDetailsOpen} onOpenChange={setIsDetailsOpen}>
-                                {/* Tăng max-w-2xl lên max-w-4xl để không gian rộng rãi, chuyên nghiệp hơn */}
-                                <DialogContent className="max-w-[700px] p-0 border border-gray-200 shadow-xl rounded-xl overflow-hidden bg-white flex flex-col max-h-[92vh] [&>button]:hidden">
+                                {/* ✅ THAY ĐỔI: max-w-[700px] → max-w-6xl (rộng hơn) */}
+                                {/* ✅ THAY ĐỔI: max-h-[92vh] → max-h-[95vh] (cao hơn) */}
+                                <DialogContent className="max-w-6xl p-0 border border-gray-200 shadow-xl rounded-xl overflow-hidden bg-white flex flex-col max-h-[95vh] [&>button]:hidden">
                                         {/* HEADER CỐ ĐỊNH */}
-                                        <div className="bg-white p-5 border-b shrink-0">
+                                        <div className="bg-white p-6 border-b shrink-0">
                                                 <div className="flex justify-between items-start">
                                                         <div>
-                                                                <DialogTitle className="text-lg font-semibold text-gray-900">Chi tiết giao dịch</DialogTitle>
-                                                                <div className="flex items-center gap-2 text-gray-500 text-[11px] mt-1 italic">
+                                                                <DialogTitle className="text-xl font-bold text-gray-900">Chi tiết giao dịch</DialogTitle>
+                                                                <div className="flex items-center gap-2 text-gray-500 text-[12px] mt-1.5 italic">
                                                                         ID Hệ thống:
                                                                         <CopyableText text={txDetails?.id?.toString() || ''} label="ID hệ thống" />
                                                                 </div>
@@ -725,42 +726,42 @@ export default function TransactionsContent({
                                                                         if (paymentStatus === 'paid') {
                                                                                 if (isUsed) {
                                                                                         return (
-                                                                                                <div className="bg-blue-50 text-blue-600 px-3 py-1 rounded-full border border-blue-100 flex items-center gap-2">
+                                                                                                <div className="bg-blue-50 text-blue-600 px-3 py-1.5 rounded-full border border-blue-100 flex items-center gap-2">
                                                                                                         <CheckCircle2 size={14} className="text-blue-600" />
-                                                                                                        <span className="text-[10px] font-medium tracking-tight">Đã sử dụng</span>
+                                                                                                        <span className="text-[11px] font-medium tracking-tight">Đã sử dụng</span>
                                                                                                 </div>
                                                                                         );
                                                                                 }
                                                                                 if (isExpired) {
                                                                                         return (
-                                                                                                <div className="bg-gray-100 text-gray-600 px-3 py-1 rounded-full border border-gray-200 flex items-center gap-2">
+                                                                                                <div className="bg-gray-100 text-gray-600 px-3 py-1.5 rounded-full border border-gray-200 flex items-center gap-2">
                                                                                                         <Clock size={14} className="text-gray-600" />
-                                                                                                        <span className="text-[10px] font-medium tracking-tight">Đã quá hạn</span>
+                                                                                                        <span className="text-[11px] font-medium tracking-tight">Đã quá hạn</span>
                                                                                                 </div>
                                                                                         );
                                                                                 }
                                                                                 return (
-                                                                                        <div className="bg-green-50 text-green-600 px-3 py-1 rounded-full border border-green-100 flex items-center gap-2">
+                                                                                        <div className="bg-green-50 text-green-600 px-3 py-1.5 rounded-full border border-green-100 flex items-center gap-2">
                                                                                                 <Timer size={14} className="text-green-600 animate-pulse" />
-                                                                                                <span className="text-[10px] font-medium tracking-tight">Đang đợi dùng</span>
+                                                                                                <span className="text-[11px] font-medium tracking-tight">Đang đợi dùng</span>
                                                                                         </div>
                                                                                 );
                                                                         }
 
                                                                         if (paymentStatus === 'pending') {
                                                                                 return (
-                                                                                        <div className="bg-yellow-50 text-yellow-600 px-3 py-1 rounded-full border border-yellow-100 flex items-center gap-2">
+                                                                                        <div className="bg-yellow-50 text-yellow-600 px-3 py-1.5 rounded-full border border-yellow-100 flex items-center gap-2">
                                                                                                 <Timer size={14} className="text-yellow-600 animate-pulse" />
-                                                                                                <span className="text-[10px] font-medium tracking-tight">Chờ thanh toán</span>
+                                                                                                <span className="text-[11px] font-medium tracking-tight">Chờ thanh toán</span>
                                                                                         </div>
                                                                                 );
                                                                         }
 
                                                                         if (paymentStatus === 'failed') {
                                                                                 return (
-                                                                                        <div className="bg-red-50 text-red-600 px-3 py-1 rounded-full border border-red-100 flex items-center gap-2">
+                                                                                        <div className="bg-red-50 text-red-600 px-3 py-1.5 rounded-full border border-red-100 flex items-center gap-2">
                                                                                                 <XCircle size={14} className="text-red-600" />
-                                                                                                <span className="text-[10px] font-medium tracking-tight">Đã hủy</span>
+                                                                                                <span className="text-[11px] font-medium tracking-tight">Đã hủy</span>
                                                                                         </div>
                                                                                 );
                                                                         }
@@ -778,7 +779,7 @@ export default function TransactionsContent({
                                         </div>
 
                                         {/* NỘI DUNG CUỘN */}
-                                        <div className="flex-1 overflow-y-auto custom-scrollbar p-6">
+                                        <div className="flex-1 overflow-y-auto custom-scrollbar p-8">
                                                 {isLoadingDetails ? (
                                                         <div className="flex flex-col items-center justify-center py-20 gap-3">
                                                                 <div className="w-8 h-8 border-3 border-blue-600 border-t-transparent rounded-full animate-spin" />
@@ -789,12 +790,12 @@ export default function TransactionsContent({
                                                                 <p className="text-red-600 italic text-sm">{detailsError}</p>
                                                         </div>
                                                 ) : txDetails ? (
-                                                        <div className="space-y-6">
-                                                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                                        <div className="space-y-8">
+                                                                <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
                                                                         {/* Cột 1: Khách Hàng */}
-                                                                        <div className="space-y-3">
-                                                                                <SectionHeader color="text-blue-600" title="Khách Hàng" icon={<UserIcon size={14} />} />
-                                                                                <div className="bg-slate-50 rounded-xl p-4 border border-slate-100 space-y-3 shadow-sm">
+                                                                        <div className="space-y-4">
+                                                                                <SectionHeader color="text-blue-600" title="Khách Hàng" icon={<UserIcon size={16} />} />
+                                                                                <div className="bg-slate-50 rounded-xl p-5 border border-slate-100 space-y-4 shadow-sm">
                                                                                         <InfoRow label="Họ và Tên" value={txDetails.user?.fullname} bold />
                                                                                         <InfoRow label="Email" value={txDetails.user?.email} color="text-blue-600" />
                                                                                         <InfoRow
@@ -802,12 +803,12 @@ export default function TransactionsContent({
                                                                                                 value={txDetails.user?.email_auth ? txDetails.user?.email_auth : 'VÃNG LAI'}
                                                                                                 color="text-red-600"
                                                                                         />
-                                                                                        <div className="flex justify-between items-end border-t border-slate-200/60 pt-2">
+                                                                                        <div className="flex justify-between items-end border-t border-slate-200/60 pt-3 gap-2">
                                                                                                 <InfoRow label="Số điện thoại" value={txDetails.user?.phone} />
                                                                                                 <InfoRow label="Chi Nhánh" value={txDetails.branch?.name || 'Vãng lai'} bold color="text-slate-900" />
                                                                                                 <Badge
                                                                                                         variant={txDetails.user?.is_active ? 'default' : 'destructive'}
-                                                                                                        className="text-[9px] h-4"
+                                                                                                        className="text-[9px] h-5"
                                                                                                 >
                                                                                                         {txDetails.user?.is_active ? 'Hoạt động' : 'Vô hiệu'}
                                                                                                 </Badge>
@@ -816,14 +817,14 @@ export default function TransactionsContent({
                                                                         </div>
 
                                                                         {/* Cột 2: Gói & Phim HOẶC Gói VR */}
-                                                                        <div className="space-y-3">
+                                                                        <div className="space-y-4">
                                                                                 {txDetails.booking_type === 'vr' ? (
                                                                                         <>
-                                                                                                <SectionHeader color="text-purple-600" title="Trải nghiệm VR" icon={<Gamepad2 size={14} />} />
-                                                                                                <div className="bg-purple-50/40 rounded-xl p-4 border border-purple-100 space-y-3 shadow-sm">
+                                                                                                <SectionHeader color="text-purple-600" title="Trải nghiệm VR" icon={<Gamepad2 size={16} />} />
+                                                                                                <div className="bg-purple-50/40 rounded-xl p-5 border border-purple-100 space-y-4 shadow-sm">
                                                                                                         <div className="flex justify-between items-center">
                                                                                                                 <InfoRow label="Tổng gói VR" value={`${txDetails.vr_items?.length || 0} loại`} bold />
-                                                                                                                <span className="text-[13px] font-bold text-slate-600">
+                                                                                                                <span className="text-[14px] font-bold text-slate-600">
                                                                                                                         Tổng lượt chơi: {Array.isArray(txDetails.vr_items)
                                                                                                                                 ? txDetails.vr_items.reduce((s: number, i: any) => s + Number(i.quantity || 0), 0)
                                                                                                                                 : 0}
@@ -832,13 +833,13 @@ export default function TransactionsContent({
                                                                                                         {/* Bảng chi tiết vr_items */}
                                                                                                         {txDetails.vr_items && txDetails.vr_items.length > 0 ? (
                                                                                                                 <div className="border border-purple-100 rounded-lg overflow-hidden bg-white">
-                                                                                                                        <Table className="[&_td]:py-2 [&_th]:py-2">
+                                                                                                                        <Table className="[&_td]:py-2.5 [&_th]:py-2.5">
                                                                                                                                 <TableHeader className="bg-purple-50/60">
                                                                                                                                         <TableRow className="hover:bg-transparent border-none">
-                                                                                                                                                <TableHead className="text-[10px] font-bold uppercase text-purple-700">Tên gói VR</TableHead>
-                                                                                                                                                <TableHead className="text-center text-[10px] font-bold uppercase text-purple-700 w-14">SL</TableHead>
-                                                                                                                                                <TableHead className="text-right text-[10px] font-bold uppercase text-purple-700 w-24">Đơn giá</TableHead>
-                                                                                                                                                <TableHead className="text-right text-[10px] font-bold uppercase text-purple-700 w-28">Thành tiền</TableHead>
+                                                                                                                                                <TableHead className="text-[11px] font-bold uppercase text-purple-700">Tên gói VR</TableHead>
+                                                                                                                                                <TableHead className="text-center text-[11px] font-bold uppercase text-purple-700 w-14">SL</TableHead>
+                                                                                                                                                <TableHead className="text-right text-[11px] font-bold uppercase text-purple-700 w-28">Đơn giá</TableHead>
+                                                                                                                                                <TableHead className="text-right text-[11px] font-bold uppercase text-purple-700 w-32">Thành tiền</TableHead>
                                                                                                                                         </TableRow>
                                                                                                                                 </TableHeader>
                                                                                                                                 <TableBody>
@@ -848,23 +849,23 @@ export default function TransactionsContent({
                                                                                                                                                 const line = Number(it.line_total ?? unit * qty);
                                                                                                                                                 return (
                                                                                                                                                         <TableRow key={it.id || `vr-${idx}`} className="border-t border-purple-50 hover:bg-transparent">
-                                                                                                                                                                <TableCell className="py-2">
+                                                                                                                                                                <TableCell className="py-2.5">
                                                                                                                                                                         <div className="flex items-center gap-2">
                                                                                                                                                                                 <div className="w-6 h-6 rounded-md bg-purple-100 flex items-center justify-center shrink-0">
                                                                                                                                                                                         <Gamepad2 className="w-3 h-3 text-purple-600" />
                                                                                                                                                                                 </div>
-                                                                                                                                                                                <span className="text-xs font-semibold text-slate-800 leading-tight">
+                                                                                                                                                                                <span className="text-sm font-semibold text-slate-800 leading-tight">
                                                                                                                                                                                         {it.package_name || it.ticket_package?.name || `Gói VR #${it.ticket_package_id || idx + 1}`}
                                                                                                                                                                                 </span>
                                                                                                                                                                         </div>
                                                                                                                                                                 </TableCell>
-                                                                                                                                                                <TableCell className="text-center font-bold text-slate-700 text-xs py-2">
+                                                                                                                                                                <TableCell className="text-center font-bold text-slate-700 text-sm py-2.5">
                                                                                                                                                                         × {qty}
                                                                                                                                                                 </TableCell>
-                                                                                                                                                                <TableCell className="text-right text-[11px] text-slate-600 py-2">
+                                                                                                                                                                <TableCell className="text-right text-[12px] text-slate-600 py-2.5">
                                                                                                                                                                         {unit.toLocaleString('vi-VN')}đ
                                                                                                                                                                 </TableCell>
-                                                                                                                                                                <TableCell className="text-right font-bold text-purple-700 text-xs py-2">
+                                                                                                                                                                <TableCell className="text-right font-bold text-purple-700 text-sm py-2.5">
                                                                                                                                                                         {line.toLocaleString('vi-VN')}đ
                                                                                                                                                                 </TableCell>
                                                                                                                                                         </TableRow>
@@ -874,11 +875,11 @@ export default function TransactionsContent({
                                                                                                                         </Table>
                                                                                                                 </div>
                                                                                                         ) : (
-                                                                                                                <div className="text-center py-4 text-slate-400 text-xs bg-purple-50/20 rounded-lg border border-purple-100 border-dashed">
+                                                                                                                <div className="text-center py-4 text-slate-400 text-sm bg-purple-50/20 rounded-lg border border-purple-100 border-dashed">
                                                                                                                         (Không có chi tiết gói VR)
                                                                                                                 </div>
                                                                                                         )}
-                                                                                                        <div className="flex justify-between items-end border-t border-purple-200/30 pt-2">
+                                                                                                        <div className="flex justify-between items-end border-t border-purple-200/30 pt-3">
                                                                                                                 <InfoRow
                                                                                                                         label="Tổng lượt chơi"
                                                                                                                         value={Array.isArray(txDetails.vr_items)
@@ -888,8 +889,8 @@ export default function TransactionsContent({
                                                                                                                         color="text-purple-700"
                                                                                                                 />
                                                                                                                 <div className="text-right">
-                                                                                                                        <p className="text-[9px] text-purple-600 uppercase font-bold">Tổng tiền</p>
-                                                                                                                        <p className="text-2xl font-black text-emerald-700">
+                                                                                                                        <p className="text-[10px] text-purple-600 uppercase font-bold">Tổng tiền</p>
+                                                                                                                        <p className="text-3xl font-black text-emerald-700">
                                                                                                                                 {txDetails.booking_details?.total_price?.toLocaleString()}đ
                                                                                                                         </p>
                                                                                                                 </div>
@@ -898,26 +899,26 @@ export default function TransactionsContent({
                                                                                         </>
                                                                                 ) : (
                                                                                         <>
-                                                                                                <SectionHeader color="text-amber-600" title="Gói & Phim" icon={<TicketIcon size={14} />} />
-                                                                                                <div className="bg-amber-50/40 rounded-xl p-4 border border-amber-100 space-y-3 shadow-sm">
+                                                                                                <SectionHeader color="text-amber-600" title="Gói & Phim" icon={<TicketIcon size={16} />} />
+                                                                                                <div className="bg-amber-50/40 rounded-xl p-5 border border-amber-100 space-y-4 shadow-sm">
                                                                                                         <div className="flex justify-between">
                                                                                                                 <InfoRow label="Loại Vé" value={txDetails.ticket_package?.name} bold />
-                                                                                                                <span className="text-[13px] font-bold text-slate-600">
+                                                                                                                <span className="text-[14px] font-bold text-slate-600">
                                                                                                                         {txDetails.ticket_package?.ticket_unit_price?.toLocaleString()}đ
                                                                                                                 </span>
                                                                                                         </div>
-                                                                                                        <div className="flex flex-wrap gap-1 border-t border-amber-200/30 pt-2 min-h-[40px]">
+                                                                                                        <div className="flex flex-wrap gap-1.5 border-t border-amber-200/30 pt-3 min-h-[40px]">
                                                                                                                 {txDetails.ticket_package?.movies?.map((m: any) => (
                                                                                                                         <Badge
                                                                                                                                 key={m.id}
                                                                                                                                 variant="outline"
-                                                                                                                                className="bg-white text-[9px] border-amber-200 text-amber-800"
+                                                                                                                                className="bg-white text-[10px] border-amber-200 text-amber-800"
                                                                                                                         >
                                                                                                                                 {m.title}
                                                                                                                         </Badge>
                                                                                                                 ))}
                                                                                                         </div>
-                                                                                                        <div className="flex justify-between items-end border-t border-amber-200/30 pt-2">
+                                                                                                        <div className="flex justify-between items-end border-t border-amber-200/30 pt-3">
                                                                                                                 <InfoRow
                                                                                                                         label="Số lượng"
                                                                                                                         value={txDetails.booking_details?.ticket_count}
@@ -925,8 +926,8 @@ export default function TransactionsContent({
                                                                                                                         color="text-amber-700"
                                                                                                                 />
                                                                                                                 <div className="text-right">
-                                                                                                                        <p className="text-[9px] text-amber-600 uppercase font-bold">Tổng tiền</p>
-                                                                                                                        <p className="text-2xl font-black text-emerald-700">
+                                                                                                                        <p className="text-[10px] text-amber-600 uppercase font-bold">Tổng tiền</p>
+                                                                                                                        <p className="text-3xl font-black text-emerald-700">
                                                                                                                                 {txDetails.booking_details?.total_price?.toLocaleString()}đ
                                                                                                                         </p>
                                                                                                                 </div>
@@ -938,11 +939,11 @@ export default function TransactionsContent({
                                                                 </div>
 
                                                                 {/* Phần 3: Trạng thái & Đối soát */}
-                                                                <div className="space-y-3">
+                                                                <div className="space-y-4">
                                                                         <SectionHeader
                                                                                 color="text-emerald-600"
                                                                                 title="Đối Soát & Trạng Thái"
-                                                                                icon={<CheckIcon size={14} />}
+                                                                                icon={<CheckIcon size={16} />}
                                                                         />
                                                                         <div
                                                                                 className={`bg-white rounded-xl border shadow-sm divide-y divide-slate-100 overflow-hidden ${txDetails.payment_info?.expired ? 'border-red-200' : 'border-slate-200'
@@ -950,7 +951,7 @@ export default function TransactionsContent({
                                                                         >
                                                                                 {/* Hàng 1: Trạng thái và Check-in */}
                                                                                 <div
-                                                                                        className={`flex justify-between p-4 items-center ${txDetails.payment_info?.expired ? 'bg-red-50/30' : 'bg-slate-50/50'
+                                                                                        className={`flex justify-between p-5 items-center ${txDetails.payment_info?.expired ? 'bg-red-50/30' : 'bg-slate-50/50'
                                                                                                 }`}
                                                                                 >
                                                                                         <div className="flex items-center gap-3">
@@ -963,23 +964,23 @@ export default function TransactionsContent({
                                                                                                         if (paymentStatus === 'paid') {
                                                                                                                 if (isUsed) {
                                                                                                                         return (
-                                                                                                                                <Badge className="bg-blue-100 text-blue-700 border-blue-200 py-1 font-bold flex items-center gap-1">
-                                                                                                                                        <CheckCircle2 size={12} />
+                                                                                                                                <Badge className="bg-blue-100 text-blue-700 border-blue-200 py-1.5 font-bold flex items-center gap-1.5 text-xs">
+                                                                                                                                        <CheckCircle2 size={14} />
                                                                                                                                         ĐÃ SỬ DỤNG
                                                                                                                                 </Badge>
                                                                                                                         );
                                                                                                                 }
                                                                                                                 if (isExpired) {
                                                                                                                         return (
-                                                                                                                                <Badge className="bg-slate-600 text-white border-slate-700 py-1 font-bold uppercase text-[10px] flex items-center gap-1">
-                                                                                                                                        <Clock size={12} />
+                                                                                                                                <Badge className="bg-slate-600 text-white border-slate-700 py-1.5 font-bold uppercase text-[11px] flex items-center gap-1.5">
+                                                                                                                                        <Clock size={14} />
                                                                                                                                         ĐÃ QUÁ HẠN
                                                                                                                                 </Badge>
                                                                                                                         );
                                                                                                                 }
                                                                                                                 return (
-                                                                                                                        <Badge className="bg-emerald-100 text-emerald-700 border-emerald-200 py-1 font-bold flex items-center gap-1">
-                                                                                                                                <Timer size={12} className="animate-pulse" />
+                                                                                                                        <Badge className="bg-emerald-100 text-emerald-700 border-emerald-200 py-1.5 font-bold flex items-center gap-1.5 text-xs">
+                                                                                                                                <Timer size={14} className="animate-pulse" />
                                                                                                                                 ĐANG ĐỢI DÙNG
                                                                                                                         </Badge>
                                                                                                                 );
@@ -987,8 +988,8 @@ export default function TransactionsContent({
 
                                                                                                         if (paymentStatus === 'pending') {
                                                                                                                 return (
-                                                                                                                        <Badge className="bg-orange-100 text-orange-700 border-orange-200 py-1 flex items-center gap-1">
-                                                                                                                                <Timer size={12} className="animate-pulse" />
+                                                                                                                        <Badge className="bg-orange-100 text-orange-700 border-orange-200 py-1.5 flex items-center gap-1.5 text-xs">
+                                                                                                                                <Timer size={14} className="animate-pulse" />
                                                                                                                                 CHỜ THANH TOÁN
                                                                                                                         </Badge>
                                                                                                                 );
@@ -996,15 +997,15 @@ export default function TransactionsContent({
 
                                                                                                         if (paymentStatus === 'failed') {
                                                                                                                 return (
-                                                                                                                        <Badge className="bg-red-100 text-red-700 border-red-200 py-1 font-bold flex items-center gap-1">
-                                                                                                                                <XCircle size={12} />
+                                                                                                                        <Badge className="bg-red-100 text-red-700 border-red-200 py-1.5 font-bold flex items-center gap-1.5 text-xs">
+                                                                                                                                <XCircle size={14} />
                                                                                                                                 ĐÃ HỦY
                                                                                                                         </Badge>
                                                                                                                 );
                                                                                                         }
 
                                                                                                         return (
-                                                                                                                <Badge variant="secondary" className="bg-slate-100 text-slate-500 border-slate-200 py-1">
+                                                                                                                <Badge variant="secondary" className="bg-slate-100 text-slate-500 border-slate-200 py-1.5 text-xs">
                                                                                                                         KHÔNG KHẢ DỤNG
                                                                                                                 </Badge>
                                                                                                         );
@@ -1013,16 +1014,16 @@ export default function TransactionsContent({
                                                                                 </div>
 
                                                                                 {/* Hàng 2: Mã đặt chỗ & Đối soát */}
-                                                                                <div className="grid grid-cols-1 md:grid-cols-3 p-4 gap-6">
+                                                                                <div className="grid grid-cols-1 md:grid-cols-3 p-6 gap-8">
                                                                                         <div>
-                                                                                                <p className="text-[10px] text-slate-400 uppercase font-bold mb-1">Phương thức</p>
-                                                                                                <span className="text-[13px] font-bold text-slate-700 uppercase">
+                                                                                                <p className="text-[11px] text-slate-400 uppercase font-bold mb-2">Phương thức</p>
+                                                                                                <span className="text-[14px] font-bold text-slate-700 uppercase">
                                                                                                         {txDetails.payment_info?.payment_method}
                                                                                                 </span>
                                                                                         </div>
 
-                                                                                        <div className="md:border-x md:px-6">
-                                                                                                <p className="text-[10px] text-blue-500 uppercase font-bold mb-1 italic">
+                                                                                        <div className="md:border-x md:px-8">
+                                                                                                <p className="text-[11px] text-blue-500 uppercase font-bold mb-2 italic">
                                                                                                         Mã đặt chỗ (Booking Code)
                                                                                                 </p>
                                                                                                 <div
@@ -1038,10 +1039,10 @@ export default function TransactionsContent({
                                                                                         </div>
 
                                                                                         <div className="flex flex-col md:items-end">
-                                                                                                <p className="text-[10px] text-slate-400 uppercase font-bold mb-1">
+                                                                                                <p className="text-[11px] text-slate-400 uppercase font-bold mb-2">
                                                                                                         Nội dung chuyển khoản (Đối soát)
                                                                                                 </p>
-                                                                                                <div className="bg-slate-100 text-slate-600 px-2 py-1 rounded border border-slate-200 text-[11px] font-mono">
+                                                                                                <div className="bg-slate-100 text-slate-600 px-3 py-2 rounded border border-slate-200 text-[12px] font-mono">
                                                                                                         <CopyableText
                                                                                                                 text={
                                                                                                                         txDetails.booking_details?.pay_txt_code || txDetails.booking_details?.transaction_id || ''
@@ -1061,7 +1062,7 @@ export default function TransactionsContent({
                                                                                         // 1. Pending: Chỉ hiện ngày tạo
                                                                                         if (paymentStatus === 'pending') {
                                                                                                 return (
-                                                                                                        <div className="grid grid-cols-1 p-4 gap-2 bg-slate-50/30 text-center">
+                                                                                                        <div className="grid grid-cols-1 p-6 gap-2 bg-slate-50/30 text-center">
                                                                                                                 <InfoRow label="Ngày tạo" value={formatDate(txDetails.booking_details?.created_at)} />
                                                                                                         </div>
                                                                                                 );
@@ -1070,7 +1071,7 @@ export default function TransactionsContent({
                                                                                         // 2. Cancelled: Hiện ngày tạo và ngày hủy (updatedAt)
                                                                                         if (paymentStatus === 'failed') {
                                                                                                 return (
-                                                                                                        <div className="grid grid-cols-2 p-4 gap-2 bg-slate-50/30 text-center">
+                                                                                                        <div className="grid grid-cols-2 p-6 gap-2 bg-slate-50/30 text-center">
                                                                                                                 <InfoRow label="Ngày tạo" value={formatDate(txDetails.booking_details?.created_at)} />
                                                                                                                 <InfoRow
                                                                                                                         label="Ngày hủy"
@@ -1084,7 +1085,7 @@ export default function TransactionsContent({
                                                                                         // 3. Used: Hiện Ngày tạo, Thanh toán, Hạn dùng, Thời điểm sử dụng, Nhân viên xác nhận
                                                                                         if (isUsed) {
                                                                                                 return (
-                                                                                                        <div className="grid grid-cols-5 p-4 gap-2 bg-slate-50/30 text-center">
+                                                                                                        <div className="grid grid-cols-5 p-6 gap-3 bg-slate-50/30 text-center">
                                                                                                                 <InfoRow label="Ngày tạo" value={formatDate(txDetails.booking_details?.created_at)} />
                                                                                                                 <InfoRow label="Thanh toán" value={formatDate(txDetails.payment_info?.paid_at)} />
                                                                                                                 <InfoRow
@@ -1109,7 +1110,7 @@ export default function TransactionsContent({
 
                                                                                         // 4. Default (Paid / Expired / Others): Hiện Ngày tạo, Thanh toán, Hạn dùng, Còn lại
                                                                                         return (
-                                                                                                <div className="grid grid-cols-4 p-4 gap-2 bg-slate-50/30 text-center">
+                                                                                                <div className="grid grid-cols-4 p-6 gap-3 bg-slate-50/30 text-center">
                                                                                                         <InfoRow label="Ngày tạo" value={formatDate(txDetails.booking_details?.created_at)} />
                                                                                                         <InfoRow label="Thanh toán" value={formatDate(txDetails.payment_info?.paid_at)} />
                                                                                                         <InfoRow
@@ -1152,12 +1153,12 @@ export default function TransactionsContent({
 
                                                 {/* Tracking Information */}
                                                 {txDetails?.tracking && (
-                                                        <div className="mt-4 p-4 bg-slate-50/30 rounded-xl border border-slate-200">
-                                                                <h4 className="text-xs font-semibold text-slate-700 mb-3 flex items-center gap-2">
-                                                                        <Clock size={14} />
+                                                        <div className="mt-6 p-5 bg-slate-50/30 rounded-xl border border-slate-200">
+                                                                <h4 className="text-sm font-semibold text-slate-700 mb-4 flex items-center gap-2">
+                                                                        <Clock size={16} />
                                                                         Thông tin tạo & cập nhật
                                                                 </h4>
-                                                                <div className="grid grid-cols-2 gap-2">
+                                                                <div className="grid grid-cols-2 gap-4">
                                                                         <InfoRow label="Tạo bởi" value={txDetails.tracking.created_by_staff_name || '-'} />
                                                                         <InfoRow label="Cập nhật bởi" value={txDetails.tracking.updated_by_staff_name || '-'} />
                                                                 </div>
@@ -1166,11 +1167,11 @@ export default function TransactionsContent({
                                         </div>
 
                                         {/* FOOTER CỐ ĐỊNH */}
-                                        <div className="p-4 bg-slate-50 border-t flex justify-end shrink-0 gap-3">
+                                        <div className="p-5 bg-slate-50 border-t flex justify-end shrink-0 gap-3">
                                                 <Button
                                                         variant="outline"
                                                         onClick={() => setIsDetailsOpen(false)}
-                                                        className="h-10 px-10 border-slate-300 hover:bg-white font-bold text-xs uppercase"
+                                                        className="h-11 px-12 border-slate-300 hover:bg-white font-bold text-sm uppercase"
                                                 >
                                                         Đóng cửa sổ
                                                 </Button>

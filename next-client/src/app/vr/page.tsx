@@ -51,8 +51,10 @@ import {
   Award,
   Zap,
   LayoutGrid,
-  SlidersHorizontal
+  SlidersHorizontal,
+  ShoppingCart
 } from 'lucide-react';
+import { cartStore } from '@/store/cartStore';
 import {
   Carousel,
   CarouselContent,
@@ -84,12 +86,14 @@ const safetyGuidelines = [
 function VRPackageCardItem({
   pkg,
   onDetail,
+  onAddToCart,
   onBook,
   formatMoney,
   resolveImageUrl
 }: {
   pkg: any;
   onDetail: () => void;
+  onAddToCart: () => void;
   onBook: () => void;
   formatMoney: (n: number) => string;
   resolveImageUrl: (u: string | undefined | null) => string;
@@ -178,6 +182,14 @@ function VRPackageCardItem({
               className="h-9 md:h-10 text-xs px-3 border-white/15 bg-white/5 hover:bg-white/10 text-slate-200 hover:text-white rounded-xl font-bold transition-all"
             >
               Chi tiết
+            </Button>
+            <Button
+              variant="outline"
+              onClick={onAddToCart}
+              title="Thêm gói VR vào giỏ hàng"
+              className="h-9 md:h-10 text-xs px-3 border-purple-500/30 bg-purple-500/10 hover:bg-purple-500/20 text-purple-300 hover:text-white rounded-xl font-bold transition-all"
+            >
+              <ShoppingCart className="w-4 h-4" />
             </Button>
             <Button
               onClick={onBook}
@@ -324,14 +336,43 @@ export default function VRShowcasePage() {
     });
   };
 
+  const handleAddToCart = (pkg: any) => {
+    cartStore.addItem({
+      packageId: pkg.id,
+      type: 'vr',
+      name: pkg.name,
+      price: pkg.price,
+      cover_image: pkg.cover_image,
+      duration_min: pkg.duration_min,
+      vr_genre: pkg.vr_genre,
+      quantity: 1,
+      branchId: selectedBranch?.id
+    });
+
+    toast.success('Đã thêm gói VR vào giỏ hàng!', {
+      description: `${pkg.name} • ${formatMoney(pkg.price)}₫`,
+      action: {
+        label: 'Xem giỏ',
+        onClick: () => cartStore.openCart()
+      }
+    });
+  };
+
   const handleBookNow = (pkg: any) => {
-    const params = new URLSearchParams();
-    if (selectedBranch?.id) {
-      params.set('branch_id', String(selectedBranch.id));
-    }
-    params.set('vr_package_id', String(pkg.id));
-    params.set('qty', '1');
-    router.push(`/booking?${params.toString()}`);
+    cartStore.addItem({
+      packageId: pkg.id,
+      type: 'vr',
+      name: pkg.name,
+      price: pkg.price,
+      cover_image: pkg.cover_image,
+      duration_min: pkg.duration_min,
+      vr_genre: pkg.vr_genre,
+      quantity: 1,
+      branchId: selectedBranch?.id,
+      selected: true
+    });
+
+    cartStore.openCart();
   };
 
   const validateForm = () => {
@@ -523,7 +564,7 @@ export default function VRShowcasePage() {
 
   return (
     <UserLayout className="bg-[#0f172a] border-none text-white font-sans">
-      <section className="relative min-h-screen pt-20 md:pt-24 lg:pt-28 pb-16 overflow-hidden">
+      <section className="relative min-h-screen pt-28 md:pt-32 lg:pt-36 pb-16 overflow-hidden">
         {/* Futuristic glowing gradients */}
         <div className="absolute inset-0 pointer-events-none overflow-hidden">
           <div className="absolute top-[5%] left-[5%] w-[45%] h-[45%] bg-purple-600/10 blur-[130px] rounded-full animate-pulse" />
@@ -632,6 +673,7 @@ export default function VRShowcasePage() {
                           key={pkg.id}
                           pkg={pkg}
                           onDetail={() => setSelectedDetailPkg(pkg)}
+                          onAddToCart={() => handleAddToCart(pkg)}
                           onBook={() => handleBookNow(pkg)}
                           formatMoney={formatMoney}
                           resolveImageUrl={resolveImageUrl}
@@ -647,6 +689,7 @@ export default function VRShowcasePage() {
                               <VRPackageCardItem
                                 pkg={pkg}
                                 onDetail={() => setSelectedDetailPkg(pkg)}
+                                onAddToCart={() => handleAddToCart(pkg)}
                                 onBook={() => handleBookNow(pkg)}
                                 formatMoney={formatMoney}
                                 resolveImageUrl={resolveImageUrl}

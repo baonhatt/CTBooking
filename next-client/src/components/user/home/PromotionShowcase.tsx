@@ -20,6 +20,9 @@ import { useBranch } from '@/hooks/useBranch';
 import { useQuery } from '@tanstack/react-query';
 import { getActiveTickets } from '@/lib/api/products';
 import { setCookie } from '@/lib/cookies';
+import { cartStore } from '@/store/cartStore';
+import { ShoppingCart } from 'lucide-react';
+import { toast } from 'sonner';
 
 export default function PromotionShowcase({ initialCombos = [] }: { initialCombos?: any[] }) {
   const router = useRouter();
@@ -47,34 +50,45 @@ export default function PromotionShowcase({ initialCombos = [] }: { initialCombo
       name: t.name,
       price: Number(t.price || 0),
       type: t.type || '',
-      display_order: t.display_order || 0
+      display_order: t.display_order || 0,
+      movies: t.movies || []
     }))
     .sort((a: any, b: any) => a.display_order - b.display_order);
 
+  const handleAddToCart = (combo: (typeof combos)[0]) => {
+    cartStore.addItem({
+      packageId: combo.id,
+      type: 'movie',
+      name: combo.name,
+      price: combo.price,
+      movies: combo.movies,
+      quantity: 1,
+      branchId: selectedBranch?.id
+    });
+
+    toast.success('Đã thêm vào giỏ hàng!', {
+      description: `${combo.name} • ${combo.price.toLocaleString('vi-VN')}₫`,
+      action: {
+        label: 'Xem giỏ',
+        onClick: () => cartStore.openCart()
+      }
+    });
+  };
+
   const handleBookCombo = (combo: (typeof combos)[0]) => {
-    try {
-      const comboPackage = {
-        id: combo.id,
-        name: combo.name,
-        price: combo.price,
-        type: combo.type,
-        display_order: combo.display_order
-      };
-      localStorage.setItem('selectedTicketPackage', JSON.stringify(comboPackage));
-      setCookie('selected_branch_id', String(selectedBranch?.id ?? ''), 60 * 60 * 24 * 30);
-    } catch (error) {
-      console.error('Error saving combo:', error);
-    }
+    // Add to cart and open cart drawer
+    cartStore.addItem({
+      packageId: combo.id,
+      type: 'movie',
+      name: combo.name,
+      price: combo.price,
+      movies: combo.movies,
+      quantity: 1,
+      branchId: selectedBranch?.id,
+      selected: true
+    });
 
-    // Show branch confirmation dialog if not disabled
-    if (!dontShowConfirm && selectedBranch) {
-      setShowBranchConfirmDialog(true);
-      return;
-    }
-
-    const params = new URLSearchParams(searchParams.toString());
-    setCookie('selected_branch_id', String(selectedBranch?.id ?? ''), 60 * 60 * 24 * 30);
-    router.push(`/booking${params.toString() ? `?${params.toString()}` : ''}`);
+    cartStore.openCart();
   };
 
   return (
@@ -148,14 +162,27 @@ export default function PromotionShowcase({ initialCombos = [] }: { initialCombo
                         <p className="text-sm text-gray-200 group-hover:text-white transition-colors">
                           Vé trải nghiệm CINESPHERE kèm quà tặng ánh sáng lưu niệm.
                         </p>
-                        <motion.button
-                          whileHover={{ scale: 1.05 }}
-                          whileTap={{ scale: 0.95 }}
-                          onClick={() => handleBookCombo(combo)}
-                          className="mt-2 w-full inline-flex items-center justify-center px-4 py-3 rounded-xl bg-gradient-to-r from-cyan-400 to-purple-500 text-black font-bold hover:from-cyan-300 hover:to-purple-400 transition-all duration-300 shadow-[0_0_25px_rgba(59,130,246,0.35)] group-hover:shadow-[0_0_35px_rgba(6,182,212,0.5)]"
-                        >
-                          Đặt ngay
-                        </motion.button>
+                        <div className="flex items-center gap-2 mt-3 pt-2">
+                          <motion.button
+                            type="button"
+                            whileHover={{ scale: 1.05 }}
+                            whileTap={{ scale: 0.95 }}
+                            onClick={() => handleAddToCart(combo)}
+                            title="Thêm gói vé vào giỏ hàng"
+                            className="p-3 rounded-xl bg-white/10 hover:bg-white/20 text-cyan-300 hover:text-white border border-white/15 transition-all duration-300 shrink-0"
+                          >
+                            <ShoppingCart className="w-5 h-5" />
+                          </motion.button>
+                          <motion.button
+                            type="button"
+                            whileHover={{ scale: 1.02 }}
+                            whileTap={{ scale: 0.98 }}
+                            onClick={() => handleBookCombo(combo)}
+                            className="flex-1 inline-flex items-center justify-center px-4 py-3 rounded-xl bg-gradient-to-r from-cyan-400 to-purple-500 text-black font-bold hover:from-cyan-300 hover:to-purple-400 transition-all duration-300 shadow-[0_0_25px_rgba(59,130,246,0.35)] group-hover:shadow-[0_0_35px_rgba(6,182,212,0.5)]"
+                          >
+                            Đặt ngay
+                          </motion.button>
+                        </div>
                       </div>
                     </motion.div>
                   </CarouselItem>

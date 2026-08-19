@@ -81,7 +81,7 @@ export default async function PostsPage() {
 
         return (
                 <UserLayout className="bg-[#0A192F]">
-                        <main className="pt-20 md:pt-28 pb-12 md:pb-24 bg-[#0A192F] min-h-screen font-sans">
+                        <main className="pt-28 md:pt-36 pb-12 md:pb-24 bg-[#0A192F] min-h-screen font-sans">
                                 <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(listSchema) }} />
                                 <section className="container my-6 mx-auto px-4 md:px-6 lg:px-8">
                                         {/* Header + Search */}

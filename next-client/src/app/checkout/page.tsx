@@ -494,7 +494,7 @@ export default function Checkout() {
 
         return (
                 <UserLayout className="bg-[#0f172a] border-none" hideFooter>
-                        <section className="relative min-h-screen flex items-center justify-center pt-16 md:pt-20 lg:pt-24 pb-10 overflow-hidden">
+                        <section className="relative min-h-screen flex items-center justify-center pt-28 md:pt-32 lg:pt-36 pb-10 overflow-hidden">
                                 {/* Animated Background Elements */}
                                 <div className="absolute inset-0 pointer-events-none overflow-hidden">
                                         <div className="absolute -top-[10%] -left-[10%] w-[40%] h-[40%] bg-blue-600/10 blur-[120px] rounded-full animate-pulse" />

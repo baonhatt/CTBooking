@@ -30,7 +30,8 @@ import {
         AlertDialogHeader,
         AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Calendar, Gamepad2 } from 'lucide-react';
+import { Calendar, ChevronDown, Gamepad2, MapPin, ShoppingCart } from 'lucide-react';
+import { useCart } from '@/store/cartStore';
 const LoginDialog = dynamic(() => import('@/components/LoginDialog'), { ssr: false });
 const RegisterDialog = dynamic(() => import('@/components/RegisterDialog'), { ssr: false });
 const ForgetPasswordDialog = dynamic(() => import('@/components/ForgetPasswordDialog'), { ssr: false });
@@ -57,44 +58,44 @@ export default function Header({
         const { userName, setUserName } = useAuthState(false);
         const activeSection = useActiveSection(disableNav);
         const { handleLogout } = useAuthHandlers(setUserName);
-        const { selectedBranch, branches, selectBranch } = useBranch();
 
-        // Check login state from cookie/localStorage - client-side only
-        const [isLoggedIn, setIsLoggedIn] = useState(false);
+        const { branches, selectedBranch, selectBranch } = useBranch();
+        const { totalItemsCount, openCart } = useCart();
+
         const [isScheduleOpen, setIsScheduleOpen] = useState(false);
 
+        // Responsive scroll padding
         useEffect(() => {
-                if (typeof window !== 'undefined') {
-                        setIsLoggedIn(!!getCookie('userToken') || !!localStorage.getItem('userToken'));
-                }
-
-                // Listen for auth changes (login/logout)
-                const handleAuthChange = () => {
-                        if (typeof window !== 'undefined') {
-                                setIsLoggedIn(!!getCookie('userToken') || !!localStorage.getItem('userToken'));
+                const updateScrollPadding = () => {
+                        const header = document.querySelector('header');
+                        if (header) {
+                                const headerHeight = header.offsetHeight;
+                                document.documentElement.style.scrollPaddingTop = `${headerHeight + 20}px`;
                         }
                 };
 
-                // Listen for open-login event (triggered by route guard)
-                const handleOpenLogin = () => {
-                        setIsLoginOpen(true);
-                };
-
-                window.addEventListener('user-auth-changed', handleAuthChange);
-                window.addEventListener('open-login', handleOpenLogin);
-                return () => {
-                        window.removeEventListener('user-auth-changed', handleAuthChange);
-                        window.removeEventListener('open-login', handleOpenLogin);
-                };
+                updateScrollPadding();
+                window.addEventListener('resize', updateScrollPadding);
+                return () => window.removeEventListener('resize', updateScrollPadding);
         }, []);
 
-        // Prefetch các trang chính để tránh lag khi điều hướng
+        // Lock body scroll when any dialog is open
         useEffect(() => {
-                router.prefetch('/booking');
-                router.prefetch('/bai-viet');
-                router.prefetch('/account');
-                router.prefetch('/vr');
-        }, [router]);
+                const hasOpenDialog = document.querySelector('[role="dialog"][data-state="open"]');
+                if (hasOpenDialog) {
+                        document.body.style.overflow = 'hidden';
+                } else {
+                        document.body.style.overflow = 'unset';
+                }
+        }, []);
+
+        // Login status
+        const [isLoggedIn, setIsLoggedIn] = useState(false);
+
+        useEffect(() => {
+                const token = getCookie('token');
+                setIsLoggedIn(!!token);
+        }, [userName]);
 
         // Dialog states
         const [isLoginOpen, setIsLoginOpen] = useState(false);
@@ -110,6 +111,18 @@ export default function Header({
 
         // Utilities
         const scrollToSection = (id: string) => {
+                if (id === 'schedule') {
+                        setIsScheduleOpen(true);
+                        return;
+                }
+
+                if (id === 'vr') {
+                        const params = new URLSearchParams(searchParams.toString());
+                        const branchParam = selectedBranch?.id ? `?branch_id=${selectedBranch.id}` : (params.toString() ? `?${params.toString()}` : '');
+                        router.push(`/vr${branchParam}`);
+                        return;
+                }
+
                 if (id === 'posts') {
                         router.push('/bai-viet');
                         return;
@@ -195,38 +208,50 @@ export default function Header({
                 setShowBranchConfirm(false);
         };
 
-        const navItems = [...NAV_ITEMS, { label: 'Tin tức', target: 'posts' }];
+        const navItems = [
+                { label: 'Phim', target: 'films' },
+                { label: 'Lịch chiếu', target: 'schedule' },
+                { label: 'Trải nghiệm VR', target: 'vr' },
+                { label: 'Giá vé', target: 'promotions' },
+                { label: 'Công nghệ', target: 'technology' },
+                { label: 'Tin tức', target: 'posts' }
+        ];
 
         return (
                 <header
                         className={cn(
                                 'fixed top-0 left-0 right-0 z-50 transition-all duration-300',
                                 forceDark
-                                        ? 'bg-black/95 backdrop-blur-lg border-b border-white/10 shadow-[0_10px_40px_rgba(67,97,238,0.15)]'
+                                        ? 'bg-[#050915]/95 backdrop-blur-xl border-b border-white/10 shadow-[0_10px_30px_rgba(0,0,0,0.5)]'
                                         : isScrolled
-                                                ? 'bg-black/80 backdrop-blur-lg border-b border-white/10 shadow-[0_10px_40px_rgba(67,97,238,0.15)]'
-                                                : 'bg-gradient-to-b from-black/80 via-black/60 to-transparent border-b border-white/10'
+                                                ? 'bg-[#050915]/90 backdrop-blur-xl border-b border-white/10 shadow-[0_10px_30px_rgba(0,0,0,0.5)]'
+                                                : 'bg-gradient-to-b from-black/90 via-black/60 to-transparent border-b border-white/5'
                         )}
                 >
-                        <div className="container mx-auto px-3 md:px-6 lg:px-8 py-4 md:py-[10px] flex items-center gap-3 md:gap-8 justify-between">
+                        <div className="container mx-auto px-4 lg:px-8 py-3.5 flex items-center justify-between gap-4">
                                 {/* Logo */}
-                                <div className="flex items-center gap-3 md:gap-4 animate-fade-in">
+                                <div className="flex items-center gap-3 animate-fade-in shrink-0">
                                         <img
                                                 onClick={handleLogoClick}
                                                 src="/logo.svg"
-                                                width={80}
-                                                height={80}
-                                                className="cursor-pointer h-12 w-12 md:h-16 md:w-16 lg:h-20 lg:w-20 drop-shadow-[0_0_30px_rgba(59,130,246,0.6)] transition-transform duration-300 hover:scale-110"
+                                                width={72}
+                                                height={72}
+                                                className="cursor-pointer h-10 md:h-12 lg:h-14 w-auto drop-shadow-[0_0_20px_rgba(59,130,246,0.5)] transition-transform duration-300 hover:scale-105"
                                                 alt="Cinesphere logo"
                                         />
                                 </div>
 
-                                {/* Desktop Navigation */}
-                                <nav className="hidden md:flex items-center gap-6 lg:gap-8 animate-fade-in delay-200">
+                                {/* Desktop Main Navigation */}
+                                <nav className="hidden lg:flex items-center gap-6 xl:gap-8 animate-fade-in delay-150">
                                         {navItems.map((item: { label: string; target: string }) => {
-                                                const isItemActive = item.target === 'posts'
-                                                        ? isPostsRoute
-                                                        : (pathname === '/' && activeSection === item.target);
+                                                const isItemActive =
+                                                        item.target === 'posts'
+                                                                ? isPostsRoute
+                                                                : item.target === 'vr'
+                                                                        ? isVrRoute
+                                                                        : item.target === 'schedule'
+                                                                                ? isScheduleOpen
+                                                                                : (pathname === '/' && activeSection === item.target);
                                                 return (
                                                         <NavItem
                                                                 key={item.target}
@@ -240,39 +265,73 @@ export default function Header({
                                         })}
                                 </nav>
 
-                                {/* Action Buttons */}
-                                <div className="flex items-center gap-3 md:gap-4 animate-fade-in delay-250">
-                                        {/* Branch Selector */}
+                                {/* Right Actions / Utilities Cluster */}
+                                <div className="flex items-center gap-2.5 sm:gap-3.5 animate-fade-in delay-200 shrink-0">
+                                        {/* Branch Selector Chip */}
                                         {selectedBranch && branches.length > 1 && (
                                                 <div className={cn(
-                                                        "relative group",
+                                                        "relative hidden sm:flex items-center",
                                                         isBookingFlow && "opacity-60 cursor-not-allowed"
                                                 )}>
+                                                        <MapPin className="w-3.5 h-3.5 text-cyan-400 absolute left-3 pointer-events-none" />
                                                         <select
                                                                 value={selectedBranch.id}
                                                                 onChange={(e) => handleBranchChange(Number(e.target.value))}
                                                                 disabled={isBookingFlow}
+                                                                aria-label="Chọn chi nhánh"
                                                                 className={cn(
-                                                                        "appearance-none bg-white/10 border border-white/20 rounded-lg px-3 py-2 pr-8 text-sm text-white/90 transition-colors backdrop-blur-sm min-w-[140px] md:min-w-[160px]",
-                                                                        isBookingFlow ? "cursor-not-allowed" : "hover:bg-white/20 hover:text-white cursor-pointer"
+                                                                        "appearance-none bg-white/[0.07] hover:bg-white/[0.12] border border-white/15 rounded-full pl-8 pr-7 py-1.5 text-xs font-semibold text-slate-200 hover:text-white transition-all backdrop-blur-md",
+                                                                        isBookingFlow ? "cursor-not-allowed" : "cursor-pointer"
                                                                 )}
                                                         >
                                                                 {branches.map((branch) => (
-                                                                        <option key={branch.id} value={branch.id} className="bg-gray-900 text-white">
+                                                                        <option key={branch.id} value={branch.id} className="bg-slate-900 text-white">
                                                                                 {branch.name}
                                                                         </option>
                                                                 ))}
                                                         </select>
-                                                        <div className="absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none">
-                                                                <svg className="w-4 h-4 text-white/70" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                                                                </svg>
-                                                        </div>
+                                                        <ChevronDown className="w-3 h-3 text-slate-400 absolute right-2.5 pointer-events-none" />
                                                 </div>
                                         )}
 
-                                        {/* Mobile Menu */}
-                                        <div className="md:hidden">
+                                        {/* Shopping Cart Button */}
+                                        <button
+                                                type="button"
+                                                onClick={openCart}
+                                                aria-label="Mở giỏ hàng"
+                                                className="relative flex items-center gap-2 text-slate-200 hover:text-white transition-all duration-300 font-semibold text-xs px-3 sm:px-3.5 py-1.5 sm:py-2 rounded-full bg-white/[0.07] hover:bg-white/[0.14] border border-white/15 hover:border-cyan-400/50 hover:shadow-[0_0_15px_rgba(6,182,212,0.25)] group"
+                                        >
+                                                <ShoppingCart className="w-4 h-4 text-cyan-400 group-hover:scale-110 transition-transform" />
+                                                <span className="hidden sm:inline">Giỏ hàng</span>
+                                                {totalItemsCount > 0 && (
+                                                        <span className="flex h-4 min-w-[16px] items-center justify-center rounded-full bg-gradient-to-r from-cyan-400 to-blue-500 px-1 text-[10px] font-black text-black shadow-md">
+                                                                {totalItemsCount}
+                                                        </span>
+                                                )}
+                                        </button>
+
+                                        {/* Desktop User Menu or Login Button */}
+                                        {isLoggedIn ? (
+                                                <div className="hidden sm:flex items-center">
+                                                        <UserMenu
+                                                                userName={userName || 'User'}
+                                                                tooltipPrefix={tooltipPrefix}
+                                                                extraMenuOptions={extraMenuOptions}
+                                                                onNavigateAccount={() => router.push('/account')}
+                                                                onLogout={handleLogout}
+                                                        />
+                                                </div>
+                                        ) : (
+                                                <button
+                                                        className="hidden sm:inline-flex h-8 sm:h-9 items-center text-xs font-bold text-white hover:text-white px-4 rounded-full bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-500 hover:to-cyan-500 transition-all duration-300 shadow-[0_0_15px_rgba(6,182,212,0.3)] hover:shadow-[0_0_20px_rgba(6,182,212,0.5)] active:scale-95 border border-cyan-400/30"
+                                                        onClick={openLogin}
+                                                >
+                                                        Đăng nhập
+                                                </button>
+                                        )}
+
+                                        {/* Mobile Hamburger Menu */}
+                                        <div className="lg:hidden">
                                                 <MobileMenu
                                                         navItems={navItems}
                                                         effectiveDisable={disableNav}
@@ -286,63 +345,10 @@ export default function Header({
                                                         selectedBranch={selectedBranch}
                                                         selectBranch={handleBranchChange}
                                                         isBookingFlow={isBookingFlow}
+                                                        totalCartCount={totalItemsCount}
+                                                        onOpenCart={openCart}
                                                 />
                                         </div>
-
-                                        {/* VR Booking Button (in header) */}
-                                        <button
-                                                type="button"
-                                                onClick={() => {
-                                                        const params = new URLSearchParams(searchParams.toString());
-                                                        const branchParam = selectedBranch?.id ? `?branch_id=${selectedBranch.id}` : (params.toString() ? `?${params.toString()}` : '');
-                                                        router.push(`/vr${branchParam}`);
-                                                }}
-                                                aria-label="Đặt trải nghiệm VR"
-                                                className={cn(
-                                                        "uiverse-schedule-btn inline-flex items-center gap-2 text-white/90 hover:text-white transition-colors duration-300 font-medium text-[15px] px-3 py-2 rounded-lg border",
-                                                        isVrRoute
-                                                                ? "bg-purple-600/30 text-purple-200 border-purple-400 shadow-[0_0_20px_rgba(168,85,247,0.4)] font-bold"
-                                                                : "hover:bg-white/8 border-white/10 hover:border-purple-400/40 hover:shadow-[0_0_20px_rgba(168,85,247,0.25)]"
-                                                )}
-                                                data-text={"\u00A0Trải nghiệm VR\u00A0"}
-                                        >
-                                                <Gamepad2 className="w-4 h-4 text-purple-300" />
-                                                <span className="actual-text">{"\u00A0Trải nghiệm VR\u00A0"}</span>
-                                                <span aria-hidden="true" className="hover-text">{"\u00A0Trải nghiệm VR\u00A0"}</span>
-                                        </button>
-
-                                        {/* Schedule Button (in header) */}
-                                        <button
-                                                type="button"
-                                                onClick={() => setIsScheduleOpen(true)}
-                                                aria-label="Xem lịch chiếu phim"
-                                                className="uiverse-schedule-btn inline-flex items-center gap-2 text-white/90 hover:text-white transition-colors duration-300 font-medium text-[15px] px-3 py-2 rounded-lg hover:bg-white/8 border border-white/10"
-                                                data-text={"\u00A0Lịch chiếu Phim\u00A0"}
-                                        >
-                                                <Calendar className="w-4 h-4 text-green-300" />
-                                                <span className="actual-text">{"\u00A0Lịch chiếu Phim\u00A0"}</span>
-                                                <span aria-hidden="true" className="hover-text">{"\u00A0Lịch chiếu Phim\u00A0"}</span>
-                                        </button>
-
-                                        {/* Desktop User Menu or Login Button */}
-                                        {isLoggedIn ? (
-                                                <div className="hidden md:flex items-center">
-                                                        <UserMenu
-                                                                userName={userName || 'User'}
-                                                                tooltipPrefix={tooltipPrefix}
-                                                                extraMenuOptions={extraMenuOptions}
-                                                                onNavigateAccount={() => router.push('/account')}
-                                                                onLogout={handleLogout}
-                                                        />
-                                                </div>
-                                        ) : (
-                                                <button
-                                                        className="hidden md:inline-flex h-10 items-center text-white/90 hover:text-white transition-colors duration-300 font-medium text-[15px] px-5 rounded-lg hover:bg-white/10 backdrop-blur-sm whitespace-nowrap border border-white/10 hover:border-white/20"
-                                                        onClick={openLogin}
-                                                >
-                                                        Đăng nhập
-                                                </button>
-                                        )}
                                 </div>
                         </div>
 

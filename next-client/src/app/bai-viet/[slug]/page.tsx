@@ -133,7 +133,7 @@ export default async function PostDetailPage({ params }: { params: { slug: strin
                         <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
                         <main className="pb-16">
                                 {/* Back button */}
-                                <div className="container mx-auto px-4 md:px-6 lg:px-8 pt-20 md:pt-24">
+                                <div className="container mx-auto px-4 md:px-6 lg:px-8 pt-28 md:pt-36">
                                         <Link
                                                 href="/bai-viet"
                                                 className="inline-flex items-center gap-2 text-slate-300 hover:text-white hover:bg-white/10 bg-transparent px-3 py-2 rounded-md transition-colors text-sm"

@@ -1,6 +1,7 @@
 import Header from '@/components/user/Header';
 import Footer from '@/components/user/Footer';
 import FloatingActions from '@/components/user/FloatingActions';
+import CartDrawer from '@/components/user/CartDrawer';
 import { cn } from '@/lib/utils';
 
 interface UserLayoutProps {
@@ -16,7 +17,9 @@ export default function UserLayout({ children, className, hideFooter = false }: 
                         <Header />
                         <div className="relative">{children}</div>
                         <FloatingActions />
+                        <CartDrawer />
                         {!hideFooter && <Footer />}
                 </div>
         );
 }
+

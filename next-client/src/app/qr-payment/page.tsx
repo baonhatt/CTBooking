@@ -326,7 +326,7 @@ export default function QRPaymentPage() {
                         <div className="relative min-h-screen pb-28 sm:pb-20">
                                 <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_50%,rgba(30,58,138,0.2),transparent_70%)] pointer-events-none" />
 
-                                <div className="relative z-10 max-w-5xl mx-auto px-4 pt-20 sm:pt-24">
+                                <div className="relative z-10 max-w-5xl mx-auto px-4 pt-28 sm:pt-36">
                                         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 py-4 px-1">
                                                 <div className="flex items-center gap-2 text-xs text-gray-500 uppercase tracking-wider font-bold">
                                                         <span className="hover:text-blue-400 cursor-pointer transition-colors" onClick={() => router.push('/')}>

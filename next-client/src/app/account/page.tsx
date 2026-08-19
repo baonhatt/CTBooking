@@ -434,8 +434,8 @@ export default function Account() {
             <div className="absolute inset-0 bg-gradient-to-b from-black/50 via-black/25 to-transparent" />
             <div className="absolute inset-0 neon-noise opacity-25" />
           </div>
-          <div className="relative z-10 max-w-5xl mx-auto px-4 pb-16 pt-16 md:pt-24">
-            <div className="flex items-center my-5 gap-2 text-sm text-gray-300 mb-4">
+          <div className="relative z-10 max-w-5xl mx-auto px-4 pb-16 pt-28 md:pt-36">
+            <div className="flex items-center pt-2 gap-2 text-sm text-gray-300 mb-6">
               <Link href="/" className="text-blue-300 hover:text-blue-200">
                 Home
               </Link>

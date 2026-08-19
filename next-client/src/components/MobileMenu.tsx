@@ -17,6 +17,8 @@ interface MobileMenuProps {
         selectedBranch?: any;
         selectBranch?: (branchId: number) => void;
         isBookingFlow?: boolean;
+        totalCartCount?: number;
+        onOpenCart?: () => void;
 }
 
 export function MobileMenu({
@@ -31,7 +33,9 @@ export function MobileMenu({
         branches = [],
         selectedBranch = null,
         selectBranch = () => { },
-        isBookingFlow = false
+        isBookingFlow = false,
+        totalCartCount = 0,
+        onOpenCart = () => { }
 }: MobileMenuProps) {
         return (
                 <Sheet>
@@ -93,6 +97,20 @@ export function MobileMenu({
 
                                         {/* Navigation items */}
                                         <nav className="flex flex-col gap-2 flex-1 overflow-y-auto">
+                                                <SheetClose asChild>
+                                                        <button
+                                                                className="flex items-center justify-between font-medium text-lg tracking-wide transition-colors duration-300 py-3 border-b border-white/5 text-cyan-300 hover:text-cyan-200"
+                                                                onClick={onOpenCart}
+                                                        >
+                                                                <span>Giỏ hàng</span>
+                                                                {totalCartCount > 0 && (
+                                                                        <span className="px-2 py-0.5 text-xs font-bold rounded-full bg-cyan-500 text-black">
+                                                                                {totalCartCount}
+                                                                        </span>
+                                                                )}
+                                                        </button>
+                                                </SheetClose>
+
                                                 {navItems.map((item) => (
                                                         <SheetClose key={item.target} asChild>
                                                                 <button

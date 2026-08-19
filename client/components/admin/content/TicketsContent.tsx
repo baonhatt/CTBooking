@@ -144,6 +144,7 @@ export default function TicketsContent(props: Props) {
     const [selectedTicket, setSelectedTicket] = useState<TicketPackage | null>(null);
     const [toggleDialogOpen, setToggleDialogOpen] = useState(false);
     const [ticketToToggle, setTicketToToggle] = useState<{ id: number; currentStatus: boolean } | null>(null);
+    const [isTogglingStatus, setIsTogglingStatus] = useState(false);
 
     // Fetch movies when dialog opens or branch changes
     React.useEffect(() => {
@@ -157,13 +158,19 @@ export default function TicketsContent(props: Props) {
         }
     }, [isEditOpen]);
 
+    // ✅ FIX: Chỉ đóng popup AFTER API call thành công
     const handleToggleStatus = async (id: number, currentStatus: boolean) => {
         try {
+            setIsTogglingStatus(true);
             await toggleTicketStatusApi(id);
             toast.success(currentStatus ? 'Đã ẩn gói vé' : 'Đã kích hoạt gói vé');
-            onRefresh();
+            setToggleDialogOpen(false);
+            // Refresh danh sách
+            await onRefresh();
         } catch (err: any) {
             toast.error(err.message || 'Lỗi khi thay đổi trạng thái');
+        } finally {
+            setIsTogglingStatus(false);
         }
     };
 
@@ -1157,7 +1164,7 @@ export default function TicketsContent(props: Props) {
                 </DialogContent>
             </Dialog>
 
-            {/* Toggle Status Alert Dialog */}
+            {/* ✅ Toggle Status Alert Dialog - Fixed */}
             <AlertDialog open={toggleDialogOpen} onOpenChange={setToggleDialogOpen}>
                 <AlertDialogContent className="rounded-2xl">
                     <AlertDialogHeader>
@@ -1177,18 +1184,28 @@ export default function TicketsContent(props: Props) {
                         </AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter className="mt-4">
-                        <AlertDialogCancel className="rounded-xl border-slate-200">Hủy</AlertDialogCancel>
+                        <AlertDialogCancel className="rounded-xl border-slate-200" disabled={isTogglingStatus}>
+                            Hủy
+                        </AlertDialogCancel>
                         <AlertDialogAction
-                            onClick={() => {
+                            disabled={isTogglingStatus}
+                            onClick={(e) => {
+                                e.preventDefault();
                                 if (ticketToToggle) {
                                     handleToggleStatus(ticketToToggle.id, ticketToToggle.currentStatus);
                                 }
-                                setToggleDialogOpen(false);
                             }}
                             className={`rounded-xl text-white ${ticketToToggle?.currentStatus ? 'bg-red-500 hover:bg-red-600' : 'bg-emerald-600 hover:bg-emerald-700'
                                 }`}
                         >
-                            {ticketToToggle?.currentStatus ? 'Đồng ý ẩn' : 'Đồng ý kích hoạt'}
+                            {isTogglingStatus ? (
+                                <span className="flex items-center gap-2">
+                                    <Loader2 className="h-4 w-4 animate-spin" />
+                                    Đang xử lý...
+                                </span>
+                            ) : (
+                                ticketToToggle?.currentStatus ? 'Đồng ý ẩn' : 'Đồng ý kích hoạt'
+                            )}
                         </AlertDialogAction>
                     </AlertDialogFooter>
                 </AlertDialogContent>

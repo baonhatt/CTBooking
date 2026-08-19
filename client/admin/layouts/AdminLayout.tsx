@@ -108,7 +108,7 @@ export default function AdminLayout({ active, setActive, handleLogout, children 
 			items: [
 				{ key: 'movies', label: 'Danh sách Phim', icon: <Clapperboard className="h-4 w-4 text-emerald-400" /> },
 				{ key: 'showtimes', label: 'Lịch chiếu phim', icon: <CalendarClock className="h-4 w-4 text-emerald-400" /> },
-				{ key: 'tickets', label: 'Gói vé xem phim', icon: <TicketIcon className="h-4 w-4 text-emerald-400" /> },
+				{ key: 'tickets', label: 'Gói vé xem phim & VR', icon: <TicketIcon className="h-4 w-4 text-emerald-400" /> },
 				{ key: 'toys', label: 'Đồ chơi & quà tặng', icon: <Package className="h-4 w-4 text-emerald-400" /> },
 				{ key: 'posts', label: 'Bài viết & Bảng tin', icon: <FileText className="h-4 w-4 text-emerald-400" /> }
 			]
