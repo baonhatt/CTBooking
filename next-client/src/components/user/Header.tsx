@@ -52,10 +52,10 @@ export default function Header({
         // Custom hooks
         const isScrolled = useScrollDetect(50);
         const isPostsRoute = pathname === '/bai-viet' || pathname.startsWith('/bai-viet/');
+        const isVrRoute = pathname === '/vr' || pathname.startsWith('/vr');
         const isBookingFlow = ['/booking', '/checkout', '/qr-payment', '/success-payment', '/vr-booking'].some(route => pathname.startsWith(route));
         const { userName, setUserName } = useAuthState(false);
-        const effectiveDisable = disableNav || (pathname !== '/' && !isPostsRoute);
-        const activeSection = useActiveSection(effectiveDisable);
+        const activeSection = useActiveSection(disableNav);
         const { handleLogout } = useAuthHandlers(setUserName);
         const { selectedBranch, branches, selectBranch } = useBranch();
 
@@ -223,16 +223,21 @@ export default function Header({
 
                                 {/* Desktop Navigation */}
                                 <nav className="hidden md:flex items-center gap-6 lg:gap-8 animate-fade-in delay-200">
-                                        {navItems.map((item: { label: string; target: string }) => (
-                                                <NavItem
-                                                        key={item.target}
-                                                        label={item.label}
-                                                        target={item.target}
-                                                        isActive={item.target === 'posts' ? pathname.startsWith('/bai-viet') : activeSection === item.target}
-                                                        disabled={item.target === 'posts' ? false : effectiveDisable}
-                                                        onClick={() => scrollToSection(item.target)}
-                                                />
-                                        ))}
+                                        {navItems.map((item: { label: string; target: string }) => {
+                                                const isItemActive = item.target === 'posts'
+                                                        ? isPostsRoute
+                                                        : (pathname === '/' && activeSection === item.target);
+                                                return (
+                                                        <NavItem
+                                                                key={item.target}
+                                                                label={item.label}
+                                                                target={item.target}
+                                                                isActive={isItemActive}
+                                                                disabled={disableNav}
+                                                                onClick={() => scrollToSection(item.target)}
+                                                        />
+                                                );
+                                        })}
                                 </nav>
 
                                 {/* Action Buttons */}
@@ -270,7 +275,7 @@ export default function Header({
                                         <div className="md:hidden">
                                                 <MobileMenu
                                                         navItems={navItems}
-                                                        effectiveDisable={effectiveDisable}
+                                                        effectiveDisable={disableNav}
                                                         scrollToSection={scrollToSection}
                                                         userName={userName}
                                                         onNavigate={router.push as any}
@@ -293,7 +298,12 @@ export default function Header({
                                                         router.push(`/vr${branchParam}`);
                                                 }}
                                                 aria-label="Đặt trải nghiệm VR"
-                                                className="uiverse-schedule-btn inline-flex items-center gap-2 text-white/90 hover:text-white transition-colors duration-300 font-medium text-[15px] px-3 py-2 rounded-lg hover:bg-white/8 border border-white/10 hover:border-purple-400/40 hover:shadow-[0_0_20px_rgba(168,85,247,0.25)]"
+                                                className={cn(
+                                                        "uiverse-schedule-btn inline-flex items-center gap-2 text-white/90 hover:text-white transition-colors duration-300 font-medium text-[15px] px-3 py-2 rounded-lg border",
+                                                        isVrRoute
+                                                                ? "bg-purple-600/30 text-purple-200 border-purple-400 shadow-[0_0_20px_rgba(168,85,247,0.4)] font-bold"
+                                                                : "hover:bg-white/8 border-white/10 hover:border-purple-400/40 hover:shadow-[0_0_20px_rgba(168,85,247,0.25)]"
+                                                )}
                                                 data-text={"\u00A0Trải nghiệm VR\u00A0"}
                                         >
                                                 <Gamepad2 className="w-4 h-4 text-purple-300" />

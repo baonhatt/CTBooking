@@ -49,8 +49,17 @@ import {
   Sparkles,
   ShieldAlert,
   Award,
-  Zap
+  Zap,
+  LayoutGrid,
+  SlidersHorizontal
 } from 'lucide-react';
+import {
+  Carousel,
+  CarouselContent,
+  CarouselItem,
+  CarouselNext,
+  CarouselPrevious
+} from '@/components/ui/carousel';
 import { useBranch } from '@/hooks/useBranch';
 import { getCookie } from '@/lib/cookies';
 import { Badge } from '@/components/ui/badge';
@@ -72,6 +81,117 @@ const safetyGuidelines = [
   'Luôn tuân thủ giới hạn khu vực chơi để tránh va chạm vật lý ngoài đời thực.'
 ];
 
+function VRPackageCardItem({
+  pkg,
+  onDetail,
+  onBook,
+  formatMoney,
+  resolveImageUrl
+}: {
+  pkg: any;
+  onDetail: () => void;
+  onBook: () => void;
+  formatMoney: (n: number) => string;
+  resolveImageUrl: (u: string | undefined | null) => string;
+}) {
+  const [imgError, setImgError] = useState(false);
+  const imageUrl = resolveImageUrl(pkg.cover_image);
+  const hasImage = Boolean(pkg.cover_image) && !imgError;
+
+  return (
+    <Card className="bg-slate-900/60 border border-white/10 backdrop-blur-md overflow-hidden hover:border-purple-500/50 hover:shadow-[0_0_30px_rgba(168,85,247,0.2)] transition-all duration-300 group flex flex-col h-full rounded-2xl w-full">
+      {/* Image header with overlay tags */}
+      <div className="relative aspect-video w-full overflow-hidden bg-slate-950 flex items-center justify-center">
+        {hasImage ? (
+          <img
+            src={imageUrl}
+            alt={pkg.name}
+            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+            onError={() => setImgError(true)}
+          />
+        ) : (
+          <div className="w-full h-full bg-gradient-to-br from-purple-950/60 via-slate-900 to-blue-950/60 flex flex-col items-center justify-center gap-2 p-4 text-center">
+            <div className="p-3 rounded-2xl bg-purple-500/15 border border-purple-500/25 text-purple-400">
+              <Gamepad2 className="w-8 h-8" />
+            </div>
+            <span className="text-[11px] font-bold text-slate-400 uppercase tracking-widest">CineSphere VR</span>
+          </div>
+        )}
+
+        <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/20 to-transparent pointer-events-none" />
+
+        {pkg.vr_genre && (
+          <span className="absolute top-3 left-3 px-3 py-1 rounded-full bg-purple-600/90 text-white text-[10px] font-extrabold uppercase tracking-widest shadow-md border border-purple-400/30">
+            {pkg.vr_genre}
+          </span>
+        )}
+        <span className="absolute bottom-3 right-3 flex items-center gap-1.5 text-xs text-purple-300 font-bold bg-slate-950/80 backdrop-blur-md py-1 px-2.5 rounded-lg border border-purple-500/30 shadow-md">
+          <Clock className="w-3.5 h-3.5 text-purple-400" /> {pkg.duration_min || 0} Phút
+        </span>
+      </div>
+
+      {/* Content Card Body */}
+      <CardContent className="p-5 flex-1 flex flex-col justify-between space-y-4">
+        <div className="space-y-3">
+          <h3 className="font-extrabold text-white text-lg tracking-wide line-clamp-1 group-hover:text-purple-300 transition-colors">
+            {pkg.name}
+          </h3>
+          <p className="text-slate-400 text-xs leading-relaxed line-clamp-2 min-h-[2.5rem]">
+            {pkg.description || 'Trải nghiệm không gian ảo hóa 3D chân thực cao với trang bị haptic tiên tiến bậc nhất.'}
+          </p>
+
+          {/* Quick checklist of dynamic premium components */}
+          <div className="space-y-2 pt-1">
+            {pkg.features && pkg.features.length > 0 ? (
+              pkg.features.slice(0, 2).map((feat: string, idx: number) => (
+                <div key={idx} className="flex items-center gap-2 text-xs text-slate-300">
+                  <Zap className="w-3.5 h-3.5 text-purple-400 shrink-0" />
+                  <span className="line-clamp-1">{feat}</span>
+                </div>
+              ))
+            ) : (
+              <div className="flex items-center gap-2 text-xs text-slate-300">
+                <Zap className="w-3.5 h-3.5 text-purple-400 shrink-0" />
+                <span>Trang bị Kính VR &amp; Haptic Vest cao cấp</span>
+              </div>
+            )}
+            <div className="flex items-center gap-2 text-xs text-slate-300">
+              <Users className="w-3.5 h-3.5 text-blue-400 shrink-0" />
+              <span>Phòng chơi rộng rãi dành cho {pkg.min_players || 1}-{pkg.max_players || 1} người</span>
+            </div>
+          </div>
+        </div>
+
+        {/* Price & Action footer */}
+        <div className="pt-4 mt-2 border-t border-white/10 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div>
+            <p className="text-[10px] text-slate-400 uppercase font-extrabold tracking-wider">Giá vé trọn gói</p>
+            <p className="text-xl md:text-2xl font-black text-white flex items-baseline gap-1">
+              {formatMoney(pkg.price)}<span className="text-xs text-slate-400 font-normal">₫/vé</span>
+            </p>
+          </div>
+
+          <div className="flex items-center gap-2 shrink-0">
+            <Button
+              variant="outline"
+              onClick={onDetail}
+              className="h-9 md:h-10 text-xs px-3 border-white/15 bg-white/5 hover:bg-white/10 text-slate-200 hover:text-white rounded-xl font-bold transition-all"
+            >
+              Chi tiết
+            </Button>
+            <Button
+              onClick={onBook}
+              className="h-9 md:h-10 text-xs px-4 bg-gradient-to-r from-purple-500 to-blue-500 hover:from-purple-600 hover:to-blue-600 text-white rounded-xl font-bold tracking-wide shadow-md shadow-purple-500/20 active:scale-95 transition-all"
+            >
+              Mua vé
+            </Button>
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
 export default function VRShowcasePage() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -88,6 +208,7 @@ export default function VRShowcasePage() {
   const [formErrors, setFormErrors] = useState<{ [key: string]: string }>({});
   const [confirmChecked, setConfirmChecked] = useState(false);
   const [showPaymentConfirmDialog, setShowPaymentConfirmDialog] = useState(false);
+  const [viewMode, setViewMode] = useState<'grid' | 'carousel'>('grid');
 
   // Modal detail view state
   const [selectedDetailPkg, setSelectedDetailPkg] = useState<any | null>(null);
@@ -455,7 +576,7 @@ export default function VRShowcasePage() {
                 </p>
               </div>
 
-              {/* VR Packages Grid */}
+              {/* VR Packages Display Section */}
               {isLoadingVR ? (
                 <div className="flex items-center justify-center py-24">
                   <Loader2 className="w-10 h-10 text-purple-400 animate-spin" />
@@ -467,98 +588,77 @@ export default function VRShowcasePage() {
                   <p className="text-slate-400 text-sm">Vui lòng kiểm tra lại chi nhánh hoặc quay lại sau.</p>
                 </Card>
               ) : (
-                <div className="flex flex-wrap justify-center gap-6">
-                  {vrPackages.map((pkg: any) => (
-                    <Card
-                      key={pkg.id}
-                      className="bg-slate-900/40 border border-white/10 backdrop-blur-md overflow-hidden hover:border-purple-500/50 hover:shadow-[0_0_25px_rgba(168,85,247,0.15)] transition-all duration-300 group flex flex-col h-full rounded-2xl w-full max-w-sm md:w-[340px]"
-                    >
-                      {/* Image header with overlay tags */}
-                      <div className="relative aspect-video w-full overflow-hidden bg-slate-800">
-                        {pkg.cover_image ? (
-                          <img
-                            src={resolveImageUrl(pkg.cover_image)}
-                            alt={pkg.name}
-                            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-                            onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }}
-                          />
-                        ) : (
-                          <div className="w-full h-full flex items-center justify-center text-slate-500">
-                            <Gamepad2 className="w-12 h-12" />
-                          </div>
-                        )}
-                        <div className="absolute inset-0 bg-gradient-to-t from-slate-950/80 to-transparent" />
-                        
-                        {pkg.vr_genre && (
-                          <span className="absolute top-3 left-3 px-3 py-1 rounded-full bg-purple-500/90 text-white text-[10px] font-bold uppercase tracking-widest shadow-md">
-                            {pkg.vr_genre}
-                          </span>
-                        )}
-                        <span className="absolute bottom-3 right-3 flex items-center gap-1.5 text-xs text-purple-300 font-bold bg-black/55 py-1 px-2.5 rounded-lg border border-purple-500/20">
-                          <Clock className="w-3.5 h-3.5" /> {pkg.duration_min} Phút
-                        </span>
-                      </div>
+                <div className="space-y-6">
+                  {/* View Mode Switcher Toolbar */}
+                  <div className="flex flex-col sm:flex-row items-center justify-between gap-3 border-b border-white/10 pb-4">
+                    <div className="flex items-center gap-2">
+                      <Sparkles className="w-5 h-5 text-purple-400" />
+                      <h3 className="text-base md:text-lg font-black text-white uppercase tracking-wider">
+                        Gói Trải Nghiệm Khả Dụng ({vrPackages.length})
+                      </h3>
+                    </div>
 
-                      {/* Content Card Body */}
-                      <CardContent className="p-5 flex-1 flex flex-col justify-between">
-                        <div className="space-y-3">
-                          <h3 className="font-extrabold text-white text-lg tracking-wide line-clamp-1 group-hover:text-purple-300 transition-colors">
-                            {pkg.name}
-                          </h3>
-                          <p className="text-slate-400 text-xs leading-relaxed line-clamp-2 min-h-[2.5rem]">
-                            {pkg.description || 'Trải nghiệm không gian ảo hóa 3D chân thực cao với trang bị haptic tiên tiến bậc nhất.'}
-                          </p>
+                    <div className="flex items-center gap-1.5 p-1 bg-white/5 border border-white/10 rounded-xl">
+                      <button
+                        onClick={() => setViewMode('grid')}
+                        className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 ${
+                          viewMode === 'grid'
+                            ? 'bg-gradient-to-r from-purple-600 to-blue-600 text-white shadow-md'
+                            : 'text-slate-400 hover:text-white'
+                        }`}
+                      >
+                        <LayoutGrid className="w-3.5 h-3.5" />
+                        <span>Dạng Lưới ({vrPackages.length})</span>
+                      </button>
+                      <button
+                        onClick={() => setViewMode('carousel')}
+                        className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 ${
+                          viewMode === 'carousel'
+                            ? 'bg-gradient-to-r from-purple-600 to-blue-600 text-white shadow-md'
+                            : 'text-slate-400 hover:text-white'
+                        }`}
+                      >
+                        <SlidersHorizontal className="w-3.5 h-3.5" />
+                        <span>Slide Carousel</span>
+                      </button>
+                    </div>
+                  </div>
 
-                          {/* Quick checklist of dynamic premium components */}
-                          <div className="space-y-1.5 pt-1.5">
-                            {pkg.features && pkg.features.length > 0 ? (
-                              pkg.features.slice(0, 2).map((feat: string, idx: number) => (
-                                <div key={idx} className="flex items-center gap-2 text-[11px] text-slate-400">
-                                  <Zap className="w-3.5 h-3.5 text-purple-400 shrink-0" />
-                                  <span className="line-clamp-1">{feat}</span>
-                                </div>
-                              ))
-                            ) : (
-                              <div className="flex items-center gap-2 text-[11px] text-slate-400">
-                                <Zap className="w-3.5 h-3.5 text-purple-400 shrink-0" />
-                                <span>Trang bị Kính VR &amp; Haptic Vest cao cấp</span>
-                              </div>
-                            )}
-                            <div className="flex items-center gap-2 text-[11px] text-slate-400">
-                              <Users className="w-3.5 h-3.5 text-blue-400 shrink-0" />
-                              <span>Phòng chơi rộng rãi dành cho {pkg.min_players}-{pkg.max_players} người</span>
-                            </div>
-                          </div>
-                        </div>
-
-                        {/* Price & Action footer */}
-                        <div className="pt-5 mt-4 border-t border-white/5 flex items-center justify-between gap-4">
-                          <div>
-                            <p className="text-[10px] text-slate-500 uppercase font-black tracking-wider">Giá vé trọn gói</p>
-                            <p className="text-2xl font-black text-white">
-                              {formatMoney(pkg.price)}<span className="text-xs ml-1 text-slate-400 font-normal">₫/vé</span>
-                            </p>
-                          </div>
-                          
-                          <div className="flex items-center gap-2">
-                            <Button
-                              variant="outline"
-                              onClick={() => setSelectedDetailPkg(pkg)}
-                              className="h-10 text-xs px-3.5 border-white/10 hover:bg-white/5 text-slate-300 hover:text-white rounded-xl font-bold"
-                            >
-                              Chi tiết
-                            </Button>
-                            <Button
-                              onClick={() => handleBookNow(pkg)}
-                              className="h-10 text-xs px-4 bg-gradient-to-r from-purple-500 to-blue-500 hover:from-purple-600 hover:to-blue-600 text-white rounded-xl font-bold tracking-wide shadow-md shadow-purple-500/20"
-                            >
-                              Mua vé
-                            </Button>
-                          </div>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  ))}
+                  {/* Render Grid or Carousel based on viewMode */}
+                  {viewMode === 'grid' ? (
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 items-stretch">
+                      {vrPackages.map((pkg: any) => (
+                        <VRPackageCardItem
+                          key={pkg.id}
+                          pkg={pkg}
+                          onDetail={() => setSelectedDetailPkg(pkg)}
+                          onBook={() => handleBookNow(pkg)}
+                          formatMoney={formatMoney}
+                          resolveImageUrl={resolveImageUrl}
+                        />
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="relative px-2 md:px-10 py-2">
+                      <Carousel opts={{ align: 'start', loop: true }} className="w-full relative">
+                        <CarouselContent className="-ml-4">
+                          {vrPackages.map((pkg: any) => (
+                            <CarouselItem key={pkg.id} className="pl-4 md:basis-1/2 lg:basis-1/3">
+                              <VRPackageCardItem
+                                pkg={pkg}
+                                onDetail={() => setSelectedDetailPkg(pkg)}
+                                onBook={() => handleBookNow(pkg)}
+                                formatMoney={formatMoney}
+                                resolveImageUrl={resolveImageUrl}
+                              />
+                            </CarouselItem>
+                          ))}
+                        </CarouselContent>
+                        <CarouselPrevious className="bg-slate-900/90 border-white/20 text-white hover:bg-purple-600 hover:text-white -left-4 md:-left-8" />
+                        <CarouselNext className="bg-slate-900/90 border-white/20 text-white hover:bg-purple-600 hover:text-white -right-4 md:-right-8" />
+                      </Carousel>
+                    </div>
+                  )}
                 </div>
               )}
 
