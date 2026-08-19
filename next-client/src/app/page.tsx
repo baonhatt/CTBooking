@@ -15,8 +15,6 @@ import { getDefaultBranch, getPublicBranches } from '@/lib/api/branches';
 
 import { siteConfig } from '@/config/site';
 
-export const runtime = 'edge';
-
 const SITE_URL = siteConfig.domain;
 
 export const metadata: Metadata = {

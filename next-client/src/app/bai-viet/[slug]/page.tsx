@@ -10,8 +10,6 @@ import PostViewIncrementor from './PostViewIncrementor';
 
 import { siteConfig } from '@/config/site';
 
-export const runtime = 'edge';
-
 const SITE_URL = siteConfig.domain;
 
 export async function generateStaticParams() {
