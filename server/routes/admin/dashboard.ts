@@ -1,9 +1,22 @@
 import { count, sum, eq, inArray, and, or, gte, lte, gt, sql, isNull } from 'drizzle-orm';
 import { formatDateForDb } from '../../../server/lib/date-utils';
+import { sqlBranchIdsStaffAccessFilter } from '../../../server/lib/branch-ids';
+
+function buildBranchBookingCondition(bookingsTable: any, restrictToBranchIds: number[] | null | undefined) {
+        if (restrictToBranchIds === null || restrictToBranchIds === undefined) return undefined;
+        if (restrictToBranchIds.length === 0) return sql`1 = 0`;
+        return inArray(bookingsTable.branch_id, restrictToBranchIds);
+}
+
+function buildBranchMovieCondition(moviesTable: any, restrictToBranchIds: number[] | null | undefined) {
+        if (restrictToBranchIds === null || restrictToBranchIds === undefined) return undefined;
+        if (restrictToBranchIds.length === 0) return sql`1 = 0`;
+        return sqlBranchIdsStaffAccessFilter(moviesTable.branch_ids, restrictToBranchIds);
+}
 
 export async function getDashboardMetricsImpl(
         anyDb: any,
-        tables: { movies: any; toys?: any; users: any; bookings: any; ticket_packages: any },
+        tables: { movies: any; toys?: any; users: any; bookings: any; ticket_packages: any; branches?: any },
         topPeriod: string = 'week',
         year?: number,
         restrictToBranchIds: number[] | null = null
@@ -25,10 +38,8 @@ export async function getDashboardMetricsImpl(
                         lte(tables.bookings.paid_at, formatDateForDb(yearEnd))
                 )
         );
-        const branchConditionBookings =
-                restrictToBranchIds && restrictToBranchIds.length > 0 ? inArray(tables.bookings.branch_id, restrictToBranchIds) : undefined;
-        const branchConditionMovies =
-                restrictToBranchIds && restrictToBranchIds.length > 0 ? inArray(tables.movies.branch_id, restrictToBranchIds) : undefined;
+        const branchConditionBookings = buildBranchBookingCondition(tables.bookings, restrictToBranchIds);
+        const branchConditionMovies = buildBranchMovieCondition(tables.movies, restrictToBranchIds);
 
         // Year-filtered counts based on created_at
         const [totalMoviesRes] = await anyDb
@@ -282,7 +293,23 @@ export async function getDashboardMetricsImpl(
                 bookingCount: Number(u.booking_count || 0)
         }));
 
+        let branchInfo: { id: number; name: string; code: string } | null = null;
+        if (restrictToBranchIds && restrictToBranchIds.length === 1 && tables.branches) {
+                try {
+                        const [b] = await anyDb
+                                .select({ id: tables.branches.id, name: tables.branches.name, code: tables.branches.code })
+                                .from(tables.branches)
+                                .where(eq(tables.branches.id, restrictToBranchIds[0]))
+                                .limit(1);
+                        if (b) branchInfo = b;
+                } catch { }
+        }
+
         return {
+                branch_id: branchInfo ? branchInfo.id : (restrictToBranchIds && restrictToBranchIds.length === 1 ? restrictToBranchIds[0] : null),
+                branch_name: branchInfo ? branchInfo.name : null,
+                branch_ids: restrictToBranchIds || null,
+                branch: branchInfo || null,
                 totalMovies,
                 totalToys,
                 totalUsers,
@@ -381,7 +408,7 @@ export async function getRevenueByDateImpl(
                 );
         }
         const statusCondition = status !== 'all' ? inArray(tables.bookings.payment_status, ['paid']) : undefined;
-        const branchCondition = args.branchIds && args.branchIds.length > 0 ? inArray(tables.bookings.branch_id, args.branchIds) : undefined;
+        const branchCondition = buildBranchBookingCondition(tables.bookings, args.branchIds);
         const whereCondition = and(dateCondition, statusCondition, branchCondition);
         const [totalRes] = await anyDb
                 .select({ sum: sum(tables.bookings.total_price) })
@@ -423,7 +450,7 @@ export async function getRevenue7DaysImpl(anyDb: any, tables: { bookings: any },
         const selectedYear = year || new Date().getFullYear();
         const yearStart = new Date(selectedYear, 0, 1);
         const yearEnd = new Date(selectedYear, 11, 31, 23, 59, 59, 999);
-        const branchCondition = branchIds && branchIds.length > 0 ? inArray(tables.bookings.branch_id, branchIds) : undefined;
+        const branchCondition = buildBranchBookingCondition(tables.bookings, branchIds);
 
         const today = new Date();
         today.setHours(0, 0, 0, 0);
@@ -480,7 +507,7 @@ export async function getRevenueByMonthImpl(
         const yearStr = String(args.year || '');
         const monthStr = String(args.month || '');
         const status = String(args.status || 'paid').toLowerCase();
-        const branchCondition = args.branchIds && args.branchIds.length > 0 ? inArray(tables.bookings.branch_id, args.branchIds) : undefined;
+        const branchCondition = buildBranchBookingCondition(tables.bookings, args.branchIds);
         if (monthStr && yearStr) {
                 const year = Number(yearStr);
                 const month = Number(monthStr);

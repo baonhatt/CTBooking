@@ -1,5 +1,6 @@
 import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
+import { Loader2 } from 'lucide-react';
 import type { BranchIdsValue } from '@/lib/branch-ids';
 
 type BranchOption = { id: number; name: string };
@@ -9,10 +10,11 @@ type BranchMultiSelectProps = {
         value: BranchIdsValue;
         onChange: (value: BranchIdsValue) => void;
         disabled?: boolean;
+        isLoading?: boolean;
         className?: string;
 };
 
-export function BranchMultiSelect({ branches, value, onChange, disabled, className }: BranchMultiSelectProps) {
+export function BranchMultiSelect({ branches, value, onChange, disabled, isLoading, className }: BranchMultiSelectProps) {
         const isAll = value === null;
         const selectedIds = value ?? [];
         const allSelected = isAll || (branches.length > 0 && selectedIds.length === branches.length);
@@ -53,7 +55,7 @@ export function BranchMultiSelect({ branches, value, onChange, disabled, classNa
                                 <Checkbox
                                         id="branch-select-all"
                                         checked={allSelected}
-                                        disabled={disabled || branches.length === 0}
+                                        disabled={disabled || branches.length === 0 || isLoading}
                                         onCheckedChange={(checked) => toggleAll(Boolean(checked))}
                                 />
                                 <Label htmlFor="branch-select-all" className="text-sm font-medium text-gray-900 cursor-pointer">
@@ -61,7 +63,12 @@ export function BranchMultiSelect({ branches, value, onChange, disabled, classNa
                                 </Label>
                         </div>
                         <div className="mt-2 max-h-40 overflow-y-auto space-y-1 rounded-lg border border-gray-200 p-2">
-                                {branches.length === 0 ? (
+                                {isLoading ? (
+                                        <div className="flex items-center gap-2 text-xs text-blue-600 font-medium px-2 py-3">
+                                                <Loader2 className="w-4 h-4 animate-spin" />
+                                                <span>Đang tải danh sách chi nhánh...</span>
+                                        </div>
+                                ) : branches.length === 0 ? (
                                         <p className="text-sm text-gray-500 px-1 py-2">Không có chi nhánh</p>
                                 ) : (
                                         branches.map((branch) => {

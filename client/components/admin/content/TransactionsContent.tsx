@@ -28,6 +28,7 @@ import {
         X,
         XCircle,
         Search,
+        Loader2,
         RefreshCw,
         SortAsc,
         SortDesc,
@@ -237,6 +238,18 @@ export default function TransactionsContent({
                         </div>
                 );
         };
+        const [localTxQuery, setLocalTxQuery] = useState(txQuery);
+
+        useEffect(() => {
+                setLocalTxQuery(txQuery);
+        }, [txQuery]);
+
+        const handleSearchTx = (e?: React.FormEvent) => {
+                if (e) e.preventDefault();
+                setTxQuery(localTxQuery);
+                setPage(1);
+        };
+
         return (
                 <div className="space-y-6">
                         <div className="flex flex-col gap-4 bg-white p-6 rounded-2xl border shadow-sm">
@@ -269,15 +282,23 @@ export default function TransactionsContent({
                                 {/* Toolbar Grid */}
                                 <div className="space-y-4">
                                         <div className="flex flex-wrap items-center gap-3">
-                                                <div className="relative flex-1 min-w-[300px]">
-                                                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 w-4 h-4" />
-                                                        <Input
-                                                                placeholder="Tìm email hoặc mã giao dịch..."
-                                                                value={txQuery}
-                                                                onChange={(e) => setTxQuery(e.target.value)}
-                                                                className="pl-10 h-11 bg-slate-50 border-transparent focus:bg-white focus:ring-2 focus:ring-blue-500 rounded-xl transition-all"
-                                                        />
-                                                </div>
+                                                <form onSubmit={(e) => { e.preventDefault(); setTxQuery(localTxQuery); setPage(1); }} className="flex flex-1 min-w-[300px] max-w-lg gap-2">
+                                                        <div className="relative flex-1">
+                                                                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 w-4 h-4" />
+                                                                <Input
+                                                                        placeholder="Tìm email hoặc mã giao dịch..."
+                                                                        value={localTxQuery}
+                                                                        onChange={(e) => setLocalTxQuery(e.target.value)}
+                                                                        className="pl-10 h-11 bg-slate-50 border-transparent focus:bg-white focus:ring-2 focus:ring-blue-500 rounded-xl transition-all"
+                                                                />
+                                                        </div>
+                                                        <Button
+                                                                type="submit"
+                                                                className="h-11 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-semibold px-4 flex items-center gap-1.5 shrink-0"
+                                                        >
+                                                                <Search className="w-4 h-4" /> Tìm kiếm
+                                                        </Button>
+                                                </form>
 
                                                 <div className="flex flex-wrap items-center gap-2">
                                                         {/* Pills filter loại booking */}
@@ -369,7 +390,7 @@ export default function TransactionsContent({
                                                                 <option value="paid_at">Thời gian thanh toán</option>
                                                         </select>
 
-                                                        {branches.length > 0 && (
+                                                        {branches.length > 0 ? (
                                                                 <select
                                                                         value={selectedBranchId || 'all'}
                                                                         onChange={(e) => setSelectedBranchId(e.target.value === 'all' ? 'all' : Number(e.target.value))}
@@ -382,6 +403,11 @@ export default function TransactionsContent({
                                                                                 </option>
                                                                         ))}
                                                                 </select>
+                                                        ) : (
+                                                                <div className="flex items-center gap-2 h-11 px-3 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium text-slate-500">
+                                                                        <Loader2 className="w-3.5 h-3.5 animate-spin text-blue-600" />
+                                                                        <span>Đang tải chi nhánh...</span>
+                                                                </div>
                                                         )}
                                                 </div>
 

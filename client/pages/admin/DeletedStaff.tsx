@@ -44,6 +44,13 @@ export default function DeletedStaffPage() {
         const totalPages = Math.max(1, Math.ceil(total / pageSize));
         const [isLoading, setIsLoading] = useState(false);
         const [searchQuery, setSearchQuery] = useState('');
+        const [localSearchQuery, setLocalSearchQuery] = useState('');
+
+        const handleSearch = (e?: React.FormEvent) => {
+                if (e) e.preventDefault();
+                setSearchQuery(localSearchQuery);
+                setPage(1);
+        };
         const [restoreDialogOpen, setRestoreDialogOpen] = useState(false);
         const [staffToRestore, setStaffToRestore] = useState<number | null>(null);
         const [sortField, setSortField] = useState<'fullname' | 'deleted_at'>('deleted_at');
@@ -158,14 +165,17 @@ export default function DeletedStaffPage() {
                                         </Button>
                                 </div>
 
-                                <div className="mb-4">
-                                        <Input
-                                                placeholder="Tìm kiếm theo email, tên..."
-                                                value={searchQuery}
-                                                onChange={(e) => setSearchQuery(e.target.value)}
-                                                className="w-64"
-                                        />
-                                </div>
+                                <form onSubmit={handleSearch} className="mb-4 flex gap-2 max-w-sm">
+                                         <Input
+                                                 placeholder="Tìm kiếm theo email, tên..."
+                                                 value={localSearchQuery}
+                                                 onChange={(e) => setLocalSearchQuery(e.target.value)}
+                                                 className="flex-1"
+                                         />
+                                         <Button type="submit" className="bg-blue-600 hover:bg-blue-700 text-white gap-1 text-xs">
+                                                 Tìm kiếm
+                                         </Button>
+                                 </form>
 
                                 {isLoading ? (
                                         <div className="text-center py-8">Đang tải...</div>

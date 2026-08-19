@@ -79,7 +79,7 @@ export default function HeroSection({
         // Prefetch booking page để tránh lag khi user bấm đặt vé
         useEffect(() => {
                 router.prefetch('/booking');
-                router.prefetch('/vr-booking');
+                router.prefetch('/vr');
         }, [router]);
 
         const [isDesktopHero, setIsDesktopHero] = useState(false);
@@ -298,7 +298,7 @@ export default function HeroSection({
                                                                         onClick={() => {
                                                                                 const params = new URLSearchParams(searchParams.toString());
                                                                                 const branchParam = selectedBranch?.id ? `?branch_id=${selectedBranch.id}` : (params.toString() ? `?${params.toString()}` : '');
-                                                                                router.push(`/vr-booking${branchParam}`);
+                                                                                router.push(`/vr${branchParam}`);
                                                                         }}
                                                                 >
                                                                         <span className="flex items-center gap-2">

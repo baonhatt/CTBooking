@@ -93,7 +93,7 @@ export default function Header({
                 router.prefetch('/booking');
                 router.prefetch('/bai-viet');
                 router.prefetch('/account');
-                router.prefetch('/vr-booking');
+                router.prefetch('/vr');
         }, [router]);
 
         // Dialog states
@@ -290,7 +290,7 @@ export default function Header({
                                                 onClick={() => {
                                                         const params = new URLSearchParams(searchParams.toString());
                                                         const branchParam = selectedBranch?.id ? `?branch_id=${selectedBranch.id}` : (params.toString() ? `?${params.toString()}` : '');
-                                                        router.push(`/vr-booking${branchParam}`);
+                                                        router.push(`/vr${branchParam}`);
                                                 }}
                                                 aria-label="Đặt trải nghiệm VR"
                                                 className="uiverse-schedule-btn inline-flex items-center gap-2 text-white/90 hover:text-white transition-colors duration-300 font-medium text-[15px] px-3 py-2 rounded-lg hover:bg-white/8 border border-white/10 hover:border-purple-400/40 hover:shadow-[0_0_20px_rgba(168,85,247,0.25)]"

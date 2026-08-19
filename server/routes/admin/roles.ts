@@ -230,7 +230,7 @@ export async function updateRoleImpl(
                 level?: number;
                 permissionIds?: number[];
         },
-        staffInfo?: { id: number; email: string; fullname: string }
+        staffInfo?: { id: number; email: string; fullname: string; isSuperAdmin?: boolean }
 ) {
         const { roles, rolePermissions } = tables;
         const { name, description, level, permissionIds } = body;
@@ -242,9 +242,9 @@ export async function updateRoleImpl(
                 return { status: 'error', message: 'Role not found' };
         }
 
-        // Cannot modify system roles
-        if (existing.isSystem) {
-                return { status: 'error', message: 'Không thể sửa system role' };
+        // Cannot modify system roles unless SuperAdmin
+        if (existing.isSystem && !staffInfo?.isSuperAdmin) {
+                return { status: 'error', message: 'Không thể sửa system role (Chỉ Super Admin mới có quyền)' };
         }
 
         // Check name uniqueness if changing name

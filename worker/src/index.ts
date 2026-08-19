@@ -1242,7 +1242,9 @@ app.get('/api/admin/dashboard/metrics', requireStaffAuth, requirePermission('das
 
         ticket_packages: schema.ticket_packages,
 
-        toys: schema.toys
+        toys: schema.toys,
+
+        branches: schema.branches
       },
 
       period,
@@ -5654,6 +5656,8 @@ app.put('/api/admin/roles/:id', requireStaffAuth, requirePermission('roles', 'ed
 
     const staffFullname = c.get('staffFullname');
 
+    const isSuperAdmin = Boolean(c.get('isSuperAdmin'));
+
     const r = await updateRoleImpl(
       db,
       {
@@ -5665,7 +5669,7 @@ app.put('/api/admin/roles/:id', requireStaffAuth, requirePermission('roles', 'ed
       },
       id,
       body,
-      { id: staffId, email: staffEmail, fullname: staffFullname }
+      { id: staffId, email: staffEmail, fullname: staffFullname, isSuperAdmin }
     );
 
     if (r.status === 'error') return c.json(r, 400);

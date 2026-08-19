@@ -153,7 +153,7 @@ export default function VouchersPage() {
                         code: generateRandomCode(),
                         name: '',
                         description: '',
-                        scope: 'vr',
+                        scope: scopeFilter === 'all' ? 'vr' : scopeFilter,
                         discount_type: 'percent',
                         discount_value: 10,
                         max_discount: null,

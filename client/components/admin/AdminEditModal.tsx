@@ -593,7 +593,10 @@ const AdminEditModal: React.FC<AdminEditModalProps> = (props) => {
                                                                                                                         }
                                                                                                                 />
                                                                                                         ) : (
-                                                                                                                <div className="h-10 bg-slate-100 rounded-lg animate-pulse" />
+                                                                                                                <div className="flex items-center gap-2 p-3 bg-slate-50 border border-slate-200 rounded-lg text-xs text-slate-500 font-medium">
+                                                                                                                        <Loader2 className="w-4 h-4 animate-spin text-blue-600" />
+                                                                                                                        <span>Đang tải danh sách chi nhánh...</span>
+                                                                                                                </div>
                                                                                                         )}
                                                                                                 </div>
 

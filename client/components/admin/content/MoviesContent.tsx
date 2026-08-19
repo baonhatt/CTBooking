@@ -35,7 +35,8 @@ import {
         Ticket,
         AlertCircle,
         SortDesc,
-        SortAsc
+        SortAsc,
+        Loader2
 } from 'lucide-react';
 import { format, formatDistanceToNow } from 'date-fns';
 import { vi } from 'date-fns/locale';
@@ -172,6 +173,17 @@ export default function MoviesContent({
                 }
         }, [isDetailsOpen, selectedMovieId]);
 
+        const [localSearch, setLocalSearch] = useState(searchQuery);
+
+        useEffect(() => {
+                setLocalSearch(searchQuery);
+        }, [searchQuery]);
+
+        const handleSearchSubmit = (e?: React.FormEvent) => {
+                if (e) e.preventDefault();
+                onSearchChange(localSearch);
+        };
+
         return (
                 <div className="space-y-6 font-sans">
                         {/* PAGE HEADER */}
@@ -184,27 +196,38 @@ export default function MoviesContent({
 
                         {/* TOOLBAR */}
                         <div className="flex flex-col xl:flex-row justify-between items-start xl:items-center gap-4 bg-white p-4 rounded-2xl border border-gray-200 shadow-sm">
-                                <div className="flex flex-1 w-full gap-3">
-                                        <div className="relative flex-1 max-w-md">
+                                <form onSubmit={handleSearchSubmit} className="flex flex-1 w-full gap-2 max-w-lg">
+                                        <div className="relative flex-1">
                                                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 w-4 h-4" />
                                                 <input
                                                         type="text"
                                                         placeholder="Tìm tên phim..."
-                                                        value={searchQuery}
-                                                        onChange={(e) => onSearchChange(e.target.value)}
-                                                        className="w-full pl-10 pr-4 py-2 bg-slate-50 border-transparent focus:bg-white focus:ring-2 focus:ring-blue-500 rounded-xl transition-all outline-none text-sm"
+                                                        value={localSearch}
+                                                        onChange={(e) => setLocalSearch(e.target.value)}
+                                                        className="w-full pl-10 pr-4 py-2 bg-slate-50 border-slate-200 border focus:bg-white focus:ring-2 focus:ring-blue-500 rounded-xl transition-all outline-none text-sm"
                                                 />
                                         </div>
                                         <Button
+                                                type="submit"
+                                                className="bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-semibold px-4 flex items-center gap-1.5 shrink-0"
+                                        >
+                                                <Search className="w-3.5 h-3.5" /> Tìm kiếm
+                                        </Button>
+                                        <Button
+                                                type="button"
                                                 variant="outline"
                                                 size="icon"
-                                                onClick={onRefresh}
-                                                className="rounded-xl shadow-sm hover:rotate-180 transition-transform duration-500"
+                                                onClick={() => {
+                                                        setLocalSearch('');
+                                                        onSearchChange('');
+                                                        onRefresh();
+                                                }}
+                                                className="rounded-xl shadow-sm hover:rotate-180 transition-transform duration-500 shrink-0"
                                                 title="Làm mới"
                                         >
                                                 <RefreshCw className={`w-4 h-4 ${isLoading ? 'animate-spin' : ''}`} />
                                         </Button>
-                                </div>
+                                </form>
 
                                 <div className="flex flex-wrap items-center gap-3 w-full xl:w-auto font-sans">
                                         <div className="flex items-center gap-2 px-3 py-1.5 bg-slate-50 rounded-xl border border-slate-200">
@@ -226,7 +249,7 @@ export default function MoviesContent({
                                                 <option value="release_date">Ngày phát hành</option>
                                         </select>
 
-                                        {branches.length > 0 && (
+                                        {branches.length > 0 ? (
                                                 <select
                                                         value={selectedBranchId || 'all'}
                                                         onChange={(e) => setSelectedBranchId(e.target.value === 'all' ? 'all' : Number(e.target.value))}
@@ -239,7 +262,13 @@ export default function MoviesContent({
                                                                 </option>
                                                         ))}
                                                 </select>
+                                        ) : (
+                                                <div className="flex items-center gap-2 h-10 px-3 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium text-slate-500">
+                                                        <Loader2 className="w-3.5 h-3.5 animate-spin text-blue-600" />
+                                                        <span>Đang tải chi nhánh...</span>
+                                                </div>
                                         )}
+
                                         {/* BỔ SUNG NÚT ĐẢO CHIỀU TẠI ĐÂY */}
                                         <Button
                                                 variant="outline"

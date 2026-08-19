@@ -227,7 +227,7 @@ export default function TicketsContent(props: Props) {
                     </div>
                 </div>
                 <div className="flex flex-wrap items-center gap-3">
-                    {branches.length > 0 && (
+                    {branches.length > 0 ? (
                         <select
                             value={selectedBranchId || 'all'}
                             onChange={(e) => setSelectedBranchId(e.target.value === 'all' ? 'all' : Number(e.target.value))}
@@ -240,6 +240,11 @@ export default function TicketsContent(props: Props) {
                                 </option>
                             ))}
                         </select>
+                    ) : (
+                        <div className="flex items-center gap-2 h-10 px-3 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium text-slate-500">
+                            <Loader2 className="w-3.5 h-3.5 animate-spin text-blue-600" />
+                            <span>Đang tải chi nhánh...</span>
+                        </div>
                     )}
                     {hasPermission('tickets', 'view_deleted') && (
                         <Button

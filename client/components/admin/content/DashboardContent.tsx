@@ -15,12 +15,16 @@ import {
         Trophy,
         Activity,
         CheckCircle2,
-        Clock
+        Clock,
+        Building2
 } from 'lucide-react';
 import { format, formatDistanceToNow } from 'date-fns';
 import { vi } from 'date-fns/locale';
 
 interface Metrics {
+        branch_id?: number | null;
+        branch_name?: string | null;
+        branch?: { id: number; name: string; code?: string } | null;
         totalMovies: number;
         totalToys: number;
         totalUsers: number;
@@ -294,10 +298,10 @@ export default function DashboardContent({
                                                 })}
                                         </select>
 
-                                        {branches.length > 0 && (
+                                        {branches.length > 0 ? (
                                                 <select
                                                         value={selectedBranchId || 'all'}
-                                                        onChange={(e) => setSelectedBranchId(e.target.value === 'all' ? 'all' : Number(e.target.value))}
+                                                        onChange={(e) => setSelectedBranchId && setSelectedBranchId(e.target.value === 'all' ? 'all' : Number(e.target.value))}
                                                         className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-900 rounded-xl font-bold text-sm border-none focus:ring-2 focus:ring-blue-500 transition-all cursor-pointer outline-none"
                                                 >
                                                         <option value="all">Tất cả chi nhánh</option>
@@ -307,7 +311,17 @@ export default function DashboardContent({
                                                                 </option>
                                                         ))}
                                                 </select>
-                                        )}
+                                        ) : metrics?.branch_name || metrics?.branch?.name ? (
+                                                <div className="flex items-center gap-2 px-4 py-2 bg-blue-50 text-blue-700 border border-blue-200 rounded-xl font-bold text-xs shadow-sm">
+                                                        <Building2 className="w-4 h-4 text-blue-600" />
+                                                        <span>{metrics.branch_name || metrics.branch?.name}</span>
+                                                </div>
+                                        ) : isPageLoading ? (
+                                                <div className="flex items-center gap-2 px-4 py-2 bg-slate-100 text-slate-500 rounded-xl font-bold text-xs">
+                                                        <Loader2 className="w-3.5 h-3.5 animate-spin text-blue-600" />
+                                                        <span>Đang tải...</span>
+                                                </div>
+                                        ) : null}
 
                                         <button
                                                 onClick={onRefresh}

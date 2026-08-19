@@ -17,7 +17,8 @@ import {
     ToggleRight,
     Tag,
     RotateCcw,
-    Loader2
+    Loader2,
+    Search
 } from 'lucide-react';
 import { format, formatDistanceToNow, isAfter, isBefore } from 'date-fns';
 import { vi } from 'date-fns/locale';
@@ -191,17 +192,29 @@ export default function VouchersContent(props: Props) {
     const [branchOptions, setBranchOptions] = useState<any[]>([]);
     const [isDetailDialogOpen, setIsDetailDialogOpen] = useState(false);
     const [selectedVoucher, setSelectedVoucher] = useState<VoucherItem | null>(null);
+    const [localSearchText, setLocalSearchText] = useState(searchText);
+
+    useEffect(() => {
+        setLocalSearchText(searchText);
+    }, [searchText]);
+
+    const handleSearchSubmit = (e?: React.FormEvent) => {
+        if (e) e.preventDefault();
+        setSearchText(localSearchText);
+        setPage(1);
+    };
 
     useEffect(() => {
         if (isEditOpen) {
-            listVRTicketPackagesForVoucher().then((res) => {
+            const scope = editData?.scope || 'vr';
+            listVRTicketPackagesForVoucher(scope).then((res) => {
                 setVrPackages(res.items || []);
             }).catch(() => {});
             getBranches({ includeInactive: true }).then((res) => {
                 setBranchOptions(res.items || []);
             }).catch(() => {});
         }
-    }, [isEditOpen]);
+    }, [isEditOpen, editData?.scope]);
 
     const handleToggleStatus = async (id: number, currentStatus: boolean) => {
         setIsTogglingId(id);
@@ -268,7 +281,7 @@ export default function VouchersContent(props: Props) {
             return;
         }
         payload.code = payload.code.toUpperCase().trim();
-        payload.scope = 'vr'; // Luôn fix scope VR theo phase 1
+        payload.scope = editData.scope || 'vr';
         payload.discount_value = value;
         payload.max_discount =
             payload.discount_type === 'percent' && payload.max_discount
@@ -348,33 +361,58 @@ export default function VouchersContent(props: Props) {
             <div className="flex flex-col xl:flex-row justify-between items-start xl:items-center gap-4 bg-white p-4 rounded-2xl border border-gray-200 shadow-sm">
                 <div className="flex flex-wrap items-center gap-3 w-full xl:w-auto">
                     {/* Search */}
-                    <div className="relative flex-1 md:min-w-[260px] md:max-w-sm">
-                        <Tag className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-                        <Input
-                            placeholder="Tìm theo mã hoặc tên voucher..."
-                            value={searchText}
-                            onChange={(e) => {
-                                setSearchText(e.target.value);
-                                setPage(1);
-                            }}
-                            className="pl-9 h-10 bg-slate-50 border-slate-200 focus:bg-white rounded-xl"
-                        />
-                    </div>
+                    <form onSubmit={handleSearchSubmit} className="flex items-center gap-2 flex-1 md:min-w-[320px] md:max-w-md">
+                        <div className="relative flex-1">
+                            <Tag className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                            <Input
+                                placeholder="Tìm theo mã hoặc tên voucher..."
+                                value={localSearchText}
+                                onChange={(e) => setLocalSearchText(e.target.value)}
+                                className="pl-9 h-10 bg-slate-50 border-slate-200 focus:bg-white rounded-xl"
+                            />
+                        </div>
+                        <Button
+                            type="submit"
+                            className="h-10 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-semibold px-4 flex items-center gap-1.5 shrink-0"
+                        >
+                            <Search className="w-3.5 h-3.5" /> Tìm kiếm
+                        </Button>
+                    </form>
 
                     {/* Scope Filter Pills */}
-                    <div className="flex items-center bg-purple-50 p-1 rounded-xl border border-purple-100">
+                    <div className="flex items-center bg-slate-50 p-1 rounded-xl border border-slate-200 gap-1">
+                        <button
+                            type="button"
+                            onClick={() => { setScopeFilter('all'); setPage(1); }}
+                            className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all flex items-center gap-1.5 ${
+                                scopeFilter === 'all'
+                                    ? 'bg-slate-800 text-white shadow-sm'
+                                    : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100/50'
+                            }`}
+                        >
+                            <TicketIcon className="w-3.5 h-3.5" /> Tất cả
+                        </button>
                         <button
                             type="button"
                             onClick={() => { setScopeFilter('vr'); setPage(1); }}
                             className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all flex items-center gap-1.5 ${
                                 scopeFilter === 'vr'
                                     ? 'bg-purple-600 text-white shadow-sm'
-                                    : scopeFilter === 'movie'
-                                        ? 'bg-blue-600 text-white shadow-sm'
-                                        : 'bg-white text-slate-900 shadow-sm'
+                                    : 'text-purple-600 hover:text-purple-100 hover:bg-purple-50/50'
                             }`}
                         >
                             <Gamepad2 className="w-3.5 h-3.5" /> Chỉ VR
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => { setScopeFilter('movie'); setPage(1); }}
+                            className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all flex items-center gap-1.5 ${
+                                scopeFilter === 'movie'
+                                    ? 'bg-blue-600 text-white shadow-sm'
+                                    : 'text-blue-600 hover:text-blue-100 hover:bg-blue-50/50'
+                            }`}
+                        >
+                            <Film className="w-3.5 h-3.5" /> Chỉ Phim
                         </button>
                     </div>
 
@@ -391,7 +429,7 @@ export default function VouchersContent(props: Props) {
                 </div>
 
                 <div className="flex flex-wrap items-center gap-3 w-full xl:w-auto">
-                    {branches.length > 0 && (
+                    {branches.length > 0 ? (
                         <select
                             value={selectedBranchId || 'all'}
                             onChange={(e) => {
@@ -405,6 +443,11 @@ export default function VouchersContent(props: Props) {
                                 <option key={b.id} value={b.id}>{b.name}</option>
                             ))}
                         </select>
+                    ) : (
+                        <div className="flex items-center gap-2 h-10 px-3 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium text-slate-500">
+                            <Loader2 className="w-3.5 h-3.5 animate-spin text-purple-600" />
+                            <span>Đang tải chi nhánh...</span>
+                        </div>
                     )}
                     {!isDeletedView && hasPermission('vouchers', 'view_deleted') && (
                         <Button
@@ -795,10 +838,16 @@ export default function VouchersContent(props: Props) {
                                 </div>
                                 <div>
                                     <DialogTitle className="text-lg font-bold text-gray-900">
-                                        {editData?.id ? 'Chỉnh sửa Voucher VR' : 'Thêm Voucher VR Mới'}
+                                        {editData?.id 
+                                            ? (editData?.scope === 'movie' ? 'Chỉnh sửa Voucher Phim' : editData?.scope === 'all' ? 'Chỉnh sửa Voucher Tổng hợp' : 'Chỉnh sửa Voucher VR')
+                                            : (editData?.scope === 'movie' ? 'Thêm Voucher Phim Mới' : editData?.scope === 'all' ? 'Thêm Voucher Mới' : 'Thêm Voucher VR Mới')}
                                     </DialogTitle>
                                     <p className="text-xs text-slate-500 mt-0.5">
-                                        Áp dụng cho Dịch vụ Trải nghiệm VR — Loại giảm, giới hạn &amp; chi nhánh
+                                        {editData?.scope === 'movie' 
+                                            ? 'Áp dụng cho Vé xem phim — Loại giảm, giới hạn & chi nhánh' 
+                                            : editData?.scope === 'all' 
+                                                ? 'Áp dụng cho Tất cả dịch vụ — Loại giảm, giới hạn & chi nhánh' 
+                                                : 'Áp dụng cho Dịch vụ Trải nghiệm VR — Loại giảm, giới hạn & chi nhánh'}
                                     </p>
                                 </div>
                             </div>
@@ -873,6 +922,32 @@ export default function VouchersContent(props: Props) {
                                             rows={3}
                                             className="w-full text-xs resize-none"
                                         />
+                                    </div>
+
+                                    <div>
+                                        <Label className="text-xs font-semibold text-gray-700 mb-1.5 block">
+                                            Phạm vi áp dụng (Scope) <span className="text-red-500">*</span>
+                                        </Label>
+                                        <Select
+                                            value={editData?.scope || 'vr'}
+                                            onValueChange={(val) => {
+                                                setEditData({
+                                                    ...editData,
+                                                    scope: val,
+                                                    applicable_ticket_package_ids: [],
+                                                    excluded_ticket_package_ids: []
+                                                });
+                                            }}
+                                        >
+                                            <SelectTrigger className="h-9.5 text-sm">
+                                                <SelectValue placeholder="Chọn phạm vi áp dụng" />
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                                <SelectItem value="vr">🎮 Trải nghiệm VR</SelectItem>
+                                                <SelectItem value="movie">🎬 Vé xem phim</SelectItem>
+                                                <SelectItem value="all">🎟️ Tất cả dịch vụ</SelectItem>
+                                            </SelectContent>
+                                        </Select>
                                     </div>
                                 </div>
 
@@ -1097,85 +1172,132 @@ export default function VouchersContent(props: Props) {
                                     </p>
                                 </div>
 
-                                {/* Applied VR packages */}
-                                <div className="bg-white p-4 rounded-2xl border border-purple-100 bg-purple-50/10 shadow-xs space-y-3">
-                                    <h3 className="text-xs font-bold text-purple-800 border-b border-purple-100 pb-2 flex items-center gap-2">
-                                        <Gamepad2 size={14} className="text-purple-600" />
-                                        Áp dụng cho gói VR cụ thể
-                                        <span className="ml-auto text-[10px] font-normal text-purple-500">
-                                            Để trống = tất cả VR
-                                        </span>
-                                    </h3>
-                                    <div className="border border-purple-100 rounded-xl p-2.5 h-40 overflow-y-auto space-y-1.5 bg-white">
-                                        {vrPackages.length === 0 ? (
-                                            <p className="text-xs text-gray-400 text-center py-6">
-                                                Không có gói VR — vui lòng tạo ít nhất 1 gói VR trước
-                                            </p>
-                                        ) : (
-                                            vrPackages.map((pkg) => {
-                                                const applied = (
-                                                    editData?.applicable_ticket_package_ids || []
-                                                ).includes(pkg.id);
-                                                const excluded = (
-                                                    editData?.excluded_ticket_package_ids || []
-                                                ).includes(pkg.id);
-                                                return (
-                                                    <div
-                                                        key={pkg.id}
-                                                        className="flex items-center space-x-2 hover:bg-purple-50 p-1.5 rounded-lg border border-transparent hover:border-purple-100 transition-colors"
-                                                    >
-                                                        <Checkbox
-                                                            id={`vrpkg-apply-${pkg.id}`}
-                                                            checked={applied}
-                                                            disabled={excluded}
-                                                            onCheckedChange={(checked) => {
-                                                                const curr =
-                                                                    editData?.applicable_ticket_package_ids || [];
-                                                                setEditData({
-                                                                    ...editData,
-                                                                    applicable_ticket_package_ids: checked
-                                                                        ? [...curr, pkg.id]
-                                                                        : curr.filter((id: number) => id !== pkg.id)
-                                                                });
-                                                            }}
-                                                        />
-                                                        <label
-                                                            htmlFor={`vrpkg-apply-${pkg.id}`}
-                                                            className="text-xs font-medium leading-none cursor-pointer flex-1 text-slate-700 truncate"
-                                                        >
-                                                            {pkg.name}
-                                                            <span className="ml-1 text-[10px] text-slate-400">
-                                                                ({formatMoney(pkg.price)})
-                                                            </span>
-                                                        </label>
-                                                        <Checkbox
-                                                            id={`vrpkg-ex-${pkg.id}`}
-                                                            checked={excluded}
-                                                            disabled={applied}
-                                                            onCheckedChange={(checked) => {
-                                                                const curr =
-                                                                    editData?.excluded_ticket_package_ids || [];
-                                                                setEditData({
-                                                                    ...editData,
-                                                                    excluded_ticket_package_ids: checked
-                                                                        ? [...curr, pkg.id]
-                                                                        : curr.filter((id: number) => id !== pkg.id)
-                                                                });
-                                                            }}
-                                                        />
-                                                        <label
-                                                            htmlFor={`vrpkg-ex-${pkg.id}`}
-                                                            className="text-[10px] text-red-500 cursor-pointer"
-                                                            title="Loại trừ gói này khỏi voucher"
-                                                        >
-                                                            {excluded ? 'Loại trừ' : 'Bỏ qua'}
-                                                        </label>
-                                                    </div>
-                                                );
-                                            })
-                                        )}
-                                    </div>
-                                </div>
+                                {/* Applied Ticket Packages based on Scope */}
+                                {(() => {
+                                    const scopeType = editData?.scope || 'vr';
+                                    const scopeConfig = {
+                                        vr: {
+                                            title: 'Áp dụng cho gói VR cụ thể',
+                                            hint: 'Để trống = tất cả VR',
+                                            empty: 'Không có gói VR — vui lòng tạo ít nhất 1 gói VR trước',
+                                            icon: <Gamepad2 size={14} className="text-purple-600" />,
+                                            themeClass: 'border-purple-100 bg-purple-50/10 text-purple-800',
+                                            borderClass: 'border-purple-100',
+                                            textTheme: 'text-purple-800',
+                                            hoverClass: 'hover:bg-purple-50 hover:border-purple-100'
+                                        },
+                                        movie: {
+                                            title: 'Áp dụng cho gói phim cụ thể',
+                                            hint: 'Để trống = tất cả gói phim',
+                                            empty: 'Không có gói phim — vui lòng tạo ít nhất 1 gói phim trước',
+                                            icon: <Film size={14} className="text-blue-600" />,
+                                            themeClass: 'border-blue-100 bg-blue-50/10 text-blue-800',
+                                            borderClass: 'border-blue-100',
+                                            textTheme: 'text-blue-800',
+                                            hoverClass: 'hover:bg-blue-50 hover:border-blue-100'
+                                        },
+                                        all: {
+                                            title: 'Áp dụng cho gói vé cụ thể',
+                                            hint: 'Để trống = tất cả gói vé',
+                                            empty: 'Không có gói vé nào — vui lòng tạo ít nhất 1 gói vé trước',
+                                            icon: <TicketIcon size={14} className="text-indigo-600" />,
+                                            themeClass: 'border-indigo-100 bg-indigo-50/10 text-indigo-800',
+                                            borderClass: 'border-indigo-100',
+                                            textTheme: 'text-indigo-800',
+                                            hoverClass: 'hover:bg-indigo-50 hover:border-indigo-100'
+                                        }
+                                    }[scopeType as 'vr' | 'movie' | 'all'] || {
+                                        title: 'Áp dụng cho gói VR cụ thể',
+                                        hint: 'Để trống = tất cả VR',
+                                        empty: 'Không có gói VR — vui lòng tạo ít nhất 1 gói VR trước',
+                                        icon: <Gamepad2 size={14} className="text-purple-600" />,
+                                        themeClass: 'border-purple-100 bg-purple-50/10 text-purple-800',
+                                        borderClass: 'border-purple-100',
+                                        textTheme: 'text-purple-800',
+                                        hoverClass: 'hover:bg-purple-50 hover:border-purple-100'
+                                    };
+
+                                    return (
+                                        <div className={`bg-white p-4 rounded-2xl border ${scopeConfig.borderClass} ${scopeConfig.themeClass.split(' ')[1] || ''} shadow-xs space-y-3`}>
+                                            <h3 className={`text-xs font-bold ${scopeConfig.textTheme} border-b ${scopeConfig.borderClass} pb-2 flex items-center gap-2`}>
+                                                {scopeConfig.icon}
+                                                {scopeConfig.title}
+                                                <span className={`ml-auto text-[10px] font-normal ${scopeConfig.textTheme.replace('800', '500')}`}>
+                                                    {scopeConfig.hint}
+                                                </span>
+                                            </h3>
+                                            <div className={`border ${scopeConfig.borderClass} rounded-xl p-2.5 h-40 overflow-y-auto space-y-1.5 bg-white`}>
+                                                {vrPackages.length === 0 ? (
+                                                    <p className="text-xs text-gray-400 text-center py-6">
+                                                        {scopeConfig.empty}
+                                                    </p>
+                                                ) : (
+                                                    vrPackages.map((pkg) => {
+                                                        const applied = (
+                                                            editData?.applicable_ticket_package_ids || []
+                                                        ).includes(pkg.id);
+                                                        const excluded = (
+                                                            editData?.excluded_ticket_package_ids || []
+                                                        ).includes(pkg.id);
+                                                        return (
+                                                            <div
+                                                                key={pkg.id}
+                                                                className={`flex items-center space-x-2 p-1.5 rounded-lg border border-transparent transition-colors ${scopeConfig.hoverClass}`}
+                                                            >
+                                                                <Checkbox
+                                                                    id={`vrpkg-apply-${pkg.id}`}
+                                                                    checked={applied}
+                                                                    disabled={excluded}
+                                                                    onCheckedChange={(checked) => {
+                                                                        const curr =
+                                                                            editData?.applicable_ticket_package_ids || [];
+                                                                        setEditData({
+                                                                            ...editData,
+                                                                            applicable_ticket_package_ids: checked
+                                                                                ? [...curr, pkg.id]
+                                                                                : curr.filter((id: number) => id !== pkg.id)
+                                                                        });
+                                                                    }}
+                                                                />
+                                                                <label
+                                                                    htmlFor={`vrpkg-apply-${pkg.id}`}
+                                                                    className="text-xs font-medium leading-none cursor-pointer flex-1 text-slate-700 truncate"
+                                                                >
+                                                                    {pkg.name}
+                                                                    <span className="ml-1 text-[10px] text-slate-400">
+                                                                        ({formatMoney(pkg.price)})
+                                                                    </span>
+                                                                </label>
+                                                                <Checkbox
+                                                                    id={`vrpkg-ex-${pkg.id}`}
+                                                                    checked={excluded}
+                                                                    disabled={applied}
+                                                                    onCheckedChange={(checked) => {
+                                                                        const curr =
+                                                                            editData?.excluded_ticket_package_ids || [];
+                                                                        setEditData({
+                                                                            ...editData,
+                                                                            excluded_ticket_package_ids: checked
+                                                                                ? [...curr, pkg.id]
+                                                                                : curr.filter((id: number) => id !== pkg.id)
+                                                                        });
+                                                                    }}
+                                                                />
+                                                                <label
+                                                                    htmlFor={`vrpkg-ex-${pkg.id}`}
+                                                                    className="text-[10px] text-red-500 cursor-pointer"
+                                                                    title="Loại trừ gói này khỏi voucher"
+                                                                >
+                                                                    {excluded ? 'Loại trừ' : 'Bỏ qua'}
+                                                                </label>
+                                                            </div>
+                                                        );
+                                                    })
+                                                )}
+                                            </div>
+                                        </div>
+                                    );
+                                })()}
 
                                 {/* Branches */}
                                 <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-xs space-y-3">
@@ -1221,9 +1343,19 @@ export default function VouchersContent(props: Props) {
                     {/* Footer action bar */}
                     <div className="px-6 py-4 bg-white border-t border-slate-200 flex items-center justify-between">
                         <div className="flex items-center gap-2 text-xs text-slate-500">
-                            <Badge variant="outline" className="border-purple-200 bg-purple-50 text-purple-700 text-[10px] font-semibold">
-                                <Gamepad2 className="w-3 h-3 inline mr-1" /> Scope: VR
-                            </Badge>
+                            {editData?.scope === 'movie' ? (
+                                <Badge variant="outline" className="border-blue-200 bg-blue-50 text-blue-700 text-[10px] font-semibold">
+                                    <Film className="w-3 h-3 inline mr-1" /> Scope: Phim
+                                </Badge>
+                            ) : editData?.scope === 'all' ? (
+                                <Badge variant="outline" className="border-indigo-200 bg-indigo-50 text-indigo-700 text-[10px] font-semibold">
+                                    <TicketIcon className="w-3 h-3 inline mr-1" /> Scope: Tất cả
+                                </Badge>
+                            ) : (
+                                <Badge variant="outline" className="border-purple-200 bg-purple-50 text-purple-700 text-[10px] font-semibold">
+                                    <Gamepad2 className="w-3 h-3 inline mr-1" /> Scope: VR
+                                </Badge>
+                            )}
                             {editData?.id ? (
                                 <span>Cập nhật lần cuối: {editData.updated_at ? format(new Date(editData.updated_at), 'dd/MM/yy HH:mm') : '-'}</span>
                             ) : (
@@ -1242,7 +1374,13 @@ export default function VouchersContent(props: Props) {
                             <Button
                                 onClick={handleSave}
                                 disabled={isSaving}
-                                className="bg-purple-600 hover:bg-purple-700 text-white rounded-lg px-6 gap-2"
+                                className={`${
+                                    editData?.scope === 'movie' 
+                                        ? 'bg-blue-600 hover:bg-blue-700' 
+                                        : editData?.scope === 'all' 
+                                            ? 'bg-indigo-600 hover:bg-indigo-700' 
+                                            : 'bg-purple-600 hover:bg-purple-700'
+                                } text-white rounded-lg px-6 gap-2`}
                             >
                                 {isSaving ? (
                                     <Loader2 className="w-4 h-4 animate-spin" />

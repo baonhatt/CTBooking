@@ -95,6 +95,13 @@ export const PostManagement = () => {
         const [totalPosts, setTotalPosts] = useState(0);
         const [currentPage, setCurrentPage] = useState(1);
         const [searchQuery, setSearchQuery] = useState('');
+        const [localSearchQuery, setLocalSearchQuery] = useState('');
+
+        const handleSearchPost = (e?: React.FormEvent) => {
+                if (e) e.preventDefault();
+                setSearchQuery(localSearchQuery);
+                setCurrentPage(1);
+        };
         const [statusFilter, setStatusFilter] = useState<string>('all');
         const [isLoading, setIsLoading] = useState(false);
         const [isEditOpen, setIsEditOpen] = useState(false);
@@ -367,21 +374,25 @@ export const PostManagement = () => {
                                         <h3 className="text-lg font-bold text-slate-900">Quản lý bài viết</h3>
                                         <p className="text-xs text-slate-500">Tổng cộng {totalPosts} bài viết</p>
                                 </div>
-                                <div className="flex flex-1 w-full md:max-w-xl gap-2 ml-auto">
+                                <form onSubmit={handleSearchPost} className="flex flex-1 w-full md:max-w-xl gap-2 ml-auto">
                                         <div className="relative flex-1">
                                                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 w-4 h-4" />
                                                 <input
                                                         type="text"
-                                                        placeholder="Tìm kiếm..."
-                                                        value={searchQuery}
-                                                        onChange={(e) => {
-                                                                setSearchQuery(e.target.value);
-                                                                setCurrentPage(1);
-                                                        }}
-                                                        className="w-full pl-10 pr-4 py-2 bg-slate-50 border-transparent focus:bg-white focus:ring-2 focus:ring-blue-500 rounded-xl transition-all outline-none text-sm border"
+                                                        placeholder="Tìm tiêu đề hoặc nội dung bài viết..."
+                                                        value={localSearchQuery}
+                                                        onChange={(e) => setLocalSearchQuery(e.target.value)}
+                                                        className="w-full pl-10 pr-4 py-2 bg-slate-50 border-slate-200 focus:bg-white focus:ring-2 focus:ring-blue-500 rounded-xl transition-all outline-none text-sm border"
                                                 />
                                         </div>
-                                        <div className="flex gap-2 items-center">
+                                        <Button
+                                                type="submit"
+                                                className="bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-semibold px-4 flex items-center gap-1.5 shrink-0"
+                                        >
+                                                <Search className="w-3.5 h-3.5" /> Tìm kiếm
+                                        </Button>
+                                </form>
+                                <div className="flex gap-2 items-center">
                                                 <select
                                                         value={statusFilter}
                                                         onChange={(e) => {
@@ -413,7 +424,6 @@ export const PostManagement = () => {
                                                         </Button>
                                                 )}
                                         </div>
-                                </div>
                         </div>
 
                         {/* ── Table ───────────────────────────────────────────────────────────── */}

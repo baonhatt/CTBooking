@@ -112,9 +112,9 @@ export default function RoleDetailPage() {
                 setIsSaveDialogOpen(true);
         };
 
-        const confirmUpdate = () => {
+        const confirmUpdate = async () => {
                 if (!id) return;
-                updateMutation.mutate({
+                await updateMutation.mutateAsync({
                         id: parseInt(id),
                         data: {
                                 name: (roleData as any)?.role?.name,
@@ -122,6 +122,7 @@ export default function RoleDetailPage() {
                                 permissionIds
                         }
                 });
+                setIsSaveDialogOpen(false);
         };
 
         const handleDelete = () => {

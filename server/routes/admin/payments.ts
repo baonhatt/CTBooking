@@ -11,8 +11,12 @@ export async function getRevenueImpl(
         const status = String(args.status || 'paid').toLowerCase();
         const whereParts: any[] = [];
         if (status !== 'all') whereParts.push(inArray(tables.bookings.payment_status, ['paid']));
-        if (args.restrictToBranchIds && args.restrictToBranchIds.length > 0) {
-                whereParts.push(inArray(tables.bookings.branch_id, args.restrictToBranchIds));
+        if (args.restrictToBranchIds !== null && args.restrictToBranchIds !== undefined) {
+                if (args.restrictToBranchIds.length === 0) {
+                        whereParts.push(sql`1 = 0`);
+                } else {
+                        whereParts.push(inArray(tables.bookings.branch_id, args.restrictToBranchIds));
+                }
         }
         let dateCondition = undefined as any;
         if (from && to) {
@@ -84,8 +88,12 @@ export async function listTransactionsImpl(
         if (branch_id !== undefined && branch_id !== null) {
                 whereCondition.push(eq(tables.bookings.branch_id, Number(branch_id)));
         }
-        if (restrictToBranchIds && restrictToBranchIds.length > 0) {
-                whereCondition.push(inArray(tables.bookings.branch_id, restrictToBranchIds));
+        if (restrictToBranchIds !== null && restrictToBranchIds !== undefined) {
+                if (restrictToBranchIds.length === 0) {
+                        whereCondition.push(sql`1 = 0`);
+                } else {
+                        whereCondition.push(inArray(tables.bookings.branch_id, restrictToBranchIds));
+                }
         }
 
         // Filter theo khoảng thời gian
@@ -219,17 +227,44 @@ export async function getTransactionByIdImpl(
         // 1. CHỈNH SỬA TRUY VẤN JOIN
         const rows = await anyDb
                 .select({
-                        booking: tables.bookings,
-                        user: tables.users,
-                        account: tables.accounts,
-                        movie: tables.movies,
-                        ticket_package: tables.ticket_packages,
-                        branch: tables.branches
+                        booking: {
+                                id: tables.bookings.id,
+                                booking_type: tables.bookings.booking_type,
+                                name: tables.bookings.name,
+                                email: tables.bookings.email,
+                                phone: tables.bookings.phone,
+                                branch_id: tables.bookings.branch_id,
+                                ticket_unit_price: tables.bookings.ticket_unit_price,
+                                ticket_count: tables.bookings.ticket_count,
+                                total_price: tables.bookings.total_price,
+                                combo: tables.bookings.combo,
+                                pay_txt_code: tables.bookings.pay_txt_code,
+                                booking_code: tables.bookings.booking_code,
+                                checked_in_at: tables.bookings.checked_in_at,
+                                is_used: tables.bookings.is_used,
+                                created_at: tables.bookings.created_at,
+                                updated_at: tables.bookings.updated_at,
+                                payment_method: tables.bookings.payment_method,
+                                payment_status: tables.bookings.payment_status,
+                                transaction_id: tables.bookings.transaction_id,
+                                paid_at: tables.bookings.paid_at,
+                                expiry_date: tables.bookings.expiry_date,
+                                ticket_package_name: tables.bookings.ticket_package_name
+                        },
+                        account: {
+                                email: tables.accounts.email,
+                                is_active: tables.accounts.is_active
+                        },
+                        ticket_package: {
+                                name: tables.ticket_packages.name
+                        },
+                        branch: {
+                                name: tables.branches.name
+                        }
                 })
                 .from(tables.bookings)
                 .leftJoin(tables.users, eq(tables.bookings.user_id, tables.users.id))
                 .leftJoin(tables.accounts, eq(tables.users.id, tables.accounts.user_id))
-                .leftJoin(tables.movies, eq(tables.bookings.movie_id, tables.movies.id))
                 .leftJoin(tables.ticket_packages, eq(tables.bookings.ticket_package_id, tables.ticket_packages.id))
                 .leftJoin(tables.branches, eq(tables.bookings.branch_id, tables.branches.id))
                 .where(
@@ -241,7 +276,7 @@ export async function getTransactionByIdImpl(
         // Kiểm tra nếu không có kết quả
         if (!rows || rows.length === 0) return null;
 
-        const { booking, user, account, movie, ticket_package, branch } = rows[0];
+        const { booking, account, ticket_package, branch } = rows[0];
 
         // 2. TÍNH TOÁN THỜI GIAN VÀ TRẠNG THÁI
         const now = new Date();
@@ -322,7 +357,7 @@ export async function getTransactionByIdImpl(
                         name: branch?.name || 'Vãng lai'
                 },
                 ticket_package: {
-                        name: ticket_package.name,
+                        name: ticket_package?.name || booking.ticket_package_name || '',
                         ticket_unit_price: booking.ticket_unit_price,
                         movies: comboMovies
                 },

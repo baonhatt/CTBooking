@@ -59,6 +59,10 @@ export async function getDashboardMetrics(period: string = 'week', year?: number
         if (year) params.append('year', String(year));
         if (branch_id) params.append('branch_id', String(branch_id));
         return request<{
+                branch_id?: number | null;
+                branch_name?: string | null;
+                branch_ids?: number[] | null;
+                branch?: { id: number; name: string; code?: string } | null;
                 totalMovies: number;
                 totalToys: number;
                 totalUsers: number;
@@ -283,12 +287,12 @@ export async function listDeletedVouchersApi(filters: VoucherListFilters = {}) {
 }
 
 /* ========== LIST VR TICKET PACKAGES FOR VOUCHER FORM ========== */
-export async function listVRTicketPackagesForVoucher() {
+export async function listVRTicketPackagesForVoucher(type: string = 'vr') {
         const params = new URLSearchParams();
-        params.set('type', 'vr');
+        params.set('type', type);
         params.set('pageSize', '100');
         params.set('is_active', 'all');
         return request<{ items: any[]; total: number }>(
-                `/api/admin/tickets?${params.toString()}`
+                `/api/tickets?${params.toString()}`
         );
 }

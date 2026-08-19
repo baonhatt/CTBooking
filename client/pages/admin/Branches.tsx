@@ -5,9 +5,10 @@ import { toast } from 'sonner';
 import { useNavigate } from 'react-router-dom';
 import { useStaffStore } from '@/store/staffStore';
 import { useStaffPermissions, useIsSuperAdmin } from '@/hooks/useStaffPermission';
-import { Edit2, X, Search, RefreshCw, Pencil, Trash2, Plus, Building2, Eye, EyeOff, Phone, Mail, MapPin, BarChart3, History, Info, HelpCircle } from 'lucide-react';
+import { Edit2, X, Search, RefreshCw, Pencil, Trash2, Plus, Building2, Eye, EyeOff, Phone, Mail, MapPin, BarChart3, History, Info, HelpCircle, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
+import { Skeleton } from '@/components/ui/skeleton';
 import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Switch } from '@/components/ui/switch';
@@ -95,6 +96,13 @@ export default function BranchesPage() {
         const [isLoading, setIsLoading] = useState(false);
         const [showActiveOnly, setShowActiveOnly] = useState(initialFilters.showActiveOnly ?? true);
         const [searchQuery, setSearchQuery] = useState(initialFilters.searchQuery || '');
+        const [localSearchQuery, setLocalSearchQuery] = useState(initialFilters.searchQuery || '');
+
+        const handleSearchBranch = (e?: React.FormEvent) => {
+                if (e) e.preventDefault();
+                setSearchQuery(localSearchQuery);
+                setPage(1);
+        };
         const [isCodeEditable, setIsCodeEditable] = useState(false);
         const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
         const [branchToDelete, setBranchToDelete] = useState<number | null>(null);
@@ -214,29 +222,39 @@ export default function BranchesPage() {
                                         </div>
                                 </div>
 
-                                {/* TOOLBAR */}
                                 <div className="flex flex-col xl:flex-row justify-between items-start xl:items-center gap-4 bg-white p-4 rounded-2xl border border-gray-200 shadow-sm">
-                                        <div className="flex flex-1 gap-3 max-w-xl">
+                                        <form onSubmit={handleSearchBranch} className="flex flex-1 gap-2 max-w-xl">
                                                 <div className="relative flex-1">
                                                         <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 w-4 h-4" />
                                                         <input
                                                                 type="text"
                                                                 placeholder="Tìm theo tên, mã, địa chỉ..."
-                                                                value={searchQuery}
-                                                                onChange={(e) => setSearchQuery(e.target.value)}
-                                                                className="w-full pl-10 pr-4 py-2 bg-slate-50 border-transparent focus:bg-white focus:ring-2 focus:ring-blue-500 rounded-xl transition-all outline-none text-sm border"
+                                                                value={localSearchQuery}
+                                                                onChange={(e) => setLocalSearchQuery(e.target.value)}
+                                                                className="w-full pl-10 pr-4 py-2 bg-slate-50 border-slate-200 focus:bg-white focus:ring-2 focus:ring-blue-500 rounded-xl transition-all outline-none text-sm border"
                                                         />
                                                 </div>
                                                 <Button
+                                                        type="submit"
+                                                        className="bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-semibold px-4 flex items-center gap-1.5 shrink-0"
+                                                >
+                                                        <Search className="w-3.5 h-3.5" /> Tìm kiếm
+                                                </Button>
+                                                <Button
+                                                        type="button"
                                                         variant="outline"
                                                         size="icon"
-                                                        onClick={handleRefresh}
+                                                        onClick={() => {
+                                                                setLocalSearchQuery('');
+                                                                setSearchQuery('');
+                                                                handleRefresh();
+                                                        }}
                                                         className="rounded-xl shadow-sm hover:rotate-180 transition-transform duration-500 shrink-0 h-10 w-10"
                                                         title="Làm mới"
                                                 >
                                                         <RefreshCw className={`w-4 h-4 ${isLoading ? 'animate-spin' : ''}`} />
                                                 </Button>
-                                        </div>
+                                        </form>
 
                                         <div className="flex flex-wrap items-center gap-3">
                                                 <div className="flex items-center gap-2 px-3 py-1.5 bg-slate-50 rounded-xl border border-slate-200">
@@ -269,7 +287,19 @@ export default function BranchesPage() {
                                 </div>
 
                                 {isLoading ? (
-                                        <div className="text-center py-8">Đang tải...</div>
+                                        <Card className="border border-gray-200 rounded-xl shadow-sm bg-white p-6">
+                                                <div className="flex items-center justify-center gap-3 py-6 text-slate-600 font-medium">
+                                                        <Loader2 className="w-6 h-6 animate-spin text-blue-600" />
+                                                        <span>Đang tải danh sách chi nhánh từ máy chủ...</span>
+                                                </div>
+                                                <div className="space-y-3">
+                                                        <Skeleton className="h-10 w-full rounded-lg bg-slate-100" />
+                                                        <Skeleton className="h-12 w-full rounded-lg bg-slate-100" />
+                                                        <Skeleton className="h-12 w-full rounded-lg bg-slate-100" />
+                                                        <Skeleton className="h-12 w-full rounded-lg bg-slate-100" />
+                                                        <Skeleton className="h-12 w-full rounded-lg bg-slate-100" />
+                                                </div>
+                                        </Card>
                                 ) : (
                                         <Card className="border border-gray-200 rounded-xl shadow-sm bg-white">
                                                 <CardContent className="p-0">

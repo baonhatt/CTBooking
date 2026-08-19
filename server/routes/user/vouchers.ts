@@ -61,14 +61,7 @@ export async function validateVoucherForVRImpl(
                 return { valid: false, message: 'Mã giảm giá chưa được kích hoạt', error_code: 'VOUCHER_INACTIVE' };
         }
 
-        // SCOPE: only accept 'vr' or 'all'
-        if (voucher.scope !== 'vr' && voucher.scope !== 'all') {
-                return {
-                        valid: false,
-                        message: 'Mã giảm giá này không áp dụng cho gói trải nghiệm VR',
-                        error_code: 'VOUCHER_SCOPE_MISMATCH'
-                };
-        }
+        // SCOPE validation will be handled dynamically below based on order contents.
 
         // DATE validity
         const nowIso = new Date().toISOString();
@@ -129,6 +122,43 @@ export async function validateVoucherForVRImpl(
                                 const pk = pkgs.find((p: any) => p.id === it.vr_package_id);
                                 if (pk) order_total += Number(pk.price) * it.quantity;
                         }
+                }
+        }
+
+        // SCOPE: verify compatibility with items
+        if (voucher.scope === 'vr') {
+                if (!vr_items || vr_items.length === 0) {
+                        return {
+                                valid: false,
+                                message: 'Mã giảm giá này chỉ áp dụng cho gói trải nghiệm VR',
+                                error_code: 'VOUCHER_SCOPE_MISMATCH'
+                        };
+                }
+        } else if (voucher.scope === 'movie') {
+                let hasMovieTickets = true;
+                if (order_total > 0 && vr_items && vr_items.length > 0) {
+                        let vrItemsTotal = 0;
+                        const vrPackageIds = vr_items.map((i) => i.vr_package_id);
+                        if (vrPackageIds.length > 0) {
+                                const pkgs = await anyDb
+                                        .select({ id: tables.ticket_packages.id, price: tables.ticket_packages.price })
+                                        .from(tables.ticket_packages)
+                                        .where(eq(tables.ticket_packages.id, vrPackageIds[0]));
+                                for (const it of vr_items) {
+                                        const pk = pkgs.find((p: any) => p.id === it.vr_package_id);
+                                        if (pk) vrItemsTotal += Number(pk.price) * it.quantity;
+                                }
+                        }
+                        if (order_total <= vrItemsTotal) {
+                                hasMovieTickets = false;
+                        }
+                }
+                if (!hasMovieTickets) {
+                        return {
+                                valid: false,
+                                message: 'Mã giảm giá này chỉ áp dụng cho vé xem phim',
+                                error_code: 'VOUCHER_SCOPE_MISMATCH'
+                        };
                 }
         }
 

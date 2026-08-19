@@ -7,8 +7,10 @@ export interface VRPackageItem {
 
 export interface VoucherValidateRequest {
   code: string;
-  vr_items: VRPackageItem[];
+  vr_items?: VRPackageItem[];
   branch_id?: number;
+  user_id?: number;
+  booking_type?: 'vr' | 'movie' | 'all';
 }
 
 export interface VRBookingRequest {

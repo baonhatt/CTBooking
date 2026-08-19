@@ -29,11 +29,14 @@ import {
         createVnpayPaymentApi,
         API_BASE_URL,
         SERVER_BASE_URL,
-        validateBookingApi
+        validateBookingApi,
+        validateVrVoucher,
+        validateVRBooking,
+        createVRBooking
 } from '@/lib/api';
 import { optimizeCloudinaryUrl } from '@/lib/utils';
 import UserLayout from '@/layouts/UserLayout';
-import { ArrowLeft, ArrowRight, CreditCard, ChevronRight, X, Loader2, Gamepad2, Plus, Minus, Users, Clock, Sparkles, Film } from 'lucide-react';
+import { ArrowLeft, ArrowRight, CreditCard, ChevronRight, X, Loader2, Gamepad2, Plus, Minus, Users, Clock, Sparkles, Film, Tag } from 'lucide-react';
 import { useBranch } from '@/hooks/useBranch';
 import { getCookie } from '@/lib/cookies';
 
@@ -43,6 +46,7 @@ export default function BookingPage() {
         const router = useRouter();
         const searchParams = useSearchParams();
         const { selectedBranch, dontShowConfirm, toggleDontShowConfirm } = useBranch();
+        const [bookingType, setBookingType] = useState<'movie' | 'vr'>('movie');
         const [step, setStep] = useState<0 | 1>(0);
         const [movie, setMovie] = useState<string>(''); // Keep for backward compatibility
         const [ticketCount, setTicketCount] = useState<number>(1);
@@ -57,6 +61,9 @@ export default function BookingPage() {
         const [isProcessing, setIsProcessing] = useState(false);
         const [showMovies, setShowMovies] = useState(false);
         const [formErrors, setFormErrors] = useState<{ [key: string]: string }>({});
+        const [voucherCode, setVoucherCode] = useState<string>('');
+        const [voucherValidating, setVoucherValidating] = useState(false);
+        const [appliedVoucher, setAppliedVoucher] = useState<any>(null);
         const countdownRef = useRef<NodeJS.Timeout | null>(null);
         const [countdown, setCountdown] = useState(600);
         const [confirmChecked, setConfirmChecked] = useState(false);
@@ -77,6 +84,16 @@ export default function BookingPage() {
                 router.prefetch('/checkout');
                 router.prefetch('/');
         }, [router]);
+
+        // Parse vr_package_id and qty from query params
+        useEffect(() => {
+                const pkgId = searchParams.get('vr_package_id');
+                const qty = searchParams.get('qty') || '1';
+                if (pkgId) {
+                        setSelectedVrQuantities({ [Number(pkgId)]: Number(qty) });
+                        setBookingType('vr');
+                }
+        }, [searchParams]);
 
         const goHomeWithBranch = () => {
                 const params = new URLSearchParams(searchParams.toString());
@@ -147,12 +164,14 @@ export default function BookingPage() {
         }));
         const defaultTicket = ticketPackages.sort((a, b) => a.display_order - b.display_order)[0];
         const unitPrice = Number(selectedPackage?.price || 0);
-        const movieTotalPrice = unitPrice * ticketCount;
+        const movieTotalPrice = bookingType === 'vr' ? 0 : unitPrice * ticketCount;
         const vrTotalPrice = Object.entries(selectedVrQuantities).reduce((acc, [pkgId, qty]) => {
                 const p = vrPackages.find((item: any) => Number(item.id) === Number(pkgId));
                 return acc + (p ? Number(p.price || 0) * qty : 0);
         }, 0);
-        const totalPrice = movieTotalPrice + vrTotalPrice;
+        const originalTotalPrice = movieTotalPrice + vrTotalPrice;
+        const voucherDiscount = Number(appliedVoucher?.discount_amount || 0);
+        const totalPrice = Math.max(0, originalTotalPrice - voucherDiscount);
         const MIN_TICKETS = 1;
         const MAX_TICKETS = 10;
         const [combo, setCombo] = useState<any>();
@@ -161,6 +180,52 @@ export default function BookingPage() {
                         if (countdownRef.current) clearInterval(countdownRef.current);
                 };
         }, []);
+
+        const applyVoucher = async () => {
+                const code = voucherCode.trim();
+                if (!code) {
+                        toast.error('Vui lòng nhập mã giảm giá');
+                        return;
+                }
+                try {
+                        setVoucherValidating(true);
+                        const vr_items = Object.entries(selectedVrQuantities)
+                                .filter(([_, qty]) => qty > 0)
+                                .map(([pkgId, qty]) => ({ vr_package_id: Number(pkgId), quantity: qty }));
+
+                        const res = await validateVrVoucher({
+                                code,
+                                vr_items,
+                                branch_id: selectedBranch?.id,
+                                booking_type: bookingType === 'vr' ? 'vr' : (vr_items.length > 0 ? 'all' : 'movie')
+                        });
+
+                        if (res?.valid) {
+                                setAppliedVoucher(res);
+                                toast.success('Áp mã thành công', {
+                                        description: `Tiết kiệm ${Number(res.discount_amount || 0).toLocaleString('vi-VN')}₫`
+                                });
+                        } else {
+                                setAppliedVoucher(null);
+                                toast.error('Mã không hợp lệ', {
+                                        description: res?.message || 'Vui lòng kiểm tra lại mã'
+                                });
+                        }
+                } catch (err: any) {
+                        setAppliedVoucher(null);
+                        toast.error('Mã không hợp lệ', {
+                                description: err?.message || 'Vui lòng kiểm tra lại mã'
+                        });
+                } finally {
+                        setVoucherValidating(false);
+                }
+        };
+
+        // Reset voucher if cart items change to prevent price manipulation
+        useEffect(() => {
+                setAppliedVoucher(null);
+                setVoucherCode('');
+        }, [selectedVrQuantities, ticketCount, selectedPackage, bookingType]);
 
         useEffect(() => {
                 if (selectedPackage && Array.isArray(ticketPackages) && ticketPackages.length > 0) {
@@ -297,12 +362,18 @@ export default function BookingPage() {
         const validateForm = () => {
                 const errors: { [key: string]: string } = {};
 
-                if (!selectedPackage?.id) {
-                        errors.ticketPackage = 'Vui lòng chọn loại vé';
-                }
-
-                if (activeMoviesFull.length > 0 && selectedMovieIds.length === 0) {
-                        errors.movies = 'Vui lòng chọn ít nhất một phim';
+                if (bookingType === 'movie') {
+                        if (!selectedPackage?.id) {
+                                errors.ticketPackage = 'Vui lòng chọn loại vé';
+                        }
+                        if (activeMoviesFull.length > 0 && selectedMovieIds.length === 0) {
+                                errors.movies = 'Vui lòng chọn ít nhất một phim';
+                        }
+                } else {
+                        const hasVr = Object.values(selectedVrQuantities).some((qty) => qty > 0);
+                        if (!hasVr) {
+                                errors.movies = 'Vui lòng chọn ít nhất một gói trải nghiệm VR';
+                        }
                 }
 
                 if (!name.trim()) {
@@ -343,17 +414,27 @@ export default function BookingPage() {
                         });
                         return;
                 }
-                if (!selectedMovie) {
-                        toast.error('Chưa chọn phim', {
-                                description: 'Vui lòng chọn một bộ phim'
-                        });
-                        return;
-                }
-                if (!selectedPackage?.id) {
-                        toast.error('Chưa chọn loại vé', {
-                                description: 'Vui lòng chọn một loại vé trong danh sách'
-                        });
-                        return;
+                if (bookingType === 'movie') {
+                        if (!selectedMovie) {
+                                toast.error('Chưa chọn phim', {
+                                        description: 'Vui lòng chọn một bộ phim'
+                                });
+                                        return;
+                        }
+                        if (!selectedPackage?.id) {
+                                toast.error('Chưa chọn loại vé', {
+                                        description: 'Vui lòng chọn một loại vé trong danh sách'
+                                });
+                                return;
+                        }
+                } else {
+                        const hasVr = Object.values(selectedVrQuantities).some((qty) => qty > 0);
+                        if (!hasVr) {
+                                toast.error('Chưa chọn gói VR', {
+                                        description: 'Vui lòng chọn ít nhất một gói trải nghiệm VR'
+                                });
+                                return;
+                        }
                 }
                 if (!name || !phone || !email) {
                         toast.error('Thiếu thông tin', {
@@ -368,9 +449,9 @@ export default function BookingPage() {
                                 description: 'Đang sử dụng mock data. Chức năng thanh toán sẽ hoạt động khi có API thật.'
                         });
                         console.log('Demo booking:', {
-                                movie: selectedMovie.title,
-                                ticket: selectedPackage.name,
-                                quantity: ticketCount,
+                                movie: bookingType === 'movie' ? selectedMovie?.title : 'Gói VR',
+                                ticket: bookingType === 'movie' ? selectedPackage?.name : 'Gói VR',
+                                quantity: bookingType === 'movie' ? ticketCount : Object.values(selectedVrQuantities).reduce((a, b) => a + b, 0),
                                 total: totalPrice,
                                 customer: { name, email, phone }
                         });
@@ -408,65 +489,106 @@ export default function BookingPage() {
                                 };
                         });
 
-                        const validation = await validateBookingApi({
-                                email,
-                                emailBook: email,
-                                phone,
-                                name,
-                                movieId: selectedMovie?.id,
-                                ticketCount,
-                                ticketPackageId: selectedPackage?.id,
-                                combo: finalCombo,
-                                vr_items,
-                                branch_id: selectedBranch?.id
-                        });
+                        let canonicalTotal = totalPrice;
+                        let booking: any = null;
 
-                        if (!validation?.status) {
-                                throw new Error(validation?.message || 'Không thể xác thực thông tin đặt vé');
+                        if (bookingType === 'movie') {
+                                const validation = await validateBookingApi({
+                                        email,
+                                        emailBook: email,
+                                        phone,
+                                        name,
+                                        movieId: selectedMovie?.id,
+                                        ticketCount,
+                                        ticketPackageId: selectedPackage?.id,
+                                        combo: finalCombo,
+                                        vr_items,
+                                        voucher_code: appliedVoucher ? voucherCode.trim() : undefined,
+                                        branch_id: selectedBranch?.id
+                                });
+
+                                if (!validation?.status) {
+                                        throw new Error(validation?.message || 'Không thể xác thực thông tin đặt vé');
+                                }
+                                canonicalTotal = Number(validation.totalPrice ?? totalPrice);
+
+                                const res = await createBookingApi({
+                                        email,
+                                        emailBook: email,
+                                        phone,
+                                        name,
+                                        movieId: selectedMovie?.id,
+                                        ticketCount,
+                                        paymentMethod,
+                                        totalPrice: canonicalTotal,
+                                        ticketPackageId: selectedPackage?.id,
+                                        pay_txt_code: orderId,
+                                        combo: finalCombo,
+                                        vr_items,
+                                        voucher_code: appliedVoucher ? voucherCode.trim() : undefined,
+                                        branch_id: selectedBranch?.id
+                                });
+                                booking = res.booking;
+                        } else {
+                                const validation = await validateVRBooking({
+                                        email,
+                                        emailBook: email,
+                                        phone,
+                                        name,
+                                        vr_items,
+                                        voucher_code: appliedVoucher ? voucherCode.trim() : undefined,
+                                        branch_id: selectedBranch?.id,
+                                        paymentMethod
+                                });
+
+                                if (validation?.status && validation.status !== 200) {
+                                        throw new Error(validation?.message || 'Không thể xác thực thông tin đặt vé VR');
+                                }
+                                canonicalTotal = Number(validation.total_price ?? totalPrice);
+
+                                const res = await createVRBooking({
+                                        email,
+                                        emailBook: email,
+                                        phone,
+                                        name,
+                                        vr_items,
+                                        voucher_code: appliedVoucher ? voucherCode.trim() : undefined,
+                                        branch_id: selectedBranch?.id,
+                                        paymentMethod,
+                                        pay_txt_code: orderId
+                                });
+                                if (res?.error || !res?.booking) {
+                                        throw new Error(res?.error || 'Không thể tạo đặt vé VR');
+                                }
+                                booking = res.booking;
                         }
-
-                        const canonicalTotal = Number(validation.totalPrice ?? totalPrice);
 
                         const summary = {
                                 orderId,
-                                movie: selectedMovie?.title,
+                                movie: bookingType === 'vr' ? 'Trải nghiệm VR' : selectedMovie?.title,
                                 name,
                                 phone,
                                 email,
                                 emailBook: email,
-                                quantity: ticketCount,
+                                quantity: bookingType === 'vr' ? Object.values(selectedVrQuantities).reduce((a, b) => a + b, 0) : ticketCount,
                                 amount: canonicalTotal,
-                                movieTotalPrice,
+                                movieTotalPrice: bookingType === 'vr' ? 0 : movieTotalPrice,
                                 vrTotalPrice,
                                 vr_items: selectedVrList,
-                                booking_type: vr_items.length > 0 ? 'combo_vr' : 'movie',
+                                booking_type: bookingType === 'vr' ? 'vr' : (vr_items.length > 0 ? 'combo_vr' : 'movie'),
                                 method: paymentMethod,
-                                poster: movieDetail?.cover_image || '',
-                                duration: movieDetail?.duration_min ? `${movieDetail.duration_min}` : '',
-                                genres: movieDetail?.genres || '',
-                                ticketPackageId: selectedPackage?.id,
-                                ticketPackageName: selectedPackage?.name,
+                                poster: bookingType === 'vr' ? (selectedVrList[0]?.cover_image || '') : (movieDetail?.cover_image || ''),
+                                duration: bookingType === 'vr' ? '' : (movieDetail?.duration_min ? `${movieDetail.duration_min}` : ''),
+                                genres: bookingType === 'vr' ? '' : (movieDetail?.genres || ''),
+                                ticketPackageId: bookingType === 'vr' ? undefined : selectedPackage?.id,
+                                ticketPackageName: bookingType === 'vr' ? 'Gói VR' : selectedPackage?.name,
                                 branch_id: selectedBranch?.id,
-                                branch_name: selectedBranch?.name
+                                branch_name: selectedBranch?.name,
+                                voucher_code: appliedVoucher?.voucher_details?.code || null,
+                                voucher_discount_amount: voucherDiscount
                         };
 
                         countdownRef.current = setInterval(() => setCountdown((c) => c - 1), 1000);
-
-                        const { booking } = await createBookingApi({
-                                email,
-                                emailBook: email,
-                                phone,
-                                name,
-                                movieId: selectedMovie?.id,
-                                ticketCount,
-                                paymentMethod,
-                                totalPrice: canonicalTotal,
-                                ticketPackageId: selectedPackage?.id,
-                                pay_txt_code: orderId,
-                                combo: finalCombo,
-                                vr_items,
-                                branch_id: selectedBranch?.id
-                        });
 
                         localStorage.setItem(
                                 'pendingOrder',
@@ -638,150 +760,206 @@ export default function BookingPage() {
                                                                 <div className="grid grid-cols-1 lg:grid-cols-12">
                                                                         {/* CỘT TRÁI: CHỌN VÉ & PHIM (7 columns) */}
                                                                         <div className="lg:col-span-7 p-6 space-y-6 border-b lg:border-b-0 lg:border-r border-white/10">
-                                                                                {/* PHẦN 1: CHỌN VÉ */}
+                                                                                {/* CHỌN DỊCH VỤ */}
                                                                                 <section className="space-y-3">
                                                                                         <div className="flex items-center gap-2 text-sm font-semibold text-blue-400 uppercase tracking-wider">
-                                                                                                <span className="p-1 rounded bg-blue-500/20">01</span>
-                                                                                                Chọn Loại Vé
+                                                                                                <span className="p-1 rounded bg-blue-500/20 text-[10px]">01</span>
+                                                                                                Chọn Dịch Vụ
                                                                                         </div>
-                                                                                        <Select
-                                                                                                value={selectedPackage?.id ? String(selectedPackage.id) : ''}
-                                                                                                onValueChange={(v) => {
-                                                                                                        const pkg = ticketPackages.find((p: any) => String(p.id) === String(v));
-                                                                                                        setSelectedPackage(pkg || null);
-                                                                                                        if (pkg?.movies) {
-                                                                                                                setActiveMoviesFull([...pkg.movies]);
-                                                                                                        } else {
+                                                                                        <div className="grid grid-cols-2 gap-3 sm:gap-4">
+                                                                                                <button
+                                                                                                        type="button"
+                                                                                                        onClick={() => {
+                                                                                                                setBookingType('movie');
+                                                                                                                // Select default ticket package if none selected
+                                                                                                                if (!selectedPackage && defaultTicket) {
+                                                                                                                        setSelectedPackage(defaultTicket);
+                                                                                                                        if (defaultTicket.movies) {
+                                                                                                                                setActiveMoviesFull([...defaultTicket.movies]);
+                                                                                                                        }
+                                                                                                                }
+                                                                                                        }}
+                                                                                                        className={`py-3.5 px-4 rounded-xl border text-center font-bold text-xs sm:text-sm transition-all flex flex-col items-center justify-center gap-2 ${
+                                                                                                                bookingType === 'movie'
+                                                                                                                        ? 'bg-blue-600/25 border-blue-500 text-blue-400 shadow-[0_0_15px_rgba(59,130,246,0.2)]'
+                                                                                                                        : 'bg-white/5 border-white/10 text-slate-400 hover:bg-white/10 hover:border-white/20'
+                                                                                                        }`}
+                                                                                                >
+                                                                                                        <Film className="w-5 h-5 shrink-0" />
+                                                                                                        <span>Đặt Vé Xem Phim</span>
+                                                                                                </button>
+                                                                                                <button
+                                                                                                        type="button"
+                                                                                                        onClick={() => {
+                                                                                                                setBookingType('vr');
+                                                                                                                setSelectedPackage(null);
                                                                                                                 setActiveMoviesFull([]);
-                                                                                                        }
-                                                                                                        setMovie('');
-                                                                                                        clearFormError('ticketPackage');
-                                                                                                }}
-                                                                                        >
-                                                                                                <SelectTrigger className="w-full bg-white/10 border-white/20 hover:bg-white/15 h-12 rounded-xl transition-all text-sm sm:text-base">
-                                                                                                        <span className="truncate font-medium">
-                                                                                                                {selectedPackage?.name || 'Chọn loại vé bạn muốn...'}
-                                                                                                        </span>
-                                                                                                </SelectTrigger>
-                                                                                                <SelectContent className="bg-[#1a1f2e] text-white border-white/20 shadow-2xl">
-                                                                                                        {ticketPackages.map((t: any) => (
-                                                                                                                <SelectItem
-                                                                                                                        key={t.id}
-                                                                                                                        value={String(t.id)}
-                                                                                                                        className="focus:bg-blue-600 focus:text-white py-3"
-                                                                                                                >
-                                                                                                                        <div className="flex items-center justify-between gap-8 w-full">
-                                                                                                                                <span className="font-medium">{t.name}</span>
-                                                                                                                                <span className="font-bold text-blue-400">
-                                                                                                                                        {Number(t.price || 0).toLocaleString('vi-VN')}₫
-                                                                                                                                </span>
-                                                                                                                        </div>
-                                                                                                                </SelectItem>
-                                                                                                        ))}
-                                                                                                </SelectContent>
-                                                                                        </Select>
-                                                                                        {formErrors.ticketPackage && (
-                                                                                                <p className="text-orange-400 text-[10px] mt-1 animate-pulse">{formErrors.ticketPackage}</p>
-                                                                                        )}
+                                                                                                        }}
+                                                                                                        className={`py-3.5 px-4 rounded-xl border text-center font-bold text-xs sm:text-sm transition-all flex flex-col items-center justify-center gap-2 ${
+                                                                                                                bookingType === 'vr'
+                                                                                                                        ? 'bg-purple-600/25 border-purple-500 text-purple-400 shadow-[0_0_15px_rgba(168,85,247,0.2)]'
+                                                                                                                        : 'bg-white/5 border-white/10 text-slate-400 hover:bg-white/10 hover:border-white/20'
+                                                                                                        }`}
+                                                                                                >
+                                                                                                        <Gamepad2 className="w-5 h-5 shrink-0" />
+                                                                                                        <span>Chỉ Đặt Trải Nghiệm VR</span>
+                                                                                                </button>
+                                                                                        </div>
                                                                                 </section>
 
-                                                                                {/* PHẦN 2: DANH SÁCH PHIM - Dạng thu gọn */}
-                                                                                {selectedPackage && (
-                                                                                        <section className="space-y-3 animate-in fade-in slide-in-from-top-2 duration-300">
-                                                                                                <div className="flex flex-wrap items-center justify-between gap-2">
-                                                                                                        <div className="text-[13px] font-semibold text-blue-400 uppercase tracking-wider leading-relaxed">
-                                                                                                                Vui lòng chọn phim áp dụng ({activeMoviesFull.length})
+                                                                                {/* PHẦN 1: CHỌN VÉ VÀ PHIM (Chỉ hiện khi đặt vé xem phim) */}
+                                                                                {bookingType === 'movie' && (
+                                                                                        <>
+                                                                                                <section className="space-y-3">
+                                                                                                        <div className="flex items-center gap-2 text-sm font-semibold text-blue-400 uppercase tracking-wider">
+                                                                                                                <span className="p-1 rounded bg-blue-500/20 text-[10px]">02</span>
+                                                                                                                Chọn Loại Vé
                                                                                                         </div>
-                                                                                                        <Button
-                                                                                                                variant="link"
-                                                                                                                className="text-blue-400 h-auto p-0 text-[13px] hover:text-blue-300"
-                                                                                                                onClick={() => setShowMovies(!showMovies)}
+                                                                                                        <Select
+                                                                                                                value={selectedPackage?.id ? String(selectedPackage.id) : ''}
+                                                                                                                onValueChange={(v) => {
+                                                                                                                        const pkg = ticketPackages.find((p: any) => String(p.id) === String(v));
+                                                                                                                        setSelectedPackage(pkg || null);
+                                                                                                                        if (pkg?.movies) {
+                                                                                                                                setActiveMoviesFull([...pkg.movies]);
+                                                                                                                        } else {
+                                                                                                                                setActiveMoviesFull([]);
+                                                                                                                        }
+                                                                                                                        setMovie('');
+                                                                                                                        clearFormError('ticketPackage');
+                                                                                                                }}
                                                                                                         >
-                                                                                                                {showMovies ? 'Thu gọn ▲' : 'Xem danh sách ▼'}
-                                                                                                        </Button>
-                                                                                                </div>
+                                                                                                                <SelectTrigger className="w-full bg-white/10 border-white/20 hover:bg-white/15 h-12 rounded-xl transition-all text-sm sm:text-base">
+                                                                                                                        <span className="truncate font-medium">
+                                                                                                                                {selectedPackage?.name || 'Chọn loại vé bạn muốn...'}
+                                                                                                                        </span>
+                                                                                                                </SelectTrigger>
+                                                                                                                <SelectContent className="bg-[#1a1f2e] text-white border-white/20 shadow-2xl">
+                                                                                                                        {ticketPackages.map((t: any) => (
+                                                                                                                                <SelectItem
+                                                                                                                                        key={t.id}
+                                                                                                                                        value={String(t.id)}
+                                                                                                                                        className="focus:bg-blue-600 focus:text-white py-3"
+                                                                                                                                >
+                                                                                                                                        <div className="flex items-center justify-between gap-8 w-full">
+                                                                                                                                                <span className="font-medium">{t.name}</span>
+                                                                                                                                                <span className="font-bold text-blue-400">
+                                                                                                                                                        {Number(t.price || 0).toLocaleString('vi-VN')}₫
+                                                                                                                                                </span>
+                                                                                                                                        </div>
+                                                                                                                                </SelectItem>
+                                                                                                                        ))}
+                                                                                                                </SelectContent>
+                                                                                                        </Select>
+                                                                                                        {formErrors.ticketPackage && (
+                                                                                                                <p className="text-orange-400 text-[10px] mt-1 animate-pulse">{formErrors.ticketPackage}</p>
+                                                                                                        )}
+                                                                                                </section>
 
-                                                                                                {!showMovies && (
-                                                                                                        <div className="animate-in fade-in zoom-in-95 duration-200">
-                                                                                                                {activeMoviesFull && activeMoviesFull.length > 0 ? (
-                                                                                                                        /* Sử dụng grid-cols-2 cho mobile và grid-cols-5 cho desktop */
-                                                                                                                        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3 sm:gap-4">
-                                                                                                                                {activeMoviesFull.map((m: any) => (
-                                                                                                                                        <div
-                                                                                                                                                key={m.id}
-                                                                                                                                                onClick={() => {
-                                                                                                                                                        setSelectedMovieIds((prev) => {
-                                                                                                                                                                if (prev.includes(m.id)) return prev.filter((id) => id !== m.id);
-                                                                                                                                                                if (prev.length >= 2) {
-                                                                                                                                                                        return [prev[1], m.id];
-                                                                                                                                                                }
-                                                                                                                                                                return [...prev, m.id];
-                                                                                                                                                        });
-                                                                                                                                                        clearFormError('movies');
-                                                                                                                                                }}
-                                                                                                                                                className={`group relative rounded-xl overflow-hidden cursor-pointer transition-all duration-300 shadow-lg hover:shadow-xl hover:shadow-blue-500/20 transform hover:scale-105 ${selectedMovieIds.includes(m.id)
-                                                                                                                                                        ? 'border-2 border-blue-500 ring-2 ring-blue-500/30 bg-blue-500/10 scale-105'
-                                                                                                                                                        : 'border border-white/10 bg-white/5 hover:border-blue-500/50'
-                                                                                                                                                        }`}
-                                                                                                                                        >
-                                                                                                                                                <div className="aspect-[2/3] relative">
-                                                                                                                                                        {/* Tỉ lệ 2:3 chuẩn poster phim */}
-                                                                                                                                                        <img
-                                                                                                                                                                src={optimizeCloudinaryUrl(m.cover_image, 200)}
-                                                                                                                                                                alt={m.title}
-                                                                                                                                                                loading="lazy"
-                                                                                                                                                                className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
-                                                                                                                                                        />
-                                                                                                                                                        {selectedMovieIds.includes(m.id) && (
-                                                                                                                                                                <div className="absolute top-2 right-2 z-10 w-6 h-6 bg-blue-600 rounded-full flex items-center justify-center border-2 border-white shadow-lg">
-                                                                                                                                                                        <div className="text-[10px] font-bold text-white">
-                                                                                                                                                                                {selectedMovieIds.indexOf(m.id) + 1}
+                                                                                                {/* PHẦN 2: DANH SÁCH PHIM */}
+                                                                                                {selectedPackage && (
+                                                                                                        <section className="space-y-3 animate-in fade-in slide-in-from-top-2 duration-300">
+                                                                                                                <div className="flex flex-wrap items-center justify-between gap-2">
+                                                                                                                        <div className="text-[13px] font-semibold text-blue-400 uppercase tracking-wider leading-relaxed">
+                                                                                                                                Vui lòng chọn phim áp dụng ({activeMoviesFull.length})
+                                                                                                                        </div>
+                                                                                                                        <Button
+                                                                                                                                variant="link"
+                                                                                                                                className="text-blue-400 h-auto p-0 text-[13px] hover:text-blue-300"
+                                                                                                                                onClick={() => setShowMovies(!showMovies)}
+                                                                                                                        >
+                                                                                                                                {showMovies ? 'Thu gọn ▲' : 'Xem danh sách ▼'}
+                                                                                                                        </Button>
+                                                                                                                </div>
+
+                                                                                                                {!showMovies && (
+                                                                                                                        <div className="animate-in fade-in zoom-in-95 duration-200">
+                                                                                                                                {activeMoviesFull && activeMoviesFull.length > 0 ? (
+                                                                                                                                        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3 sm:gap-4">
+                                                                                                                                                {activeMoviesFull.map((m: any) => (
+                                                                                                                                                        <div
+                                                                                                                                                                key={m.id}
+                                                                                                                                                                onClick={() => {
+                                                                                                                                                                        setSelectedMovieIds((prev) => {
+                                                                                                                                                                                if (prev.includes(m.id)) return prev.filter((id) => id !== m.id);
+                                                                                                                                                                                if (prev.length >= 2) {
+                                                                                                                                                                                        return [prev[1], m.id];
+                                                                                                                                                                                }
+                                                                                                                                                                                return [...prev, m.id];
+                                                                                                                                                                        });
+                                                                                                                                                                        clearFormError('movies');
+                                                                                                                                                                }}
+                                                                                                                                                                className={`group relative rounded-xl overflow-hidden cursor-pointer transition-all duration-300 shadow-lg hover:shadow-xl hover:shadow-blue-500/20 transform hover:scale-105 ${selectedMovieIds.includes(m.id)
+                                                                                                                                                                        ? 'border-2 border-blue-500 ring-2 ring-blue-500/30 bg-blue-500/10 scale-105'
+                                                                                                                                                                        : 'border border-white/10 bg-white/5 hover:border-blue-500/50'
+                                                                                                                                                                        }`}
+                                                                                                                                                        >
+                                                                                                                                                                <div className="aspect-[2/3] relative">
+                                                                                                                                                                        <img
+                                                                                                                                                                                src={optimizeCloudinaryUrl(m.cover_image, 200)}
+                                                                                                                                                                                alt={m.title}
+                                                                                                                                                                                loading="lazy"
+                                                                                                                                                                                className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
+                                                                                                                                                                        />
+                                                                                                                                                                        {selectedMovieIds.includes(m.id) && (
+                                                                                                                                                                                <div className="absolute top-2 right-2 z-10 w-6 h-6 bg-blue-600 rounded-full flex items-center justify-center border-2 border-white shadow-lg">
+                                                                                                                                                                                        <div className="text-[10px] font-bold text-white">
+                                                                                                                                                                                                {selectedMovieIds.indexOf(m.id) + 1}
+                                                                                                                                                                                        </div>
+                                                                                                                                                                                </div>
+                                                                                                                                                                        )}
+                                                                                                                                                                        <div className="absolute inset-0 bg-gradient-to-t from-black via-black/40 to-transparent opacity-90" />
+                                                                                                                                                                        <div className="absolute bottom-0 p-2 w-full">
+                                                                                                                                                                                <div className="text-[11px] font-bold text-white leading-tight truncate mb-1">
+                                                                                                                                                                                        {m.title}
+                                                                                                                                                                                </div>
+                                                                                                                                                                                <div className="flex items-center gap-1.5">
+                                                                                                                                                                                        <span className="px-1 py-0.5 rounded bg-blue-600 text-[9px] text-white font-black">
+                                                                                                                                                                                                {m.duration_min ? `${m.duration_min}'` : '--'}
+                                                                                                                                                                                        </span>
+                                                                                                                                                                                        <span className="text-[9px] text-gray-300/90 truncate font-light italic hidden sm:block">
+                                                                                                                                                                                                {m.description || 'Phim đặc sắc'}
+                                                                                                                                                                                        </span>
+                                                                                                                                                                                </div>
                                                                                                                                                                         </div>
                                                                                                                                                                 </div>
-                                                                                                                                                        )}
-                                                                                                                                                        <div className="absolute inset-0 bg-gradient-to-t from-black via-black/40 to-transparent opacity-90" />
-                                                                                                                                                        <div className="absolute bottom-0 p-2 w-full">
-                                                                                                                                                                <div className="text-[11px] font-bold text-white leading-tight truncate mb-1">
-                                                                                                                                                                        {m.title}
-                                                                                                                                                                </div>
-                                                                                                                                                                <div className="flex items-center gap-1.5">
-                                                                                                                                                                        <span className="px-1 py-0.5 rounded bg-blue-600 text-[9px] text-white font-black">
-                                                                                                                                                                                {m.duration_min ? `${m.duration_min}'` : '--'}
-                                                                                                                                                                        </span>
-                                                                                                                                                                        <span className="text-[9px] text-gray-300/90 truncate font-light italic hidden sm:block">
-                                                                                                                                                                                {m.description || 'Phim đặc sắc'}
-                                                                                                                                                                        </span>
-                                                                                                                                                                </div>
                                                                                                                                                         </div>
-                                                                                                                                                </div>
+                                                                                                                                                ))}
                                                                                                                                         </div>
-                                                                                                                                ))}
-                                                                                                                        </div>
-                                                                                                                ) : (
-                                                                                                                        <div className="p-6 text-center border border-dashed border-white/10 rounded-xl text-gray-500 text-sm italic">
-                                                                                                                                Không có phim áp dụng cho loại vé này
+                                                                                                                                ) : (
+                                                                                                                                        <div className="p-6 text-center border border-dashed border-white/10 rounded-xl text-gray-500 text-sm italic">
+                                                                                                                                                Không có phim áp dụng cho loại vé này
+                                                                                                                                        </div>
+                                                                                                                                )}
                                                                                                                         </div>
                                                                                                                 )}
+                                                                                                        </section>
+                                                                                                )}
+                                                                                                {formErrors.movies && (
+                                                                                                        <div className="bg-orange-500/10 border border-orange-500/30 rounded-lg p-3 animate-in fade-in duration-200">
+                                                                                                                <p className="text-orange-400 text-sm flex items-center gap-2">
+                                                                                                                        <span className="w-1 h-1 bg-orange-400 rounded-full"></span>
+                                                                                                                        {formErrors.movies}
+                                                                                                                </p>
                                                                                                         </div>
                                                                                                 )}
-                                                                                        </section>
-                                                                                )}
-                                                                                {formErrors.movies && (
-                                                                                        <div className="bg-orange-500/10 border border-orange-500/30 rounded-lg p-3 animate-in fade-in duration-200">
-                                                                                                <p className="text-orange-400 text-sm flex items-center gap-2">
-                                                                                                        <span className="w-1 h-1 bg-orange-400 rounded-full"></span>
-                                                                                                        {formErrors.movies}
-                                                                                                </p>
-                                                                                        </div>
+                                                                                        </>
                                                                                 )}
 
-                                                                                {/* PHẦN 3: GÓI TRẢI NGHIỆM VR KÈM THEO (TÙY CHỌN) */}
+                                                                                {/* PHẦN 3: GÓI TRẢI NGHIỆM VR */}
                                                                                 {vrPackages && vrPackages.length > 0 && (
                                                                                         <section className="space-y-3 pt-2 animate-in fade-in slide-in-from-top-2 duration-300">
                                                                                                 <div className="flex items-center justify-between">
                                                                                                         <div className="flex items-center gap-2 text-[13px] font-semibold text-purple-400 uppercase tracking-wider">
                                                                                                                 <Gamepad2 className="w-4 h-4 text-purple-400" />
-                                                                                                                Trải nghiệm VR kèm theo (Tùy chọn)
+                                                                                                                {bookingType === 'vr' ? (
+                                                                                                                        <>
+                                                                                                                                <span className="p-1 rounded bg-purple-500/25 text-[10px]">02</span>
+                                                                                                                                Chọn Gói Trải Nghiệm VR
+                                                                                                                        </>
+                                                                                                                ) : (
+                                                                                                                        <span>Trải nghiệm VR kèm theo (Tùy chọn)</span>
+                                                                                                                )}
                                                                                                         </div>
                                                                                                         {Object.keys(selectedVrQuantities).length > 0 && (
                                                                                                                 <span className="text-[11px] bg-purple-500/20 text-purple-300 px-2 py-0.5 rounded-full border border-purple-500/30 font-medium">
@@ -878,30 +1056,42 @@ export default function BookingPage() {
                                                                                 )}
 
                                                                                 {/* TÓM TẮT TẠM TÍNH (Chỉ hiện trên Desktop ở phía trái) */}
-                                                                                {selectedPackage && (
+                                                                                {(selectedPackage || bookingType === 'vr') && (
                                                                                         <div className="mt-auto pt-6 hidden lg:block">
                                                                                                 <div className="overflow-hidden rounded-xl border border-blue-500/30 bg-blue-500/5 p-3.5 flex flex-col justify-between gap-2.5 animate-in fade-in slide-in-from-bottom-2 duration-400">
                                                                                                         <div className="space-y-2">
-                                                                                                                <div className="flex justify-between items-start">
-                                                                                                                        <div>
-                                                                                                                                <h4 className="text-white font-bold text-sm sm:text-base">{selectedPackage.name}</h4>
-                                                                                                                                <p className="text-[12px] text-gray-400">
-                                                                                                                                        {selectedPackage.description || `Gói vé ${selectedPackage.type || 'tiêu chuẩn'}`}
-                                                                                                                                </p>
+                                                                                                                {selectedPackage && bookingType !== 'vr' && (
+                                                                                                                        <div className="flex justify-between items-start">
+                                                                                                                                <div>
+                                                                                                                                        <h4 className="text-white font-bold text-sm sm:text-base">{selectedPackage.name}</h4>
+                                                                                                                                        <p className="text-[12px] text-gray-400">
+                                                                                                                                                {selectedPackage.description || `Gói vé ${selectedPackage.type || 'tiêu chuẩn'}`}
+                                                                                                                                        </p>
+                                                                                                                                </div>
+                                                                                                                                <div className="text-right shrink-0">
+                                                                                                                                        <p className="text-sm font-bold text-white">x{ticketCount}</p>
+                                                                                                                                        <p className="text-xs text-blue-300">{movieTotalPrice.toLocaleString('vi-VN')}₫</p>
+                                                                                                                                </div>
                                                                                                                         </div>
-                                                                                                                        <div className="text-right">
-                                                                                                                                <p className="text-sm font-bold text-white">x{ticketCount}</p>
-                                                                                                                                <p className="text-xs text-blue-300">{movieTotalPrice.toLocaleString('vi-VN')}₫</p>
-                                                                                                                        </div>
-                                                                                                                </div>
+                                                                                                                )}
 
                                                                                                                 {vrTotalPrice > 0 && (
-                                                                                                                        <div className="pt-2 border-t border-white/10 flex justify-between items-center text-xs">
+                                                                                                                        <div className={`pt-2 ${selectedPackage && bookingType !== 'vr' ? 'border-t border-white/10' : ''} flex justify-between items-center text-xs`}>
                                                                                                                                 <div className="flex items-center gap-1.5 text-purple-300 font-medium">
                                                                                                                                         <Gamepad2 className="w-3.5 h-3.5" />
                                                                                                                                         <span>Gói trải nghiệm VR ({Object.values(selectedVrQuantities).reduce((a, b) => a + b, 0)} lượt)</span>
                                                                                                                                 </div>
                                                                                                                                 <span className="font-bold text-purple-400">{vrTotalPrice.toLocaleString('vi-VN')}₫</span>
+                                                                                                                        </div>
+                                                                                                                )}
+
+                                                                                                                {voucherDiscount > 0 && (
+                                                                                                                        <div className="pt-2 border-t border-white/10 flex justify-between items-center text-xs text-emerald-400">
+                                                                                                                                <div className="flex items-center gap-1.5 font-medium">
+                                                                                                                                        <Tag className="w-3.5 h-3.5" />
+                                                                                                                                        <span>Giảm giá ({appliedVoucher?.voucher_details?.code?.toUpperCase()})</span>
+                                                                                                                                </div>
+                                                                                                                                <span className="font-bold">-{voucherDiscount.toLocaleString('vi-VN')}₫</span>
                                                                                                                         </div>
                                                                                                                 )}
                                                                                                         </div>
@@ -1004,57 +1194,130 @@ export default function BookingPage() {
                                                                                                                 <p className="text-orange-400 text-[10px] mt-1 animate-pulse">{formErrors.email}</p>
                                                                                                         )}
                                                                                                 </div>
-                                                                                                <div className="space-y-1.5">
-                                                                                                        <Label className="text-sm font-medium text-gray-400 ml-1">Số Lượng Vé</Label>
-                                                                                                        <div className="flex items-center gap-2">
-                                                                                                                <Button
-                                                                                                                        type="button"
-                                                                                                                        variant="outline"
-                                                                                                                        className="bg-white/5 border-white/10 hover:bg-red-500/20 hover:text-red-400 h-10 w-10 p-0 rounded-lg transition-colors"
-                                                                                                                        onClick={() => setTicketCount((c) => Math.max(MIN_TICKETS, c - 1))}
-                                                                                                                >
-                                                                                                                        -
-                                                                                                                </Button>
-                                                                                                                <div className="flex-1 text-center font-bold bg-white/5 border border-white/10 rounded-lg h-10 flex items-center justify-center text-sm">
-                                                                                                                        {ticketCount}
-                                                                                                                </div>
-                                                                                                                <Button
-                                                                                                                        type="button"
-                                                                                                                        variant="outline"
-                                                                                                                        className="bg-white/5 border-white/10 hover:bg-green-500/20 hover:text-green-400 h-10 w-10 p-0 rounded-lg transition-colors"
-                                                                                                                        onClick={() => setTicketCount((c) => Math.min(MAX_TICKETS, c + 1))}
-                                                                                                                >
+
+                                                                                                {bookingType === 'movie' && (
+                                                                                                        <div className="space-y-1.5 animate-in fade-in duration-300">
+                                                                                                                <Label className="text-sm font-medium text-gray-400 ml-1">Số Lượng Vé</Label>
+                                                                                                                <div className="flex items-center gap-2">
+                                                                                                                        <Button
+                                                                                                                                type="button"
+                                                                                                                                variant="outline"
+                                                                                                                                className="bg-white/5 border-white/10 hover:bg-red-500/20 hover:text-red-400 h-10 w-10 p-0 rounded-lg transition-colors"
+                                                                                                                                onClick={() => setTicketCount((c) => Math.max(MIN_TICKETS, c - 1))}
+                                                                                                                        >
+                                                                                                                                -
+                                                                                                                        </Button>
+                                                                                                                        <div className="flex-1 text-center font-bold bg-white/5 border border-white/10 rounded-lg h-10 flex items-center justify-center text-sm">
+                                                                                                                                {ticketCount}
+                                                                                                                        </div>
+                                                                                                                        <Button
+                                                                                                                                type="button"
+                                                                                                                                variant="outline"
+                                                                                                                                className="bg-white/5 border-white/10 hover:bg-green-500/20 hover:text-green-400 h-10 w-10 p-0 rounded-lg transition-colors"
+                                                                                                                                onClick={() => setTicketCount((c) => Math.min(MAX_TICKETS, c + 1))}
+                                                                                                                        >
                                                                                                                         +
-                                                                                                                </Button>
+                                                                                                                        </Button>
+                                                                                                                </div>
                                                                                                         </div>
+                                                                                                )}
+
+                                                                                                {/* MÃ GIẢM GIÁ (VOUCHER) */}
+                                                                                                <div className="space-y-1.5 pt-1.5 border-t border-white/5 mt-1">
+                                                                                                        <Label className="text-sm font-medium text-gray-400 ml-1">Mã Giảm Giá</Label>
+                                                                                                        {appliedVoucher ? (
+                                                                                                                <div className="flex items-center justify-between gap-2 p-2.5 rounded-lg bg-emerald-500/15 border border-emerald-500/30 text-xs animate-in zoom-in-95 duration-250">
+                                                                                                                        <div className="flex items-center gap-2 min-w-0">
+                                                                                                                                <Tag className="w-4 h-4 text-emerald-400 shrink-0" />
+                                                                                                                                <div className="min-w-0 text-left">
+                                                                                                                                        <p className="font-bold text-white truncate text-xs">
+                                                                                                                                                {appliedVoucher?.voucher_details?.code?.toUpperCase() || voucherCode.toUpperCase()}
+                                                                                                                                        </p>
+                                                                                                                                        <p className="text-[10px] text-emerald-300 font-bold">
+                                                                                                                                                Đã áp dụng: -{voucherDiscount.toLocaleString('vi-VN')}₫
+                                                                                                                                        </p>
+                                                                                                                                </div>
+                                                                                                                        </div>
+                                                                                                                        <Button
+                                                                                                                                type="button"
+                                                                                                                                variant="ghost"
+                                                                                                                                size="sm"
+                                                                                                                                className="text-slate-400 hover:text-white hover:bg-white/5 h-8 w-8 p-0 shrink-0"
+                                                                                                                                onClick={() => {
+                                                                                                                                        setAppliedVoucher(null);
+                                                                                                                                        setVoucherCode('');
+                                                                                                                                        toast.info('Đã hủy áp dụng mã');
+                                                                                                                                }}
+                                                                                                                        >
+                                                                                                                                <X className="w-4 h-4" />
+                                                                                                                        </Button>
+                                                                                                                </div>
+                                                                                                        ) : (
+                                                                                                                <div className="flex gap-2">
+                                                                                                                        <Input
+                                                                                                                                type="text"
+                                                                                                                                placeholder="MÃ GIẢM GIÁ (NẾU CÓ)"
+                                                                                                                                value={voucherCode}
+                                                                                                                                onChange={(e) => setVoucherCode(e.target.value.toUpperCase())}
+                                                                                                                                className="h-11 bg-white/5 border-white/10 text-white placeholder:text-slate-500 uppercase font-mono font-bold text-xs"
+                                                                                                                                onKeyDown={(e) => {
+                                                                                                                                        if (e.key === 'Enter') {
+                                                                                                                                                e.preventDefault();
+                                                                                                                                                applyVoucher();
+                                                                                                                                        }
+                                                                                                                                }}
+                                                                                                                        />
+                                                                                                                        <Button
+                                                                                                                                type="button"
+                                                                                                                                onClick={applyVoucher}
+                                                                                                                                disabled={voucherValidating || !voucherCode.trim()}
+                                                                                                                                className="h-11 px-4 bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-500 hover:to-blue-400 text-white font-bold text-xs rounded-lg shrink-0 transition-all duration-300"
+                                                                                                                        >
+                                                                                                                                {voucherValidating ? <Loader2 className="w-3.5 h-3.5 animate-spin mr-1.5" /> : null}
+                                                                                                                                Áp dụng
+                                                                                                                        </Button>
+                                                                                                                </div>
+                                                                                                        )}
                                                                                                 </div>
                                                                                         </div>
                                                                                 </section>
 
-                                                                                {/* TÓM TẮT TẠM TÍNH (Chỉ hiện trên Mobile ở đây - phía dưới form thông tin) */}
-                                                                                {selectedPackage && (
-                                                                                        <div className="lg:hidden mb-6">
+                                                                                {/* TÓM TẮT TẠM TÍNH MOBILE */}
+                                                                                {(selectedPackage || bookingType === 'vr') && (
+                                                                                        <div className="lg:hidden p-6 pt-0">
                                                                                                 <div className="overflow-hidden rounded-xl border border-blue-500/30 bg-blue-500/5 p-4 flex flex-col justify-between gap-3 animate-in fade-in slide-in-from-bottom-2 duration-400">
-                                                                                                        <div className="flex justify-between items-start">
-                                                                                                                <div>
-                                                                                                                        <h4 className="text-white font-bold text-base">{selectedPackage.name}</h4>
-                                                                                                                        <p className="text-[12px] text-gray-400 leading-relaxed">
-                                                                                                                                {selectedPackage.description || `Gói vé ${selectedPackage.type || 'tiêu chuẩn'}`}
-                                                                                                                        </p>
+                                                                                                        {selectedPackage && bookingType !== 'vr' && (
+                                                                                                                <div className="flex justify-between items-start">
+                                                                                                                        <div>
+                                                                                                                                <h4 className="text-white font-bold text-base">{selectedPackage.name}</h4>
+                                                                                                                                <p className="text-[12px] text-gray-400 leading-relaxed">
+                                                                                                                                        {selectedPackage.description || `Gói vé ${selectedPackage.type || 'tiêu chuẩn'}`}
+                                                                                                                                </p>
+                                                                                                                        </div>
+                                                                                                                        <div className="text-right shrink-0">
+                                                                                                                                <p className="text-sm font-bold text-white">x{ticketCount}</p>
+                                                                                                                                <p className="text-xs text-blue-300">{movieTotalPrice.toLocaleString('vi-VN')}₫</p>
+                                                                                                                        </div>
                                                                                                                 </div>
-                                                                                                                <div className="text-right shrink-0">
-                                                                                                                        <p className="text-sm font-bold text-white">x{ticketCount}</p>
-                                                                                                                        <p className="text-xs text-blue-300">{movieTotalPrice.toLocaleString('vi-VN')}₫</p>
-                                                                                                                </div>
-                                                                                                        </div>
+                                                                                                        )}
 
                                                                                                         {vrTotalPrice > 0 && (
-                                                                                                                <div className="pt-2 border-t border-white/10 flex justify-between items-center text-xs">
+                                                                                                                <div className={`pt-2 ${selectedPackage && bookingType !== 'vr' ? 'border-t border-white/10' : ''} flex justify-between items-center text-xs`}>
                                                                                                                         <span className="text-purple-300 font-medium flex items-center gap-1">
                                                                                                                                 <Gamepad2 className="w-3 h-3" />
                                                                                                                                 Gói VR ({Object.values(selectedVrQuantities).reduce((a, b) => a + b, 0)} lượt)
                                                                                                                         </span>
                                                                                                                         <span className="font-bold text-purple-400">{vrTotalPrice.toLocaleString('vi-VN')}₫</span>
+                                                                                                                </div>
+                                                                                                        )}
+
+                                                                                                        {voucherDiscount > 0 && (
+                                                                                                                <div className="pt-2 border-t border-white/10 flex justify-between items-center text-xs text-emerald-400">
+                                                                                                                        <span className="flex items-center gap-1 font-medium">
+                                                                                                                                <Tag className="w-3 h-3" />
+                                                                                                                                Giảm giá ({appliedVoucher?.voucher_details?.code?.toUpperCase()})
+                                                                                                                        </span>
+                                                                                                                        <span className="font-bold">-{voucherDiscount.toLocaleString('vi-VN')}₫</span>
                                                                                                                 </div>
                                                                                                         )}
 
@@ -1203,8 +1466,12 @@ export default function BookingPage() {
                                                                                                 ⚠️ Một số lưu ý quan trọng:
                                                                                         </h4>
                                                                                         <ul className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-1 text-[11px] sm:text-[13px] text-gray-400 list-inside list-disc">
-                                                                                                <li>Trẻ em &gt;70cm. Dưới 1m4 cần người lớn.</li>
-                                                                                                <li>Cân nhắc nếu có bệnh tim, sợ độ cao.</li>
+                                                                                                {bookingType === 'movie' && (
+                                                                                                        <li>Trẻ em &gt;70cm. Dưới 1m4 cần người lớn.</li>
+                                                                                                )}
+                                                                                                {Object.values(selectedVrQuantities).some((qty) => qty > 0) && (
+                                                                                                        <li>Cân nhắc nếu có bệnh tim, sợ độ cao.</li>
+                                                                                                )}
                                                                                                 <li>Vé không hoàn trả hoặc đổi ngày.</li>
                                                                                                 <li>Không mang thức ăn/nước uống ngoài.</li>
                                                                                         </ul>
@@ -1230,6 +1497,59 @@ export default function BookingPage() {
                                                                                                 </button>
                                                                                         </div>
 
+                                                                                        {/* MÃ GIẢM GIÁ (VOUCHER) */}
+                                                                                        <div className="space-y-2">
+                                                                                                <h3 className="text-xs sm:text-sm font-semibold text-gray-400 uppercase tracking-wider">
+                                                                                                        Mã giảm giá
+                                                                                                </h3>
+                                                                                                {appliedVoucher ? (
+                                                                                                        <div className="flex items-center justify-between gap-2 p-2.5 rounded-xl bg-emerald-500/10 border border-emerald-500/25 text-xs">
+                                                                                                                <div className="flex items-center gap-2 min-w-0">
+                                                                                                                        <Tag className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                                                                                                                        <div className="min-w-0">
+                                                                                                                                <p className="font-bold text-white truncate">
+                                                                                                                                        {appliedVoucher?.voucher_details?.code?.toUpperCase() || voucherCode.toUpperCase()}
+                                                                                                                                </p>
+                                                                                                                                <p className="text-[10px] text-emerald-300 font-bold">
+                                                                                                                                        Đã giảm: -{voucherDiscount.toLocaleString('vi-VN')}₫
+                                                                                                                                </p>
+                                                                                                                        </div>
+                                                                                                                </div>
+                                                                                                                <Button
+                                                                                                                        variant="ghost"
+                                                                                                                        size="sm"
+                                                                                                                        className="text-slate-400 hover:text-white hover:bg-white/5 h-8 w-8 p-0"
+                                                                                                                        onClick={() => {
+                                                                                                                                setAppliedVoucher(null);
+                                                                                                                                setVoucherCode('');
+                                                                                                                                toast.info('Đã bỏ mã giảm giá');
+                                                                                                                        }}
+                                                                                                                >
+                                                                                                                        <X className="w-4 h-4" />
+                                                                                                                </Button>
+                                                                                                        </div>
+                                                                                                ) : (
+                                                                                                        <div className="flex gap-2">
+                                                                                                                <Input
+                                                                                                                        type="text"
+                                                                                                                        placeholder="NHẬP MÃ GIẢM GIÁ"
+                                                                                                                        value={voucherCode}
+                                                                                                                        onChange={(e) => setVoucherCode(e.target.value.toUpperCase())}
+                                                                                                                        className="h-10 bg-white/5 border-white/10 text-white placeholder:text-slate-500 uppercase font-mono font-bold text-xs"
+                                                                                                                        onKeyDown={(e) => e.key === 'Enter' && applyVoucher()}
+                                                                                                                />
+                                                                                                                <Button
+                                                                                                                        onClick={applyVoucher}
+                                                                                                                        disabled={voucherValidating || !voucherCode.trim()}
+                                                                                                                        className="h-10 px-4 bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-500 hover:to-blue-400 text-white font-bold text-xs rounded-xl shrink-0"
+                                                                                                                >
+                                                                                                                        {voucherValidating ? <Loader2 className="w-3 h-3 animate-spin mr-1.5" /> : null}
+                                                                                                                        Áp dụng
+                                                                                                                </Button>
+                                                                                                        </div>
+                                                                                                )}
+                                                                                        </div>
+
                                                                                         <div className="space-y-2 sm:space-y-3">
                                                                                                 <h3 className="text-xs sm:text-sm font-semibold text-gray-400 uppercase tracking-wider">
                                                                                                         Booking Summary
@@ -1245,7 +1565,7 @@ export default function BookingPage() {
                                                                                                                 <span className="text-gray-400">Số lượng vé</span>
                                                                                                                 <span className="text-white font-medium">x{ticketCount}</span>
                                                                                                         </div>
-                                                                                                        <div className="flex justify-between pb-2 border-b border-white/10">
+                                                                                                        <div className="flex justify-between">
                                                                                                                 <span className="text-gray-400">Tiền vé</span>
                                                                                                                 <span className="text-white font-medium">{movieTotalPrice.toLocaleString('vi-VN')}₫</span>
                                                                                                         </div>
@@ -1254,6 +1574,16 @@ export default function BookingPage() {
                                                                                                                 <div className="flex justify-between pb-2 border-b border-white/10 text-purple-300">
                                                                                                                         <span>Gói trải nghiệm VR ({Object.values(selectedVrQuantities).reduce((a, b) => a + b, 0)} lượt)</span>
                                                                                                                         <span className="font-bold text-purple-400">{vrTotalPrice.toLocaleString('vi-VN')}₫</span>
+                                                                                                                </div>
+                                                                                                        )}
+
+                                                                                                        {voucherDiscount > 0 && (
+                                                                                                                <div className="flex justify-between pb-2 border-b border-white/10 text-emerald-400">
+                                                                                                                        <span className="flex items-center gap-1 font-semibold">
+                                                                                                                                <Tag className="w-3.5 h-3.5" />
+                                                                                                                                Giảm giá ({appliedVoucher?.voucher_details?.code?.toUpperCase()})
+                                                                                                                        </span>
+                                                                                                                        <span className="font-bold">-{voucherDiscount.toLocaleString('vi-VN')}₫</span>
                                                                                                                 </div>
                                                                                                         )}
 

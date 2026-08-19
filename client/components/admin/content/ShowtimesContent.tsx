@@ -230,15 +230,10 @@ export default function ShowtimesContent({ branches, schedules, isLoading, onRef
 
                         <Card className="border border-gray-200 rounded-xl shadow-sm bg-white">
                                 <CardContent className="p-0">
-                                        {isLoading && branches.length === 0 ? (
-                                                <div className="flex items-center justify-center py-16 text-slate-400 gap-2">
-                                                        <Loader2 className="w-5 h-5 animate-spin" />
-                                                        Đang tải chi nhánh...
-                                                </div>
-                                        ) : branches.length === 0 ? (
-                                                <div className="flex flex-col items-center justify-center py-16 text-center px-6">
-                                                        <MapPin className="w-10 h-10 text-slate-300 mb-3" />
-                                                        <p className="font-semibold text-slate-700">Chưa có chi nhánh</p>
+                                        {isLoading || branches.length === 0 ? (
+                                                <div className="flex items-center justify-center py-16 text-slate-500 gap-3">
+                                                        <Loader2 className="w-6 h-6 animate-spin text-blue-600" />
+                                                        <span className="font-medium text-sm">Đang tải danh sách chi nhánh & lịch chiếu...</span>
                                                 </div>
                                         ) : (
                                                 <div className="divide-y divide-slate-100">

@@ -42,6 +42,12 @@ export default function RolesPage() {
         const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
         const [roleToDelete, setRoleToDelete] = useState<Role | null>(null);
         const [searchQuery, setSearchQuery] = useState('');
+        const [localSearchQuery, setLocalSearchQuery] = useState('');
+
+        const handleSearchRole = (e?: React.FormEvent) => {
+                if (e) e.preventDefault();
+                setSearchQuery(localSearchQuery);
+        };
         const [showSystemOnly, setShowSystemOnly] = useState(false);
 
         // Form state for create
@@ -192,30 +198,38 @@ export default function RolesPage() {
                                                                 <CardTitle>Quản lý vai trò</CardTitle>
                                                                 <p className="text-xs text-slate-500">Tổng cộng {roles.length} vai trò trong hệ thống</p>
                                                         </div>
-                                                        <div className="flex flex-1 w-full md:max-w-md gap-2 ml-auto">
+                                                        <form onSubmit={handleSearchRole} className="flex flex-1 w-full md:max-w-md gap-2 ml-auto">
                                                                 <div className="relative flex-1">
                                                                         <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 w-4 h-4" />
                                                                         <input
-                                                                                className="w-full pl-10 pr-4 py-2 bg-slate-50 border-transparent focus:bg-white focus:ring-2 focus:ring-blue-500 rounded-xl transition-all outline-none text-sm border"
-                                                                                value={searchQuery}
-                                                                                onChange={(e) => setSearchQuery(e.target.value)}
+                                                                                className="w-full pl-10 pr-4 py-2 bg-slate-50 border-slate-200 focus:bg-white focus:ring-2 focus:ring-blue-500 rounded-xl transition-all outline-none text-sm border"
+                                                                                value={localSearchQuery}
+                                                                                onChange={(e) => setLocalSearchQuery(e.target.value)}
                                                                                 placeholder="Tìm theo tên vai trò..."
                                                                         />
                                                                 </div>
                                                                 <Button
+                                                                        type="submit"
+                                                                        className="bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-semibold px-4 flex items-center gap-1.5 shrink-0"
+                                                                >
+                                                                        <Search className="w-3.5 h-3.5" /> Tìm kiếm
+                                                                </Button>
+                                                                <Button
+                                                                        type="button"
                                                                         variant="outline"
                                                                         size="icon"
                                                                         onClick={() => {
+                                                                                setLocalSearchQuery('');
                                                                                 setSearchQuery('');
                                                                                 setShowSystemOnly(false);
                                                                                 queryClient.invalidateQueries({ queryKey: ['roles'] });
                                                                         }}
-                                                                        className="h-10 w-10 hover:rotate-180 transition-transform duration-500"
+                                                                        className="h-10 w-10 hover:rotate-180 transition-transform duration-500 shrink-0"
                                                                         title="Làm mới"
                                                                 >
                                                                         <RefreshCw className="h-4 w-4" />
                                                                 </Button>
-                                                        </div>
+                                                        </form>
                                                         <div className="flex gap-2">
                                                                 {hasPermission('roles', 'view_deleted') && (
                                                                         <Button

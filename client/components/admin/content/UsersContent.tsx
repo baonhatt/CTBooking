@@ -84,6 +84,18 @@ export default function UsersContent({
                 setSelectedUserId(userId);
                 setIsDetailsOpen(true);
         };
+        const [localUserQuery, setLocalUserQuery] = useState(userQuery);
+
+        useEffect(() => {
+                setLocalUserQuery(userQuery);
+        }, [userQuery]);
+
+        const handleSearchUser = (e?: React.FormEvent) => {
+                if (e) e.preventDefault();
+                setUserQuery(localUserQuery);
+                setPage(1);
+        };
+
         return (
                 <div className="space-y-6">
                         {/* PAGE HEADER */}
@@ -96,26 +108,37 @@ export default function UsersContent({
 
                         {/* TOOLBAR */}
                         <div className="flex flex-col xl:flex-row justify-between items-start xl:items-center gap-4 bg-white p-4 rounded-2xl border border-gray-200 shadow-sm">
-                                <div className="flex flex-1 gap-3 max-w-xl">
+                                <form onSubmit={handleSearchUser} className="flex flex-1 gap-2 max-w-xl">
                                         <div className="relative flex-1">
                                                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 w-4 h-4" />
                                                 <input
-                                                        className="w-full pl-10 pr-4 py-2 bg-slate-50 border-transparent focus:bg-white focus:ring-2 focus:ring-blue-500 rounded-xl transition-all outline-none text-sm border"
-                                                        value={userQuery}
-                                                        onChange={(e) => setUserQuery(e.target.value)}
+                                                        className="w-full pl-10 pr-4 py-2 bg-slate-50 border-slate-200 focus:bg-white focus:ring-2 focus:ring-blue-500 rounded-xl transition-all outline-none text-sm border"
+                                                        value={localUserQuery}
+                                                        onChange={(e) => setLocalUserQuery(e.target.value)}
                                                         placeholder="Tìm theo tên, email hoặc SĐT..."
                                                 />
                                         </div>
                                         <Button
+                                                type="submit"
+                                                className="bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-semibold px-4 flex items-center gap-1.5 shrink-0"
+                                        >
+                                                <Search className="w-3.5 h-3.5" /> Tìm kiếm
+                                        </Button>
+                                        <Button
+                                                type="button"
                                                 variant="outline"
                                                 size="icon"
-                                                onClick={onRefresh}
+                                                onClick={() => {
+                                                        setLocalUserQuery('');
+                                                        setUserQuery('');
+                                                        onRefresh();
+                                                }}
                                                 className="rounded-xl shadow-sm hover:rotate-180 transition-transform duration-500 shrink-0 h-10 w-10"
                                                 title="Làm mới"
                                         >
                                                 <RefreshCw className={`w-4 h-4 ${isLoading ? 'animate-spin' : ''}`} />
                                         </Button>
-                                </div>
+                                </form>
                         </div>
                         <Card className="border border-gray-200 rounded-xl shadow-sm bg-white">
                                 <CardContent className="p-0">
