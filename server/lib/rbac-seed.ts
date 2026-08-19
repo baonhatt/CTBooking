@@ -144,6 +144,7 @@ export const ROLES_SEED = [
       'vouchers:create',
       'vouchers:edit',
       'vouchers:toggle_status',
+      'vouchers:delete',
       'transactions:view',
       'posts:view',
       'posts:create',

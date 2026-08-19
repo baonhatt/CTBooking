@@ -61,10 +61,11 @@ export async function listTransactionsImpl(
                 branch_id?: number | null;
                 from?: string;
                 to?: string;
+                booking_type?: 'all' | 'movie' | 'vr';
                 restrictToBranchIds?: number[] | null;
         }
 ) {
-        const { page, pageSize, searchText, status, sort, dir, payment_method, branch_id, from, to, restrictToBranchIds = null } = args;
+        const { page, pageSize, searchText, status, sort, dir, payment_method, branch_id, from, to, booking_type = 'all', restrictToBranchIds = null } = args;
         const skip = (page - 1) * pageSize;
         const whereCondition: any[] = [];
 
@@ -73,6 +74,11 @@ export async function listTransactionsImpl(
 
         // Filter theo phương thức thanh toán
         if (payment_method) whereCondition.push(eq(tables.bookings.payment_method, payment_method));
+
+        // Filter theo loại booking (movie / vr)
+        if (booking_type && booking_type !== 'all') {
+                whereCondition.push(eq(tables.bookings.booking_type, booking_type));
+        }
 
         // Filter theo chi nhánh
         if (branch_id !== undefined && branch_id !== null) {
@@ -187,7 +193,8 @@ export async function listTransactionsImpl(
                         updatedAt: tx.updated_at,
                         expiryDate: tx.expiry_date || null,
                         expired,
-                        daysLeft
+                        daysLeft,
+                        booking_type: tx.booking_type || 'movie'
                 };
         });
 
@@ -204,6 +211,7 @@ export async function getTransactionByIdImpl(
                 ticket_packages: any;
                 branches: any;
                 auditLogs: any;
+                booking_vr_items?: any;
         },
         id: number,
         restrictToBranchIds: number[] | null = null
@@ -282,9 +290,26 @@ export async function getTransactionByIdImpl(
                 .orderBy(desc(tables.auditLogs.createdAt))
                 .limit(1);
 
-        // 4. MAPPING DỮ LIỆU ĐỂ HIỂN THỊ TRÊN GIAO DIỆN KIỂM SOÁT
+        // 4b. Load vr_items nếu là booking VR
+        let vr_items: any[] = [];
+        const bType = booking.booking_type || 'movie';
+        if (bType === 'vr' && tables.booking_vr_items) {
+                try {
+                        vr_items = await anyDb
+                                .select()
+                                .from(tables.booking_vr_items)
+                                .where(eq(tables.booking_vr_items.booking_id, id))
+                                .orderBy(tables.booking_vr_items.id);
+                } catch (e) {
+                        console.warn('Could not load vr_items for transaction:', e);
+                }
+        }
+
+        // 5. MAPPING DỮ LIỆU ĐỂ HIỂN THỊ TRÊN GIAO DIỆN KIỂM SOÁT
         return {
                 id: booking.id,
+                booking_type: bType,
+                vr_items,
                 user: {
                         email_auth: account?.email || '',
                         fullname: booking.name || 'Tên mặc định',

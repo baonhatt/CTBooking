@@ -39,6 +39,8 @@ import DeletedStaffPage from '@/pages/admin/DeletedStaff';
 import DeletedTicketsPage from '@/pages/admin/DeletedTickets';
 import DeletedRolesPage from '@/pages/admin/DeletedRoles';
 import DeletedBranchesPage from '@/pages/admin/DeletedBranches';
+import VouchersPage from '@/pages/admin/Vouchers';
+import DeletedVouchersPage from '@/pages/admin/DeletedVouchers';
 
 const AccessDenied = () => {
         const navigate = useNavigate();
@@ -253,6 +255,7 @@ export const AdminGate = () => {
                                 <Route path="/posts/new" element={<ProtectedRoute module="posts" action="create"><PostCreatePage /></ProtectedRoute>} />
                                 <Route path="/posts/:id/edit" element={<ProtectedRoute module="posts" action="edit"><PostEditPage /></ProtectedRoute>} />
                                 <Route path="/tickets" element={<ProtectedRoute module="tickets" action="view"><TicketsPage /></ProtectedRoute>} />
+                                <Route path="/vouchers" element={<ProtectedRoute module="vouchers" action="view"><VouchersPage /></ProtectedRoute>} />
                                 <Route path="/transactions" element={<ProtectedRoute module="transactions" action="view"><TransactionsPage /></ProtectedRoute>} />
                                 <Route path="/ticket-check" element={<ProtectedRoute module="ticket_check" action="scan"><TicketCheckPage /></ProtectedRoute>} />
                                 <Route path="/branches" element={<ProtectedRoute module="branches" action="view"><BranchesPage /></ProtectedRoute>} />
@@ -270,6 +273,7 @@ export const AdminGate = () => {
                                 <Route path="/deleted/tickets" element={<ProtectedRoute module="tickets" action="view_deleted"><DeletedTicketsPage /></ProtectedRoute>} />
                                 <Route path="/deleted/roles" element={<ProtectedRoute module="roles" action="view_deleted"><DeletedRolesPage /></ProtectedRoute>} />
                                 <Route path="/deleted/branches" element={<ProtectedRoute module="branches" action="view_deleted"><DeletedBranchesPage /></ProtectedRoute>} />
+                                <Route path="/deleted/vouchers" element={<ProtectedRoute module="vouchers" action="view_deleted"><DeletedVouchersPage /></ProtectedRoute>} />
 
                                 <Route path="/profile" element={<ProfilePage active="profile" setActive={() => { }} adminEmailState={staff?.email || ''} handleLogout={handleLogout} />} />
                                 <Route path="*" element={<Navigate to="/" replace />} />

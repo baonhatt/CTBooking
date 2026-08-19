@@ -29,6 +29,7 @@ export async function getTransactions(options?: {
         sort?: 'created_at' | 'paid_at';
         dir?: 'asc' | 'desc';
         branch_id?: number | 'all';
+        booking_type?: 'all' | 'movie' | 'vr';
         signal?: AbortSignal;
 }) {
         const params = new URLSearchParams();
@@ -42,6 +43,7 @@ export async function getTransactions(options?: {
         if (options?.sort) params.set('sort', options.sort);
         if (options?.branch_id) params.set('branch_id', String(options.branch_id));
         if (options?.dir) params.set('dir', options.dir);
+        if (options?.booking_type) params.set('booking_type', options.booking_type);
         const path = `/api/admin/transactions${params.toString() ? `?${params.toString()}` : ''}`;
         return request<{
                 items: any[];
@@ -202,4 +204,91 @@ export async function changeStaffPasswordWithOTP(body: { oldPassword: string; ne
                 method: 'POST',
                 body: JSON.stringify(body)
         });
+}
+
+/* ========== VOUCHERS ADMIN API ========== */
+
+export interface VoucherListFilters {
+        page?: number;
+        pageSize?: number;
+        q?: string;
+        scope?: 'all' | 'vr' | 'movie';
+        is_active?: 'all' | 'true' | 'false';
+        branch_id?: number | 'all';
+}
+
+export async function listVouchersApi(filters: VoucherListFilters = {}) {
+        const params = new URLSearchParams();
+        Object.entries(filters).forEach(([k, v]) => {
+                if (v !== undefined && v !== null && v !== '') params.set(k, String(v));
+        });
+        const qs = params.toString();
+        return request<{
+                items: any[];
+                page: number;
+                pageSize: number;
+                total: number;
+        }>(`/api/admin/vouchers${qs ? `?${qs}` : ''}`);
+}
+
+export async function getVoucherApi(id: number) {
+        return request<any>(`/api/admin/vouchers/${id}`);
+}
+
+export async function createVoucherApi(payload: Record<string, any>) {
+        return request<any>('/api/admin/vouchers', {
+                method: 'POST',
+                body: JSON.stringify(payload)
+        });
+}
+
+export async function updateVoucherApi(id: number, payload: Record<string, any>) {
+        return request<any>(`/api/admin/vouchers/${id}`, {
+                method: 'PUT',
+                body: JSON.stringify(payload)
+        });
+}
+
+export async function deleteVoucherApi(id: number) {
+        return request<{ status: string; message?: string }>(`/api/admin/vouchers/${id}`, {
+                method: 'DELETE'
+        });
+}
+
+export async function restoreVoucherApi(id: number) {
+        return request<{ status: string; message?: string }>(`/api/admin/vouchers/${id}/restore`, {
+                method: 'POST'
+        });
+}
+
+export async function toggleVoucherStatusApi(id: number) {
+        return request<{ status: string; is_active?: boolean }>(
+                `/api/admin/vouchers/${id}/toggle-status`,
+                { method: 'POST' }
+        );
+}
+
+export async function listDeletedVouchersApi(filters: VoucherListFilters = {}) {
+        const params = new URLSearchParams();
+        Object.entries(filters).forEach(([k, v]) => {
+                if (v !== undefined && v !== null && v !== '') params.set(k, String(v));
+        });
+        const qs = params.toString();
+        return request<{
+                items: any[];
+                page: number;
+                pageSize: number;
+                total: number;
+        }>(`/api/admin/deleted/vouchers${qs ? `?${qs}` : ''}`);
+}
+
+/* ========== LIST VR TICKET PACKAGES FOR VOUCHER FORM ========== */
+export async function listVRTicketPackagesForVoucher() {
+        const params = new URLSearchParams();
+        params.set('type', 'vr');
+        params.set('pageSize', '100');
+        params.set('is_active', 'all');
+        return request<{ items: any[]; total: number }>(
+                `/api/admin/tickets?${params.toString()}`
+        );
 }

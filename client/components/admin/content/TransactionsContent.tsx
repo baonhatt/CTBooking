@@ -31,7 +31,9 @@ import {
         RefreshCw,
         SortAsc,
         SortDesc,
-        FilterX
+        FilterX,
+        Gamepad2,
+        Film
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { formatDistanceToNow } from 'date-fns';
@@ -56,6 +58,7 @@ interface Tx {
         branch_id?: number | null;
         created_by_staff_name?: string;
         updated_by_staff_name?: string;
+        booking_type?: 'movie' | 'vr' | string;
 }
 interface Props {
         data: Tx[];
@@ -78,6 +81,8 @@ interface Props {
         toDate?: string;
         setFromDate?: (v: string) => void;
         setToDate?: (v: string) => void;
+        bookingTypeFilter?: 'all' | 'movie' | 'vr';
+        setBookingTypeFilter?: (v: 'all' | 'movie' | 'vr') => void;
         isLoading?: boolean;
         branches?: any[];
         selectedBranchId?: number | 'all' | null;
@@ -105,6 +110,8 @@ export default function TransactionsContent({
         toDate = '',
         setFromDate = () => { },
         setToDate = () => { },
+        bookingTypeFilter = 'all',
+        setBookingTypeFilter = () => { },
         isLoading = false,
         branches = [],
         selectedBranchId = null,
@@ -273,6 +280,37 @@ export default function TransactionsContent({
                                                 </div>
 
                                                 <div className="flex flex-wrap items-center gap-2">
+                                                        {/* Pills filter loại booking */}
+                                                        <div className="flex items-center gap-1 p-1 bg-slate-50 rounded-xl border border-slate-200 h-11">
+                                                                <button
+                                                                        onClick={() => { setBookingTypeFilter?.('all'); setPage(1); }}
+                                                                        className={`px-3 h-8 rounded-lg text-xs font-bold transition-all ${bookingTypeFilter === 'all'
+                                                                                        ? 'bg-slate-800 text-white shadow-sm'
+                                                                                        : 'text-slate-500 hover:text-slate-700 hover:bg-white'
+                                                                                }`}
+                                                                >
+                                                                        Tất cả
+                                                                </button>
+                                                                <button
+                                                                        onClick={() => { setBookingTypeFilter?.('movie'); setPage(1); }}
+                                                                        className={`px-3 h-8 rounded-lg text-xs font-bold transition-all flex items-center gap-1 ${bookingTypeFilter === 'movie'
+                                                                                        ? 'bg-blue-600 text-white shadow-sm shadow-blue-200'
+                                                                                        : 'text-slate-500 hover:text-blue-600 hover:bg-white'
+                                                                                }`}
+                                                                >
+                                                                        <Film size={12} /> Vé Phim
+                                                                </button>
+                                                                <button
+                                                                        onClick={() => { setBookingTypeFilter?.('vr'); setPage(1); }}
+                                                                        className={`px-3 h-8 rounded-lg text-xs font-bold transition-all flex items-center gap-1 ${bookingTypeFilter === 'vr'
+                                                                                        ? 'bg-purple-600 text-white shadow-sm shadow-purple-200'
+                                                                                        : 'text-slate-500 hover:text-purple-600 hover:bg-white'
+                                                                                }`}
+                                                                >
+                                                                        <Gamepad2 size={12} /> Trải nghiệm VR
+                                                                </button>
+                                                        </div>
+
                                                         <div className="flex items-center gap-3 px-4 py-2 bg-slate-50 rounded-xl border border-slate-200 h-11">
                                                                 <span className="text-xs font-medium text-slate-500 whitespace-nowrap">
                                                                         Chỉ hiện đã thanh toán
@@ -375,6 +413,7 @@ export default function TransactionsContent({
                                                                         setPaymentMethod?.('');
                                                                         setFromDate?.('');
                                                                         setToDate?.('');
+                                                                        setBookingTypeFilter?.('all');
                                                                         setPage(1);
                                                                         toast.info('Đã đặt lại bộ lọc');
                                                                 }}
@@ -397,6 +436,7 @@ export default function TransactionsContent({
                                                                 </TableHead>
                                                                 <TableHead className="text-xs font-semibold text-gray-600 uppercase py-3">Chi nhánh</TableHead>
                                                                 <TableHead className="text-xs font-semibold text-gray-600 uppercase py-3">Người dùng</TableHead>
+                                                                <TableHead className="text-center text-xs font-semibold text-gray-600 uppercase py-3">Loại</TableHead>
                                                                 <TableHead className="text-xs font-semibold text-gray-600 uppercase py-3">Sản phẩm</TableHead>
                                                                 <TableHead className="text-center text-xs font-semibold text-gray-600 uppercase py-3">Số lượng</TableHead>
                                                                 <TableHead className="text-xs font-semibold text-gray-600 uppercase py-3">Doanh thu</TableHead>
@@ -413,7 +453,7 @@ export default function TransactionsContent({
                                                         {isLoading
                                                                 ? Array.from({ length: 5 }).map((_, idx) => (
                                                                         <TableRow key={`sk-${idx}`}>
-                                                                                <TableCell colSpan={9}>
+                                                                                <TableCell colSpan={10}>
                                                                                         <Skeleton className="h-10 w-full" />
                                                                                 </TableCell>
                                                                         </TableRow>
@@ -508,16 +548,27 @@ export default function TransactionsContent({
                                                                                                 </div>
                                                                                         </TableCell>
                                                                                         <TableCell>
-                                                                                                <div className="flex flex-col">
-                                                                                                        <span className="font-semibold text-sm text-gray-900">
-                                                                                                                {t.userName || 'Khách Vãng Lai'}
-                                                                                                        </span>
-                                                                                                        <span className="text-[11px] text-gray-500">{t.email}</span>
-                                                                                                </div>
-                                                                                        </TableCell>
-                                                                                        <TableCell className="max-w-[150px] truncate font-medium text-sm">
-                                                                                                {t.ticket_package_name}
-                                                                                        </TableCell>
+                                                                                <div className="flex flex-col">
+                                                                                        <span className="font-semibold text-sm text-gray-900">
+                                                                                                {t.userName || 'Khách Vãng Lai'}
+                                                                                        </span>
+                                                                                        <span className="text-[11px] text-gray-500">{t.email}</span>
+                                                                                </div>
+                                                                        </TableCell>
+                                                                        <TableCell className="text-center">
+                                                                                {t.booking_type === 'vr' ? (
+                                                                                        <Badge className="bg-purple-100 text-purple-700 border-purple-200 py-0.5 font-bold flex items-center gap-1 mx-auto w-fit">
+                                                                                                <Gamepad2 size={10} /> VR
+                                                                                        </Badge>
+                                                                                ) : (
+                                                                                        <Badge className="bg-blue-100 text-blue-700 border-blue-200 py-0.5 font-bold flex items-center gap-1 mx-auto w-fit">
+                                                                                                <Film size={10} /> Phim
+                                                                                        </Badge>
+                                                                                )}
+                                                                        </TableCell>
+                                                                        <TableCell className="max-w-[150px] truncate font-medium text-sm">
+                                                                                {t.ticket_package_name}
+                                                                        </TableCell>
                                                                                         <TableCell className="text-center font-bold">{t.ticketCount}</TableCell>
                                                                                         <TableCell className="font-bold text-blue-700">
                                                                                                 {t.totalPrice.toLocaleString('vi-VN')}đ
@@ -738,42 +789,125 @@ export default function TransactionsContent({
                                                                                 </div>
                                                                         </div>
 
-                                                                        {/* Cột 2: Gói & Phim */}
+                                                                        {/* Cột 2: Gói & Phim HOẶC Gói VR */}
                                                                         <div className="space-y-3">
-                                                                                <SectionHeader color="text-amber-600" title="Gói & Phim" icon={<TicketIcon size={14} />} />
-                                                                                <div className="bg-amber-50/40 rounded-xl p-4 border border-amber-100 space-y-3 shadow-sm">
-                                                                                        <div className="flex justify-between">
-                                                                                                <InfoRow label="Loại Vé" value={txDetails.ticket_package?.name} bold />
-                                                                                                <span className="text-[13px] font-bold text-slate-600">
-                                                                                                        {txDetails.ticket_package?.ticket_unit_price?.toLocaleString()}đ
-                                                                                                </span>
-                                                                                        </div>
-                                                                                        <div className="flex flex-wrap gap-1 border-t border-amber-200/30 pt-2 min-h-[40px]">
-                                                                                                {txDetails.ticket_package?.movies?.map((m: any) => (
-                                                                                                        <Badge
-                                                                                                                key={m.id}
-                                                                                                                variant="outline"
-                                                                                                                className="bg-white text-[9px] border-amber-200 text-amber-800"
-                                                                                                        >
-                                                                                                                {m.title}
-                                                                                                        </Badge>
-                                                                                                ))}
-                                                                                        </div>
-                                                                                        <div className="flex justify-between items-end border-t border-amber-200/30 pt-2">
-                                                                                                <InfoRow
-                                                                                                        label="Số lượng"
-                                                                                                        value={txDetails.booking_details?.ticket_count}
-                                                                                                        large
-                                                                                                        color="text-amber-700"
-                                                                                                />
-                                                                                                <div className="text-right">
-                                                                                                        <p className="text-[9px] text-amber-600 uppercase font-bold">Tổng tiền</p>
-                                                                                                        <p className="text-2xl font-black text-emerald-700">
-                                                                                                                {txDetails.booking_details?.total_price?.toLocaleString()}đ
-                                                                                                        </p>
+                                                                                {txDetails.booking_type === 'vr' ? (
+                                                                                        <>
+                                                                                                <SectionHeader color="text-purple-600" title="Trải nghiệm VR" icon={<Gamepad2 size={14} />} />
+                                                                                                <div className="bg-purple-50/40 rounded-xl p-4 border border-purple-100 space-y-3 shadow-sm">
+                                                                                                        <div className="flex justify-between items-center">
+                                                                                                                <InfoRow label="Tổng gói VR" value={`${txDetails.vr_items?.length || 0} loại`} bold />
+                                                                                                                <span className="text-[13px] font-bold text-slate-600">
+                                                                                                                        Tổng lượt chơi: {Array.isArray(txDetails.vr_items)
+                                                                                                                                ? txDetails.vr_items.reduce((s: number, i: any) => s + Number(i.quantity || 0), 0)
+                                                                                                                                : 0}
+                                                                                                                </span>
+                                                                                                        </div>
+                                                                                                        {/* Bảng chi tiết vr_items */}
+                                                                                                        {txDetails.vr_items && txDetails.vr_items.length > 0 ? (
+                                                                                                                <div className="border border-purple-100 rounded-lg overflow-hidden bg-white">
+                                                                                                                        <Table className="[&_td]:py-2 [&_th]:py-2">
+                                                                                                                                <TableHeader className="bg-purple-50/60">
+                                                                                                                                        <TableRow className="hover:bg-transparent border-none">
+                                                                                                                                                <TableHead className="text-[10px] font-bold uppercase text-purple-700">Tên gói VR</TableHead>
+                                                                                                                                                <TableHead className="text-center text-[10px] font-bold uppercase text-purple-700 w-14">SL</TableHead>
+                                                                                                                                                <TableHead className="text-right text-[10px] font-bold uppercase text-purple-700 w-24">Đơn giá</TableHead>
+                                                                                                                                                <TableHead className="text-right text-[10px] font-bold uppercase text-purple-700 w-28">Thành tiền</TableHead>
+                                                                                                                                        </TableRow>
+                                                                                                                                </TableHeader>
+                                                                                                                                <TableBody>
+                                                                                                                                        {txDetails.vr_items.map((it: any, idx: number) => {
+                                                                                                                                                const qty = Number(it.quantity || 1);
+                                                                                                                                                const unit = Number(it.discounted_unit_price ?? it.unit_price ?? 0);
+                                                                                                                                                const line = Number(it.line_total ?? unit * qty);
+                                                                                                                                                return (
+                                                                                                                                                        <TableRow key={it.id || `vr-${idx}`} className="border-t border-purple-50 hover:bg-transparent">
+                                                                                                                                                                <TableCell className="py-2">
+                                                                                                                                                                        <div className="flex items-center gap-2">
+                                                                                                                                                                                <div className="w-6 h-6 rounded-md bg-purple-100 flex items-center justify-center shrink-0">
+                                                                                                                                                                                        <Gamepad2 className="w-3 h-3 text-purple-600" />
+                                                                                                                                                                                </div>
+                                                                                                                                                                                <span className="text-xs font-semibold text-slate-800 leading-tight">
+                                                                                                                                                                                        {it.package_name || it.ticket_package?.name || `Gói VR #${it.ticket_package_id || idx + 1}`}
+                                                                                                                                                                                </span>
+                                                                                                                                                                        </div>
+                                                                                                                                                                </TableCell>
+                                                                                                                                                                <TableCell className="text-center font-bold text-slate-700 text-xs py-2">
+                                                                                                                                                                        × {qty}
+                                                                                                                                                                </TableCell>
+                                                                                                                                                                <TableCell className="text-right text-[11px] text-slate-600 py-2">
+                                                                                                                                                                        {unit.toLocaleString('vi-VN')}đ
+                                                                                                                                                                </TableCell>
+                                                                                                                                                                <TableCell className="text-right font-bold text-purple-700 text-xs py-2">
+                                                                                                                                                                        {line.toLocaleString('vi-VN')}đ
+                                                                                                                                                                </TableCell>
+                                                                                                                                                        </TableRow>
+                                                                                                                                                );
+                                                                                                                                        })}
+                                                                                                                                </TableBody>
+                                                                                                                        </Table>
+                                                                                                                </div>
+                                                                                                        ) : (
+                                                                                                                <div className="text-center py-4 text-slate-400 text-xs bg-purple-50/20 rounded-lg border border-purple-100 border-dashed">
+                                                                                                                        (Không có chi tiết gói VR)
+                                                                                                                </div>
+                                                                                                        )}
+                                                                                                        <div className="flex justify-between items-end border-t border-purple-200/30 pt-2">
+                                                                                                                <InfoRow
+                                                                                                                        label="Tổng lượt chơi"
+                                                                                                                        value={Array.isArray(txDetails.vr_items)
+                                                                                                                                ? txDetails.vr_items.reduce((s: number, i: any) => s + Number(i.quantity || 0), 0)
+                                                                                                                                : 0}
+                                                                                                                        large
+                                                                                                                        color="text-purple-700"
+                                                                                                                />
+                                                                                                                <div className="text-right">
+                                                                                                                        <p className="text-[9px] text-purple-600 uppercase font-bold">Tổng tiền</p>
+                                                                                                                        <p className="text-2xl font-black text-emerald-700">
+                                                                                                                                {txDetails.booking_details?.total_price?.toLocaleString()}đ
+                                                                                                                        </p>
+                                                                                                                </div>
+                                                                                                        </div>
                                                                                                 </div>
-                                                                                        </div>
-                                                                                </div>
+                                                                                        </>
+                                                                                ) : (
+                                                                                        <>
+                                                                                                <SectionHeader color="text-amber-600" title="Gói & Phim" icon={<TicketIcon size={14} />} />
+                                                                                                <div className="bg-amber-50/40 rounded-xl p-4 border border-amber-100 space-y-3 shadow-sm">
+                                                                                                        <div className="flex justify-between">
+                                                                                                                <InfoRow label="Loại Vé" value={txDetails.ticket_package?.name} bold />
+                                                                                                                <span className="text-[13px] font-bold text-slate-600">
+                                                                                                                        {txDetails.ticket_package?.ticket_unit_price?.toLocaleString()}đ
+                                                                                                                </span>
+                                                                                                        </div>
+                                                                                                        <div className="flex flex-wrap gap-1 border-t border-amber-200/30 pt-2 min-h-[40px]">
+                                                                                                                {txDetails.ticket_package?.movies?.map((m: any) => (
+                                                                                                                        <Badge
+                                                                                                                                key={m.id}
+                                                                                                                                variant="outline"
+                                                                                                                                className="bg-white text-[9px] border-amber-200 text-amber-800"
+                                                                                                                        >
+                                                                                                                                {m.title}
+                                                                                                                        </Badge>
+                                                                                                                ))}
+                                                                                                        </div>
+                                                                                                        <div className="flex justify-between items-end border-t border-amber-200/30 pt-2">
+                                                                                                                <InfoRow
+                                                                                                                        label="Số lượng"
+                                                                                                                        value={txDetails.booking_details?.ticket_count}
+                                                                                                                        large
+                                                                                                                        color="text-amber-700"
+                                                                                                                />
+                                                                                                                <div className="text-right">
+                                                                                                                        <p className="text-[9px] text-amber-600 uppercase font-bold">Tổng tiền</p>
+                                                                                                                        <p className="text-2xl font-black text-emerald-700">
+                                                                                                                                {txDetails.booking_details?.total_price?.toLocaleString()}đ
+                                                                                                                        </p>
+                                                                                                                </div>
+                                                                                                        </div>
+                                                                                                </div>
+                                                                                        </>
+                                                                                )}
                                                                         </div>
                                                                 </div>
 

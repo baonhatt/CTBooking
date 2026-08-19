@@ -6,6 +6,14 @@ import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import {
+    Table,
+    TableBody,
+    TableCell,
+    TableHead,
+    TableHeader,
+    TableRow
+} from '@/components/ui/table';
+import {
     AlertDialog,
     AlertDialogAction,
     AlertDialogCancel,
@@ -28,11 +36,28 @@ import {
     Info,
     Loader2,
     Clock,
-    RefreshCw
+    RefreshCw,
+    Gamepad2,
+    Tag,
+    Percent
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { differenceInDays } from 'date-fns';
 import { useStaffPermissions, useIsSuperAdmin } from '@/hooks/useStaffPermission';
+
+interface VRItem {
+    id?: number;
+    booking_id?: number;
+    ticket_package_id?: number;
+    package_name?: string;
+    quantity?: number;
+    unit_price?: number | string;
+    line_total?: number | string;
+    voucher_id?: number | null;
+    discounted_unit_price?: number | string;
+    ticket_package?: any;
+    [k: string]: any;
+}
 
 interface TicketInfo {
     id: number;
@@ -44,6 +69,9 @@ interface TicketInfo {
     email: string;
     ticket_count: number;
     total_price: number | string;
+    original_total_price?: number | string | null;
+    voucher_discount_amount?: number | string | null;
+    voucher_code_snapshot?: string | null;
     created_at: string;
     paid_at: string | null;
     expiry_date: string | null;
@@ -59,7 +87,16 @@ interface TicketInfo {
     movie_title?: string;
     movie_duration?: string;
     ticket_package_name?: string;
+    booking_type?: 'movie' | 'vr' | string | null;
+    vr_items?: VRItem[];
 }
+
+const formatMoney = (n: number | string | null | undefined) => {
+    if (n === null || n === undefined || n === '') return '0₫';
+    const num = Number(n);
+    if (isNaN(num)) return '0₫';
+    return num.toLocaleString('vi-VN') + '₫';
+};
 
 export default function TicketCheckContent() {
     const [code, setCode] = useState('');
@@ -117,8 +154,9 @@ export default function TicketCheckContent() {
                 // 1. Xử lý xác nhận vào cổng
                 const res = await useTicketApi(ticketInfo.booking_code);
                 if (res?.status === 'success') {
+                    const isVR = ticketInfo.booking_type === 'vr';
                     toast.success('Thành công', {
-                        description: 'Đã xác nhận cho khách vào cổng'
+                        description: isVR ? 'Đã xác nhận khách vào phòng VR' : 'Đã xác nhận cho khách vào cổng'
                     });
 
                     // Cập nhật giao diện ngay lập tức
@@ -258,48 +296,168 @@ export default function TicketCheckContent() {
                             className={`overflow-hidden border-none shadow-2xl shadow-slate-200/50 rounded-2xl transition-all ${ticketInfo.is_used ? 'opacity-60 grayscale-[0.5]' : ''}`}
                         >
                             <CardContent className="p-0">
-                                <div className="bg-slate-50/50 p-6 border-b flex justify-between items-center">
+                                <div className={`p-6 border-b flex justify-between items-center ${
+                                    ticketInfo.booking_type === 'vr'
+                                        ? 'bg-purple-50/60 border-purple-100'
+                                        : 'bg-slate-50/50'
+                                }`}>
                                     <div className="flex flex-col gap-1">
-                                        <div className="flex items-center gap-2 text-blue-600 font-bold">
-                                            <Ticket className="w-5 h-5" />
-                                            <span className="text-lg">Gói: {ticketInfo.ticket_package_name}</span>
+                                        <div className={`font-bold flex items-center gap-2 ${
+                                            ticketInfo.booking_type === 'vr' ? 'text-purple-700' : 'text-blue-600'
+                                        }`}>
+                                            {ticketInfo.booking_type === 'vr' ? (
+                                                <Gamepad2 className="w-5 h-5" />
+                                            ) : (
+                                                <Ticket className="w-5 h-5" />
+                                            )}
+                                            <span className="text-lg">
+                                                {ticketInfo.booking_type === 'vr' ? 'TRẢI NGHIỆM VR' : 'Gói vé'}:{' '}
+                                                {ticketInfo.ticket_package_name || (ticketInfo.booking_type === 'vr' ? 'Combo gói VR' : '')}
+                                            </span>
                                         </div>
                                         <div className="flex items-center gap-3 ml-7">
-                                            <span className="text-[11px] font-bold text-blue-500">
-                                                GIÁ 1 VÉ:{' '}
-                                                {Number(Number(ticketInfo.total_price) / ticketInfo.ticket_count).toLocaleString('vi-VN')} đ
-                                            </span>
+                                            {ticketInfo.booking_type !== 'vr' ? (
+                                                <>
+                                                    <span className="text-[11px] font-bold text-blue-500">
+                                                        GIÁ 1 VÉ:{' '}
+                                                        {Number(Number(ticketInfo.total_price) / ticketInfo.ticket_count).toLocaleString('vi-VN')} đ
+                                                    </span>
+                                                </>
+                                            ) : (
+                                                <>
+                                                    <span className="text-[11px] font-bold text-purple-600 bg-purple-100 px-2 py-0.5 rounded">
+                                                        {ticketInfo.vr_items?.length || 0} loại gói
+                                                    </span>
+                                                    <span className="text-[11px] font-bold text-purple-500">
+                                                        Tổng lượt chơi:{' '}
+                                                        {(ticketInfo.vr_items || []).reduce(
+                                                            (s, i) => s + Number(i.quantity || 0),
+                                                            0
+                                                        )}
+                                                    </span>
+                                                </>
+                                            )}
                                             <span className="text-[10px] font-mono font-bold text-slate-400 bg-slate-200/50 px-2 rounded">
                                                 ID: #{ticketInfo.id}
                                             </span>
+                                            {ticketInfo.voucher_code_snapshot ? (
+                                                <Badge className="bg-orange-500/10 text-orange-700 border border-orange-200 text-[10px] font-bold gap-1 px-2 py-0.5">
+                                                    <Tag className="w-3 h-3" />
+                                                    Mã {ticketInfo.voucher_code_snapshot}
+                                                    {Number(ticketInfo.voucher_discount_amount || 0) > 0 ? (
+                                                        <span className="ml-0.5 text-orange-800">
+                                                            (-{formatMoney(ticketInfo.voucher_discount_amount)})
+                                                        </span>
+                                                    ) : null}
+                                                </Badge>
+                                            ) : null}
                                         </div>
                                     </div>
-                                    <Badge className="bg-red-500 text-white px-4 py-1.5 flex gap-2 items-center border-none font-black text-sm shadow-sm">
-                                        <User size={16} /> {ticketInfo.ticket_count} VÉ
+                                    <Badge className={`px-4 py-1.5 flex gap-2 items-center border-none font-black text-sm shadow-sm text-white ${
+                                        ticketInfo.booking_type === 'vr'
+                                            ? 'bg-purple-600'
+                                            : 'bg-red-500'
+                                    }`}>
+                                        {ticketInfo.booking_type === 'vr' ? (
+                                            <Gamepad2 size={16} />
+                                        ) : (
+                                            <User size={16} />
+                                        )}
+                                        {ticketInfo.booking_type === 'vr' ? `${
+                                            (ticketInfo.vr_items || []).reduce((s, i) => s + Number(i.quantity || 0), 0)
+                                        } LƯỢT CHƠI` : `${ticketInfo.ticket_count} VÉ`}
                                     </Badge>
                                 </div>
 
                                 <div className="p-6 space-y-6">
-                                    <div>
-                                        <h3 className="text-xs font-semibold text-gray-500 mb-4 flex items-center gap-2">
-                                            <Film size={14} /> Danh sách phim & thời lượng:
-                                        </h3>
-                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                                            {parseJsonData(ticketInfo.movie_title).map((title: string, i: number) => (
-                                                <div
-                                                    key={i}
-                                                    className="flex items-center justify-between p-4 rounded-xl border border-slate-100 bg-slate-50/30"
-                                                >
-                                                    <span className="font-bold text-slate-700 text-sm">{title}</span>
-                                                    <span className="text-[10px] font-bold text-slate-400 bg-white px-2 py-1 rounded-md border border-slate-100">
-                                                        {parseJsonData(ticketInfo.movie_duration)[i]} ph
-                                                    </span>
+                                    {/* Section: Movies / VR Items List */}
+                                    {ticketInfo.booking_type === 'vr' ? (
+                                        <div>
+                                            <h3 className="text-xs font-semibold text-purple-600 mb-4 flex items-center gap-2">
+                                                <Gamepad2 size={14} /> Danh sách gói trải nghiệm VR:
+                                            </h3>
+                                            {ticketInfo.vr_items && ticketInfo.vr_items.length > 0 ? (
+                                                <div className="border border-purple-100 rounded-xl overflow-hidden">
+                                                    <Table>
+                                                        <TableHeader className="bg-purple-50/60">
+                                                            <TableRow className="hover:bg-transparent border-none">
+                                                                <TableHead className="text-[10px] font-bold uppercase text-purple-700 py-3">Tên gói VR</TableHead>
+                                                                <TableHead className="text-center text-[10px] font-bold uppercase text-purple-700 py-3">SL</TableHead>
+                                                                <TableHead className="text-right text-[10px] font-bold uppercase text-purple-700 py-3">Đơn giá</TableHead>
+                                                                <TableHead className="text-right text-[10px] font-bold uppercase text-purple-700 py-3">Thành tiền</TableHead>
+                                                            </TableRow>
+                                                        </TableHeader>
+                                                        <TableBody>
+                                                            {ticketInfo.vr_items.map((it, idx) => {
+                                                                const qty = Number(it.quantity || 1);
+                                                                const unit = Number(it.discounted_unit_price ?? it.unit_price ?? 0);
+                                                                const line = Number(it.line_total ?? unit * qty);
+                                                                return (
+                                                                    <TableRow key={it.id || `vr-${idx}`} className="border-t border-purple-50 hover:bg-purple-50/30">
+                                                                        <TableCell className="py-3">
+                                                                            <div className="flex items-center gap-2">
+                                                                                <div className="w-8 h-8 rounded-lg bg-purple-100 flex items-center justify-center shrink-0">
+                                                                                    <Gamepad2 className="w-4 h-4 text-purple-600" />
+                                                                                </div>
+                                                                                <div>
+                                                                                    <p className="text-sm font-semibold text-slate-800 leading-tight">
+                                                                                        {it.package_name || it.ticket_package?.name || `Gói VR #${it.ticket_package_id || idx + 1}`}
+                                                                                    </p>
+                                                                                    {Number(it.voucher_id) > 0 ? (
+                                                                                        <p className="text-[10px] text-orange-600 mt-0.5 flex items-center gap-1">
+                                                                                            <Percent className="w-3 h-3" />
+                                                                                            Đã áp voucher cho gói này
+                                                                                        </p>
+                                                                                    ) : null}
+                                                                                </div>
+                                                                            </div>
+                                                                        </TableCell>
+                                                                        <TableCell className="text-center font-bold text-slate-700">
+                                                                            × {qty}
+                                                                        </TableCell>
+                                                                        <TableCell className="text-right text-sm text-slate-600">
+                                                                            {formatMoney(unit)}
+                                                                        </TableCell>
+                                                                        <TableCell className="text-right font-bold text-purple-700">
+                                                                            {formatMoney(line)}
+                                                                        </TableCell>
+                                                                    </TableRow>
+                                                                );
+                                                            })}
+                                                        </TableBody>
+                                                    </Table>
                                                 </div>
-                                            ))}
+                                            ) : (
+                                                <div className="text-center py-10 text-slate-400 text-sm bg-purple-50/20 rounded-xl border border-purple-100 border-dashed">
+                                                    (Không có chi tiết gói VR)
+                                                </div>
+                                            )}
                                         </div>
-                                    </div>
+                                    ) : (
+                                        <div>
+                                            <h3 className="text-xs font-semibold text-gray-500 mb-4 flex items-center gap-2">
+                                                <Film size={14} /> Danh sách phim & thời lượng:
+                                            </h3>
+                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                                {parseJsonData(ticketInfo.movie_title).map((title: string, i: number) => (
+                                                    <div
+                                                        key={i}
+                                                        className="flex items-center justify-between p-4 rounded-xl border border-slate-100 bg-slate-50/30"
+                                                    >
+                                                        <span className="font-bold text-slate-700 text-sm">{title}</span>
+                                                        <span className="text-[10px] font-bold text-slate-400 bg-white px-2 py-1 rounded-md border border-slate-100">
+                                                            {parseJsonData(ticketInfo.movie_duration)[i]} ph
+                                                        </span>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    )}
 
-                                    <div className="grid grid-cols-2 md:grid-cols-3 gap-6 pt-6 border-t border-slate-100">
+                                    {/* Timestamps row */}
+                                    <div className={`grid grid-cols-2 md:grid-cols-3 gap-6 pt-6 border-t ${
+                                        ticketInfo.booking_type === 'vr' ? 'border-purple-100' : 'border-slate-100'
+                                    }`}>
                                         <div className="space-y-1">
                                             <p className="text-xs font-medium text-gray-500">Ngày đặt</p>
                                             <p className="text-sm font-semibold text-slate-600">{formatDate(ticketInfo.created_at)}</p>
@@ -308,18 +466,57 @@ export default function TicketCheckContent() {
                                             <p className="text-xs font-medium text-green-600">Thanh toán</p>
                                             <p className="text-sm font-semibold text-green-600">{formatDate(ticketInfo.paid_at)}</p>
                                         </div>
-                                        <div className="space-y-1">
-                                            <p className="text-xs font-medium text-red-500">
-                                                Hết hạn (
-                                                {(() => {
-                                                    const days = differenceInDays(new Date(ticketInfo.expiry_date), new Date());
-                                                    return days < 0 ? 'Đã hết hạn' : ` ${days} ngày nữa`;
-                                                })()}
-                                                )
-                                            </p>
-                                            <p className="text-sm font-semibold text-red-500">{formatDate(ticketInfo.expiry_date)}</p>
-                                        </div>
+                                        {ticketInfo.booking_type !== 'vr' ? (
+                                            <div className="space-y-1">
+                                                <p className="text-xs font-medium text-red-500">
+                                                    Hết hạn (
+                                                    {(() => {
+                                                        const days = differenceInDays(new Date(ticketInfo.expiry_date as any), new Date());
+                                                        return days < 0 ? 'Đã hết hạn' : ` ${days} ngày nữa`;
+                                                    })()}
+                                                    )
+                                                </p>
+                                                <p className="text-sm font-semibold text-red-500">{formatDate(ticketInfo.expiry_date)}</p>
+                                            </div>
+                                        ) : (
+                                            <div className="space-y-1">
+                                                <p className="text-xs font-medium text-purple-500">Hạn sử dụng (VR)</p>
+                                                <p className="text-sm font-semibold text-purple-700">
+                                                    {ticketInfo.expiry_date ? formatDate(ticketInfo.expiry_date) : 'Vô thời hạn'}
+                                                </p>
+                                            </div>
+                                        )}
                                     </div>
+
+                                    {/* Discount breakdown row if voucher applied */}
+                                    {(Number(ticketInfo.original_total_price) > 0 || Number(ticketInfo.voucher_discount_amount) > 0) && (
+                                        <div className="grid grid-cols-1 md:grid-cols-3 gap-3 pt-4 border-t border-dashed border-orange-200">
+                                            {Number(ticketInfo.original_total_price) > 0 && (
+                                                <div className="bg-orange-50/60 border border-orange-100 rounded-xl p-3">
+                                                    <p className="text-[10px] font-bold uppercase text-orange-500">Tổng gốc</p>
+                                                    <p className="text-sm font-semibold text-orange-700 line-through opacity-80">
+                                                        {formatMoney(ticketInfo.original_total_price)}
+                                                    </p>
+                                                </div>
+                                            )}
+                                            {Number(ticketInfo.voucher_discount_amount) > 0 && (
+                                                <div className="bg-red-50/60 border border-red-100 rounded-xl p-3">
+                                                    <p className="text-[10px] font-bold uppercase text-red-500 flex items-center gap-1">
+                                                        <Percent className="w-3 h-3" /> Giảm từ voucher
+                                                    </p>
+                                                    <p className="text-sm font-semibold text-red-700">
+                                                        − {formatMoney(ticketInfo.voucher_discount_amount)}
+                                                    </p>
+                                                </div>
+                                            )}
+                                            <div className="bg-green-50/60 border border-green-100 rounded-xl p-3">
+                                                <p className="text-[10px] font-bold uppercase text-green-600">Thành tiền</p>
+                                                <p className="text-sm font-black text-green-700">
+                                                    {formatMoney(ticketInfo.total_price)}
+                                                </p>
+                                            </div>
+                                        </div>
+                                    )}
                                 </div>
                             </CardContent>
                         </Card>
@@ -486,9 +683,9 @@ export default function TicketCheckContent() {
                             </CardContent>
                         </Card>
 
-                        {/* Card thông tin thanh toán - Chuyển màu tối nếu hết hạn */}
+                        {/* Card thông tin thanh toán - Chuyển màu nếu VR hoặc hết hạn */}
                         <Card
-                            className={`${ticketInfo.expired ? 'bg-gray-500' : 'bg-blue-600'} text-white overflow-hidden relative shadow-lg transition-colors`}
+                            className={`${ticketInfo.expired ? 'bg-gray-500' : ticketInfo.booking_type === 'vr' ? 'bg-purple-600' : 'bg-blue-600'} text-white overflow-hidden relative shadow-lg transition-colors`}
                         >
                             <CheckCircle2 className="absolute -top-4 -right-4 opacity-10 w-32 h-32" />
                             <CardContent className="p-6 space-y-5 relative z-10">

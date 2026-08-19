@@ -1114,6 +1114,8 @@ app.get('/api/admin/transactions', requireStaffAuth, requirePermission('transact
     const from = String(c.req.query('from') || '');
 
     const to = String(c.req.query('to') || '');
+    const booking_type_raw = String(c.req.query('booking_type') || 'all');
+    const booking_type = (['all', 'movie', 'vr'].includes(booking_type_raw) ? booking_type_raw : 'all') as 'all' | 'movie' | 'vr';
     const branch_id_raw = c.req.query('branch_id');
     const branch_id = branch_id_raw && branch_id_raw !== 'all' ? Number(branch_id_raw) : undefined;
 
@@ -1154,6 +1156,7 @@ app.get('/api/admin/transactions', requireStaffAuth, requirePermission('transact
 
         from,
         to,
+        booking_type,
         restrictToBranchIds: restrictBranchIds
       }
     );
@@ -1187,7 +1190,9 @@ app.get('/api/admin/transactions/:id', requireStaffAuth, requirePermission('tran
 
         branches: schema.branches,
 
-        auditLogs: schema.auditLogs
+        auditLogs: schema.auditLogs,
+
+        booking_vr_items: (schema as any).booking_vr_items
       },
 
       id,

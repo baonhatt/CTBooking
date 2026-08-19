@@ -33,6 +33,7 @@ export default function TransactionsPage() {
         const [paymentMethod, setPaymentMethod] = useState<string>(initialFilters.paymentMethod ?? '');
         const [fromDate, setFromDate] = useState<string>(initialFilters.fromDate ?? '');
         const [toDate, setToDate] = useState<string>(initialFilters.toDate ?? '');
+        const [bookingTypeFilter, setBookingTypeFilter] = useState<'all' | 'movie' | 'vr'>(initialFilters.bookingTypeFilter ?? 'all');
         const [selectedBranchId, setSelectedBranchId] = useState<number | 'all' | null>(() => {
                 if (initialFilters.branchId !== undefined) return initialFilters.branchId;
                 if (staff?.isSuperAdmin) return 'all';
@@ -74,11 +75,12 @@ export default function TransactionsPage() {
                                 paymentMethod,
                                 fromDate,
                                 toDate,
-                                branchId: selectedBranchId
+                                branchId: selectedBranchId,
+                                bookingTypeFilter
                         };
                         localStorage.setItem('admin_transactions_filters', JSON.stringify(state));
                 } catch { }
-        }, [txQuery, txStatus, sortKey, sortDir, paymentMethod, fromDate, toDate, selectedBranchId]);
+        }, [txQuery, txStatus, sortKey, sortDir, paymentMethod, fromDate, toDate, selectedBranchId, bookingTypeFilter]);
 
         // Load transactions khi page hoặc query thay đổi
         useEffect(() => {
@@ -95,7 +97,8 @@ export default function TransactionsPage() {
                                         payment_method: paymentMethod || undefined,
                                         from: fromDate || undefined,
                                         to: toDate || undefined,
-                                        branch_id: selectedBranchId
+                                        branch_id: selectedBranchId,
+                                        booking_type: bookingTypeFilter
                                 });
                                 setTransactions(
                                         items.map((t: any) => ({
@@ -113,7 +116,8 @@ export default function TransactionsPage() {
                                                 createdAt: new Date(t.createdAt),
                                                 paidAt: t.paidAt ? new Date(t.paidAt) : null,
                                                 updatedAt: t.updatedAt ? new Date(t.updatedAt) : null,
-                                                branch_id: t.branch_id
+                                                branch_id: t.branch_id,
+                                                booking_type: t.booking_type || 'movie'
                                         }))
                                 );
                                 setTotalTransactions(total);
@@ -123,7 +127,7 @@ export default function TransactionsPage() {
                                 setIsLoading(false);
                         }
                 })();
-        }, [txPage, pageSize, txQuery, txStatus, sortKey, sortDir, paymentMethod, fromDate, toDate, selectedBranchId]);
+        }, [txPage, pageSize, txQuery, txStatus, sortKey, sortDir, paymentMethod, fromDate, toDate, selectedBranchId, bookingTypeFilter]);
 
         const txTotalPages = useMemo(() => Math.max(1, Math.ceil(totalTransactions / pageSize)), [totalTransactions]);
 
@@ -140,7 +144,8 @@ export default function TransactionsPage() {
                                 payment_method: paymentMethod || undefined,
                                 from: fromDate || undefined,
                                 to: toDate || undefined,
-                                branch_id: selectedBranchId
+                                branch_id: selectedBranchId,
+                                booking_type: bookingTypeFilter
                         });
                         setTransactions(
                                 items.map((t: any) => ({
@@ -158,7 +163,8 @@ export default function TransactionsPage() {
                                         paidAt: t.paidAt ? new Date(t.paidAt) : null,
                                         updatedAt: t.updatedAt ? new Date(t.updatedAt) : null,
                                         branch_id: t.branch_id,
-                                        is_used: t.is_used
+                                        is_used: t.is_used,
+                                        booking_type: t.booking_type || 'movie'
                                 }))
                         );
                         setTotalTransactions(total);
@@ -206,6 +212,8 @@ export default function TransactionsPage() {
                                 toDate={toDate}
                                 setFromDate={setFromDate}
                                 setToDate={setToDate}
+                                bookingTypeFilter={bookingTypeFilter}
+                                setBookingTypeFilter={setBookingTypeFilter}
                                 isLoading={isLoading}
                         />
                 </AdminLayout>

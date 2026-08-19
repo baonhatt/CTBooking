@@ -17,7 +17,8 @@ import {
 	User,
 	Menu,
 	X,
-	CalendarClock
+	CalendarClock,
+	Percent
 } from 'lucide-react';
 import { buildUrl, request } from '@/lib/api/http';
 import { useStaffPermissions, useIsSuperAdmin } from '@/hooks/useStaffPermission';
@@ -39,6 +40,8 @@ interface Props {
 	| 'posts'
 	| 'transactions'
 	| 'tickets'
+	| 'vouchers'
+	| 'deleted-vouchers'
 	| 'ticket-check'
 	| 'uploads'
 	| 'email-logs'
@@ -67,8 +70,14 @@ export default function AdminLayout({ active, setActive, handleLogout, children 
 	function go(tab: Props['active']) {
 		setActive(tab);
 		setIsSidebarOpen(false); // Close sidebar on mobile when navigating
-		const path = tab === 'ticket-check' ? 'ticket-check' : tab === 'audit-logs' ? 'audit-logs' : tab;
-		navigate(`/${path}`);
+		if (tab === 'vouchers') {
+			navigate('/vouchers');
+		} else if (tab === 'deleted-vouchers') {
+			navigate('/deleted/vouchers');
+		} else {
+			const path = tab === 'ticket-check' ? 'ticket-check' : tab === 'audit-logs' ? 'audit-logs' : tab;
+			navigate(`/${path}`);
+		}
 	}
 	const itemClass = (isActive: boolean) =>
 		`w-full justify-start gap-2 rounded-md ${isActive ? 'bg-white/10 text-white font-medium' : 'text-white/80'} hover:bg-white/10 hover:text-white transition-all`;
@@ -88,6 +97,7 @@ export default function AdminLayout({ active, setActive, handleLogout, children 
 		toys: { module: 'toys', action: 'view' },
 		posts: { module: 'posts', action: 'view' },
 		tickets: { module: 'tickets', action: 'view' },
+		vouchers: { module: 'vouchers', action: 'view' },
 		transactions: { module: 'transactions', action: 'view' },
 		'ticket-check': { module: 'ticket_check', action: 'scan' },
 		branches: { module: 'branches', action: 'view' },
@@ -153,6 +163,7 @@ export default function AdminLayout({ active, setActive, handleLogout, children 
 		{ key: 'toys' as const, label: 'Đồ chơi', icon: <Package className="h-4 w-4" /> },
 		{ key: 'posts' as const, label: 'Bài viết', icon: <FileText className="h-4 w-4" /> },
 		{ key: 'tickets' as const, label: 'Gói vé', icon: <TicketIcon className="h-4 w-4" /> },
+		{ key: 'vouchers' as const, label: 'Vouchers', icon: <Percent className="h-4 w-4" /> },
 		{ key: 'transactions' as const, label: 'Giao dịch', icon: <CreditCard className="h-4 w-4" /> },
 		{ key: 'ticket-check' as const, label: 'Kiểm Tra Vé', icon: <ScanLine className="h-4 w-4" /> },
 		{ key: 'branches' as const, label: 'Chi nhánh', icon: <Settings className="h-4 w-4" /> },
