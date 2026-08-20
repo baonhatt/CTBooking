@@ -615,10 +615,10 @@ export default function BookingPage() {
 		<UserLayout>
 			<div className="min-h-screen bg-[#070b14] relative overflow-hidden text-slate-100 selection:bg-cyan-500/30">
 				{/* Ambient Background Lights */}
-				<div className="absolute inset-0 pointer-events-none">
-					<div className="absolute top-10 left-1/4 w-96 h-96 bg-blue-600/10 rounded-full blur-[140px]" />
-					<div className="absolute bottom-1/4 right-10 w-96 h-96 bg-purple-600/15 rounded-full blur-[160px]" />
-					<div className="absolute top-1/2 right-1/3 w-80 h-80 bg-cyan-500/10 rounded-full blur-[130px]" />
+				<div className="absolute inset-0 pointer-events-none overflow-hidden">
+					<div className="hidden sm:block absolute top-10 left-1/4 w-96 h-96 bg-blue-600/10 rounded-full blur-[140px]" />
+					<div className="hidden sm:block absolute top-[500px] right-10 w-96 h-96 bg-purple-600/15 rounded-full blur-[160px]" />
+					<div className="hidden sm:block absolute top-[1200px] right-1/3 w-80 h-80 bg-cyan-500/10 rounded-full blur-[130px]" />
 					<div className="absolute inset-0 bg-gradient-to-b from-black/60 via-transparent to-black/80" />
 					<div className="absolute inset-0 neon-noise opacity-20" />
 				</div>
@@ -687,15 +687,15 @@ export default function BookingPage() {
 								{/* 1. ORDER ITEMS LIST CARD */}
 								<Card className="bg-slate-900/60 backdrop-blur-xl border border-white/10 rounded-2xl overflow-hidden shadow-2xl">
 									<CardHeader className="bg-white/[0.03] border-b border-white/10 py-4 px-5 sm:px-6">
-										<CardTitle className="text-base sm:text-lg font-bold text-white flex items-center justify-between">
-											<div className="flex items-center gap-2.5">
+										<div className="text-base sm:text-lg font-bold text-white flex items-center justify-between">
+											<h2 className="flex items-center gap-2.5 text-base sm:text-lg font-bold text-white">
 												<span className="w-1.5 h-6 bg-gradient-to-b from-cyan-400 to-blue-500 rounded-full" />
 												<span>Chi Tiết Dịch Vụ Đã Chọn</span>
-											</div>
+											</h2>
 											<span className="text-xs text-slate-400 font-normal">
 												Tổng {selectedItems.reduce((s, i) => s + i.quantity, 0)} vé/gói
 											</span>
-										</CardTitle>
+										</div>
 									</CardHeader>
 
 									<CardContent className="p-5 sm:p-6 space-y-4">
@@ -742,6 +742,9 @@ export default function BookingPage() {
 																			src={optimizeCloudinaryUrl(item.cover_image, 160)}
 																			alt={item.name}
 																			className="w-full h-full object-cover"
+																			onError={(e) => {
+																				(e.target as HTMLImageElement).src = 'https://images.unsplash.com/photo-1489599849927-2ee91cede3ba?w=400&q=80';
+																			}}
 																		/>
 																	) : (
 																		<div
@@ -872,6 +875,9 @@ export default function BookingPage() {
 																		alt={m.title}
 																		loading="lazy"
 																		className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+																		onError={(e) => {
+																			(e.target as HTMLImageElement).src = 'https://images.unsplash.com/photo-1489599849927-2ee91cede3ba?w=400&q=80';
+																		}}
 																	/>
 
 																	{/* Checkmark Tag */}

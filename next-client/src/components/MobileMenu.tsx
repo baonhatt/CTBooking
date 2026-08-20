@@ -42,7 +42,8 @@ export function MobileMenu({
                         <SheetTrigger asChild>
                                 <Button
                                         variant="default"
-                                        className="bg-white/10 backdrop-blur-md border-white/20 text-white w-10 h-10 hover:bg-white/20"
+                                        aria-label="Mở menu điều hướng"
+                                        className="bg-white/10 backdrop-blur-md border-white/20 text-white w-10 h-10 hover:bg-white/20 touch-manipulation select-none active:scale-95 transition-transform"
                                 >
                                         <Menu className="h-6 w-6" />
                                 </Button>
@@ -50,7 +51,7 @@ export function MobileMenu({
 
                         <SheetContent
                                 side="top"
-                                className="w-full h-[100dvh] bg-[#050915] border-none text-white p-0 [&>button]:hidden z-[60]"
+                                className="w-full h-[100dvh] bg-[#050915] border-none text-white p-0 [&>button]:hidden z-[60] touch-manipulation"
                         >
                                 <SheetTitle className="sr-only">Menu di động</SheetTitle>
                                 <SheetDescription className="sr-only">Điều hướng nhanh các mục trong Cinesphere</SheetDescription>

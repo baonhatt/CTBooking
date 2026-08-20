@@ -63,6 +63,11 @@ export default function Header({
         const { totalItemsCount, openCart } = useCart();
 
         const [isScheduleOpen, setIsScheduleOpen] = useState(false);
+        const [mounted, setMounted] = useState(false);
+
+        useEffect(() => {
+                setMounted(true);
+        }, []);
 
         // Responsive scroll padding
         useEffect(() => {
@@ -298,12 +303,12 @@ export default function Header({
                                         <button
                                                 type="button"
                                                 onClick={openCart}
-                                                aria-label="Mở giỏ hàng"
-                                                className="relative flex items-center gap-2 text-slate-200 hover:text-white transition-all duration-300 font-semibold text-xs px-3 sm:px-3.5 py-1.5 sm:py-2 rounded-full bg-white/[0.07] hover:bg-white/[0.14] border border-white/15 hover:border-cyan-400/50 hover:shadow-[0_0_15px_rgba(6,182,212,0.25)] group"
+                                                aria-label="Giỏ hàng"
+                                                className="relative flex items-center gap-2 text-slate-200 hover:text-white transition-all duration-200 font-semibold text-xs px-3 sm:px-3.5 py-1.5 sm:py-2 rounded-full bg-white/[0.07] hover:bg-white/[0.14] border border-white/15 hover:border-cyan-400/50 hover:shadow-[0_0_15px_rgba(6,182,212,0.25)] touch-manipulation select-none active:scale-95 group"
                                         >
                                                 <ShoppingCart className="w-4 h-4 text-cyan-400 group-hover:scale-110 transition-transform" />
                                                 <span className="hidden sm:inline">Giỏ hàng</span>
-                                                {totalItemsCount > 0 && (
+                                                {mounted && totalItemsCount > 0 && (
                                                         <span className="flex h-4 min-w-[16px] items-center justify-center rounded-full bg-gradient-to-r from-cyan-400 to-blue-500 px-1 text-[10px] font-black text-black shadow-md">
                                                                 {totalItemsCount}
                                                         </span>
