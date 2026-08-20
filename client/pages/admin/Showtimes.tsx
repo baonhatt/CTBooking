@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import AdminLayout from '@/admin/layouts/AdminLayout';
 import ShowtimesContent from '@/components/admin/content/ShowtimesContent';
-import { getShowtimesAdmin, getBranches, getPublicBranches } from '@/lib/api';
+import { getShowtimesAdmin, getAdminBranchOptions, getPublicBranches } from '@/lib/api';
 import { useStaffPermission } from '@/hooks/useStaffPermission';
 import { useStaffStore } from '@/store/staffStore';
 import { useNavigate } from 'react-router-dom';
@@ -55,7 +55,7 @@ export default function ShowtimesPage() {
                 (async () => {
                         try {
                                 const { items: branchItems } = canViewBranches
-                                        ? await getBranches({ includeInactive: true })
+                                        ? await getAdminBranchOptions({ includeInactive: true })
                                         : await getPublicBranches();
                                 const activeBranches = (branchItems || []).filter((b: any) => !b.deleted_at);
                                 setBranches(activeBranches);

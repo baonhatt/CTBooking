@@ -7,7 +7,7 @@ import {
         getRevenue7Days,
         getRevenueByMonth,
         getTransactions,
-        getBranches
+        getAdminBranchOptions
 } from '@/lib/api';
 import { useStaffStore } from '@/store/staffStore';
 import { useStaffPermission } from '@/hooks/useStaffPermission';
@@ -88,7 +88,7 @@ export default function DashboardPage() {
 
                 (async () => {
                         try {
-                                const { items } = await getBranches({ includeInactive: true });
+                                const { items } = await getAdminBranchOptions({ includeInactive: true });
                                 setBranches(items);
 
                                 // If not superadmin, default to their first branch if none selected

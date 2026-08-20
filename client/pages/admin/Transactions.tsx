@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { getTransactions, getBranches } from '@/lib/api';
+import { getTransactions, getAdminBranchOptions } from '@/lib/api';
 import AdminLayout from '@/admin/layouts/AdminLayout';
 import TransactionsContent from '@/components/admin/content/TransactionsContent';
 import { useStaffPermission } from '@/hooks/useStaffPermission';
@@ -52,7 +52,7 @@ export default function TransactionsPage() {
 
                 (async () => {
                         try {
-                                const { items } = await getBranches({ includeInactive: true });
+                                const { items } = await getAdminBranchOptions({ includeInactive: true });
                                 setBranches(items);
 
                                 // If not superadmin and no branch selected, default to first branch

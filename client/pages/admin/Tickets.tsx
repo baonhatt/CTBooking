@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import AdminLayout from '@/admin/layouts/AdminLayout';
 import TicketsContent from '@/components/admin/content/TicketsContent';
-import { getTickets, deleteTicketApi, getBranches } from '@/lib/api';
+import { getTickets, deleteTicketApi, getAdminBranchOptions } from '@/lib/api';
 import { useStaffPermission } from '@/hooks/useStaffPermission';
 import { useStaffStore } from '@/store/staffStore';
 import { useNavigate } from 'react-router-dom';
@@ -92,7 +92,7 @@ export default function TicketsPage() {
 
                 (async () => {
                         try {
-                                const { items } = await getBranches({ includeInactive: true });
+                                const { items } = await getAdminBranchOptions({ includeInactive: true });
                                 setBranches(items);
 
                                 // If not superadmin and no branch selected, default to first branch

@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { getMoviesAdmin, updateMovieStatus, getBranches, deleteMovieApi } from '@/lib/api';
+import { getMoviesAdmin, updateMovieStatus, getAdminBranchOptions, deleteMovieApi } from '@/lib/api';
 import AdminLayout from '@/admin/layouts/AdminLayout';
 import MoviesContent from '@/components/admin/content/MoviesContent';
 import { useStaffPermission } from '@/hooks/useStaffPermission';
@@ -71,7 +71,7 @@ export default function MoviesPage() {
 
                 (async () => {
                         try {
-                                const { items } = await getBranches({ includeInactive: true });
+                                const { items } = await getAdminBranchOptions({ includeInactive: true });
                                 setBranches(items);
 
                                 // If not superadmin and no branch selected, default to first branch

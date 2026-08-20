@@ -68,7 +68,7 @@ import {
     updateVoucherApi,
     toggleVoucherStatusApi,
     listVRTicketPackagesForVoucher,
-    getBranches,
+    getAdminBranchOptions,
     type VoucherListFilters
 } from '@/lib/api';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -210,7 +210,7 @@ export default function VouchersContent(props: Props) {
             listVRTicketPackagesForVoucher(scope).then((res) => {
                 setVrPackages(res.items || []);
             }).catch(() => {});
-            getBranches({ includeInactive: true }).then((res) => {
+            getAdminBranchOptions({ includeInactive: true }).then((res) => {
                 setBranchOptions(res.items || []);
             }).catch(() => {});
         }

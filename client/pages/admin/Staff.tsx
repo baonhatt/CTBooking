@@ -11,6 +11,7 @@ import { toast } from 'sonner';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { request } from '@/lib/api/http';
+import { getAdminBranchOptions } from '@/lib/api';
 import AdminLayout from '@/admin/layouts/AdminLayout';
 import { useStaffStore } from '@/store/staffStore';
 import { useNavigate } from 'react-router-dom';
@@ -131,7 +132,7 @@ export default function StaffPage() {
         const { data: branchesData } = useQuery({
                 queryKey: ['branches'],
                 queryFn: async () => {
-                        return request('/api/admin/branches?pageSize=100');
+                        return getAdminBranchOptions({ includeInactive: true });
                 },
                 enabled: canViewBranches
         });

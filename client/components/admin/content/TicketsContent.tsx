@@ -35,7 +35,7 @@ import { BranchIdsBadge } from '@/components/admin/BranchIdsBadge';
 import { normalizeBranchIdsInput } from '@/lib/branch-ids';
 import { toast } from 'sonner';
 import { useNavigate } from 'react-router-dom';
-import { createTicketApi, updateTicketApi, getBranches, toggleTicketStatusApi } from '@/lib/api';
+import { createTicketApi, updateTicketApi, getAdminBranchOptions, toggleTicketStatusApi } from '@/lib/api';
 import { uploadDirectToCloudinary } from '@/lib/api/uploads';
 import { getMoviesAdmin } from '@/lib/api/movies';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -152,7 +152,7 @@ export default function TicketsContent(props: Props) {
             getMoviesAdmin({ status: 'active', pageSize: 100 }).then((res) => {
                 setMovies(res.items);
             });
-            getBranches({ includeInactive: true }).then((res) => {
+            getAdminBranchOptions({ includeInactive: true }).then((res) => {
                 setBranchOptions(res.items);
             });
         }

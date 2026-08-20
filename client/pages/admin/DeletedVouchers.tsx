@@ -5,7 +5,7 @@ import {
         listDeletedVouchersApi,
         deleteVoucherApi,
         restoreVoucherApi,
-        getBranches,
+        getAdminBranchOptions,
         type VoucherListFilters
 } from '@/lib/api';
 import { useStaffPermission } from '@/hooks/useStaffPermission';
@@ -75,7 +75,7 @@ export default function DeletedVouchersPage() {
                 }
                 (async () => {
                         try {
-                                const { items } = await getBranches({ includeInactive: true });
+                                const { items } = await getAdminBranchOptions({ includeInactive: true });
                                 setBranches(items);
                                 if (!staff?.isSuperAdmin && selectedBranchId === null && items.length > 0) {
                                         setSelectedBranchId(items[0].id);

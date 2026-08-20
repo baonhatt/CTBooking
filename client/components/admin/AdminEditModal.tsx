@@ -12,7 +12,7 @@ import {
         updateToyApi,
         getToys,
         getMovieById,
-        getBranches
+        getAdminBranchOptions
 } from '@/lib/api';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
@@ -66,7 +66,7 @@ const AdminEditModal: React.FC<AdminEditModalProps> = (props) => {
                 if (isEditOpen && editType === 'movie' && !branchesProp?.length) {
                         (async () => {
                                 try {
-                                        const { items } = await getBranches({ includeInactive: true });
+                                        const { items } = await getAdminBranchOptions({ includeInactive: true });
                                         setBranches(items);
                                 } catch (error) {
                                         console.error('Error loading branches:', error);
