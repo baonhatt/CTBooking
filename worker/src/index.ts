@@ -271,27 +271,28 @@ type Bindings = {
 };
 
 const getCloudHelpers = (c: Context, env: Bindings) => {
-  const local = isLocal(c.req.url);
-
   return {
     uploader: async (base64: string, folder: string) => {
-      if (local) {
-        return await localUploader(base64, folder);
+      try {
+        if (hasCloudinary(env)) {
+          const res = await uploadCloudinaryImageDataURI(env, base64, folder);
+          return { url: res.url };
+        }
+      } catch (err) {
+        console.warn('[Uploader] Cloudinary upload failed, using Data URI fallback:', err);
       }
-
-      const res = await uploadCloudinaryImageDataURI(env, base64, folder);
-
-      return { url: res.url };
+      return { url: base64 };
     },
 
     deleter: async (url: string, type: 'image' | 'video' = 'image') => {
-      if (local && url.startsWith('/uploads/')) {
-        return await localDeleter(url);
+      try {
+        const publicId = getPublicIdFromUrl(url);
+        if (publicId && hasCloudinary(env)) {
+          await deleteCloudinaryImage(env, publicId, type);
+        }
+      } catch (err) {
+        console.warn('[Deleter] Cloudinary delete warning:', err);
       }
-
-      const publicId = getPublicIdFromUrl(url);
-
-      if (publicId) await deleteCloudinaryImage(env, publicId, type);
     }
   };
 };

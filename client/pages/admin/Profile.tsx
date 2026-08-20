@@ -149,18 +149,29 @@ export default function ProfilePage({ active, setActive, adminEmailState, handle
                                         <CardHeader>
                                                 <CardTitle>Đổi Mật Khẩu</CardTitle>
                                         </CardHeader>
-                                        <CardContent className="space-y-4">
-                                                <div>
-                                                        <Label htmlFor="oldPassword">Mật khẩu cũ *</Label>
-                                                        <Input
-                                                                id="oldPassword"
-                                                                type="password"
-                                                                value={oldPassword}
-                                                                onChange={(e) => setOldPassword(e.target.value)}
-                                                                placeholder="Nhập mật khẩu cũ"
-                                                                disabled={showOtpInput}
+                                        <CardContent>
+                                                <form onSubmit={(e) => e.preventDefault()} className="space-y-4" autoComplete="off">
+                                                        <input
+                                                                type="text"
+                                                                name="username"
+                                                                value={staff.email}
+                                                                readOnly
+                                                                className="hidden"
+                                                                autoComplete="off"
                                                         />
-                                                </div>
+                                                        <div>
+                                                                <Label htmlFor="oldPassword">Mật khẩu cũ *</Label>
+                                                                <Input
+                                                                        id="oldPassword"
+                                                                        name="oldPassword"
+                                                                        type="password"
+                                                                        autoComplete="off"
+                                                                        value={oldPassword}
+                                                                        onChange={(e) => setOldPassword(e.target.value)}
+                                                                        placeholder="Nhập mật khẩu cũ"
+                                                                        disabled={showOtpInput}
+                                                                />
+                                                        </div>
 
                                                 {!showOtpInput ? (
                                                         <Button
@@ -240,6 +251,7 @@ export default function ProfilePage({ active, setActive, adminEmailState, handle
                                                                 </Button>
                                                         </>
                                                 )}
+                                                </form>
                                         </CardContent>
                                 </Card>
                         </div>

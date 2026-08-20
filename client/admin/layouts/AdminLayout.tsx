@@ -103,30 +103,30 @@ export default function AdminLayout({ active, setActive, handleLogout, children 
 		},
 		{
 			id: 'cinema_ops',
-			title: 'Vận hành Rạp & Phim',
+			title: 'Vận hành Rạp',
 			icon: <Clapperboard className="h-4 w-4 text-emerald-400" />,
 			items: [
 				{ key: 'movies', label: 'Danh sách Phim', icon: <Clapperboard className="h-4 w-4 text-emerald-400" /> },
 				{ key: 'showtimes', label: 'Lịch chiếu phim', icon: <CalendarClock className="h-4 w-4 text-emerald-400" /> },
-				{ key: 'tickets', label: 'Gói vé xem phim & VR', icon: <TicketIcon className="h-4 w-4 text-emerald-400" /> },
+				{ key: 'tickets', label: 'Gói vé & Bảng giá', icon: <TicketIcon className="h-4 w-4 text-emerald-400" /> },
 				{ key: 'toys', label: 'Đồ chơi & quà tặng', icon: <Package className="h-4 w-4 text-emerald-400" /> },
 				{ key: 'posts', label: 'Bài viết & Bảng tin', icon: <FileText className="h-4 w-4 text-emerald-400" /> }
 			]
 		},
 		{
 			id: 'sales_customers',
-			title: 'Kinh doanh & Khách hàng',
+			title: 'Kinh doanh & Vé',
 			icon: <CreditCard className="h-4 w-4 text-amber-400" />,
 			items: [
-				{ key: 'transactions', label: 'Giao dịch vé', icon: <CreditCard className="h-4 w-4 text-amber-400" /> },
-				{ key: 'vouchers', label: 'Mã Giảm Giá (Vouchers)', icon: <Percent className="h-4 w-4 text-amber-400" /> },
-				{ key: 'ticket-check', label: 'Kiểm Tra Vé (Soát vé)', icon: <ScanLine className="h-4 w-4 text-amber-400" /> },
+				{ key: 'transactions', label: 'Hóa đơn & Đơn hàng', icon: <CreditCard className="h-4 w-4 text-amber-400" /> },
+				{ key: 'vouchers', label: 'Mã giảm giá (Voucher)', icon: <Percent className="h-4 w-4 text-amber-400" /> },
+				{ key: 'ticket-check', label: 'Soát vé xem phim', icon: <ScanLine className="h-4 w-4 text-amber-400" /> },
 				{ key: 'users', label: 'Tài khoản Khách hàng', icon: <UsersIcon className="h-4 w-4 text-amber-400" /> }
 			]
 		},
 		{
 			id: 'system_management',
-			title: 'Quản trị Systems & Nhân sự',
+			title: 'Quản trị & Nhân sự',
 			icon: <Building2 className="h-4 w-4 text-purple-400" />,
 			items: [
 				{ key: 'branches', label: 'Quản lý Chi nhánh', icon: <Building2 className="h-4 w-4 text-purple-400" /> },
@@ -174,19 +174,10 @@ export default function AdminLayout({ active, setActive, handleLogout, children 
 	const [openGroups, setOpenGroups] = useState<Record<string, boolean>>(() => {
 		const initial: Record<string, boolean> = {};
 		for (const group of menuGroups) {
-			initial[group.id] = group.items.some((item) => item.key === active);
+			initial[group.id] = true;
 		}
 		return initial;
 	});
-
-	useEffect(() => {
-		for (const group of menuGroups) {
-			if (group.items.some((item) => item.key === active)) {
-				setOpenGroups((prev) => ({ ...prev, [group.id]: true }));
-				break;
-			}
-		}
-	}, [active]);
 
 	const toggleGroup = (groupId: string) => {
 		setOpenGroups((prev) => ({ ...prev, [groupId]: !prev[groupId] }));
@@ -293,12 +284,11 @@ export default function AdminLayout({ active, setActive, handleLogout, children 
 								<img src={iconCine} alt="CINESPHERE" className="h-9 w-auto" />
 								<div>
 									<div className="font-black tracking-widest text-sm text-blue-100">CINESPHERE</div>
-									<div className="text-[10px] font-semibold text-blue-400/90 uppercase tracking-wider">Management Portal</div>
+									<div className="text-[10px] font-semibold text-blue-400/90 uppercase tracking-wider flex items-center gap-1.5">
+										<span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+										Management Portal
+									</div>
 								</div>
-							</div>
-							<div className="text-[10px] font-bold uppercase tracking-widest text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 rounded-md py-1 px-2.5 mb-1 mt-2 flex items-center gap-1.5 w-fit" title={staffEmail}>
-								<span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
-								{isSuperAdmin ? '⚡ SUPER ADMIN' : ' STAFF'} • {staffName}
 							</div>
 						</div>
 
@@ -306,11 +296,18 @@ export default function AdminLayout({ active, setActive, handleLogout, children 
 							<div className="relative">
 								<Search className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-white/40" />
 								<input
-									type="text"
+									type="search"
+									name="admin_sidebar_search_query"
+									id="admin_sidebar_search_query"
 									placeholder="Tìm kiếm danh mục..."
 									value={searchQuery}
 									onChange={(e) => setSearchQuery(e.target.value)}
-									className="w-full bg-white/5 border border-white/10 rounded-lg pl-8 pr-3 py-1.5 text-xs text-white placeholder:text-white/40 focus:outline-none focus:border-blue-500/50 focus:bg-white/10 transition-all"
+									autoComplete="off"
+									autoCorrect="off"
+									spellCheck={false}
+									data-lpignore="true"
+									data-form-type="other"
+									className="w-full bg-white/5 border border-white/10 rounded-lg pl-8 pr-3 py-1.5 text-xs text-white placeholder:text-white/40 focus:outline-none focus:border-blue-500/50 focus:bg-white/10 transition-all [&::-webkit-search-cancel-button]:hidden"
 								/>
 								{searchQuery && (
 									<button
@@ -332,14 +329,14 @@ export default function AdminLayout({ active, setActive, handleLogout, children 
 									<div key={group.id} className="rounded-lg overflow-hidden border border-white/5 bg-white/[0.02]">
 										<button
 											onClick={() => toggleGroup(group.id)}
-											className={`w-full flex items-center justify-between px-3 py-2 text-xs font-bold uppercase tracking-wider transition-all ${hasActiveChild
-													? 'text-blue-300 bg-white/5'
-													: 'text-white/70 hover:text-white hover:bg-white/5'
+											className={`w-full flex items-center justify-between px-3 py-2 text-xs font-semibold tracking-normal transition-all ${hasActiveChild
+													? 'text-blue-300 bg-white/5 font-bold'
+													: 'text-white/80 hover:text-white hover:bg-white/5'
 												}`}
 										>
-											<div className="flex items-center gap-2 truncate">
-												{isOpen ? <FolderOpen className="h-3.5 w-3.5 text-blue-400 shrink-0" /> : <Folder className="h-3.5 w-3.5 text-white/40 shrink-0" />}
-												<span className="truncate">{group.title}</span>
+											<div className="flex items-center gap-2 min-w-0 flex-1 pr-1">
+												<span className="shrink-0">{group.icon}</span>
+												<span className="truncate text-white/90 font-bold">{group.title}</span>
 											</div>
 											<div className="flex items-center gap-1.5 shrink-0">
 												<span className="text-[10px] bg-white/10 px-1.5 py-0.2 rounded-full font-mono text-white/60">
@@ -380,15 +377,6 @@ export default function AdminLayout({ active, setActive, handleLogout, children 
 					</div>
 
 					<div className="space-y-1.5 mt-auto pt-3 border-t border-white/10 px-1">
-						<button
-							onClick={() => go('profile')}
-							className={`w-full flex items-center gap-2 px-3 py-2 rounded-md text-xs font-medium transition-all ${active === 'profile' ? 'bg-blue-600/30 text-white font-semibold' : 'text-white/80 hover:bg-white/10 hover:text-white'
-								}`}
-						>
-							<User className="h-4 w-4 text-blue-400 shrink-0" />
-							<span>Hồ sơ & Mật khẩu</span>
-						</button>
-
 						{hasPermission('settings', 'view') && (
 							<button
 								onClick={() => go('settings')}
@@ -402,14 +390,19 @@ export default function AdminLayout({ active, setActive, handleLogout, children 
 
 						<div
 							onClick={() => go('profile')}
-							className="px-2.5 py-2 flex items-center gap-2 text-white/80 bg-white/5 hover:bg-white/10 rounded-lg cursor-pointer transition-all border border-white/5 mt-1"
+							className="px-2.5 py-2 flex items-center gap-2.5 text-white/80 bg-white/5 hover:bg-white/10 rounded-lg cursor-pointer transition-all border border-white/5 mt-1 group"
 							title="Bấm để xem hồ sơ và đổi mật khẩu"
 						>
-							<div className="h-7 w-7 rounded-full bg-blue-600 flex items-center justify-center text-xs font-bold text-white uppercase shadow shrink-0">
+							<div className="h-8 w-8 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-xs font-bold text-white uppercase shadow shrink-0 border border-white/10">
 								{staffName?.charAt(0) || 'A'}
 							</div>
 							<div className="flex flex-col min-w-0 flex-1">
-								<span className="text-xs font-semibold text-white truncate">{staffName}</span>
+								<div className="flex items-center justify-between gap-1">
+									<span className="text-xs font-semibold text-white truncate group-hover:text-blue-300 transition-colors">{staffName}</span>
+									<span className="text-[9px] font-bold text-emerald-400 bg-emerald-500/15 border border-emerald-500/30 rounded px-1.5 py-0.5 shrink-0">
+										{isSuperAdmin ? 'Super Admin' : 'Staff'}
+									</span>
+								</div>
 								<span className="text-[10px] text-white/60 truncate">{staffEmail}</span>
 							</div>
 						</div>
