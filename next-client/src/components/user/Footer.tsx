@@ -259,7 +259,7 @@ export default function Footer() {
                                 </div>
 
                                 <div className="border-t border-white/10 pt-8 text-center">
-                                        <p className="text-gray-400 text-sm">© {new Date().getFullYear()} {selectedBranch?.name || 'CINESPHERE'}. Tất cả quyền được bảo lưu.</p>
+                                        <p className="text-gray-400 text-sm">© {new Date().getFullYear()} {'CINESPHERE'}. Tất cả quyền được bảo lưu.</p>
                                 </div>
                         </div>
                 </footer>
