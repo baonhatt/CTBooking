@@ -15,7 +15,7 @@ export default function UserLayout({ children, className, hideFooter = false }: 
         return (
                 <div className={cn('min-h-screen bg-gradient-dark', className)}>
                         <Header />
-                        <div className="relative">{children}</div>
+                        <main className="relative">{children}</main>
                         <FloatingActions />
                         <CartDrawer />
                         {!hideFooter && <Footer />}

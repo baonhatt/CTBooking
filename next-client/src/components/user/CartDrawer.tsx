@@ -124,15 +124,15 @@ export default function CartDrawer() {
   return (
     <AnimatePresence>
       {isOpen && (
-        <div className="fixed inset-0 z-[100] flex justify-end">
+        <div className="fixed inset-0 z-[100] flex justify-end touch-manipulation">
           {/* Backdrop */}
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            transition={{ duration: 0.25 }}
+            transition={{ duration: 0.2 }}
             onClick={closeCart}
-            className="fixed inset-0 bg-black/75 backdrop-blur-sm"
+            className="fixed inset-0 bg-black/75 backdrop-blur-sm cursor-pointer"
           />
 
           {/* Drawer Panel */}
@@ -141,7 +141,7 @@ export default function CartDrawer() {
             initial={{ x: '100%' }}
             animate={{ x: 0 }}
             exit={{ x: '100%' }}
-            transition={{ type: 'spring', damping: 26, stiffness: 280 }}
+            transition={{ duration: 0.25, ease: [0.16, 1, 0.3, 1] }}
             className="relative z-10 w-full max-w-lg bg-[#0a0f1d] border-l border-white/10 text-white shadow-2xl flex flex-col h-full"
           >
             {/* Top Glowing Header */}

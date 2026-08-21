@@ -1,40 +1,23 @@
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Phone, MessageCircle, Ticket, Headset, X } from 'lucide-react';
 import { useRouter, usePathname, useSearchParams } from 'next/navigation';
 import { cn } from '@/lib/utils';
 import { useBranch } from '@/hooks/useBranch';
+import { useCart } from '@/store/cartStore';
 
 export default function FloatingActions() {
         const [isExpanded, setIsExpanded] = useState(false);
-        const [isOverlayOpen, setIsOverlayOpen] = useState(false);
         const router = useRouter();
         const pathname = usePathname();
         const searchParams = useSearchParams();
         const { selectedBranch } = useBranch();
+        const { isOpen: isCartOpen } = useCart();
 
         // CHỈ HIỆN Ở TRANG CHỦ THEO YÊU CẦU CỦA USER
         const isHome = pathname === '/';
-
-        // Kiểm tra xem có đang mở Modal/Drawer/Menu nào không để ẩn nút nổi
-        useEffect(() => {
-                if (!isHome) return;
-
-                const checkOverlay = () => {
-                        // Radix UI và Vaul Drawer thường thêm style pointer-events: none hoặc overflow: hidden vào body
-                        const hasLock = document.body.style.overflow === 'hidden' ||
-                                document.body.hasAttribute('data-radix-scroll-lock');
-                        setIsOverlayOpen(!!hasLock);
-                };
-
-                // Theo dõi sự thay đổi của body attribute
-                const observer = new MutationObserver(checkOverlay);
-                observer.observe(document.body, { attributes: true, attributeFilter: ['style', 'data-radix-scroll-lock'] });
-
-                return () => observer.disconnect();
-        }, [isHome]);
 
         // Parse branch settings to get specific hotline
         const branchSettings = useMemo(() => {
@@ -46,8 +29,8 @@ export default function FloatingActions() {
                 }
         }, [selectedBranch]);
 
-        // Nếu không phải trang chủ hoặc đang mở overlay thì không render
-        if (!isHome || isOverlayOpen) return null;
+        // Nếu không phải trang chủ hoặc đang mở giỏ hàng thì không render
+        if (!isHome || isCartOpen) return null;
 
         const handleQuickBook = () => {
                 const params = new URLSearchParams(searchParams.toString());

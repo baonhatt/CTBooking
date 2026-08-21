@@ -1,12 +1,14 @@
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ArrowUp, MapPin, Phone, Mail, Facebook, Building2 } from 'lucide-react';
 import { useBranch } from '@/hooks/useBranch';
 
 export default function Footer() {
         const [isVisible, setIsVisible] = useState(false);
+        const [loadMap, setLoadMap] = useState(false);
+        const mapContainerRef = useRef<HTMLDivElement>(null);
         const { selectedBranch } = useBranch();
 
         // Parse branch settings
@@ -67,11 +69,26 @@ export default function Footer() {
                 return () => window.removeEventListener('scroll', handler);
         }, []);
 
+        useEffect(() => {
+                if (!mapContainerRef.current) return;
+                const observer = new IntersectionObserver(
+                        (entries) => {
+                                if (entries[0]?.isIntersecting) {
+                                        setLoadMap(true);
+                                        observer.disconnect();
+                                }
+                        },
+                        { rootMargin: '300px' }
+                );
+                observer.observe(mapContainerRef.current);
+                return () => observer.disconnect();
+        }, []);
+
         return (
                 <footer className="relative bg-gradient-to-b from-[#060915] to-black border-t border-white/10 py-10 md:py-16 overflow-hidden">
                         <div className="absolute inset-0 neon-noise opacity-30 pointer-events-none" />
-                        <div className="absolute left-0 top-0 w-96 h-96 bg-purple-500/10 blur-[120px]" />
-                        <div className="absolute right-0 bottom-0 w-96 h-96 bg-cyan-500/10 blur-[120px]" />
+                        <div className="hidden sm:block absolute left-0 top-0 w-96 h-96 bg-purple-500/10 blur-[120px]" />
+                        <div className="hidden sm:block absolute right-0 bottom-0 w-96 h-96 bg-cyan-500/10 blur-[120px]" />
 
                         <div className="container mx-auto px-4 relative z-10">
                                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8 mb-12">
@@ -200,18 +217,24 @@ export default function Footer() {
                                                                 VỊ TRÍ RẠP
                                                         </span>
                                                 </h4>
-                                                <div className="relative w-full h-64 rounded-lg overflow-hidden border border-white/20 shadow-lg">
-                                                        <iframe
-                                                                src={mapSrc}
-                                                                width="100%"
-                                                                height="100%"
-                                                                style={{ border: 0 }}
-                                                                allowFullScreen
-                                                                loading="lazy"
-                                                                referrerPolicy="no-referrer-when-downgrade"
-                                                                className="w-full h-full"
-                                                                title={`Vị trí ${selectedBranch?.name || 'CINESPHERE'}`}
-                                                        />
+                                                <div ref={mapContainerRef} className="relative w-full h-64 rounded-lg overflow-hidden border border-white/20 shadow-lg bg-white/5">
+                                                        {loadMap ? (
+                                                                <iframe
+                                                                        src={mapSrc}
+                                                                        width="100%"
+                                                                        height="100%"
+                                                                        style={{ border: 0 }}
+                                                                        allowFullScreen
+                                                                        loading="lazy"
+                                                                        referrerPolicy="no-referrer-when-downgrade"
+                                                                        className="w-full h-full"
+                                                                        title={`Vị trí ${selectedBranch?.name || 'CINESPHERE'}`}
+                                                                />
+                                                        ) : (
+                                                                <div className="w-full h-full flex items-center justify-center text-xs text-gray-400">
+                                                                        Đang tải bản đồ...
+                                                                </div>
+                                                        )}
                                                         <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent pointer-events-none" />
                                                 </div>
                                         </motion.div>

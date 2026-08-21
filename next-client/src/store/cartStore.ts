@@ -18,6 +18,12 @@ export interface CartItem {
 
 const STORAGE_KEY = 'cinesphere_cart_items';
 const LISTENERS = new Set<() => void>();
+const DRAWER_LISTENERS = new Set<(isOpen: boolean) => void>();
+
+let memoryItemsCache: CartItem[] | null = null;
+let isCartDrawerOpen = false;
+let lastDrawerActionTime = 0;
+const DRAWER_COOLDOWN_MS = 250;
 
 function notifyListeners() {
   LISTENERS.forEach((listener) => {
@@ -29,20 +35,39 @@ function notifyListeners() {
   });
 }
 
+function notifyDrawerListeners(isOpen: boolean) {
+  DRAWER_LISTENERS.forEach((listener) => {
+    try {
+      listener(isOpen);
+    } catch (e) {
+      console.error('Error in drawer listener', e);
+    }
+  });
+}
+
 function getStoredItems(): CartItem[] {
+  if (memoryItemsCache !== null) {
+    return memoryItemsCache;
+  }
   if (typeof window === 'undefined') return [];
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) return [];
+    if (!raw) {
+      memoryItemsCache = [];
+      return [];
+    }
     const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) ? parsed : [];
+    memoryItemsCache = Array.isArray(parsed) ? parsed : [];
+    return memoryItemsCache;
   } catch (e) {
     console.error('Error reading cart from localStorage', e);
+    memoryItemsCache = [];
     return [];
   }
 }
 
 function saveStoredItems(items: CartItem[]) {
+  memoryItemsCache = items;
   if (typeof window === 'undefined') return;
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(items));
@@ -52,8 +77,6 @@ function saveStoredItems(items: CartItem[]) {
     console.error('Error saving cart to localStorage', e);
   }
 }
-
-let isCartDrawerOpen = false;
 
 export const cartStore = {
   getItems(): CartItem[] {
@@ -65,18 +88,31 @@ export const cartStore = {
   },
 
   openCart() {
-    isCartDrawerOpen = true;
-    notifyListeners();
+    const now = Date.now();
+    if (now - lastDrawerActionTime < DRAWER_COOLDOWN_MS && isCartDrawerOpen) return;
+    lastDrawerActionTime = now;
+    if (!isCartDrawerOpen) {
+      isCartDrawerOpen = true;
+      notifyDrawerListeners(true);
+    }
   },
 
   closeCart() {
-    isCartDrawerOpen = false;
-    notifyListeners();
+    const now = Date.now();
+    if (now - lastDrawerActionTime < DRAWER_COOLDOWN_MS && !isCartDrawerOpen) return;
+    lastDrawerActionTime = now;
+    if (isCartDrawerOpen) {
+      isCartDrawerOpen = false;
+      notifyDrawerListeners(false);
+    }
   },
 
   toggleCart() {
+    const now = Date.now();
+    if (now - lastDrawerActionTime < DRAWER_COOLDOWN_MS) return;
+    lastDrawerActionTime = now;
     isCartDrawerOpen = !isCartDrawerOpen;
-    notifyListeners();
+    notifyDrawerListeners(isCartDrawerOpen);
   },
 
   addItem(item: Omit<CartItem, 'id' | 'selected'> & { selected?: boolean }) {
@@ -167,9 +203,14 @@ export const cartStore = {
     LISTENERS.add(listener);
     if (typeof window !== 'undefined') {
       const handleStorage = (e: StorageEvent) => {
-        if (e.key === STORAGE_KEY) listener();
+        if (e.key === STORAGE_KEY) {
+          memoryItemsCache = null;
+          listener();
+        }
       };
-      const handleCustom = () => listener();
+      const handleCustom = () => {
+        listener();
+      };
       window.addEventListener('storage', handleStorage);
       window.addEventListener('cinesphere-cart-updated', handleCustom);
 
@@ -182,6 +223,13 @@ export const cartStore = {
     return () => {
       LISTENERS.delete(listener);
     };
+  },
+
+  subscribeDrawer(listener: (isOpen: boolean) => void) {
+    DRAWER_LISTENERS.add(listener);
+    return () => {
+      DRAWER_LISTENERS.delete(listener);
+    };
   }
 };
 
@@ -190,17 +238,25 @@ import { useState, useEffect } from 'react';
 export function useCart() {
   const [items, setItems] = useState<CartItem[]>([]);
   const [isOpen, setIsOpen] = useState(false);
+  const [isMounted, setIsMounted] = useState(false);
 
   useEffect(() => {
+    setIsMounted(true);
     setItems(cartStore.getItems());
     setIsOpen(cartStore.getIsOpen());
 
-    const unsubscribe = cartStore.subscribe(() => {
+    const unsubscribeItems = cartStore.subscribe(() => {
       setItems(cartStore.getItems());
-      setIsOpen(cartStore.getIsOpen());
     });
 
-    return unsubscribe;
+    const unsubscribeDrawer = cartStore.subscribeDrawer((open) => {
+      setIsOpen(open);
+    });
+
+    return () => {
+      unsubscribeItems();
+      unsubscribeDrawer();
+    };
   }, []);
 
   const totalItemsCount = items.reduce((sum, item) => sum + item.quantity, 0);
@@ -217,6 +273,7 @@ export function useCart() {
   return {
     items,
     isOpen,
+    isMounted,
     totalItemsCount,
     selectedItems,
     selectedCount,
