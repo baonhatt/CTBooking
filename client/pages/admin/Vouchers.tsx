@@ -148,12 +148,13 @@ export default function VouchersPage() {
         }, [page, showActiveOnly, selectedBranchId, scopeFilter, searchText]);
 
         const openCreate = () => {
+                const newScope = scopeFilter === 'all' ? 'vr' : scopeFilter;
                 setEditData({
                         id: 0,
                         code: generateRandomCode(),
                         name: '',
                         description: '',
-                        scope: scopeFilter === 'all' ? 'vr' : scopeFilter,
+                        scope: newScope,
                         discount_type: 'percent',
                         discount_value: 10,
                         max_discount: null,
@@ -164,7 +165,11 @@ export default function VouchersPage() {
                         valid_until: null,
                         applicable_ticket_package_ids: [],
                         excluded_ticket_package_ids: [],
-                        branch_ids: null,
+                        branch_ids: staff?.isSuperAdmin
+                                ? null
+                                : selectedBranchId && selectedBranchId !== 'all'
+                                        ? [selectedBranchId]
+                                        : null,
                         is_active: true
                 });
                 setIsEditOpen(true);

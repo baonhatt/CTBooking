@@ -18,7 +18,8 @@ import {
     Tag,
     RotateCcw,
     Loader2,
-    Search
+    Search,
+    FilterX
 } from 'lucide-react';
 import { format, formatDistanceToNow, isAfter, isBefore } from 'date-fns';
 import { vi } from 'date-fns/locale';
@@ -341,151 +342,231 @@ export default function VouchersContent(props: Props) {
     };
 
     return (
-        <div className="space-y-6">
-            {/* PAGE HEADER */}
-            <div className="flex items-center justify-between">
-                <div>
-                    <h1 className="text-xl font-bold text-slate-800 flex items-center gap-2.5">
-                        <TicketIcon className="w-5.5 h-5.5 text-purple-600" />
-                        {isDeletedView ? 'Thùng rác Vouchers' : 'Quản lý Vouchers (Ưu đãi)'}
-                    </h1>
-                    <p className="text-sm text-slate-400 mt-0.5">
-                        {isDeletedView
-                            ? `${data.length} voucher đã xóa trong thùng rác`
-                            : `Tổng cộng ${data.length} voucher — áp dụng cho Trải nghiệm VR`}
-                    </p>
-                </div>
-            </div>
-
-            {/* TOOLBAR */}
-            <div className="flex flex-col xl:flex-row justify-between items-start xl:items-center gap-4 bg-white p-4 rounded-2xl border border-gray-200 shadow-sm">
-                <div className="flex flex-wrap items-center gap-3 w-full xl:w-auto">
-                    {/* Search */}
-                    <form onSubmit={handleSearchSubmit} className="flex items-center gap-2 flex-1 md:min-w-[320px] md:max-w-md">
-                        <div className="relative flex-1">
-                            <Tag className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-                            <Input
-                                placeholder="Tìm theo mã hoặc tên voucher..."
-                                value={localSearchText}
-                                onChange={(e) => setLocalSearchText(e.target.value)}
-                                className="pl-9 h-10 bg-slate-50 border-slate-200 focus:bg-white rounded-xl"
-                            />
-                        </div>
+        <div className="space-y-6 font-sans">
+            {/* HEADER + TOOLBAR CARD (gộp 1 khối theo chuẩn Transactions) */}
+            <div className="flex flex-col gap-4 bg-white p-6 rounded-2xl border shadow-sm">
+                <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+                    <div className="flex flex-col gap-1">
+                        <h3 className="text-lg font-bold text-slate-900 flex items-center gap-2">
+                            {isDeletedView ? (
+                                <Trash2 className="w-5 h-5 text-rose-500" />
+                            ) : (
+                                <Tag className="w-5 h-5 text-purple-600" />
+                            )}
+                            {isDeletedView ? 'Vouchers đã xóa' : 'Quản lý Vouchers (Ưu đãi)'}
+                            <Badge
+                                variant="secondary"
+                                className="rounded-full bg-slate-100 text-slate-600 px-2 py-0 h-5 text-[10px] font-bold"
+                            >
+                                {data.length}
+                            </Badge>
+                        </h3>
+                        <p className="text-xs text-slate-500">
+                            {isDeletedView
+                                ? 'Xem và phục hồi các voucher đã chuyển vào thùng rác.'
+                                : 'Quản lý mã ưu đãi, giảm giá áp dụng cho VR, Phim hoặc Tất cả dịch vụ.'}
+                        </p>
+                    </div>
+                    <div className="flex items-center gap-2 w-full md:w-auto justify-end">
+                        {!isDeletedView && (
+                            <Button
+                                variant="outline"
+                                size="icon"
+                                className="text-slate-400 hover:text-rose-600 hover:bg-rose-50 hover:border-rose-100 w-11 h-11 rounded-xl transition-all shadow-sm shrink-0"
+                                title="Đặt lại bộ lọc"
+                                onClick={() => {
+                                    setLocalSearchText('');
+                                    setSearchText('');
+                                    setScopeFilter('vr');
+                                    setShowActiveOnly(true);
+                                    setPage(1);
+                                    toast.info('Đã đặt lại bộ lọc');
+                                }}
+                            >
+                                <FilterX size={18} />
+                            </Button>
+                        )}
                         <Button
-                            type="submit"
-                            className="h-10 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-semibold px-4 flex items-center gap-1.5 shrink-0"
+                            variant="outline"
+                            size="icon"
+                            onClick={onRefresh}
+                            className="rounded-xl shadow-sm hover:rotate-180 transition-transform duration-500 shrink-0 h-11 w-11"
+                            title="Làm mới"
                         >
-                            <Search className="w-3.5 h-3.5" /> Tìm kiếm
+                            <RefreshCw className={`w-4 h-4 ${isLoading ? 'animate-spin' : ''}`} />
                         </Button>
-                    </form>
+                    </div>
+                </div>
 
-                    {/* Scope Filter Pills */}
-                    <div className="flex items-center bg-slate-50 p-1 rounded-xl border border-slate-200 gap-1">
-                        <button
-                            type="button"
-                            onClick={() => { setScopeFilter('all'); setPage(1); }}
-                            className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all flex items-center gap-1.5 ${
-                                scopeFilter === 'all'
-                                    ? 'bg-slate-800 text-white shadow-sm'
-                                    : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100/50'
-                            }`}
+                <div className="h-px bg-slate-100 my-0.5" />
+
+                {/* Row 1: Search + (Scope Pills + Active Switch) */}
+                <div className="space-y-3">
+                    <div className="flex flex-wrap items-center gap-3">
+                        {/* Search Form */}
+                        <form
+                            onSubmit={handleSearchSubmit}
+                            className="flex flex-1 min-w-[300px] max-w-lg gap-2"
                         >
-                            <TicketIcon className="w-3.5 h-3.5" /> Tất cả
-                        </button>
-                        <button
-                            type="button"
-                            onClick={() => { setScopeFilter('vr'); setPage(1); }}
-                            className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all flex items-center gap-1.5 ${
-                                scopeFilter === 'vr'
-                                    ? 'bg-purple-600 text-white shadow-sm'
-                                    : 'text-purple-600 hover:text-purple-100 hover:bg-purple-50/50'
-                            }`}
-                        >
-                            <Gamepad2 className="w-3.5 h-3.5" /> Chỉ VR
-                        </button>
-                        <button
-                            type="button"
-                            onClick={() => { setScopeFilter('movie'); setPage(1); }}
-                            className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all flex items-center gap-1.5 ${
-                                scopeFilter === 'movie'
-                                    ? 'bg-blue-600 text-white shadow-sm'
-                                    : 'text-blue-600 hover:text-blue-100 hover:bg-blue-50/50'
-                            }`}
-                        >
-                            <Film className="w-3.5 h-3.5" /> Chỉ Phim
-                        </button>
+                            <div className="relative flex-1">
+                                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 w-4 h-4" />
+                                <Input
+                                    placeholder="Tìm mã voucher hoặc tên chương trình..."
+                                    value={localSearchText}
+                                    onChange={(e) => setLocalSearchText(e.target.value)}
+                                    className="pl-10 pr-9 h-11 bg-slate-50 border-transparent focus:bg-white focus:ring-2 focus:ring-blue-500 rounded-xl transition-all"
+                                />
+                                {localSearchText && (
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            setLocalSearchText('');
+                                            setSearchText('');
+                                            setPage(1);
+                                        }}
+                                        className="absolute right-2 top-1/2 -translate-y-1/2 w-7 h-7 rounded-md flex items-center justify-center text-slate-400 hover:text-slate-600 hover:bg-slate-200/70 transition-colors"
+                                        title="Xóa tìm kiếm"
+                                    >
+                                        <X className="w-4 h-4" />
+                                    </button>
+                                )}
+                            </div>
+                            <Button
+                                type="submit"
+                                className="h-11 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-semibold px-4 flex items-center gap-1.5 shrink-0"
+                            >
+                                <Search className="w-4 h-4" /> Tìm kiếm
+                            </Button>
+                        </form>
+
+                        <div className="flex flex-wrap items-center gap-2">
+                            {/* Scope Pills (theo chuẩn Transactions: shadow active) */}
+                            <div className="flex items-center gap-1 p-1 bg-slate-50 rounded-xl border border-slate-200 h-11">
+                                <button
+                                    type="button"
+                                    onClick={() => { setScopeFilter('all'); setPage(1); }}
+                                    className={`px-3 h-8 rounded-lg text-xs font-bold transition-all ${
+                                        scopeFilter === 'all'
+                                            ? 'bg-slate-800 text-white shadow-sm'
+                                            : 'text-slate-500 hover:text-slate-700 hover:bg-white'
+                                    }`}
+                                >
+                                    Tất cả
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => { setScopeFilter('vr'); setPage(1); }}
+                                    className={`px-3 h-8 rounded-lg text-xs font-bold transition-all flex items-center gap-1 ${
+                                        scopeFilter === 'vr'
+                                            ? 'bg-purple-600 text-white shadow-sm shadow-purple-200'
+                                            : 'text-slate-500 hover:text-purple-600 hover:bg-white'
+                                    }`}
+                                >
+                                    <Gamepad2 size={12} /> Chỉ VR
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => { setScopeFilter('movie'); setPage(1); }}
+                                    className={`px-3 h-8 rounded-lg text-xs font-bold transition-all flex items-center gap-1 ${
+                                        scopeFilter === 'movie'
+                                            ? 'bg-blue-600 text-white shadow-sm shadow-blue-200'
+                                            : 'text-slate-500 hover:text-blue-600 hover:bg-white'
+                                    }`}
+                                >
+                                    <Film size={12} /> Chỉ Phim
+                                </button>
+                            </div>
+
+                            {!isDeletedView && (
+                                <div className="flex items-center gap-3 px-4 py-2 bg-slate-50 rounded-xl border border-slate-200 h-11">
+                                    <ToggleRight size={14} className="text-slate-400" />
+                                    <span className="text-xs font-medium text-slate-500 whitespace-nowrap">
+                                        Chỉ voucher đang bật
+                                    </span>
+                                    <Switch
+                                        checked={showActiveOnly}
+                                        onCheckedChange={setShowActiveOnly}
+                                        className="data-[state=checked]:bg-green-500 data-[state=unchecked]:bg-slate-300 cursor-pointer"
+                                    />
+                                </div>
+                            )}
+                        </div>
                     </div>
 
-                    {!isDeletedView && (
-                        <div className="flex items-center gap-2 px-3 py-1.5 bg-slate-50 rounded-xl border border-slate-200">
-                            <span className="text-[10px] font-bold text-slate-500 uppercase">Chỉ voucher bật</span>
-                            <Switch
-                                checked={showActiveOnly}
-                                onCheckedChange={setShowActiveOnly}
-                                className="data-[state=checked]:bg-green-500 data-[state=unchecked]:bg-gray-300 cursor-pointer"
-                            />
+                    {/* Row 2: Branch select + Action buttons (Refresh, Trash, Create) */}
+                    <div className="flex flex-wrap items-center justify-between gap-3">
+                        <div className="flex flex-wrap items-center gap-3">
+                            {branches.length > 0 ? (
+                                <div className="flex items-center gap-2 pl-3 pr-1 py-1.5 bg-slate-50 rounded-xl border border-slate-200 h-11">
+                                    <Tag size={14} className="text-slate-400" />
+                                    <Select
+                                        value={String(selectedBranchId ?? 'all')}
+                                        onValueChange={(val) => {
+                                            setSelectedBranchId(val === 'all' ? 'all' : Number(val));
+                                            setPage(1);
+                                        }}
+                                    >
+                                        <SelectTrigger className="h-8 w-full sm:w-[190px] border-0 bg-transparent shadow-none p-0 focus:ring-0 text-xs text-slate-600">
+                                            <SelectValue placeholder="Chi nhánh" />
+                                        </SelectTrigger>
+                                        <SelectContent className="rounded-xl border-slate-200">
+                                            <SelectItem value="all">🌐 Tất cả chi nhánh</SelectItem>
+                                            {branches.map((b) => (
+                                                <SelectItem key={b.id} value={String(b.id)}>🏬 {b.name}</SelectItem>
+                                            ))}
+                                        </SelectContent>
+                                    </Select>
+                                </div>
+                            ) : (
+                                <div className="flex items-center gap-2 h-11 px-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium text-slate-500">
+                                    <Loader2 className="w-4 h-4 animate-spin text-purple-600" />
+                                    <span>Đang tải chi nhánh...</span>
+                                </div>
+                            )}
                         </div>
-                    )}
-                </div>
 
-                <div className="flex flex-wrap items-center gap-3 w-full xl:w-auto">
-                    {branches.length > 0 ? (
-                        <select
-                            value={selectedBranchId || 'all'}
-                            onChange={(e) => {
-                                setSelectedBranchId(e.target.value === 'all' ? 'all' : Number(e.target.value));
-                                setPage(1);
-                            }}
-                            className="bg-white border rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-purple-500 outline-none shadow-sm cursor-pointer h-10"
-                        >
-                            <option value="all">Tất cả chi nhánh</option>
-                            {branches.map((b) => (
-                                <option key={b.id} value={b.id}>{b.name}</option>
-                            ))}
-                        </select>
-                    ) : (
-                        <div className="flex items-center gap-2 h-10 px-3 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium text-slate-500">
-                            <Loader2 className="w-3.5 h-3.5 animate-spin text-purple-600" />
-                            <span>Đang tải chi nhánh...</span>
+                        <div className="flex flex-wrap items-center gap-2">
+                            {!isDeletedView && hasPermission('vouchers', 'view_deleted') && (
+                                <Button
+                                    variant="outline"
+                                    onClick={() => navigate('/deleted/vouchers')}
+                                    className="h-11 rounded-xl flex items-center gap-2 px-4 shadow-sm border-slate-200"
+                                >
+                                    <Trash2 className="w-4 h-4" />
+                                    <span className="hidden sm:inline text-sm text-slate-600 font-medium">Xem đã xóa</span>
+                                </Button>
+                            )}
+                            {isDeletedView && (
+                                <Button
+                                    variant="outline"
+                                    onClick={() => navigate('/vouchers')}
+                                    className="h-11 rounded-xl flex items-center gap-2 px-4 shadow-sm border-slate-200"
+                                >
+                                    <RotateCcw className="w-4 h-4" />
+                                    <span className="text-sm font-medium">Về danh sách</span>
+                                </Button>
+                            )}
+                            {!isDeletedView && hasPermission('vouchers', 'create') && (
+                                <Button
+                                    onClick={onCreate}
+                                    className={`h-11 rounded-xl shadow-sm gap-2 text-white px-5 font-medium whitespace-nowrap ${
+                                        scopeFilter === 'movie'
+                                            ? 'bg-blue-600 hover:bg-blue-700 shadow-blue-200'
+                                            : scopeFilter === 'all'
+                                                ? 'bg-indigo-600 hover:bg-indigo-700 shadow-indigo-200'
+                                                : 'bg-purple-600 hover:bg-purple-700 shadow-purple-200'
+                                    }`}
+                                >
+                                    <Plus className="w-4 h-4" />
+                                    {scopeFilter === 'movie'
+                                        ? 'Thêm voucher Phim'
+                                        : scopeFilter === 'all'
+                                            ? 'Thêm voucher'
+                                            : 'Thêm voucher VR'}
+                                </Button>
+                            )}
                         </div>
-                    )}
-                    {!isDeletedView && hasPermission('vouchers', 'view_deleted') && (
-                        <Button
-                            variant="outline"
-                            onClick={() => navigate('/admin/deleted/vouchers')}
-                            className="rounded-xl flex items-center gap-2 h-10 px-4 shadow-sm"
-                        >
-                            <Trash2 className="w-4 h-4" />
-                            <span className="hidden sm:inline text-sm">Thùng rác</span>
-                        </Button>
-                    )}
-                    {isDeletedView && (
-                        <Button
-                            variant="outline"
-                            onClick={() => navigate('/admin/vouchers')}
-                            className="rounded-xl flex items-center gap-2 h-10 px-4 shadow-sm"
-                        >
-                            <RotateCcw className="w-4 h-4" />
-                            <span className="text-sm">Về danh sách</span>
-                        </Button>
-                    )}
-                    {!isDeletedView && hasPermission('vouchers', 'create') && (
-                        <Button
-                            onClick={onCreate}
-                            className="bg-purple-600 hover:bg-purple-700 rounded-lg shadow-sm gap-2 text-white h-10 px-5 font-medium"
-                        >
-                            <Plus className="w-4 h-4" /> Thêm voucher VR
-                        </Button>
-                    )}
-                    <Button
-                        variant="outline"
-                        size="icon"
-                        onClick={onRefresh}
-                        className="rounded-xl shadow-sm hover:rotate-180 transition-transform duration-500 shrink-0 h-10 w-10"
-                        title="Làm mới"
-                    >
-                        <RefreshCw className={`w-4 h-4 ${isLoading ? 'animate-spin' : ''}`} />
-                    </Button>
+                    </div>
                 </div>
             </div>
 
@@ -543,11 +624,11 @@ export default function VouchersContent(props: Props) {
                                                     <Tag className="w-10 h-10 opacity-40" />
                                                     <p className="text-sm font-medium">
                                                         {isDeletedView
-                                                            ? 'Thùng rác trống'
+                                                            ? 'Chưa có voucher nào bị xóa'
                                                             : 'Chưa có voucher nào trong hệ thống'}
                                                     </p>
                                                     {!isDeletedView && hasPermission('vouchers', 'create') && (
-                                                        <p className="text-xs">Bấm "Thêm voucher VR" để tạo ưu đãi đầu tiên</p>
+                                                        <p className="text-xs">Bấm "{scopeFilter === 'movie' ? 'Thêm voucher Phim' : scopeFilter === 'all' ? 'Thêm voucher' : 'Thêm voucher VR'}" để tạo ưu đãi đầu tiên</p>
                                                     )}
                                                 </div>
                                             </TableCell>
@@ -759,9 +840,9 @@ export default function VouchersContent(props: Props) {
                                                                         <AlertDialogDescription className="text-slate-500 text-sm leading-relaxed">
                                                                             Voucher <b className="font-mono bg-slate-100 px-1.5 py-0.5 rounded">
                                                                                 {v.code}
-                                                                            </b> ({v.name}) sẽ được chuyển vào thùng rác.
+                                                                            </b> ({v.name}) sẽ được chuyển vào danh sách đã xóa.
                                                                             <br />
-                                                                            Bạn có thể phục hồi lại từ menu "Thùng rác".
+                                                                            Bạn có thể phục hồi lại từ mục "Xem đã xóa".
                                                                         </AlertDialogDescription>
                                                                     </AlertDialogHeader>
                                                                     <AlertDialogFooter>
@@ -1422,6 +1503,16 @@ export default function VouchersContent(props: Props) {
                     </DialogHeader>
                     {selectedVoucher && (
                         <div className="overflow-y-auto px-6 py-5 space-y-4 flex-1">
+                            {(() => {
+                                const toArr = (v: any): number[] =>
+                                    Array.isArray(v) ? (v as number[]) : [];
+                                const applied = toArr(selectedVoucher.applicable_ticket_package_ids);
+                                const excluded = toArr(selectedVoucher.excluded_ticket_package_ids);
+                                const recent = Array.isArray(selectedVoucher.recent_redemptions)
+                                    ? (selectedVoucher.recent_redemptions as any[])
+                                    : [];
+                                return (
+                                    <>
                             {/* Info Grid */}
                             <div className="grid grid-cols-2 md:grid-cols-3 gap-3 text-xs">
                                 <div className="bg-slate-50 rounded-xl p-3 border border-slate-100">
@@ -1487,15 +1578,15 @@ export default function VouchersContent(props: Props) {
                             </div>
 
                             {/* Applied package lists */}
-                            {(selectedVoucher.applicable_ticket_package_ids?.length || selectedVoucher.excluded_ticket_package_ids?.length) && (
+                            {(applied.length || excluded.length) && (
                                 <div className="grid grid-cols-2 gap-3">
-                                    {selectedVoucher.applicable_ticket_package_ids?.length ? (
+                                    {applied.length ? (
                                         <div>
                                             <Label className="text-[10px] font-bold uppercase text-green-600 block mb-1.5">
-                                                ✓ Áp dụng cho ({selectedVoucher.applicable_ticket_package_ids.length}) gói
+                                                ✓ Áp dụng cho ({applied.length}) gói
                                             </Label>
                                             <div className="space-y-1 max-h-36 overflow-y-auto border border-green-100 rounded-xl p-2 bg-green-50/40">
-                                                {selectedVoucher.applicable_ticket_package_ids.map((id) => (
+                                                {applied.map((id) => (
                                                     <Badge key={id} variant="outline" className="border-green-200 bg-white text-green-700 text-[10px]">
                                                         ID #{id}
                                                     </Badge>
@@ -1503,13 +1594,13 @@ export default function VouchersContent(props: Props) {
                                             </div>
                                         </div>
                                     ) : null}
-                                    {selectedVoucher.excluded_ticket_package_ids?.length ? (
+                                    {excluded.length ? (
                                         <div>
                                             <Label className="text-[10px] font-bold uppercase text-red-600 block mb-1.5">
-                                                ✗ Loại trừ ({selectedVoucher.excluded_ticket_package_ids.length}) gói
+                                                ✗ Loại trừ ({excluded.length}) gói
                                             </Label>
                                             <div className="space-y-1 max-h-36 overflow-y-auto border border-red-100 rounded-xl p-2 bg-red-50/40">
-                                                {selectedVoucher.excluded_ticket_package_ids.map((id) => (
+                                                {excluded.map((id) => (
                                                     <Badge key={id} variant="outline" className="border-red-200 bg-white text-red-700 text-[10px]">
                                                         ID #{id}
                                                     </Badge>
@@ -1521,7 +1612,7 @@ export default function VouchersContent(props: Props) {
                             )}
 
                             {/* Recent redemptions */}
-                            {selectedVoucher.recent_redemptions?.length > 0 && (
+                            {recent.length > 0 && (
                                 <div>
                                     <Label className="text-[10px] font-bold uppercase text-slate-600 block mb-1.5">
                                         20 giao dịch redeem gần nhất
@@ -1536,7 +1627,7 @@ export default function VouchersContent(props: Props) {
                                                 </TableRow>
                                             </TableHeader>
                                             <TableBody>
-                                                {selectedVoucher.recent_redemptions.map((r: any, i: number) => (
+                                                {recent.map((r: any, i: number) => (
                                                     <TableRow key={`rd-${r.id || i}`} className="hover:bg-slate-50 border-t border-slate-100">
                                                         <TableCell className="text-xs font-mono">#{r.booking_id}</TableCell>
                                                         <TableCell className="text-xs font-semibold text-green-700">
@@ -1568,6 +1659,9 @@ export default function VouchersContent(props: Props) {
                                     của <b className="text-slate-700">{selectedVoucher.updated_by_staff_name || '-'}</b>
                                 </span>
                             </div>
+                                    </>
+                                );
+                            })()}
                         </div>
                     )}
                 </DialogContent>
