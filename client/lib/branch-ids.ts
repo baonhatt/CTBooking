@@ -39,14 +39,15 @@ export function getBranchIdsDisplayStatus(branch_ids: BranchIdsValue): BranchIds
 }
 
 export function formatBranchIdsLabel(
-        branch_ids: BranchIdsValue,
+        branch_ids: unknown,
         branches: { id: number; name: string }[]
 ): string {
-        const status = getBranchIdsDisplayStatus(branch_ids);
+        const normalized: BranchIdsValue = parseBranchIdsFromApi(branch_ids);
+        const status = getBranchIdsDisplayStatus(normalized);
         if (status === 'all') return 'Tất cả chi nhánh';
         if (status === 'unset') return 'Chưa chọn chi nhánh';
-        const names = branch_ids!
+        const names = normalized!
                 .map((id) => branches.find((b) => b.id === id)?.name)
                 .filter(Boolean);
-        return names.length > 0 ? names.join(', ') : branch_ids!.join(', ');
+        return names.length > 0 ? names.join(', ') : normalized!.join(', ');
 }

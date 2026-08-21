@@ -287,11 +287,17 @@ export async function listDeletedVouchersApi(filters: VoucherListFilters = {}) {
 }
 
 /* ========== LIST VR TICKET PACKAGES FOR VOUCHER FORM ========== */
-export async function listVRTicketPackagesForVoucher(type: string = 'vr') {
+export async function listVRTicketPackagesForVoucher(
+        type: string = 'vr',
+        branchFilter?: { branch_id?: number | null; restrictToBranchIds?: number[] | null }
+) {
         const params = new URLSearchParams();
         params.set('type', type);
         params.set('pageSize', '100');
         params.set('is_active', 'all');
+        if (branchFilter?.branch_id) {
+                params.set('branch_id', String(branchFilter.branch_id));
+        }
         return request<{ items: any[]; total: number }>(
                 `/api/tickets?${params.toString()}`
         );

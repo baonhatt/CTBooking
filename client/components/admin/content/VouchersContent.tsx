@@ -55,6 +55,7 @@ import {
     AlertDialogTitle,
     AlertDialogTrigger
 } from '@/components/ui/alert-dialog';
+import { XCircle, CheckCircle2 } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
@@ -194,6 +195,7 @@ export default function VouchersContent(props: Props) {
     const [isDetailDialogOpen, setIsDetailDialogOpen] = useState(false);
     const [selectedVoucher, setSelectedVoucher] = useState<VoucherItem | null>(null);
     const [localSearchText, setLocalSearchText] = useState(searchText);
+    const [voucherToToggle, setVoucherToToggle] = useState<{ id: number; currentStatus: boolean } | null>(null);
 
     useEffect(() => {
         setLocalSearchText(searchText);
@@ -208,20 +210,56 @@ export default function VouchersContent(props: Props) {
     useEffect(() => {
         if (isEditOpen) {
             const scope = editData?.scope || 'vr';
-            listVRTicketPackagesForVoucher(scope).then((res) => {
-                setVrPackages(res.items || []);
+            const branchIds = editData?.branch_ids;
+            const isSingleBranch = Array.isArray(branchIds) && branchIds.length === 1;
+            const isMultiBranch = Array.isArray(branchIds) && branchIds.length > 1;
+            const branchFilter = isSingleBranch
+                ? { branch_id: branchIds[0] }
+                : undefined;
+            listVRTicketPackagesForVoucher(scope, branchFilter).then((res) => {
+                let packages = res.items || [];
+                if (isMultiBranch) {
+                    const allowedIds = new Set(branchIds as number[]);
+                    packages = packages.filter((pkg: any) => {
+                        const noBranchConfig =
+                            (pkg.branch_id === undefined || pkg.branch_id === null) &&
+                            (pkg.branch_ids === undefined ||
+                                pkg.branch_ids === null ||
+                                (Array.isArray(pkg.branch_ids) && pkg.branch_ids.length === 0) ||
+                                pkg.branch_ids === '[]');
+                        if (noBranchConfig) return true;
+                        if (typeof pkg.branch_id === 'number' && allowedIds.has(pkg.branch_id)) {
+                            return true;
+                        }
+                        let pkgBranchArr: number[] = [];
+                        if (Array.isArray(pkg.branch_ids)) {
+                            pkgBranchArr = pkg.branch_ids;
+                        } else if (typeof pkg.branch_ids === 'string' && pkg.branch_ids.trim().length > 0) {
+                            try {
+                                const parsed = JSON.parse(pkg.branch_ids);
+                                if (Array.isArray(parsed)) pkgBranchArr = parsed;
+                            } catch {}
+                        }
+                        if (pkgBranchArr.length === 0 && (pkg.branch_id === undefined || pkg.branch_id === null)) {
+                            return true;
+                        }
+                        return pkgBranchArr.some((id) => allowedIds.has(Number(id)));
+                    });
+                }
+                setVrPackages(packages);
             }).catch(() => {});
             getAdminBranchOptions({ includeInactive: true }).then((res) => {
                 setBranchOptions(res.items || []);
             }).catch(() => {});
         }
-    }, [isEditOpen, editData?.scope]);
+    }, [isEditOpen, editData?.scope, JSON.stringify(editData?.branch_ids)]);
 
     const handleToggleStatus = async (id: number, currentStatus: boolean) => {
         setIsTogglingId(id);
         try {
             await toggleVoucherStatusApi(id);
             toast.success(!currentStatus ? 'Đã bật voucher' : 'Đã ẩn voucher');
+            setVoucherToToggle(null);
             onRefresh();
         } catch (err: any) {
             toast.error(err.message || 'Lỗi khi thay đổi trạng thái');
@@ -746,18 +784,103 @@ export default function VouchersContent(props: Props) {
                                                     ) : (
                                                         <div className="flex items-center justify-center">
                                                             {hasPermission('vouchers', 'toggle_status') ? (
-                                                                <button
-                                                                    type="button"
-                                                                    onClick={() => handleToggleStatus(v.id, !!v.is_active)}
-                                                                    className="transition-transform hover:scale-110"
-                                                                    title={v.is_active ? 'Tắt voucher' : 'Bật voucher'}
+                                                                <AlertDialog
+                                                                    open={
+                                                                        voucherToToggle?.id === v.id
+                                                                    }
+                                                                    onOpenChange={(open) => {
+                                                                        if (!open) setVoucherToToggle(null);
+                                                                    }}
                                                                 >
-                                                                    {v.is_active ? (
-                                                                        <ToggleRight className="w-9 h-9 text-green-600" strokeWidth={2} />
-                                                                    ) : (
-                                                                        <ToggleLeft className="w-9 h-9 text-slate-400" strokeWidth={2} />
-                                                                    )}
-                                                                </button>
+                                                                    <AlertDialogTrigger asChild>
+                                                                        <Switch
+                                                                            checked={!!v.is_active}
+                                                                            className="scale-100 transition-all border-2 border-transparent cursor-pointer shrink-0"
+                                                                            style={{
+                                                                                opacity: 1,
+                                                                                backgroundColor: v.is_active ? '#10b981' : '#d1d5db',
+                                                                                boxShadow: 'none'
+                                                                            }}
+                                                                            onClick={(e) => {
+                                                                                e.preventDefault();
+                                                                                setVoucherToToggle({
+                                                                                    id: v.id,
+                                                                                    currentStatus: !!v.is_active
+                                                                                });
+                                                                            }}
+                                                                        />
+                                                                    </AlertDialogTrigger>
+                                                                    <AlertDialogContent className="max-w-md rounded-2xl font-sans bg-white">
+                                                                        <AlertDialogHeader>
+                                                                            <AlertDialogTitle className="text-slate-900 flex items-center gap-2">
+                                                                                {voucherToToggle?.currentStatus ? (
+                                                                                    <>
+                                                                                        <XCircle className="w-5 h-5 text-red-500" />
+                                                                                        Xác nhận ẩn voucher
+                                                                                    </>
+                                                                                ) : (
+                                                                                    <>
+                                                                                        <CheckCircle2 className="w-5 h-5 text-emerald-500" />
+                                                                                        Xác nhận kích hoạt voucher
+                                                                                    </>
+                                                                                )}
+                                                                            </AlertDialogTitle>
+                                                                            <AlertDialogDescription className="text-slate-500 text-sm">
+                                                                                Voucher{' '}
+                                                                                <b className="font-mono bg-slate-100 px-1.5 py-0.5 rounded">
+                                                                                    {v.code}
+                                                                                </b>{' '}
+                                                                                — {v.name}
+                                                                                <br />
+                                                                                {voucherToToggle?.currentStatus ? (
+                                                                                    <>
+                                                                                        Voucher sẽ <strong>không còn áp dụng được</strong> cho khách hàng.
+                                                                                    </>
+                                                                                ) : (
+                                                                                    <>
+                                                                                        Voucher sẽ <strong>hiển thị công khai</strong> và sẵn sàng cho khách hàng áp dụng.
+                                                                                    </>
+                                                                                )}
+                                                                            </AlertDialogDescription>
+                                                                        </AlertDialogHeader>
+                                                                        <AlertDialogFooter className="mt-3">
+                                                                            <AlertDialogCancel
+                                                                                className="rounded-lg"
+                                                                                onClick={() => setVoucherToToggle(null)}
+                                                                            >
+                                                                                Hủy
+                                                                            </AlertDialogCancel>
+                                                                            <AlertDialogAction
+                                                                                disabled={isTogglingId === v.id}
+                                                                                onClick={(e) => {
+                                                                                    e.preventDefault();
+                                                                                    if (voucherToToggle) {
+                                                                                        handleToggleStatus(
+                                                                                            voucherToToggle.id,
+                                                                                            voucherToToggle.currentStatus
+                                                                                        );
+                                                                                    }
+                                                                                }}
+                                                                                className={`rounded-lg text-white ${
+                                                                                    voucherToToggle?.currentStatus
+                                                                                        ? 'bg-red-600 hover:bg-red-700'
+                                                                                        : 'bg-emerald-600 hover:bg-emerald-700'
+                                                                                }`}
+                                                                            >
+                                                                                {isTogglingId === v.id ? (
+                                                                                    <span className="flex items-center gap-2">
+                                                                                        <Loader2 className="w-4 h-4 animate-spin" />
+                                                                                        Đang xử lý...
+                                                                                    </span>
+                                                                                ) : voucherToToggle?.currentStatus ? (
+                                                                                    'Đồng ý ẩn'
+                                                                                ) : (
+                                                                                    'Đồng ý kích hoạt'
+                                                                                )}
+                                                                            </AlertDialogAction>
+                                                                        </AlertDialogFooter>
+                                                                    </AlertDialogContent>
+                                                                </AlertDialog>
                                                             ) : (
                                                                 <Badge
                                                                     variant="outline"
@@ -1298,15 +1421,75 @@ export default function VouchersContent(props: Props) {
                                         hoverClass: 'hover:bg-purple-50 hover:border-purple-100'
                                     };
 
+                                    const appliedList: number[] =
+                                        Array.isArray(editData?.applicable_ticket_package_ids)
+                                            ? editData.applicable_ticket_package_ids
+                                            : [];
+                                    const excludedList: number[] =
+                                        Array.isArray(editData?.excluded_ticket_package_ids)
+                                            ? editData.excluded_ticket_package_ids
+                                            : [];
+                                    const hasAnyApplicable = appliedList.length > 0;
+                                    const hasAnyExcluded = excludedList.length > 0;
+                                    const mode: 'all' | 'whitelist' | 'blacklist' = hasAnyApplicable
+                                        ? 'whitelist'
+                                        : hasAnyExcluded
+                                        ? 'blacklist'
+                                        : 'all';
+
                                     return (
                                         <div className={`bg-white p-4 rounded-2xl border ${scopeConfig.borderClass} ${scopeConfig.themeClass.split(' ')[1] || ''} shadow-xs space-y-3`}>
-                                            <h3 className={`text-xs font-bold ${scopeConfig.textTheme} border-b ${scopeConfig.borderClass} pb-2 flex items-center gap-2`}>
-                                                {scopeConfig.icon}
-                                                {scopeConfig.title}
+                                            <div className={`text-xs font-bold ${scopeConfig.textTheme} border-b ${scopeConfig.borderClass} pb-2 flex flex-wrap items-center gap-2`}>
+                                                <div className="flex items-center gap-2 mr-2">
+                                                    {scopeConfig.icon}
+                                                    {scopeConfig.title}
+                                                </div>
+                                                {mode === 'whitelist' && (
+                                                    <Badge variant="outline" className="text-[10px] border-green-300 bg-green-50 text-green-700 px-2 py-0 rounded-full">
+                                                        ✓ Chỉ áp {appliedList.length} gói
+                                                    </Badge>
+                                                )}
+                                                {mode === 'blacklist' && (
+                                                    <Badge variant="outline" className="text-[10px] border-red-300 bg-red-50 text-red-700 px-2 py-0 rounded-full">
+                                                        ✗ Loại trừ {excludedList.length} gói
+                                                    </Badge>
+                                                )}
+                                                {mode === 'all' && (
+                                                    <Badge variant="outline" className="text-[10px] border-slate-300 bg-slate-50 text-slate-600 px-2 py-0 rounded-full">
+                                                        ○ Áp tất cả
+                                                    </Badge>
+                                                )}
                                                 <span className={`ml-auto text-[10px] font-normal ${scopeConfig.textTheme.replace('800', '500')}`}>
                                                     {scopeConfig.hint}
                                                 </span>
-                                            </h3>
+                                            </div>
+
+                                            {mode !== 'all' && (
+                                                <div
+                                                    className={`rounded-lg px-3 py-2 border text-[11px] flex items-center gap-2 ${
+                                                        mode === 'whitelist'
+                                                            ? 'bg-green-50 border-green-200 text-green-700'
+                                                            : 'bg-red-50 border-red-200 text-red-700'
+                                                    }`}
+                                                >
+                                                    {mode === 'whitelist' ? (
+                                                        <>
+                                                            <CheckCircle2 className="w-3.5 h-3.5 shrink-0" />
+                                                            <span>
+                                                                <b>Chỉ áp gói:</b> bỏ hết tick cột Áp dụng → mới tick được Loại trừ.
+                                                            </span>
+                                                        </>
+                                                    ) : (
+                                                        <>
+                                                            <XCircle className="w-3.5 h-3.5 shrink-0" />
+                                                            <span>
+                                                                <b>Áp tất cả trừ:</b> bỏ hết tick cột Loại trừ → mới tick được Áp dụng.
+                                                            </span>
+                                                        </>
+                                                    )}
+                                                </div>
+                                            )}
+
                                             <div className={`border ${scopeConfig.borderClass} rounded-xl p-2.5 h-40 overflow-y-auto space-y-1.5 bg-white`}>
                                                 {vrPackages.length === 0 ? (
                                                     <p className="text-xs text-gray-400 text-center py-6">
@@ -1314,63 +1497,96 @@ export default function VouchersContent(props: Props) {
                                                     </p>
                                                 ) : (
                                                     vrPackages.map((pkg) => {
-                                                        const applied = (
-                                                            editData?.applicable_ticket_package_ids || []
-                                                        ).includes(pkg.id);
-                                                        const excluded = (
-                                                            editData?.excluded_ticket_package_ids || []
-                                                        ).includes(pkg.id);
+                                                        const applied = appliedList.includes(pkg.id);
+                                                        const excluded = excludedList.includes(pkg.id);
+                                                        const applyDisabled = excluded || hasAnyExcluded;
+                                                        const excludeDisabled = applied || hasAnyApplicable;
                                                         return (
                                                             <div
                                                                 key={pkg.id}
                                                                 className={`flex items-center space-x-2 p-1.5 rounded-lg border border-transparent transition-colors ${scopeConfig.hoverClass}`}
                                                             >
-                                                                <Checkbox
-                                                                    id={`vrpkg-apply-${pkg.id}`}
-                                                                    checked={applied}
-                                                                    disabled={excluded}
-                                                                    onCheckedChange={(checked) => {
-                                                                        const curr =
-                                                                            editData?.applicable_ticket_package_ids || [];
-                                                                        setEditData({
-                                                                            ...editData,
-                                                                            applicable_ticket_package_ids: checked
+                                                                <div className={applyDisabled && !applied ? 'opacity-60' : ''}>
+                                                                    <Checkbox
+                                                                        id={`vrpkg-apply-${pkg.id}`}
+                                                                        checked={applied}
+                                                                        disabled={applyDisabled}
+                                                                        onCheckedChange={(checked) => {
+                                                                            const curr =
+                                                                                editData?.applicable_ticket_package_ids || [];
+                                                                            const nextApplied = checked
                                                                                 ? [...curr, pkg.id]
-                                                                                : curr.filter((id: number) => id !== pkg.id)
-                                                                        });
-                                                                    }}
-                                                                />
+                                                                                : curr.filter((id: number) => id !== pkg.id);
+                                                                            const nextEditData: any = {
+                                                                                ...editData,
+                                                                                applicable_ticket_package_ids:
+                                                                                    nextApplied.length > 0 ? nextApplied : null
+                                                                            };
+                                                                            if (nextApplied.length > 0 && hasAnyExcluded) {
+                                                                                nextEditData.excluded_ticket_package_ids = null;
+                                                                                toast.info(
+                                                                                    'Đã chuyển Chỉ áp gói — danh sách Loại trừ đã xóa.'
+                                                                                );
+                                                                            }
+                                                                            setEditData(nextEditData);
+                                                                        }}
+                                                                    />
+                                                                </div>
                                                                 <label
                                                                     htmlFor={`vrpkg-apply-${pkg.id}`}
-                                                                    className="text-xs font-medium leading-none cursor-pointer flex-1 text-slate-700 truncate"
+                                                                    className={`text-xs font-medium leading-none cursor-pointer flex-1 truncate ${
+                                                                        applyDisabled && !applied ? 'text-slate-400' : 'text-slate-700'
+                                                                    }`}
+                                                                    title={applyDisabled && !applied
+                                                                        ? 'Bỏ hết Loại trừ → mới tick được Áp dụng'
+                                                                        : undefined
+                                                                    }
                                                                 >
                                                                     {pkg.name}
                                                                     <span className="ml-1 text-[10px] text-slate-400">
                                                                         ({formatMoney(pkg.price)})
                                                                     </span>
                                                                 </label>
-                                                                <Checkbox
-                                                                    id={`vrpkg-ex-${pkg.id}`}
-                                                                    checked={excluded}
-                                                                    disabled={applied}
-                                                                    onCheckedChange={(checked) => {
-                                                                        const curr =
-                                                                            editData?.excluded_ticket_package_ids || [];
-                                                                        setEditData({
-                                                                            ...editData,
-                                                                            excluded_ticket_package_ids: checked
+                                                                <div className={excludeDisabled && !excluded ? 'opacity-60' : ''}>
+                                                                    <Checkbox
+                                                                        id={`vrpkg-ex-${pkg.id}`}
+                                                                        checked={excluded}
+                                                                        disabled={excludeDisabled}
+                                                                        onCheckedChange={(checked) => {
+                                                                            const curr =
+                                                                                editData?.excluded_ticket_package_ids || [];
+                                                                            const nextExcluded = checked
                                                                                 ? [...curr, pkg.id]
-                                                                                : curr.filter((id: number) => id !== pkg.id)
-                                                                        });
-                                                                    }}
-                                                                />
-                                                                <label
-                                                                    htmlFor={`vrpkg-ex-${pkg.id}`}
-                                                                    className="text-[10px] text-red-500 cursor-pointer"
-                                                                    title="Loại trừ gói này khỏi voucher"
-                                                                >
-                                                                    {excluded ? 'Loại trừ' : 'Bỏ qua'}
-                                                                </label>
+                                                                                : curr.filter((id: number) => id !== pkg.id);
+                                                                            if (nextExcluded.length > 0 && hasAnyApplicable) {
+                                                                                setEditData({
+                                                                                    ...editData,
+                                                                                    applicable_ticket_package_ids: null,
+                                                                                    excluded_ticket_package_ids:
+                                                                                        nextExcluded.length > 0 ? nextExcluded : null
+                                                                                });
+                                                                                toast.info(
+                                                                                    'Đã chuyển Loại trừ — các mục Áp dụng đã xóa.'
+                                                                                );
+                                                                            } else {
+                                                                                setEditData({
+                                                                                    ...editData,
+                                                                                    excluded_ticket_package_ids:
+                                                                                        nextExcluded.length > 0 ? nextExcluded : null
+                                                                                });
+                                                                            }
+                                                                        }}
+                                                                    />
+                                                                </div>
+                                                                {excluded ? (
+                                                                    <label
+                                                                        htmlFor={`vrpkg-ex-${pkg.id}`}
+                                                                        className="text-[10px] text-red-500 cursor-pointer font-semibold"
+                                                                        title="Bỏ chọn để hủy loại trừ gói này"
+                                                                    >
+                                                                        Loại trừ
+                                                                    </label>
+                                                                ) : null}
                                                             </div>
                                                         );
                                                     })

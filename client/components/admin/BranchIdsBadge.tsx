@@ -1,19 +1,43 @@
-import { formatBranchIdsLabel, getBranchIdsDisplayStatus, type BranchIdsValue } from '@/lib/branch-ids';
+import { formatBranchIdsLabel, getBranchIdsDisplayStatus, parseBranchIdsFromApi, type BranchIdsValue } from '@/lib/branch-ids';
 
 type BranchIdsBadgeProps = {
-        branch_ids?: BranchIdsValue | null;
-        branch_id?: number | null;
+        branch_ids?: unknown;
+        branch_id?: unknown;
         branches: { id: number; name: string }[];
         className?: string;
 };
 
+function toSingleBranchIdOrNull(raw: unknown): BranchIdsValue {
+        if (raw === null || raw === undefined) return null;
+        if (typeof raw === 'number') {
+                return Number.isNaN(raw) || raw <= 0 ? null : [raw];
+        }
+        if (typeof raw === 'string') {
+                const trimmed = raw.trim();
+                if (trimmed.length === 0) return null;
+                const n = Number(trimmed);
+                if (!Number.isNaN(n) && n > 0) return [n];
+                try {
+                        const parsed = JSON.parse(trimmed);
+                        if (typeof parsed === 'number') {
+                                return Number.isNaN(parsed) || parsed <= 0 ? null : [parsed];
+                        }
+                        if (Array.isArray(parsed) && parsed.length > 0) {
+                                const n2 = Number(parsed[0]);
+                                return Number.isNaN(n2) || n2 <= 0 ? null : [n2];
+                        }
+                } catch {
+                        return null;
+                }
+        }
+        return null;
+}
+
 export function BranchIdsBadge({ branch_ids, branch_id, branches, className }: BranchIdsBadgeProps) {
-        const normalized =
+        const normalized: BranchIdsValue =
                 branch_ids !== undefined
-                        ? branch_ids
-                        : branch_id
-                          ? [branch_id]
-                          : null;
+                        ? parseBranchIdsFromApi(branch_ids)
+                        : toSingleBranchIdOrNull(branch_id);
         const status = getBranchIdsDisplayStatus(normalized);
         const label = formatBranchIdsLabel(normalized, branches);
 
