@@ -27,7 +27,7 @@ export default function TransactionsPage() {
         const [txPage, setTxPage] = useState(1);
         const pageSize = 10;
         const [txQuery, setTxQuery] = useState(initialFilters.txQuery ?? '');
-        const [txStatus, setTxStatus] = useState<'paid' | 'all'>(initialFilters.txStatus ?? 'paid');
+        const [txStatus, setTxStatus] = useState<'paid' | 'all'>(initialFilters.txStatus ?? 'all');
         const [sortKey, setSortKey] = useState<'created_at' | 'paid_at'>(initialFilters.sortKey ?? 'created_at');
         const [sortDir, setSortDir] = useState<'asc' | 'desc'>(initialFilters.sortDir ?? 'desc');
         const [paymentMethod, setPaymentMethod] = useState<string>(initialFilters.paymentMethod ?? '');

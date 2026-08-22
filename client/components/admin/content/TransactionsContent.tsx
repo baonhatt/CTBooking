@@ -827,7 +827,7 @@ export default function TransactionsContent({
                                                                                                                 <span className="text-[14px] font-bold text-slate-600">
                                                                                                                         Tổng lượt chơi: {Array.isArray(txDetails.vr_items)
                                                                                                                                 ? txDetails.vr_items.reduce((s: number, i: any) => s + Number(i.quantity || 0), 0)
-                                                                                                                                : 0}
+                                                                                                                                : txDetails.booking_details?.ticket_count || 0}
                                                                                                                 </span>
                                                                                                         </div>
                                                                                                         {/* Bảng chi tiết vr_items */}
@@ -882,9 +882,9 @@ export default function TransactionsContent({
                                                                                                         <div className="flex justify-between items-end border-t border-purple-200/30 pt-3">
                                                                                                                 <InfoRow
                                                                                                                         label="Tổng lượt chơi"
-                                                                                                                        value={Array.isArray(txDetails.vr_items)
+                                                                                                                        value={Array.isArray(txDetails.vr_items) && txDetails.vr_items.length > 0
                                                                                                                                 ? txDetails.vr_items.reduce((s: number, i: any) => s + Number(i.quantity || 0), 0)
-                                                                                                                                : 0}
+                                                                                                                                : txDetails.booking_details?.ticket_count || 0}
                                                                                                                         large
                                                                                                                         color="text-purple-700"
                                                                                                                 />
@@ -899,29 +899,83 @@ export default function TransactionsContent({
                                                                                         </>
                                                                                 ) : (
                                                                                         <>
-                                                                                                <SectionHeader color="text-amber-600" title="Gói & Phim" icon={<TicketIcon size={16} />} />
+                                                                                                <SectionHeader color="text-amber-600" title={txDetails.booking_type === 'combo_vr' ? 'Gói Vé & VR Combo' : 'Gói & Phim'} icon={<TicketIcon size={16} />} />
                                                                                                 <div className="bg-amber-50/40 rounded-xl p-5 border border-amber-100 space-y-4 shadow-sm">
-                                                                                                        <div className="flex justify-between">
-                                                                                                                <InfoRow label="Loại Vé" value={txDetails.ticket_package?.name} bold />
-                                                                                                                <span className="text-[14px] font-bold text-slate-600">
-                                                                                                                        {txDetails.ticket_package?.ticket_unit_price?.toLocaleString()}đ
-                                                                                                                </span>
-                                                                                                        </div>
-                                                                                                        <div className="flex flex-wrap gap-1.5 border-t border-amber-200/30 pt-3 min-h-[40px]">
-                                                                                                                {txDetails.ticket_package?.movies?.map((m: any) => (
-                                                                                                                        <Badge
-                                                                                                                                key={m.id}
-                                                                                                                                variant="outline"
-                                                                                                                                className="bg-white text-[10px] border-amber-200 text-amber-800"
-                                                                                                                        >
-                                                                                                                                {m.title}
-                                                                                                                        </Badge>
-                                                                                                                ))}
-                                                                                                        </div>
+                                                                                                        {/* Nếu có danh sách chi tiết vr_items */}
+                                                                                                        {txDetails.vr_items && txDetails.vr_items.length > 0 ? (
+                                                                                                                <div className="border border-amber-200/60 rounded-lg overflow-hidden bg-white">
+                                                                                                                        <Table className="[&_td]:py-2.5 [&_th]:py-2.5">
+                                                                                                                                <TableHeader className="bg-amber-50/70">
+                                                                                                                                        <TableRow className="hover:bg-transparent border-none">
+                                                                                                                                                <TableHead className="text-[11px] font-bold uppercase text-amber-800">Tên gói / Vé</TableHead>
+                                                                                                                                                <TableHead className="text-center text-[11px] font-bold uppercase text-amber-800 w-14">SL</TableHead>
+                                                                                                                                                <TableHead className="text-right text-[11px] font-bold uppercase text-amber-800 w-28">Đơn giá</TableHead>
+                                                                                                                                                <TableHead className="text-right text-[11px] font-bold uppercase text-amber-800 w-32">Thành tiền</TableHead>
+                                                                                                                                        </TableRow>
+                                                                                                                                </TableHeader>
+                                                                                                                                <TableBody>
+                                                                                                                                        {txDetails.vr_items.map((it: any, idx: number) => {
+                                                                                                                                                const qty = Number(it.quantity || 1);
+                                                                                                                                                const unit = Number(it.discounted_unit_price ?? it.unit_price ?? 0);
+                                                                                                                                                const line = Number(it.line_total ?? unit * qty);
+                                                                                                                                                return (
+                                                                                                                                                        <TableRow key={it.id || `item-${idx}`} className="border-t border-amber-100/60 hover:bg-transparent">
+                                                                                                                                                                <TableCell className="py-2.5">
+                                                                                                                                                                        <div className="flex items-center gap-2">
+                                                                                                                                                                                <div className="w-6 h-6 rounded-md bg-amber-100 flex items-center justify-center shrink-0">
+                                                                                                                                                                                        <TicketIcon className="w-3 h-3 text-amber-700" />
+                                                                                                                                                                                </div>
+                                                                                                                                                                                <span className="text-sm font-semibold text-slate-800 leading-tight">
+                                                                                                                                                                                        {it.package_name || txDetails.ticket_package?.name || `Gói vé #${idx + 1}`}
+                                                                                                                                                                                </span>
+                                                                                                                                                                        </div>
+                                                                                                                                                                </TableCell>
+                                                                                                                                                                <TableCell className="text-center font-bold text-slate-700 text-sm py-2.5">
+                                                                                                                                                                        × {qty}
+                                                                                                                                                                </TableCell>
+                                                                                                                                                                <TableCell className="text-right text-[12px] text-slate-600 py-2.5">
+                                                                                                                                                                        {unit.toLocaleString('vi-VN')}đ
+                                                                                                                                                                </TableCell>
+                                                                                                                                                                <TableCell className="text-right font-bold text-amber-900 text-sm py-2.5">
+                                                                                                                                                                        {line.toLocaleString('vi-VN')}đ
+                                                                                                                                                                </TableCell>
+                                                                                                                                                        </TableRow>
+                                                                                                                                                );
+                                                                                                                                        })}
+                                                                                                                                </TableBody>
+                                                                                                                        </Table>
+                                                                                                                </div>
+                                                                                                        ) : (
+                                                                                                                <div className="flex justify-between">
+                                                                                                                        <InfoRow label="Loại Vé" value={txDetails.ticket_package?.name || txDetails.ticket_package_name} bold />
+                                                                                                                        <span className="text-[14px] font-bold text-slate-600">
+                                                                                                                                {txDetails.ticket_package?.ticket_unit_price?.toLocaleString()}đ
+                                                                                                                        </span>
+                                                                                                                </div>
+                                                                                                        )}
+
+                                                                                                        {/* Danh sách phim combo nếu có */}
+                                                                                                        {txDetails.ticket_package?.movies && txDetails.ticket_package.movies.length > 0 && (
+                                                                                                                <div className="space-y-1 border-t border-amber-200/30 pt-3">
+                                                                                                                        <p className="text-xs text-gray-500 font-medium">Phim trong gói:</p>
+                                                                                                                        <div className="flex flex-wrap gap-1.5 min-h-[32px]">
+                                                                                                                                {txDetails.ticket_package?.movies?.map((m: any) => (
+                                                                                                                                        <Badge
+                                                                                                                                                key={m.id}
+                                                                                                                                                variant="outline"
+                                                                                                                                                className="bg-white text-[10px] border-amber-200 text-amber-800"
+                                                                                                                                        >
+                                                                                                                                                {m.title}
+                                                                                                                                        </Badge>
+                                                                                                                                ))}
+                                                                                                                        </div>
+                                                                                                                </div>
+                                                                                                        )}
+
                                                                                                         <div className="flex justify-between items-end border-t border-amber-200/30 pt-3">
                                                                                                                 <InfoRow
-                                                                                                                        label="Số lượng"
-                                                                                                                        value={txDetails.booking_details?.ticket_count}
+                                                                                                                        label="Số lượng vé"
+                                                                                                                        value={txDetails.booking_details?.ticket_count || (Array.isArray(txDetails.vr_items) ? txDetails.vr_items.reduce((s: number, i: any) => s + Number(i.quantity || 0), 0) : 1)}
                                                                                                                         large
                                                                                                                         color="text-amber-700"
                                                                                                                 />

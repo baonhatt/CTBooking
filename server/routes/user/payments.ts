@@ -325,9 +325,9 @@ export async function createPaymentImpl(
 
                 // Use explicit UTC ISO timestamps for created_at/updated_at để đồng bộ giữa Postgres & D1
                 const nowIso = new Date();
-                let pay_txt_code_dt = '';
-                if (pay_txt_code) {
-                        pay_txt_code_dt = pay_txt_code;
+                let pay_txt_code_dt: string | null = null;
+                if (pay_txt_code && String(pay_txt_code).trim()) {
+                        pay_txt_code_dt = String(pay_txt_code).trim();
                 }
 
                 const hasVR = vrItemsDetails && vrItemsDetails.length > 0;
@@ -371,22 +371,69 @@ export async function createPaymentImpl(
                         return { status: 500, message: 'Không thể tạo đặt vé' };
                 }
 
-                // Insert VR items into booking_vr_items if present
-                if (hasVR && tables.booking_vr_items) {
-                        for (const item of vrItemsDetails!) {
-                                await anyDb.insert(tables.booking_vr_items).values({
-                                        booking_id: bookingRow.id,
-                                        vr_ticket_package_id: item.vr_package_id,
-                                        quantity: item.quantity,
-                                        unit_price: item.unit_price,
-                                        package_name: item.package_name,
-                                        voucher_id: voucherDetails?.id || null,
-                                        discounted_unit_price: item.unit_price,
-                                        line_total: item.line_total,
-                                        voucher_discount_amount: 0,
-                                        branch_id: item.branch_id || branchIdToSave,
-                                        created_at: formatDateForDb(nowIso)
-                                });
+                // Insert line items into booking_vr_items
+                const insertedItemsArr: any[] = [];
+                if (tables.booking_vr_items) {
+                        // 1. Insert movie ticket package if present
+                        if (validation.ticketPackage) {
+                                const pkgQty = ticketCount || 1;
+                                const pkgPrice = Number(validation.ticketPackage.price || 0);
+                                let pkgLineTotal = Number(totalPrice);
+                                if (hasVR) {
+                                        const vrSubtotal = (vrItemsDetails || []).reduce((sum, it) => sum + Number(it.line_total || 0), 0);
+                                        pkgLineTotal = Math.max(0, Number(totalPrice) - vrSubtotal);
+                                }
+                                const pkgDiscount = Number(voucherDiscountAmount || 0);
+                                const pkgDiscountedUnit = pkgQty > 0 ? +(pkgLineTotal / pkgQty).toFixed(2) : pkgPrice;
+
+                                try {
+                                        const r = await anyDb
+                                                .insert(tables.booking_vr_items)
+                                                .values({
+                                                        booking_id: bookingRow.id,
+                                                        vr_ticket_package_id: Number(validation.ticketPackage.id),
+                                                        quantity: pkgQty,
+                                                        unit_price: pkgPrice,
+                                                        package_name: validation.ticketPackage.name || 'Gói vé',
+                                                        voucher_id: voucherDetails?.id || null,
+                                                        discounted_unit_price: pkgDiscountedUnit,
+                                                        line_total: pkgLineTotal,
+                                                        voucher_discount_amount: pkgDiscount,
+                                                        branch_id: branchIdToSave,
+                                                        created_at: formatDateForDb(nowIso)
+                                                })
+                                                .returning();
+                                        if (r) insertedItemsArr.push(Array.isArray(r) ? r[0] : r);
+                                } catch (err: any) {
+                                        console.error('Error inserting movie ticket item to booking_vr_items:', err);
+                                }
+                        }
+
+                        // 2. Insert VR items into booking_vr_items if present
+                        if (hasVR) {
+                                for (const item of vrItemsDetails!) {
+                                        try {
+                                                const r = await anyDb
+                                                        .insert(tables.booking_vr_items)
+                                                        .values({
+                                                                booking_id: bookingRow.id,
+                                                                vr_ticket_package_id: item.vr_package_id,
+                                                                quantity: item.quantity,
+                                                                unit_price: item.unit_price,
+                                                                package_name: item.package_name,
+                                                                voucher_id: voucherDetails?.id || null,
+                                                                discounted_unit_price: item.unit_price,
+                                                                line_total: item.line_total,
+                                                                voucher_discount_amount: 0,
+                                                                branch_id: item.branch_id || branchIdToSave,
+                                                                created_at: formatDateForDb(nowIso)
+                                                        })
+                                                        .returning();
+                                                if (r) insertedItemsArr.push(Array.isArray(r) ? r[0] : r);
+                                        } catch (err: any) {
+                                                console.error('Error inserting VR item to booking_vr_items:', err);
+                                        }
+                                }
                         }
                 }
 
@@ -409,7 +456,7 @@ export async function createPaymentImpl(
                                 email: bookingRow.email,
                                 payment_status: bookingRow.payment_status,
                                 created_at: bookingRow.created_at,
-                                vr_items: vrItemsDetails || []
+                                vr_items: insertedItemsArr.length > 0 ? insertedItemsArr : (vrItemsDetails || [])
                         }
                 };
         } catch (err: any) {

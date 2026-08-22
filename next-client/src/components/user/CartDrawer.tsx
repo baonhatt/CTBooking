@@ -226,7 +226,9 @@ export default function CartDrawer() {
                     <Button
                       onClick={() => {
                         closeCart();
-                        router.push('/vr');
+                        const el = document.getElementById('vr');
+                        if (el) el.scrollIntoView({ behavior: 'smooth' });
+                        else router.push('/#vr');
                       }}
                       className="flex-1 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 text-white font-bold text-xs h-10 rounded-xl"
                     >

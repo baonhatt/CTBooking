@@ -230,13 +230,13 @@ export default function HeroSection({
                 <LazyMotion features={domAnimation} strict>
                         <section
                                 id="hero"
-                                className="relative min-h-[85vh] lg:min-h-screen overflow-hidden bg-gradient-to-br from-[#050915] via-[#0b1226] to-[#0e1b3d] text-white pt-16 sm:pt-24"
+                                className="relative min-h-[85vh] lg:min-h-screen overflow-hidden bg-gradient-to-b from-[#030712] via-[#070b1e] to-[#050915] text-white pt-16 sm:pt-24"
                                 onMouseMove={isDesktopHero ? onMove : undefined}
                                 onMouseEnter={isDesktopHero ? onMouseEnter : undefined}
                         >
-                                <div className="absolute inset-0 bg-black">
-                                        <div className="absolute inset-0 bg-[radial-gradient(circle_at_20%_20%,rgba(59,130,246,0.4),transparent_30%),radial-gradient(circle_at_80%_30%,rgba(236,72,153,0.3),transparent_35%),radial-gradient(circle_at_50%_70%,rgba(34,211,238,0.35),transparent_30%)]" />
-                                        <div className="absolute inset-0 bg-gradient-to-b from-black/80 via-black/50 to-[#050915]/95" />
+                                <div className="absolute inset-0 bg-black/40">
+                                        <div className="absolute inset-0 bg-[radial-gradient(circle_at_20%_20%,rgba(59,130,246,0.35),transparent_35%),radial-gradient(circle_at_80%_30%,rgba(236,72,153,0.25),transparent_40%),radial-gradient(circle_at_50%_70%,rgba(34,211,238,0.3),transparent_35%)]" />
+                                        <div className="absolute inset-0 bg-gradient-to-b from-transparent via-[#050915]/60 to-[#050915]" />
                                 </div>
 
                                 <div className="absolute -left-24 top-10 w-[520px] h-[520px] rounded-full bg-cyan-500/15 blur-[120px] animate-pulse pointer-events-none" />
@@ -282,7 +282,7 @@ export default function HeroSection({
                                                                 className="flex flex-wrap items-center gap-4 pt-2"
                                                         >
                                                                 <Button
-                                                                        className="group rounded-2xl px-9 py-8 text-base md:text-lg font-semibold bg-gradient-to-r from-cyan-400 via-blue-600 to-fuchsia-500 hover:from-fuchsia-500 hover:via-cyan-400 hover:to-blue-600 text-white shadow-[0_0_40px_rgba(59,130,246,0.6)] transition-all duration-500 hover:shadow-[0_0_60px_rgba(236,72,153,0.8)] hover:scale-105"
+                                                                        className="group rounded-xl px-8 py-6 text-sm sm:text-base font-bold bg-gradient-to-r from-cyan-500 via-blue-600 to-fuchsia-500 hover:from-fuchsia-500 hover:via-cyan-400 hover:to-blue-600 text-white shadow-[0_0_30px_rgba(6,182,212,0.4)] transition-all duration-500 hover:shadow-[0_0_50px_rgba(236,72,153,0.6)] hover:scale-[1.02] active:scale-95"
                                                                         onClick={() => {
                                                                                 const bookingSection = document.getElementById('promotions');
                                                                                 bookingSection?.scrollIntoView({ behavior: 'smooth' });
@@ -290,15 +290,14 @@ export default function HeroSection({
                                                                 >
                                                                         <span className="flex items-center gap-2">
                                                                                 Đặt vé ngay
-                                                                                <Play className="h-5 w-5 group-hover:translate-x-1 transition-transform" />
+                                                                                <Play className="h-4 w-4 group-hover:translate-x-1 transition-transform" />
                                                                         </span>
                                                                 </Button>
                                                                 <Button
-                                                                        className="group rounded-2xl px-9 py-8 text-base md:text-lg font-semibold bg-gradient-to-r from-purple-600 via-fuchsia-600 to-pink-600 hover:from-pink-600 hover:via-purple-600 hover:to-fuchsia-600 text-white shadow-[0_0_40px_rgba(168,85,247,0.6)] transition-all duration-500 hover:shadow-[0_0_60px_rgba(236,72,153,0.8)] hover:scale-105"
+                                                                        className="group rounded-xl px-8 py-6 text-sm sm:text-base font-bold bg-gradient-to-r from-purple-600 via-fuchsia-600 to-pink-600 hover:from-pink-600 hover:via-purple-600 hover:to-fuchsia-600 text-white shadow-[0_0_30px_rgba(168,85,247,0.4)] transition-all duration-500 hover:shadow-[0_0_50px_rgba(236,72,153,0.6)] hover:scale-[1.02] active:scale-95"
                                                                         onClick={() => {
-                                                                                const params = new URLSearchParams(searchParams.toString());
-                                                                                const branchParam = selectedBranch?.id ? `?branch_id=${selectedBranch.id}` : (params.toString() ? `?${params.toString()}` : '');
-                                                                                router.push(`/vr${branchParam}`);
+                                                                                const vrSection = document.getElementById('vr');
+                                                                                vrSection?.scrollIntoView({ behavior: 'smooth' });
                                                                         }}
                                                                 >
                                                                         <span className="flex items-center gap-2">

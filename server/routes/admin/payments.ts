@@ -325,10 +325,10 @@ export async function getTransactionByIdImpl(
                 .orderBy(desc(tables.auditLogs.createdAt))
                 .limit(1);
 
-        // 4b. Load vr_items nếu là booking VR
+        // 4b. Load vr_items (line items) từ bảng booking_vr_items
         let vr_items: any[] = [];
         const bType = booking.booking_type || 'movie';
-        if (bType === 'vr' && tables.booking_vr_items) {
+        if (tables.booking_vr_items) {
                 try {
                         vr_items = await anyDb
                                 .select()

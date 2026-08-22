@@ -275,56 +275,61 @@ export default function FilmCarousel({ initialFilms = [], onSelectFilm }: FilmCa
                                 >
                                         Đóng
                                 </Button>
-                                <Button
-                                        onClick={handleBookTicket}
-                                        className="bg-gradient-to-r from-cyan-400 via-blue-600 to-fuchsia-500 hover:from-fuchsia-500 hover:via-cyan-400 hover:to-blue-600 text-white font-semibold shadow-[0_0_30px_rgba(59,130,246,0.4)] hover:shadow-[0_0_40px_rgba(236,72,153,0.6)] transition-all duration-300 hover:scale-105 flex-1 md:flex-none"
-                                >
-                                        <Ticket className="h-4 w-4 mr-2" />
-                                        Đặt vé ngay
-                                </Button>
-                        </div>
-                )
-        );
+					<Button
+						onClick={handleBookTicket}
+						className="bg-gradient-to-r from-cyan-400 via-blue-600 to-fuchsia-500 hover:from-fuchsia-500 hover:via-cyan-400 hover:to-blue-600 text-white font-semibold shadow-[0_0_30px_rgba(59,130,246,0.4)] hover:shadow-[0_0_40px_rgba(236,72,153,0.6)] transition-all duration-300 hover:scale-105 flex-1 md:flex-none"
+					>
+						<Ticket className="h-4 w-4 mr-2" />
+						Đặt vé ngay
+					</Button>
+				</div>
+			)
+		);
 
-        return (
-                <section
-                        id="films"
-                        className="relative py-20 px-2 bg-gradient-to-b from-[#050915] via-[#0b1226] to-[#0e1b3d] overflow-hidden"
-                >
-                        <div className="absolute inset-0 opacity-60 neon-noise pointer-events-none" />
-                        <div className="absolute -left-10 -top-10 w-72 h-72 rounded-full bg-cyan-500/15 blur-3xl" />
-                        <div className="absolute right-0 bottom-0 w-96 h-96 rounded-full bg-fuchsia-500/10 blur-[120px]" />
+	return (
+		<section
+			id="films"
+			className="relative py-20 px-2 bg-gradient-to-b from-[#050915] via-[#070b1e] to-[#050915] overflow-hidden"
+		>
+			<div className="absolute inset-0 opacity-60 neon-noise pointer-events-none" />
+			<div className="absolute -left-10 -top-10 w-72 h-72 rounded-full bg-cyan-500/15 blur-3xl pointer-events-none" />
+			<div className="absolute right-0 bottom-0 w-96 h-96 rounded-full bg-fuchsia-500/10 blur-[120px] pointer-events-none" />
 
-                        <div className="container mx-auto px-3 relative z-10">
-                                <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-4 mb-10">
-                                        <div>
-                                                <p className="text-sm uppercase tracking-[0.24em] text-cyan-200">Phim</p>
-                                                <h2 className="text-3xl md:text-4xl font-bold text-white mt-2">Thư viện phim hologram 8K</h2>
-                                                <p className="text-gray-300 mt-2 max-w-2xl">
-                                                        Lướt qua các suất chiếu đa chiều. Chọn phim để mở chi tiết và chuyển tới bước đặt vé ngay.
-                                                </p>
-                                        </div>
-                                        <div className="flex items-center gap-3">
-                                                <Button
-                                                        variant="ghost"
-                                                        className="rounded-full border border-white/15 text-white hover:border-cyan-300 disabled:opacity-50 disabled:cursor-not-allowed"
-                                                        onClick={scrollPrev}
-                                                        disabled={!canScrollPrev}
-                                                        aria-label="Xem phim trước đó"
-                                                >
-                                                        <ChevronLeft className="h-5 w-5" />
-                                                </Button>
-                                                <Button
-                                                        variant="ghost"
-                                                        className="rounded-full border border-white/15 text-white hover:border-cyan-300 disabled:opacity-50 disabled:cursor-not-allowed"
-                                                        onClick={scrollNext}
-                                                        disabled={!canScrollNext}
-                                                        aria-label="Xem phim tiếp theo"
-                                                >
-                                                        <ChevronRight className="h-5 w-5" />
-                                                </Button>
-                                        </div>
-                                </div>
+			<div className="container mx-auto px-4 relative z-10">
+				<div className="flex flex-col md:flex-row md:items-end md:justify-between gap-6 mb-12">
+					<div className="space-y-3">
+						<div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-cyan-500/15 border border-cyan-500/30 text-cyan-300 text-xs font-bold uppercase tracking-widest backdrop-blur-md shadow-[0_0_20px_rgba(6,182,212,0.2)]">
+							<Ticket className="w-4 h-4 text-cyan-400" />
+							<span>Thư Viện Phim Chiếu Rạp</span>
+						</div>
+						<h2 className="text-3xl sm:text-4xl md:text-5xl font-black text-white tracking-tight leading-tight">
+							Thư viện phim <span className="text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 via-teal-300 to-blue-400">hologram 8K</span>
+						</h2>
+						<p className="text-slate-300 text-sm sm:text-base max-w-2xl leading-relaxed">
+							Lướt qua các suất chiếu đa chiều. Chọn phim để mở chi tiết và chuyển tới bước đặt vé ngay.
+						</p>
+					</div>
+					<div className="flex items-center gap-3 self-end md:self-auto">
+						<Button
+							variant="ghost"
+							className="w-10 h-10 rounded-xl bg-white/[0.07] hover:bg-white/[0.15] border border-white/15 text-white hover:border-cyan-400/50 hover:shadow-[0_0_15px_rgba(6,182,212,0.3)] disabled:opacity-30 transition-all flex items-center justify-center p-0"
+							onClick={scrollPrev}
+							disabled={!canScrollPrev}
+							aria-label="Xem phim trước đó"
+						>
+							<ChevronLeft className="h-5 w-5" />
+						</Button>
+						<Button
+							variant="ghost"
+							className="w-10 h-10 rounded-xl bg-white/[0.07] hover:bg-white/[0.15] border border-white/15 text-white hover:border-cyan-400/50 hover:shadow-[0_0_15px_rgba(6,182,212,0.3)] disabled:opacity-30 transition-all flex items-center justify-center p-0"
+							onClick={scrollNext}
+							disabled={!canScrollNext}
+							aria-label="Xem phim tiếp theo"
+						>
+							<ChevronRight className="h-5 w-5" />
+						</Button>
+					</div>
+				</div>
 
                                 {!mounted ? (
                                         <div className="w-full">

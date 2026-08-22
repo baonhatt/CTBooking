@@ -1,22 +1,13 @@
 'use client';
 
 import { motion, AnimatePresence } from 'framer-motion';
-import { Play, Pause, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Play, Pause, ChevronLeft, ChevronRight, Sparkles } from 'lucide-react';
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { optimizeCloudinaryVideoUrl, getCloudinaryThumbnail } from '@/lib/utils';
 import useEmblaCarousel from 'embla-carousel-react';
 import type { EmblaCarouselType } from 'embla-carousel';
 
-const spaceElements = [
-  { id: 1, size: 'w-32 h-32', position: 'top-20 left-4', delay: 0, duration: 8 },
-  { id: 2, size: 'w-24 h-24', position: 'top-40 left-8', delay: 1, duration: 10 },
-  { id: 3, size: 'w-20 h-20', position: 'top-60 left-12', delay: 2, duration: 12 },
-  { id: 4, size: 'w-28 h-28', position: 'top-80 left-6', delay: 0.5, duration: 9 },
-  { id: 5, size: 'w-36 h-36', position: 'top-20 right-4', delay: 1.5, duration: 11 },
-  { id: 6, size: 'w-24 h-24', position: 'top-40 right-8', delay: 2.5, duration: 13 },
-  { id: 7, size: 'w-20 h-20', position: 'top-60 right-12', delay: 0.8, duration: 10 },
-  { id: 8, size: 'w-32 h-32', position: 'top-80 right-6', delay: 1.2, duration: 9 }
-];
+
 
 export default function TechnologyBanner({
   initialMainItem = null,
@@ -249,86 +240,11 @@ export default function TechnologyBanner({
   return (
     <section
       id="technology"
-      className="relative py-24 bg-gradient-to-b from-[#060915] via-[#0b1426] to-[#0f1d3a] overflow-hidden"
+      className="relative py-20 bg-gradient-to-b from-[#060915] via-[#080d21] to-[#050915] overflow-hidden"
     >
       <div className="absolute inset-0 neon-noise opacity-50 pointer-events-none" />
-      <div className="absolute -left-10 top-16 w-72 h-72 bg-cyan-500/20 blur-[120px]" />
-      <div className="absolute right-0 bottom-10 w-80 h-80 bg-purple-500/20 blur-[130px]" />
-
-      <div className="absolute inset-0 pointer-events-none hidden lg:block">
-        {spaceElements.slice(0, 4).map((element) => (
-          <motion.div
-            key={`left-${element.id}`}
-            className={`absolute ${element.position} ${element.size} opacity-30`}
-            animate={{ y: [0, -20, 0], x: [0, 10, 0], rotate: [0, 180, 360], scale: [1, 1.1, 1] }}
-            transition={{ duration: element.duration, repeat: Infinity, ease: 'easeInOut', delay: element.delay }}
-          >
-            <div className="w-full h-full rounded-full bg-gradient-to-br from-cyan-400/40 via-blue-500/30 to-purple-500/40 relative overflow-hidden">
-              <div className="absolute inset-0 bg-[radial-gradient(circle_at_30%_30%,rgba(255,255,255,0.3),transparent)]" />
-              <div className="absolute top-1/4 left-1/4 w-2 h-2 bg-white/60 rounded-full blur-sm" />
-              <div className="absolute top-1/3 right-1/4 w-1.5 h-1.5 bg-white/40 rounded-full blur-sm" />
-              {element.id % 2 === 0 && (
-                <div
-                  className="absolute inset-0 border-2 border-cyan-300/20 rounded-full"
-                  style={{ transform: 'scale(1.2)' }}
-                />
-              )}
-            </div>
-          </motion.div>
-        ))}
-
-        {[...Array(12)].map((_, i) => (
-          <motion.div
-            key={`star-left-${i}`}
-            className="absolute w-1 h-1 bg-cyan-300 rounded-full"
-            style={{ left: `${5 + (i % 4) * 3}%`, top: `${20 + Math.floor(i / 4) * 25}%` }}
-            animate={{ opacity: [0.3, 1, 0.3], scale: [1, 1.5, 1] }}
-            transition={{ duration: 2 + (i % 3), repeat: Infinity, delay: i * 0.2 }}
-          />
-        ))}
-
-        {spaceElements.slice(4, 8).map((element) => (
-          <motion.div
-            key={`right-${element.id}`}
-            className={`absolute ${element.position} ${element.size} opacity-30`}
-            animate={{ y: [0, -20, 0], x: [0, -10, 0], rotate: [0, -180, -360], scale: [1, 1.1, 1] }}
-            transition={{ duration: element.duration, repeat: Infinity, ease: 'easeInOut', delay: element.delay }}
-          >
-            <div className="w-full h-full rounded-full bg-gradient-to-br from-purple-400/40 via-pink-500/30 to-fuchsia-500/40 relative overflow-hidden">
-              <div className="absolute inset-0 bg-[radial-gradient(circle_at_30%_30%,rgba(255,255,255,0.3),transparent)]" />
-              <div className="absolute top-1/4 left-1/4 w-2 h-2 bg-white/60 rounded-full blur-sm" />
-              <div className="absolute top-1/3 right-1/4 w-1.5 h-1.5 bg-white/40 rounded-full blur-sm" />
-              {element.id % 2 === 1 && (
-                <div
-                  className="absolute inset-0 border-2 border-purple-300/20 rounded-full"
-                  style={{ transform: 'scale(1.2)' }}
-                />
-              )}
-            </div>
-          </motion.div>
-        ))}
-
-        {[...Array(12)].map((_, i) => (
-          <motion.div
-            key={`star-right-${i}`}
-            className="absolute w-1 h-1 bg-purple-300 rounded-full"
-            style={{ right: `${5 + (i % 4) * 3}%`, top: `${20 + Math.floor(i / 4) * 25}%` }}
-            animate={{ opacity: [0.3, 1, 0.3], scale: [1, 1.5, 1] }}
-            transition={{ duration: 2 + (i % 3), repeat: Infinity, delay: i * 0.2 }}
-          />
-        ))}
-
-        <motion.div
-          className="absolute top-1/4 left-0 w-64 h-64 bg-cyan-500/10 rounded-full blur-3xl"
-          animate={{ x: [0, 30, 0], y: [0, -20, 0], scale: [1, 1.2, 1] }}
-          transition={{ duration: 15, repeat: Infinity, ease: 'easeInOut' }}
-        />
-        <motion.div
-          className="absolute top-1/3 right-0 w-64 h-64 bg-purple-500/10 rounded-full blur-3xl"
-          animate={{ x: [0, -30, 0], y: [0, 20, 0], scale: [1, 1.2, 1] }}
-          transition={{ duration: 18, repeat: Infinity, ease: 'easeInOut' }}
-        />
-      </div>
+      <div className="absolute -left-10 top-16 w-96 h-96 bg-cyan-500/15 blur-[140px] pointer-events-none" />
+      <div className="absolute right-0 bottom-10 w-96 h-96 bg-purple-500/15 blur-[140px] pointer-events-none" />
 
       <div className="container mx-auto px-4 relative z-10">
         <motion.div
@@ -336,10 +252,13 @@ export default function TechnologyBanner({
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true }}
           transition={{ duration: 0.4 }}
-          className="text-center mb-16 max-w-4xl mx-auto"
+          className="text-center mb-16 max-w-3xl mx-auto space-y-3"
         >
-          <p className="text-sm uppercase tracking-[0.28em] text-cyan-200 mb-4">CINESPHERE EXPERIENCE</p>
-          <h2 className="text-4xl md:text-5xl lg:text-6xl font-extrabold mb-6 lg:leading-[1.25]">
+          <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-blue-500/15 border border-blue-500/30 text-blue-300 text-xs font-bold uppercase tracking-widest backdrop-blur-md shadow-[0_0_20px_rgba(59,130,246,0.2)]">
+            <Sparkles className="w-4 h-4 text-blue-400" />
+            <span>CINESPHERE EXPERIENCE</span>
+          </div>
+          <h2 className="text-3xl sm:text-4xl md:text-5xl font-black text-white tracking-tight leading-tight">
             <span className="bg-gradient-to-r from-cyan-300 to-blue-400 bg-clip-text text-transparent">
               Chạm tới Vô Cực
             </span>{' '}
@@ -347,7 +266,7 @@ export default function TechnologyBanner({
               cùng Vũ Trụ Đa Chiều 8K
             </span>
           </h2>
-          <p className="text-lg md:text-xl whitespace-break-spaces text-gray-200 leading-relaxed">
+          <p className="text-slate-300 text-sm sm:text-base leading-relaxed">
             Chào mừng bạn đến với Huyễn Cảnh Không Gian, nơi những giới hạn về vật lý bị xóa nhòa để nhường chỗ cho
             những trải nghiệm thị giác đỉnh cao. Không đơn thuần là một phòng chiếu phim, đây là "cánh cửa thần kỳ" đưa
             bạn bước vào những chiều không gian mà thực tại chưa bao giờ chạm tới.

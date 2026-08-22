@@ -8,28 +8,60 @@ export function useActiveSection(disabled: boolean) {
   useEffect(() => {
     if (disabled) return;
 
-    const observerOptions = {
-      root: null,
-      rootMargin: '-20% 0px -70% 0px', // Focus on the upper-middle part of the viewport
-      threshold: 0
-    };
+    const determineActiveSection = () => {
+      // Nếu đang ở gần đầu trang (Hero)
+      if (window.scrollY < 120) {
+        setActiveSection('hero');
+        return;
+      }
 
-    const handleIntersection = (entries: IntersectionObserverEntry[]) => {
-      entries.forEach((entry) => {
-        if (entry.isIntersecting) {
-          setActiveSection(entry.target.id);
+      // Điểm mốc phát hiện trong viewport (khoảng 35% từ đỉnh màn hình xuống)
+      const viewportTarget = window.innerHeight * 0.35;
+
+      let currentActive = 'hero';
+
+      for (const id of SECTION_IDS) {
+        const el = document.getElementById(id);
+        if (!el) continue;
+
+        const rect = el.getBoundingClientRect();
+        // Section đang bao phủ điểm mốc viewportTarget
+        if (rect.top <= viewportTarget && rect.bottom > viewportTarget) {
+          currentActive = id;
+          break;
         }
-      });
+      }
+
+      setActiveSection(currentActive);
     };
 
-    const observer = new IntersectionObserver(handleIntersection, observerOptions);
+    // Kiểm tra ngay khi mount và sau các khoảng trễ để đảm bảo DOM render xong
+    determineActiveSection();
+    const t1 = setTimeout(determineActiveSection, 150);
+    const t2 = setTimeout(determineActiveSection, 500);
+    const t3 = setTimeout(determineActiveSection, 1000);
 
-    SECTION_IDS.forEach((id) => {
-      const el = document.getElementById(id);
-      if (el) observer.observe(el);
-    });
+    let ticking = false;
+    const handleScroll = () => {
+      if (!ticking) {
+        window.requestAnimationFrame(() => {
+          determineActiveSection();
+          ticking = false;
+        });
+        ticking = true;
+      }
+    };
 
-    return () => observer.disconnect();
+    window.addEventListener('scroll', handleScroll, { passive: true });
+    window.addEventListener('resize', determineActiveSection, { passive: true });
+
+    return () => {
+      clearTimeout(t1);
+      clearTimeout(t2);
+      clearTimeout(t3);
+      window.removeEventListener('scroll', handleScroll);
+      window.removeEventListener('resize', determineActiveSection);
+    };
   }, [disabled]);
 
   return activeSection;

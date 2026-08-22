@@ -121,13 +121,6 @@ export default function Header({
                         return;
                 }
 
-                if (id === 'vr') {
-                        const params = new URLSearchParams(searchParams.toString());
-                        const branchParam = selectedBranch?.id ? `?branch_id=${selectedBranch.id}` : (params.toString() ? `?${params.toString()}` : '');
-                        router.push(`/vr${branchParam}`);
-                        return;
-                }
-
                 if (id === 'posts') {
                         router.push('/bai-viet');
                         return;
@@ -213,14 +206,7 @@ export default function Header({
                 setShowBranchConfirm(false);
         };
 
-        const navItems = [
-                { label: 'Phim', target: 'films' },
-                { label: 'Lịch chiếu', target: 'schedule' },
-                { label: 'Trải nghiệm VR', target: 'vr' },
-                { label: 'Giá vé', target: 'promotions' },
-                { label: 'Công nghệ', target: 'technology' },
-                { label: 'Tin tức', target: 'posts' }
-        ];
+        const navItems = NAV_ITEMS;
 
         return (
                 <header
@@ -248,16 +234,18 @@ export default function Header({
 
                                 {/* Desktop Main Navigation */}
                                 <nav className="hidden lg:flex items-center gap-6 xl:gap-8 animate-fade-in delay-150">
-                                        {navItems.map((item: { label: string; target: string }) => {
-                                                const isItemActive =
-                                                        item.target === 'posts'
-                                                                ? isPostsRoute
-                                                                : item.target === 'vr'
-                                                                        ? isVrRoute
-                                                                        : item.target === 'schedule'
-                                                                                ? isScheduleOpen
-                                                                                : (pathname === '/' && activeSection === item.target);
-                                                return (
+					{navItems.map((item: { label: string; target: string }) => {
+						const isItemActive =
+							item.target === 'posts'
+								? isPostsRoute
+								: item.target === 'schedule'
+									? isScheduleOpen
+									: pathname === '/'
+										? activeSection === item.target
+										: item.target === 'vr'
+											? isVrRoute
+											: false;
+						return (
                                                         <NavItem
                                                                 key={item.target}
                                                                 label={item.label}
