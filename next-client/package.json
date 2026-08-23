@@ -8,8 +8,8 @@
     "start": "next start",
     "build:cf": "node scripts/inject-edge-runtime.mjs && npx @cloudflare/next-on-pages",
     "preview": "npx wrangler pages dev",
-    "pages:deploy:preview": "npm run build:cf && npx wrangler pages deploy --env preview",
-    "pages:deploy:prod": "npm run build:cf && npx wrangler pages deploy --env production",
+    "pages:deploy:preview": "npm run build:cf && npx wrangler pages deploy .vercel/output/static --project-name=cinema-next --branch=preview",
+    "pages:deploy:prod": "npm run build:cf && npx wrangler pages deploy .vercel/output/static --project-name=cinema-next --branch=main",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
