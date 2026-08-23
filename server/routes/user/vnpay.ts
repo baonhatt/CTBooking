@@ -36,21 +36,6 @@ const VNP_HASH_SECRET = process.env.VITE_VNPAY_HASH_SECRET || '';
 const VNP_GATEWAY = process.env.VITE_VNPAY_GATEWAY || '';
 const VNP_RETURN_URL = '';
 
-<<<<<<< HEAD
-export async function createVnpayPaymentImpl(
-  payload: {
-    amount: number;
-    orderId: string;
-    orderInfo: string;
-    locale?: string;
-    tmnCode?: string;
-    hashSecret?: string;
-    returnUrl?: string;
-    ip?: string;
-    gateway?: string;
-  }
-) {
-=======
 export async function createVnpayPaymentImpl(payload: {
   amount: number;
   orderId: string;
@@ -62,7 +47,6 @@ export async function createVnpayPaymentImpl(payload: {
   ip?: string;
   gateway?: string;
 }) {
->>>>>>> preview
   const { amount, orderId, orderInfo, locale = 'vn' } = payload;
   if (!amount || !orderId || !orderInfo) {
     return { status: 400, message: 'Invalid payload' };

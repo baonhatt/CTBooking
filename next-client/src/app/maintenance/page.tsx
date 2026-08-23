@@ -3,11 +3,7 @@ import type { Metadata } from 'next';
 
 export const metadata: Metadata = {
   title: 'Hệ thống đang bảo trì - CineSphere',
-<<<<<<< HEAD
-  description: 'Hệ thống đang được nâng cấp và bảo trì',
-=======
   description: 'Hệ thống đang được nâng cấp và bảo trì'
->>>>>>> preview
 };
 
 const Maintenance = () => {
@@ -33,13 +29,8 @@ const Maintenance = () => {
           </h1>
 
           <p className="text-lg text-gray-300 leading-relaxed mb-8">
-<<<<<<< HEAD
-            Chúng tôi đang tiến hành nâng cấp và bảo trì hệ thống để mang đến cho bạn trải nghiệm tốt nhất.
-            Quá trình này sẽ diễn ra trong thời gian ngắn. Xin lỗi vì sự bất tiện này!
-=======
             Chúng tôi đang tiến hành nâng cấp và bảo trì hệ thống để mang đến cho bạn trải nghiệm tốt nhất. Quá trình
             này sẽ diễn ra trong thời gian ngắn. Xin lỗi vì sự bất tiện này!
->>>>>>> preview
           </p>
 
           <div className="inline-flex flex-col items-center gap-2">

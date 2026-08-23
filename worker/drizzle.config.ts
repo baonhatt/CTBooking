@@ -1,18 +1,3 @@
-<<<<<<< HEAD
-import { defineConfig } from 'drizzle-kit';
-
-export default defineConfig({
-        schema: './src/schema.ts',
-        out: './drizzle',
-        dialect: 'sqlite',
-        driver: 'd1-http',
-        dbCredentials: {
-                accountId: '',
-                databaseId: '',
-                token: ''
-        }
-});
-=======
 import { defineConfig } from 'drizzle-kit';
 
 export default defineConfig({
@@ -23,4 +8,3 @@ export default defineConfig({
                 url: './local.db'
         }
 });
->>>>>>> preview

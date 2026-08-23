@@ -28,15 +28,10 @@ export function MobileMenu({
   return (
     <Sheet>
       <SheetTrigger asChild>
-<<<<<<< HEAD
-        <Button variant="default" className="bg-white/10 backdrop-blur-md border-white/20 text-white w-10 h-10 hover:bg-white/20">
-        </Button>
-=======
         <Button
           variant="default"
           className="bg-white/10 backdrop-blur-md border-white/20 text-white w-10 h-10 hover:bg-white/20"
         ></Button>
->>>>>>> preview
       </SheetTrigger>
 
       <SheetContent

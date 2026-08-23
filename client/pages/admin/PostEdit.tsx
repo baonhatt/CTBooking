@@ -7,9 +7,6 @@ import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-<<<<<<< HEAD
-import { ArrowLeft, Save, Eye, ChevronDown, ChevronUp, Copy, Type, Link, Calendar, Image as ImageIcon, FileText, Search, Share2, Globe, RefreshCw } from 'lucide-react';
-=======
 import {
         ArrowLeft,
         Save,
@@ -27,7 +24,6 @@ import {
         Globe,
         RefreshCw
 } from 'lucide-react';
->>>>>>> preview
 import { PostRichTextEditor } from '@/components/admin/content/PostRichTextEditor';
 import { getPosts, updatePostApi, getPostById } from '@/lib/api';
 import { uploadDirectToCloudinary } from '@/lib/api/uploads';
@@ -64,9 +60,6 @@ export default function PostEditPage() {
         const { id } = useParams<{ id: string }>();
         const navigate = useNavigate();
         const [active, setActive] = useState<
-<<<<<<< HEAD
-                'dashboard' | 'users' | 'movies' | 'toys' | 'posts' | 'transactions' | 'tickets' | 'ticket-check' | 'uploads' | 'email-logs' | 'settings'
-=======
                 | 'dashboard'
                 | 'users'
                 | 'movies'
@@ -82,7 +75,6 @@ export default function PostEditPage() {
                 | 'staff'
                 | 'roles'
                 | 'audit-logs'
->>>>>>> preview
         >('posts');
         const [isLoading, setIsLoading] = useState(true);
         const [isSaving, setIsSaving] = useState(false);
@@ -139,10 +131,6 @@ export default function PostEditPage() {
                 const initial = JSON.parse(initialSnapshotRef.current);
                 const current = editData;
                 const changed: Record<string, boolean> = {};
-<<<<<<< HEAD
-                const fields = ['title', 'slug', 'content', 'excerpt', 'featured_image', 'status', 'is_featured', 'published_at', 'meta_description', 'meta_keywords', 'seo_title', 'og_image', 'canonical_url', 'schema_type'];
-                fields.forEach(field => {
-=======
                 const fields = [
                         'title',
                         'slug',
@@ -160,7 +148,6 @@ export default function PostEditPage() {
                         'schema_type'
                 ];
                 fields.forEach((field) => {
->>>>>>> preview
                         if (initial[field] !== current[field]) {
                                 changed[field] = true;
                         }
@@ -333,13 +320,6 @@ export default function PostEditPage() {
                                         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
                                                 <div className="flex items-center justify-between h-16">
                                                         <div className="flex items-center gap-4">
-<<<<<<< HEAD
-                                                                <Button variant="ghost" size="icon" onClick={() => navigate('/posts')} className="rounded-xl">
-                                                                        <ArrowLeft className="w-5 h-5" />
-                                                                </Button>
-                                                                <div className="min-w-0">
-                                                                        <h1 className="text-lg font-bold text-slate-900 truncate">{editData.title || 'Bài viết chưa có tiêu đề'}</h1>
-=======
                                                                 <Button variant="ghost" size="icon" onClick={() => navigate('/posts')} className="rounded-xl" title="Quay lại">
                                                                         <ArrowLeft className="w-5 h-5" />
                                                                 </Button>
@@ -347,7 +327,6 @@ export default function PostEditPage() {
                                                                         <h1 className="text-lg font-bold text-slate-900 truncate">
                                                                                 {editData.title || 'Bài viết chưa có tiêu đề'}
                                                                         </h1>
->>>>>>> preview
                                                                         <div className="flex items-center gap-2 mt-0.5">
                                                                                 <StatusBadge status={editData.status || 'draft'} />
                                                                         </div>
@@ -355,24 +334,6 @@ export default function PostEditPage() {
                                                         </div>
                                                         <div className="flex items-center gap-2">
                                                                 {editData.status === 'published' ? (
-<<<<<<< HEAD
-                                                                        <Button onClick={() => handleSave('archived')} disabled={isSaving} variant="outline" className="rounded-xl">
-                                                                                Gỡ phát hành
-                                                                        </Button>
-                                                                ) : editData.status === 'archived' ? (
-                                                                        <Button onClick={() => handleSave('draft')} disabled={isSaving} variant="outline" className="rounded-xl">
-                                                                                Chuyển sang nháp
-                                                                        </Button>
-                                                                ) : (
-                                                                        <Button onClick={() => handleSave('published')} disabled={isSaving} className="rounded-xl bg-emerald-600 hover:bg-emerald-700">
-                                                                                Xuất bản
-                                                                        </Button>
-                                                                )}
-                                                                <Button onClick={() => handleSave()} disabled={isSaving} className="rounded-xl bg-blue-600 hover:bg-blue-700">
-                                                                        <Save className="w-4 h-4 mr-2" />
-                                                                        {isSaving ? 'Đang lưu...' : 'Lưu'}
-                                                                </Button>
-=======
                                                                         <>
                                                                                 <Button
                                                                                         onClick={() => handleSave('archived')}
@@ -438,7 +399,6 @@ export default function PostEditPage() {
                                                                                 </Button>
                                                                         </>
                                                                 ) : null}
->>>>>>> preview
                                                         </div>
                                                 </div>
                                         </div>
@@ -495,10 +455,6 @@ export default function PostEditPage() {
                                                                         {/* Rich Text Editor */}
                                                                         <div>
                                                                                 <Label>Nội dung</Label>
-<<<<<<< HEAD
-                                                                                <div className={`mt-2 ${isFieldChanged('content') ? 'border-amber-500 ring-1 ring-amber-500 rounded-lg' : ''}`}>
-                                                                                        <PostRichTextEditor value={editData.content || ''} onChange={(content) => setEditData((prev) => ({ ...prev, content }))} />
-=======
                                                                                 <div
                                                                                         className={`mt-2 ${isFieldChanged('content') ? 'border-amber-500 ring-1 ring-amber-500 rounded-lg' : ''}`}
                                                                                 >
@@ -506,7 +462,6 @@ export default function PostEditPage() {
                                                                                                 value={editData.content || ''}
                                                                                                 onChange={(content) => setEditData((prev) => ({ ...prev, content }))}
                                                                                         />
->>>>>>> preview
                                                                                 </div>
                                                                         </div>
                                                                 </CardContent>
@@ -517,14 +472,10 @@ export default function PostEditPage() {
                                                 <div className="lg:col-span-4 space-y-4">
                                                         {/* Section 1: Publishing */}
                                                         <Card className="border-none shadow-sm">
-<<<<<<< HEAD
-                                                                <CardHeader className="px-4 py-3 bg-slate-50 border-b cursor-pointer" onClick={() => toggleSection('publish')}>
-=======
                                                                 <CardHeader
                                                                         className="px-4 py-3 bg-slate-50 border-b cursor-pointer"
                                                                         onClick={() => toggleSection('publish')}
                                                                 >
->>>>>>> preview
                                                                         <div className="flex items-center justify-between">
                                                                                 <CardTitle className="text-sm font-bold">Xuất bản</CardTitle>
                                                                                 {sections.publish ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
@@ -532,38 +483,16 @@ export default function PostEditPage() {
                                                                 </CardHeader>
                                                                 {sections.publish && (
                                                                         <CardContent className="p-4 space-y-4">
-<<<<<<< HEAD
-                                                                                <div>
-                                                                                        <Label className="flex items-center gap-2">
-                                                                                                <FileText className="w-4 h-4 text-slate-500" />
-                                                                                                Trạng thái
-                                                                                        </Label>
-                                                                                        <select
-                                                                                                className={`mt-2 w-full px-3 py-2 border border-slate-200 rounded-xl bg-white text-sm ${isFieldChanged('status') ? 'border-amber-500 ring-1 ring-amber-500' : ''}`}
-                                                                                                value={editData.status || 'draft'}
-                                                                                                onChange={(e) => setEditData({ ...editData, status: e.target.value as any })}
-                                                                                        >
-                                                                                                <option value="draft">Bản nháp</option>
-                                                                                                <option value="published">Đã xuất bản</option>
-                                                                                                <option value="archived">Lưu trữ</option>
-                                                                                        </select>
-                                                                                </div>
-=======
->>>>>>> preview
                                                                                 <div className="flex items-center justify-between">
                                                                                         <Label className="flex items-center gap-2">
                                                                                                 <Search className="w-4 h-4 text-slate-500" />
                                                                                                 Bài nổi bật
                                                                                         </Label>
-<<<<<<< HEAD
-                                                                                        <Switch checked={editData.is_featured || false} onCheckedChange={(checked) => setEditData({ ...editData, is_featured: checked })} className="data-[state=checked]:bg-emerald-600" />
-=======
                                                                                         <Switch
                                                                                                 checked={editData.is_featured || false}
                                                                                                 onCheckedChange={(checked) => setEditData({ ...editData, is_featured: checked })}
                                                                                                 className="data-[state=checked]:bg-emerald-600"
                                                                                         />
->>>>>>> preview
                                                                                 </div>
                                                                                 <div>
                                                                                         <Label className="flex items-center gap-2">
@@ -583,14 +512,10 @@ export default function PostEditPage() {
 
                                                         {/* Section 2: Images & Summary */}
                                                         <Card className="border-none shadow-sm">
-<<<<<<< HEAD
-                                                                <CardHeader className="px-4 py-3 bg-slate-50 border-b cursor-pointer" onClick={() => toggleSection('images')}>
-=======
                                                                 <CardHeader
                                                                         className="px-4 py-3 bg-slate-50 border-b cursor-pointer"
                                                                         onClick={() => toggleSection('images')}
                                                                 >
->>>>>>> preview
                                                                         <div className="flex items-center justify-between">
                                                                                 <CardTitle className="text-sm font-bold">Hình ảnh & Tóm tắt</CardTitle>
                                                                                 {sections.images ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
@@ -603,17 +528,6 @@ export default function PostEditPage() {
                                                                                                 <ImageIcon className="w-4 h-4 text-slate-500" />
                                                                                                 Ảnh đại diện
                                                                                         </Label>
-<<<<<<< HEAD
-                                                                                        <div className={`mt-2 flex items-center gap-2 ${isFieldChanged('featured_image') ? 'border-amber-500 ring-1 ring-amber-500 p-2 rounded-lg' : ''}`}>
-                                                                                                <Input type="file" accept="image/*" onChange={(e) => {
-                                                                                                        const file = e.target.files?.[0];
-                                                                                                        if (file) {
-                                                                                                                const url = URL.createObjectURL(file);
-                                                                                                                setEditData((prev) => ({ ...prev, featured_image: url, imageFile: file }));
-                                                                                                        }
-                                                                                                }} />
-                                                                                                <Button variant="outline" size="sm" onClick={() => setEditData((prev) => ({ ...prev, featured_image: '', imageFile: undefined }))} disabled={!editData.featured_image}>
-=======
                                                                                         <div
                                                                                                 className={`mt-2 flex items-center gap-2 ${isFieldChanged('featured_image') ? 'border-amber-500 ring-1 ring-amber-500 p-2 rounded-lg' : ''}`}
                                                                                         >
@@ -634,7 +548,6 @@ export default function PostEditPage() {
                                                                                                         onClick={() => setEditData((prev) => ({ ...prev, featured_image: '', imageFile: undefined }))}
                                                                                                         disabled={!editData.featured_image}
                                                                                                 >
->>>>>>> preview
                                                                                                         Gỡ
                                                                                                 </Button>
                                                                                         </div>
@@ -667,14 +580,10 @@ export default function PostEditPage() {
 
                                                         {/* Section 3: SEO & Sharing */}
                                                         <Card className="border-none shadow-sm">
-<<<<<<< HEAD
-                                                                <CardHeader className="px-4 py-3 bg-slate-50 border-b cursor-pointer" onClick={() => toggleSection('seo')}>
-=======
                                                                 <CardHeader
                                                                         className="px-4 py-3 bg-slate-50 border-b cursor-pointer"
                                                                         onClick={() => toggleSection('seo')}
                                                                 >
->>>>>>> preview
                                                                         <div className="flex items-center justify-between">
                                                                                 <CardTitle className="text-sm font-bold">SEO & Chia sẻ</CardTitle>
                                                                                 {sections.seo ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
@@ -707,13 +616,7 @@ export default function PostEditPage() {
                                                                                                 </Button>
                                                                                         </div>
                                                                                         <div className="mt-1 flex items-center justify-between">
-<<<<<<< HEAD
-                                                                                                <p className="text-[11px] text-amber-600">
-                                                                                                        {editData.seo_title?.length || 0}/60 ký tự
-                                                                                                </p>
-=======
                                                                                                 <p className="text-[11px] text-amber-600">{editData.seo_title?.length || 0}/60 ký tự</p>
->>>>>>> preview
                                                                                                 <p className="text-[11px] text-slate-400">Ấn icon để sao chép từ tiêu đề bài viết</p>
                                                                                         </div>
                                                                                 </div>
@@ -737,15 +640,11 @@ export default function PostEditPage() {
                                                                                                         onClick={() => {
                                                                                                                 if (editData.excerpt) {
                                                                                                                         if (editData.excerpt.length > 160) {
-<<<<<<< HEAD
-                                                                                                                                if (confirm(`Tóm tắt dài ${editData.excerpt.length} ký tự. Chỉ có thể copy tối đa 160 ký tự. Bạn có muốn tiếp tục?`)) {
-=======
                                                                                                                                 if (
                                                                                                                                         confirm(
                                                                                                                                                 `Tóm tắt dài ${editData.excerpt.length} ký tự. Chỉ có thể copy tối đa 160 ký tự. Bạn có muốn tiếp tục?`
                                                                                                                                         )
                                                                                                                                 ) {
->>>>>>> preview
                                                                                                                                         setEditData({ ...editData, meta_description: editData.excerpt.slice(0, 160) });
                                                                                                                                 }
                                                                                                                         } else {
@@ -760,13 +659,7 @@ export default function PostEditPage() {
                                                                                                 </Button>
                                                                                         </div>
                                                                                         <div className="mt-1 flex items-center justify-between">
-<<<<<<< HEAD
-                                                                                                <p className="text-[11px] text-amber-600">
-                                                                                                        {editData.meta_description?.length || 0}/160 ký tự
-                                                                                                </p>
-=======
                                                                                                 <p className="text-[11px] text-amber-600">{editData.meta_description?.length || 0}/160 ký tự</p>
->>>>>>> preview
                                                                                                 <p className="text-[11px] text-slate-400">Ấn icon để sao chép từ tóm tắt bài viết</p>
                                                                                         </div>
                                                                                 </div>
@@ -787,13 +680,6 @@ export default function PostEditPage() {
                                                                                                 <Share2 className="w-4 h-4 text-slate-500" />
                                                                                                 Ảnh khi chia sẻ Facebook/Zalo
                                                                                         </Label>
-<<<<<<< HEAD
-                                                                                        <div className={`mt-2 flex items-center gap-2 ${isFieldChanged('og_image') ? 'border-amber-500 ring-1 ring-amber-500 p-2 rounded-lg' : ''}`}>
-                                                                                                <Input type="file" accept="image/*" onChange={(e) => {
-                                                                                                        const file = e.target.files?.[0];
-                                                                                                        if (file) setEditData({ ...editData, ogImageFile: file });
-                                                                                                }} />
-=======
                                                                                         <div
                                                                                                 className={`mt-2 flex items-center gap-2 ${isFieldChanged('og_image') ? 'border-amber-500 ring-1 ring-amber-500 p-2 rounded-lg' : ''}`}
                                                                                         >
@@ -805,7 +691,6 @@ export default function PostEditPage() {
                                                                                                                 if (file) setEditData({ ...editData, ogImageFile: file });
                                                                                                         }}
                                                                                                 />
->>>>>>> preview
                                                                                                 {editData.og_image && (
                                                                                                         <img
                                                                                                                 src={editData.og_image}
@@ -833,16 +718,12 @@ export default function PostEditPage() {
                                                                                                         type="button"
                                                                                                         variant="outline"
                                                                                                         size="icon"
-<<<<<<< HEAD
-                                                                                                        onClick={() => setEditData({ ...editData, canonical_url: editData.slug ? `https://cinesphere.com.vn/bai-viet/${editData.slug}` : '' })}
-=======
                                                                                                         onClick={() =>
                                                                                                                 setEditData({
                                                                                                                         ...editData,
                                                                                                                         canonical_url: editData.slug ? `https://cinesphere.com.vn/bai-viet/${editData.slug}` : ''
                                                                                                                 })
                                                                                                         }
->>>>>>> preview
                                                                                                         title="Sao chép URL bài viết"
                                                                                                         className="shrink-0"
                                                                                                 >

@@ -1,8 +1,4 @@
-<<<<<<< HEAD
-import { SERVER_BASE_URL } from "./http";
-=======
 import { SERVER_BASE_URL } from './http';
->>>>>>> preview
 
 export interface UploadResult {
   url: string;
@@ -53,11 +49,7 @@ export function uploadAdminVideo(
   onProgress?: (percent: number) => void
 ): Promise<UploadResult> {
   return new Promise((resolve, reject) => {
-<<<<<<< HEAD
-    const baseUrl = SERVER_BASE_URL || "";
-=======
     const baseUrl = SERVER_BASE_URL || '';
->>>>>>> preview
     const xhr = new XMLHttpRequest();
     xhr.open('POST', `${baseUrl}/api/admin/uploads/video`);
     xhr.responseType = 'json';
@@ -118,11 +110,7 @@ export function uploadDirectToCloudinary(
 
     const trySigned = async () => {
       try {
-<<<<<<< HEAD
-        const baseUrl = SERVER_BASE_URL || "";
-=======
         const baseUrl = SERVER_BASE_URL || '';
->>>>>>> preview
         const resp = await fetch(`${baseUrl}/api/admin/cloudinary/sign`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -208,11 +196,7 @@ export async function createSiteMediaApi(body: {
   display_order?: number;
   is_active?: boolean;
 }) {
-<<<<<<< HEAD
-  const baseUrl = SERVER_BASE_URL || "";
-=======
   const baseUrl = SERVER_BASE_URL || '';
->>>>>>> preview
   const res = await fetch(`${baseUrl}/api/admin/site-media`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -240,11 +224,7 @@ export async function updateSiteMediaApi(body: {
   display_order?: number;
   is_active?: boolean;
 }) {
-<<<<<<< HEAD
-  const baseUrl = SERVER_BASE_URL || "";
-=======
   const baseUrl = SERVER_BASE_URL || '';
->>>>>>> preview
   const res = await fetch(`${baseUrl}/api/admin/site-media`, {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
@@ -264,20 +244,11 @@ export async function getSiteMediaApi(options?: {
   signal?: AbortSignal;
 }) {
   const params = new URLSearchParams();
-<<<<<<< HEAD
-  if (options?.section) params.set("section", options.section);
-  if (options?.type) params.set("type", options.type);
-  if (typeof options?.active === "boolean")
-    params.set("active", String(options.active));
-  const baseUrl = SERVER_BASE_URL || "";
-  const path = `${baseUrl}/api/site-media${params.toString() ? `?${params.toString()}` : ""}`;
-=======
   if (options?.section) params.set('section', options.section);
   if (options?.type) params.set('type', options.type);
   if (typeof options?.active === 'boolean') params.set('active', String(options.active));
   const baseUrl = SERVER_BASE_URL || '';
   const path = `${baseUrl}/api/site-media${params.toString() ? `?${params.toString()}` : ''}`;
->>>>>>> preview
   const res = await fetch(path, { signal: options?.signal });
   if (!res.ok) {
     const data = await res.json().catch(() => ({}));
@@ -287,13 +258,8 @@ export async function getSiteMediaApi(options?: {
 }
 
 export async function deleteSiteMediaApi(id: number) {
-<<<<<<< HEAD
-  const baseUrl = SERVER_BASE_URL || "";
-  const res = await fetch(`${baseUrl}/api/admin/site-media/${id}`, { method: "DELETE" });
-=======
   const baseUrl = SERVER_BASE_URL || '';
   const res = await fetch(`${baseUrl}/api/admin/site-media/${id}`, { method: 'DELETE' });
->>>>>>> preview
   const data = await res.json().catch(() => ({}));
   if (!res.ok) {
     throw new Error(data?.message || `HTTP ${res.status}`);

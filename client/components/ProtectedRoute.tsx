@@ -11,19 +11,11 @@ interface Props {
  */
 export default function ProtectedRoute({ children }: Props) {
   const token = localStorage.getItem('userToken');
-<<<<<<< HEAD
-  
-=======
 
->>>>>>> preview
   // Check login
   if (!token) {
     return <Navigate to="/login" replace />;
   }
-<<<<<<< HEAD
-  
-=======
 
->>>>>>> preview
   return <>{children}</>;
 }

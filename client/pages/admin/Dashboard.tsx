@@ -1,11 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import AdminLayout from '@/admin/layouts/AdminLayout';
 import DashboardContent from '@/components/admin/content/DashboardContent';
-<<<<<<< HEAD
-import { getDashboardMetrics, getRevenueByDate, getRevenue7Days, getRevenueByMonth, getTransactions } from '@/lib/api';
-
-export default function DashboardPage() {
-=======
 import {
         getDashboardMetrics,
         getRevenueByDate,
@@ -25,7 +20,6 @@ export default function DashboardPage() {
         const canViewRevenue = useStaffPermission('dashboard', 'view_revenue');
         const canViewBranches = useStaffPermission('branches', 'view');
         const [activeTab, setActiveTab] = useState('dashboard');
->>>>>>> preview
         const [metrics, setMetrics] = useState({
                 totalMovies: 0,
                 totalToys: 0,
@@ -78,8 +72,6 @@ export default function DashboardPage() {
         // Global Refresh Key
         const [refreshKey, setRefreshKey] = useState(0);
 
-<<<<<<< HEAD
-=======
         // Branch filter
         const [selectedBranchId, setSelectedBranchId] = useState<number | 'all' | null>(() => {
                 if (staff?.isSuperAdmin) return 'all';
@@ -109,7 +101,6 @@ export default function DashboardPage() {
                 })();
         }, [staff, canViewBranches, selectedBranchId]);
 
->>>>>>> preview
         const handleRefresh = () => {
                 setRefreshKey((prev) => prev + 1);
         };
@@ -119,11 +110,7 @@ export default function DashboardPage() {
                 (async () => {
                         try {
                                 setIsTopTicketsLoading(true);
-<<<<<<< HEAD
-                                const data = await getDashboardMetrics(topPeriod, selectedYear);
-=======
                                 const data = await getDashboardMetrics(topPeriod, selectedYear, selectedBranchId);
->>>>>>> preview
                                 setMetrics(data);
                         } catch (err) {
                                 console.error('Failed to load metrics:', err);
@@ -132,16 +119,6 @@ export default function DashboardPage() {
                                 setIsPageLoading(false);
                         }
                 })();
-<<<<<<< HEAD
-        }, [topPeriod, selectedYear, refreshKey]);
-
-        // Load revenue for selected year on mount or refresh
-        useEffect(() => {
-                (async () => {
-                        try {
-                                setIsRevenueLoading(true);
-                                const data = await getRevenueByDate(undefined, 'paid', selectedYear);
-=======
         }, [topPeriod, selectedYear, refreshKey, selectedBranchId]);
 
         // Load revenue for selected year on mount or refresh
@@ -151,7 +128,6 @@ export default function DashboardPage() {
                         try {
                                 setIsRevenueLoading(true);
                                 const data = await getRevenueByDate(undefined, 'paid', selectedYear, selectedBranchId);
->>>>>>> preview
                                 setDateRevenue({ total: data.total, count: data.count, revenueByMethod: data.revenueByMethod });
                         } catch (err) {
                                 console.error('Failed to load date revenue:', err);
@@ -159,23 +135,6 @@ export default function DashboardPage() {
                                 setIsRevenueLoading(false);
                         }
                 })();
-<<<<<<< HEAD
-        }, [selectedYear, refreshKey]);
-
-        // Handle date filter apply
-        const handleApplyDateFilter = async () => {
-                try {
-                        setIsRevenueLoading(true);
-                        if (dateFilterType === 'year') {
-                                const data = await getRevenueByDate(undefined, 'paid', selectedYear);
-                                setDateRevenue({ total: data.total, count: data.count, revenueByMethod: data.revenueByMethod });
-                        } else if (dateFilterType === 'day') {
-                                const data = await getRevenueByDate(selectedDate, 'paid', selectedYear);
-                                setDateRevenue({ total: data.total, count: data.count, revenueByMethod: data.revenueByMethod });
-                        } else if (dateFilterType === 'month') {
-                                const [year, month] = selectedDate.split('-');
-                                const data = await getRevenueByMonth(parseInt(year), parseInt(month), 'paid');
-=======
         }, [selectedYear, refreshKey, selectedBranchId, canViewRevenue]);
 
         // Handle date filter apply
@@ -192,7 +151,6 @@ export default function DashboardPage() {
                         } else if (dateFilterType === 'month') {
                                 const [year, month] = selectedDate.split('-');
                                 const data = await getRevenueByMonth(parseInt(year), parseInt(month), 'paid', selectedBranchId);
->>>>>>> preview
                                 if ('total' in data) {
                                         setDateRevenue({
                                                 total: data.total,
@@ -210,31 +168,16 @@ export default function DashboardPage() {
 
         // Load 7-day revenue for selected year
         useEffect(() => {
-<<<<<<< HEAD
-                (async () => {
-                        try {
-                                const data = await getRevenue7Days(selectedYear);
-=======
                 if (!canViewRevenue) return;
 
                 (async () => {
                         try {
                                 const data = await getRevenue7Days(selectedYear, selectedBranchId);
->>>>>>> preview
                                 setRevenue7DaysData(data.data);
                         } catch (err) {
                                 console.error('Failed to load 7-day revenue:', err);
                         }
                 })();
-<<<<<<< HEAD
-        }, [selectedYear, refreshKey]);
-
-        // Load monthly revenue when selectedYear or refreshKey changes
-        useEffect(() => {
-                (async () => {
-                        try {
-                                const data = await getRevenueByMonth(selectedYear, undefined, 'paid');
-=======
         }, [selectedYear, refreshKey, selectedBranchId, canViewRevenue]);
 
         // Load monthly revenue when selectedYear or refreshKey changes
@@ -243,7 +186,6 @@ export default function DashboardPage() {
                 (async () => {
                         try {
                                 const data = await getRevenueByMonth(selectedYear, undefined, 'paid', selectedBranchId);
->>>>>>> preview
                                 if ('data' in data) {
                                         setRevenueByMonthData(data.data);
                                 }
@@ -251,21 +193,6 @@ export default function DashboardPage() {
                                 console.error('Failed to load monthly revenue:', err);
                         }
                 })();
-<<<<<<< HEAD
-        }, [selectedYear, refreshKey]);
-
-        return (
-                <AdminLayout
-                        active={'dashboard' as any}
-                        setActive={(() => { }) as any}
-                        adminEmailState={localStorage.getItem('adminEmail') || 'admin@email.com'}
-                        handleLogout={() => {
-                                localStorage.removeItem('adminToken');
-                                localStorage.removeItem('adminEmail');
-                                window.dispatchEvent(new Event('admin-auth-changed'));
-                                window.location.href = '/';
-                        }}
-=======
         }, [selectedYear, refreshKey, selectedBranchId, canViewRevenue]);
 
         const handleLogout = () => {
@@ -280,7 +207,6 @@ export default function DashboardPage() {
                         setActive={setActiveTab as any}
                         adminEmailState={staff?.email || 'admin@email.com'}
                         handleLogout={handleLogout}
->>>>>>> preview
                 >
                         <DashboardContent
                                 metrics={metrics}
@@ -296,20 +222,14 @@ export default function DashboardPage() {
                                 revenueByMonthData={revenueByMonthData}
                                 isPageLoading={isPageLoading}
                                 isTopTicketsLoading={isTopTicketsLoading}
-<<<<<<< HEAD
-=======
                                 branches={branches}
                                 selectedBranchId={selectedBranchId}
                                 setSelectedBranchId={setSelectedBranchId}
->>>>>>> preview
                                 isRevenueLoading={isRevenueLoading}
                                 topPeriod={topPeriod}
                                 setTopPeriod={setTopPeriod}
                                 onRefresh={handleRefresh}
-<<<<<<< HEAD
-=======
                                 canViewRevenue={canViewRevenue}
->>>>>>> preview
                         />
                 </AdminLayout>
         );

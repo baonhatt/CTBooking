@@ -1,16 +1,10 @@
 import { useEffect, useState } from 'react';
-<<<<<<< HEAD
-import { Routes, Route, Navigate, useNavigate } from 'react-router-dom';
-=======
 import { Routes, Route, Navigate, useNavigate, useSearchParams } from 'react-router-dom';
 import { toast } from 'sonner';
->>>>>>> preview
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
-<<<<<<< HEAD
-=======
 import { useStaffStore } from '@/store/staffStore';
 import { useStaffPermission, useIsSuperAdmin } from '@/hooks/useStaffPermission';
 import { loginApi } from '@/lib/api/auth';
@@ -18,30 +12,20 @@ import { request } from '@/lib/api/http';
 import { checkSuperAdminSetup } from '@/lib/api/admin';
 import { AlertCircle, ShieldAlert } from 'lucide-react';
 import { forceChangePasswordApi } from '@/lib/api/auth';
->>>>>>> preview
 import AdminIndex from '@/pages/admin/AdminIndex';
 import DashboardPage from '@/pages/admin/Dashboard';
 import UsersPage from '@/pages/admin/Users';
 import MoviesPage from '@/pages/admin/Movies';
-<<<<<<< HEAD
-import ToysPage from '@/pages/admin/Toys';
-import PostsPage from '@/pages/admin/Posts';
-import PostEditPage from '@/pages/admin/PostEdit';
-=======
 import ShowtimesPage from '@/pages/admin/Showtimes';
 import ToysPage from '@/pages/admin/Toys';
 import PostsPage from '@/pages/admin/Posts';
 import PostEditPage from '@/pages/admin/PostEdit';
 import PostCreatePage from '@/pages/admin/PostCreate';
->>>>>>> preview
 import TransactionsPage from '@/pages/admin/Transactions';
 import TicketsPage from '@/pages/admin/Tickets';
 import TicketCheckPage from '@/pages/admin/TicketCheck';
 import UploadsPage from '@/pages/admin/Uploads';
 import SettingsPage from '@/pages/admin/Settings';
-<<<<<<< HEAD
-// import { adminLoginApi } from "@/lib/api";
-=======
 import BranchesPage from '@/pages/admin/Branches';
 import EmailLogsPage from '@/pages/admin/EmailLogs';
 import StaffPage from '@/pages/admin/Staff';
@@ -85,7 +69,6 @@ const ProtectedRoute = ({ children, module, action }: { children: React.ReactNod
 
         return <>{children}</>;
 };
->>>>>>> preview
 
 const AdminLoginView = () => {
         const navigate = useNavigate();
@@ -95,29 +78,13 @@ const AdminLoginView = () => {
         const [error, setError] = useState('');
         const [isEmailFocused, setIsEmailFocused] = useState(false);
         const [isPasswordFocused, setIsPasswordFocused] = useState(false);
-<<<<<<< HEAD
-=======
         const setStaff = useStaffStore((state) => state.setStaff);
->>>>>>> preview
 
         async function handleLogin(e?: React.FormEvent) {
                 e?.preventDefault();
                 try {
                         setLoading(true);
                         setError('');
-<<<<<<< HEAD
-                        // const { token } = await adminLoginApi({ email, password });
-                        // localStorage.setItem("adminToken", token);
-                        if (email === 'admin@email.com' && password === 'admin') {
-                                localStorage.setItem('adminToken', 'adminToken');
-                        } else {
-                                setError('Đăng nhập thất bại');
-                                return;
-                        }
-                        localStorage.setItem('adminEmail', email);
-                        window.dispatchEvent(new Event('admin-auth-changed'));
-                        navigate('/', { replace: true });
-=======
 
                         const data = await loginApi({ email, password });
 
@@ -130,7 +97,6 @@ const AdminLoginView = () => {
                         }
                 } catch (err) {
                         setError('Lỗi kết nối server');
->>>>>>> preview
                 } finally {
                         setLoading(false);
                 }
@@ -183,40 +149,6 @@ const AdminLoginView = () => {
         );
 };
 
-<<<<<<< HEAD
-import EmailLogsPage from '@/pages/admin/EmailLogs';
-
-export const AdminGate = () => {
-        const [hasToken, setHasToken] = useState<boolean>(!!localStorage.getItem('adminToken'));
-        useEffect(() => {
-                const onAuthChanged = () => setHasToken(!!localStorage.getItem('adminToken'));
-                window.addEventListener('admin-auth-changed', onAuthChanged as any);
-                window.addEventListener('storage', onAuthChanged as any);
-                return () => {
-                        window.removeEventListener('admin-auth-changed', onAuthChanged as any);
-                        window.removeEventListener('storage', onAuthChanged as any);
-                };
-        }, []);
-        if (!hasToken) return <AdminLoginView />;
-        return (
-                <Routes>
-                        <Route path="/" element={<DashboardPage />} />
-                        <Route path="/users" element={<UsersPage />} />
-                        <Route path="/movies" element={<MoviesPage />} />
-                        <Route path="/toys" element={<ToysPage />} />
-                        <Route path="/posts" element={<PostsPage />} />
-                        <Route path="/posts/:id/edit" element={<PostEditPage />} />
-                        <Route path="/tickets" element={<TicketsPage />} />
-                        <Route path="/transactions" element={<TransactionsPage />} />
-                        <Route path="/ticket-check" element={<TicketCheckPage />} />
-                        <Route path="/uploads" element={<UploadsPage />} />
-                        <Route path="/email-logs" element={<EmailLogsPage />} />
-                        <Route path="/settings" element={<SettingsPage />} />
-                        <Route path="*" element={<Navigate to="/" replace />} />
-                </Routes>
-        );
-};
-=======
 export const AdminGate = () => {
         const isAuthenticated = useStaffStore((state) => state.isAuthenticated);
         const staff = useStaffStore((state) => state.staff);
@@ -441,4 +373,3 @@ const ForcePasswordChangeView = ({ staff }: { staff: any }) => {
         );
 };
 
->>>>>>> preview

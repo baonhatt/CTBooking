@@ -1,9 +1,3 @@
-<<<<<<< HEAD
-// Import các hàm cần thiết từ thư viện
-import { eq, or, desc, asc, count, inArray, and, sql } from 'drizzle-orm';
-import { formatDateForDb } from '../../lib/date-utils';
-import { deleteCache } from '../../../worker/src/utils';
-=======
 import { eq, or, desc, asc, count, inArray, and, sql, isNull, isNotNull, like } from 'drizzle-orm';
 import { formatDateForDb } from '../../lib/date-utils';
 import { deleteCache } from '../../../worker/src/utils';
@@ -17,7 +11,6 @@ import {
         sqlBranchIdsMatchFilter,
         sqlBranchIdsStaffAccessFilter
 } from '../../lib/branch-ids';
->>>>>>> preview
 
 /**
  * Hàm helper xử lý dữ liệu combo
@@ -68,15 +61,6 @@ function processComboInput(combo: any): number[] {
  */
 export async function listTicketPackagesImpl(
         anyDb: any,
-<<<<<<< HEAD
-        tables: { ticket_packages: any; movies: any },
-        args: { page: number; pageSize: number; q: string; includeInactive?: boolean }
-) {
-        const { page, pageSize, q, includeInactive = false } = args;
-
-        // 1. Xây dựng điều kiện where
-        let whereCondition = includeInactive ? undefined : eq(tables.ticket_packages.is_active, true);
-=======
         tables: { ticket_packages: any; movies: any; branches?: any },
         args: { page: number; pageSize: number; q: string; includeInactive?: boolean; branch_id?: number; restrictToBranchIds?: number[] | null; type?: 'all' | 'movie' | 'vr' }
 ) {
@@ -93,7 +77,6 @@ export async function listTicketPackagesImpl(
                 const vrCond = eq(tables.ticket_packages.type, 'vr');
                 whereCondition = whereCondition ? and(whereCondition, vrCond) : vrCond;
         }
->>>>>>> preview
 
         if (q) {
                 const lowerSearch = q.toLowerCase();
@@ -105,10 +88,6 @@ export async function listTicketPackagesImpl(
 
                 whereCondition = whereCondition ? and(whereCondition, searchCondition) : searchCondition;
         }
-<<<<<<< HEAD
-
-        // 2. Lấy dữ liệu phân trang
-=======
         if (branch_id) {
                 const branchFilter = sqlBranchIdsMatchFilter(tables.ticket_packages.branch_ids, tables.ticket_packages.branch_id, branch_id);
                 whereCondition = whereCondition ? and(whereCondition, branchFilter) : branchFilter;
@@ -118,7 +97,6 @@ export async function listTicketPackagesImpl(
                 whereCondition = whereCondition ? and(whereCondition, staffFilter) : staffFilter;
         }
         // 2. Lấy dữ liệu phân trang - tạm thời bỏ join branches
->>>>>>> preview
         const [totalResArray, pkgList] = await Promise.all([
                 anyDb.select({ count: count() }).from(tables.ticket_packages).where(whereCondition),
                 anyDb
@@ -135,24 +113,6 @@ export async function listTicketPackagesImpl(
         const total = totalResult ? Number(totalResult.count) : 0;
 
         // 3. Xử lý combo và features cho từng gói vé
-<<<<<<< HEAD
-        const items = packages.map((pkg: any) => ({
-                ...pkg,
-                // Parse JSON string to array (handle old data formats: JSON array or "1|2|3")
-                combo: pkg.combo ? (Array.isArray(pkg.combo) ? pkg.combo : (() => {
-                        try { return JSON.parse(pkg.combo); } catch {
-                                // Handle old format: "1|2|3"
-                                if (typeof pkg.combo === 'string' && pkg.combo.includes('|')) {
-                                        return pkg.combo.split('|').map((x: string) => x.trim()).filter(Boolean);
-                                }
-                                return [];
-                        }
-                })()) : [],
-                features: pkg.features ? (Array.isArray(pkg.features) ? pkg.features : (() => {
-                        try { return JSON.parse(pkg.features); } catch { return []; }
-                })()) : []
-        }));
-=======
         const items = packages.map((pkg: any) =>
                 enrichWithParsedBranchIds({
                         ...pkg,
@@ -188,7 +148,6 @@ export async function listTicketPackagesImpl(
                         : []
                 })
         );
->>>>>>> preview
 
         // 4. Trả về kết quả phân trang
         return {
@@ -207,31 +166,6 @@ export async function listTicketPackagesImpl(
  * @param id ID của gói vé cần lấy
  * @returns Thông tin chi tiết gói vé hoặc null nếu không tìm thấy
  */
-<<<<<<< HEAD
-export async function getTicketPackageImpl(anyDb: any, tables: { ticket_packages: any }, id: number) {
-        const [item] = await anyDb
-                .select()
-                .from(tables.ticket_packages)
-                .where(eq(tables.ticket_packages.id, id)) // Tìm theo ID
-                .limit(1); // Chỉ lấy 1 bản ghi
-        if (!item) return null;
-        // Parse JSON strings to arrays (handle old data formats: JSON array or "1|2|3")
-        return {
-                ...item,
-                combo: item.combo ? (Array.isArray(item.combo) ? item.combo : (() => {
-                        try { return JSON.parse(item.combo); } catch {
-                                // Handle old format: "1|2|3"
-                                if (typeof item.combo === 'string' && item.combo.includes('|')) {
-                                        return item.combo.split('|').map((x: string) => x.trim()).filter(Boolean);
-                                }
-                                return [];
-                        }
-                })()) : [],
-                features: item.features ? (Array.isArray(item.features) ? item.features : (() => {
-                        try { return JSON.parse(item.features); } catch { return []; }
-                })()) : []
-        };
-=======
 export async function getTicketPackageImpl(
         anyDb: any,
         tables: { ticket_packages: any; auditLogs: any; branches?: any },
@@ -298,7 +232,6 @@ export async function getTicketPackageImpl(
                                 })()
                         : []
         });
->>>>>>> preview
 }
 
 /**
@@ -310,11 +243,7 @@ export async function getTicketPackageImpl(
  */
 export async function createTicketPackageImpl(
         anyDb: any,
-<<<<<<< HEAD
-        tables: { ticket_packages: any; movies: any },
-=======
         tables: { ticket_packages: any; movies: any; auditLogs: any },
->>>>>>> preview
         args: {
                 name: string; // Tên gói vé
                 code?: string; // Mã gói vé
@@ -328,10 +257,6 @@ export async function createTicketPackageImpl(
                 is_member_only?: boolean; // Chỉ dành cho thành viên
                 is_active?: boolean; // Trạng thái hoạt động
                 display_order?: number; // Thứ tự hiển thị
-<<<<<<< HEAD
-        },
-        RUN_ENV: any
-=======
                 branch_id?: number | null;
                 branch_ids?: number[] | null;
                 // ===== VR-specific fields =====
@@ -343,7 +268,6 @@ export async function createTicketPackageImpl(
         },
         RUN_ENV: any,
         staffInfo?: { id: number; email: string; fullname: string }
->>>>>>> preview
 ) {
         const {
                 name,
@@ -357,11 +281,6 @@ export async function createTicketPackageImpl(
                 max_group_size,
                 is_member_only,
                 is_active,
-<<<<<<< HEAD
-                display_order
-        } = args;
-
-=======
                 display_order,
                 branch_id,
                 branch_ids,
@@ -374,7 +293,6 @@ export async function createTicketPackageImpl(
 
         const branchFields = resolveBranchIdsInput(branch_ids, branch_id);
 
->>>>>>> preview
         // 1. Chuẩn bị thời gian tạo và cập nhật
         const now = new Date();
         const formattedNow = formatDateForDb(now);
@@ -454,8 +372,6 @@ export async function createTicketPackageImpl(
                         is_active: is_active ?? true,
                         // Mặc định thứ tự hiển thị là 0 nếu không xác định
                         display_order: Number(display_order ?? 0),
-<<<<<<< HEAD
-=======
                         branch_id: branchFields.branch_id ?? null,
                         branch_ids: branchFields.branch_ids ?? null,
                         // ===== VR-specific fields =====
@@ -464,7 +380,6 @@ export async function createTicketPackageImpl(
                         vr_genre: vr_genre || null,
                         min_players: min_players !== undefined ? Number(min_players) : null,
                         max_players: max_players !== undefined ? Number(max_players) : null,
->>>>>>> preview
                         // Thời gian tạo và cập nhật
                         created_at: formattedNow,
                         updated_at: formattedNow
@@ -491,9 +406,6 @@ export async function createTicketPackageImpl(
                 await RUN_ENV.KV_BINDING.delete('activeTicketPackages');
         }
 
-<<<<<<< HEAD
-        return { item };
-=======
         const auditNew = buildAuditPayload(item);
 
         // Log audit action
@@ -514,7 +426,6 @@ export async function createTicketPackageImpl(
         }
 
         return { item: enrichWithParsedBranchIds(item) };
->>>>>>> preview
 }
 
 /**
@@ -527,11 +438,7 @@ export async function createTicketPackageImpl(
  */
 export async function updateTicketPackageImpl(
         anyDb: any,
-<<<<<<< HEAD
-        tables: { ticket_packages: any; movies: any },
-=======
         tables: { ticket_packages: any; movies: any; auditLogs: any },
->>>>>>> preview
         id: number,
         args: {
                 name?: string; // Tên gói vé
@@ -546,11 +453,6 @@ export async function updateTicketPackageImpl(
                 is_member_only?: boolean; // Chỉ dành cho thành viên
                 is_active?: boolean; // Trạng thái hoạt động
                 display_order?: number; // Thứ tự hiển thị
-<<<<<<< HEAD
-        },
-        RUN_ENV: any
-) {
-=======
                 branch_id?: number | null;
                 branch_ids?: number[] | null;
                 // ===== VR-specific fields =====
@@ -568,7 +470,6 @@ export async function updateTicketPackageImpl(
                 throw new Error('Không tìm thấy gói vé');
         }
 
->>>>>>> preview
         const {
                 name,
                 code,
@@ -581,9 +482,6 @@ export async function updateTicketPackageImpl(
                 max_group_size,
                 is_member_only,
                 is_active,
-<<<<<<< HEAD
-                display_order
-=======
                 display_order,
                 branch_id,
                 branch_ids,
@@ -592,7 +490,6 @@ export async function updateTicketPackageImpl(
                 vr_genre,
                 min_players,
                 max_players
->>>>>>> preview
         } = args;
 
         const now = new Date();
@@ -610,8 +507,6 @@ export async function updateTicketPackageImpl(
         if (is_member_only !== undefined) data.is_member_only = Boolean(is_member_only);
         if (is_active !== undefined) data.is_active = Boolean(is_active);
         if (display_order !== undefined) data.display_order = Number(display_order);
-<<<<<<< HEAD
-=======
         if (branch_ids !== undefined || branch_id !== undefined) {
                 const branchFields = resolveBranchIdsInput(branch_ids, branch_id);
                 if (branchFields.branch_ids !== undefined) data.branch_ids = branchFields.branch_ids;
@@ -623,7 +518,6 @@ export async function updateTicketPackageImpl(
         if (vr_genre !== undefined) data.vr_genre = vr_genre || null;
         if (min_players !== undefined) data.min_players = min_players !== null ? Number(min_players) : null;
         if (max_players !== undefined) data.max_players = max_players !== null ? Number(max_players) : null;
->>>>>>> preview
 
         // 2. Tối ưu xử lý Features
         if (features !== undefined) {
@@ -676,22 +570,15 @@ export async function updateTicketPackageImpl(
                 .returning();
 
         // D1/SQLite trả về array khi dùng .returning()
-<<<<<<< HEAD
-        const item = Array.isArray(updatedRes) ? updatedRes[0] : updatedRes;
-=======
         let item = Array.isArray(updatedRes) ? updatedRes[0] : updatedRes;
         if (!item) {
                 item = await anyDb.query.ticket_packages.findFirst({ where: eq(tables.ticket_packages.id, id) });
         }
->>>>>>> preview
 
         if (RUN_ENV && RUN_ENV.KV_BINDING) {
                 await RUN_ENV.KV_BINDING.delete('activeTicketPackages');
         }
 
-<<<<<<< HEAD
-        return item || null;
-=======
         const auditOld = buildAuditPayload(existing);
         const auditNew = buildAuditPayload(item);
 
@@ -714,7 +601,6 @@ export async function updateTicketPackageImpl(
 
         if (!item) return null;
         return enrichWithParsedBranchIds(item);
->>>>>>> preview
 }
 
 /**
@@ -726,16 +612,10 @@ export async function updateTicketPackageImpl(
  */
 export async function deleteTicketPackageImpl(
         anyDb: any,
-<<<<<<< HEAD
-        tables: { ticket_packages: any; bookings: any },
-        id: number,
-        RUN_ENV: any
-=======
         tables: { ticket_packages: any; bookings: any; auditLogs: any },
         id: number,
         RUN_ENV: any,
         staffInfo?: { id: number; email: string; fullname: string }
->>>>>>> preview
 ) {
         try {
                 // 1. Kiểm tra gói vé có tồn tại không
@@ -746,9 +626,6 @@ export async function deleteTicketPackageImpl(
                 // Nếu không tìm thấy gói vé, trả về null
                 if (!existing) return null;
 
-<<<<<<< HEAD
-                // 2. Thực hiện soft delete (update is_active = false)
-=======
                 // 2. Check if ticket package is being used in bookings
                 const [bookingCount] = await anyDb
                         .select({ count: count() })
@@ -762,16 +639,12 @@ export async function deleteTicketPackageImpl(
                 }
 
                 // 3. Thực hiện soft delete (update is_active = false và deleted_at)
->>>>>>> preview
                 await anyDb
                         .update(tables.ticket_packages)
                         .set({
                                 is_active: false,
-<<<<<<< HEAD
-=======
                                 deleted_at: new Date().toISOString(),
                                 deleted_by_staff_id: staffInfo?.id,
->>>>>>> preview
                                 updated_at: formatDateForDb(new Date())
                         })
                         .where(eq(tables.ticket_packages.id, id));
@@ -780,8 +653,6 @@ export async function deleteTicketPackageImpl(
                         await RUN_ENV.KV_BINDING.delete('activeTicketPackages');
                 }
 
-<<<<<<< HEAD
-=======
                 // Log audit action
                 if (staffInfo) {
                         await logAuditAction(
@@ -797,7 +668,6 @@ export async function deleteTicketPackageImpl(
                         );
                 }
 
->>>>>>> preview
                 return {
                         status: 200,
                         message: 'Gói vé đã được chuyển sang trạng thái Ngừng hoạt động thành công'
@@ -807,8 +677,6 @@ export async function deleteTicketPackageImpl(
                 throw err;
         }
 }
-<<<<<<< HEAD
-=======
 
 export async function restoreTicketPackageImpl(
         anyDb: any,
@@ -981,4 +849,3 @@ export async function toggleTicketStatusImpl(
 
         return { ok: true, is_active: newStatus };
 }
->>>>>>> preview

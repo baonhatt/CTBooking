@@ -8,30 +8,6 @@ export function useActiveSection(disabled: boolean) {
   useEffect(() => {
     if (disabled) return;
 
-<<<<<<< HEAD
-    const observerOptions = {
-      root: null,
-      rootMargin: '-20% 0px -70% 0px', // Focus on the upper-middle part of the viewport
-      threshold: 0
-    };
-
-    const handleIntersection = (entries: IntersectionObserverEntry[]) => {
-      entries.forEach((entry) => {
-        if (entry.isIntersecting) {
-          setActiveSection(entry.target.id);
-        }
-      });
-    };
-
-    const observer = new IntersectionObserver(handleIntersection, observerOptions);
-
-    SECTION_IDS.forEach((id) => {
-      const el = document.getElementById(id);
-      if (el) observer.observe(el);
-    });
-
-    return () => observer.disconnect();
-=======
     const determineActiveSection = () => {
       // Nếu đang ở gần đầu trang (Hero)
       if (window.scrollY < 120) {
@@ -86,13 +62,7 @@ export function useActiveSection(disabled: boolean) {
       window.removeEventListener('scroll', handleScroll);
       window.removeEventListener('resize', determineActiveSection);
     };
->>>>>>> preview
   }, [disabled]);
 
   return activeSection;
 }
-<<<<<<< HEAD
-
-
-=======
->>>>>>> preview

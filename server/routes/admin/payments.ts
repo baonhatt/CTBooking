@@ -4,29 +4,11 @@ import { formatDateForDb } from '../../../server/lib/date-utils';
 export async function getRevenueImpl(
         anyDb: any,
         tables: { bookings: any },
-<<<<<<< HEAD
-        args: { from?: string; to?: string; status?: string }
-=======
         args: { from?: string; to?: string; status?: string; restrictToBranchIds?: number[] | null }
->>>>>>> preview
 ) {
         const from = args.from ? new Date(args.from) : undefined;
         const to = args.to ? new Date(args.to) : undefined;
         const status = String(args.status || 'paid').toLowerCase();
-<<<<<<< HEAD
-        const whereCondition = status === 'all' ? undefined : inArray(tables.bookings.payment_status, ['paid']);
-        let dateCondition = undefined as any;
-        if (from && to) {
-                dateCondition = or(
-                        and(
-                                gte(tables.bookings.paid_at, formatDateForDb(from)),
-                                lte(tables.bookings.paid_at, formatDateForDb(to))
-                        ),
-                        and(
-                                gte(tables.bookings.created_at, formatDateForDb(from)),
-                                lte(tables.bookings.created_at, formatDateForDb(to))
-                        )
-=======
         const whereParts: any[] = [];
         if (status !== 'all') whereParts.push(inArray(tables.bookings.payment_status, ['paid']));
         if (args.restrictToBranchIds !== null && args.restrictToBranchIds !== undefined) {
@@ -41,7 +23,6 @@ export async function getRevenueImpl(
                 dateCondition = or(
                         and(gte(tables.bookings.paid_at, formatDateForDb(from)), lte(tables.bookings.paid_at, formatDateForDb(to))),
                         and(gte(tables.bookings.created_at, formatDateForDb(from)), lte(tables.bookings.created_at, formatDateForDb(to)))
->>>>>>> preview
                 );
         } else if (from) {
                 dateCondition = or(
@@ -54,11 +35,7 @@ export async function getRevenueImpl(
                         lte(tables.bookings.created_at, formatDateForDb(to))
                 );
         }
-<<<<<<< HEAD
-        const finalWhere = and(whereCondition, dateCondition);
-=======
         const finalWhere = and(...whereParts, dateCondition);
->>>>>>> preview
         const [agg] = await anyDb
                 .select({ total: sum(tables.bookings.total_price), count: count() })
                 .from(tables.bookings)
@@ -85,13 +62,6 @@ export async function listTransactionsImpl(
                 sort: string;
                 dir: 'asc' | 'desc';
                 payment_method: string;
-<<<<<<< HEAD
-                from?: string;
-                to?: string;
-        }
-) {
-        const { page, pageSize, searchText, status, sort, dir, payment_method, from, to } = args;
-=======
                 branch_id?: number | null;
                 from?: string;
                 to?: string;
@@ -100,7 +70,6 @@ export async function listTransactionsImpl(
         }
 ) {
         const { page, pageSize, searchText, status, sort, dir, payment_method, branch_id, from, to, booking_type = 'all', restrictToBranchIds = null } = args;
->>>>>>> preview
         const skip = (page - 1) * pageSize;
         const whereCondition: any[] = [];
 
@@ -110,8 +79,6 @@ export async function listTransactionsImpl(
         // Filter theo phương thức thanh toán
         if (payment_method) whereCondition.push(eq(tables.bookings.payment_method, payment_method));
 
-<<<<<<< HEAD
-=======
         // Filter theo loại booking (movie / vr)
         if (booking_type && booking_type !== 'all') {
                 whereCondition.push(eq(tables.bookings.booking_type, booking_type));
@@ -129,7 +96,6 @@ export async function listTransactionsImpl(
                 }
         }
 
->>>>>>> preview
         // Filter theo khoảng thời gian
         if (from || to) {
                 const f = from ? new Date(from) : undefined;
@@ -145,19 +111,9 @@ export async function listTransactionsImpl(
                                 )
                         );
                 } else if (f) {
-<<<<<<< HEAD
-                        whereCondition.push(
-                                or(gte(createdField, formatDateForDb(f)), gte(paidField, formatDateForDb(f)))
-                        );
-                } else if (t) {
-                        whereCondition.push(
-                                or(lte(createdField, formatDateForDb(t)), lte(paidField, formatDateForDb(t)))
-                        );
-=======
                         whereCondition.push(or(gte(createdField, formatDateForDb(f)), gte(paidField, formatDateForDb(f))));
                 } else if (t) {
                         whereCondition.push(or(lte(createdField, formatDateForDb(t)), lte(paidField, formatDateForDb(t))));
->>>>>>> preview
                 }
         }
 
@@ -228,10 +184,7 @@ export async function listTransactionsImpl(
                         id: tx.id,
                         bookingId: tx.id,
                         user_id: tx.user_id,
-<<<<<<< HEAD
-=======
                         branch_id: tx.branch_id,
->>>>>>> preview
                         email: tx.email || '', // Ưu tiên email trong booking
                         phone: tx.phone || '',
                         name: tx.name || row.user?.fullname || '',
@@ -248,12 +201,8 @@ export async function listTransactionsImpl(
                         updatedAt: tx.updated_at,
                         expiryDate: tx.expiry_date || null,
                         expired,
-<<<<<<< HEAD
-                        daysLeft
-=======
                         daysLeft,
                         booking_type: tx.booking_type || 'movie'
->>>>>>> preview
                 };
         });
 
@@ -268,28 +217,16 @@ export async function getTransactionByIdImpl(
                 accounts: any;
                 movies: any;
                 ticket_packages: any;
-<<<<<<< HEAD
-        },
-        id: number
-=======
                 branches: any;
                 auditLogs: any;
                 booking_vr_items?: any;
         },
         id: number,
         restrictToBranchIds: number[] | null = null
->>>>>>> preview
 ) {
         // 1. CHỈNH SỬA TRUY VẤN JOIN
         const rows = await anyDb
                 .select({
-<<<<<<< HEAD
-                        booking: tables.bookings,
-                        user: tables.users,
-                        account: tables.accounts,
-                        movie: tables.movies,
-                        ticket_package: tables.ticket_packages
-=======
                         booking: {
                                 id: tables.bookings.id,
                                 booking_type: tables.bookings.booking_type,
@@ -324,16 +261,10 @@ export async function getTransactionByIdImpl(
                         branch: {
                                 name: tables.branches.name
                         }
->>>>>>> preview
                 })
                 .from(tables.bookings)
                 .leftJoin(tables.users, eq(tables.bookings.user_id, tables.users.id))
                 .leftJoin(tables.accounts, eq(tables.users.id, tables.accounts.user_id))
-<<<<<<< HEAD
-                .leftJoin(tables.movies, eq(tables.bookings.movie_id, tables.movies.id))
-                .leftJoin(tables.ticket_packages, eq(tables.bookings.ticket_package_id, tables.ticket_packages.id))
-                .where(eq(tables.bookings.id, id));
-=======
                 .leftJoin(tables.ticket_packages, eq(tables.bookings.ticket_package_id, tables.ticket_packages.id))
                 .leftJoin(tables.branches, eq(tables.bookings.branch_id, tables.branches.id))
                 .where(
@@ -341,16 +272,11 @@ export async function getTransactionByIdImpl(
                                 ? and(eq(tables.bookings.id, id), inArray(tables.bookings.branch_id, restrictToBranchIds))
                                 : eq(tables.bookings.id, id)
                 );
->>>>>>> preview
 
         // Kiểm tra nếu không có kết quả
         if (!rows || rows.length === 0) return null;
 
-<<<<<<< HEAD
-        const { booking, user, account, movie, ticket_package } = rows[0];
-=======
         const { booking, account, ticket_package, branch } = rows[0];
->>>>>>> preview
 
         // 2. TÍNH TOÁN THỜI GIAN VÀ TRẠNG THÁI
         const now = new Date();
@@ -368,14 +294,10 @@ export async function getTransactionByIdImpl(
                         } else if (typeof booking.combo === 'string') {
                                 // Handle old format: "1|2|3" or JSON array
                                 if (booking.combo.includes('|')) {
-<<<<<<< HEAD
-                                        movieIds = booking.combo.split('|').map((x: string) => x.trim()).filter(Boolean);
-=======
                                         movieIds = booking.combo
                                                 .split('|')
                                                 .map((x: string) => x.trim())
                                                 .filter(Boolean);
->>>>>>> preview
                                 } else {
                                         movieIds = JSON.parse(booking.combo);
                                 }
@@ -388,11 +310,6 @@ export async function getTransactionByIdImpl(
                 }
         }
 
-<<<<<<< HEAD
-        // 4. MAPPING DỮ LIỆU ĐỂ HIỂN THỊ TRÊN GIAO DIỆN KIỂM SOÁT
-        return {
-                id: booking.id,
-=======
         // Get tracking data from audit logs
         const [createLog] = await anyDb
                 .select()
@@ -428,7 +345,6 @@ export async function getTransactionByIdImpl(
                 id: booking.id,
                 booking_type: bType,
                 vr_items,
->>>>>>> preview
                 user: {
                         email_auth: account?.email || '',
                         fullname: booking.name || 'Tên mặc định',
@@ -436,33 +352,18 @@ export async function getTransactionByIdImpl(
                         phone: booking.phone || '',
                         is_active: account?.is_active ?? true
                 },
-<<<<<<< HEAD
-                ticket_package: {
-                        name: ticket_package.name,
-=======
                 branch: {
                         id: booking.branch_id,
                         name: branch?.name || 'Vãng lai'
                 },
                 ticket_package: {
                         name: ticket_package?.name || booking.ticket_package_name || '',
->>>>>>> preview
                         ticket_unit_price: booking.ticket_unit_price,
                         movies: comboMovies
                 },
                 booking_details: {
                         ticket_count: booking.ticket_count,
                         total_price: Number(booking.total_price),
-<<<<<<< HEAD
-                        combo: booking?.combo ? (Array.isArray(booking.combo) ? booking.combo : (() => {
-                                try {
-                                        if (typeof booking.combo === 'string' && booking.combo.includes('|')) {
-                                                return booking.combo.split('|').map((x: string) => x.trim()).filter(Boolean);
-                                        }
-                                        return typeof booking.combo === 'string' ? JSON.parse(booking.combo) : [];
-                                } catch { return []; }
-                        })()) : [],
-=======
                         combo: booking?.combo
                                 ? Array.isArray(booking.combo)
                                         ? booking.combo
@@ -480,7 +381,6 @@ export async function getTransactionByIdImpl(
                                                 }
                                         })()
                                 : [],
->>>>>>> preview
                         pay_txt_code: booking?.pay_txt_code,
                         booking_code: booking?.booking_code,
                         checked_in_at: booking?.checked_in_at,
@@ -496,11 +396,6 @@ export async function getTransactionByIdImpl(
                         expiry_date: booking.expiry_date,
                         expired,
                         days_left: daysLeft
-<<<<<<< HEAD
-                }
-        };
-}
-=======
                 },
                 tracking: {
                         created_by_staff_name: createLog?.staffFullname || null,
@@ -510,4 +405,3 @@ export async function getTransactionByIdImpl(
 }
 
 
->>>>>>> preview

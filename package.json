@@ -12,15 +12,6 @@
   },
   "scripts": {
     "dev": "vite",
-<<<<<<< HEAD
-    "dev:worker": "wrangler dev --config worker/wrangler.toml",
-    "dev:all": "concurrently \"npm run dev\" \"npm run dev:worker\"",
-    "dev:debug": "tsx --inspect=9229 --tsconfig tsconfig.json node_modules/vite/bin/vite.js",
-    "build": "npm run build:client",
-    "build:next": "cd next-client && npx @cloudflare/next-on-pages",
-    "build:client": "cross-env VITE_SERVER_BASE_URL=https://api.cinesphere.com.vn vite build",
-    "build:client:preview": "cross-env VITE_SERVER_BASE_URL=https://api.cinesphere.com.vn vite build --mode preview",
-=======
     "dev:worker": "wrangler dev --env preview --port 8787 --config worker/wrangler.toml",
     "dev:worker:local": "wrangler dev --local --config worker/wrangler.toml",
     "dev:all": "concurrently \"npm run dev\" \"npm run dev:worker\"",
@@ -29,7 +20,6 @@
     "build:next": "cd next-client && npm run build:cf",
     "build:client": "cross-env VITE_SERVER_BASE_URL=https://api.cinesphere.com.vn vite build",
     "build:client:preview": "cross-env VITE_SERVER_BASE_URL=https://cinema-worker-preview.baonhat20.workers.dev vite build --mode preview",
->>>>>>> preview
     "start": "node dist/server/node-build.mjs",
     "test": "vitest --run",
     "format.fix": "prettier --write .",
@@ -39,10 +29,7 @@
     "pages:deploy:prod": "npm run build:client && npx wrangler pages deploy dist/spa --project-name=cinema-admin-pages --branch=main",
     "pages:deploy:preview": "npm run build:client:preview && npx wrangler pages deploy dist/spa --project-name=cinema-admin-pages --branch=preview",
     "db:push": "drizzle-kit push",
-<<<<<<< HEAD
-=======
     "db:migrate:preview": "wrangler d1 migrations apply cinema_db --remote --env preview --config worker/wrangler.toml",
->>>>>>> preview
     "db:import-local": "npx wrangler d1 execute cinema-db --local --file=cinema_db_prod.sql --config worker/wrangler.toml"
   },
   "rollup": {
@@ -59,21 +46,14 @@
     "dotenv": "^17.2.3",
     "drizzle-kit": "^0.31.8",
     "drizzle-orm": "^0.45.1",
-<<<<<<< HEAD
-=======
     "esbuild": "^0.28.2",
->>>>>>> preview
     "express": "^5.1.0",
     "hono": "^4.11.1",
     "multer": "^2.0.2",
     "nodemailer": "^7.0.11",
     "react-helmet-async": "^3.0.0",
     "sharp": "^0.34.5",
-<<<<<<< HEAD
-    "wrangler": "^4.54.0",
-=======
     "wrangler": "^4.124.0",
->>>>>>> preview
     "zod": "^3.25.76"
   },
   "devDependencies": {
@@ -158,12 +138,7 @@
   },
   "packageManager": "pnpm@10.14.0+sha512.ad27a79641b49c3e481a16a805baa71817a04bbe06a38d17e60e2eaee83f6a146c6a688125f5792e48dd5ba30e7da52a5cda4c3992b9ccf333f9ce223af84748",
   "overrides": {
-<<<<<<< HEAD
-    "@types/react": "18.3.23",
-    "@types/react-dom": "18.3.7"
-=======
     "@types/react": "^18.3.23",
     "@types/react-dom": "^18.3.7"
->>>>>>> preview
   }
 }

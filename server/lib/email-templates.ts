@@ -7,13 +7,10 @@ export function getBookingEmailTemplate(data: {
         durationMin?: string; // Nhận chuỗi JSON: "[10, 12, 5]"
         ticketPackageName?: string;
         expiryDate?: string | Date;
-<<<<<<< HEAD
-=======
         branchName?: string;
         branchAddress?: string;
         branchPhone?: string;
         branchSettings?: string;
->>>>>>> preview
 }): string {
         // 1. XỬ LÝ DỮ LIỆU JSON TỪ API
         let movieTitles: string[] = [];
@@ -27,8 +24,6 @@ export function getBookingEmailTemplate(data: {
                 durations = data.durationMin ? [data.durationMin] : ['--'];
         }
 
-<<<<<<< HEAD
-=======
         // Parse branch settings for hotline
         let hotline = data.branchPhone || '1900-xxxx';
         if (data.branchSettings) {
@@ -38,7 +33,6 @@ export function getBookingEmailTemplate(data: {
                 } catch (e) { }
         }
 
->>>>>>> preview
         // 2. TẠO LIST PHIM THEO LAYOUT MỚI
         const moviesHtml = movieTitles
                 .map(
@@ -96,8 +90,6 @@ export function getBookingEmailTemplate(data: {
             </div>
 
             <div class="section-title">CHI TIẾT ĐƠN HÀNG</div>
-<<<<<<< HEAD
-=======
             ${data.branchName ? `
             <div class="row">
                 <span class="label">Chi nhánh:</span>
@@ -108,7 +100,6 @@ export function getBookingEmailTemplate(data: {
                 <span class="value" style="font-size: 12px;">${data.branchAddress || ''}</span>
             </div>
             ` : ''}
->>>>>>> preview
             <div class="row">
                 <span class="label">Số lượng vé:</span>
                 <span class="value">${data.ticketCount} vé</span>
@@ -150,11 +141,7 @@ export function getBookingEmailTemplate(data: {
 
         <div class="footer">
             <p><strong>CINESPHERE - Rạp chiếu phim hiện đại</strong></p>
-<<<<<<< HEAD
-            <p>Email: cinesphere0629@gmail.com | Hotline: 1900-xxxx</p>
-=======
             <p>Email: cinesphere0629@gmail.com | Hotline: ${hotline}</p>
->>>>>>> preview
             <p style="margin-top: 10px; opacity: 0.6;">Đây là email tự động, vui lòng không trả lời email này.</p>
         </div>
     </div>
@@ -437,8 +424,6 @@ export function getOTPEmailTemplate(data: {
 </html>
   `;
 }
-<<<<<<< HEAD
-=======
 
 // Shared mail layout for staff emails
 function getStaffEmailLayout(content: string, subtitle: string): string {
@@ -617,4 +602,3 @@ export function getStaffPasswordChangeOTPTemplate(data: {
 
         return getStaffEmailLayout(content, 'Xác thực thay đổi mật khẩu');
 }
->>>>>>> preview

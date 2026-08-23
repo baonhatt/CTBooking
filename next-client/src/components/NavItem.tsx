@@ -37,8 +37,3 @@ export function NavItem({ label, target, isActive, disabled, onClick }: NavItemP
     </button>
   );
 }
-<<<<<<< HEAD
-
-
-=======
->>>>>>> preview

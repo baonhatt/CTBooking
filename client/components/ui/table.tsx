@@ -57,15 +57,11 @@ TableHead.displayName = 'TableHead';
 
 const TableCell = React.forwardRef<HTMLTableCellElement, React.TdHTMLAttributes<HTMLTableCellElement>>(
   ({ className, ...props }, ref) => (
-<<<<<<< HEAD
-    <td ref={ref} className={cn('p-4 align-middle whitespace-nowrap [&:has([role=checkbox])]:pr-0', className)} {...props} />
-=======
     <td
       ref={ref}
       className={cn('p-4 align-middle whitespace-nowrap [&:has([role=checkbox])]:pr-0', className)}
       {...props}
     />
->>>>>>> preview
   )
 );
 TableCell.displayName = 'TableCell';

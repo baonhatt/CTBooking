@@ -20,23 +20,11 @@ import {
         CreditCard,
         Hash,
         Phone,
-<<<<<<< HEAD
-} from "lucide-react";
-import UserLayout from "@/layouts/UserLayout";
-import {
-        createMomoPaymentApi,
-        API_BASE_URL,
-        SERVER_BASE_URL,
-        confirmBookingApi,
-        getBookingByIdApi,
-} from "@/lib/api";
-=======
         MapPin,
         Gamepad2
 } from 'lucide-react';
 import UserLayout from '@/layouts/UserLayout';
 import { createMomoPaymentApi, API_BASE_URL, SERVER_BASE_URL, confirmBookingApi, getBookingByIdApi, getVRBookingById } from '@/lib/api';
->>>>>>> preview
 import { useAuthState } from '@/hooks/useAuthState';
 
 export default function Checkout() {
@@ -48,11 +36,8 @@ export default function Checkout() {
         const [bookingCode, setBookingCode] = useState<string | null>(null);
         const { userName, isLoading: authLoading } = useAuthState(true);
         const [isLoggedIn, setIsLoggedIn] = useState<boolean>(false);
-<<<<<<< HEAD
-=======
         const [isVR, setIsVR] = useState<boolean>(false);
         const [vrItems, setVrItems] = useState<any[]>([]);
->>>>>>> preview
         const formatMoney = (n: number | string) => new Intl.NumberFormat('en-US').format(Number(n || 0));
 
         useEffect(() => {
@@ -74,12 +59,8 @@ export default function Checkout() {
                 const resultCode = searchParams.get('resultCode');
                 const amountParam = searchParams.get('amount');
                 const extraData = searchParams.get('extraData');
-<<<<<<< HEAD
-                const transId = searchParams.get('transId') || searchParams.get('requestId') || searchParams.get('orderId') || (undefined as any);
-=======
                 const transId =
                         searchParams.get('transId') || searchParams.get('requestId') || searchParams.get('orderId') || (undefined as any);
->>>>>>> preview
 
                 // Handle VNPay callback
                 const vnpResponseCode = searchParams.get('vnp_ResponseCode');
@@ -114,8 +95,6 @@ export default function Checkout() {
                                 try {
                                         const bookingData = await getBookingByIdApi(Number(bookingId_vnpay));
                                         if (bookingData) {
-<<<<<<< HEAD
-=======
                                                 const bookingType = (bookingData as any).booking_type || 'movie';
                                                 const vr = bookingType === 'vr';
                                                 let vrList: any[] = [];
@@ -128,7 +107,6 @@ export default function Checkout() {
                                                 setIsVR(vr);
                                                 setVrItems(vrList);
 
->>>>>>> preview
                                                 const pendingFromApi = {
                                                         orderId: `ORDER${bookingData.id}`,
                                                         movie: '',
@@ -142,13 +120,9 @@ export default function Checkout() {
                                                         method: 'vnpay',
                                                         booking_id: bookingData.id,
                                                         user_id: bookingData.user_id,
-<<<<<<< HEAD
-                                                        payment_status: bookingData.payment_status
-=======
                                                         payment_status: bookingData.payment_status,
                                                         booking_type: bookingType,
                                                         vr_items: vrList
->>>>>>> preview
                                                 };
                                                 setOrder(pendingFromApi);
                                                 try {
@@ -195,8 +169,6 @@ export default function Checkout() {
                                         try {
                                                 const bookingData = await getBookingByIdApi(Number(bookingId_vnpay));
                                                 if (bookingData) {
-<<<<<<< HEAD
-=======
                                                         const bookingType = (bookingData as any).booking_type || 'movie';
                                                         const vr = bookingType === 'vr';
                                                         let vrList: any[] = [];
@@ -209,7 +181,6 @@ export default function Checkout() {
                                                         setIsVR(vr);
                                                         setVrItems(vrList);
 
->>>>>>> preview
                                                         const pendingFromApi = {
                                                                 orderId: `ORDER${bookingData.id}`,
                                                                 movie: '',
@@ -223,13 +194,9 @@ export default function Checkout() {
                                                                 method: 'vnpay',
                                                                 booking_id: bookingData.id,
                                                                 user_id: bookingData.user_id,
-<<<<<<< HEAD
-                                                                payment_status: bookingData.payment_status
-=======
                                                                 payment_status: bookingData.payment_status,
                                                                 booking_type: bookingType,
                                                                 vr_items: vrList
->>>>>>> preview
                                                         };
                                                         setOrder(pendingFromApi);
                                                         setStatus(
@@ -247,12 +214,9 @@ export default function Checkout() {
                                 try {
                                         const o = JSON.parse(savedOrder);
                                         setOrder(o);
-<<<<<<< HEAD
-=======
                                         const vr = o.booking_type === 'vr' || (Array.isArray(o.vr_items) && o.vr_items.length > 0);
                                         setIsVR(vr);
                                         if (vr && Array.isArray(o.vr_items)) setVrItems(o.vr_items);
->>>>>>> preview
                                         setStatus(o.payment_status === 'paid' ? 'success' : o.payment_status === 'failed' ? 'failed' : '');
                                 } catch { }
                         } else {
@@ -266,12 +230,9 @@ export default function Checkout() {
                         const merged = { ...pending };
                         if (amountParam) merged.amount = Number(amountParam);
                         setOrder(merged);
-<<<<<<< HEAD
-=======
                         const vr = merged.booking_type === 'vr' || (Array.isArray(merged.vr_items) && merged.vr_items.length > 0);
                         setIsVR(vr);
                         if (vr && Array.isArray(merged.vr_items)) setVrItems(merged.vr_items);
->>>>>>> preview
                 }
 
                 // MoMo payment handling
@@ -299,12 +260,9 @@ export default function Checkout() {
                         }
                         try {
                                 const snap = { ...(pending || {}), payment_status };
-<<<<<<< HEAD
-=======
                                 const vr = snap.booking_type === 'vr' || (Array.isArray(snap.vr_items) && snap.vr_items.length > 0);
                                 setIsVR(vr);
                                 if (vr && Array.isArray(snap.vr_items)) setVrItems(snap.vr_items);
->>>>>>> preview
                                 localStorage.setItem('lastCheckoutOrder', JSON.stringify(snap));
                         } catch { }
                         localStorage.removeItem('pendingOrder');
@@ -342,8 +300,6 @@ export default function Checkout() {
                                         if ((bookingData as any).booking_code) {
                                                 setBookingCode((bookingData as any).booking_code);
                                         }
-<<<<<<< HEAD
-=======
                                         const bookingType = (bookingData as any).booking_type || 'movie';
                                         const vr = bookingType === 'vr';
                                         let vrList: any[] = [];
@@ -356,7 +312,6 @@ export default function Checkout() {
                                         setIsVR(vr);
                                         setVrItems(vrList);
 
->>>>>>> preview
                                         const merged = {
                                                 ...order,
                                                 amount: bookingData.total_price ?? order.amount,
@@ -370,13 +325,9 @@ export default function Checkout() {
                                                 duration: (bookingData as any).duration_min || order.duration,
                                                 ticketPackageName: (bookingData as any).ticket_package_name || order.ticketPackageName,
                                                 expiryDate: (bookingData as any).expiry_date || order.expiryDate,
-<<<<<<< HEAD
-                                                paidAt: (bookingData as any).paid_at || order.paidAt
-=======
                                                 paidAt: (bookingData as any).paid_at || order.paidAt,
                                                 booking_type: bookingType,
                                                 vr_items: vrList
->>>>>>> preview
                                         } as any;
                                         setOrder(merged);
                                         try {
@@ -402,11 +353,7 @@ export default function Checkout() {
                                 user_id: Number(pendingData.user_id || 0),
                                 payment_id: Number(pendingData.booking_id),
                                 payment_status: 'paid',
-<<<<<<< HEAD
-                                transaction_id: (vnpTransactionNo || vnpTxnRef) || undefined,
-=======
                                 transaction_id: vnpTransactionNo || vnpTxnRef || undefined,
->>>>>>> preview
                                 paid_at: new Date().toISOString()
                         })
                                 .then(() => {
@@ -422,11 +369,7 @@ export default function Checkout() {
                                 user_id: Number(pendingData.user_id || 0),
                                 payment_id: Number(pendingData.booking_id),
                                 payment_status: 'failed',
-<<<<<<< HEAD
-                                transaction_id: (vnpTransactionNo || vnpTxnRef) || undefined,
-=======
                                 transaction_id: vnpTransactionNo || vnpTxnRef || undefined,
->>>>>>> preview
                                 paid_at: new Date().toISOString()
                         })
                                 .then(() => {
@@ -462,13 +405,9 @@ export default function Checkout() {
                         const secretKey = process.env.NEXT_PUBLIC_MOMO_SECRET_KEY || '';
                         const requestId = Date.now().toString();
                         const orderId = order.orderId || `ORDER${Date.now()}`;
-<<<<<<< HEAD
-                        const orderInfo = `${order.movie || 'Movie'} | ${order.quantity} vé`;
-=======
                         const orderInfo = isVR
                                 ? `Đặt trải nghiệm VR | ${vrItems?.reduce((s, i) => s + (i.quantity || 0), 0) || order?.quantity || 1} gói`
                                 : `${order.movie || 'Movie'} | ${order.quantity} vé`;
->>>>>>> preview
                         const extraDataEncoded = btoa(unescape(encodeURIComponent(JSON.stringify(order))));
                         const payload = {
                                 partnerCode,
@@ -554,16 +493,8 @@ export default function Checkout() {
         const isError = status === 'failed' || order?.payment_status === 'failed';
 
         return (
-<<<<<<< HEAD
-                <UserLayout
-                        className="bg-[#020617] border-none"
-                        hideFooter
-                >
-                        <section className="relative min-h-screen flex items-center justify-center pt-16 md:pt-20 lg:pt-24 pb-10 overflow-hidden">
-=======
                 <UserLayout className="bg-[#0f172a] border-none" hideFooter>
                         <section className="relative min-h-screen flex items-center justify-center pt-28 md:pt-32 lg:pt-36 pb-10 overflow-hidden">
->>>>>>> preview
                                 {/* Animated Background Elements */}
                                 <div className="absolute inset-0 pointer-events-none overflow-hidden">
                                         <div className="absolute -top-[10%] -left-[10%] w-[40%] h-[40%] bg-blue-600/10 blur-[120px] rounded-full animate-pulse" />
@@ -602,37 +533,6 @@ export default function Checkout() {
                                                                 </div>
                                                         </div>
 
-<<<<<<< HEAD
-                                                        {/* Movie List Section */}
-                                                        <div className="p-3 pb-1">
-                                                                <div className="flex items-center gap-2 mb-2">
-                                                                        <div className="p-2 bg-blue-500/10 rounded-lg">
-                                                                                <Film className="w-4 h-4 text-blue-400" />
-                                                                        </div>
-                                                                        <h2 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Danh sách phim</h2>
-                                                                </div>
-                                                                <div className="space-y-2">
-                                                                        {movies.map((m: any, i: number) => (
-                                                                                <div key={i} className="flex items-start gap-3 group">
-                                                                                        <div className="mt-1.5 w-1.5 h-1.5 rounded-full bg-blue-500 shadow-[0_0_8px_rgba(59,130,246,0.6)]" />
-                                                                                        <div className="flex-1">
-                                                                                                <p className="text-slate-100 font-semibold leading-snug group-hover:text-blue-400 transition-colors">
-                                                                                                        {m.title}
-                                                                                                </p>
-                                                                                                {m.duration && (
-                                                                                                        <span className="text-[10px] text-slate-500 font-medium">{m.duration} phút</span>
-                                                                                                )}
-                                                                                        </div>
-                                                                                </div>
-                                                                        ))}
-                                                                </div>
-                                                        </div>
-
-                                                        {/* Dashed Separator with Cutouts */}
-                                                        <div className="relative h-2 flex items-center my-1">
-                                                                <div className="absolute left-0 -translate-x-1/2 w-5 h-5 bg-[#020617] rounded-full border border-white/10" />
-                                                                <div className="absolute right-0 translate-x-1/2 w-5 h-5 bg-[#020617] rounded-full border border-white/10" />
-=======
                                                         {/* Movie / VR List Section */}
                                                         {movies.length > 0 && movies[0]?.title && (
                                                                 <div className="p-3 pb-1">
@@ -701,27 +601,11 @@ export default function Checkout() {
                                                         <div className="relative h-2 flex items-center my-1">
                                                                 <div className="absolute left-0 -translate-x-1/2 w-5 h-5 bg-[#0f172a] rounded-full border border-white/15" />
                                                                 <div className="absolute right-0 translate-x-1/2 w-5 h-5 bg-[#0f172a] rounded-full border border-white/15" />
->>>>>>> preview
                                                                 <div className="w-full border-t border-dashed border-white/20" />
                                                         </div>
 
                                                         {/* Booking & Ticket Details */}
                                                         <div className="p-3 pt-1 grid grid-cols-2 gap-x-6 gap-y-1">
-<<<<<<< HEAD
-                                                                {/* Package */}
-                                                                <div className="space-y-1">
-                                                                        <div className="flex items-center gap-1.5 text-slate-500">
-                                                                                <Ticket className="w-3 h-3 md:w-4 md:h-4" />
-                                                                                <span className="text-[10px] md:text-xs uppercase font-bold tracking-tighter">Gói vé</span>
-                                                                        </div>
-                                                                        <p className="text-sm md:text-base font-bold text-slate-200">
-                                                                                {order?.ticketPackageName || 'Vé đơn'}
-                                                                        </p>
-                                                                </div>
-
-                                                                {/* Date/Expiry */}
-                                                                {order?.expiryDate && (
-=======
                                                                 {/* Package / VR Type */}
                                                                 <div className="space-y-1">
                                                                         <div className="flex items-center gap-1.5 text-slate-500">
@@ -743,7 +627,6 @@ export default function Checkout() {
 
                                                                 {/* Date/Expiry - Chỉ show cho phim */}
                                                                 {!isVR && order?.expiryDate && (
->>>>>>> preview
                                                                         <div className="space-y-1">
                                                                                 <div className="flex items-center gap-1.5 text-slate-500">
                                                                                         <Calendar className="w-3 h-3 md:w-4 md:h-4" />
@@ -755,8 +638,6 @@ export default function Checkout() {
                                                                         </div>
                                                                 )}
 
-<<<<<<< HEAD
-=======
                                                                 {/* VR Số lượng gói (nếu nhiều hơn 1 loại, tạm ẩn hoặc show tổng quantity) */}
                                                                 {isVR && vrItems?.length > 0 && (
                                                                         <div className="space-y-1">
@@ -770,17 +651,10 @@ export default function Checkout() {
                                                                         </div>
                                                                 )}
 
->>>>>>> preview
                                                                 {/* Unit Price */}
                                                                 <div className="space-y-1">
                                                                         <div className="flex items-center gap-1.5 text-slate-500">
                                                                                 <CreditCard className="w-3 h-3 md:w-4 md:h-4" />
-<<<<<<< HEAD
-                                                                                <span className="text-[10px] md:text-xs uppercase font-bold tracking-tighter">Giá đơn</span>
-                                                                        </div>
-                                                                        <p className="text-sm md:text-base font-medium text-slate-300">
-                                                                                {formatMoney(order?.amount / (order?.quantity || 1))}₫
-=======
                                                                                 <span className="text-[10px] md:text-xs uppercase font-bold tracking-tighter">
                                                                                         {!isVR ? 'Giá đơn' : 'Thành tiền / gói'}
                                                                                 </span>
@@ -792,23 +666,12 @@ export default function Checkout() {
                                                                                                 ? `${formatMoney(Number(vrItems[0]?.unit_price || vrItems[0]?.discounted_unit_price || order?.amount))}₫`
                                                                                                 : `${formatMoney(order?.amount)}₫ (tổng)`
                                                                                         )}
->>>>>>> preview
                                                                         </p>
                                                                 </div>
 
                                                                 {/* Quantity */}
                                                                 <div className="space-y-1 text-right">
                                                                         <div className="flex items-center justify-end gap-1.5 text-slate-500">
-<<<<<<< HEAD
-                                                                                <span className="text-[10px] md:text-xs uppercase font-bold tracking-tighter">Số lượng</span>
-                                                                        </div>
-                                                                        <p className="text-xl md:text-2xl font-black text-white italic">x{order?.quantity || 1}</p>
-                                                                </div>
-                                                        </div>
-
-                                                        {/* Customer Banner */}
-                                                        <div className="mx-3 p-2 bg-white/[0.03] border border-white/5 rounded-2xl space-y-1">
-=======
                                                                                 <span className="text-[10px] md:text-xs uppercase font-bold tracking-tighter">
                                                                                         {!isVR ? 'Số lượng' : 'Tổng lượt chơi'}
                                                                                 </span>
@@ -854,7 +717,6 @@ export default function Checkout() {
 
                                                         {/* Customer Banner */}
                                                         <div className="mx-3 p-2 bg-white/[0.06] border border-white/10 rounded-2xl space-y-1">
->>>>>>> preview
                                                                 <div className="flex items-center justify-between">
                                                                         <div className="flex items-center gap-2">
                                                                                 <div className="w-8 h-8 md:w-10 md:h-10 rounded-full bg-gradient-to-br from-blue-500 to-purple-500 flex items-center justify-center">
@@ -940,11 +802,7 @@ export default function Checkout() {
                                                                         >
                                                                                 <Sparkles className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
                                                                                 <span>
-<<<<<<< HEAD
-                                                                                        Hệ thống đã gửi thông tin vé chi tiết và **Mã đặt vé** tới <b>{order?.email}</b>. Quý khách vui
-=======
                                                                                         Hệ thống đã gửi {!isVR ? 'thông tin vé chi tiết và **Mã đặt vé**' : 'thông tin trải nghiệm VR chi tiết và **Mã đặt chỗ**'} tới <b>{order?.email}</b>. Quý khách vui
->>>>>>> preview
                                                                                         lòng kiểm tra email (bao gồm cả thư rác).
                                                                                 </span>
                                                                         </motion.div>
@@ -965,20 +823,12 @@ export default function Checkout() {
                                                         </div>
 
                                                         {/* Decorative Corner Elements */}
-<<<<<<< HEAD
-                                                        <div className="absolute top-0 right-0 w-16 h-16 bg-white/[0.02] -rotate-45 translate-x-1/2 -translate-y-1/2" />
-=======
                                                         <div className="absolute top-0 right-0 w-16 h-16 bg-white/[0.06] -rotate-45 translate-x-1/2 -translate-y-1/2" />
->>>>>>> preview
                                                 </div>
 
                                                 {/* Footer Text */}
                                                 <p className="text-center mt-4 text-slate-500 text-[10px] uppercase font-bold tracking-[0.2em]">
-<<<<<<< HEAD
-                                                        CineSphere • Trải nghiệm điện ảnh đỉnh cao
-=======
                                                         CineSphere • {!isVR ? 'Trải nghiệm điện ảnh đỉnh cao' : '🎮 Trải nghiệm VR đẳng cấp'}
->>>>>>> preview
                                                 </p>
                                         </motion.div>
                                 </div>

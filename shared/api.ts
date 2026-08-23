@@ -8,21 +8,10 @@
  * Example response type for /api/demo
  */
 export interface DemoResponse {
-        message: string;
+  message: string;
 }
 
 export interface Movie {
-<<<<<<< HEAD
-        id: string;
-        title: string;
-        year: number;
-        duration: string;
-        price: number;
-        release_date: Date;
-        rating: number;
-        genres: string[];
-        posterUrl: string;
-=======
   id: string;
   title: string;
   year: number;
@@ -32,53 +21,20 @@ export interface Movie {
   rating: number;
   genres: string[];
   posterUrl: string;
->>>>>>> preview
 }
 
 export interface Login {
-        email: string;
-        password: string;
+  email: string;
+  password: string;
 }
 
 export interface Register {
-        email: string;
-        password: string;
-        name?: string;
+  email: string;
+  password: string;
+  name?: string;
 }
 
 export interface MoviesResponse {
-<<<<<<< HEAD
-        year: number;
-        count: number;
-        items: Movie[];
-}
-
-export interface ActiveMoviesTodayResponse {
-        id: number;
-        title: string;
-        description: string;
-        cover_image: string;
-        detail_images: string;
-        genres: string;
-        rating: string;
-        duration_min: number;
-        price: number;
-        release_date: Date;
-}
-
-export interface PaymentRequest {
-        email: string;
-        emailBook: string;
-        phone: string;
-        name: string;
-        movieId?: number;
-        combo?: number[];
-        ticketCount: number;
-        paymentMethod: 'cash' | 'momo' | 'vnpay';
-        totalPrice?: number;
-        ticketPackageId?: number;
-        pay_txt_code?: string;
-=======
   year: number;
   count: number;
   items: Movie[];
@@ -112,7 +68,6 @@ export interface PaymentRequest {
   vr_items?: VRPackageItem[];
   voucher_code?: string;
   branch_id?: number;
->>>>>>> preview
 }
 
 // =====================================================================

@@ -1,9 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import AdminLayout from '@/admin/layouts/AdminLayout';
 import TicketsContent from '@/components/admin/content/TicketsContent';
-<<<<<<< HEAD
-import { getTickets, deleteTicketApi } from '@/lib/api';
-=======
 import { getTickets, deleteTicketApi, getAdminBranchOptions } from '@/lib/api';
 import { useStaffPermission } from '@/hooks/useStaffPermission';
 import { useStaffStore } from '@/store/staffStore';
@@ -12,7 +9,6 @@ import { toast } from 'sonner';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { X } from 'lucide-react';
->>>>>>> preview
 
 interface TicketPackage {
         id: number;
@@ -22,18 +18,13 @@ interface TicketPackage {
         price: number;
         features?: string[];
         type?: string;
-<<<<<<< HEAD
-=======
         combo?: number[];
         movies?: any[];
->>>>>>> preview
         min_group_size?: number;
         max_group_size?: number;
         is_member_only?: boolean;
         is_active?: boolean;
         display_order?: number;
-<<<<<<< HEAD
-=======
         branch_id?: number;
         branch_ids?: number[] | null;
         branch_name?: string;
@@ -42,15 +33,10 @@ interface TicketPackage {
         vr_genre?: string;
         min_players?: number;
         max_players?: number;
->>>>>>> preview
         updated_at?: string;
 }
 
 export default function TicketsPage() {
-<<<<<<< HEAD
-        const [tickets, setTickets] = useState<TicketPackage[]>([]);
-        const [page, setPage] = useState(1);
-=======
         const navigate = useNavigate();
         const staff = useStaffStore((state) => state.staff);
         const clearStaff = useStaffStore((state) => state.clearStaff);
@@ -68,17 +54,10 @@ export default function TicketsPage() {
         const [activeTab, setActiveTab] = useState('tickets');
         const [tickets, setTickets] = useState<TicketPackage[]>([]);
         const [page, setPage] = useState(initialFilters.page || 1);
->>>>>>> preview
         const pageSize = 10;
         const [total, setTotal] = useState(0);
         const totalPages = Math.max(1, Math.ceil(total / pageSize));
 
-<<<<<<< HEAD
-        const [isEditOpen, setIsEditOpen] = useState(false);
-        const [editData, setEditData] = useState<any>(null);
-        const [isLoading, setIsLoading] = useState(false);
-        const [showActiveOnly, setShowActiveOnly] = useState(true);
-=======
         const [typeFilter, setTypeFilter] = useState<'all' | 'movie' | 'vr'>(initialFilters.typeFilter || 'all');
         const [isEditOpen, setIsEditOpen] = useState(false);
         const [editData, setEditData] = useState<any>(null);
@@ -125,20 +104,15 @@ export default function TicketsPage() {
                         }
                 })();
         }, [staff, canViewBranches, selectedBranchId]);
->>>>>>> preview
 
         const handleRefresh = async () => {
                 setIsLoading(true);
                 const { items, total } = await getTickets({
                         page,
                         pageSize,
-<<<<<<< HEAD
-                        includeInactive: !showActiveOnly
-=======
                         type: typeFilter,
                         includeInactive: !showActiveOnly,
                         branch_id: selectedBranchId
->>>>>>> preview
                 });
                 setTickets(
                         items.map((t: any) => ({
@@ -156,8 +130,6 @@ export default function TicketsPage() {
                                 is_member_only: !!t.is_member_only,
                                 is_active: t.is_active ?? true,
                                 display_order: t.display_order ?? 0,
-<<<<<<< HEAD
-=======
                                 branch_id: t.branch_id || undefined,
                                 branch_ids: Array.isArray(t.branch_ids) ? t.branch_ids : t.branch_ids ?? null,
                                 cover_image: t.cover_image || undefined,
@@ -165,7 +137,6 @@ export default function TicketsPage() {
                                 vr_genre: t.vr_genre || undefined,
                                 min_players: t.min_players !== null && t.min_players !== undefined ? Number(t.min_players) : undefined,
                                 max_players: t.max_players !== null && t.max_players !== undefined ? Number(t.max_players) : undefined,
->>>>>>> preview
                                 updated_at: t.updated_at ? new Date(t.updated_at).toISOString() : undefined
                         }))
                 );
@@ -175,31 +146,6 @@ export default function TicketsPage() {
 
         useEffect(() => {
                 handleRefresh();
-<<<<<<< HEAD
-        }, [page, showActiveOnly]);
-
-        const openCreate = () => {
-                setEditData({ id: 0, name: '', price: 0, is_active: true, features: [] });
-                setIsEditOpen(true);
-        };
-
-        const openEdit = (data: any) => {
-                setEditData({ ...data });
-                setIsEditOpen(true);
-        };
-
-        return (
-                <AdminLayout
-                        active={'tickets' as any}
-                        setActive={(() => { }) as any}
-                        adminEmailState={localStorage.getItem('adminEmail') || 'admin@email.com'}
-                        handleLogout={() => {
-                                localStorage.removeItem('adminToken');
-                                localStorage.removeItem('adminEmail');
-                                window.dispatchEvent(new Event('admin-auth-changed'));
-                                window.location.href = '/';
-                        }}
-=======
         }, [page, showActiveOnly, selectedBranchId, typeFilter]);
 
         useEffect(() => {
@@ -251,7 +197,6 @@ export default function TicketsPage() {
                         setActive={setActiveTab as any}
                         adminEmailState={staff?.email || 'admin@email.com'}
                         handleLogout={handleLogout}
->>>>>>> preview
                 >
                         <TicketsContent
                                 data={tickets}
@@ -268,11 +213,6 @@ export default function TicketsPage() {
                                 onRefresh={handleRefresh}
                                 deleteTicketApi={deleteTicketApi as any}
                                 isLoading={isLoading}
-<<<<<<< HEAD
-                                showActiveOnly={showActiveOnly}
-                                setShowActiveOnly={setShowActiveOnly}
-                        />
-=======
                                 branches={branches}
                                 onDelete={handleDelete}
                                 selectedBranchId={selectedBranchId}
@@ -311,7 +251,6 @@ export default function TicketsPage() {
                                         </DialogFooter>
                                 </DialogContent>
                         </Dialog>
->>>>>>> preview
                 </AdminLayout>
         );
 }

@@ -1,12 +1,6 @@
-<<<<<<< HEAD
-import { eq, and, gte, lt } from 'drizzle-orm';
-import { mailQueue } from './mail-queue';
-import { getOTPEmailTemplate } from './email-templates';
-=======
 import { eq, and, gte, lt, isNull } from 'drizzle-orm';
 import { mailQueue } from './mail-queue';
 import { getOTPEmailTemplate, getStaffPasswordChangeOTPTemplate } from './email-templates';
->>>>>>> preview
 import { formatDateForDb } from './date-utils';
 
 export function generateOTP(length: number = 6): string {
@@ -73,18 +67,7 @@ export async function createOTPRecord(
         expiredAt.setMinutes(expiredAt.getMinutes() + expiryMinutes);
 
         // Delete existing OTP tokens for this account (invalidate old OTPs)
-<<<<<<< HEAD
-        await anyDb
-                .delete(tables.tokens)
-                .where(
-                        and(
-                                eq(tables.tokens.account_id, accountId),
-                                eq(tables.tokens.type, 'otp')
-                        )
-                );
-=======
         await anyDb.delete(tables.tokens).where(and(eq(tables.tokens.account_id, accountId), eq(tables.tokens.type, 'otp')));
->>>>>>> preview
 
         // Insert new OTP token
         const inserted = await anyDb
@@ -108,15 +91,7 @@ export async function validateOTP(
         otp: string
 ): Promise<{ valid: boolean; attempts?: number; error?: string }> {
         const tokenRecord = await anyDb.query.tokens.findFirst({
-<<<<<<< HEAD
-                where: and(
-                        eq(tables.tokens.account_id, accountId),
-                        eq(tables.tokens.type, 'otp'),
-                        eq(tables.tokens.token, otp)
-                )
-=======
                 where: and(eq(tables.tokens.account_id, accountId), eq(tables.tokens.type, 'otp'), eq(tables.tokens.token, otp))
->>>>>>> preview
         });
 
         if (!tokenRecord) {
@@ -136,24 +111,8 @@ export async function validateOTP(
         return { valid: true };
 }
 
-<<<<<<< HEAD
-export async function deleteOTP(
-        anyDb: any,
-        tables: { tokens: any },
-        accountId: number
-) {
-        await anyDb
-                .delete(tables.tokens)
-                .where(
-                        and(
-                                eq(tables.tokens.account_id, accountId),
-                                eq(tables.tokens.type, 'otp')
-                        )
-                );
-=======
 export async function deleteOTP(anyDb: any, tables: { tokens: any }, accountId: number) {
         await anyDb.delete(tables.tokens).where(and(eq(tables.tokens.account_id, accountId), eq(tables.tokens.type, 'otp')));
->>>>>>> preview
 }
 
 export async function canResendOTP(
@@ -163,14 +122,7 @@ export async function canResendOTP(
         cooldownSeconds: number
 ): Promise<{ canResend: boolean; secondsRemaining?: number }> {
         const tokenRecord = await anyDb.query.tokens.findFirst({
-<<<<<<< HEAD
-                where: and(
-                        eq(tables.tokens.account_id, accountId),
-                        eq(tables.tokens.type, 'otp')
-                ),
-=======
                 where: and(eq(tables.tokens.account_id, accountId), eq(tables.tokens.type, 'otp')),
->>>>>>> preview
                 orderBy: (tokens: any, { desc }) => [desc(tokens.created_at)]
         });
 
@@ -191,8 +143,6 @@ export async function canResendOTP(
                 secondsRemaining: cooldownSeconds - elapsedSeconds
         };
 }
-<<<<<<< HEAD
-=======
 
 // Staff OTP functions for password change
 export async function sendStaffPasswordChangeOTP(
@@ -305,4 +255,3 @@ export async function deleteStaffOTP(anyDb: any, tables: { staffTokens: any }, s
                 .set({ revokedAt: new Date().toISOString(), revokeReason: 'used' })
                 .where(and(eq(tables.staffTokens.staffId, staffId), eq(tables.staffTokens.type, 'otp'), isNull(tables.staffTokens.revokedAt)));
 }
->>>>>>> preview

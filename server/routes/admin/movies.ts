@@ -1,11 +1,3 @@
-<<<<<<< HEAD
-import { eq, desc, and, inArray, sql, or } from 'drizzle-orm';
-import { formatDateForDb } from '../../lib/date-utils';
-
-export async function createMovieImpl(
-        anyDb: any,
-        tables: { movies: any },
-=======
 import { eq, desc, and, inArray, sql, or, isNull, isNotNull, like, count } from 'drizzle-orm';
 import { formatDateForDb } from '../../lib/date-utils';
 import { logAuditAction } from '../../lib/audit-logger';
@@ -23,7 +15,6 @@ import {
 export async function createMovieImpl(
         anyDb: any,
         tables: { movies: any; auditLogs: any },
->>>>>>> preview
         data: {
                 title: string;
                 description?: string;
@@ -35,12 +26,6 @@ export async function createMovieImpl(
                 duration_min: number;
                 is_active?: boolean;
                 release_date: string | Date | null;
-<<<<<<< HEAD
-        },
-        config?: any,
-        RUN_ENV?: any,
-        uploader?: (base64: string, folder: string) => Promise<{ url: string }>
-=======
                 branch_id?: number | null;
                 branch_ids?: number[] | null;
         },
@@ -48,7 +33,6 @@ export async function createMovieImpl(
         RUN_ENV?: any,
         uploader?: (base64: string, folder: string) => Promise<{ url: string }>,
         staffInfo?: { id: number; email: string; fullname: string }
->>>>>>> preview
 ) {
         if (config) {
                 process.env = config;
@@ -64,10 +48,7 @@ export async function createMovieImpl(
                         throw error; // Throw lỗi khi upload ảnh
                 }
         }
-<<<<<<< HEAD
-=======
         const branchFields = resolveBranchIdsInput(data.branch_ids, data.branch_id);
->>>>>>> preview
         const baseData: any = {
                 title: data.title,
                 description: data.description,
@@ -76,11 +57,8 @@ export async function createMovieImpl(
                 genres: Array.isArray(data.genres) ? JSON.stringify(data.genres) : data.genres,
                 rating: data.rating ?? null,
                 duration_min: data.duration_min,
-<<<<<<< HEAD
-=======
                 branch_id: branchFields.branch_id ?? null,
                 branch_ids: branchFields.branch_ids ?? null,
->>>>>>> preview
                 is_active: data.is_active === undefined ? true : Boolean(data.is_active),
                 release_date: data.release_date ? formatDateForDb(data.release_date) : null,
                 created_at: formatDateForDb(now),
@@ -95,9 +73,6 @@ export async function createMovieImpl(
                         await RUN_ENV.KV_BINDING.delete('active_movies_v2');
                 }
 
-<<<<<<< HEAD
-                return { movie };
-=======
                 const auditNew = buildAuditPayload(movie);
 
                 // Log audit action
@@ -118,7 +93,6 @@ export async function createMovieImpl(
                 }
 
                 return { movie: enrichWithParsedBranchIds(movie) };
->>>>>>> preview
         } catch (err: any) {
                 throw err;
         }
@@ -126,11 +100,7 @@ export async function createMovieImpl(
 
 export async function updateMovieImpl(
         anyDb: any,
-<<<<<<< HEAD
-        tables: { movies: any; ticket_packages: any },
-=======
         tables: { movies: any; ticket_packages: any; auditLogs: any },
->>>>>>> preview
         id: number,
         data: {
                 title?: string;
@@ -143,22 +113,15 @@ export async function updateMovieImpl(
                 duration_min?: number;
                 is_active?: boolean;
                 release_date?: string | Date | null;
-<<<<<<< HEAD
-=======
                 branch_id?: number | null;
                 branch_ids?: number[] | null;
->>>>>>> preview
         },
         config?: any,
         RUN_ENV?: any,
         uploader?: (base64: string, folder: string) => Promise<{ url: string }>,
-<<<<<<< HEAD
-        deleter?: (url: string) => Promise<void>
-=======
         deleter?: (url: string) => Promise<void>,
         staffInfo?: { id: number; email: string; fullname: string },
         restrictToBranchIds: number[] | null = null
->>>>>>> preview
 ) {
         if (config) {
                 process.env = config;
@@ -168,14 +131,11 @@ export async function updateMovieImpl(
         const oldMovie = await anyDb.query.movies.findFirst({
                 where: eq(tables.movies.id, id)
         });
-<<<<<<< HEAD
-=======
         if (oldMovie && restrictToBranchIds && restrictToBranchIds.length > 0 && !staffCanAccessBranchIds(oldMovie.branch_ids, restrictToBranchIds, false)) {
                 const err: any = new Error('Bạn không có quyền sửa phim thuộc chi nhánh khác');
                 err.statusCode = 403;
                 throw err;
         }
->>>>>>> preview
         const payload: any = { updated_at: formatDateForDb(now) };
         // Xử lý upload ảnh nếu có base64
         if (data.cover_image_base64 && uploader) {
@@ -192,12 +152,6 @@ export async function updateMovieImpl(
         // Các trường khác
         if (data.title !== undefined) payload.title = data.title;
         if (data.description !== undefined) payload.description = data.description;
-<<<<<<< HEAD
-        if (data.detail_images !== undefined) payload.detail_images = Array.isArray(data.detail_images) ? JSON.stringify(data.detail_images) : data.detail_images;
-        if (data.genres !== undefined) payload.genres = Array.isArray(data.genres) ? JSON.stringify(data.genres) : data.genres;
-        if (data.rating !== undefined) payload.rating = data.rating ?? null;
-        if (data.duration_min !== undefined) payload.duration_min = data.duration_min;
-=======
         if (data.detail_images !== undefined)
                 payload.detail_images = Array.isArray(data.detail_images) ? JSON.stringify(data.detail_images) : data.detail_images;
         if (data.genres !== undefined)
@@ -209,7 +163,6 @@ export async function updateMovieImpl(
                 if (branchFields.branch_ids !== undefined) payload.branch_ids = branchFields.branch_ids;
                 if (branchFields.branch_id !== undefined) payload.branch_id = branchFields.branch_id;
         }
->>>>>>> preview
         if (data.is_active !== undefined) payload.is_active = data.is_active;
         if (data.release_date !== undefined) {
                 payload.release_date = data.release_date ? formatDateForDb(data.release_date) : null;
@@ -219,11 +172,7 @@ export async function updateMovieImpl(
                 const activePackages = await anyDb
                         .select({ name: tables.ticket_packages.name, combo: tables.ticket_packages.combo })
                         .from(tables.ticket_packages)
-<<<<<<< HEAD
-                        .where(eq(tables.ticket_packages.is_active, true));
-=======
                         .where(and(eq(tables.ticket_packages.is_active, true), isNull(tables.ticket_packages.deleted_at)));
->>>>>>> preview
 
                 const conflictPackages = activePackages.filter((p: any) => {
                         let comboArr: any[] = [];
@@ -233,14 +182,10 @@ export async function updateMovieImpl(
                                 } else if (typeof p.combo === 'string') {
                                         // Handle old format: "1|2|3" or JSON array
                                         if (p.combo.includes('|')) {
-<<<<<<< HEAD
-                                                comboArr = p.combo.split('|').map((x: string) => x.trim()).filter(Boolean);
-=======
                                                 comboArr = p.combo
                                                         .split('|')
                                                         .map((x: string) => x.trim())
                                                         .filter(Boolean);
->>>>>>> preview
                                         } else {
                                                 comboArr = JSON.parse(p.combo);
                                         }
@@ -278,9 +223,6 @@ export async function updateMovieImpl(
                 ) {
                         deleter(oldMovie.cover_image).catch((e) => console.error('Failed to delete old movie image:', e));
                 }
-<<<<<<< HEAD
-                return { movie };
-=======
 
                 const auditOld = buildAuditPayload(oldMovie);
                 const auditNew = buildAuditPayload(movie);
@@ -303,7 +245,6 @@ export async function updateMovieImpl(
                 }
 
                 return { movie: enrichWithParsedBranchIds(movie) };
->>>>>>> preview
         } catch (err: any) {
                 throw err;
         }
@@ -311,19 +252,12 @@ export async function updateMovieImpl(
 
 export async function deleteMovieImpl(
         anyDb: any,
-<<<<<<< HEAD
-        tables: { movies: any },
-        id: number,
-        RUN_ENV: any,
-        deleter?: (url: string) => Promise<void>
-=======
         tables: { movies: any; auditLogs: any; ticket_packages: any },
         id: number,
         RUN_ENV: any,
         deleter?: (url: string) => Promise<void>,
         staffInfo?: { id: number; email: string; fullname: string },
         restrictToBranchIds: number[] | null = null
->>>>>>> preview
 ) {
         // Check if movie exists before deleting
         const existing = await anyDb.query.movies.findFirst({
@@ -331,15 +265,6 @@ export async function deleteMovieImpl(
         });
 
         if (!existing) return null;
-<<<<<<< HEAD
-
-        // Delete cover image
-        if (existing.cover_image && deleter) {
-                deleter(existing.cover_image).catch((e) => console.error('Failed to delete movie image:', e));
-        }
-
-        await anyDb.delete(tables.movies).where(eq(tables.movies.id, id));
-=======
         if (restrictToBranchIds && restrictToBranchIds.length > 0 && !staffCanAccessBranchIds(existing.branch_ids, restrictToBranchIds, false)) {
                 const err: any = new Error('Bạn không có quyền xóa phim thuộc chi nhánh khác');
                 err.statusCode = 403;
@@ -379,23 +304,11 @@ export async function deleteMovieImpl(
 
         // Soft delete by setting is_active = false and deleted_at
         await anyDb.update(tables.movies).set({ is_active: false, deleted_at: new Date().toISOString(), deleted_by_staff_id: staffInfo?.id }).where(eq(tables.movies.id, id));
->>>>>>> preview
 
         if (RUN_ENV && RUN_ENV.KV_BINDING) {
                 await RUN_ENV.KV_BINDING.delete('active_movies_v2');
         }
 
-<<<<<<< HEAD
-        return { ok: true };
-}
-
-export async function updateMovieStatusImpl(
-        anyDb: any,
-        tables: { movies: any; ticket_packages: any },
-        id: number,
-        isActive: boolean,
-        RUN_ENV?: any
-=======
         const auditOld = buildAuditPayload(existing);
         const auditNew = buildAuditPayload({ ...existing, is_active: false, deleted_at: new Date().toISOString(), deleted_by_staff_id: staffInfo?.id });
 
@@ -531,14 +444,11 @@ export async function updateMovieStatusImpl(
         RUN_ENV?: any,
         restrictToBranchIds: number[] | null = null,
         staffInfo?: { id: number; email: string; fullname: string }
->>>>>>> preview
 ) {
         try {
                 if (typeof isActive !== 'boolean') {
                         throw new Error('isActive must be a boolean');
                 }
-<<<<<<< HEAD
-=======
                 const existingMovie = await anyDb.query.movies.findFirst({
                         where: eq(tables.movies.id, id)
                 });
@@ -554,17 +464,12 @@ export async function updateMovieStatusImpl(
                         err.statusCode = 403;
                         throw err;
                 }
->>>>>>> preview
                 if (isActive === false) {
                         const searchId = String(id);
                         const activePackages = await anyDb
                                 .select({ name: tables.ticket_packages.name, combo: tables.ticket_packages.combo })
                                 .from(tables.ticket_packages)
-<<<<<<< HEAD
-                                .where(eq(tables.ticket_packages.is_active, true));
-=======
                                 .where(and(eq(tables.ticket_packages.is_active, true), isNull(tables.ticket_packages.deleted_at)));
->>>>>>> preview
 
                         const conflictPackages = activePackages.filter((p: any) => {
                                 let comboArr: any[] = [];
@@ -574,14 +479,10 @@ export async function updateMovieStatusImpl(
                                         } else if (typeof p.combo === 'string') {
                                                 // Handle old format: "1|2|3" or JSON array
                                                 if (p.combo.includes('|')) {
-<<<<<<< HEAD
-                                                        comboArr = p.combo.split('|').map((x: string) => x.trim()).filter(Boolean);
-=======
                                                         comboArr = p.combo
                                                                 .split('|')
                                                                 .map((x: string) => x.trim())
                                                                 .filter(Boolean);
->>>>>>> preview
                                                 } else {
                                                         comboArr = JSON.parse(p.combo);
                                                 }
@@ -613,8 +514,6 @@ export async function updateMovieStatusImpl(
                         throw new Error('Movie not found');
                 }
 
-<<<<<<< HEAD
-=======
                 // Log audit action
                 if (staffInfo) {
                         await logAuditAction(
@@ -630,7 +529,6 @@ export async function updateMovieStatusImpl(
                         );
                 }
 
->>>>>>> preview
                 return {
                         status: 200,
                         message: 'Đã thay đổi trạng thái thành công!',
@@ -648,14 +546,9 @@ export async function updateMovieStatusImpl(
 
 export async function getMovieByIdImpl(
         anyDb: any,
-<<<<<<< HEAD
-        tables: { movies: any; bookings: any; ticket_packages: any },
-        movieId: number
-=======
         tables: { movies: any; bookings: any; ticket_packages: any; auditLogs: any },
         movieId: number,
         restrictToBranchIds: number[] | null = null
->>>>>>> preview
 ) {
         // Helper to safely parse JSON strings from D1/SQLite
         const safeParseJson = (val: any) => {
@@ -679,10 +572,6 @@ export async function getMovieByIdImpl(
                 return isNaN(d.getTime()) ? null : d.toISOString();
         };
 
-<<<<<<< HEAD
-        const movie = await anyDb.query.movies.findFirst({
-                where: eq(tables.movies.id, movieId)
-=======
         const movieWhere =
                 restrictToBranchIds && restrictToBranchIds.length > 0
                         ? and(
@@ -695,7 +584,6 @@ export async function getMovieByIdImpl(
                 with: {
                         branch: true
                 }
->>>>>>> preview
         });
         if (!movie) return null;
 
@@ -725,9 +613,6 @@ export async function getMovieByIdImpl(
                         features: tables.ticket_packages.features
                 })
                 .from(tables.ticket_packages)
-<<<<<<< HEAD
-                .where(eq(tables.ticket_packages.is_active, true));
-=======
                 .where(
                         restrictToBranchIds && restrictToBranchIds.length > 0
                                 ? and(
@@ -737,7 +622,6 @@ export async function getMovieByIdImpl(
                                   )
                                 : and(eq(tables.ticket_packages.is_active, true), isNull(tables.ticket_packages.deleted_at))
                 );
->>>>>>> preview
 
         const applicablePackages = activePackages.filter((p: any) => {
                 let comboArr: any[] = [];
@@ -747,14 +631,10 @@ export async function getMovieByIdImpl(
                         } else if (typeof p.combo === 'string') {
                                 // Handle old format: "1|2|3" or JSON array
                                 if (p.combo.includes('|')) {
-<<<<<<< HEAD
-                                        comboArr = p.combo.split('|').map((x: string) => x.trim()).filter(Boolean);
-=======
                                         comboArr = p.combo
                                                 .split('|')
                                                 .map((x: string) => x.trim())
                                                 .filter(Boolean);
->>>>>>> preview
                                 } else {
                                         comboArr = JSON.parse(p.combo);
                                 }
@@ -765,8 +645,6 @@ export async function getMovieByIdImpl(
                 return Array.isArray(comboArr) && comboArr.map(String).includes(searchId);
         });
 
-<<<<<<< HEAD
-=======
         // Get tracking data from audit logs
         const [createLog] = await anyDb
                 .select()
@@ -782,7 +660,6 @@ export async function getMovieByIdImpl(
                 .orderBy(desc(tables.auditLogs.createdAt))
                 .limit(1);
 
->>>>>>> preview
         return {
                 id: movie.id,
                 title: movie.title,
@@ -795,11 +672,6 @@ export async function getMovieByIdImpl(
                 release_date: safeDate(movie.release_date),
                 created_at: safeDate(movie.created_at),
                 updated_at: safeDate(movie.updated_at),
-<<<<<<< HEAD
-                stats: { totalTicketsSold, totalRevenue, successfulBookings },
-                applicable_packages: applicablePackages || [],
-                detail_images: safeParseJson(movie.detail_images)
-=======
                 created_by_staff_name: createLog?.staffFullname || null,
                 updated_by_staff_name: updateLog?.staffFullname || null,
                 stats: { totalTicketsSold, totalRevenue, successfulBookings },
@@ -807,6 +679,5 @@ export async function getMovieByIdImpl(
                 detail_images: safeParseJson(movie.detail_images),
                 branch_id: movie.branch_id,
                 branch_ids: parseBranchIds(movie.branch_ids)
->>>>>>> preview
         };
 }
