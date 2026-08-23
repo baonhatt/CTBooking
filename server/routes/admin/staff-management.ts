@@ -170,8 +170,8 @@ export async function createStaffImpl(
 
         // Check if email already exists in staffs
         const [existingStaff] = await db.select().from(staffs).where(eq(staffs.email, email)).limit(1);
-        if (existingStaff) {
-                return { status: 'error', message: 'Email đã tồn tại trong danh sách nhân viên' };
+        if (existingStaff && !existingStaff.deletedAt) {
+                return { status: 'error', message: 'Email đã tồn tại trong danh sách nhân viên đang hoạt động' };
         }
 
         // Check if email already exists in accounts (Users)
@@ -200,27 +200,62 @@ export async function createStaffImpl(
         // Hash password
         const hashedPassword = await hashPassword(generatedPassword);
 
-        // Create staff
-        const [newStaff] = await db
-                .insert(staffs)
-                .values({
-                        email,
-                        password: hashedPassword,
-                        fullname,
-                        phone,
-                        avatar,
-                        isSuperAdmin: false,
-                        isActive: true,
-                        forcePasswordChange,
-                        createdAt: now,
-                        updatedAt: now
-                })
-                .returning();
+        // Log generated password to console for local dev convenience
+        console.log(`\n===============================================================`);
+        console.log(`🎉 [STAFF CREATED / REACTIVATED]`);
+        console.log(`👤 Nhân viên: ${fullname} (${email})`);
+        console.log(`🔑 MẬT KHẨU KHỞI TẠO: ${generatedPassword}`);
+        console.log(`===============================================================\n`);
+
+        let targetStaffId: number;
+
+        if (existingStaff && existingStaff.deletedAt) {
+                // Reactivate soft-deleted staff
+                targetStaffId = existingStaff.id;
+                await db
+                        .update(staffs)
+                        .set({
+                                password: hashedPassword,
+                                fullname,
+                                phone: phone || null,
+                                avatar: avatar || null,
+                                isSuperAdmin: false,
+                                isActive: true,
+                                deletedAt: null,
+                                deleted_by_staff_id: null,
+                                forcePasswordChange,
+                                updatedAt: now
+                        })
+                        .where(eq(staffs.id, targetStaffId));
+
+                // Clean old roles and branches
+                await db.delete(staffRoles).where(eq(staffRoles.staffId, targetStaffId));
+                await db.delete(staffBranches).where(eq(staffBranches.staffId, targetStaffId));
+                await invalidateStaffPermissionCache(kv, targetStaffId);
+        } else {
+                // Create brand new staff
+                const [newStaff] = await db
+                        .insert(staffs)
+                        .values({
+                                email,
+                                password: hashedPassword,
+                                fullname,
+                                phone,
+                                avatar,
+                                isSuperAdmin: false,
+                                isActive: true,
+                                forcePasswordChange,
+                                createdAt: now,
+                                updatedAt: now
+                        })
+                        .returning();
+                targetStaffId = newStaff.id;
+        }
 
         // Assign roles
         for (const roleId of roleIds) {
                 await db.insert(staffRoles).values({
-                        staffId: newStaff.id,
+                        staffId: targetStaffId,
                         roleId
                 });
         }
@@ -228,13 +263,14 @@ export async function createStaffImpl(
         // Assign branches
         for (const branchId of branchIds) {
                 await db.insert(staffBranches).values({
-                        staffId: newStaff.id,
+                        staffId: targetStaffId,
                         branchId
                 });
         }
 
         // Send email with password
-        const loginUrl = (env?.VITE_CLIENT_BASE_URL || 'https://cinesphere.com.vn') + '/admin/login';
+        const clientBase = String(env?.VITE_CLIENT_BASE_URL || 'https://cinesphere.com.vn').replace(/\/$/, '');
+        const loginUrl = `${clientBase}/login`;
         const emailHtml = getStaffAccountCreatedTemplate({
                 staffName: fullname,
                 email: email,
@@ -247,10 +283,10 @@ export async function createStaffImpl(
                 mailQueue.add(
                         async () => {
                                 try {
-                                        await mailer(email, 'Tài khoản nhân viên CINESPHERE', emailHtml);
-                                        console.log(`[Staff] Sent account creation email to ${email}`);
-                                } catch (e) {
-                                        console.error(`[Staff] Failed to send email to ${email}:`, e);
+                                        const mailRes = await mailer(email, 'Tài khoản nhân viên CINESPHERE', emailHtml);
+                                        console.log(`[Staff] Sent account creation email to ${email}`, mailRes);
+                                } catch (e: any) {
+                                        console.error(`[Staff] Failed to send email to ${email}:`, e?.message || e);
                                         throw e;
                                 }
                         },
@@ -260,25 +296,26 @@ export async function createStaffImpl(
                                 subject: 'Tài khoản nhân viên CINESPHERE',
                                 emailType: 'welcome',
                                 recipientType: 'staff',
-                                staffId: newStaff.id,
+                                staffId: targetStaffId,
                                 emailLogsTable: email_logs
                         },
                         context
                 );
         } else {
-                console.warn('[Staff] No mailer provided, skipping account creation email');
+                console.warn('[Staff] No mailer provided, skipping account creation email (password was logged to console)');
         }
 
-        const auditNew = buildStaffAuditPayload(newStaff, { roleIds, branchIds });
+        const [finalStaff] = await db.select().from(staffs).where(eq(staffs.id, targetStaffId)).limit(1);
+        const auditNew = buildStaffAuditPayload(finalStaff, { roleIds, branchIds });
 
         // Log audit action
         await logAuditAction(
                 db,
                 tables.auditLogs,
-                'create',
+                existingStaff?.deletedAt ? 'restore' : 'create',
                 'staff',
-                newStaff.id,
-                `Tạo nhân viên: ${fullname} (${email})`,
+                targetStaffId,
+                `${existingStaff?.deletedAt ? 'Tạo lại (kích hoạt)' : 'Tạo'} nhân viên: ${fullname} (${email})`,
                 caller?.id || null,
                 caller?.email || email,
                 caller?.fullname || fullname,
@@ -290,9 +327,9 @@ export async function createStaffImpl(
                 status: 'success',
                 message: 'Đã tạo nhân viên thành công',
                 staff: {
-                        id: newStaff.id,
-                        email: newStaff.email,
-                        fullname: newStaff.fullname
+                        id: targetStaffId,
+                        email: email,
+                        fullname: fullname
                 }
         };
 }
@@ -639,7 +676,8 @@ export async function resetStaffPasswordImpl(
         await invalidateStaffPermissionCache(kv, id);
 
         // Send email notification about password reset
-        const loginUrl = (env?.VITE_CLIENT_BASE_URL || 'https://cinesphere.com.vn') + '/admin/login';
+        const clientBase = String(env?.VITE_CLIENT_BASE_URL || 'https://cinesphere.com.vn').replace(/\/$/, '');
+        const loginUrl = `${clientBase}/login`;
         const emailHtml = getStaffPasswordResetTemplate({
                 staffName: existing.fullname,
                 email: existing.email,
@@ -647,15 +685,22 @@ export async function resetStaffPasswordImpl(
                 loginUrl: loginUrl
         });
 
+        // Log prominent reset password banner in console for local dev convenience
+        console.log(`\n===============================================================`);
+        console.log(`🔑 [ADMIN RESET STAFF PASSWORD]`);
+        console.log(`👤 Nhân viên: ${existing.fullname} (${existing.email})`);
+        console.log(`🔑 MẬT KHẨU MỚI: ${newPassword}`);
+        console.log(`===============================================================\n`);
+
         if (mailer) {
                 const { mailQueue } = await import('../../lib/mail-queue');
                 mailQueue.add(
                         async () => {
                                 try {
-                                        await mailer(existing.email, 'Reset Mật Khẩu Nhân Viên - CINESPHERE', emailHtml);
-                                        console.log(`[Staff] Sent password reset email to ${existing.email}`);
-                                } catch (e) {
-                                        console.error(`[Staff] Failed to send password reset email to ${existing.email}:`, e);
+                                        const mailRes = await mailer(existing.email, 'Reset Mật Khẩu Nhân Viên - CINESPHERE', emailHtml);
+                                        console.log(`[Staff] Sent password reset email to ${existing.email}`, mailRes);
+                                } catch (e: any) {
+                                        console.error(`[Staff] Failed to send password reset email to ${existing.email}:`, e?.message || e);
                                         throw e;
                                 }
                         },
@@ -671,7 +716,7 @@ export async function resetStaffPasswordImpl(
                         context
                 );
         } else {
-                console.warn('[Staff] No mailer provided, skipping password reset email');
+                console.warn('[Staff] No mailer provided, skipping password reset email (new password was logged to console)');
         }
 
         const auditOld = buildStaffAuditPayload(existing);

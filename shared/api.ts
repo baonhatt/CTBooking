@@ -113,6 +113,10 @@ export interface VoucherSummary {
   code: string;
   name: string;
   description?: string;
+  sale_staff_id?: number | null;
+  sale_name?: string | null;
+  sale_email?: string | null;
+  total_revenue?: number;
   scope: 'vr' | 'movie' | 'all';
   discount_type: 'percent' | 'fixed';
   discount_value: number;
@@ -160,6 +164,10 @@ export interface VoucherCreateRequest {
   code: string;
   name: string;
   description?: string;
+  note?: string;
+  sale_staff_id?: number | null;
+  sale_name?: string | null;
+  sale_email?: string | null;
   scope?: 'vr' | 'movie' | 'all';
   discount_type: 'percent' | 'fixed';
   discount_value: number;

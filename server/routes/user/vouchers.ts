@@ -1,6 +1,7 @@
 import { eq, and, count, isNull, sql } from 'drizzle-orm';
 import type { VoucherValidateResponse, VRPackageItem } from '../../../shared/api';
 import { formatDateForDb } from '../../lib/date-utils';
+import { parseVoucherMetadata } from '../admin/vouchers';
 
 function parseNullableJsonArray(val: any): number[] {
         if (val === null || val === undefined) return [];
@@ -221,9 +222,13 @@ export async function validateVoucherForVRImpl(
         }
         if (discount_amount > order_total) discount_amount = order_total;
 
+        const meta = parseVoucherMetadata(voucher.description);
+
         return {
                 valid: true,
-                message: `Áp dụng thành công: Tiết kiệm ${discount_amount.toLocaleString('vi-VN')}đ`,
+                message: meta.sale_name
+                        ? `Áp dụng mã của Sale ${meta.sale_name} thành công: Tiết kiệm ${discount_amount.toLocaleString('vi-VN')}đ`
+                        : `Áp dụng thành công: Tiết kiệm ${discount_amount.toLocaleString('vi-VN')}đ`,
                 discount_amount,
                 discount_type: dType as 'percent' | 'fixed',
                 order_total_before: order_total,
@@ -232,7 +237,10 @@ export async function validateVoucherForVRImpl(
                         id: voucher.id,
                         code: voucher.code,
                         name: voucher.name,
-                        description: voucher.description,
+                        description: meta.note || voucher.description,
+                        sale_staff_id: meta.sale_staff_id,
+                        sale_name: meta.sale_name,
+                        sale_email: meta.sale_email,
                         scope: voucher.scope,
                         discount_type: voucher.discount_type,
                         discount_value: dValue,
@@ -271,8 +279,18 @@ export async function redeemVoucherAfterPaymentImpl(
                 staff_id?: number;
         }
 ) {
-        const { voucher_id, booking_id, user_id, discount_amount_applied, order_total_before_discount, order_total_after_discount, staff_id } = args;
+        const { voucher_id, booking_id, user_id, discount_amount_applied, order_total_before_discount, order_total_after_discount } = args;
+        let staff_id = args.staff_id;
         if (!voucher_id || !booking_id) return { ok: false, error: 'Missing voucher_id/booking_id' };
+
+        const voucher = await anyDb.query.vouchers.findFirst({ where: eq(tables.vouchers.id, voucher_id) });
+
+        if (!staff_id && voucher?.description) {
+                const meta = parseVoucherMetadata(voucher.description);
+                if (meta.sale_staff_id) {
+                        staff_id = meta.sale_staff_id;
+                }
+        }
 
         await anyDb
                 .update(tables.vouchers)

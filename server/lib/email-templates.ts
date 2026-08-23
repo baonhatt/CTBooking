@@ -481,7 +481,7 @@ export function getStaffAccountCreatedTemplate(data: {
         password: string;
         loginUrl?: string;
 }): string {
-        const loginUrl = data.loginUrl || 'https://cinesphere.com.vn/admin/login';
+        const loginUrl = data.loginUrl || 'https://cinesphere.com.vn/login';
 
         const content = `
       <div class="greeting">
@@ -527,7 +527,7 @@ export function getStaffPasswordResetTemplate(data: {
         newPassword: string;
         loginUrl?: string;
 }): string {
-        const loginUrl = data.loginUrl || 'https://cinesphere.com.vn/admin/login';
+        const loginUrl = data.loginUrl || 'https://cinesphere.com.vn/login';
 
         const content = `
       <div class="greeting">

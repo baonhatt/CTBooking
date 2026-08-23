@@ -273,17 +273,21 @@ export async function toggleVoucherStatusApi(id: number) {
 }
 
 export async function listDeletedVouchersApi(filters: VoucherListFilters = {}) {
-        const params = new URLSearchParams();
-        Object.entries(filters).forEach(([k, v]) => {
-                if (v !== undefined && v !== null && v !== '') params.set(k, String(v));
-        });
-        const qs = params.toString();
-        return request<{
-                items: any[];
-                page: number;
-                pageSize: number;
-                total: number;
-        }>(`/api/admin/deleted/vouchers${qs ? `?${qs}` : ''}`);
+	const params = new URLSearchParams();
+	Object.entries(filters).forEach(([k, v]) => {
+		if (v !== undefined && v !== null && v !== '') params.set(k, String(v));
+	});
+	const qs = params.toString();
+	return request<{
+		items: any[];
+		page: number;
+		pageSize: number;
+		total: number;
+	}>(`/api/admin/vouchers/deleted${qs ? `?${qs}` : ''}`);
+}
+
+export async function listStaffOptionsApi() {
+	return request<{ status?: string; items: any[]; total: number }>('/api/admin/staff?pageSize=100');
 }
 
 /* ========== LIST VR TICKET PACKAGES FOR VOUCHER FORM ========== */

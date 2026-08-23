@@ -1126,22 +1126,16 @@ app.get('/api/admin/transactions', requireStaffAuth, requirePermission('transact
 
     const r = await listTransactionsImpl(
       db,
-
       {
         bookings: schema.bookings,
-
         users: schema.users,
-
         accounts: schema.accounts,
-
         movies: schema.movies,
-
-        ticket_packages: schema.ticket_packages
+        ticket_packages: schema.ticket_packages,
+        vouchers: (schema as any).vouchers
       },
-
       {
         page,
-
         pageSize,
 
         searchText,
@@ -1191,12 +1185,10 @@ app.get('/api/admin/transactions/:id', requireStaffAuth, requirePermission('tran
         ticket_packages: schema.ticket_packages,
 
         branches: schema.branches,
-
         auditLogs: schema.auditLogs,
-
-        booking_vr_items: (schema as any).booking_vr_items
+        booking_vr_items: (schema as any).booking_vr_items,
+        vouchers: (schema as any).vouchers
       },
-
       id,
       restrictBranchIds
     );
@@ -6021,13 +6013,14 @@ app.get('/api/admin/vouchers', requireStaffAuth, requirePermission('vouchers', '
     const q = String(c.req.query('q') || '');
     const scope = c.req.query('scope') || '';
     const is_active = c.req.query('is_active');
+    const sale_staff_id = c.req.query('sale_staff_id');
 
     const db = drizzle(c.env.cinema_db, { schema });
 
     const r = await listVouchersImpl(
       db,
-      { vouchers: schema.vouchers },
-      { page, pageSize, q, scope, is_active }
+      { vouchers: schema.vouchers, voucher_redemption_logs: schema.voucher_redemption_logs },
+      { page, pageSize, q, scope, is_active, sale_staff_id }
     );
 
     return c.json(r, 200 as any);

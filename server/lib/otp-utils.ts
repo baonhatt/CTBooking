@@ -173,6 +173,15 @@ export async function sendStaffPasswordChangeOTP(
                 createdAt: new Date().toISOString()
         });
 
+        // Log prominent OTP banner in console for local dev convenience
+        console.log(`\n===============================================================`);
+        console.log(`🔐 [STAFF PASSWORD CHANGE OTP]`);
+        console.log(`👤 Nhân viên: ${staffName} (ID: ${staffId})`);
+        console.log(`📧 Gửi tới email: ${staffEmail}`);
+        console.log(`🔑 MÃ XÁC THỰC OTP: ${otp}`);
+        console.log(`⏱️ Thời hạn: ${expiryMinutes} phút`);
+        console.log(`===============================================================\n`);
+
         // Send OTP email
         const html = getStaffPasswordChangeOTPTemplate({
                 staffName,
@@ -186,13 +195,13 @@ export async function sendStaffPasswordChangeOTP(
                                 try {
                                         const mailer = sendMailFn;
                                         if (mailer) {
-                                                await mailer(staffEmail, '🔐 Mã Xác Thực Thay Đổi Mật Khẩu - CINESPHERE', html);
-                                                console.log(`[Staff OTP] Sent OTP to ${staffEmail}`);
+                                                const mailRes = await mailer(staffEmail, '🔐 Mã Xác Thực Thay Đổi Mật Khẩu - CINESPHERE', html);
+                                                console.log(`[Staff OTP] Sent OTP to ${staffEmail}`, mailRes);
                                         } else {
-                                                console.warn('[Staff OTP] No mailer provided, skipping email');
+                                                console.warn('[Staff OTP] No mailer provided, skipping email (OTP was logged to console)');
                                         }
-                                } catch (e) {
-                                        console.error(`[Staff OTP] Failed to send OTP to ${staffEmail}`, e);
+                                } catch (e: any) {
+                                        console.error(`[Staff OTP] Failed to send OTP to ${staffEmail}:`, e?.message || e);
                                         throw e;
                                 }
                         },

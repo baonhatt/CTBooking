@@ -23,6 +23,7 @@ export const PERMISSIONS_SEED = [
   // Users (khách hàng)
   { module: 'users', action: 'view', description: 'Xem danh sách khách hàng' },
   { module: 'users', action: 'view_detail', description: 'Xem chi tiết khách hàng' },
+  { module: 'users', action: 'export', description: 'Xuất dữ liệu khách hàng' },
 
   // Movies
   { module: 'movies', action: 'view', description: 'Xem danh sách phim' },
@@ -93,6 +94,7 @@ export const PERMISSIONS_SEED = [
 
   // Transactions
   { module: 'transactions', action: 'view', description: 'Xem giao dịch' },
+  { module: 'transactions', action: 'export', description: 'Xuất file báo cáo giao dịch (Excel/CSV)' },
 
   // Vouchers (VR / giảm giá)
   { module: 'vouchers', action: 'view', description: 'Xem danh sách vouchers' },
@@ -101,7 +103,8 @@ export const PERMISSIONS_SEED = [
   { module: 'vouchers', action: 'toggle_status', description: 'Bật/tắt trạng thái voucher' },
   { module: 'vouchers', action: 'delete', description: 'Xóa voucher' },
   { module: 'vouchers', action: 'view_deleted', description: 'Xem voucher đã xóa' },
-  { module: 'vouchers', action: 'restore', description: 'Khôi phục voucher đã xóa' }
+  { module: 'vouchers', action: 'restore', description: 'Khôi phục voucher đã xóa' },
+  { module: 'vouchers', action: 'export', description: 'Xuất dữ liệu vouchers' }
 ];
 
 export const ROLES_SEED = [
@@ -145,12 +148,15 @@ export const ROLES_SEED = [
       'vouchers:edit',
       'vouchers:toggle_status',
       'vouchers:delete',
+      'vouchers:export',
       'transactions:view',
+      'transactions:export',
       'posts:view',
       'posts:create',
       'posts:edit',
       'users:view',
       'users:view_detail',
+      'users:export',
       'staff:view',
       'branches:view',
       'branches:edit',

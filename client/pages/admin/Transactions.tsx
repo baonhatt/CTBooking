@@ -100,80 +100,95 @@ export default function TransactionsPage() {
                                         branch_id: selectedBranchId,
                                         booking_type: bookingTypeFilter
                                 });
-                                setTransactions(
-                                        items.map((t: any) => ({
-                                                id: String(t.id),
-                                                userId: t.user_id,
-                                                email: t.email,
-                                                userName: t.userName,
-                                                ticket_package_name: t.ticket_package_name,
-                                                ticketCount: t.ticketCount,
-                                                totalPrice: t.totalPrice,
-                                                paymentMethod: t.paymentMethod,
-                                                paymentStatus: t.paymentStatus,
-                                                is_used: t.is_used,
-                                                expired: t.expired,
-                                                createdAt: new Date(t.createdAt),
-                                                paidAt: t.paidAt ? new Date(t.paidAt) : null,
-                                                updatedAt: t.updatedAt ? new Date(t.updatedAt) : null,
-                                                branch_id: t.branch_id,
-                                                booking_type: t.booking_type || 'movie'
-                                        }))
-                                );
-                                setTotalTransactions(total);
-                        } catch (error) {
-                                console.error('Lỗi load giao dịch:', error);
-                        } finally {
-                                setIsLoading(false);
-                        }
-                })();
-        }, [txPage, pageSize, txQuery, txStatus, sortKey, sortDir, paymentMethod, fromDate, toDate, selectedBranchId, bookingTypeFilter]);
+				setTransactions(
+					items.map((t: any) => ({
+						id: String(t.id),
+						userId: t.user_id,
+						email: t.email,
+						userName: t.userName,
+						transactionId: t.transactionId,
+						ticket_package_name: t.ticket_package_name,
+						ticketCount: t.ticketCount,
+						totalPrice: t.totalPrice,
+						originalTotalPrice: t.originalTotalPrice ?? t.original_price,
+						voucher_id: t.voucher_id,
+						voucher_code: t.voucher_code,
+						voucher_discount_amount: t.voucher_discount_amount,
+						sale_staff_id: t.sale_staff_id,
+						sale_name: t.sale_name,
+						sale_email: t.sale_email,
+						paymentMethod: t.paymentMethod,
+						paymentStatus: t.paymentStatus,
+						is_used: t.is_used,
+						expired: t.expired,
+						createdAt: new Date(t.createdAt),
+						paidAt: t.paidAt ? new Date(t.paidAt) : null,
+						updatedAt: t.updatedAt ? new Date(t.updatedAt) : null,
+						branch_id: t.branch_id,
+						booking_type: t.booking_type || 'movie'
+					}))
+				);
+				setTotalTransactions(total);
+			} catch (error) {
+				console.error('Lỗi load giao dịch:', error);
+			} finally {
+				setIsLoading(false);
+			}
+		})();
+	}, [txPage, pageSize, txQuery, txStatus, sortKey, sortDir, paymentMethod, fromDate, toDate, selectedBranchId, bookingTypeFilter]);
 
-        const txTotalPages = useMemo(() => Math.max(1, Math.ceil(totalTransactions / pageSize)), [totalTransactions]);
+	const txTotalPages = useMemo(() => Math.max(1, Math.ceil(totalTransactions / pageSize)), [totalTransactions]);
 
-        const handleRefresh = async () => {
-                try {
-                        setIsLoading(true);
-                        const { items, total } = await getTransactions({
-                                page: txPage,
-                                pageSize,
-                                searchText: txQuery,
-                                status: txStatus,
-                                sort: sortKey,
-                                dir: sortDir,
-                                payment_method: paymentMethod || undefined,
-                                from: fromDate || undefined,
-                                to: toDate || undefined,
-                                branch_id: selectedBranchId,
-                                booking_type: bookingTypeFilter
-                        });
-                        setTransactions(
-                                items.map((t: any) => ({
-                                        id: String(t.id),
-                                        userId: t.user_id,
-                                        email: t.email,
-                                        userName: t.userName,
-                                        transactionId: t.transactionId,
-                                        ticket_package_name: t.ticket_package_name,
-                                        ticketCount: t.ticketCount,
-                                        totalPrice: t.totalPrice,
-                                        paymentMethod: t.paymentMethod,
-                                        paymentStatus: t.paymentStatus,
-                                        createdAt: new Date(t.createdAt),
-                                        paidAt: t.paidAt ? new Date(t.paidAt) : null,
-                                        updatedAt: t.updatedAt ? new Date(t.updatedAt) : null,
-                                        branch_id: t.branch_id,
-                                        is_used: t.is_used,
-                                        booking_type: t.booking_type || 'movie'
-                                }))
-                        );
-                        setTotalTransactions(total);
-                } catch (error) {
-                        console.error('Lỗi refresh giao dịch:', error);
-                } finally {
-                        setIsLoading(false);
-                }
-        };
+	const handleRefresh = async () => {
+		try {
+			setIsLoading(true);
+			const { items, total } = await getTransactions({
+				page: txPage,
+				pageSize,
+				searchText: txQuery,
+				status: txStatus,
+				sort: sortKey,
+				dir: sortDir,
+				payment_method: paymentMethod || undefined,
+				from: fromDate || undefined,
+				to: toDate || undefined,
+				branch_id: selectedBranchId,
+				booking_type: bookingTypeFilter
+			});
+			setTransactions(
+				items.map((t: any) => ({
+					id: String(t.id),
+					userId: t.user_id,
+					email: t.email,
+					userName: t.userName,
+					transactionId: t.transactionId,
+					ticket_package_name: t.ticket_package_name,
+					ticketCount: t.ticketCount,
+					totalPrice: t.totalPrice,
+					originalTotalPrice: t.originalTotalPrice ?? t.original_price,
+					voucher_id: t.voucher_id,
+					voucher_code: t.voucher_code,
+					voucher_discount_amount: t.voucher_discount_amount,
+					sale_staff_id: t.sale_staff_id,
+					sale_name: t.sale_name,
+					sale_email: t.sale_email,
+					paymentMethod: t.paymentMethod,
+					paymentStatus: t.paymentStatus,
+					createdAt: new Date(t.createdAt),
+					paidAt: t.paidAt ? new Date(t.paidAt) : null,
+					updatedAt: t.updatedAt ? new Date(t.updatedAt) : null,
+					branch_id: t.branch_id,
+					is_used: t.is_used,
+					booking_type: t.booking_type || 'movie'
+				}))
+			);
+			setTotalTransactions(total);
+		} catch (error) {
+			console.error('Lỗi refresh giao dịch:', error);
+		} finally {
+			setIsLoading(false);
+		}
+	};
 
         const handleLogout = () => {
                 localStorage.removeItem('staffToken');

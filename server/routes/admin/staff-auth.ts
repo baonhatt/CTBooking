@@ -73,7 +73,7 @@ export async function staffLoginImpl(db: any, tables: any, kv: any, body: { emai
                         email: staff.email,
                         fullname: staff.fullname,
                         isSuperAdmin: staff.isSuperAdmin,
-                        forcePasswordChange: staff.forcePasswordChange
+                        forcePasswordChange: Boolean(staff.forcePasswordChange)
                 },
                 permissions,
                 branchIds,
@@ -112,7 +112,7 @@ export async function staffGetMeImpl(db: any, tables: any, kv: any, staffId: num
                         phone: staff.phone,
                         avatar: staff.avatar,
                         isSuperAdmin: staff.isSuperAdmin,
-                        forcePasswordChange: staff.forcePasswordChange,
+                        forcePasswordChange: Boolean(staff.forcePasswordChange),
                         lastLoginAt: staff.lastLoginAt
                 },
                 permissions,

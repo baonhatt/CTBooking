@@ -53,8 +53,7 @@ export class MailQueue {
                 let table: any = emailLogsTable;
 
                 try {
-                        if (!table) {
-                                // Import schema dynamically to avoid circular dependencies
+                        if (!table && db) {
                                 try {
                                         const schemaModule = await import('../../worker/src/schema.js');
                                         table = schemaModule.email_logs;
@@ -63,48 +62,55 @@ export class MailQueue {
                                 }
                         }
 
-                        if (table) {
-                                // Insert pending log
-                                const insertResult = await db
-                                        .insert(table)
-                                        .values({
-                                                recipient,
-                                                subject,
-                                                email_type: emailType,
-                                                status: 'pending',
-                                                provider: provider || null,
-                                                recipient_type: recipientType,
-                                                user_id: userId || null,
-                                                staff_id: staffId || null,
-                                                booking_id: bookingId || null,
-                                                metadata: additionalData ? JSON.stringify(additionalData) : null,
-                                                created_at: formatDateForDb(new Date()),
-                                                updated_at: formatDateForDb(new Date())
-                                        })
-                                        .returning({ id: table.id });
+                        if (table && db) {
+                                try {
+                                        const insertResult = await db
+                                                .insert(table)
+                                                .values({
+                                                        recipient,
+                                                        subject,
+                                                        email_type: emailType,
+                                                        status: 'pending',
+                                                        provider: provider || null,
+                                                        recipient_type: recipientType,
+                                                        user_id: userId || null,
+                                                        staff_id: staffId || null,
+                                                        booking_id: bookingId || null,
+                                                        metadata: additionalData ? JSON.stringify(additionalData) : null,
+                                                        created_at: formatDateForDb(new Date()),
+                                                        updated_at: formatDateForDb(new Date())
+                                                })
+                                                .returning({ id: table.id });
 
-                                logId = insertResult[0]?.id;
+                                        logId = insertResult[0]?.id;
+                                } catch (logInsertErr: any) {
+                                        console.warn('[EmailTracking] Could not create pending log in DB:', logInsertErr?.message);
+                                }
                         }
 
                         // Execute email sending task
                         await task();
 
                         // Update to sent
-                        if (logId && table) {
-                                await db
-                                        .update(table)
-                                        .set({
-                                                status: 'sent',
-                                                sent_at: formatDateForDb(new Date()),
-                                                updated_at: formatDateForDb(new Date())
-                                        })
-                                        .where(eq(table.id, logId));
+                        if (logId && table && db) {
+                                try {
+                                        await db
+                                                .update(table)
+                                                .set({
+                                                        status: 'sent',
+                                                        sent_at: formatDateForDb(new Date()),
+                                                        updated_at: formatDateForDb(new Date())
+                                                })
+                                                .where(eq(table.id, logId));
+                                } catch (logUpdateErr: any) {
+                                        console.warn('[EmailTracking] Could not update sent status in DB:', logUpdateErr?.message);
+                                }
                         }
 
-                        console.log(`[EmailTracking] ✅ Email sent successfully (ID: ${logId})`);
+                        console.log(`[EmailTracking] ✅ Email sent successfully to ${recipient} (ID: ${logId})`);
                 } catch (error: any) {
                         // Update to failed
-                        if (logId && table) {
+                        if (logId && table && db) {
                                 try {
                                         await db
                                                 .update(table)
@@ -120,7 +126,7 @@ export class MailQueue {
                         }
 
                         console.error(`[EmailTracking] ❌ Email failed (ID: ${logId}):`, error?.message);
-                        throw error; // Re-throw to maintain original error handling
+                        throw error;
                 }
         }
 

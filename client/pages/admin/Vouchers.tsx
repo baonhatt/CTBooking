@@ -18,6 +18,11 @@ interface VoucherItem {
         code: string;
         name: string;
         description?: string;
+        note?: string;
+        sale_staff_id?: number | null;
+        sale_name?: string | null;
+        sale_email?: string | null;
+        total_revenue?: number;
         scope?: string;
         discount_type: 'percent' | 'fixed';
         discount_value: number;
@@ -75,9 +80,10 @@ export default function VouchersPage() {
         const totalPages = Math.max(1, Math.ceil(total / pageSize));
 
         const [scopeFilter, setScopeFilter] = useState<VoucherListFilters['scope']>(
-                initialFilters.scopeFilter || 'vr'
+                initialFilters.scopeFilter || 'all'
         );
         const [searchText, setSearchText] = useState<string>(initialFilters.searchText || '');
+        const [selectedSaleId, setSelectedSaleId] = useState<string | number>(initialFilters.selectedSaleId || 'all');
         const [isEditOpen, setIsEditOpen] = useState(false);
         const [editData, setEditData] = useState<any>(null);
         const [isLoading, setIsLoading] = useState(false);
@@ -119,8 +125,9 @@ export default function VouchersPage() {
                                 is_active: showActiveOnly ? 'true' : 'all',
                                 branch_id: (selectedBranchId as any) === 'all' || !selectedBranchId
                                         ? undefined
-                                        : (selectedBranchId as any)
-                        });
+                                        : (selectedBranchId as any),
+                                sale_staff_id: selectedSaleId === 'all' ? undefined : selectedSaleId
+                        } as any);
                         setVouchers(items || []);
                         setTotal(total ?? 0);
                 } catch (err: any) {
@@ -132,7 +139,7 @@ export default function VouchersPage() {
 
         useEffect(() => {
                 handleRefresh();
-        }, [page, showActiveOnly, selectedBranchId, scopeFilter, searchText]);
+        }, [page, showActiveOnly, selectedBranchId, scopeFilter, searchText, selectedSaleId]);
 
         useEffect(() => {
                 try {
@@ -141,20 +148,24 @@ export default function VouchersPage() {
                                 showActiveOnly,
                                 branchId: selectedBranchId,
                                 scopeFilter,
-                                searchText
+                                searchText,
+                                selectedSaleId
                         };
                         localStorage.setItem('admin_vouchers_filters', JSON.stringify(state));
                 } catch { }
-        }, [page, showActiveOnly, selectedBranchId, scopeFilter, searchText]);
+        }, [page, showActiveOnly, selectedBranchId, scopeFilter, searchText, selectedSaleId]);
 
         const openCreate = () => {
-                const newScope = scopeFilter === 'all' ? 'vr' : scopeFilter;
                 setEditData({
                         id: 0,
                         code: generateRandomCode(),
                         name: '',
                         description: '',
-                        scope: newScope,
+                        note: '',
+                        sale_staff_id: null,
+                        sale_name: null,
+                        sale_email: null,
+                        scope: 'all',
                         discount_type: 'percent',
                         discount_value: 10,
                         max_discount: null,
@@ -236,6 +247,8 @@ export default function VouchersPage() {
                                 setSelectedBranchId={setSelectedBranchId}
                                 searchText={searchText}
                                 setSearchText={(s) => { setSearchText(s); setPage(1); }}
+                                selectedSaleId={selectedSaleId}
+                                setSelectedSaleId={(s) => { setSelectedSaleId(s); setPage(1); }}
                                 isDeletedView={false}
                                 onDelete={handleDelete}
                                 onRestore={handleRestore}

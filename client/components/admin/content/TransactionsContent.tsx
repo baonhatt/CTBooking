@@ -15,51 +15,68 @@ import {
         PaginationPrevious
 } from '@/components/ui/pagination';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { getTransactionById, getTickets } from '@/lib/api';
 import {
-        CheckCircle2,
-        CheckCheck,
-        CheckIcon,
-        Clock,
-        Copy,
-        TicketIcon,
-        Timer,
-        UserIcon,
-        X,
-        XCircle,
-        Search,
-        Loader2,
-        RefreshCw,
-        SortAsc,
-        SortDesc,
-        FilterX,
-        Gamepad2,
-        Film
+	DropdownMenu,
+	DropdownMenuContent,
+	DropdownMenuItem,
+	DropdownMenuTrigger
+} from '@/components/ui/dropdown-menu';
+import { getTransactionById, getTransactions, getTickets } from '@/lib/api';
+import { exportTransactionsData } from '@/lib/exportUtils';
+import {
+	CheckCircle2,
+	CheckCheck,
+	CheckIcon,
+	Clock,
+	Copy,
+	TicketIcon,
+	Timer,
+	UserIcon,
+	X,
+	XCircle,
+	Search,
+	Loader2,
+	RefreshCw,
+	SortAsc,
+	SortDesc,
+	FilterX,
+	Gamepad2,
+	Film,
+	Download,
+	FileSpreadsheet
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { formatDistanceToNow } from 'date-fns';
 import { vi } from 'date-fns/locale';
+import { useStaffPermissions, useIsSuperAdmin } from '@/hooks/useStaffPermission';
 
 interface Tx {
-        id: string;
-        userId?: number | null;
-        transactionId: string;
-        email: string;
-        userName: string;
-        ticket_package_name: string;
-        ticketCount: number;
-        totalPrice: number;
-        paymentMethod: string;
-        paymentStatus: string;
-        is_used: boolean;
-        createdAt: Date;
-        paidAt?: Date | null;
-        updatedAt?: Date | null;
-        expired: boolean;
-        branch_id?: number | null;
-        created_by_staff_name?: string;
-        updated_by_staff_name?: string;
-        booking_type?: 'movie' | 'vr' | string;
+	id: string;
+	userId?: number | null;
+	transactionId: string;
+	email: string;
+	userName: string;
+	ticket_package_name: string;
+	ticketCount: number;
+	totalPrice: number;
+	originalTotalPrice?: number;
+	paymentMethod: string;
+	paymentStatus: string;
+	is_used: boolean;
+	createdAt: Date;
+	paidAt?: Date | null;
+	updatedAt?: Date | null;
+	expired: boolean;
+	branch_id?: number | null;
+	created_by_staff_name?: string;
+	updated_by_staff_name?: string;
+	booking_type?: 'movie' | 'vr' | string;
+	voucher_id?: number | null;
+	voucher_code?: string | null;
+	voucher_discount_amount?: number;
+	sale_staff_id?: number | null;
+	sale_name?: string | null;
+	sale_email?: string | null;
 }
 interface Props {
         data: Tx[];
@@ -238,44 +255,131 @@ export default function TransactionsContent({
                         </div>
                 );
         };
-        const [localTxQuery, setLocalTxQuery] = useState(txQuery);
+	const isSuperAdmin = useIsSuperAdmin();
+	const permissions = useStaffPermissions();
+	const canExport = isSuperAdmin || permissions.some((p) => (p.module === 'transactions' || p.module === '*') && (p.action === 'export' || p.action === '*'));
+	const [localTxQuery, setLocalTxQuery] = useState(txQuery);
+	const [isExporting, setIsExporting] = useState(false);
 
-        useEffect(() => {
-                setLocalTxQuery(txQuery);
-        }, [txQuery]);
+	useEffect(() => {
+		setLocalTxQuery(txQuery);
+	}, [txQuery]);
 
-        const handleSearchTx = (e?: React.FormEvent) => {
-                if (e) e.preventDefault();
-                setTxQuery(localTxQuery);
-                setPage(1);
-        };
+	const handleSearchTx = (e?: React.FormEvent) => {
+		if (e) e.preventDefault();
+		setTxQuery(localTxQuery);
+		setPage(1);
+	};
 
-        return (
-                <div className="space-y-6">
-                        <div className="flex flex-col gap-4 bg-white p-6 rounded-2xl border shadow-sm">
-                                <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-                                        <div className="flex flex-col gap-1">
-                                                <h3 className="text-lg font-bold text-slate-900 flex items-center gap-2">
-                                                        Lịch Sử Giao Dịch
-                                                        <Badge
-                                                                variant="secondary"
-                                                                className="rounded-full bg-slate-100 text-slate-600 px-2 py-0 h-5 text-[10px] font-bold"
-                                                        >
-                                                                {transactionsLength}
-                                                        </Badge>
-                                                </h3>
-                                                <p className="text-xs text-slate-500">Quản lý và đối soát thông tin đặt vé hệ thống.</p>
-                                        </div>
-                                        <Button
-                                                variant="outline"
-                                                size="icon"
-                                                onClick={onRefresh}
-                                                className="rounded-xl shadow-sm hover:rotate-180 transition-transform duration-500 shrink-0 h-10 w-10"
-                                                title="Làm mới"
-                                        >
-                                                <RefreshCw className={`w-4 h-4 ${isLoading ? 'animate-spin' : ''}`} />
-                                        </Button>
-                                </div>
+	const handleExportAll = async () => {
+		try {
+			setIsExporting(true);
+			toast.info('Đang chuẩn bị dữ liệu xuất...');
+			const res = await getTransactions({
+				page: 1,
+				pageSize: 5000,
+				searchText: txQuery,
+				status: txStatus,
+				sort: sortKey,
+				dir: sortDir,
+				payment_method: paymentMethod || undefined,
+				from: fromDate || undefined,
+				to: toDate || undefined,
+				branch_id: selectedBranchId,
+				booking_type: bookingTypeFilter
+			});
+			const items = res?.items || [];
+			if (items.length === 0) {
+				toast.error('Không tìm thấy giao dịch nào phù hợp với bộ lọc');
+				return;
+			}
+			exportTransactionsData(items, branches, 'danh_sach_giao_dich_tat_ca');
+			toast.success(`Đã xuất thành công ${items.length} giao dịch ra file Excel/CSV!`);
+		} catch (err: any) {
+			toast.error(err.message || 'Lỗi xuất dữ liệu');
+		} finally {
+			setIsExporting(false);
+		}
+	};
+
+	const handleExportCurrentPage = () => {
+		if (!data || data.length === 0) {
+			toast.error('Không có dữ liệu trên trang hiện tại để xuất');
+			return;
+		}
+		exportTransactionsData(data, branches, `danh_sach_giao_dich_trang_${currentPage}`);
+		toast.success(`Đã xuất ${data.length} giao dịch trang ${currentPage} ra file Excel/CSV!`);
+	};
+
+	return (
+		<div className="space-y-6">
+			<div className="flex flex-col gap-4 bg-white p-6 rounded-2xl border shadow-sm">
+				<div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+					<div className="flex flex-col gap-1">
+						<h3 className="text-lg font-bold text-slate-900 flex items-center gap-2">
+							Lịch Sử Giao Dịch
+							<Badge
+								variant="secondary"
+								className="rounded-full bg-slate-100 text-slate-600 px-2 py-0 h-5 text-[10px] font-bold"
+							>
+								{transactionsLength}
+							</Badge>
+						</h3>
+						<p className="text-xs text-slate-500">Quản lý, đối soát và xuất file thống kê doanh thu hệ thống.</p>
+					</div>
+					<div className="flex items-center gap-2">
+						{canExport && (
+							<DropdownMenu>
+								<DropdownMenuTrigger asChild>
+									<Button
+										variant="outline"
+										disabled={isExporting}
+										className="h-10 px-4 rounded-xl border-emerald-300 bg-emerald-50/80 text-emerald-800 hover:bg-emerald-100 font-semibold shadow-xs flex items-center gap-2 text-xs transition-all"
+									>
+										{isExporting ? (
+											<Loader2 className="w-4 h-4 animate-spin text-emerald-600" />
+										) : (
+											<FileSpreadsheet className="w-4 h-4 text-emerald-600" />
+										)}
+										<span>Xuất Excel / CSV</span>
+									</Button>
+								</DropdownMenuTrigger>
+								<DropdownMenuContent align="end" className="rounded-xl w-60 p-1.5 shadow-lg border-slate-200">
+									<DropdownMenuItem
+										onClick={handleExportAll}
+										className="cursor-pointer gap-2.5 py-2.5 px-3 text-xs font-medium rounded-lg hover:bg-emerald-50 hover:text-emerald-900"
+									>
+										<Download className="w-4 h-4 text-emerald-600" />
+										<div className="flex flex-col">
+											<span className="font-semibold">Xuất toàn bộ theo bộ lọc</span>
+											<span className="text-[10px] text-slate-400">({transactionsLength} giao dịch)</span>
+										</div>
+									</DropdownMenuItem>
+									<DropdownMenuItem
+										onClick={handleExportCurrentPage}
+										className="cursor-pointer gap-2.5 py-2.5 px-3 text-xs font-medium rounded-lg hover:bg-blue-50 hover:text-blue-900 border-t border-slate-100"
+									>
+										<FileSpreadsheet className="w-4 h-4 text-blue-600" />
+										<div className="flex flex-col">
+											<span className="font-semibold">Xuất trang hiện tại</span>
+											<span className="text-[10px] text-slate-400">({data.length} giao dịch)</span>
+										</div>
+									</DropdownMenuItem>
+								</DropdownMenuContent>
+							</DropdownMenu>
+						)}
+
+						<Button
+							variant="outline"
+							size="icon"
+							onClick={onRefresh}
+							className="rounded-xl shadow-sm hover:rotate-180 transition-transform duration-500 shrink-0 h-10 w-10"
+							title="Làm mới"
+						>
+							<RefreshCw className={`w-4 h-4 ${isLoading ? 'animate-spin' : ''}`} />
+						</Button>
+					</div>
+				</div>
 
                                 <div className="h-px bg-slate-100 my-2" />
 
@@ -454,27 +558,27 @@ export default function TransactionsContent({
                         {/* Bảng dữ liệu đã tối ưu cột */}
                         <Card className="border border-gray-200 rounded-xl shadow-sm bg-white">
                                 <CardContent className="p-0">
-                                        <Table>
-                                                <TableHeader className="bg-gray-50">
-                                                        <TableRow className="hover:bg-transparent border-none">
-                                                                <TableHead className="text-xs font-semibold text-gray-600 uppercase py-3 pr-0">
-                                                                        ID
-                                                                </TableHead>
-                                                                <TableHead className="text-xs font-semibold text-gray-600 uppercase py-3">Chi nhánh</TableHead>
-                                                                <TableHead className="text-xs font-semibold text-gray-600 uppercase py-3">Người dùng</TableHead>
-                                                                <TableHead className="text-center text-xs font-semibold text-gray-600 uppercase py-3">Loại</TableHead>
-                                                                <TableHead className="text-xs font-semibold text-gray-600 uppercase py-3">Sản phẩm</TableHead>
-                                                                <TableHead className="text-center text-xs font-semibold text-gray-600 uppercase py-3">Số lượng</TableHead>
-                                                                <TableHead className="text-xs font-semibold text-gray-600 uppercase py-3">Doanh thu</TableHead>
-                                                                <TableHead className="text-xs font-semibold text-gray-600 uppercase py-3">Thời gian</TableHead>
-                                                                <TableHead className="text-center text-xs font-semibold text-gray-600 uppercase py-3">
-                                                                        Phương thức
-                                                                </TableHead>
-                                                                <TableHead className="text-right text-xs font-semibold text-gray-600 uppercase py-3 pr-6">
-                                                                        Thao tác
-                                                                </TableHead>
-                                                        </TableRow>
-                                                </TableHeader>
+					<Table>
+						<TableHeader className="bg-sky-50/80 border-b border-sky-100">
+							<TableRow className="hover:bg-transparent border-none">
+								<TableHead className="text-xs font-bold text-sky-900 uppercase py-3.5 pr-0">
+									ID
+								</TableHead>
+								<TableHead className="text-xs font-bold text-sky-900 uppercase py-3.5">Chi nhánh</TableHead>
+								<TableHead className="text-xs font-bold text-sky-900 uppercase py-3.5">Người dùng</TableHead>
+								<TableHead className="text-center text-xs font-bold text-sky-900 uppercase py-3.5">Loại</TableHead>
+								<TableHead className="text-xs font-bold text-sky-900 uppercase py-3.5">Sản phẩm</TableHead>
+								<TableHead className="text-center text-xs font-bold text-sky-900 uppercase py-3.5">Số lượng</TableHead>
+								<TableHead className="text-xs font-bold text-sky-900 uppercase py-3.5">Doanh thu</TableHead>
+								<TableHead className="text-xs font-bold text-sky-900 uppercase py-3.5">Thời gian</TableHead>
+								<TableHead className="text-center text-xs font-bold text-sky-900 uppercase py-3.5">
+									Phương thức
+								</TableHead>
+								<TableHead className="text-right text-xs font-bold text-sky-900 uppercase py-3.5 pr-6">
+									Thao tác
+								</TableHead>
+							</TableRow>
+						</TableHeader>
                                                 <TableBody>
                                                         {isLoading
                                                                 ? Array.from({ length: 5 }).map((_, idx) => (
@@ -548,57 +652,74 @@ export default function TransactionsContent({
                                                                                         };
                                                                                 }
 
-                                                                                return {
-                                                                                        text: 'N/A',
-                                                                                        style: 'bg-gray-100 text-gray-400',
-                                                                                        icon: null,
-                                                                                        modalIcon: null,
-                                                                                        ticketText: 'N/A',
-                                                                                        ticketStyle: 'bg-gray-100 text-gray-400'
-                                                                                };
-                                                                        };
+													return {
+														text: 'N/A',
+														style: 'bg-gray-100 text-gray-400',
+														icon: null,
+														modalIcon: null,
+														ticketText: 'N/A',
+														ticketStyle: 'bg-gray-100 text-gray-400'
+													};
+												};
 
-                                                                        const config = getStatusConfig();
+												const config = getStatusConfig();
 
-                                                                        return (
-                                                                                <TableRow key={t.id} className="hover:bg-gray-50 transition-colors border-b border-gray-200 h-[52px]">
-                                                                                        <TableCell className="font-mono text-xs text-gray-500">#{t.id}</TableCell>
-                                                                                        <TableCell>
-                                                                                                <div 
-                                                                                                        className="text-[12px] font-medium text-slate-600 max-w-[120px] truncate" 
-                                                                                                        title={branches.find((b) => b.id === t.branch_id)?.name || 'Tất cả chi nhánh'}
-                                                                                                >
-                                                                                                        {branches.find((b) => b.id === t.branch_id)?.name || (
-                                                                                                                <span className="italic text-slate-400">Tất cả chi nhánh</span>
-                                                                                                        )}
-                                                                                                </div>
-                                                                                        </TableCell>
-                                                                                        <TableCell>
-                                                                                <div className="flex flex-col">
-                                                                                        <span className="font-semibold text-sm text-gray-900">
-                                                                                                {t.userName || 'Khách Vãng Lai'}
-                                                                                        </span>
-                                                                                        <span className="text-[11px] text-gray-500">{t.email}</span>
-                                                                                </div>
-                                                                        </TableCell>
-                                                                        <TableCell className="text-center">
-                                                                                {t.booking_type === 'vr' ? (
-                                                                                        <Badge className="bg-purple-100 text-purple-700 border-purple-200 py-0.5 font-bold flex items-center gap-1 mx-auto w-fit">
-                                                                                                <Gamepad2 size={10} /> VR
-                                                                                        </Badge>
-                                                                                ) : (
-                                                                                        <Badge className="bg-blue-100 text-blue-700 border-blue-200 py-0.5 font-bold flex items-center gap-1 mx-auto w-fit">
-                                                                                                <Film size={10} /> Phim
-                                                                                        </Badge>
-                                                                                )}
-                                                                        </TableCell>
-                                                                        <TableCell className="max-w-[150px] truncate font-medium text-sm">
-                                                                                {t.ticket_package_name}
-                                                                        </TableCell>
-                                                                                        <TableCell className="text-center font-bold">{t.ticketCount}</TableCell>
-                                                                                        <TableCell className="font-bold text-blue-700">
-                                                                                                {t.totalPrice.toLocaleString('vi-VN')}đ
-                                                                                        </TableCell>
+												return (
+													<TableRow key={t.id} className="hover:bg-gray-50 transition-colors border-b border-gray-200 h-[52px]">
+														<TableCell className="font-mono text-xs text-gray-500">#{t.id}</TableCell>
+														<TableCell>
+															<div 
+																className="text-[12px] font-medium text-slate-600 max-w-[120px] truncate" 
+																title={branches.find((b) => b.id === t.branch_id)?.name || 'Tất cả chi nhánh'}
+															>
+																{branches.find((b) => b.id === t.branch_id)?.name || (
+																	<span className="italic text-slate-400">Tất cả chi nhánh</span>
+																)}
+															</div>
+														</TableCell>
+														<TableCell>
+															<div className="flex flex-col">
+																<span className="font-semibold text-sm text-gray-900">
+																	{t.userName || 'Khách Vãng Lai'}
+																</span>
+																<span className="text-[11px] text-gray-500">{t.email}</span>
+																{t.voucher_code && (
+																	<div className="flex items-center gap-1 mt-1 flex-wrap">
+																		<span className="inline-flex items-center px-1.5 py-0.5 rounded bg-purple-100 text-purple-700 font-mono text-[10px] font-bold">
+																			🏷️ {t.voucher_code}
+																		</span>
+																		{t.sale_name && (
+																			<span className="text-[10px] text-blue-600 font-semibold truncate">
+																				👤 {t.sale_name}
+																			</span>
+																		)}
+																	</div>
+																)}
+															</div>
+														</TableCell>
+														<TableCell className="text-center">
+															{t.booking_type === 'vr' ? (
+																<Badge className="bg-purple-100 text-purple-700 border-purple-200 py-0.5 font-bold flex items-center gap-1 mx-auto w-fit">
+																	<Gamepad2 size={10} /> VR
+																</Badge>
+															) : (
+																<Badge className="bg-blue-100 text-blue-700 border-blue-200 py-0.5 font-bold flex items-center gap-1 mx-auto w-fit">
+																	<Film size={10} /> Phim
+																</Badge>
+															)}
+														</TableCell>
+														<TableCell className="max-w-[150px] truncate font-medium text-sm">
+															{t.ticket_package_name}
+														</TableCell>
+														<TableCell className="text-center font-bold">{t.ticketCount}</TableCell>
+														<TableCell className="font-bold text-blue-700">
+															<div>{t.totalPrice.toLocaleString('vi-VN')}đ</div>
+															{t.voucher_discount_amount && t.voucher_discount_amount > 0 ? (
+																<div className="text-[10px] text-emerald-600 font-medium">
+																	-{(t.voucher_discount_amount).toLocaleString('vi-VN')}đ
+																</div>
+															) : null}
+														</TableCell>
                                                                                         <TableCell className="text-[11px] text-slate-500 font-medium">
                                                                                                 {(() => {
                                                                                                         const config = getStatusConfig();
@@ -1204,6 +1325,36 @@ export default function TransactionsContent({
                                                                 </div>
                                                         </div>
                                                 ) : null}
+
+                                                {/* Voucher & Sale Attribution */}
+                                                {(txDetails?.voucher_info?.voucher_code || txDetails?.voucher_info?.sale_name) && (
+                                                        <div className="mt-6 p-5 bg-purple-50/40 rounded-xl border border-purple-100">
+                                                                <h4 className="text-sm font-semibold text-purple-900 mb-3 flex items-center gap-2">
+                                                                        <TicketIcon size={16} className="text-purple-600" />
+                                                                        Ưu đãi & Nhân viên Sale phụ trách
+                                                                </h4>
+                                                                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                                                                        <InfoRow 
+                                                                                label="Mã Voucher" 
+                                                                                value={txDetails.voucher_info.voucher_code || '-'} 
+                                                                                bold 
+                                                                                color="text-purple-700" 
+                                                                        />
+                                                                        <InfoRow 
+                                                                                label="Giảm giá" 
+                                                                                value={txDetails.voucher_info.voucher_discount_amount ? `${Number(txDetails.voucher_info.voucher_discount_amount).toLocaleString('vi-VN')}đ` : '0đ'} 
+                                                                                bold 
+                                                                                color="text-emerald-700" 
+                                                                        />
+                                                                        <InfoRow 
+                                                                                label="Sale phụ trách" 
+                                                                                value={txDetails.voucher_info.sale_name ? `${txDetails.voucher_info.sale_name}${txDetails.voucher_info.sale_email ? ` (${txDetails.voucher_info.sale_email})` : ''}` : 'Voucher chung'} 
+                                                                                bold 
+                                                                                color="text-blue-700" 
+                                                                        />
+                                                                </div>
+                                                        </div>
+                                                )}
 
                                                 {/* Tracking Information */}
                                                 {txDetails?.tracking && (

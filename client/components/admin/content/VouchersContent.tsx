@@ -71,6 +71,7 @@ import {
     toggleVoucherStatusApi,
     listVRTicketPackagesForVoucher,
     getAdminBranchOptions,
+    listStaffOptionsApi,
     type VoucherListFilters
 } from '@/lib/api';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -81,6 +82,11 @@ interface VoucherItem {
     code: string;
     name: string;
     description?: string;
+    note?: string;
+    sale_staff_id?: number | null;
+    sale_name?: string | null;
+    sale_email?: string | null;
+    total_revenue?: number;
     scope?: string;
     discount_type: 'percent' | 'fixed';
     discount_value: number;
@@ -131,6 +137,8 @@ interface Props {
     branches?: any[];
     selectedBranchId?: number | 'all' | null;
     setSelectedBranchId?: (id: number | 'all' | null) => void;
+    selectedSaleId?: string | number;
+    setSelectedSaleId?: (id: string | number) => void;
     searchText: string;
     setSearchText: (s: string) => void;
     isDeletedView?: boolean;
@@ -178,6 +186,8 @@ export default function VouchersContent(props: Props) {
         branches = [],
         selectedBranchId = null,
         setSelectedBranchId = () => {},
+        selectedSaleId = 'all',
+        setSelectedSaleId = () => {},
         searchText,
         setSearchText,
         isDeletedView = false,
@@ -192,10 +202,23 @@ export default function VouchersContent(props: Props) {
     const [isTogglingId, setIsTogglingId] = useState<number | null>(null);
     const [vrPackages, setVrPackages] = useState<any[]>([]);
     const [branchOptions, setBranchOptions] = useState<any[]>([]);
+    const [staffList, setStaffList] = useState<Array<{ id: number; fullname: string; email: string }>>([]);
     const [isDetailDialogOpen, setIsDetailDialogOpen] = useState(false);
     const [selectedVoucher, setSelectedVoucher] = useState<VoucherItem | null>(null);
     const [localSearchText, setLocalSearchText] = useState(searchText);
     const [voucherToToggle, setVoucherToToggle] = useState<{ id: number; currentStatus: boolean } | null>(null);
+
+    useEffect(() => {
+        listStaffOptionsApi().then((res) => {
+            if (res?.items && Array.isArray(res.items)) {
+                setStaffList(res.items.map((s: any) => ({
+                    id: s.id,
+                    fullname: s.fullname || s.email,
+                    email: s.email
+                })));
+            }
+        }).catch(() => {});
+    }, []);
 
     useEffect(() => {
         setLocalSearchText(searchText);
@@ -320,8 +343,12 @@ export default function VouchersContent(props: Props) {
             return;
         }
         payload.code = payload.code.toUpperCase().trim();
-        payload.scope = editData.scope || 'vr';
+        payload.scope = editData.scope || 'all';
         payload.discount_value = value;
+        payload.sale_staff_id = editData.sale_staff_id ? Number(editData.sale_staff_id) : null;
+        payload.sale_name = editData.sale_name || null;
+        payload.sale_email = editData.sale_email || null;
+        payload.note = editData.note || editData.description || '';
         payload.max_discount =
             payload.discount_type === 'percent' && payload.max_discount
                 ? Number(payload.max_discount)
@@ -531,7 +558,7 @@ export default function VouchersContent(props: Props) {
                         </div>
                     </div>
 
-                    {/* Row 2: Branch select + Action buttons (Refresh, Trash, Create) */}
+                    {/* Row 2: Branch select + Sale select + Action buttons (Refresh, Trash, Create) */}
                     <div className="flex flex-wrap items-center justify-between gap-3">
                         <div className="flex flex-wrap items-center gap-3">
                             {branches.length > 0 ? (
@@ -559,6 +586,32 @@ export default function VouchersContent(props: Props) {
                                 <div className="flex items-center gap-2 h-11 px-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium text-slate-500">
                                     <Loader2 className="w-4 h-4 animate-spin text-purple-600" />
                                     <span>Đang tải chi nhánh...</span>
+                                </div>
+                            )}
+
+                            {/* Sale filter */}
+                            {staffList.length > 0 && (
+                                <div className="flex items-center gap-2 pl-3 pr-1 py-1.5 bg-slate-50 rounded-xl border border-slate-200 h-11">
+                                    <span className="text-xs">👤</span>
+                                    <Select
+                                        value={String(selectedSaleId ?? 'all')}
+                                        onValueChange={(val) => {
+                                            setSelectedSaleId(val);
+                                            setPage(1);
+                                        }}
+                                    >
+                                        <SelectTrigger className="h-8 w-full sm:w-[180px] border-0 bg-transparent shadow-none p-0 focus:ring-0 text-xs text-slate-600">
+                                            <SelectValue placeholder="Tất cả Sale" />
+                                        </SelectTrigger>
+                                        <SelectContent className="rounded-xl border-slate-200">
+                                            <SelectItem value="all">👤 Tất cả Sale</SelectItem>
+                                            {staffList.map((st) => (
+                                                <SelectItem key={st.id} value={String(st.id)}>
+                                                    {st.fullname}
+                                                </SelectItem>
+                                            ))}
+                                        </SelectContent>
+                                    </Select>
                                 </div>
                             )}
                         </div>
@@ -612,30 +665,33 @@ export default function VouchersContent(props: Props) {
             <Card className="border border-gray-200 rounded-xl shadow-sm bg-white">
                 <CardContent className="p-0">
                     <Table>
-                        <TableHeader className="bg-gray-50">
+                        <TableHeader className="bg-sky-50/80 border-b border-sky-100">
                             <TableRow className="hover:bg-transparent border-none">
-                                <TableHead className="text-xs font-semibold text-gray-600 uppercase py-3">
+                                <TableHead className="text-xs font-bold text-sky-900 uppercase py-3.5">
                                     Mã voucher
                                 </TableHead>
-                                <TableHead className="text-xs font-semibold text-gray-600 uppercase py-3">
+                                <TableHead className="text-xs font-bold text-sky-900 uppercase py-3.5">
                                     Tên chương trình
                                 </TableHead>
-                                <TableHead className="text-xs font-semibold text-gray-600 uppercase py-3">
+                                <TableHead className="text-xs font-bold text-sky-900 uppercase py-3.5">
+                                    Sale phụ trách
+                                </TableHead>
+                                <TableHead className="text-xs font-bold text-sky-900 uppercase py-3.5">
                                     Giảm giá
                                 </TableHead>
-                                <TableHead className="text-xs font-semibold text-gray-600 uppercase py-3">
-                                    Đã dùng / Giới hạn
+                                <TableHead className="text-xs font-bold text-sky-900 uppercase py-3.5">
+                                    Đã dùng / Doanh thu
                                 </TableHead>
-                                <TableHead className="text-xs font-semibold text-gray-600 uppercase py-3 min-w-[160px]">
+                                <TableHead className="text-xs font-bold text-sky-900 uppercase py-3.5 min-w-[160px]">
                                     Hiệu lực
                                 </TableHead>
-                                <TableHead className="text-xs font-semibold text-gray-600 uppercase py-3 min-w-[120px]">
+                                <TableHead className="text-xs font-bold text-sky-900 uppercase py-3.5 min-w-[120px]">
                                     Chi nhánh
                                 </TableHead>
-                                <TableHead className="text-center text-xs font-semibold text-gray-600 uppercase py-3">
+                                <TableHead className="text-center text-xs font-bold text-sky-900 uppercase py-3.5">
                                     Trạng thái
                                 </TableHead>
-                                <TableHead className="text-right text-xs font-semibold text-gray-600 uppercase py-3 pr-6">
+                                <TableHead className="text-right text-xs font-bold text-sky-900 uppercase py-3.5 pr-6">
                                     Thao tác
                                 </TableHead>
                             </TableRow>
@@ -645,9 +701,10 @@ export default function VouchersContent(props: Props) {
                                 ? Array.from({ length: 5 }).map((_, idx) => (
                                     <TableRow key={`sk-${idx}`}>
                                         <TableCell><Skeleton className="h-4 w-24" /></TableCell>
-                                        <TableCell><Skeleton className="h-4 w-40" /></TableCell>
+                                        <TableCell><Skeleton className="h-4 w-36" /></TableCell>
+                                        <TableCell><Skeleton className="h-4 w-24" /></TableCell>
                                         <TableCell><Skeleton className="h-4 w-20" /></TableCell>
-                                        <TableCell><Skeleton className="h-4 w-16" /></TableCell>
+                                        <TableCell><Skeleton className="h-4 w-20" /></TableCell>
                                         <TableCell><Skeleton className="h-4 w-36" /></TableCell>
                                         <TableCell><Skeleton className="h-4 w-20" /></TableCell>
                                         <TableCell><Skeleton className="h-5 w-14 mx-auto rounded-full" /></TableCell>
@@ -657,7 +714,7 @@ export default function VouchersContent(props: Props) {
                                 : data.length === 0
                                     ? (
                                         <TableRow>
-                                            <TableCell colSpan={8} className="py-16 text-center">
+                                            <TableCell colSpan={9} className="py-16 text-center">
                                                 <div className="flex flex-col items-center gap-2 text-slate-400">
                                                     <Tag className="w-10 h-10 opacity-40" />
                                                     <p className="text-sm font-medium">
@@ -704,6 +761,21 @@ export default function VouchersContent(props: Props) {
                                                     </div>
                                                 </TableCell>
                                                 <TableCell>
+                                                    {v.sale_name ? (
+                                                        <div className="flex items-center gap-2">
+                                                            <div className="w-6 h-6 rounded-full bg-blue-100 text-blue-700 flex items-center justify-center text-[11px] font-bold shrink-0">
+                                                                {v.sale_name.charAt(0).toUpperCase()}
+                                                            </div>
+                                                            <div className="min-w-0">
+                                                                <p className="text-xs font-semibold text-slate-800 truncate">{v.sale_name}</p>
+                                                                {v.sale_email && <p className="text-[10px] text-slate-400 truncate">{v.sale_email}</p>}
+                                                            </div>
+                                                        </div>
+                                                    ) : (
+                                                        <span className="text-slate-400 text-xs italic">Voucher chung</span>
+                                                    )}
+                                                </TableCell>
+                                                <TableCell>
                                                     {v.discount_type === 'percent' ? (
                                                         <Badge variant="outline" className="border-orange-300 bg-orange-50 text-orange-700 text-xs font-bold gap-1">
                                                             <Percent className="w-3 h-3" />
@@ -730,6 +802,11 @@ export default function VouchersContent(props: Props) {
                                                                 {limit ? Number(limit).toLocaleString() : '∞'}
                                                             </span>
                                                         </span>
+                                                        {v.total_revenue !== undefined && v.total_revenue > 0 ? (
+                                                            <span className="text-[11px] font-semibold text-emerald-600">
+                                                                Thu: {formatMoney(v.total_revenue)}
+                                                            </span>
+                                                        ) : null}
                                                         {v.per_user_limit ? (
                                                             <span className="text-[10px] text-slate-400">
                                                                 / 1 user: {v.per_user_limit} lượt
@@ -1116,14 +1193,49 @@ export default function VouchersContent(props: Props) {
                                     </div>
 
                                     <div>
+                                        <Label className="text-xs font-semibold text-gray-700 mb-1.5 flex items-center justify-between">
+                                            <span>Nhân viên Sale phụ trách</span>
+                                            <span className="text-[11px] text-slate-400 font-normal">Ghi nhận hoa hồng / doanh số</span>
+                                        </Label>
+                                        <Select
+                                            value={editData?.sale_staff_id ? String(editData.sale_staff_id) : 'none'}
+                                            onValueChange={(val) => {
+                                                if (val === 'none') {
+                                                    setEditData({ ...editData, sale_staff_id: null, sale_name: null, sale_email: null });
+                                                } else {
+                                                    const selected = staffList.find((s) => String(s.id) === val);
+                                                    setEditData({
+                                                        ...editData,
+                                                        sale_staff_id: Number(val),
+                                                        sale_name: selected?.fullname || null,
+                                                        sale_email: selected?.email || null
+                                                    });
+                                                }
+                                            }}
+                                        >
+                                            <SelectTrigger className="h-9.5 text-sm bg-white">
+                                                <SelectValue placeholder="-- Chọn nhân viên Sale phụ trách --" />
+                                            </SelectTrigger>
+                                            <SelectContent className="rounded-xl">
+                                                <SelectItem value="none">-- Không gán Sale (Voucher chung) --</SelectItem>
+                                                {staffList.map((st) => (
+                                                    <SelectItem key={st.id} value={String(st.id)}>
+                                                        👤 {st.fullname} ({st.email})
+                                                    </SelectItem>
+                                                ))}
+                                            </SelectContent>
+                                        </Select>
+                                    </div>
+
+                                    <div>
                                         <Label className="text-xs font-semibold text-gray-700 mb-1.5 block">
-                                            Mô tả (tùy chọn)
+                                            Ghi chú / Mô tả (tùy chọn)
                                         </Label>
                                         <Textarea
-                                            placeholder="Mô tả ngắn gọn về chương trình này..."
-                                            value={editData?.description || ''}
-                                            onChange={(e) => setEditData({ ...editData, description: e.target.value })}
-                                            rows={3}
+                                            placeholder="Mô tả ngắn gọn về voucher hoặc ghi chú nội bộ..."
+                                            value={editData?.note !== undefined ? editData.note : editData?.description || ''}
+                                            onChange={(e) => setEditData({ ...editData, note: e.target.value, description: e.target.value })}
+                                            rows={2}
                                             className="w-full text-xs resize-none"
                                         />
                                     </div>
@@ -1133,7 +1245,7 @@ export default function VouchersContent(props: Props) {
                                             Phạm vi áp dụng (Scope) <span className="text-red-500">*</span>
                                         </Label>
                                         <Select
-                                            value={editData?.scope || 'vr'}
+                                            value={editData?.scope || 'all'}
                                             onValueChange={(val) => {
                                                 setEditData({
                                                     ...editData,
@@ -1147,9 +1259,9 @@ export default function VouchersContent(props: Props) {
                                                 <SelectValue placeholder="Chọn phạm vi áp dụng" />
                                             </SelectTrigger>
                                             <SelectContent>
+                                                <SelectItem value="all">🎟️ Toàn bộ hóa đơn (Tất cả dịch vụ)</SelectItem>
                                                 <SelectItem value="vr">🎮 Trải nghiệm VR</SelectItem>
                                                 <SelectItem value="movie">🎬 Vé xem phim</SelectItem>
-                                                <SelectItem value="all">🎟️ Tất cả dịch vụ</SelectItem>
                                             </SelectContent>
                                         </Select>
                                     </div>

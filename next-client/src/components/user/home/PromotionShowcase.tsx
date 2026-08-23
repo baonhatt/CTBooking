@@ -107,11 +107,9 @@ export default function PromotionShowcase({ initialCombos = [] }: { initialCombo
             <span>Ưu Đãi Suất Chiếu</span>
           </div>
           <h2 className="text-3xl sm:text-4xl md:text-5xl font-black text-white tracking-tight leading-tight">
-            Chọn gói phù hợp – <span className="text-transparent bg-clip-text bg-gradient-to-r from-amber-300 via-orange-300 to-yellow-200">ưu đãi kèm quà tặng</span>
+            Chọn gói phù hợp
           </h2>
-          <p className="text-slate-300 text-sm sm:text-base leading-relaxed italic">
-            “Quà tặng hộp đèn kèm hình ảnh” - “Cúp ngàn quang cáo”
-          </p>
+
         </div>
 
         {combos.length === 0 ? (
