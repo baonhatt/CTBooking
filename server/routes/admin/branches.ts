@@ -181,9 +181,13 @@ export async function listBranchOptionsImpl(
                         id: tables.branches.id,
                         name: tables.branches.name,
                         code: tables.branches.code,
+                        address: tables.branches.address,
+                        phone: tables.branches.phone,
+                        email: tables.branches.email,
                         is_default: tables.branches.is_default,
                         is_open: tables.branches.is_open,
-                        is_active: tables.branches.is_active
+                        is_active: tables.branches.is_active,
+                        settings: tables.branches.settings
                 })
                 .from(tables.branches)
                 .where(whereCondition)

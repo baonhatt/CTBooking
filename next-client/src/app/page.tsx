@@ -1,4 +1,5 @@
 import { Suspense } from 'react';
+export const runtime = 'edge';
 import type { Metadata } from 'next';
 import UserLayout from '@/layouts/UserLayout';
 import HeroSection from '@/components/user/home/HeroSection';

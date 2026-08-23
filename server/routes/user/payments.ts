@@ -844,6 +844,13 @@ export async function getBookingByIdImpl(
         return {
                 status: 200,
                 ...booking,
+                branch: booking.branch_name ? {
+                        id: booking.branch_id,
+                        name: booking.branch_name,
+                        address: booking.branch_address,
+                        phone: booking.branch_phone,
+                        settings: booking.branch_settings
+                } : null,
                 vr_items
         };
 }

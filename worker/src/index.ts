@@ -4740,6 +4740,24 @@ app.get('/api/branches/options', async (c) => {
   }
 });
 
+// Public: Get branch by ID
+app.get('/api/branches/:id', async (c) => {
+  try {
+    const id = Number(c.req.param('id'));
+    const db = drizzle(c.env.cinema_db, { schema });
+
+    const branch = await getBranchImpl(db, { branches: schema.branches, auditLogs: schema.auditLogs }, id);
+
+    if (!branch || branch.deleted_at || !branch.is_active) {
+      return c.json({ message: 'Không tìm thấy chi nhánh' }, 404);
+    }
+
+    return c.json({ branch }, 200);
+  } catch (err: any) {
+    return c.json({ status: 'error', message: String(err?.message || 'Internal error') }, 500);
+  }
+});
+
 // Public: List all active branches (for dropdown)
 
 app.get('/api/branches', async (c) => {

@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+export const runtime = 'edge';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { ArrowLeft, Eye } from 'lucide-react';

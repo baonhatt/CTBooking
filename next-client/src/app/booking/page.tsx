@@ -524,7 +524,10 @@ export default function BookingPage() {
 						user_id: booking?.user_id,
 						totalAmount: canonicalTotal,
 						movieTitle: summary.movie,
-						ticketType: summary.ticketPackageName
+						ticketType: summary.ticketPackageName,
+						branch_id: selectedBranch?.id,
+						branch_name: selectedBranch?.name,
+						branch_settings: selectedBranch?.settings
 					})
 				);
 				localStorage.removeItem('qrPaymentEndTime');

@@ -44,13 +44,15 @@ export default function QRPaymentPage() {
         const [showExpiredDialog, setShowExpiredDialog] = useState(false);
         const [showCancelDialog, setShowCancelDialog] = useState(false);
 
-        const BANK_INFO = {
+        const DEFAULT_BANK_INFO = {
                 bankName: 'Ngân Hàng OCB',
                 accountNumber: '596310',
                 accountName: 'CONG TY TNHH CONG NGHE VR VIET NAM',
-                bankCode: 'OCB'
+                bankCode: 'OCB',
+                qrCodeUrl: ''
         };
 
+        const [bankInfo, setBankInfo] = useState(DEFAULT_BANK_INFO);
         const paymentDataRef = useRef<any>(null);
 
         // Prefetch trang đích để tránh lag sau khi thanh toán xong
@@ -59,6 +61,76 @@ export default function QRPaymentPage() {
                 router.prefetch('/checkout');
                 router.prefetch('/');
         }, [router]);
+
+        const extractBankInfoFromSettings = (settingsStrOrObj: any) => {
+                if (!settingsStrOrObj) return null;
+                try {
+                        const settings = typeof settingsStrOrObj === 'string' ? JSON.parse(settingsStrOrObj) : settingsStrOrObj;
+                        const pc = settings?.payment_config;
+                        if (!pc) return null;
+
+                        const bankNameToCode: { [key: string]: string } = {
+                                'MB Bank': 'MB',
+                                'MB': 'MB',
+                                'Vietcombank': 'VCB',
+                                'VCB': 'VCB',
+                                'BIDV': 'BIDV',
+                                'Vietinbank': 'CTG',
+                                'VietinBank': 'CTG',
+                                'Techcombank': 'TCB',
+                                'TCB': 'TCB',
+                                'ACB': 'ACB',
+                                'Sacombank': 'STB',
+                                'OCB': 'OCB',
+                                'VPBank': 'VPB',
+                                'TPBank': 'TPB',
+                                'HDBank': 'HDB'
+                        };
+
+                        const bankName = (pc.bank_name || '').trim();
+                        const rawBankCode = (pc.bank_code || bankNameToCode[bankName] || bankName || DEFAULT_BANK_INFO.bankCode).toUpperCase().trim();
+                        const accountNumber = (pc.account_number || '').trim();
+                        const accountName = (pc.account_name || '').trim();
+                        const qrCodeUrl = (pc.qr_code_url || '').trim();
+
+                        if (bankName || accountNumber || accountName || qrCodeUrl) {
+                                return {
+                                        bankName: bankName || DEFAULT_BANK_INFO.bankName,
+                                        bankCode: rawBankCode || DEFAULT_BANK_INFO.bankCode,
+                                        accountNumber: accountNumber || DEFAULT_BANK_INFO.accountNumber,
+                                        accountName: accountName || DEFAULT_BANK_INFO.accountName,
+                                        qrCodeUrl: qrCodeUrl || ''
+                                };
+                        }
+                } catch (e) {
+                        console.error('Error parsing branch payment config:', e);
+                }
+                return null;
+        };
+
+        const generateQRCode = (data: any, details?: any) => {
+                const amount = data?.totalAmount || data?.amount || 0;
+                const orderId = data?.orderId || data?.booking_id || '';
+                const description = `${orderId} `;
+
+                const branchSettingsRaw =
+                        details?.branch?.settings ||
+                        details?.branch_settings ||
+                        data?.branch_settings;
+
+                const branchBank = extractBankInfoFromSettings(branchSettingsRaw);
+                const activeBank = branchBank || DEFAULT_BANK_INFO;
+
+                setBankInfo(activeBank);
+
+                if (activeBank.qrCodeUrl) {
+                        setQrCodeUrl(activeBank.qrCodeUrl);
+                        return;
+                }
+
+                const qrContent = `https://img.vietqr.io/image/${activeBank.bankCode}-${activeBank.accountNumber}-compact2.png?amount=${amount}&addInfo=${encodeURIComponent(description)}&accountName=${encodeURIComponent(activeBank.accountName)}`;
+                setQrCodeUrl(qrContent);
+        };
 
         useEffect(() => {
                 const savedData = localStorage.getItem('qrPaymentData');
@@ -73,7 +145,7 @@ export default function QRPaymentPage() {
                 paymentDataRef.current = data;
                 generateQRCode(data);
 
-                // Fetch full booking details (Ticket Info)
+                // Fetch full booking details (Ticket Info & Branch settings)
                 const fetchBookingDetails = async () => {
                         const bId = data?.bookingId || data?.booking_id;
                         if (bId) {
@@ -83,8 +155,8 @@ export default function QRPaymentPage() {
                                         if (res.ok) {
                                                 const json = await res.json();
                                                 setBookingDetails(json);
-                                                // Regenerate QR code with branch settings
-                                                generateQRCode(data);
+                                                // Regenerate QR code and bank info with branch settings
+                                                generateQRCode(data, json);
                                         }
                                 } catch (error) {
                                         console.error('Error fetching booking details:', error);
@@ -168,57 +240,6 @@ export default function QRPaymentPage() {
                 const m = Math.floor(seconds / 60);
                 const s = seconds % 60;
                 return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')} `;
-        };
-
-        const generateQRCode = (data: any) => {
-                const amount = data.totalAmount || data.amount || 0;
-                const orderId = data.orderId || data.booking_id || '';
-                const description = `${orderId} `;
-
-                // Use branch payment config if available, fallback to default BANK_INFO
-                let bankCode = BANK_INFO.bankCode;
-                let accountNumber = BANK_INFO.accountNumber;
-                let accountName = BANK_INFO.accountName;
-
-                if (bookingDetails?.branch?.settings) {
-                        try {
-                                const settings = JSON.parse(bookingDetails.branch.settings);
-                                if (settings.payment_config) {
-                                        const pc = settings.payment_config;
-                                        if (pc.qr_code_url) {
-                                                // Use custom QR URL if provided
-                                                setQrCodeUrl(pc.qr_code_url);
-                                                return;
-                                        }
-                                        if (pc.bank_name && pc.account_number) {
-                                                // Use custom bank_code if provided, otherwise map from bank name
-                                                if (pc.bank_code) {
-                                                        bankCode = pc.bank_code;
-                                                } else {
-                                                        // Map bank name to bank code (simplified mapping)
-                                                        const bankNameToCode: { [key: string]: string } = {
-                                                                'MB Bank': 'MB',
-                                                                'Vietcombank': 'VCB',
-                                                                'BIDV': 'BIDV',
-                                                                'Vietinbank': 'VCB',
-                                                                'Techcombank': 'TCB',
-                                                                'ACB': 'ACB',
-                                                                'Sacombank': 'SACOMBANK',
-                                                                'OCB': 'OCB'
-                                                        };
-                                                        bankCode = bankNameToCode[pc.bank_name] || BANK_INFO.bankCode;
-                                                }
-                                                accountNumber = pc.account_number;
-                                                accountName = pc.account_name || BANK_INFO.accountName;
-                                        }
-                                }
-                        } catch (e) {
-                                console.error('Error parsing branch settings:', e);
-                        }
-                }
-
-                const qrContent = `https://img.vietqr.io/image/${bankCode}-${accountNumber}-compact2.png?amount=${amount}&addInfo=${encodeURIComponent(description)}&accountName=${encodeURIComponent(accountName)}`;
-                setQrCodeUrl(qrContent);
         };
 
         const copyToClipboard = async (text: string, label: string) => {
@@ -583,19 +604,19 @@ export default function QRPaymentPage() {
                                                                                         {[
                                                                                                 {
                                                                                                         label: 'Ngân hàng',
-                                                                                                        value: BANK_INFO.bankName,
-                                                                                                        copy: BANK_INFO.bankName
+                                                                                                        value: bankInfo.bankName,
+                                                                                                        copy: bankInfo.bankName
                                                                                                 },
                                                                                                 {
                                                                                                         label: 'Số tài khoản',
-                                                                                                        value: BANK_INFO.accountNumber,
-                                                                                                        copy: BANK_INFO.accountNumber,
+                                                                                                        value: bankInfo.accountNumber,
+                                                                                                        copy: bankInfo.accountNumber,
                                                                                                         mono: true
                                                                                                 },
                                                                                                 {
                                                                                                         label: 'Chủ tài khoản',
-                                                                                                        value: BANK_INFO.accountName,
-                                                                                                        copy: BANK_INFO.accountName
+                                                                                                        value: bankInfo.accountName,
+                                                                                                        copy: bankInfo.accountName
                                                                                                 },
                                                                                                 {
                                                                                                         label: 'Nội dung',

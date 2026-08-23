@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+export const runtime = 'edge';
 import Link from 'next/link';
 import { getPublicPosts, type PostItem } from '@/lib/api/posts';
 import { buildPostHref, formatDate } from '@/lib/utils';
