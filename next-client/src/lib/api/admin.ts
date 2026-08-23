@@ -1,10 +1,26 @@
 import { request } from '@/lib/api/http';
 
 export async function adminLoginApi(body: { email: string; password: string }) {
+<<<<<<< HEAD
         return request<{ token: string; exp: number; user: { email: string } }>('/api/admin/login', {
                 method: 'POST',
                 body: JSON.stringify(body)
         });
+=======
+        const res = await request<any>('/api/admin/auth/login', {
+                method: 'POST',
+                body: JSON.stringify(body)
+        });
+
+        if (res.status === 'success' && res.staff && !res.user) {
+                res.user = {
+                        ...res.staff,
+                        username: res.staff.fullname
+                };
+        }
+
+        return res;
+>>>>>>> preview
 }
 
 export async function getAdminRevenue(options?: {
@@ -177,3 +193,20 @@ export async function getEmailLogsApi(options?: {
                 };
         }>(path, { signal: options?.signal });
 }
+<<<<<<< HEAD
+=======
+
+export async function requestStaffPasswordChangeOTP(body: { oldPassword: string }) {
+        return request<{ status: string; message: string }>('/api/admin/auth/request-password-change-otp', {
+                method: 'POST',
+                body: JSON.stringify(body)
+        });
+}
+
+export async function changeStaffPasswordWithOTP(body: { oldPassword: string; newPassword: string; otp: string }) {
+        return request<{ status: string; message: string }>('/api/admin/auth/change-password-with-otp', {
+                method: 'POST',
+                body: JSON.stringify(body)
+        });
+}
+>>>>>>> preview

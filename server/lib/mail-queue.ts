@@ -5,8 +5,15 @@ export type EmailMetadata = {
         db: any;
         recipient: string;
         subject: string;
+<<<<<<< HEAD
         emailType: 'welcome' | 'reset_password' | 'booking_confirmation' | 'otp';
         userId?: number;
+=======
+        emailType: 'welcome' | 'reset_password' | 'booking_confirmation' | 'otp' | 'staff_otp';
+        recipientType?: 'user' | 'staff';
+        userId?: number;
+        staffId?: number;
+>>>>>>> preview
         bookingId?: number;
         provider?: string;
         additionalData?: any;
@@ -38,7 +45,13 @@ export class MailQueue {
                         recipient,
                         subject,
                         emailType,
+<<<<<<< HEAD
                         userId,
+=======
+                        recipientType = 'user',
+                        userId,
+                        staffId,
+>>>>>>> preview
                         bookingId,
                         provider,
                         additionalData,
@@ -69,7 +82,13 @@ export class MailQueue {
                                                 email_type: emailType,
                                                 status: 'pending',
                                                 provider: provider || null,
+<<<<<<< HEAD
                                                 user_id: userId || null,
+=======
+                                                recipient_type: recipientType,
+                                                user_id: userId || null,
+                                                staff_id: staffId || null,
+>>>>>>> preview
                                                 booking_id: bookingId || null,
                                                 metadata: additionalData ? JSON.stringify(additionalData) : null,
                                                 created_at: formatDateForDb(new Date()),

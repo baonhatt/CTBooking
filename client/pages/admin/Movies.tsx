@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
+<<<<<<< HEAD
 import { getMoviesAdmin, updateMovieStatus } from '@/lib/api';
 import AdminLayout from '@/admin/layouts/AdminLayout';
 import MoviesContent from '@/components/admin/content/MoviesContent';
@@ -6,6 +7,33 @@ import AdminEditModal from '@/components/admin/AdminEditModal';
 import { toast } from 'sonner';
 
 export default function MoviesPage() {
+=======
+import { getMoviesAdmin, updateMovieStatus, getAdminBranchOptions, deleteMovieApi } from '@/lib/api';
+import AdminLayout from '@/admin/layouts/AdminLayout';
+import MoviesContent from '@/components/admin/content/MoviesContent';
+import { useStaffPermission } from '@/hooks/useStaffPermission';
+import AdminEditModal from '@/components/admin/AdminEditModal';
+import { toast } from 'sonner';
+import { useStaffStore } from '@/store/staffStore';
+import { useNavigate } from 'react-router-dom';
+import {
+        AlertDialog,
+        AlertDialogAction,
+        AlertDialogCancel,
+        AlertDialogContent,
+        AlertDialogDescription,
+        AlertDialogFooter,
+        AlertDialogHeader,
+        AlertDialogTitle
+} from '@/components/ui/alert-dialog';
+
+export default function MoviesPage() {
+        const navigate = useNavigate();
+        const staff = useStaffStore((state) => state.staff);
+        const clearStaff = useStaffStore((state) => state.clearStaff);
+        const [activeTab, setActiveTab] = useState('movies');
+
+>>>>>>> preview
         const getInitialFilters = () => {
                 try {
                         const raw = localStorage.getItem('admin_movies_filters');
@@ -25,6 +53,16 @@ export default function MoviesPage() {
                 initialFilters.sortKey ?? 'updated_at'
         );
         const [sortDir, setSortDir] = useState<'asc' | 'desc'>(initialFilters.sortDir ?? 'desc');
+<<<<<<< HEAD
+=======
+        const [selectedBranchId, setSelectedBranchId] = useState<number | 'all' | null>(() => {
+                if (initialFilters.branchId !== undefined) return initialFilters.branchId;
+                if (staff?.isSuperAdmin) return 'all';
+                return null;
+        });
+        const canViewBranches = useStaffPermission('branches', 'view');
+        const [branches, setBranches] = useState<any[]>([]);
+>>>>>>> preview
         const pageSize = 10;
         const [isEditOpen, setIsEditOpen] = useState(false);
         const [editType, setEditType] = useState<'movie' | null>(null);
@@ -34,6 +72,33 @@ export default function MoviesPage() {
 
         const [isDetailsOpen, setIsDetailsOpen] = useState(false);
         const [selectedMovieId, setSelectedMovieId] = useState<number | null>(null);
+<<<<<<< HEAD
+=======
+        const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+        const [movieToDelete, setMovieToDelete] = useState<number | null>(null);
+
+        // Load branches only when branch viewing is allowed
+        useEffect(() => {
+                if (!canViewBranches) {
+                        setBranches([]);
+                        return;
+                }
+
+                (async () => {
+                        try {
+                                const { items } = await getAdminBranchOptions({ includeInactive: true });
+                                setBranches(items);
+
+                                // If not superadmin and no branch selected, default to first branch
+                                if (!staff?.isSuperAdmin && selectedBranchId === null && items.length > 0) {
+                                        setSelectedBranchId(items[0].id);
+                                }
+                        } catch (error) {
+                                console.error('Error loading branches:', error);
+                        }
+                })();
+        }, [staff, canViewBranches, selectedBranchId]);
+>>>>>>> preview
 
         useEffect(() => {
                 (async () => {
@@ -44,7 +109,12 @@ export default function MoviesPage() {
                                 q: searchQuery,
                                 sort: sortKey,
                                 dir: sortDir,
+<<<<<<< HEAD
                                 status: showActiveOnly ? 'active' : 'all'
+=======
+                                status: showActiveOnly ? 'active' : 'all',
+                                branch_id: selectedBranchId
+>>>>>>> preview
                         });
                         const mapped = items.map((m: any) => ({
                                 id: String(m.id),
@@ -57,7 +127,13 @@ export default function MoviesPage() {
                                 updated_at: m.updated_at ? new Date(m.updated_at).toISOString() : null,
                                 rating: m.rating ?? null,
                                 price: Number(m.price || 0),
+<<<<<<< HEAD
                                 is_active: m.is_active
+=======
+                                is_active: m.is_active,
+                                branch_id: m.branch_id,
+                                branch_ids: Array.isArray(m.branch_ids) ? m.branch_ids : m.branch_ids ?? null
+>>>>>>> preview
                         }));
                         setMoviesLocal(mapped);
                         setTotalMovies(total);
@@ -68,10 +144,17 @@ export default function MoviesPage() {
                         setIsLoading(false);
                 })();
                 try {
+<<<<<<< HEAD
                         const state = { searchQuery, sortKey, sortDir, showActiveOnly };
                         localStorage.setItem('admin_movies_filters', JSON.stringify(state));
                 } catch { }
         }, [moviesPage, pageSize, searchQuery, sortKey, sortDir, showActiveOnly]);
+=======
+                        const state = { searchQuery, sortKey, sortDir, showActiveOnly, branchId: selectedBranchId };
+                        localStorage.setItem('admin_movies_filters', JSON.stringify(state));
+                } catch { }
+        }, [moviesPage, pageSize, searchQuery, sortKey, sortDir, showActiveOnly, selectedBranchId]);
+>>>>>>> preview
 
         const moviesTotalPages = useMemo(() => Math.max(1, Math.ceil(totalMovies / pageSize)), [totalMovies]);
         const filteredMovies = useMemo(
@@ -144,7 +227,12 @@ export default function MoviesPage() {
                         q: searchQuery,
                         sort: sortKey,
                         dir: sortDir,
+<<<<<<< HEAD
                         status: showActiveOnly ? 'active' : 'all'
+=======
+                        status: showActiveOnly ? 'active' : 'all',
+                        branch_id: selectedBranchId
+>>>>>>> preview
                 });
                 const mapped = items.map((m: any) => ({
                         id: String(m.id),
@@ -157,6 +245,11 @@ export default function MoviesPage() {
                         rating: m.rating ?? null,
                         price: Number(m.price || 0),
                         is_active: m.is_active,
+<<<<<<< HEAD
+=======
+                        branch_id: m.branch_id,
+                        branch_ids: Array.isArray(m.branch_ids) ? m.branch_ids : m.branch_ids ?? null,
+>>>>>>> preview
                         updated_at: m.updated_at ? new Date(m.updated_at).toISOString() : null
                 }));
                 setMoviesLocal(mapped);
@@ -189,6 +282,7 @@ export default function MoviesPage() {
                 } finally {
                 }
         };
+<<<<<<< HEAD
         return (
                 <AdminLayout
                         active={'movies' as any}
@@ -200,6 +294,39 @@ export default function MoviesPage() {
                                 window.dispatchEvent(new Event('admin-auth-changed'));
                                 window.location.href = '/';
                         }}
+=======
+        const handleDelete = (id: number) => {
+                setMovieToDelete(id);
+                setDeleteDialogOpen(true);
+        };
+        const handleConfirmDelete = async () => {
+                if (!movieToDelete) return;
+                try {
+                        await deleteMovieApi(movieToDelete);
+                        toast.success('Thành công', {
+                                description: 'Phim đã được xóa'
+                        });
+                        setDeleteDialogOpen(false);
+                        handleRefresh();
+                } catch (e: any) {
+                        toast.error('Lỗi', {
+                                description: e?.message || 'Có lỗi xảy ra'
+                        });
+                }
+        };
+        const handleLogout = () => {
+                localStorage.removeItem('staffToken');
+                clearStaff();
+                navigate('/login');
+        };
+
+        return (
+                <AdminLayout
+                        active={activeTab as any}
+                        setActive={setActiveTab as any}
+                        adminEmailState={staff?.email || 'admin@email.com'}
+                        handleLogout={handleLogout}
+>>>>>>> preview
                 >
                         <MoviesContent
                                 data={filteredMovies}
@@ -228,6 +355,13 @@ export default function MoviesPage() {
                                 setIsDetailsOpen={setIsDetailsOpen}
                                 selectedMovieId={selectedMovieId}
                                 setSelectedMovieId={setSelectedMovieId}
+<<<<<<< HEAD
+=======
+                                branches={branches}
+                                selectedBranchId={selectedBranchId}
+                                setSelectedBranchId={setSelectedBranchId}
+                                onDelete={handleDelete}
+>>>>>>> preview
                         />
                         <AdminEditModal
                                 isEditOpen={isEditOpen}
@@ -245,7 +379,26 @@ export default function MoviesPage() {
                                 setToys={() => { }}
                                 onViewDetails={handleViewDetails}
                                 onRefresh={handleRefresh}
+<<<<<<< HEAD
                         />
+=======
+                                branches={branches}
+                        />
+                        <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+                                <AlertDialogContent>
+                                        <AlertDialogHeader>
+                                                <AlertDialogTitle>Xác nhận xóa phim</AlertDialogTitle>
+                                                <AlertDialogDescription>
+                                                        Bạn có chắc chắn muốn xóa phim này? Hành động này không thể hoàn tác.
+                                                </AlertDialogDescription>
+                                        </AlertDialogHeader>
+                                        <AlertDialogFooter>
+                                                <AlertDialogCancel>Hủy</AlertDialogCancel>
+                                                <AlertDialogAction onClick={handleConfirmDelete}>Xóa</AlertDialogAction>
+                                        </AlertDialogFooter>
+                                </AlertDialogContent>
+                        </AlertDialog>
+>>>>>>> preview
                 </AdminLayout>
         );
 }

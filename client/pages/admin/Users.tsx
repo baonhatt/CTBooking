@@ -3,8 +3,19 @@ import UsersContent from '@/components/admin/content/UsersContent';
 import AdminEditModal from '@/components/admin/AdminEditModal';
 import React, { useMemo, useState, useEffect } from 'react';
 import { getUsers } from '@/lib/api';
+<<<<<<< HEAD
 
 export default function UsersPage() {
+=======
+import { useStaffStore } from '@/store/staffStore';
+import { useNavigate } from 'react-router-dom';
+
+export default function UsersPage() {
+        const navigate = useNavigate();
+        const staff = useStaffStore((state) => state.staff);
+        const clearStaff = useStaffStore((state) => state.clearStaff);
+        const [activeTab, setActiveTab] = useState('users');
+>>>>>>> preview
         const [users, setUsers] = useState<any[]>([]);
         const [totalUsers, setTotalUsers] = useState(0);
         const [usersPage, setUsersPage] = useState(1);
@@ -83,6 +94,7 @@ export default function UsersPage() {
                 setIsLoading(false);
         };
 
+<<<<<<< HEAD
         return (
                 <AdminLayout
                         active={'users' as any}
@@ -94,6 +106,20 @@ export default function UsersPage() {
                                 window.dispatchEvent(new Event('admin-auth-changed'));
                                 window.location.href = '/';
                         }}
+=======
+        const handleLogout = () => {
+                localStorage.removeItem('staffToken');
+                clearStaff();
+                navigate('/login');
+        };
+
+        return (
+                <AdminLayout
+                        active={activeTab as any}
+                        setActive={setActiveTab as any}
+                        adminEmailState={staff?.email || 'admin@email.com'}
+                        handleLogout={handleLogout}
+>>>>>>> preview
                 >
                         <UsersContent
                                 data={users}

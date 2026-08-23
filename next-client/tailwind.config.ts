@@ -54,6 +54,7 @@ export default {
         sm: 'calc(var(--radius) - 4px)'
       },
       fontFamily: {
+<<<<<<< HEAD
         sans: [
           'Inter',
           '-apple-system',
@@ -61,6 +62,9 @@ export default {
           'system-ui',
           'sans-serif'
         ]
+=======
+        sans: ['Inter', '-apple-system', 'BlinkMacSystemFont', 'system-ui', 'sans-serif']
+>>>>>>> preview
       },
       keyframes: {
         'accordion-down': {

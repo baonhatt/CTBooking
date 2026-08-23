@@ -1,7 +1,23 @@
+<<<<<<< HEAD
 // Import các hàm cần thiết từ thư viện
 import { eq, or, desc, asc, count, inArray, and, sql } from 'drizzle-orm';
 import { formatDateForDb } from '../../lib/date-utils';
 import { deleteCache } from '../../../worker/src/utils';
+=======
+import { eq, or, desc, asc, count, inArray, and, sql, isNull, isNotNull, like } from 'drizzle-orm';
+import { formatDateForDb } from '../../lib/date-utils';
+import { deleteCache } from '../../../worker/src/utils';
+import { logAuditAction } from '../../lib/audit-logger';
+import { buildAuditPayload } from '../../lib/audit-utils';
+import {
+        enrichWithParsedBranchIds,
+        enrichItemsWithParsedBranchIds,
+        resolveBranchIdsInput,
+        staffCanAccessBranchIds,
+        sqlBranchIdsMatchFilter,
+        sqlBranchIdsStaffAccessFilter
+} from '../../lib/branch-ids';
+>>>>>>> preview
 
 /**
  * Hàm helper xử lý dữ liệu combo
@@ -52,6 +68,7 @@ function processComboInput(combo: any): number[] {
  */
 export async function listTicketPackagesImpl(
         anyDb: any,
+<<<<<<< HEAD
         tables: { ticket_packages: any; movies: any },
         args: { page: number; pageSize: number; q: string; includeInactive?: boolean }
 ) {
@@ -59,6 +76,24 @@ export async function listTicketPackagesImpl(
 
         // 1. Xây dựng điều kiện where
         let whereCondition = includeInactive ? undefined : eq(tables.ticket_packages.is_active, true);
+=======
+        tables: { ticket_packages: any; movies: any; branches?: any },
+        args: { page: number; pageSize: number; q: string; includeInactive?: boolean; branch_id?: number; restrictToBranchIds?: number[] | null; type?: 'all' | 'movie' | 'vr' }
+) {
+        const { page, pageSize, q, includeInactive = false, branch_id, restrictToBranchIds = null, type = 'all' } = args;
+
+        // 1. Xây dựng điều kiện where
+        let whereCondition = includeInactive ? undefined : and(eq(tables.ticket_packages.is_active, true), isNull(tables.ticket_packages.deleted_at));
+
+        // Type filter
+        if (type === 'movie') {
+                const movieCond = sql`(${tables.ticket_packages.type} IS NULL OR ${tables.ticket_packages.type} != 'vr')`;
+                whereCondition = whereCondition ? and(whereCondition, movieCond) : movieCond;
+        } else if (type === 'vr') {
+                const vrCond = eq(tables.ticket_packages.type, 'vr');
+                whereCondition = whereCondition ? and(whereCondition, vrCond) : vrCond;
+        }
+>>>>>>> preview
 
         if (q) {
                 const lowerSearch = q.toLowerCase();
@@ -70,8 +105,20 @@ export async function listTicketPackagesImpl(
 
                 whereCondition = whereCondition ? and(whereCondition, searchCondition) : searchCondition;
         }
+<<<<<<< HEAD
 
         // 2. Lấy dữ liệu phân trang
+=======
+        if (branch_id) {
+                const branchFilter = sqlBranchIdsMatchFilter(tables.ticket_packages.branch_ids, tables.ticket_packages.branch_id, branch_id);
+                whereCondition = whereCondition ? and(whereCondition, branchFilter) : branchFilter;
+        }
+        if (restrictToBranchIds && restrictToBranchIds.length > 0) {
+                const staffFilter = sqlBranchIdsStaffAccessFilter(tables.ticket_packages.branch_ids, restrictToBranchIds);
+                whereCondition = whereCondition ? and(whereCondition, staffFilter) : staffFilter;
+        }
+        // 2. Lấy dữ liệu phân trang - tạm thời bỏ join branches
+>>>>>>> preview
         const [totalResArray, pkgList] = await Promise.all([
                 anyDb.select({ count: count() }).from(tables.ticket_packages).where(whereCondition),
                 anyDb
@@ -88,6 +135,7 @@ export async function listTicketPackagesImpl(
         const total = totalResult ? Number(totalResult.count) : 0;
 
         // 3. Xử lý combo và features cho từng gói vé
+<<<<<<< HEAD
         const items = packages.map((pkg: any) => ({
                 ...pkg,
                 // Parse JSON string to array (handle old data formats: JSON array or "1|2|3")
@@ -104,6 +152,43 @@ export async function listTicketPackagesImpl(
                         try { return JSON.parse(pkg.features); } catch { return []; }
                 })()) : []
         }));
+=======
+        const items = packages.map((pkg: any) =>
+                enrichWithParsedBranchIds({
+                        ...pkg,
+                // Parse JSON string to array (handle old data formats: JSON array or "1|2|3")
+                combo: pkg.combo
+                        ? Array.isArray(pkg.combo)
+                                ? pkg.combo
+                                : (() => {
+                                        try {
+                                                return JSON.parse(pkg.combo);
+                                        } catch {
+                                                // Handle old format: "1|2|3"
+                                                if (typeof pkg.combo === 'string' && pkg.combo.includes('|')) {
+                                                        return pkg.combo
+                                                                .split('|')
+                                                                .map((x: string) => x.trim())
+                                                                .filter(Boolean);
+                                                }
+                                                return [];
+                                        }
+                                })()
+                        : [],
+                features: pkg.features
+                        ? Array.isArray(pkg.features)
+                                ? pkg.features
+                                : (() => {
+                                        try {
+                                                return JSON.parse(pkg.features);
+                                        } catch {
+                                                return [];
+                                        }
+                                })()
+                        : []
+                })
+        );
+>>>>>>> preview
 
         // 4. Trả về kết quả phân trang
         return {
@@ -122,6 +207,7 @@ export async function listTicketPackagesImpl(
  * @param id ID của gói vé cần lấy
  * @returns Thông tin chi tiết gói vé hoặc null nếu không tìm thấy
  */
+<<<<<<< HEAD
 export async function getTicketPackageImpl(anyDb: any, tables: { ticket_packages: any }, id: number) {
         const [item] = await anyDb
                 .select()
@@ -145,6 +231,74 @@ export async function getTicketPackageImpl(anyDb: any, tables: { ticket_packages
                         try { return JSON.parse(item.features); } catch { return []; }
                 })()) : []
         };
+=======
+export async function getTicketPackageImpl(
+        anyDb: any,
+        tables: { ticket_packages: any; auditLogs: any; branches?: any },
+        id: number,
+        restrictToBranchIds: number[] | null = null
+) {
+        const whereClause =
+                restrictToBranchIds && restrictToBranchIds.length > 0
+                        ? and(
+                                  eq(tables.ticket_packages.id, id),
+                                  sqlBranchIdsStaffAccessFilter(tables.ticket_packages.branch_ids, restrictToBranchIds)
+                          )
+                        : eq(tables.ticket_packages.id, id);
+        const [item] = await anyDb.select().from(tables.ticket_packages).where(whereClause).limit(1);
+        if (!item) return null;
+
+        // Get tracking data from audit logs
+        const [createLog] = await anyDb
+                .select()
+                .from(tables.auditLogs)
+                .where(and(eq(tables.auditLogs.entityType, 'ticket_package'), eq(tables.auditLogs.entityId, String(id)), eq(tables.auditLogs.action, 'create')))
+                .orderBy(tables.auditLogs.createdAt)
+                .limit(1);
+
+        const [updateLog] = await anyDb
+                .select()
+                .from(tables.auditLogs)
+                .where(and(eq(tables.auditLogs.entityType, 'ticket_package'), eq(tables.auditLogs.entityId, String(id)), eq(tables.auditLogs.action, 'update')))
+                .orderBy(desc(tables.auditLogs.createdAt))
+                .limit(1);
+
+        // Parse JSON strings to arrays (handle old data formats: JSON array or "1|2|3")
+        return enrichWithParsedBranchIds({
+                ...item,
+                created_by_staff_name: createLog?.staffFullname || null,
+                updated_by_staff_name: updateLog?.staffFullname || null,
+                combo: item.combo
+                        ? Array.isArray(item.combo)
+                                ? item.combo
+                                : (() => {
+                                        try {
+                                                return JSON.parse(item.combo);
+                                        } catch {
+                                                // Handle old format: "1|2|3"
+                                                if (typeof item.combo === 'string' && item.combo.includes('|')) {
+                                                        return item.combo
+                                                                .split('|')
+                                                                .map((x: string) => x.trim())
+                                                                .filter(Boolean);
+                                                }
+                                                return [];
+                                        }
+                                })()
+                        : [],
+                features: item.features
+                        ? Array.isArray(item.features)
+                                ? item.features
+                                : (() => {
+                                        try {
+                                                return JSON.parse(item.features);
+                                        } catch {
+                                                return [];
+                                        }
+                                })()
+                        : []
+        });
+>>>>>>> preview
 }
 
 /**
@@ -156,7 +310,11 @@ export async function getTicketPackageImpl(anyDb: any, tables: { ticket_packages
  */
 export async function createTicketPackageImpl(
         anyDb: any,
+<<<<<<< HEAD
         tables: { ticket_packages: any; movies: any },
+=======
+        tables: { ticket_packages: any; movies: any; auditLogs: any },
+>>>>>>> preview
         args: {
                 name: string; // Tên gói vé
                 code?: string; // Mã gói vé
@@ -170,8 +328,22 @@ export async function createTicketPackageImpl(
                 is_member_only?: boolean; // Chỉ dành cho thành viên
                 is_active?: boolean; // Trạng thái hoạt động
                 display_order?: number; // Thứ tự hiển thị
+<<<<<<< HEAD
         },
         RUN_ENV: any
+=======
+                branch_id?: number | null;
+                branch_ids?: number[] | null;
+                // ===== VR-specific fields =====
+                cover_image?: string;
+                duration_min?: number;
+                vr_genre?: string;
+                min_players?: number;
+                max_players?: number;
+        },
+        RUN_ENV: any,
+        staffInfo?: { id: number; email: string; fullname: string }
+>>>>>>> preview
 ) {
         const {
                 name,
@@ -185,9 +357,24 @@ export async function createTicketPackageImpl(
                 max_group_size,
                 is_member_only,
                 is_active,
+<<<<<<< HEAD
                 display_order
         } = args;
 
+=======
+                display_order,
+                branch_id,
+                branch_ids,
+                cover_image,
+                duration_min,
+                vr_genre,
+                min_players,
+                max_players
+        } = args;
+
+        const branchFields = resolveBranchIdsInput(branch_ids, branch_id);
+
+>>>>>>> preview
         // 1. Chuẩn bị thời gian tạo và cập nhật
         const now = new Date();
         const formattedNow = formatDateForDb(now);
@@ -267,6 +454,17 @@ export async function createTicketPackageImpl(
                         is_active: is_active ?? true,
                         // Mặc định thứ tự hiển thị là 0 nếu không xác định
                         display_order: Number(display_order ?? 0),
+<<<<<<< HEAD
+=======
+                        branch_id: branchFields.branch_id ?? null,
+                        branch_ids: branchFields.branch_ids ?? null,
+                        // ===== VR-specific fields =====
+                        cover_image: cover_image || null,
+                        duration_min: duration_min !== undefined ? Number(duration_min) : null,
+                        vr_genre: vr_genre || null,
+                        min_players: min_players !== undefined ? Number(min_players) : null,
+                        max_players: max_players !== undefined ? Number(max_players) : null,
+>>>>>>> preview
                         // Thời gian tạo và cập nhật
                         created_at: formattedNow,
                         updated_at: formattedNow
@@ -293,7 +491,30 @@ export async function createTicketPackageImpl(
                 await RUN_ENV.KV_BINDING.delete('activeTicketPackages');
         }
 
+<<<<<<< HEAD
         return { item };
+=======
+        const auditNew = buildAuditPayload(item);
+
+        // Log audit action
+        if (staffInfo) {
+                await logAuditAction(
+                        anyDb,
+                        tables.auditLogs,
+                        'create',
+                        'ticket_package',
+                        item.id,
+                        `Tạo gói vé: ${name}`,
+                        staffInfo.id,
+                        staffInfo.email,
+                        staffInfo.fullname,
+                        undefined,
+                        auditNew
+                );
+        }
+
+        return { item: enrichWithParsedBranchIds(item) };
+>>>>>>> preview
 }
 
 /**
@@ -306,7 +527,11 @@ export async function createTicketPackageImpl(
  */
 export async function updateTicketPackageImpl(
         anyDb: any,
+<<<<<<< HEAD
         tables: { ticket_packages: any; movies: any },
+=======
+        tables: { ticket_packages: any; movies: any; auditLogs: any },
+>>>>>>> preview
         id: number,
         args: {
                 name?: string; // Tên gói vé
@@ -321,9 +546,29 @@ export async function updateTicketPackageImpl(
                 is_member_only?: boolean; // Chỉ dành cho thành viên
                 is_active?: boolean; // Trạng thái hoạt động
                 display_order?: number; // Thứ tự hiển thị
+<<<<<<< HEAD
         },
         RUN_ENV: any
 ) {
+=======
+                branch_id?: number | null;
+                branch_ids?: number[] | null;
+                // ===== VR-specific fields =====
+                cover_image?: string;
+                duration_min?: number;
+                vr_genre?: string;
+                min_players?: number;
+                max_players?: number;
+        },
+        RUN_ENV: any,
+        staffInfo?: { id: number; email: string; fullname: string }
+) {
+        const existing = await anyDb.query.ticket_packages.findFirst({ where: eq(tables.ticket_packages.id, id) });
+        if (!existing) {
+                throw new Error('Không tìm thấy gói vé');
+        }
+
+>>>>>>> preview
         const {
                 name,
                 code,
@@ -336,7 +581,18 @@ export async function updateTicketPackageImpl(
                 max_group_size,
                 is_member_only,
                 is_active,
+<<<<<<< HEAD
                 display_order
+=======
+                display_order,
+                branch_id,
+                branch_ids,
+                cover_image,
+                duration_min,
+                vr_genre,
+                min_players,
+                max_players
+>>>>>>> preview
         } = args;
 
         const now = new Date();
@@ -354,6 +610,20 @@ export async function updateTicketPackageImpl(
         if (is_member_only !== undefined) data.is_member_only = Boolean(is_member_only);
         if (is_active !== undefined) data.is_active = Boolean(is_active);
         if (display_order !== undefined) data.display_order = Number(display_order);
+<<<<<<< HEAD
+=======
+        if (branch_ids !== undefined || branch_id !== undefined) {
+                const branchFields = resolveBranchIdsInput(branch_ids, branch_id);
+                if (branchFields.branch_ids !== undefined) data.branch_ids = branchFields.branch_ids;
+                if (branchFields.branch_id !== undefined) data.branch_id = branchFields.branch_id;
+        }
+        // ===== VR-specific fields =====
+        if (cover_image !== undefined) data.cover_image = cover_image || null;
+        if (duration_min !== undefined) data.duration_min = duration_min !== null ? Number(duration_min) : null;
+        if (vr_genre !== undefined) data.vr_genre = vr_genre || null;
+        if (min_players !== undefined) data.min_players = min_players !== null ? Number(min_players) : null;
+        if (max_players !== undefined) data.max_players = max_players !== null ? Number(max_players) : null;
+>>>>>>> preview
 
         // 2. Tối ưu xử lý Features
         if (features !== undefined) {
@@ -406,13 +676,45 @@ export async function updateTicketPackageImpl(
                 .returning();
 
         // D1/SQLite trả về array khi dùng .returning()
+<<<<<<< HEAD
         const item = Array.isArray(updatedRes) ? updatedRes[0] : updatedRes;
+=======
+        let item = Array.isArray(updatedRes) ? updatedRes[0] : updatedRes;
+        if (!item) {
+                item = await anyDb.query.ticket_packages.findFirst({ where: eq(tables.ticket_packages.id, id) });
+        }
+>>>>>>> preview
 
         if (RUN_ENV && RUN_ENV.KV_BINDING) {
                 await RUN_ENV.KV_BINDING.delete('activeTicketPackages');
         }
 
+<<<<<<< HEAD
         return item || null;
+=======
+        const auditOld = buildAuditPayload(existing);
+        const auditNew = buildAuditPayload(item);
+
+        // Log audit action
+        if (staffInfo) {
+                await logAuditAction(
+                        anyDb,
+                        tables.auditLogs,
+                        'update',
+                        'ticket_package',
+                        id,
+                        `Cập nhật gói vé: ${name || id}`,
+                        staffInfo.id,
+                        staffInfo.email,
+                        staffInfo.fullname,
+                        auditOld,
+                        auditNew
+                );
+        }
+
+        if (!item) return null;
+        return enrichWithParsedBranchIds(item);
+>>>>>>> preview
 }
 
 /**
@@ -424,9 +726,16 @@ export async function updateTicketPackageImpl(
  */
 export async function deleteTicketPackageImpl(
         anyDb: any,
+<<<<<<< HEAD
         tables: { ticket_packages: any; bookings: any },
         id: number,
         RUN_ENV: any
+=======
+        tables: { ticket_packages: any; bookings: any; auditLogs: any },
+        id: number,
+        RUN_ENV: any,
+        staffInfo?: { id: number; email: string; fullname: string }
+>>>>>>> preview
 ) {
         try {
                 // 1. Kiểm tra gói vé có tồn tại không
@@ -437,11 +746,32 @@ export async function deleteTicketPackageImpl(
                 // Nếu không tìm thấy gói vé, trả về null
                 if (!existing) return null;
 
+<<<<<<< HEAD
                 // 2. Thực hiện soft delete (update is_active = false)
+=======
+                // 2. Check if ticket package is being used in bookings
+                const [bookingCount] = await anyDb
+                        .select({ count: count() })
+                        .from(tables.bookings)
+                        .where(eq(tables.bookings.ticket_package_id, id));
+
+                if (bookingCount?.count > 0) {
+                        const err: any = new Error(`Không thể xóa gói vé vì có ${bookingCount.count} booking đang sử dụng`);
+                        err.statusCode = 400;
+                        throw err;
+                }
+
+                // 3. Thực hiện soft delete (update is_active = false và deleted_at)
+>>>>>>> preview
                 await anyDb
                         .update(tables.ticket_packages)
                         .set({
                                 is_active: false,
+<<<<<<< HEAD
+=======
+                                deleted_at: new Date().toISOString(),
+                                deleted_by_staff_id: staffInfo?.id,
+>>>>>>> preview
                                 updated_at: formatDateForDb(new Date())
                         })
                         .where(eq(tables.ticket_packages.id, id));
@@ -450,6 +780,24 @@ export async function deleteTicketPackageImpl(
                         await RUN_ENV.KV_BINDING.delete('activeTicketPackages');
                 }
 
+<<<<<<< HEAD
+=======
+                // Log audit action
+                if (staffInfo) {
+                        await logAuditAction(
+                                anyDb,
+                                tables.auditLogs,
+                                'delete',
+                                'ticket_package',
+                                id,
+                                `Xóa gói vé: ${existing.name}`,
+                                staffInfo.id,
+                                staffInfo.email,
+                                staffInfo.fullname
+                        );
+                }
+
+>>>>>>> preview
                 return {
                         status: 200,
                         message: 'Gói vé đã được chuyển sang trạng thái Ngừng hoạt động thành công'
@@ -459,3 +807,178 @@ export async function deleteTicketPackageImpl(
                 throw err;
         }
 }
+<<<<<<< HEAD
+=======
+
+export async function restoreTicketPackageImpl(
+        anyDb: any,
+        tables: { ticket_packages: any; auditLogs: any },
+        id: number,
+        staffInfo?: { id: number; email: string; fullname: string }
+) {
+        try {
+                const existing = await anyDb.query.ticket_packages.findFirst({
+                        where: eq(tables.ticket_packages.id, id)
+                });
+
+                if (!existing) {
+                        const err: any = new Error('Ticket package not found');
+                        err.statusCode = 404;
+                        throw err;
+                }
+
+                // Restore by setting is_active = true and deleted_at = null
+                await anyDb
+                        .update(tables.ticket_packages)
+                        .set({
+                                is_active: true,
+                                deleted_at: null,
+                                updated_at: formatDateForDb(new Date())
+                        })
+                        .where(eq(tables.ticket_packages.id, id));
+
+                const auditOld = buildAuditPayload(existing);
+                const auditNew = buildAuditPayload({ ...existing, is_active: true, deleted_at: null });
+
+                // Log audit action
+                if (staffInfo) {
+                        await logAuditAction(
+                                anyDb,
+                                tables.auditLogs,
+                                'restore',
+                                'ticket_package',
+                                id,
+                                `Restore gói vé: ${existing.name}`,
+                                staffInfo.id,
+                                staffInfo.email,
+                                staffInfo.fullname,
+                                auditOld,
+                                auditNew
+                        );
+                }
+
+                return { ok: true };
+        } catch (err: any) {
+                throw err;
+        }
+}
+
+export async function listDeletedTicketPackagesImpl(
+        anyDb: any,
+        tables: { ticket_packages: any; staffs: any },
+        options: { page?: number; pageSize?: number; search?: string; branch_id?: number | null; restrictToBranchIds?: number[] | null } = {}
+) {
+        const { ticket_packages, staffs } = tables;
+        const { page = 1, pageSize = 10, search = '', branch_id, restrictToBranchIds = null } = options;
+
+        const conditions = [];
+        if (search) {
+                conditions.push(like(ticket_packages.name, `%${search}%`));
+        }
+        if (branch_id) {
+                conditions.push(sqlBranchIdsMatchFilter(ticket_packages.branch_ids, ticket_packages.branch_id, branch_id));
+        }
+        if (restrictToBranchIds && restrictToBranchIds.length > 0) {
+                conditions.push(sqlBranchIdsStaffAccessFilter(ticket_packages.branch_ids, restrictToBranchIds));
+        }
+        conditions.push(isNotNull(ticket_packages.deleted_at));
+
+        const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
+
+        const items = await anyDb
+                .select({
+                        id: ticket_packages.id,
+                        name: ticket_packages.name,
+                        code: ticket_packages.code,
+                        description: ticket_packages.description,
+                        price: ticket_packages.price,
+                        features: ticket_packages.features,
+                        type: ticket_packages.type,
+                        combo: ticket_packages.combo,
+                        min_group_size: ticket_packages.min_group_size,
+                        max_group_size: ticket_packages.max_group_size,
+                        is_member_only: ticket_packages.is_member_only,
+                        is_active: ticket_packages.is_active,
+                        display_order: ticket_packages.display_order,
+                        branch_id: ticket_packages.branch_id,
+                        branch_ids: ticket_packages.branch_ids,
+                        created_at: ticket_packages.created_at,
+                        updated_at: ticket_packages.updated_at,
+                        deleted_at: ticket_packages.deleted_at,
+                        deleted_by_staff_id: ticket_packages.deleted_by_staff_id,
+                        deleted_by_staff_name: staffs.fullname
+                })
+                .from(ticket_packages)
+                .leftJoin(staffs, eq(ticket_packages.deleted_by_staff_id, staffs.id))
+                .where(whereClause)
+                .limit(pageSize)
+                .offset((page - 1) * pageSize)
+                .orderBy(desc(ticket_packages.deleted_at));
+
+        const [countResult] = await anyDb
+                .select({ count: count() })
+                .from(ticket_packages)
+                .where(whereClause);
+
+        return {
+                status: 'success',
+                items: enrichItemsWithParsedBranchIds(items),
+                total: countResult?.count || 0,
+                page,
+                pageSize
+        };
+}
+
+export async function toggleTicketStatusImpl(
+        anyDb: any,
+        tables: { ticket_packages: any; auditLogs: any },
+        id: number,
+        RUN_ENV: any,
+        staffInfo?: { id: number; email: string; fullname: string }
+) {
+        const existing = await anyDb.query.ticket_packages.findFirst({
+                where: eq(tables.ticket_packages.id, id)
+        });
+
+        if (!existing) {
+                const err: any = new Error('Gói vé không tồn tại');
+                err.statusCode = 404;
+                throw err;
+        }
+
+        const newStatus = !existing.is_active;
+
+        await anyDb
+                .update(tables.ticket_packages)
+                .set({
+                        is_active: newStatus,
+                        updated_at: formatDateForDb(new Date())
+                })
+                .where(eq(tables.ticket_packages.id, id));
+
+        if (RUN_ENV && RUN_ENV.KV_BINDING) {
+                await RUN_ENV.KV_BINDING.delete('activeTicketPackages');
+        }
+
+        const auditOld = buildAuditPayload(existing);
+        const auditNew = buildAuditPayload({ ...existing, is_active: newStatus });
+
+        if (staffInfo) {
+                await logAuditAction(
+                        anyDb,
+                        tables.auditLogs,
+                        'update',
+                        'ticket_package',
+                        id,
+                        `${newStatus ? 'Kích hoạt' : 'Ẩn'} gói vé: ${existing.name}`,
+                        staffInfo.id,
+                        staffInfo.email,
+                        staffInfo.fullname,
+                        auditOld,
+                        auditNew
+                );
+        }
+
+        return { ok: true, is_active: newStatus };
+}
+>>>>>>> preview

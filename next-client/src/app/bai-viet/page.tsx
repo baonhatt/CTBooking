@@ -5,8 +5,11 @@ import { buildPostHref, formatDate } from '@/lib/utils';
 import UserLayout from '@/layouts/UserLayout';
 import PostsSearchClient from '@/app/bai-viet/PostsSearchClient';
 
+<<<<<<< HEAD
 export const runtime = 'edge';
 
+=======
+>>>>>>> preview
 import { siteConfig } from '@/config/site';
 
 const SITE_URL = siteConfig.domain;
@@ -18,8 +21,12 @@ export const metadata: Metadata = {
         alternates: { canonical: `${SITE_URL}/bai-viet` },
         openGraph: {
                 title: 'Tin Tức Điện Ảnh | Cinesphere Blog',
+<<<<<<< HEAD
                 description:
                         'Khám phá các tin tức điện ảnh độc quyền và review khách quan từ đội ngũ chuyên gia Cinesphere.',
+=======
+                description: 'Khám phá các tin tức điện ảnh độc quyền và review khách quan từ đội ngũ chuyên gia Cinesphere.',
+>>>>>>> preview
                 type: 'website',
                 url: `${SITE_URL}/bai-viet`,
                 locale: 'vi_VN',
@@ -29,19 +36,34 @@ export const metadata: Metadata = {
                                 url: '/og-default.jpg',
                                 width: 1200,
                                 height: 630,
+<<<<<<< HEAD
                                 alt: 'Cinesphere Blog - Tin Tức Điện Ảnh',
                         },
                 ],
+=======
+                                alt: 'Cinesphere Blog - Tin Tức Điện Ảnh'
+                        }
+                ]
+>>>>>>> preview
         },
         twitter: {
                 card: 'summary_large_image',
                 title: 'Tin Tức Điện Ảnh | Cinesphere Blog',
+<<<<<<< HEAD
                 description:
                         'Khám phá các tin tức điện ảnh độc quyền và review khách quan từ đội ngũ chuyên gia Cinesphere.',
                 images: ['/og-default.jpg'],
         },
 };
 
+=======
+                description: 'Khám phá các tin tức điện ảnh độc quyền và review khách quan từ đội ngũ chuyên gia Cinesphere.',
+                images: ['/og-default.jpg']
+        }
+};
+
+
+>>>>>>> preview
 // ⚡ Server Component – HTML đầy đủ tại Edge, Google index ngay lập tức
 export default async function PostsPage() {
         let posts: PostItem[] = [];
@@ -65,9 +87,33 @@ export default async function PostsPage() {
         const featured = posts.slice(0, 3);
         const others = posts.slice(3);
 
+<<<<<<< HEAD
         return (
                 <UserLayout className="bg-[#0A192F]">
                         <main className="pt-20 md:pt-28 pb-12 md:pb-24 bg-[#0A192F] min-h-screen font-sans">
+=======
+        const listSchema = {
+                '@context': 'https://schema.org',
+                '@type': 'CollectionPage',
+                name: 'Tin tức Cinesphere',
+                description: 'Các bài viết, review phim và tin tức điện ảnh mới nhất tại Cinesphere.',
+                url: `${SITE_URL}/bai-viet`,
+                mainEntity: {
+                        '@type': 'ItemList',
+                        itemListElement: posts.map((post, index) => ({
+                                '@type': 'ListItem',
+                                position: index + 1,
+                                url: `${SITE_URL}${buildPostHref(post)}`,
+                                name: post.title
+                        }))
+                }
+        };
+
+        return (
+                <UserLayout className="bg-[#0A192F]">
+                        <main className="pt-28 md:pt-36 pb-12 md:pb-24 bg-[#0A192F] min-h-screen font-sans">
+                                <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(listSchema) }} />
+>>>>>>> preview
                                 <section className="container my-6 mx-auto px-4 md:px-6 lg:px-8">
                                         {/* Header + Search */}
                                         <div className="flex flex-col lg:flex-row lg:items-end justify-between border-b border-white/10 pb-6 mb-10">
@@ -97,7 +143,14 @@ export default async function PostsPage() {
                                                                                 <div className="relative aspect-[16/9] lg:aspect-[2/1] rounded-[1.25rem] overflow-hidden mb-6">
                                                                                         {/* eslint-disable-next-line @next/next/no-img-element */}
                                                                                         <img
+<<<<<<< HEAD
                                                                                                 src={featured[0].featured_image ?? 'https://images.unsplash.com/photo-1489599849927-2ee91cede3ba?q=80&w=1200'}
+=======
+                                                                                                src={
+                                                                                                        featured[0].featured_image ??
+                                                                                                        'https://images.unsplash.com/photo-1489599849927-2ee91cede3ba?q=80&w=1200'
+                                                                                                }
+>>>>>>> preview
                                                                                                 className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700 ease-in-out"
                                                                                                 alt={featured[0].title}
                                                                                         />
@@ -133,7 +186,14 @@ export default async function PostsPage() {
                                                                                         <div className="relative aspect-[16/9] xl:aspect-[4/3] 2xl:aspect-[16/9] rounded-2xl overflow-hidden mb-4">
                                                                                                 {/* eslint-disable-next-line @next/next/no-img-element */}
                                                                                                 <img
+<<<<<<< HEAD
                                                                                                         src={post.featured_image ?? 'https://images.unsplash.com/photo-1536440136628-849c177e76a1?q=80&w=800'}
+=======
+                                                                                                        src={
+                                                                                                                post.featured_image ??
+                                                                                                                'https://images.unsplash.com/photo-1536440136628-849c177e76a1?q=80&w=800'
+                                                                                                        }
+>>>>>>> preview
                                                                                                         className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700 ease-in-out"
                                                                                                         alt={post.title}
                                                                                                 />
@@ -170,7 +230,13 @@ export default async function PostsPage() {
                                                                                 <div className="relative aspect-[16/10] rounded-[1rem] overflow-hidden mb-4">
                                                                                         {/* eslint-disable-next-line @next/next/no-img-element */}
                                                                                         <img
+<<<<<<< HEAD
                                                                                                 src={post.featured_image ?? 'https://images.unsplash.com/photo-1542204165-65bf26472b9b?q=80&w=800'}
+=======
+                                                                                                src={
+                                                                                                        post.featured_image ?? 'https://images.unsplash.com/photo-1542204165-65bf26472b9b?q=80&w=800'
+                                                                                                }
+>>>>>>> preview
                                                                                                 className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500 ease-in-out"
                                                                                                 alt={post.title}
                                                                                         />

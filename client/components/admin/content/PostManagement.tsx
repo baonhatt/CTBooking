@@ -1,11 +1,40 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+<<<<<<< HEAD
 import { Card, CardContent } from '@/components/ui/card';
+=======
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+>>>>>>> preview
 import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Switch } from '@/components/ui/switch';
+<<<<<<< HEAD
 import { Search, RefreshCw, Edit3, Plus, FileText, X, Image as ImageIcon, Link2, Eye } from 'lucide-react';
+=======
+import {
+        Search,
+        RefreshCw,
+        Edit3,
+        Plus,
+        FileText,
+        X,
+        Image as ImageIcon,
+        Link2,
+        Eye,
+        ArrowLeft,
+        Save,
+        ChevronDown,
+        ChevronUp,
+        Copy,
+        Type,
+        Link,
+        Calendar,
+        Share2,
+        Globe,
+        Trash2
+} from 'lucide-react';
+>>>>>>> preview
 import {
         Pagination,
         PaginationContent,
@@ -19,10 +48,18 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+<<<<<<< HEAD
 import { getPosts, createPostApi, updatePostApi } from '@/lib/api';
 import { uploadDirectToCloudinary } from '@/lib/api/uploads';
 import { PostRichTextEditor } from './PostRichTextEditor';
 import { toast } from 'sonner';
+=======
+import { getPosts, createPostApi, updatePostApi, deletePostApi } from '@/lib/api';
+import { uploadDirectToCloudinary } from '@/lib/api/uploads';
+import { PostRichTextEditor } from './PostRichTextEditor';
+import { toast } from 'sonner';
+import { useStaffPermissions, useIsSuperAdmin } from '@/hooks/useStaffPermission';
+>>>>>>> preview
 
 interface PostData {
         id: number;
@@ -43,12 +80,24 @@ interface PostData {
         og_image?: string;
         canonical_url?: string;
         schema_type?: string;
+<<<<<<< HEAD
+=======
+        created_by_staff_name?: string;
+        updated_by_staff_name?: string;
+>>>>>>> preview
 }
 
 function getPlainTextFromHtml(value?: string) {
         if (!value) return '';
         if (typeof document === 'undefined') {
+<<<<<<< HEAD
                 return value.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+=======
+                return value
+                        .replace(/<[^>]+>/g, ' ')
+                        .replace(/\s+/g, ' ')
+                        .trim();
+>>>>>>> preview
         }
         const temp = document.createElement('div');
         temp.innerHTML = value;
@@ -57,17 +106,46 @@ function getPlainTextFromHtml(value?: string) {
 
 export const PostManagement = () => {
         const navigate = useNavigate();
+<<<<<<< HEAD
+=======
+        const isSuperAdmin = useIsSuperAdmin();
+        const permissions = useStaffPermissions();
+
+        const hasPermission = (module: string, action: string) => {
+                if (isSuperAdmin) return true;
+                return permissions.some((p) => p.module === module && p.action === action);
+        };
+>>>>>>> preview
         const [posts, setPosts] = useState<PostData[]>([]);
         const [totalPosts, setTotalPosts] = useState(0);
         const [currentPage, setCurrentPage] = useState(1);
         const [searchQuery, setSearchQuery] = useState('');
+<<<<<<< HEAD
+=======
+        const [localSearchQuery, setLocalSearchQuery] = useState('');
+
+        const handleSearchPost = (e?: React.FormEvent) => {
+                if (e) e.preventDefault();
+                setSearchQuery(localSearchQuery);
+                setCurrentPage(1);
+        };
+>>>>>>> preview
         const [statusFilter, setStatusFilter] = useState<string>('all');
         const [isLoading, setIsLoading] = useState(false);
         const [isEditOpen, setIsEditOpen] = useState(false);
         const [isPreviewOpen, setIsPreviewOpen] = useState(false);
+<<<<<<< HEAD
         const [editData, setEditData] = useState<Partial<PostData> & { imageFile?: File; ogImageFile?: File }>({});
         const [isSaving, setIsSaving] = useState(false);
         const [activeTab, setActiveTab] = useState('content');
+=======
+        const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+        const [postToDelete, setPostToDelete] = useState<PostData | null>(null);
+        const [editData, setEditData] = useState<Partial<PostData> & { imageFile?: File; ogImageFile?: File }>({});
+        const [isSaving, setIsSaving] = useState(false);
+        const [activeTab, setActiveTab] = useState('content');
+        const [sections, setSections] = useState<{ publish: boolean; images: boolean; seo: boolean }>({ publish: true, images: true, seo: false });
+>>>>>>> preview
         const initialSnapshotRef = useRef<string>('');
 
         const pageSize = 10;
@@ -107,7 +185,13 @@ export const PostManagement = () => {
         const requestClose = async (force = false) => {
                 if (!isEditOpen) return;
                 if (!force && hasUnsavedChanges()) {
+<<<<<<< HEAD
                         const ok = window.confirm('Bạn có thay đổi chưa lưu. Đóng lại sẽ mất toàn bộ nội dung đang nhập. Bạn chắc chắn muốn đóng?');
+=======
+                        const ok = window.confirm(
+                                'Bạn có thay đổi chưa lưu. Đóng lại sẽ mất toàn bộ nội dung đang nhập. Bạn chắc chắn muốn đóng?'
+                        );
+>>>>>>> preview
                         if (!ok) return;
                 }
                 setIsEditOpen(false);
@@ -138,16 +222,50 @@ export const PostManagement = () => {
         const totalPages = useMemo(() => Math.max(1, Math.ceil(totalPosts / pageSize)), [totalPosts]);
 
         const handleCreate = () => {
+<<<<<<< HEAD
                 const next = { id: 0, title: '', content: '', excerpt: '', status: 'draft', is_featured: false, meta_description: '', meta_keywords: '', seo_title: '', og_image: '', canonical_url: '', schema_type: 'Article' };
                 setEditData(next);
                 initialSnapshotRef.current = snapshotEditData(next);
                 setIsEditOpen(true);
+=======
+                navigate('/posts/new');
+>>>>>>> preview
         };
 
         const handleEdit = (post: PostData) => {
                 navigate(`/posts/${post.id}/edit`);
         };
 
+<<<<<<< HEAD
+=======
+        const handleDelete = (post: PostData) => {
+                // Check if post is published
+                if (post.status === 'published') {
+                        toast.error('Không thể xóa', { description: 'Bài viết đã xuất bản. Vui lòng gỡ xuất bản trước khi xóa.' });
+                        return;
+                }
+                setPostToDelete(post);
+                setIsDeleteDialogOpen(true);
+        };
+
+        const confirmDelete = async (hardDelete = false) => {
+                if (!postToDelete?.id) return;
+                try {
+                        await deletePostApi(postToDelete.id, hardDelete);
+                        toast.success(hardDelete ? 'Đã xóa vĩnh viễn' : 'Đã lưu trữ bài viết');
+                        setIsDeleteDialogOpen(false);
+                        setPostToDelete(null);
+                        fetchPosts();
+                } catch (error: any) {
+                        toast.error('Lỗi', { description: error?.message || 'Không thể xóa bài viết' });
+                }
+        };
+
+        const toggleSection = (key: 'publish' | 'images' | 'seo') => {
+                setSections((prev) => ({ ...prev, [key]: !prev[key] }));
+        };
+
+>>>>>>> preview
         const handleSave = async (overrideStatus?: 'draft' | 'published' | 'archived') => {
                 if (!editData.title?.trim()) {
                         toast.error('Lỗi', { description: 'Vui lòng nhập tiêu đề' });
@@ -186,8 +304,14 @@ export const PostManagement = () => {
                                 }
                         }
 
+<<<<<<< HEAD
                         const nextStatus: 'draft' | 'published' | 'archived' =
                                 isNew ? 'draft' : overrideStatus || (editData.status as any) || 'draft';
+=======
+                        const nextStatus: 'draft' | 'published' | 'archived' = isNew
+                                ? 'draft'
+                                : overrideStatus || (editData.status as any) || 'draft';
+>>>>>>> preview
 
                         const payload = {
                                 title: editData.title!,
@@ -303,11 +427,16 @@ export const PostManagement = () => {
                                         <h3 className="text-lg font-bold text-slate-900">Quản lý bài viết</h3>
                                         <p className="text-xs text-slate-500">Tổng cộng {totalPosts} bài viết</p>
                                 </div>
+<<<<<<< HEAD
                                 <div className="flex flex-1 w-full md:max-w-xl gap-2 ml-auto">
+=======
+                                <form onSubmit={handleSearchPost} className="flex flex-1 w-full md:max-w-xl gap-2 ml-auto">
+>>>>>>> preview
                                         <div className="relative flex-1">
                                                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 w-4 h-4" />
                                                 <input
                                                         type="text"
+<<<<<<< HEAD
                                                         placeholder="Tìm kiếm bài viết..."
                                                         value={searchQuery}
                                                         onChange={(e) => { setSearchQuery(e.target.value); setCurrentPage(1); }}
@@ -318,6 +447,28 @@ export const PostManagement = () => {
                                                 <select
                                                         value={statusFilter}
                                                         onChange={(e) => { setStatusFilter(e.target.value); setCurrentPage(1); }}
+=======
+                                                        placeholder="Tìm tiêu đề hoặc nội dung bài viết..."
+                                                        value={localSearchQuery}
+                                                        onChange={(e) => setLocalSearchQuery(e.target.value)}
+                                                        className="w-full pl-10 pr-4 py-2 bg-slate-50 border-slate-200 focus:bg-white focus:ring-2 focus:ring-blue-500 rounded-xl transition-all outline-none text-sm border"
+                                                />
+                                        </div>
+                                        <Button
+                                                type="submit"
+                                                className="bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-semibold px-4 flex items-center gap-1.5 shrink-0"
+                                        >
+                                                <Search className="w-3.5 h-3.5" /> Tìm kiếm
+                                        </Button>
+                                </form>
+                                <div className="flex gap-2 items-center">
+                                                <select
+                                                        value={statusFilter}
+                                                        onChange={(e) => {
+                                                                setStatusFilter(e.target.value);
+                                                                setCurrentPage(1);
+                                                        }}
+>>>>>>> preview
                                                         className="px-3 py-2 bg-slate-50 rounded-xl border border-slate-200 text-sm font-medium"
                                                 >
                                                         <option value="all">Tất cả</option>
@@ -330,6 +481,7 @@ export const PostManagement = () => {
                                                         size="icon"
                                                         onClick={fetchPosts}
                                                         className="rounded-xl shadow-sm hover:rotate-180 transition-transform duration-500 shrink-0 h-10 w-10 flex items-center justify-center bg-white border-slate-200"
+<<<<<<< HEAD
                                                 >
                                                         <RefreshCw className={`w-4 h-4 ${isLoading ? 'animate-spin' : ''}`} />
                                                 </Button>
@@ -341,6 +493,21 @@ export const PostManagement = () => {
                                                 </Button>
                                         </div>
                                 </div>
+=======
+                                                        title="Làm mới"
+                                                >
+                                                        <RefreshCw className={`w-4 h-4 ${isLoading ? 'animate-spin' : ''}`} />
+                                                </Button>
+                                                {hasPermission('posts', 'create') && (
+                                                        <Button
+                                                                onClick={handleCreate}
+                                                                className="bg-blue-600 hover:bg-blue-700 rounded-xl shadow-lg shadow-blue-200 gap-2 text-white font-bold h-10 px-4"
+                                                        >
+                                                                <Plus className="w-4 h-4" /> Tạo bài viết
+                                                        </Button>
+                                                )}
+                                        </div>
+>>>>>>> preview
                         </div>
 
                         {/* ── Table ───────────────────────────────────────────────────────────── */}
@@ -349,23 +516,60 @@ export const PostManagement = () => {
                                         <Table className="w-full table-fixed">
                                                 <TableHeader className="bg-slate-50/80">
                                                         <TableRow className="hover:bg-transparent border-none">
+<<<<<<< HEAD
                                                                 <TableHead className="w-14 text-center text-[10px] uppercase font-bold text-slate-400 shrink-0">ID</TableHead>
                                                                 <TableHead className="text-[10px] uppercase font-bold text-slate-500 min-w-0">Tiêu đề</TableHead>
                                                                 <TableHead className="text-[10px] uppercase font-bold text-slate-500 text-center w-[110px] shrink-0">Trạng thái</TableHead>
                                                                 <TableHead className="text-[10px] uppercase font-bold text-slate-500 text-center w-[100px] hidden sm:table-cell shrink-0">Xuất bản</TableHead>
                                                                 <TableHead className="text-[10px] uppercase font-bold text-slate-500 text-center w-[80px] hidden md:table-cell shrink-0">Lượt xem</TableHead>
                                                                 <TableHead className="text-right text-[10px] uppercase font-bold text-slate-500 pr-4 w-[70px] shrink-0">Thao tác</TableHead>
+=======
+                                                                <TableHead className="w-14 text-center text-[10px] uppercase font-bold text-slate-400 shrink-0">
+                                                                        ID
+                                                                </TableHead>
+                                                                <TableHead className="text-[10px] uppercase font-bold text-slate-500 min-w-0">Tiêu đề</TableHead>
+                                                                <TableHead className="text-[10px] uppercase font-bold text-slate-500 text-center w-[110px] shrink-0">
+                                                                        Trạng thái
+                                                                </TableHead>
+                                                                <TableHead className="text-[10px] uppercase font-bold text-slate-500 text-center w-[90px] hidden sm:table-cell shrink-0">
+                                                                        Xuất bản
+                                                                </TableHead>
+                                                                <TableHead className="text-[10px] uppercase font-bold text-slate-500 text-center w-[70px] hidden md:table-cell shrink-0">
+                                                                        Lượt xem
+                                                                </TableHead>
+                                                                <TableHead className="text-right text-[10px] uppercase font-bold text-slate-500 pr-4 w-[100px] shrink-0">
+                                                                        Thao tác
+                                                                </TableHead>
+>>>>>>> preview
                                                         </TableRow>
                                                 </TableHeader>
                                                 <TableBody>
                                                         {isLoading ? (
                                                                 Array.from({ length: 5 }).map((_, idx) => (
                                                                         <TableRow key={`sk-${idx}`}>
+<<<<<<< HEAD
                                                                                 <TableCell><Skeleton className="h-4 w-8 mx-auto" /></TableCell>
                                                                                 <TableCell><Skeleton className="h-4 w-64" /></TableCell>
                                                                                 <TableCell><Skeleton className="h-5 w-20 mx-auto" /></TableCell>
                                                                                 <TableCell><Skeleton className="h-4 w-24 mx-auto" /></TableCell>
                                                                                 <TableCell className="text-right"><Skeleton className="h-8 w-24 ml-auto" /></TableCell>
+=======
+                                                                                <TableCell>
+                                                                                        <Skeleton className="h-4 w-8 mx-auto" />
+                                                                                </TableCell>
+                                                                                <TableCell>
+                                                                                        <Skeleton className="h-4 w-64" />
+                                                                                </TableCell>
+                                                                                <TableCell>
+                                                                                        <Skeleton className="h-5 w-20 mx-auto" />
+                                                                                </TableCell>
+                                                                                <TableCell>
+                                                                                        <Skeleton className="h-4 w-24 mx-auto" />
+                                                                                </TableCell>
+                                                                                <TableCell className="text-right">
+                                                                                        <Skeleton className="h-8 w-24 ml-auto" />
+                                                                                </TableCell>
+>>>>>>> preview
                                                                         </TableRow>
                                                                 ))
                                                         ) : posts.length === 0 ? (
@@ -398,7 +602,15 @@ export const PostManagement = () => {
                                                                                                                                 Nổi bật
                                                                                                                         </span>
                                                                                                                 )}
+<<<<<<< HEAD
                                                                                                                 {post.excerpt && <div className="text-xs text-slate-400 truncate hidden sm:block" title={post.excerpt}>{post.excerpt}</div>}
+=======
+                                                                                                                {post.excerpt && (
+                                                                                                                        <div className="text-xs text-slate-400 truncate hidden sm:block" title={post.excerpt}>
+                                                                                                                                {post.excerpt}
+                                                                                                                        </div>
+                                                                                                                )}
+>>>>>>> preview
                                                                                                         </div>
                                                                                                 </div>
                                                                                         </div>
@@ -416,15 +628,38 @@ export const PostManagement = () => {
                                                                                         </span>
                                                                                 </TableCell>
                                                                                 <TableCell className="text-right pr-4">
+<<<<<<< HEAD
+=======
+                                                                                {hasPermission('posts', 'edit') && (
+>>>>>>> preview
                                                                                         <Button
                                                                                                 variant="ghost"
                                                                                                 size="icon"
                                                                                                 onClick={() => handleEdit(post)}
+<<<<<<< HEAD
                                                                                                 className="h-8 w-8 text-blue-600 hover:text-blue-700 hover:bg-blue-50 rounded-lg transition-colors"
+=======
+                                                                                                className="h-8 w-8 text-yellow-600 hover:text-yellow-700 hover:bg-yellow-50 rounded-lg transition-colors"
+>>>>>>> preview
                                                                                                 title="Chỉnh sửa"
                                                                                         >
                                                                                                 <Edit3 size={16} />
                                                                                         </Button>
+<<<<<<< HEAD
+=======
+                                                                                )}
+                                                                                {hasPermission('posts', 'delete') && (
+                                                                                        <Button
+                                                                                                variant="ghost"
+                                                                                                size="icon"
+                                                                                                onClick={() => handleDelete(post)}
+                                                                                                className="h-8 w-8 text-red-600 hover:text-red-700 hover:bg-red-50 rounded-lg transition-colors"
+                                                                                                title="Xóa"
+                                                                                        >
+                                                                                                <Trash2 size={16} />
+                                                                                        </Button>
+                                                                                )}
+>>>>>>> preview
                                                                                 </TableCell>
                                                                         </TableRow>
                                                                 ))
@@ -440,7 +675,14 @@ export const PostManagement = () => {
                                         <PaginationItem>
                                                 <PaginationPrevious
                                                         href="#"
+<<<<<<< HEAD
                                                         onClick={(e) => { e.preventDefault(); if (currentPage > 1) setCurrentPage(currentPage - 1); }}
+=======
+                                                        onClick={(e) => {
+                                                                e.preventDefault();
+                                                                if (currentPage > 1) setCurrentPage(currentPage - 1);
+                                                        }}
+>>>>>>> preview
                                                 />
                                         </PaginationItem>
                                         {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
@@ -448,7 +690,14 @@ export const PostManagement = () => {
                                                         <PaginationLink
                                                                 href="#"
                                                                 isActive={page === currentPage}
+<<<<<<< HEAD
                                                                 onClick={(e) => { e.preventDefault(); setCurrentPage(page); }}
+=======
+                                                                onClick={(e) => {
+                                                                        e.preventDefault();
+                                                                        setCurrentPage(page);
+                                                                }}
+>>>>>>> preview
                                                         >
                                                                 {page}
                                                         </PaginationLink>
@@ -457,12 +706,20 @@ export const PostManagement = () => {
                                         <PaginationItem>
                                                 <PaginationNext
                                                         href="#"
+<<<<<<< HEAD
                                                         onClick={(e) => { e.preventDefault(); if (currentPage < totalPages) setCurrentPage(currentPage + 1); }}
+=======
+                                                        onClick={(e) => {
+                                                                e.preventDefault();
+                                                                if (currentPage < totalPages) setCurrentPage(currentPage + 1);
+                                                        }}
+>>>>>>> preview
                                                 />
                                         </PaginationItem>
                                 </PaginationContent>
                         </Pagination>
 
+<<<<<<< HEAD
                         {/* ── Edit / Create Dialog ─────────────────────────────────────────────
            Cấu trúc chuẩn để scroll hoạt động:
            DialogContent  h-[92vh]  flex flex-col
@@ -476,11 +733,23 @@ export const PostManagement = () => {
                         >
                                 <DialogContent
                                         className="max-w-6xl w-[95vw] h-[92vh] p-0 overflow-hidden bg-white flex flex-col [&>button]:hidden"
+=======
+                        {/* ── Edit / Create Dialog ───────────────────────────────────────────── */}
+                        <Dialog
+                                open={isEditOpen}
+                                onOpenChange={(next) => {
+                                        if (next) setIsEditOpen(true);
+                                }}
+                        >
+                                <DialogContent
+                                        className="max-w-7xl w-[95vw] h-[92vh] p-0 overflow-hidden bg-white flex flex-col [&>button]:hidden"
+>>>>>>> preview
                                         onPointerDownOutside={(e) => e.preventDefault()}
                                         onInteractOutside={(e) => e.preventDefault()}
                                         onEscapeKeyDown={(e) => e.preventDefault()}
                                         onOpenAutoFocus={(e) => e.preventDefault()}
                                 >
+<<<<<<< HEAD
                                         {/* Header — cố định trên cùng */}
                                         <div className="shrink-0 px-6 py-4 border-b bg-slate-900 text-white flex items-center justify-between">
                                                 <div className="min-w-0">
@@ -523,10 +792,87 @@ export const PostManagement = () => {
                                                                                                 <Label>Tiêu đề</Label>
                                                                                                 <Textarea
                                                                                                         className="mt-2 min-h-[44px] resize-y"
+=======
+                                        {/* Sticky Header */}
+                                        <div className="sticky top-0 z-10 bg-white border-b shadow-sm shrink-0">
+                                                <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+                                                        <div className="flex items-center justify-between h-16">
+                                                                <div className="flex items-center gap-4"> title="Quay lại"
+                                                                        <Button variant="ghost" size="icon" onClick={() => requestClose(false)} className="rounded-xl">
+                                                                                <ArrowLeft className="w-5 h-5" />
+                                                                        </Button>
+                                                                        <div className="min-w-0">
+                                                                                <h1 className="text-lg font-bold text-slate-900 truncate">
+                                                                                        {editData.title || 'Bài viết chưa có tiêu đề'}
+                                                                                </h1>
+                                                                                <div className="flex items-center gap-2 mt-0.5">
+                                                                                        <StatusBadge status={editData.status || 'draft'} />
+                                                                                </div>
+                                                                        </div>
+                                                                </div>
+                                                                <div className="flex items-center gap-2">
+                                                                        {editData.status === 'published' ? (
+                                                                                <Button
+                                                                                        onClick={() => handleSave('archived')}
+                                                                                        disabled={isSaving}
+                                                                                        variant="outline"
+                                                                                        className="rounded-xl"
+                                                                                >
+                                                                                        Gỡ phát hành
+                                                                                </Button>
+                                                                        ) : editData.status === 'archived' ? (
+                                                                                <Button
+                                                                                        onClick={() => handleSave('draft')}
+                                                                                        disabled={isSaving}
+                                                                                        variant="outline"
+                                                                                        className="rounded-xl"
+                                                                                >
+                                                                                        Chuyển sang nháp
+                                                                                </Button>
+                                                                        ) : (
+                                                                                <Button
+                                                                                        onClick={() => handleSave('published')}
+                                                                                        disabled={isSaving}
+                                                                                        className="rounded-xl bg-emerald-600 hover:bg-emerald-700"
+                                                                                >
+                                                                                        Xuất bản
+                                                                                </Button>
+                                                                        )}
+                                                                        <Button
+                                                                                onClick={() => handleSave()}
+                                                                                disabled={isSaving}
+                                                                                className="rounded-xl bg-blue-600 hover:bg-blue-700"
+                                                                        >
+                                                                                <Save className="w-4 h-4 mr-2" />
+                                                                                {isSaving ? 'Đang lưu...' : 'Lưu'}
+                                                                        </Button>
+                                                                </div>
+                                                        </div>
+                                                </div>
+                                        </div>
+
+                                        {/* Main Content */}
+                                        <div className="flex-1 min-h-0 overflow-y-auto">
+                                                <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+                                                        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+                                                                {/* Left Column - Editor (65%) */}
+                                                                <div className="lg:col-span-8 space-y-6">
+                                                                        <Card className="border-none shadow-sm">
+                                                                                <CardContent className="p-6 space-y-6">
+                                                                                        {/* Title */}
+                                                                                        <div>
+                                                                                                <Label className="flex items-center gap-2">
+                                                                                                        <Type className="w-4 h-4 text-slate-500" />
+                                                                                                        Tiêu đề bài viết
+                                                                                                </Label>
+                                                                                                <Input
+                                                                                                        className="mt-2 text-lg font-semibold"
+>>>>>>> preview
                                                                                                         value={editData.title || ''}
                                                                                                         onChange={(e) => setEditData({ ...editData, title: e.target.value })}
                                                                                                         placeholder="Nhập tiêu đề bài viết..."
                                                                                                 />
+<<<<<<< HEAD
                                                                                                 <p className="mt-2 text-[11px] text-slate-500 flex items-center gap-1.5">
                                                                                                         <Link2 className="w-3.5 h-3.5 text-slate-400" />
                                                                                                         Slug dự kiến:{' '}
@@ -562,10 +908,28 @@ export const PostManagement = () => {
                                                                                                                                 setEditData((prev) => ({ ...prev, featured_image: url, imageFile: file }));
                                                                                                                         }
                                                                                                                 }}
+=======
+                                                                                        </div>
+
+                                                                                        {/* Slug */}
+                                                                                        <div>
+                                                                                                <Label className="flex items-center gap-2">
+                                                                                                        <Link className="w-4 h-4 text-slate-500" />
+                                                                                                        Đường dẫn URL
+                                                                                                </Label>
+                                                                                                <div className="mt-2 flex items-center gap-2">
+                                                                                                        <span className="text-slate-400 text-sm">/bai-viet/</span>
+                                                                                                        <Input
+                                                                                                                className="flex-1 font-mono text-sm"
+                                                                                                                value={editData.slug || ''}
+                                                                                                                onChange={(e) => setEditData({ ...editData, slug: e.target.value })}
+                                                                                                                placeholder="tu-dong-tao-tu-tieu-de"
+>>>>>>> preview
                                                                                                         />
                                                                                                         <Button
                                                                                                                 type="button"
                                                                                                                 variant="outline"
+<<<<<<< HEAD
                                                                                                                 className="shrink-0 rounded-xl"
                                                                                                                 onClick={() => setEditData((prev) => ({ ...prev, featured_image: '', imageFile: undefined }))}
                                                                                                                 disabled={!editData.featured_image}
@@ -790,6 +1154,327 @@ export const PostManagement = () => {
                                                                 Hủy
                                                         </Button>
                                                         {renderSaveButtons()}
+=======
+                                                                                                                size="icon"
+                                                                                                                onClick={() => setEditData({ ...editData, slug: makeSlug(editData.title || '') })}
+                                                                                                                title="Tạo lại slug từ tiêu đề"
+                                                                                                                className="shrink-0"
+                                                                                                        >
+                                                                                                                <RefreshCw className="w-4 h-4" />
+                                                                                                        </Button>
+                                                                                                </div>
+                                                                                        </div>
+
+                                                                                        {/* Rich Text Editor */}
+                                                                                        <div>
+                                                                                                <Label>Nội dung</Label>
+                                                                                                <div className="mt-2">
+                                                                                                        <PostRichTextEditor
+                                                                                                                value={editData.content || ''}
+                                                                                                                onChange={(content) => setEditData((prev) => ({ ...prev, content }))}
+                                                                                                        />
+                                                                                                </div>
+                                                                                        </div>
+                                                                                </CardContent>
+                                                                        </Card>
+                                                                </div>
+
+                                                                {/* Right Column - Settings (35%) */}
+                                                                <div className="lg:col-span-4 space-y-4">
+                                                                        {/* Section 1: Publishing */}
+                                                                        <Card className="border-none shadow-sm">
+                                                                                <CardHeader
+                                                                                        className="px-4 py-3 bg-slate-50 border-b cursor-pointer"
+                                                                                        onClick={() => toggleSection('publish')}
+                                                                                >
+                                                                                        <div className="flex items-center justify-between">
+                                                                                                <CardTitle className="text-sm font-bold">Xuất bản</CardTitle>
+                                                                                                {sections.publish ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+                                                                                        </div>
+                                                                                </CardHeader>
+                                                                                {sections.publish && (
+                                                                                        <CardContent className="p-4 space-y-4">
+                                                                                                <div>
+                                                                                                        <Label className="flex items-center gap-2">
+                                                                                                                <FileText className="w-4 h-4 text-slate-500" />
+                                                                                                                Trạng thái
+                                                                                                        </Label>
+                                                                                                        <select
+                                                                                                                className="mt-2 w-full px-3 py-2 border border-slate-200 rounded-xl bg-white text-sm"
+                                                                                                                value={editData.status || 'draft'}
+                                                                                                                onChange={(e) => setEditData({ ...editData, status: e.target.value as any })}
+                                                                                                        >
+                                                                                                                <option value="draft">Bản nháp</option>
+                                                                                                                <option value="published">Đã xuất bản</option>
+                                                                                                                <option value="archived">Lưu trữ</option>
+                                                                                                        </select>
+                                                                                                </div>
+                                                                                                <div className="flex items-center justify-between">
+                                                                                                        <Label className="flex items-center gap-2">
+                                                                                                                <Search className="w-4 h-4 text-slate-500" />
+                                                                                                                Bài nổi bật
+                                                                                                        </Label>
+                                                                                                        <Switch
+                                                                                                                checked={editData.is_featured || false}
+                                                                                                                onCheckedChange={(checked) => setEditData({ ...editData, is_featured: checked })}
+                                                                                                                className="data-[state=checked]:bg-green-500 data-[state=unchecked]:bg-gray-300 cursor-pointer"
+                                                                                                        />
+                                                                                                </div>
+                                                                                                <div>
+                                                                                                        <Label className="flex items-center gap-2">
+                                                                                                                <Calendar className="w-4 h-4 text-slate-500" />
+                                                                                                                Ngày đăng
+                                                                                                        </Label>
+                                                                                                        <Input
+                                                                                                                type="datetime-local"
+                                                                                                                className="h-10 mt-2"
+                                                                                                                value={editData.published_at ? new Date(editData.published_at).toISOString().slice(0, 16) : ''}
+                                                                                                                onChange={(e) => setEditData({ ...editData, published_at: e.target.value })}
+                                                                                                        />
+                                                                                                </div>
+                                                                                        </CardContent>
+                                                                                )}
+                                                                        </Card>
+
+                                                                        {/* Section 2: Images & Summary */}
+                                                                        <Card className="border-none shadow-sm">
+                                                                                <CardHeader
+                                                                                        className="px-4 py-3 bg-slate-50 border-b cursor-pointer"
+                                                                                        onClick={() => toggleSection('images')}
+                                                                                >
+                                                                                        <div className="flex items-center justify-between">
+                                                                                                <CardTitle className="text-sm font-bold">Hình ảnh & Tóm tắt</CardTitle>
+                                                                                                {sections.images ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+                                                                                        </div>
+                                                                                </CardHeader>
+                                                                                {sections.images && (
+                                                                                        <CardContent className="p-4 space-y-4">
+                                                                                                <div>
+                                                                                                        <Label className="flex items-center gap-2">
+                                                                                                                <ImageIcon className="w-4 h-4 text-slate-500" />
+                                                                                                                Ảnh đại diện
+                                                                                                        </Label>
+                                                                                                        <div className="mt-2 flex items-center gap-2">
+                                                                                                                <Input
+                                                                                                                        type="file"
+                                                                                                                        accept="image/*"
+                                                                                                                        onChange={(e) => {
+                                                                                                                                const file = e.target.files?.[0];
+                                                                                                                                if (file) {
+                                                                                                                                        const url = URL.createObjectURL(file);
+                                                                                                                                        setEditData((prev) => ({ ...prev, featured_image: url, imageFile: file }));
+                                                                                                                                }
+                                                                                                                        }}
+                                                                                                                />
+                                                                                                                <Button
+                                                                                                                        variant="outline"
+                                                                                                                        size="sm"
+                                                                                                                        onClick={() => setEditData((prev) => ({ ...prev, featured_image: '', imageFile: undefined }))}
+                                                                                                                        disabled={!editData.featured_image}
+                                                                                                                >
+                                                                                                                        Gỡ
+                                                                                                                </Button>
+                                                                                                        </div>
+                                                                                                        <p className="mt-2 text-[11px] text-slate-500">Ảnh hiển thị trong danh sách và khi chia sẻ</p>
+                                                                                                        {editData.featured_image && (
+                                                                                                                <img
+                                                                                                                        src={editData.featured_image}
+                                                                                                                        alt="Preview"
+                                                                                                                        className="mt-2 w-full aspect-video object-cover rounded-lg border cursor-pointer hover:opacity-80 transition-opacity"
+                                                                                                                        onClick={() => window.open(editData.featured_image, '_blank')}
+                                                                                                                        title="Click để xem ảnh lớn"
+                                                                                                                />
+                                                                                                        )}
+                                                                                                </div>
+                                                                                                <div>
+                                                                                                        <Label className="flex items-center gap-2">
+                                                                                                                <FileText className="w-4 h-4 text-slate-500" />
+                                                                                                                Tóm tắt
+                                                                                                        </Label>
+                                                                                                        <Textarea
+                                                                                                                className="mt-2 min-h-[80px] resize-y"
+                                                                                                                value={editData.excerpt || ''}
+                                                                                                                onChange={(e) => setEditData({ ...editData, excerpt: e.target.value })}
+                                                                                                                placeholder="1-2 câu mô tả ngắn, hiển thị ngoài danh sách"
+                                                                                                        />
+                                                                                                </div>
+                                                                                        </CardContent>
+                                                                                )}
+                                                                        </Card>
+
+                                                                        {/* Section 3: SEO & Sharing */}
+                                                                        <Card className="border-none shadow-sm">
+                                                                                <CardHeader
+                                                                                        className="px-4 py-3 bg-slate-50 border-b cursor-pointer"
+                                                                                        onClick={() => toggleSection('seo')}
+                                                                                >
+                                                                                        <div className="flex items-center justify-between">
+                                                                                                <CardTitle className="text-sm font-bold">SEO & Chia sẻ</CardTitle>
+                                                                                                {sections.seo ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+                                                                                        </div>
+                                                                                </CardHeader>
+                                                                                {sections.seo && (
+                                                                                        <CardContent className="p-4 space-y-4">
+                                                                                                <div>
+                                                                                                        <Label className="flex items-center gap-2">
+                                                                                                                <Search className="w-4 h-4 text-slate-500" />
+                                                                                                                Tiêu đề trên Google
+                                                                                                        </Label>
+                                                                                                        <div className="mt-2 flex items-center gap-2">
+                                                                                                                <Input
+                                                                                                                        className="flex-1"
+                                                                                                                        value={editData.seo_title || ''}
+                                                                                                                        onChange={(e) => setEditData({ ...editData, seo_title: e.target.value })}
+                                                                                                                        placeholder="Ví dụ: Phim 8 Kỳ Quan | Cinesphere"
+                                                                                                                        maxLength={60}
+                                                                                                                />
+                                                                                                                <Button
+                                                                                                                        type="button"
+                                                                                                                        variant="outline"
+                                                                                                                        size="icon"
+                                                                                                                        onClick={() => setEditData({ ...editData, seo_title: editData.title || '' })}
+                                                                                                                        title="Sao chép từ tiêu đề bài viết"
+                                                                                                                        className="shrink-0"
+                                                                                                                >
+                                                                                                                        <Copy className="w-4 h-4" />
+                                                                                                                </Button>
+                                                                                                        </div>
+                                                                                                        <div className="mt-1 flex items-center justify-between">
+                                                                                                                <p className="text-[11px] text-amber-600">{editData.seo_title?.length || 0}/60 ký tự</p>
+                                                                                                                <p className="text-[11px] text-slate-400">Ấn icon để sao chép từ tiêu đề bài viết</p>
+                                                                                                        </div>
+                                                                                                </div>
+                                                                                                <div>
+                                                                                                        <Label className="flex items-center gap-2">
+                                                                                                                <FileText className="w-4 h-4 text-slate-500" />
+                                                                                                                Mô tả trên Google
+                                                                                                        </Label>
+                                                                                                        <div className="mt-2 flex items-start gap-2">
+                                                                                                                <Textarea
+                                                                                                                        className="flex-1 min-h-[80px] resize-y"
+                                                                                                                        value={editData.meta_description || ''}
+                                                                                                                        onChange={(e) => setEditData({ ...editData, meta_description: e.target.value })}
+                                                                                                                        placeholder="Tóm tắt ngắn 120-160 ký tự giúp tăng click từ Google"
+                                                                                                                        maxLength={160}
+                                                                                                                />
+                                                                                                                <Button
+                                                                                                                        type="button"
+                                                                                                                        variant="outline"
+                                                                                                                        size="icon"
+                                                                                                                        onClick={() => {
+                                                                                                                                if (editData.excerpt) {
+                                                                                                                                        if (editData.excerpt.length > 160) {
+                                                                                                                                                if (
+                                                                                                                                                        confirm(
+                                                                                                                                                                `Tóm tắt dài ${editData.excerpt.length} ký tự. Chỉ có thể copy tối đa 160 ký tự. Bạn có muốn tiếp tục?`
+                                                                                                                                                        )
+                                                                                                                                                ) {
+                                                                                                                                                        setEditData({ ...editData, meta_description: editData.excerpt.slice(0, 160) });
+                                                                                                                                                }
+                                                                                                                                        } else {
+                                                                                                                                                setEditData({ ...editData, meta_description: editData.excerpt });
+                                                                                                                                        }
+                                                                                                                                }
+                                                                                                                        }}
+                                                                                                                        title="Sao chép từ tóm tắt"
+                                                                                                                        className="shrink-0"
+                                                                                                                >
+                                                                                                                        <Copy className="w-4 h-4" />
+                                                                                                                </Button>
+                                                                                                        </div>
+                                                                                                        <div className="mt-1 flex items-center justify-between">
+                                                                                                                <p className="text-[11px] text-amber-600">{editData.meta_description?.length || 0}/160 ký tự</p>
+                                                                                                                <p className="text-[11px] text-slate-400">Ấn icon để sao chép từ tóm tắt bài viết</p>
+                                                                                                        </div>
+                                                                                                </div>
+                                                                                                <div>
+                                                                                                        <Label className="flex items-center gap-2">
+                                                                                                                <Search className="w-4 h-4 text-slate-500" />
+                                                                                                                Từ khóa
+                                                                                                        </Label>
+                                                                                                        <Input
+                                                                                                                className="mt-2"
+                                                                                                                value={editData.meta_keywords || ''}
+                                                                                                                onChange={(e) => setEditData({ ...editData, meta_keywords: e.target.value })}
+                                                                                                                placeholder="phim, rạp chiếu, review"
+                                                                                                        />
+                                                                                                </div>
+                                                                                                <div>
+                                                                                                        <Label className="flex items-center gap-2">
+                                                                                                                <Share2 className="w-4 h-4 text-slate-500" />
+                                                                                                                Ảnh khi chia sẻ Facebook/Zalo
+                                                                                                        </Label>
+                                                                                                        <div className="mt-2 flex items-center gap-2">
+                                                                                                                <Input
+                                                                                                                        type="file"
+                                                                                                                        accept="image/*"
+                                                                                                                        onChange={(e) => {
+                                                                                                                                const file = e.target.files?.[0];
+                                                                                                                                if (file) setEditData({ ...editData, ogImageFile: file });
+                                                                                                                        }}
+                                                                                                                />
+                                                                                                                {editData.og_image && (
+                                                                                                                        <img
+                                                                                                                                src={editData.og_image}
+                                                                                                                                alt="OG Preview"
+                                                                                                                                className="w-12 h-12 object-cover rounded border cursor-pointer hover:opacity-80 transition-opacity"
+                                                                                                                                onClick={() => window.open(editData.og_image, '_blank')}
+                                                                                                                                title="Click để xem ảnh lớn"
+                                                                                                                        />
+                                                                                                                )}
+                                                                                                        </div>
+                                                                                                </div>
+                                                                                                <div>
+                                                                                                        <Label className="flex items-center gap-2">
+                                                                                                                <Globe className="w-4 h-4 text-slate-500" />
+                                                                                                                URL chuẩn
+                                                                                                        </Label>
+                                                                                                        <div className="mt-2 flex items-center gap-2">
+                                                                                                                <Input
+                                                                                                                        className="flex-1"
+                                                                                                                        value={editData.canonical_url || ''}
+                                                                                                                        onChange={(e) => setEditData({ ...editData, canonical_url: e.target.value })}
+                                                                                                                        placeholder="https://cinesphere.com.vn/bai-viet/ten-bai-viet"
+                                                                                                                />
+                                                                                                                <Button
+                                                                                                                        type="button"
+                                                                                                                        variant="outline"
+                                                                                                                        size="icon"
+                                                                                                                        onClick={() =>
+                                                                                                                                setEditData({
+                                                                                                                                        ...editData,
+                                                                                                                                        canonical_url: editData.slug ? `https://cinesphere.com.vn/bai-viet/${editData.slug}` : ''
+                                                                                                                                })
+                                                                                                                        }
+                                                                                                                        title="Sao chép URL bài viết"
+                                                                                                                        className="shrink-0"
+                                                                                                                >
+                                                                                                                        <Copy className="w-4 h-4" />
+                                                                                                                </Button>
+                                                                                                        </div>
+                                                                                                        <p className="mt-1 text-[11px] text-slate-400">Ấn icon để sao chép URL bài viết</p>
+                                                                                                </div>
+                                                                                                <div>
+                                                                                                        <Label className="flex items-center gap-2">
+                                                                                                                <FileText className="w-4 h-4 text-slate-500" />
+                                                                                                                Loại nội dung
+                                                                                                        </Label>
+                                                                                                        <select
+                                                                                                                className="mt-2 w-full px-3 py-2 border border-slate-200 rounded-xl bg-white text-sm"
+                                                                                                                value={editData.schema_type || 'Article'}
+                                                                                                                onChange={(e) => setEditData({ ...editData, schema_type: e.target.value })}
+                                                                                                        >
+                                                                                                                <option value="Article">Bài viết</option>
+                                                                                                                <option value="NewsArticle">Tin tức</option>
+                                                                                                                <option value="BlogPosting">Blog</option>
+                                                                                                        </select>
+                                                                                                </div>
+                                                                                        </CardContent>
+                                                                                )}
+                                                                        </Card>
+                                                                </div>
+                                                        </div>
+>>>>>>> preview
                                                 </div>
                                         </div>
                                 </DialogContent>
@@ -813,6 +1498,7 @@ export const PostManagement = () => {
                                                                 </h1>
                                                                 <div className="flex flex-wrap items-center gap-2 text-xs text-slate-500">
                                                                         <span className="inline-flex items-center rounded-full bg-slate-100 px-2.5 py-1 font-semibold text-slate-700">
+<<<<<<< HEAD
                                                                                 {editData.status === 'published' ? 'Đã xuất bản' : editData.status === 'archived' ? 'Lưu trữ' : 'Nháp'}
                                                                         </span>
                                                                         <span>{new Date().toLocaleDateString('vi-VN')}</span>
@@ -820,6 +1506,23 @@ export const PostManagement = () => {
                                                                 {editData.excerpt?.trim() && (
                                                                         <p className="text-slate-600 leading-7">{editData.excerpt.trim()}</p>
                                                                 )}
+=======
+                                                                                {editData.status === 'published'
+                                                                                        ? 'Đã xuất bản'
+                                                                                        : editData.status === 'archived'
+                                                                                                ? 'Lưu trữ'
+                                                                                                : 'Nháp'}
+                                                                        </span>
+                                                                        <span>{new Date().toLocaleDateString('vi-VN')}</span>
+                                                                        {editData.created_by_staff_name && (
+                                                                                <span>Tạo bởi: {editData.created_by_staff_name}</span>
+                                                                        )}
+                                                                        {editData.updated_by_staff_name && (
+                                                                                <span>Cập nhật bởi: {editData.updated_by_staff_name}</span>
+                                                                        )}
+                                                                </div>
+                                                                {editData.excerpt?.trim() && <p className="text-slate-600 leading-7">{editData.excerpt.trim()}</p>}
+>>>>>>> preview
                                                         </header>
                                                         <section
                                                                 className="prose prose-slate max-w-none prose-img:rounded-xl prose-headings:font-extrabold"
@@ -831,6 +1534,37 @@ export const PostManagement = () => {
                                         </div>
                                 </DialogContent>
                         </Dialog>
+<<<<<<< HEAD
                 </div>
         );
 };
+=======
+
+                        {/* ── Delete Confirmation Dialog ─────────────────────────────────────── */}
+                        <Dialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+                                <DialogContent className="max-w-md">
+                                        <DialogHeader>
+                                                <DialogTitle>Xác nhận xóa bài viết</DialogTitle>
+                                        </DialogHeader>
+                                        <p className="py-4 text-sm text-slate-600">
+                                                Bạn có chắc chắn muốn xóa bài viết "{postToDelete?.title}"? Bài viết sẽ được chuyển sang trạng thái lưu trữ.
+                                        </p>
+                                        <div className="flex justify-end gap-2">
+                                                <Button variant="outline" onClick={() => setIsDeleteDialogOpen(false)}>
+                                                        Hủy
+                                                </Button>
+                                                <Button variant="destructive" onClick={() => confirmDelete(false)}>
+                                                        Lưu trữ
+                                                </Button>
+                                                {isSuperAdmin && (
+                                                        <Button variant="destructive" onClick={() => confirmDelete(true)} className="bg-red-700 hover:bg-red-800">
+                                                                Xóa vĩnh viễn
+                                                        </Button>
+                                                )}
+                                        </div>
+                                </DialogContent>
+                        </Dialog>
+                </div>
+        );
+};
+>>>>>>> preview

@@ -9,11 +9,18 @@ export function useScrollDetect(threshold: number = 50) {
       setIsScrolled(window.scrollY > threshold);
     };
 
+<<<<<<< HEAD
     window.addEventListener('scroll', handleScroll);
+=======
+    window.addEventListener('scroll', handleScroll, { passive: true });
+>>>>>>> preview
     return () => window.removeEventListener('scroll', handleScroll);
   }, [threshold]);
 
   return isScrolled;
 }
+<<<<<<< HEAD
 
 
+=======
+>>>>>>> preview

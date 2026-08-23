@@ -1,11 +1,75 @@
 'use client';
 
+<<<<<<< HEAD
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ArrowUp, MapPin, Phone, Mail, Facebook } from 'lucide-react';
 
 export default function Footer() {
         const [isVisible, setIsVisible] = useState(false);
+=======
+import { useState, useEffect, useMemo, useRef } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { ArrowUp, MapPin, Phone, Mail, Facebook, Building2 } from 'lucide-react';
+import { useBranch } from '@/hooks/useBranch';
+
+export default function Footer() {
+        const [isVisible, setIsVisible] = useState(false);
+        const [loadMap, setLoadMap] = useState(false);
+        const mapContainerRef = useRef<HTMLDivElement>(null);
+        const { selectedBranch } = useBranch();
+
+        // Parse branch settings
+        const branchSettings = useMemo(() => {
+                try {
+                        if (!selectedBranch?.settings) return {};
+                        return JSON.parse(selectedBranch.settings);
+                } catch (e) {
+                        return {};
+                }
+        }, [selectedBranch]);
+
+        // Determine the map src for the iframe
+        const mapSrc = useMemo(() => {
+                const manualEntry = (branchSettings.map_coords || branchSettings.map_query)?.trim();
+
+                if (manualEntry) {
+                        // If it's a full Google Maps URL from browser address bar
+                        if (manualEntry.includes('google.com/maps') && !manualEntry.includes('output=embed')) {
+                                // Extract place name (most reliable for POIs)
+                                const placeMatch = manualEntry.match(/\/place\/([^\/\?]+)/);
+                                if (placeMatch) {
+                                        return `https://maps.google.com/maps?q=${placeMatch[1]}&hl=vi&z=16&output=embed`;
+                                }
+
+                                // Extract exact coordinates if place name not found
+                                const latMatch = manualEntry.match(/!3d(-?\d+\.\d+)/);
+                                const lngMatch = manualEntry.match(/!4d(-?\d+\.\d+)/);
+                                if (latMatch && lngMatch) {
+                                        return `https://maps.google.com/maps?q=${latMatch[1]},${lngMatch[1]}&hl=vi&z=16&output=embed`;
+                                }
+
+                                // Fallback to raw URL with embed param
+                                return manualEntry.includes('?') ? `${manualEntry}&output=embed` : `${manualEntry}?output=embed`;
+                        }
+
+                        // If it's already an embed link or a custom search term/coord
+                        if (manualEntry.includes('output=embed') || manualEntry.includes('/embed')) {
+                                return manualEntry;
+                        }
+
+                        return `https://maps.google.com/maps?q=${encodeURIComponent(manualEntry)}&hl=vi&z=16&output=embed`;
+                }
+
+                // Fallback sequence: Branch Name -> Company Name -> Address
+                const fallbackQuery = selectedBranch?.name ||
+                        branchSettings.company_name ||
+                        selectedBranch?.address ||
+                        'Vạn Hạnh Mall, số 11 đường Sư Vạn Hạnh, Quận 10, Thành phố Hồ Chí Minh';
+
+                return `https://maps.google.com/maps?q=${encodeURIComponent(fallbackQuery)}&hl=vi&z=16&output=embed`;
+        }, [branchSettings, selectedBranch]);
+>>>>>>> preview
 
         useEffect(() => {
                 const setIsScrolled = (v: boolean) => setIsVisible(v);
@@ -14,11 +78,34 @@ export default function Footer() {
                 return () => window.removeEventListener('scroll', handler);
         }, []);
 
+<<<<<<< HEAD
         return (
                 <footer className="relative bg-gradient-to-b from-[#060915] to-black border-t border-white/10 py-10 md:py-16 overflow-hidden">
                         <div className="absolute inset-0 neon-noise opacity-30 pointer-events-none" />
                         <div className="absolute left-0 top-0 w-96 h-96 bg-purple-500/10 blur-[120px]" />
                         <div className="absolute right-0 bottom-0 w-96 h-96 bg-cyan-500/10 blur-[120px]" />
+=======
+        useEffect(() => {
+                if (!mapContainerRef.current) return;
+                const observer = new IntersectionObserver(
+                        (entries) => {
+                                if (entries[0]?.isIntersecting) {
+                                        setLoadMap(true);
+                                        observer.disconnect();
+                                }
+                        },
+                        { rootMargin: '300px' }
+                );
+                observer.observe(mapContainerRef.current);
+                return () => observer.disconnect();
+        }, []);
+
+        return (
+                <footer className="relative bg-gradient-to-b from-[#060915] to-black border-t border-white/10 py-10 md:py-16 overflow-hidden">
+                        <div className="absolute inset-0 neon-noise opacity-30 pointer-events-none" />
+                        <div className="hidden sm:block absolute left-0 top-0 w-96 h-96 bg-purple-500/10 blur-[120px]" />
+                        <div className="hidden sm:block absolute right-0 bottom-0 w-96 h-96 bg-cyan-500/10 blur-[120px]" />
+>>>>>>> preview
 
                         <div className="container mx-auto px-4 relative z-10">
                                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8 mb-12">
@@ -89,6 +176,7 @@ export default function Footer() {
                                                         </span>
                                                 </h4>
                                                 <div className="space-y-4">
+<<<<<<< HEAD
                                                         <div className="flex items-start gap-4 group">
                                                                 <div className="w-10 h-10 rounded-full bg-red-500/20 border border-red-500/30 flex items-center justify-center flex-shrink-0 group-hover:bg-red-500/30 transition-colors">
                                                                         <MapPin className="h-5 w-5 text-red-400" />
@@ -122,6 +210,51 @@ export default function Footer() {
                                                                         cinesphere0629@gmail.com
                                                                 </a>
                                                         </div>
+=======
+                                                        {(branchSettings.company_name || (!selectedBranch?.settings && selectedBranch?.name)) && (
+                                                                <div className="flex items-start gap-4 group">
+                                                                        <div className="w-10 h-10 rounded-full bg-red-500/20 border border-red-500/30 flex items-center justify-center flex-shrink-0 group-hover:bg-red-500/30 transition-colors">
+                                                                                <Building2 className="h-5 w-5 text-red-400" />
+                                                                        </div>
+                                                                        <div className="text-gray-300 text-sm">
+                                                                                <p className="font-semibold text-white mb-1 uppercase">
+                                                                                        {branchSettings.company_name || 'Công ty TNHH CÔNG NGHỆ VR VIỆT NAM'}
+                                                                                </p>
+                                                                                <p className="text-xs leading-relaxed">
+                                                                                        {branchSettings.company_address || 'Vạn Hạnh Mall, số 11 đường Sư Vạn Hạnh, Quận 10, Thành phố Hồ Chí Minh'}
+                                                                                </p>
+                                                                        </div>
+                                                                </div>
+                                                        )}
+
+                                                        {(branchSettings.hotline || selectedBranch?.phone || (!selectedBranch?.settings && selectedBranch?.id)) && (
+                                                                <div className="flex items-center gap-4 group">
+                                                                        <div className="w-10 h-10 rounded-full bg-cyan-500/20 border border-cyan-500/30 flex items-center justify-center flex-shrink-0 group-hover:bg-cyan-500/30 transition-colors">
+                                                                                <Phone className="h-5 w-5 text-cyan-400" />
+                                                                        </div>
+                                                                        <a
+                                                                                href={`tel:${branchSettings.hotline || selectedBranch?.phone || '0366431179'}`}
+                                                                                className="text-gray-300 hover:text-cyan-400 transition-colors font-medium text-sm"
+                                                                        >
+                                                                                {branchSettings.hotline || selectedBranch?.phone || '036.6431.179'}
+                                                                        </a>
+                                                                </div>
+                                                        )}
+
+                                                        {(selectedBranch?.email || (!selectedBranch?.settings && selectedBranch?.id)) && (
+                                                                <div className="flex items-center gap-4 group">
+                                                                        <div className="w-10 h-10 rounded-full bg-purple-500/20 border border-purple-500/30 flex items-center justify-center flex-shrink-0 group-hover:bg-purple-500/30 transition-colors">
+                                                                                <Mail className="h-5 w-5 text-purple-400" />
+                                                                        </div>
+                                                                        <a
+                                                                                href={`mailto:${selectedBranch?.email || 'cinesphere0629@gmail.com'}`}
+                                                                                className="text-gray-300 hover:text-purple-400 transition-colors font-medium text-sm break-all"
+                                                                        >
+                                                                                {selectedBranch?.email || 'cinesphere0629@gmail.com'}
+                                                                        </a>
+                                                                </div>
+                                                        )}
+>>>>>>> preview
                                                 </div>
                                         </motion.div>
 
@@ -137,6 +270,7 @@ export default function Footer() {
                                                                 VỊ TRÍ RẠP
                                                         </span>
                                                 </h4>
+<<<<<<< HEAD
                                                 <div className="relative w-full h-64 rounded-lg overflow-hidden border border-white/20 shadow-lg">
                                                         <iframe
                                                                 src={`https://www.google.com/maps?q=${encodeURIComponent(
@@ -151,6 +285,26 @@ export default function Footer() {
                                                                 className="w-full h-full"
                                                                 title="Vị trí CINESPHERE"
                                                         />
+=======
+                                                <div ref={mapContainerRef} className="relative w-full h-64 rounded-lg overflow-hidden border border-white/20 shadow-lg bg-white/5">
+                                                        {loadMap ? (
+                                                                <iframe
+                                                                        src={mapSrc}
+                                                                        width="100%"
+                                                                        height="100%"
+                                                                        style={{ border: 0 }}
+                                                                        allowFullScreen
+                                                                        loading="lazy"
+                                                                        referrerPolicy="no-referrer-when-downgrade"
+                                                                        className="w-full h-full"
+                                                                        title={`Vị trí ${selectedBranch?.name || 'CINESPHERE'}`}
+                                                                />
+                                                        ) : (
+                                                                <div className="w-full h-full flex items-center justify-center text-xs text-gray-400">
+                                                                        Đang tải bản đồ...
+                                                                </div>
+                                                        )}
+>>>>>>> preview
                                                         <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent pointer-events-none" />
                                                 </div>
                                         </motion.div>
@@ -168,6 +322,7 @@ export default function Footer() {
                                                         </span>
                                                 </h4>
                                                 <div className="space-y-3 text-gray-300 text-sm">
+<<<<<<< HEAD
                                                         <div>
                                                                 <p className="font-semibold text-white mb-1">Tên đại diện:</p>
                                                                 <p className="text-xs">TRẦN THỊ THUỲ DƯƠNG</p>
@@ -188,11 +343,39 @@ export default function Footer() {
                                                                 <p className="font-semibold text-white mb-1">Đăng ký thay đổi lần thứ 1:</p>
                                                                 <p className="text-xs">10 tháng 12 năm 2025</p>
                                                         </div>
+=======
+                                                        {/* Render dynamic extra info if value exists */}
+                                                        {branchSettings.extra_info?.filter((info: any) => info.value && info.value.trim() !== '').map((info: any, idx: number) => (
+                                                                <div key={idx}>
+                                                                        <p className="font-semibold text-white mb-1">{info.label}:</p>
+                                                                        <p className="text-xs uppercase">{info.value}</p>
+                                                                </div>
+                                                        ))}
+
+                                                        {/* Fallback if no dynamic info is provided yet */}
+                                                        {(!branchSettings.extra_info || branchSettings.extra_info.filter((info: any) => info.value).length === 0) && !selectedBranch?.settings && (
+                                                                <>
+                                                                        <div>
+                                                                                <p className="font-semibold text-white mb-1">Tên đại diện:</p>
+                                                                                <p className="text-xs uppercase">TRẦN THỊ THUỲ DƯƠNG</p>
+                                                                        </div>
+                                                                        <div>
+                                                                                <p className="font-semibold text-white mb-1">Số ĐKKD:</p>
+                                                                                <p className="text-xs">0319157654</p>
+                                                                        </div>
+                                                                        <div>
+                                                                                <p className="font-semibold text-white mb-1">Cấp tại:</p>
+                                                                                <p className="text-xs">Phòng ĐKKD Sở KH&ĐT Tp. HCM</p>
+                                                                        </div>
+                                                                </>
+                                                        )}
+>>>>>>> preview
                                                 </div>
                                         </motion.div>
                                 </div>
 
                                 <div className="border-t border-white/10 pt-8 text-center">
+<<<<<<< HEAD
                                         <p className="text-gray-400 text-sm">© 2025 CINESPHERE. Tất cả quyền được bảo lưu.</p>
                                 </div>
                         </div>
@@ -215,6 +398,11 @@ export default function Footer() {
                                         </motion.button>
                                 )}
                         </AnimatePresence>
+=======
+                                        <p className="text-gray-400 text-sm">© {new Date().getFullYear()} {'CINESPHERE'}. Tất cả quyền được bảo lưu.</p>
+                                </div>
+                        </div>
+>>>>>>> preview
                 </footer>
         );
 }

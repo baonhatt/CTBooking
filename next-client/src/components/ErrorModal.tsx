@@ -34,4 +34,8 @@ export function ErrorModal({ open, title, message, onOpenChange }: ErrorModalPro
   );
 }
 
+<<<<<<< HEAD
 
+=======
+export default ErrorModal;
+>>>>>>> preview

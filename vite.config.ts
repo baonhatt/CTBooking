@@ -64,6 +64,7 @@ export default defineConfig(({ mode }) => ({
       configureServer(server) {
         server.middlewares.use(async (req, res, next) => {
           const url = new URL(req.url || '', `http://${req.headers.host}`);
+<<<<<<< HEAD
           
           if (url.pathname.startsWith('/uploads/ctbooking/')) {
             const fs = await import('node:fs');
@@ -76,14 +77,35 @@ export default defineConfig(({ mode }) => ({
             if (!fs.existsSync(targetPath)) {
               console.log(`[Vite Downloader] Missing file: ${url.pathname}`);
               
+=======
+
+          if (url.pathname.startsWith('/uploads/ctbooking/')) {
+            const fs = await import('node:fs');
+            const path = await import('node:path');
+
+            const relativePath = url.pathname.replace(/^\//, '');
+            const targetPath = path.resolve(process.cwd(), relativePath);
+
+            // 1. Download if missing
+            if (!fs.existsSync(targetPath)) {
+              console.log(`[Vite Downloader] Missing file: ${url.pathname}`);
+
+>>>>>>> preview
               const cloudName = 'dzp3rbeix';
               const ext = path.extname(url.pathname).toLowerCase();
               const isVideo = ['.mp4', '.webm', '.mov', '.m4v'].includes(ext);
               const resourceType = isVideo ? 'video' : 'image';
+<<<<<<< HEAD
               
               const publicPath = url.pathname.replace('/uploads/', '');
               const cloudinaryUrl = `https://res.cloudinary.com/${cloudName}/${resourceType}/upload/${publicPath}`;
               
+=======
+
+              const publicPath = url.pathname.replace('/uploads/', '');
+              const cloudinaryUrl = `https://res.cloudinary.com/${cloudName}/${resourceType}/upload/${publicPath}`;
+
+>>>>>>> preview
               try {
                 const targetDir = path.dirname(targetPath);
                 if (!fs.existsSync(targetDir)) {
@@ -106,9 +128,21 @@ export default defineConfig(({ mode }) => ({
             if (fs.existsSync(targetPath)) {
               const ext = path.extname(targetPath).toLowerCase();
               const mimeMap: Record<string, string> = {
+<<<<<<< HEAD
                 '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.png': 'image/png',
                 '.gif': 'image/gif', '.webp': 'image/webp', '.svg': 'image/svg+xml',
                 '.mp4': 'video/mp4', '.webm': 'video/webm', '.mov': 'video/quicktime'
+=======
+                '.jpg': 'image/jpeg',
+                '.jpeg': 'image/jpeg',
+                '.png': 'image/png',
+                '.gif': 'image/gif',
+                '.webp': 'image/webp',
+                '.svg': 'image/svg+xml',
+                '.mp4': 'video/mp4',
+                '.webm': 'video/webm',
+                '.mov': 'video/quicktime'
+>>>>>>> preview
               };
               res.setHeader('Content-Type', mimeMap[ext] || 'application/octet-stream');
               res.setHeader('Access-Control-Allow-Origin', '*');

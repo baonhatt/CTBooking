@@ -1,9 +1,18 @@
 import { eq, desc, and, or, like, sql } from 'drizzle-orm';
 import { formatDateForDb } from '../../lib/date-utils';
+<<<<<<< HEAD
 
 export async function listPostsImpl(
         anyDb: any,
         tables: { posts: any },
+=======
+import { logAuditAction } from '../../lib/audit-logger';
+import { buildAuditPayload } from '../../lib/audit-utils';
+
+export async function listPostsImpl(
+        anyDb: any,
+        tables: { posts: any; auditLogs: any },
+>>>>>>> preview
         options: {
                 page?: number;
                 pageSize?: number;
@@ -36,7 +45,22 @@ export async function listPostsImpl(
 
         const items = await anyDb.query.posts.findMany({
                 where: whereCondition,
+<<<<<<< HEAD
                 orderBy: [desc(tables.posts.created_at)],
+=======
+                orderBy: [
+                        // Sort by status priority: published (1) > draft (2) > archived (3)
+                        sql`CASE 
+                                WHEN ${tables.posts.status} = 'published' THEN 1
+                                WHEN ${tables.posts.status} = 'draft' THEN 2
+                                WHEN ${tables.posts.status} = 'archived' THEN 3
+                                ELSE 4
+                        END`,
+                        // Then sort by published_at DESC (if published) or created_at DESC
+                        desc(tables.posts.published_at),
+                        desc(tables.posts.created_at)
+                ],
+>>>>>>> preview
                 limit: pageSize,
                 offset: (page - 1) * pageSize
         });
@@ -46,7 +70,11 @@ export async function listPostsImpl(
 
 export async function getPostImpl(
         anyDb: any,
+<<<<<<< HEAD
         tables: { posts: any },
+=======
+        tables: { posts: any; auditLogs: any },
+>>>>>>> preview
         identifier: number | string,
         publicOnly: boolean = false
 ) {
@@ -78,6 +106,7 @@ export async function getPostImpl(
         const post = await anyDb.query.posts.findFirst({
                 where: condition
         });
+<<<<<<< HEAD
         return post || null;
 }
 
@@ -85,6 +114,35 @@ export async function getPostImpl(
 export async function createPostImpl(
         anyDb: any,
         tables: { posts: any },
+=======
+        if (!post) return null;
+
+        // Get tracking data from audit logs
+        const [createLog] = await anyDb
+                .select()
+                .from(tables.auditLogs)
+                .where(and(eq(tables.auditLogs.entityType, 'post'), eq(tables.auditLogs.entityId, String(post.id)), eq(tables.auditLogs.action, 'create')))
+                .orderBy(tables.auditLogs.createdAt)
+                .limit(1);
+
+        const [updateLog] = await anyDb
+                .select()
+                .from(tables.auditLogs)
+                .where(and(eq(tables.auditLogs.entityType, 'post'), eq(tables.auditLogs.entityId, String(post.id)), eq(tables.auditLogs.action, 'update')))
+                .orderBy(desc(tables.auditLogs.createdAt))
+                .limit(1);
+
+        return {
+                ...post,
+                created_by_staff_name: createLog?.staffFullname || null,
+                updated_by_staff_name: updateLog?.staffFullname || null
+        };
+}
+
+export async function createPostImpl(
+        anyDb: any,
+        tables: { posts: any; auditLogs: any },
+>>>>>>> preview
         args: {
                 title: string;
                 content: string;
@@ -102,9 +160,31 @@ export async function createPostImpl(
                 schema_type?: string;
         },
         RUN_ENV?: any,
+<<<<<<< HEAD
         uploader?: (base64: string, folder: string) => Promise<{ url: string }>
 ) {
         const { title, content, excerpt, featured_image, image_base64, author_id, status, is_featured, meta_description, meta_keywords, seo_title, og_image, canonical_url, schema_type } = args;
+=======
+        uploader?: (base64: string, folder: string) => Promise<{ url: string }>,
+        staffInfo?: { id: number; email: string; fullname: string }
+) {
+        const {
+                title,
+                content,
+                excerpt,
+                featured_image,
+                image_base64,
+                author_id,
+                status,
+                is_featured,
+                meta_description,
+                meta_keywords,
+                seo_title,
+                og_image,
+                canonical_url,
+                schema_type
+        } = args;
+>>>>>>> preview
 
         let savedImage = featured_image;
 
@@ -160,6 +240,7 @@ export async function createPostImpl(
                 insertData.author_id = null;
         }
 
+<<<<<<< HEAD
         const inserted = await anyDb
                 .insert(tables.posts)
                 .values(insertData)
@@ -168,11 +249,42 @@ export async function createPostImpl(
 
         let post: any = Array.isArray(inserted) ? inserted[0] : inserted;
         return post || null;
+=======
+        const inserted = await anyDb.insert(tables.posts).values(insertData).returning();
+
+        let post: any = Array.isArray(inserted) ? inserted[0] : inserted;
+        if (!post) return null;
+
+        const auditNew = buildAuditPayload(post);
+
+        // Log audit action
+        if (staffInfo) {
+                await logAuditAction(
+                        anyDb,
+                        tables.auditLogs,
+                        'create',
+                        'post',
+                        post.id,
+                        `Tạo bài viết: ${title}`,
+                        staffInfo.id,
+                        staffInfo.email,
+                        staffInfo.fullname,
+                        undefined,
+                        auditNew
+                );
+        }
+
+        return post;
+>>>>>>> preview
 }
 
 export async function updatePostImpl(
         anyDb: any,
+<<<<<<< HEAD
         tables: { posts: any },
+=======
+        tables: { posts: any; auditLogs: any },
+>>>>>>> preview
         id: number,
         args: {
                 title?: string;
@@ -192,14 +304,37 @@ export async function updatePostImpl(
         },
         RUN_ENV?: any,
         uploader?: (base64: string, folder: string) => Promise<{ url: string }>,
+<<<<<<< HEAD
         deleter?: (url: string) => Promise<void>
+=======
+        deleter?: (url: string) => Promise<void>,
+        staffInfo?: { id: number; email: string; fullname: string }
+>>>>>>> preview
 ) {
         const existing = await anyDb.query.posts.findFirst({
                 where: eq(tables.posts.id, id)
         });
         if (!existing) return null;
 
+<<<<<<< HEAD
         const { title, content, excerpt, featured_image, image_base64, status, is_featured, meta_description, meta_keywords, seo_title, og_image, canonical_url, schema_type } = args;
+=======
+        const {
+                title,
+                content,
+                excerpt,
+                featured_image,
+                image_base64,
+                status,
+                is_featured,
+                meta_description,
+                meta_keywords,
+                seo_title,
+                og_image,
+                canonical_url,
+                schema_type
+        } = args;
+>>>>>>> preview
 
         const data: any = {
                 updated_at: formatDateForDb(new Date())
@@ -244,6 +379,12 @@ export async function updatePostImpl(
         const updatedRes = await anyDb.update(tables.posts).set(data).where(eq(tables.posts.id, id)).returning();
 
         let post: any = Array.isArray(updatedRes) ? updatedRes[0] : updatedRes;
+<<<<<<< HEAD
+=======
+        if (!post) {
+                post = await anyDb.query.posts.findFirst({ where: eq(tables.posts.id, id) });
+        }
+>>>>>>> preview
 
         if (
                 existing &&
@@ -255,20 +396,56 @@ export async function updatePostImpl(
                 deleter(existing.featured_image).catch((e) => console.error('Failed to delete old post image:', e));
         }
 
+<<<<<<< HEAD
+=======
+        if (existing && data.og_image && existing.og_image && existing.og_image !== data.og_image && deleter) {
+                deleter(existing.og_image).catch((e) => console.error('Failed to delete old post OG image:', e));
+        }
+
+        const auditOld = buildAuditPayload(existing);
+        const auditNew = buildAuditPayload(post);
+
+        // Log audit action
+        if (staffInfo) {
+                await logAuditAction(
+                        anyDb,
+                        tables.auditLogs,
+                        'update',
+                        'post',
+                        id,
+                        `Cập nhật bài viết: ${post?.title || existing.title}`,
+                        staffInfo.id,
+                        staffInfo.email,
+                        staffInfo.fullname,
+                        auditOld,
+                        auditNew
+                );
+        }
+
+>>>>>>> preview
         return post || null;
 }
 
 export async function deletePostImpl(
         anyDb: any,
+<<<<<<< HEAD
         tables: { posts: any },
         id: number,
         deleter?: (url: string) => Promise<void>
+=======
+        tables: { posts: any; auditLogs: any },
+        id: number,
+        deleter?: (url: string) => Promise<void>,
+        staffInfo?: { id: number; email: string; fullname: string },
+        isSuperAdmin?: boolean
+>>>>>>> preview
 ) {
         const existing = await anyDb.query.posts.findFirst({
                 where: eq(tables.posts.id, id)
         });
         if (!existing) return null;
 
+<<<<<<< HEAD
         if (existing.featured_image && deleter) {
                 deleter(existing.featured_image).catch((e) => console.error('Failed to delete post image:', e));
         }
@@ -283,6 +460,58 @@ export async function incrementPostViewImpl(
         id: number
 ) {
         return anyDb.update(tables.posts)
+=======
+        // Check if post is published
+        if (existing.status === 'published' && !isSuperAdmin) {
+                throw new Error('Bài viết đã xuất bản. Vui lòng gỡ xuất bản trước khi xóa.');
+        }
+
+        // Soft delete for regular staff (archive), hard delete for superadmin
+        if (isSuperAdmin) {
+                // Hard delete: remove from database
+                if (existing.featured_image && deleter) {
+                        deleter(existing.featured_image).catch((e) => console.error('Failed to delete post image:', e));
+                }
+
+                await anyDb.delete(tables.posts).where(eq(tables.posts.id, id));
+        } else {
+                // Soft delete: change status to archived
+                await anyDb
+                        .update(tables.posts)
+                        .set({
+                                status: 'archived',
+                                published_at: null,
+                                updated_at: formatDateForDb(new Date())
+                        })
+                        .where(eq(tables.posts.id, id));
+        }
+
+        const auditOld = buildAuditPayload(existing);
+
+        // Log audit action
+        if (staffInfo) {
+                await logAuditAction(
+                        anyDb,
+                        tables.auditLogs,
+                        isSuperAdmin ? 'delete' : 'archive',
+                        'post',
+                        id,
+                        isSuperAdmin ? `Xóa vĩnh viễn bài viết: ${existing.title}` : `Lưu trữ bài viết: ${existing.title}`,
+                        staffInfo.id,
+                        staffInfo.email,
+                        staffInfo.fullname,
+                        auditOld,
+                        undefined
+                );
+        }
+
+        return existing;
+}
+
+export async function incrementPostViewImpl(anyDb: any, tables: { posts: any; auditLogs: any }, id: number) {
+        return anyDb
+                .update(tables.posts)
+>>>>>>> preview
                 .set({
                         view_count: sql`${tables.posts.view_count} + 1`
                 })

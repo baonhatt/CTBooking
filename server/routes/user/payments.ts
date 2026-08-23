@@ -1,4 +1,5 @@
 import { PaymentRequest } from '@shared/api';
+<<<<<<< HEAD
 import { eq, and, asc, desc, isNull, or, inArray } from 'drizzle-orm';
 import { generateBookingCode, getBookingEmailTemplate } from '../../lib/booking-utils';
 import { sendMail } from '../mail-service';
@@ -11,11 +12,26 @@ class HttpError extends Error {
     super(message);
     this.status = status;
   }
+=======
+import { eq, and, asc, desc, isNull, or, inArray, sql } from 'drizzle-orm';
+import { generateBookingCode, getBookingEmailTemplate } from '../../lib/booking-utils';
+import { mailQueue } from '../../lib/mail-queue';
+import { formatDateForDb } from '../../lib/date-utils';
+import { redeemVoucherAfterPaymentImpl, validateVoucherForVRImpl } from './vouchers';
+
+class HttpError extends Error {
+        status: number;
+        constructor(status: number, message: string) {
+                super(message);
+                this.status = status;
+        }
+>>>>>>> preview
 }
 
 const MAX_TICKET_PER_ORDER = 10;
 
 type BookingValidationResult = {
+<<<<<<< HEAD
   user: {
     id: number | null;
     email: string;
@@ -582,3 +598,979 @@ export async function confirmUseTicketImpl(
     return { status, message };
   }
 }
+=======
+        user: {
+                id: number | null;
+                email: string;
+                fullname?: string | null;
+                phone?: string | null;
+        };
+        movies: any[];
+        ticketPackage: any;
+        unitPrice: number;
+        movieTotalPrice: number;
+        vrItemsDetails?: Array<{
+                vr_package_id: number;
+                quantity: number;
+                unit_price: number;
+                package_name: string;
+                line_total: number;
+                branch_id?: number | null;
+        }>;
+        vrTotalPrice: number;
+        voucherDetails?: any;
+        voucherDiscountAmount: number;
+        originalTotalPrice: number;
+        totalPrice: number;
+};
+
+async function validateBookingInput(
+        anyDb: any,
+        body: PaymentRequest,
+        tables: {
+                users: any;
+                accounts: any;
+                movies: any;
+                ticket_packages: any;
+                branches: any;
+                vouchers?: any;
+                voucher_redemption_logs?: any;
+        }
+): Promise<BookingValidationResult> {
+        const { email, emailBook, phone, name, combo, ticketCount, ticketPackageId, vr_items, voucher_code, branch_id } = body;
+
+        if (!email || !phone || !emailBook || !name || !ticketCount || ticketCount <= 0) {
+                throw new HttpError(400, 'Vui lòng nhập đầy đủ thông tin hợp lệ.');
+        }
+        if (ticketCount > MAX_TICKET_PER_ORDER) {
+                throw new HttpError(400, `Mỗi lượt chỉ đặt tối đa ${MAX_TICKET_PER_ORDER} vé.`);
+        }
+        if (!combo || !Array.isArray(combo) || combo.length === 0) {
+                throw new HttpError(400, 'Vui lòng chọn ít nhất một bộ phim trong combo.');
+        }
+
+        const usersTable = tables.users;
+        const accountsTable = tables.accounts;
+        const moviesTable = tables.movies;
+        const ticketPackagesTable = tables.ticket_packages;
+        const branchesTable = tables.branches;
+
+        const userResult = await anyDb
+                .select({
+                        id: usersTable.id,
+                        fullname: usersTable.fullname,
+                        phone: usersTable.phone,
+                        email: accountsTable.email
+                })
+                .from(usersTable)
+                .innerJoin(accountsTable, eq(usersTable.id, accountsTable.user_id))
+                .where(eq(accountsTable.email, email))
+                .limit(1);
+
+        const user = userResult[0];
+        const userEmail = user?.email || email;
+
+        // Fetch all movies in the combo
+        const movies = await anyDb.query.movies.findMany({
+                where: and(
+                        inArray(
+                                moviesTable.id,
+                                combo.map((id) => Number(id))
+                        ),
+                        eq(moviesTable.is_active, true),
+                        isNull(moviesTable.deleted_at)
+                )
+        });
+
+        if (movies.length !== combo.length) {
+                throw new HttpError(404, 'Một số phim trong combo không hợp lệ hoặc đã ngừng hoạt động.');
+        }
+
+        let ticketPackage: any = null;
+        if (ticketPackageId) {
+                ticketPackage = await anyDb.query.ticket_packages.findFirst({
+                        where: eq(ticketPackagesTable.id, ticketPackageId)
+                });
+                if (!ticketPackage || ticketPackage.is_active === false || ticketPackage.deleted_at !== null) {
+                        throw new HttpError(404, 'Gói vé không hợp lệ hoặc đã tắt.');
+                }
+        } else {
+                ticketPackage = await anyDb.query.ticket_packages.findFirst({
+                        where: and(
+                                eq(ticketPackagesTable.is_active, true),
+                                isNull(ticketPackagesTable.deleted_at),
+                                sql`(${ticketPackagesTable.type} IS NULL OR ${ticketPackagesTable.type} != 'vr')`
+                        ),
+                        orderBy: [asc(ticketPackagesTable.display_order), asc(ticketPackagesTable.price)]
+                });
+                if (!ticketPackage) {
+                        throw new HttpError(400, 'Không tìm thấy gói vé khả dụng.');
+                }
+        }
+
+        // Branch check: Ensure the branch is open
+        let branchSettings: any = {};
+        const targetBranchId = ticketPackage.branch_id || branch_id;
+        if (targetBranchId) {
+                const branch = await anyDb.query.branches.findFirst({
+                        where: and(eq(branchesTable.id, targetBranchId), isNull(branchesTable.deleted_at))
+                });
+                if (!branch) {
+                        throw new HttpError(404, 'Chi nhánh không tồn tại.');
+                }
+                if (!branch.is_active) {
+                        throw new HttpError(403, 'Chi nhánh hiện đang ngừng hoạt động.');
+                }
+                if (!branch.is_open) {
+                        throw new HttpError(403, 'Chi nhánh hiện đang đóng cửa. Vui lòng quay lại sau.');
+                }
+                // Parse branch settings
+                try {
+                        branchSettings = branch.settings ? JSON.parse(branch.settings) : {};
+                } catch (e) {
+                        branchSettings = {};
+                }
+        }
+
+        const unitPrice = Number(ticketPackage.price || 0);
+        if (!Number.isFinite(unitPrice) || unitPrice <= 0) {
+                throw new HttpError(400, 'Giá vé không hợp lệ.');
+        }
+        const movieTotalPrice = unitPrice * ticketCount;
+
+        // Process VR Items (if any)
+        const vrItemsDetails: Array<{
+                vr_package_id: number;
+                quantity: number;
+                unit_price: number;
+                package_name: string;
+                line_total: number;
+                branch_id?: number | null;
+        }> = [];
+        let vrTotalPrice = 0;
+
+        if (vr_items && Array.isArray(vr_items) && vr_items.length > 0) {
+                const vrPackageIds = vr_items.map((i) => i.vr_package_id);
+                const vrPkgs = await anyDb.query.ticket_packages.findMany({
+                        where: and(
+                                inArray(ticketPackagesTable.id, vrPackageIds),
+                                eq(ticketPackagesTable.type, 'vr'),
+                                eq(ticketPackagesTable.is_active, true),
+                                isNull(ticketPackagesTable.deleted_at)
+                        )
+                });
+
+                if (vrPkgs.length !== vrPackageIds.length) {
+                        throw new HttpError(404, 'Một số gói VR không tồn tại hoặc đã ngừng hoạt động.');
+                }
+
+                const vrPkgMap = new Map(vrPkgs.map((p: any) => [p.id, p]));
+                for (const it of vr_items) {
+                        const pkg: any = vrPkgMap.get(it.vr_package_id);
+                        if (!pkg) continue;
+                        const qty = Math.max(1, Number(it.quantity || 1));
+                        const price = Number(pkg.price || 0);
+                        const lineTotal = price * qty;
+                        vrTotalPrice += lineTotal;
+                        vrItemsDetails.push({
+                                vr_package_id: pkg.id,
+                                quantity: qty,
+                                unit_price: price,
+                                package_name: pkg.name,
+                                line_total: lineTotal,
+                                branch_id: pkg.branch_id || targetBranchId || null
+                        });
+                }
+        }
+
+        const originalTotalPrice = movieTotalPrice + vrTotalPrice;
+        let voucherDiscountAmount = 0;
+        let voucherDetails: any = null;
+
+        // Validate Voucher (if provided and vouchers table exists)
+        if (voucher_code && tables.vouchers) {
+                try {
+                        const vRes = await validateVoucherForVRImpl(
+                                anyDb,
+                                tables as any,
+                                {
+                                        code: voucher_code,
+                                        vr_items: vr_items || [],
+                                        branch_id: targetBranchId,
+                                        user_id: user?.id ?? undefined,
+                                        order_total_before: originalTotalPrice
+                                }
+                        );
+                        if (vRes.valid && vRes.discount_amount) {
+                                voucherDiscountAmount = Math.min(originalTotalPrice, vRes.discount_amount);
+                                voucherDetails = vRes.voucher_details;
+                        }
+                } catch (vErr) {
+                        console.warn('Voucher validation ignored error:', vErr);
+                }
+        }
+
+        const totalPrice = Math.max(0, originalTotalPrice - voucherDiscountAmount);
+
+        return {
+                user: {
+                        id: user?.id ?? null,
+                        email: userEmail,
+                        fullname: user?.fullname ?? name,
+                        phone: user?.phone ?? phone
+                },
+                movies,
+                ticketPackage,
+                unitPrice,
+                movieTotalPrice,
+                vrItemsDetails,
+                vrTotalPrice,
+                voucherDetails,
+                voucherDiscountAmount,
+                originalTotalPrice,
+                totalPrice
+        };
+}
+
+export async function validateBookingImpl(
+        anyDb: any,
+        payload: PaymentRequest,
+        tables: {
+                users: any;
+                accounts: any;
+                movies: any;
+                ticket_packages: any;
+                branches: any;
+                vouchers?: any;
+                voucher_redemption_logs?: any;
+        }
+) {
+        try {
+                const result = await validateBookingInput(anyDb, payload, tables);
+                return {
+                        status: 200,
+                        user: result.user,
+                        movies: result.movies.map((movie) => ({
+                                id: movie.id,
+                                title: movie.title,
+                                is_active: movie.is_active,
+                                duration_min: movie.duration_min,
+                                cover_image: movie.cover_image
+                        })),
+                        ticketPackage: {
+                                id: result.ticketPackage.id,
+                                name: result.ticketPackage.name,
+                                price: Number(result.ticketPackage.price || 0)
+                        },
+                        unitPrice: result.unitPrice,
+                        movieTotalPrice: result.movieTotalPrice,
+                        vrItems: result.vrItemsDetails || [],
+                        vrTotalPrice: result.vrTotalPrice,
+                        originalTotalPrice: result.originalTotalPrice,
+                        voucherDiscountAmount: result.voucherDiscountAmount,
+                        voucherDetails: result.voucherDetails,
+                        totalPrice: result.totalPrice
+                };
+        } catch (err: any) {
+                const status = err?.status || 500;
+                const message = err?.message || 'Lỗi máy chủ nội bộ';
+                return { status, message };
+        }
+}
+
+export async function createPaymentImpl(
+        anyDb: any,
+        payload: PaymentRequest,
+        tables: {
+                bookings: any;
+                users: any;
+                accounts: any;
+                movies: any;
+                ticket_packages: any;
+                branches: any;
+                booking_vr_items?: any;
+                vouchers?: any;
+                voucher_redemption_logs?: any;
+        }
+) {
+        try {
+                const validation = await validateBookingInput(anyDb, payload, tables);
+                const { user, movies, totalPrice, vrItemsDetails, originalTotalPrice, voucherDiscountAmount, voucherDetails } = validation;
+                const { emailBook, phone, name, ticketCount, paymentMethod, pay_txt_code, combo, voucher_code, branch_id } = payload;
+                const userId = user?.id ? Number(user.id) : null;
+
+                const bookingsTable = tables.bookings;
+
+                // Format movie details as pipe-separated strings
+                const movieTitles = JSON.stringify(movies.map((m) => m.title));
+                const movieDurations = JSON.stringify(movies.map((m) => m.duration_min));
+                const moviePosters = JSON.stringify(movies.map((m) => m.cover_image));
+
+                // Use explicit UTC ISO timestamps for created_at/updated_at để đồng bộ giữa Postgres & D1
+                const nowIso = new Date();
+                let pay_txt_code_dt: string | null = null;
+                if (pay_txt_code && String(pay_txt_code).trim()) {
+                        pay_txt_code_dt = String(pay_txt_code).trim();
+                }
+
+                const hasVR = vrItemsDetails && vrItemsDetails.length > 0;
+                const bookingType = hasVR ? 'combo_vr' : 'movie';
+                const branchIdToSave = validation.ticketPackage?.branch_id || branch_id || null;
+
+                // Try to use .returning() to get the inserted row when supported (Postgres).
+                // Fallback to the existing query approach for DBs that don't support returning (D1/SQLite).
+                const insertedBooking = await anyDb
+                        .insert(bookingsTable)
+                        .values({
+                                user_id: userId,
+                                movie_id: null, // No single movie ID for combo
+                                ticket_package_id: validation.ticketPackage?.id ? Number(validation.ticketPackage.id) : null,
+                                ticket_count: ticketCount,
+                                total_price: Number(totalPrice),
+                                original_total_price: Number(originalTotalPrice || totalPrice),
+                                voucher_id: voucherDetails?.id || null,
+                                voucher_code_snapshot: voucher_code || null,
+                                voucher_discount_amount: Number(voucherDiscountAmount || 0),
+                                booking_type: bookingType,
+                                payment_method: (paymentMethod || 'cash').toLowerCase(),
+                                phone,
+                                name,
+                                email: emailBook,
+                                combo: JSON.stringify(combo || []),
+                                movie_title: movieTitles,
+                                movie_duration: movieDurations,
+                                movie_poster: moviePosters,
+                                ticket_package_name: validation.ticketPackage?.name || null,
+                                ticket_unit_price: validation.ticketPackage?.price ? Number(validation.ticketPackage.price) : null,
+                                branch_id: branchIdToSave,
+                                pay_txt_code: pay_txt_code_dt,
+                                created_at: formatDateForDb(nowIso),
+                                updated_at: formatDateForDb(nowIso)
+                        })
+                        .returning();
+
+                let bookingRow = Array.isArray(insertedBooking) ? insertedBooking[0] : insertedBooking;
+                if (!bookingRow) {
+                        return { status: 500, message: 'Không thể tạo đặt vé' };
+                }
+
+                // Insert line items into booking_vr_items
+                const insertedItemsArr: any[] = [];
+                if (tables.booking_vr_items) {
+                        // 1. Insert movie ticket package if present
+                        if (validation.ticketPackage) {
+                                const pkgQty = ticketCount || 1;
+                                const pkgPrice = Number(validation.ticketPackage.price || 0);
+                                let pkgLineTotal = Number(totalPrice);
+                                if (hasVR) {
+                                        const vrSubtotal = (vrItemsDetails || []).reduce((sum, it) => sum + Number(it.line_total || 0), 0);
+                                        pkgLineTotal = Math.max(0, Number(totalPrice) - vrSubtotal);
+                                }
+                                const pkgDiscount = Number(voucherDiscountAmount || 0);
+                                const pkgDiscountedUnit = pkgQty > 0 ? +(pkgLineTotal / pkgQty).toFixed(2) : pkgPrice;
+
+                                try {
+                                        const r = await anyDb
+                                                .insert(tables.booking_vr_items)
+                                                .values({
+                                                        booking_id: bookingRow.id,
+                                                        vr_ticket_package_id: Number(validation.ticketPackage.id),
+                                                        quantity: pkgQty,
+                                                        unit_price: pkgPrice,
+                                                        package_name: validation.ticketPackage.name || 'Gói vé',
+                                                        voucher_id: voucherDetails?.id || null,
+                                                        discounted_unit_price: pkgDiscountedUnit,
+                                                        line_total: pkgLineTotal,
+                                                        voucher_discount_amount: pkgDiscount,
+                                                        branch_id: branchIdToSave,
+                                                        created_at: formatDateForDb(nowIso)
+                                                })
+                                                .returning();
+                                        if (r) insertedItemsArr.push(Array.isArray(r) ? r[0] : r);
+                                } catch (err: any) {
+                                        console.error('Error inserting movie ticket item to booking_vr_items:', err);
+                                }
+                        }
+
+                        // 2. Insert VR items into booking_vr_items if present
+                        if (hasVR) {
+                                for (const item of vrItemsDetails!) {
+                                        try {
+                                                const r = await anyDb
+                                                        .insert(tables.booking_vr_items)
+                                                        .values({
+                                                                booking_id: bookingRow.id,
+                                                                vr_ticket_package_id: item.vr_package_id,
+                                                                quantity: item.quantity,
+                                                                unit_price: item.unit_price,
+                                                                package_name: item.package_name,
+                                                                voucher_id: voucherDetails?.id || null,
+                                                                discounted_unit_price: item.unit_price,
+                                                                line_total: item.line_total,
+                                                                voucher_discount_amount: 0,
+                                                                branch_id: item.branch_id || branchIdToSave,
+                                                                created_at: formatDateForDb(nowIso)
+                                                        })
+                                                        .returning();
+                                                if (r) insertedItemsArr.push(Array.isArray(r) ? r[0] : r);
+                                        } catch (err: any) {
+                                                console.error('Error inserting VR item to booking_vr_items:', err);
+                                        }
+                                }
+                        }
+                }
+
+                return {
+                        status: 201,
+                        message: 'Khởi tạo đặt vé thành công',
+                        booking: {
+                                id: bookingRow.id,
+                                user_id: bookingRow.user_id,
+                                movie_id: bookingRow.movie_id,
+                                ticket_package_id: bookingRow.ticket_package_id,
+                                ticket_count: bookingRow.ticket_count,
+                                total_price: bookingRow.total_price,
+                                original_total_price: bookingRow.original_total_price,
+                                voucher_discount_amount: bookingRow.voucher_discount_amount,
+                                booking_type: bookingRow.booking_type,
+                                payment_method: bookingRow.payment_method,
+                                phone: bookingRow.phone,
+                                name: bookingRow.name,
+                                email: bookingRow.email,
+                                payment_status: bookingRow.payment_status,
+                                created_at: bookingRow.created_at,
+                                vr_items: insertedItemsArr.length > 0 ? insertedItemsArr : (vrItemsDetails || [])
+                        }
+                };
+        } catch (err: any) {
+                const status = err?.status || 500;
+                const message = err?.message || 'Lỗi máy chủ nội bộ';
+                return { status, message };
+        }
+}
+
+export async function updatePaymentImpl(
+        anyDb: any,
+        payload: {
+                user_id?: number;
+                payment_id?: number;
+                payment_status?: string;
+                transaction_id?: string;
+                paid_at?: string | Date;
+        },
+        sendMailFn?: (to: string, subject: string, html: string) => Promise<any>,
+        getBookingEmailHtml?: (data: any) => string,
+        tables?: {
+                bookings: any;
+                users: any;
+                accounts: any;
+                movies: any;
+                ticket_packages: any;
+                branches: any;
+                email_logs?: any;
+        },
+        context?: { waitUntil: (promise: Promise<any>) => void }
+) {
+        try {
+                const { user_id, payment_id, payment_status, transaction_id, paid_at } = payload;
+                if (!payment_id || !payment_status) {
+                        return { status: 400, message: 'Vui lòng nhập đầy đủ thông tin hợp lệ.' };
+                }
+
+                const { bookings: bookingsTable, movies: moviesTable, ticket_packages: pkgsTable, branches: branchesTable, vouchers: vouchersTable, voucher_redemption_logs: logsTable, booking_vr_items: vrItemsTable } = tables || ({} as any);
+                if (!bookingsTable || !moviesTable || !pkgsTable || !branchesTable) return { status: 500, message: 'Missing tables definition' };
+
+                // 1. Tối ưu Query đầu tiên: Sử dụng Join thay vì 'with' để lấy data gửi mail sau này
+                const whereClause =
+                        user_id && Number(user_id) !== 0
+                                ? and(eq(bookingsTable.id, Number(payment_id)), eq(bookingsTable.user_id, Number(user_id)))
+                                : eq(bookingsTable.id, Number(payment_id));
+
+                const rows = await anyDb
+                        .select({
+                                booking: bookingsTable,
+                                duration_min: moviesTable.duration_min,
+                                package_name: pkgsTable.name,
+                                movie_title: bookingsTable.movie_title,
+                                movie_duration: bookingsTable.movie_duration,
+                                // Branch fields for email
+                                branch_name: branchesTable.name,
+                                branch_address: branchesTable.address,
+                                branch_phone: branchesTable.phone,
+                                branch_settings: branchesTable.settings
+                        })
+                        .from(bookingsTable)
+                        .leftJoin(moviesTable, eq(bookingsTable.movie_id, moviesTable.id))
+                        .leftJoin(pkgsTable, eq(bookingsTable.ticket_package_id, pkgsTable.id))
+                        .leftJoin(branchesTable, eq(bookingsTable.branch_id, branchesTable.id))
+                        .where(whereClause)
+                        .limit(1);
+
+                const result = rows[0];
+                if (!result) return { status: 404, message: 'Không tìm thấy đặt vé.' };
+
+                const { booking } = result;
+                let bookingCode = booking.booking_code;
+                const isPaid = String(payment_status).toLowerCase() === 'paid';
+                const isAlreadyPaid = String(booking.payment_status).toLowerCase() === 'paid';
+
+                // 2. Logic tạo mã vé
+                if (isPaid && !bookingCode) {
+                        bookingCode = await generateBookingCode(anyDb);
+                }
+
+                // Bảo vệ: Nếu đơn đã thanh toán (isAlreadyPaid) mà request gửi lên là failed
+                // => Chặn update, trả về thông báo để Client xử lý (Alert "Đã thanh toán" thay vì "Đã hủy")
+                if (isAlreadyPaid && payment_status === 'failed') {
+                        return {
+                                status: 409, // Conflict
+                                message: 'Giao dịch đã được thanh toán thành công',
+                                booking: booking
+                        };
+                }
+
+                // 3. Chuẩn bị payload update
+                const now = new Date();
+                const updatePayload: any = {
+                        payment_status,
+                        updated_at: formatDateForDb(now),
+                        transaction_id: transaction_id ?? booking.transaction_id
+                };
+
+                if (isPaid) {
+                        const paidAtDate = paid_at ? new Date(paid_at) : new Date();
+                        const validPaidAt = isNaN(paidAtDate.getTime()) ? new Date() : paidAtDate;
+
+                        // Fetch branch settings for ticket expiry days
+                        let branchSettings: any = {};
+                        if (booking.branch_id) {
+                                const branch = await anyDb.query.branches.findFirst({
+                                        where: and(eq(branchesTable.id, booking.branch_id), isNull(branchesTable.deleted_at))
+                                });
+                                if (branch) {
+                                        try {
+                                                branchSettings = branch.settings ? JSON.parse(branch.settings) : {};
+                                        } catch (e) {
+                                                branchSettings = {};
+                                        }
+                                }
+                        }
+
+                        // Use branch ticket_expiry_days setting, default to 10 days if not set
+                        const expiryDays = branchSettings.ticket_expiry_days || 10;
+                        updatePayload.paid_at = formatDateForDb(validPaidAt);
+                        updatePayload.expiry_date = formatDateForDb(new Date(validPaidAt.getTime() + expiryDays * 24 * 60 * 60 * 1000));
+                        updatePayload.booking_code = bookingCode;
+                }
+
+                // 4. Update và lấy kết quả mới nhất
+                const updatedRes = await anyDb
+                        .update(bookingsTable)
+                        .set(updatePayload)
+                        .where(eq(bookingsTable.id, booking.id))
+                        .returning();
+
+                const updatedBooking = Array.isArray(updatedRes) ? updatedRes[0] : updatedRes;
+
+                // 5b. Redeem Voucher + VR booking logic (only if paid)
+                if (isPaid && !isAlreadyPaid) {
+                        // Redeem voucher (if used)
+                        if (booking.voucher_id && vouchersTable && logsTable) {
+                                try {
+                                        const originalTotal = Number(booking.original_total_price || booking.total_price || 0);
+                                        const finalTotal = Number(booking.total_price || 0);
+                                        const discAmt = Number(booking.voucher_discount_amount || 0);
+                                        await redeemVoucherAfterPaymentImpl(anyDb, { vouchers: vouchersTable, voucher_redemption_logs: logsTable, bookings: bookingsTable }, {
+                                                voucher_id: Number(booking.voucher_id),
+                                                booking_id: booking.id,
+                                                user_id: booking.user_id ? Number(booking.user_id) : undefined,
+                                                discount_amount_applied: discAmt > 0 ? discAmt : Math.max(0, originalTotal - finalTotal),
+                                                order_total_before_discount: originalTotal > 0 ? originalTotal : finalTotal + discAmt,
+                                                order_total_after_discount: finalTotal
+                                        });
+                                } catch (e) {
+                                        console.error('[updatePayment] Redeem voucher lỗi (không rollback, booking đã paid)', e);
+                                }
+                        }
+                }
+
+                // 5. Gửi mail (Chỉ khi thanh toán thành công)
+                if (isPaid) {
+                        // Determine booking_type
+                        const isVR = booking.booking_type === 'vr';
+                        // Sử dụng mailQueue để gửi mail ngầm, không chặn response
+                        mailQueue.add(
+                                async () => {
+                                        try {
+                                                let vr_items: any[] = [];
+                                                if (isVR && vrItemsTable) {
+                                                        try {
+                                                                vr_items = await anyDb.query.booking_vr_items.findMany({
+                                                                        where: eq(vrItemsTable.booking_id, booking.id)
+                                                                });
+                                                        } catch {}
+                                                }
+
+                                                if (isVR) {
+                                                        // === VR-specific email ===
+                                                        const originalTotal = Number(booking.original_total_price || booking.total_price || 0);
+                                                        const discountAmt = Number(booking.voucher_discount_amount || 0);
+                                                        const totalVR = Number(booking.total_price || 0);
+                                                        const listVRHtml = (vr_items.length > 0 ? vr_items : []).map((it: any) => `
+                                                                <tr>
+                                                                        <td style="padding:10px;border-bottom:1px solid #eee;">${it.package_name || 'Gói VR'}</td>
+                                                                        <td style="padding:10px;border-bottom:1px solid #eee;text-align:center;">${it.quantity || 1}</td>
+                                                                        <td style="padding:10px;border-bottom:1px solid #eee;text-align:right;">${(Number(it.unit_price) * (it.quantity || 1)).toLocaleString('vi-VN')}đ</td>
+                                                                        <td style="padding:10px;border-bottom:1px solid #eee;text-align:right;">${Number(it.line_total || (Number(it.discounted_unit_price || it.unit_price) * (it.quantity || 1))).toLocaleString('vi-VN')}đ</td>
+                                                                </tr>
+                                                        `).join('');
+                                                        const html = `
+                                                                <div style="font-family:Arial,sans-serif;max-width:640px;margin:auto;padding:20px;color:#222;">
+                                                                        <h2 style="color:#7c3aed;text-align:center;">🎮 CINESPHERE - XÁC NHẬN ĐẶT TRẢI NGHIỆM VR</h2>
+                                                                        <p>Xin chào <b>${booking.name || 'Khách hàng'}</b>, cảm ơn bạn đã trải nghiệm VR tại CineSphere!</p>
+                                                                        <div style="background:#f8fafc;padding:15px;border-radius:8px;margin:15px 0;">
+                                                                                <p style="margin:6px 0;"><b>Mã đơn:</b> ${bookingCode || ''}</p>
+                                                                                <p style="margin:6px 0;"><b>Liên hệ:</b> ${booking.phone} / ${booking.email}</p>
+                                                                                <p style="margin:6px 0;"><b>Ngày đặt:</b> ${new Date(booking.created_at).toLocaleString('vi-VN')}</p>
+                                                                                ${booking.voucher_code_snapshot ? `<p style="margin:6px 0;"><b>Voucher đã áp:</b> ${booking.voucher_code_snapshot} (giảm ${discountAmt.toLocaleString('vi-VN')}đ)</p>` : ''}
+                                                                                ${result.branch_name ? `<p style="margin:6px 0;"><b>Chi nhánh:</b> ${result.branch_name}${result.branch_address ? ' - ' + result.branch_address : ''}</p>` : ''}
+                                                                                ${updatedBooking?.expiry_date ? `<p style="margin:6px 0;"><b>Vui lòng sử dụng trước:</b> ${new Date(updatedBooking.expiry_date).toLocaleDateString('vi-VN')}</p>` : ''}
+                                                                        </div>
+                                                                        <h3 style="margin-top:20px;">Danh sách gói VR đã đặt</h3>
+                                                                        <table style="width:100%;border-collapse:collapse;margin-top:10px;">
+                                                                                <thead>
+                                                                                        <tr style="background:#f1f5f9;">
+                                                                                                <th style="padding:10px;text-align:left;">Gói</th>
+                                                                                                <th style="padding:10px;text-align:center;">SL</th>
+                                                                                                <th style="padding:10px;text-align:right;">Giá gốc</th>
+                                                                                                <th style="padding:10px;text-align:right;">Thành tiền</th>
+                                                                                        </tr>
+                                                                                </thead>
+                                                                                <tbody>
+                                                                                        ${listVRHtml}
+                                                                                </tbody>
+                                                                        </table>
+                                                                        <div style="margin-top:20px;text-align:right;">
+                                                                                ${discountAmt > 0 ? `<p style="margin:4px;">Tổng gốc: <b>${originalTotal.toLocaleString('vi-VN')}đ</b></p>` : ''}
+                                                                                ${discountAmt > 0 ? `<p style="margin:4px;color:#16a34a;">Giảm voucher: <b>- ${discountAmt.toLocaleString('vi-VN')}đ</b></p>` : ''}
+                                                                                <h3 style="color:#7c3aed;">Tổng thanh toán: ${totalVR.toLocaleString('vi-VN')}đ</h3>
+                                                                        </div>
+                                                                        <hr style="border:none;border-top:1px dashed #cbd5e1;margin:25px 0;">
+                                                                        <p style="font-size:13px;color:#64748b;text-align:center;">Hãy mang theo mã đơn hàng khi đến chi nhánh. Trân trọng!</p>
+                                                                </div>
+                                                        `;
+                                                        const mailer = sendMailFn;
+                                                        if (mailer) {
+                                                                await mailer(booking.email, `🎮 Xác nhận đặt trải nghiệm VR - CINESPHERE`, html);
+                                                                console.log(`[MailQueue] Đã gửi VR mail xác nhận cho booking ${booking.id}`);
+                                                        }
+                                                } else {
+                                                        // === Original MOVIE email ===
+                                                        const templateData = {
+                                                                bookingCode: bookingCode || '',
+                                                                customerName: booking.name || 'Khách hàng',
+                                                                movieTitle: booking.movie_title || '',
+                                                                ticketCount: booking.ticket_count,
+                                                                totalPrice: Number(booking.total_price).toLocaleString('vi-VN'),
+                                                                durationMin: booking.movie_duration,
+                                                                ticketPackageName: result.package_name,
+                                                                expiryDate: updatedBooking?.expiry_date,
+                                                                // Pass branch info to email template
+                                                                branchName: result.branch_name,
+                                                                branchAddress: result.branch_address,
+                                                                branchPhone: result.branch_phone,
+                                                                branchSettings: result.branch_settings
+                                                        };
+
+                                                        const emailTemplate = getBookingEmailHtml
+                                                                ? getBookingEmailHtml(templateData)
+                                                                : getBookingEmailTemplate(templateData);
+                                                        const mailer = sendMailFn;
+
+                                                        if (mailer) {
+                                                                await mailer(booking.email, `🎬 Xác nhận đặt vé - CINESPHERE`, emailTemplate);
+                                                                console.log(`[MailQueue] Đã gửi mail xác nhận cho booking ${booking.id}`);
+                                                        } else {
+                                                                console.warn('[Payments] No mailer provided, skipping confirmation email');
+                                                        }
+                                                }
+                                        } catch (err) {
+                                                console.error(`[MailQueue] Lỗi gửi mail cho booking ${booking.id}:`, err);
+                                                throw err;
+                                        }
+                                },
+                                {
+                                        db: anyDb,
+                                        recipient: booking.email,
+                                        subject: booking.booking_type === 'vr' ? '🎮 Xác nhận đặt trải nghiệm VR - CINESPHERE' : '🎬 Xác nhận đặt vé - CINESPHERE',
+                                        emailType: 'booking_confirmation',
+                                        userId: booking.user_id || undefined,
+                                        bookingId: booking.id,
+                                        emailLogsTable: tables?.email_logs
+                                },
+                                context
+                        );
+                }
+
+                return {
+                        status: 200,
+                        message:
+                                payment_status === 'failed'
+                                        ? 'Giao dịch đã được hủy thành công'
+                                        : 'Giao dịch đã xử lý xong (Mail đã được gửi tới khách hàng)',
+                        booking: updatedBooking
+                };
+        } catch (err: any) {
+                return {
+                        status: err?.status || 500,
+                        message: err?.message || 'Lỗi máy chủ nội bộ'
+                };
+        }
+}
+
+export async function getBookingImpl(anyDb: any, id: number, tables: { bookings: any }) {
+        const bookingsTable = tables.bookings;
+        const booking = await anyDb.query.bookings.findFirst({
+                where: eq(bookingsTable.id, id),
+                columns: {
+                        id: true,
+                        payment_status: true,
+                        total_price: true,
+                        ticket_count: true,
+                        created_at: true,
+                        name: true,
+                        email: true,
+                        phone: true,
+                        user_id: true,
+                        movie_id: true,
+                        ticket_package_id: true
+                }
+        });
+        if (!booking) return { status: 404, message: 'Không tìm thấy' };
+        return {
+                status: 200,
+                id: booking.id,
+                payment_status: booking.payment_status,
+                total_price: booking.total_price,
+                ticket_count: booking.ticket_count,
+                created_at: booking.created_at,
+                movie_id: booking.movie_id,
+                ticket_package_id: booking.ticket_package_id
+        };
+}
+
+export async function getBookingByIdImpl(
+        anyDb: any,
+        id: number,
+        tables: { bookings: any; movies: any; ticket_packages: any; branches: any }
+) {
+        const { bookings, movies, ticket_packages, branches } = tables;
+
+        // Sử dụng Join để lấy tất cả dữ liệu trong 1 Query duy nhất
+        const rows = await anyDb
+                .select({
+                        // Booking fields
+                        id: bookings.id,
+                        booking_code: bookings.booking_code,
+                        payment_status: bookings.payment_status,
+                        user_id: bookings.user_id,
+                        name: bookings.name,
+                        phone: bookings.phone,
+                        email: bookings.email,
+                        ticket_count: bookings.ticket_count,
+                        total_price: bookings.total_price,
+                        original_total_price: bookings.original_total_price,
+                        voucher_discount_amount: bookings.voucher_discount_amount,
+                        voucher_code_snapshot: bookings.voucher_code_snapshot,
+                        booking_type: bookings.booking_type,
+                        movie_id: bookings.movie_id,
+                        ticket_package_id: bookings.ticket_package_id,
+                        expiry_date: bookings.expiry_date,
+                        checked_in_at: bookings.checked_in_at,
+                        created_at: bookings.created_at,
+                        paid_at: bookings.paid_at,
+                        payment_method: bookings.payment_method,
+                        // Movie fields
+                        movie_title: bookings.movie_title,
+                        movie_image: bookings.movie_poster,
+                        duration_min: bookings.movie_duration,
+                        // Package fields
+                        ticket_package_name: bookings.ticket_package_name,
+                        // Branch fields
+                        branch_name: branches.name,
+                        branch_address: branches.address,
+                        branch_phone: branches.phone,
+                        branch_settings: branches.settings
+                })
+                .from(bookings)
+                .leftJoin(branches, eq(bookings.branch_id, branches.id))
+                .where(eq(bookings.id, id))
+                .limit(1);
+
+        const booking = rows[0];
+        if (!booking) {
+                return { status: 404, message: 'Không tìm thấy thông tin đặt vé' };
+        }
+
+        let vr_items: any[] = [];
+        if ((tables as any).booking_vr_items) {
+                try {
+                        vr_items = await anyDb
+                                .select()
+                                .from((tables as any).booking_vr_items)
+                                .where(eq((tables as any).booking_vr_items.booking_id, id));
+                } catch (e) {
+                        console.warn('Could not load booking_vr_items:', e);
+                }
+        }
+
+        return {
+                status: 200,
+                ...booking,
+                vr_items
+        };
+}
+
+export async function getBookingByCodeImpl(anyDb: any, codeRaw: string, tables: { bookings: any }) {
+        const code = String(codeRaw || '');
+        if (!code || code.trim() === '') return { status: 400, message: 'Thiếu mã vé' };
+        const normalizedCode = code.trim().toUpperCase();
+
+        // Extract exact CS + timestamp pattern if present
+        // Pattern: CS followed by 10 digits (timestamp in seconds) + 2 digits (random) = 12 digits total
+        const codeMatch = normalizedCode.match(/CS\d{12}/);
+        const exactCode = codeMatch ? codeMatch[0] : normalizedCode;
+
+        const bookingsTable = tables.bookings;
+        const booking = await anyDb.query.bookings.findFirst({
+                where: or(
+                        // Điều kiện 1: booking_code khớp
+                        eq(bookingsTable.booking_code, exactCode),
+
+                        // Điều kiện 2: pay_txt_code khớp VÀ method là vietqr
+                        and(eq(bookingsTable.pay_txt_code, exactCode), eq(bookingsTable.payment_method, 'vietqr'))
+                ),
+                with: {
+                        user: {
+                                columns: {
+                                        fullname: true
+                                }
+                        }
+                }
+        });
+        if (!booking) return { status: 404, message: 'Không tìm thấy vé' };
+        const now = new Date();
+        const paidAt = booking.paid_at ? new Date(booking.paid_at) : null;
+        const expiryAt = booking.expiry_date ? new Date(booking.expiry_date as any) : null;
+        const isPaid = (booking.payment_status || '').toLowerCase() === 'paid';
+        const expired = Boolean(expiryAt && now.getTime() > expiryAt.getTime());
+        const valid = Boolean(isPaid && paidAt && expiryAt && !expired && !booking.is_used);
+        const can_use = Boolean(valid);
+        const daysLeft = expiryAt ? Math.ceil((expiryAt.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)) : null;
+        let vr_items: any[] = [];
+        if ((tables as any).booking_vr_items) {
+                try {
+                        vr_items = await anyDb
+                                .select()
+                                .from((tables as any).booking_vr_items)
+                                .where(eq((tables as any).booking_vr_items.booking_id, booking.id));
+                } catch {}
+        }
+
+        return {
+                status: 200,
+                id: booking.id,
+                booking_code: booking.booking_code,
+                payment_status: booking.payment_status,
+                user_id: booking.user_id,
+                name: booking.name,
+                phone: booking.phone,
+                email: booking.email,
+                ticket_count: Number(booking.ticket_count),
+                total_price: Number(booking.total_price),
+                original_total_price: booking.original_total_price,
+                voucher_discount_amount: booking.voucher_discount_amount,
+                voucher_code_snapshot: booking.voucher_code_snapshot,
+                booking_type: booking.booking_type,
+                movie_id: booking.movie_id,
+                ticket_package_id: booking.ticket_package_id,
+                created_at: booking.created_at,
+                paid_at: booking.paid_at,
+                expiry_date: booking.expiry_date,
+                payment_method: booking.payment_method,
+                userName: booking.user?.fullname || '',
+                is_used: Boolean(booking.is_used),
+                movie_title: booking.movie_title || '',
+                movie_duration: booking.movie_duration || '',
+                movie_poster: booking.movie_poster || '',
+                ticket_package_name: booking.ticket_package_name || '',
+                ticket_unit_price: Number(booking.ticket_unit_price) || 0,
+                valid,
+                can_use,
+                pay_txt_code: booking.pay_txt_code,
+                validity_days: daysLeft,
+                expired,
+                checked_in_at: booking.checked_in_at,
+                vr_items
+        };
+}
+
+export async function confirmUseTicketImpl(
+        anyDb: any,
+        codeRaw: string,
+        tables: { bookings: any },
+        restrictToBranchIds: number[] | null = null
+) {
+        try {
+                const code = String(codeRaw || '');
+                if (!code || !code.trim()) return { status: 400, message: 'Vui lòng nhập mã vé' };
+                const normalizedCode = code.trim().toUpperCase();
+                const bookingsTable = tables.bookings;
+                const booking = await anyDb.query.bookings.findFirst({
+                        where:
+                                restrictToBranchIds && restrictToBranchIds.length > 0
+                                        ? and(eq(bookingsTable.booking_code, normalizedCode), inArray(bookingsTable.branch_id, restrictToBranchIds))
+                                        : eq(bookingsTable.booking_code, normalizedCode)
+                });
+
+                if (!booking) return { status: 404, message: 'Không tìm thấy vé' };
+
+                // Kiểm tra chi nhánh (RBAC)
+                if (restrictToBranchIds && restrictToBranchIds.length > 0) {
+                        if (!booking.branch_id || !restrictToBranchIds.includes(booking.branch_id)) {
+                                return { status: 403, message: 'Bạn không có quyền xác nhận vé thuộc chi nhánh khác' };
+                        }
+                }
+                const isPaid = (booking.payment_status || '').toLowerCase() === 'paid';
+                const paidAt = booking.paid_at ? new Date(booking.paid_at) : null;
+                const expiryAt = booking.expiry_date ? new Date(booking.expiry_date as any) : null;
+                const expired = Boolean(expiryAt && Date.now() > expiryAt.getTime());
+                const valid = Boolean(isPaid && paidAt && expiryAt && !expired && !booking.is_used);
+                if (!valid) return { status: 400, message: 'Vé không còn hiệu lực hoặc đã sử dụng' };
+                // Update booking (tương thích với D1/SQLite không hỗ trợ .returning())
+                const updatedRes = await anyDb
+                        .update(bookingsTable)
+                        .set({
+                                is_used: true,
+                                updated_at: formatDateForDb(new Date()),
+                                checked_in_at: formatDateForDb(new Date())
+                        })
+                        .where(eq(bookingsTable.id, booking.id))
+                        .returning();
+
+                const updated = Array.isArray(updatedRes) ? updatedRes[0] : updatedRes;
+
+                if (!updated) return { status: 500, message: 'Không thể cập nhật trạng thái vé' };
+                return {
+                        status: 200,
+                        message: 'Xác nhận sử dụng vé thành công',
+                        booking: { id: updated.id, is_used: updated.is_used }
+                };
+        } catch (err: any) {
+                const status = err?.status || 500;
+                const message = err?.message || 'Lỗi máy chủ nội bộ';
+                return { status, message };
+        }
+}
+
+>>>>>>> preview

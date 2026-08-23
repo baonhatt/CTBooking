@@ -13,6 +13,7 @@ export function isLocal(url: string): boolean {
 }
 
 /**
+<<<<<<< HEAD
  * Parses a media URL for local development. If the URL is a Cloudinary link and we are on LOCAL,
  * it maps to a local path and triggers a background download if the file is missing.
  */
@@ -49,10 +50,17 @@ export function parseMediaUrl(url: string | null | undefined, c: Context): strin
     }
   }
 
+=======
+ * Returns the media URL directly (preserves Cloudinary CDN URLs in all environments).
+ */
+export function parseMediaUrl(url: string | null | undefined, _c?: Context): string {
+  if (!url || typeof url !== 'string') return '';
+>>>>>>> preview
   return url;
 }
 
 /**
+<<<<<<< HEAD
  * Handles local file upload. Uses dynamic imports to avoid breaking Cloudflare Worker builds.
  */
 export async function localUploader(base64: string, folder: string): Promise<{ url: string }> {
@@ -112,4 +120,17 @@ export async function localDeleter(url: string): Promise<void> {
   } catch (err) {
     // Ignore errors in deletion in restricted environments
   }
+=======
+ * Legacy local uploader stub (all uploads now route to Cloudinary).
+ */
+export async function localUploader(base64: string, _folder: string): Promise<{ url: string }> {
+  return { url: base64 };
+}
+
+/**
+ * Legacy local deleter stub (no-op).
+ */
+export async function localDeleter(_url: string): Promise<void> {
+  // No-op for local deleter
+>>>>>>> preview
 }

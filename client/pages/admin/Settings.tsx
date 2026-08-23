@@ -1,6 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import AdminLayout from '@/admin/layouts/AdminLayout';
+<<<<<<< HEAD
+=======
+import { useStaffStore } from '@/store/staffStore';
+>>>>>>> preview
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
@@ -11,6 +15,10 @@ import {
         LayoutDashboard,
         Users,
         Clapperboard,
+<<<<<<< HEAD
+=======
+        CalendarClock,
+>>>>>>> preview
         Package,
         Ticket,
         CreditCard,
@@ -19,15 +27,39 @@ import {
         Mail,
         FileText
 } from 'lucide-react';
+<<<<<<< HEAD
 import { buildUrl } from '@/lib/api/http';
+=======
+import { buildUrl, request } from '@/lib/api/http';
+import { useStaffPermission } from '@/hooks/useStaffPermission';
+
+interface AdminSettingsResponse {
+        settings: {
+                hidden_tabs?: string[];
+                otp_settings?: {
+                        enable_2fa: boolean;
+                        otp_expiry_minutes: number;
+                        otp_length: number;
+                        otp_resend_cooldown_seconds: number;
+                        max_otp_attempts: number;
+                };
+        };
+}
+>>>>>>> preview
 
 const ALL_TABS = [
         { key: 'dashboard', label: 'Bảng điều khiển', icon: LayoutDashboard },
         { key: 'users', label: 'Người dùng', icon: Users },
         { key: 'movies', label: 'Phim', icon: Clapperboard },
+<<<<<<< HEAD
         { key: 'toys', label: 'Đồ chơi', icon: Package },
         { key: 'posts', label: 'Bài viết (Admin)', icon: FileText },
         { key: 'posts-user', label: 'Bài viết ở User', icon: FileText },
+=======
+        { key: 'showtimes', label: 'Lịch chiếu', icon: CalendarClock },
+        { key: 'toys', label: 'Đồ chơi', icon: Package },
+        { key: 'posts', label: 'Bài viết (Admin)', icon: FileText },
+>>>>>>> preview
         { key: 'tickets', label: 'Gói vé', icon: Ticket },
         { key: 'transactions', label: 'Giao dịch', icon: CreditCard },
         { key: 'ticket-check', label: 'Kiểm Tra Vé', icon: ScanLine },
@@ -37,6 +69,11 @@ const ALL_TABS = [
 
 export default function SettingsPage() {
         const navigate = useNavigate();
+<<<<<<< HEAD
+=======
+        const staff = useStaffStore((state) => state.staff);
+        const clearStaff = useStaffStore((state) => state.clearStaff);
+>>>>>>> preview
         const [adminEmail, setAdminEmail] = useState('');
         const [hiddenTabs, setHiddenTabs] = useState<string[]>(() => {
                 if (window.location.hostname !== 'localhost') return [];
@@ -51,11 +88,19 @@ export default function SettingsPage() {
                 max_otp_attempts: 5
         });
         const [isSyncing, setIsSyncing] = useState(false);
+<<<<<<< HEAD
+=======
+        const canManageSettings = useStaffPermission('settings', 'manage');
+>>>>>>> preview
 
         const isProd = window.location.hostname !== 'localhost';
 
         useEffect(() => {
+<<<<<<< HEAD
                 setAdminEmail(localStorage.getItem('adminEmail') || 'admin@email.com');
+=======
+                setAdminEmail(staff?.email || 'admin@email.com');
+>>>>>>> preview
 
                 // Sync with server if in production
                 if (isProd) {
@@ -65,8 +110,12 @@ export default function SettingsPage() {
 
         const fetchSettings = async () => {
                 try {
+<<<<<<< HEAD
                         const res = await fetch(buildUrl('/api/admin/settings'));
                         const data = await res.json();
+=======
+                        const data = await request<AdminSettingsResponse>('/api/admin/settings');
+>>>>>>> preview
                         if (data && data.settings) {
                                 if (Array.isArray(data.settings)) {
                                         // Old format: just hidden tabs
@@ -87,12 +136,17 @@ export default function SettingsPage() {
         };
 
         const handleToggleTab = async (key: string) => {
+<<<<<<< HEAD
                 if (key === 'posts' || key === 'posts-user') {
                         const password = window.prompt("Nhập mật khẩu để thay đổi cài đặt Bài viết:");
                         if (password !== 'nhat123') {
                                 alert("Mật khẩu không đúng!");
                                 return;
                         }
+=======
+                if (!canManageSettings) {
+                        return;
+>>>>>>> preview
                 }
 
                 const newHidden = hiddenTabs.includes(key) ? hiddenTabs.filter((k) => k !== key) : [...hiddenTabs, key];
@@ -108,6 +162,10 @@ export default function SettingsPage() {
         };
 
         const handleSaveOtpSettings = async () => {
+<<<<<<< HEAD
+=======
+                if (!canManageSettings) return;
+>>>>>>> preview
                 await saveSettings(hiddenTabs, otpSettings);
         };
 
@@ -116,9 +174,14 @@ export default function SettingsPage() {
                 if (isProd) {
                         setIsSyncing(true);
                         try {
+<<<<<<< HEAD
                                 await fetch(buildUrl('/api/admin/settings'), {
                                         method: 'POST',
                                         headers: { 'Content-Type': 'application/json' },
+=======
+                                await request('/api/admin/settings', {
+                                        method: 'POST',
+>>>>>>> preview
                                         body: JSON.stringify({
                                                 hidden_tabs: newHidden,
                                                 otp_settings: newOtpSettings
@@ -133,6 +196,7 @@ export default function SettingsPage() {
         };
 
         const handleLogout = () => {
+<<<<<<< HEAD
                 localStorage.removeItem('adminToken');
                 localStorage.removeItem('adminEmail');
                 window.dispatchEvent(new Event('admin-auth-changed'));
@@ -141,12 +205,31 @@ export default function SettingsPage() {
 
         return (
                 <AdminLayout active="settings" setActive={() => { }} adminEmailState={adminEmail} handleLogout={handleLogout}>
+=======
+                localStorage.removeItem('staffToken');
+                clearStaff();
+                navigate('/login');
+        };
+
+        return (
+                <AdminLayout
+                        active="settings"
+                        setActive={() => { }}
+                        adminEmailState={staff?.email || 'admin@email.com'}
+                        handleLogout={handleLogout}
+                >
+>>>>>>> preview
                         <div className="space-y-6 max-w-5xl mx-auto">
                                 {/* Header */}
                                 <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-2">
                                         <div className="flex items-center gap-4">
+<<<<<<< HEAD
                                                 <div className="w-14 h-14 bg-slate-900 rounded-2xl flex items-center justify-center shadow-2xl shadow-slate-200">
                                                         <SettingsIcon size={28} className="text-white" />
+=======
+                                                <div className="w-14 h-14 bg-blue-50 rounded-2xl flex items-center justify-center shadow-lg shadow-blue-100">
+                                                        <SettingsIcon size={28} className="text-blue-600" />
+>>>>>>> preview
                                                 </div>
                                                 <div>
                                                         <h1 className="text-3xl font-black text-slate-900 tracking-tight leading-none mb-1">Cấu hình Hệ thống</h1>
@@ -221,6 +304,10 @@ export default function SettingsPage() {
                                                                                                 </div>
                                                                                                 <Switch
                                                                                                         checked={!isHidden}
+<<<<<<< HEAD
+=======
+                                                                                                        disabled={!canManageSettings}
+>>>>>>> preview
                                                                                                         onCheckedChange={() => handleToggleTab(tab.key)}
                                                                                                         className="data-[state=checked]:bg-blue-600"
                                                                                                         onClick={(e) => e.stopPropagation()}
@@ -234,15 +321,24 @@ export default function SettingsPage() {
 
                                                 {/* OTP Settings Card */}
                                                 <Card className="border-none shadow-2xl shadow-slate-200/50 rounded-[2rem] overflow-hidden bg-white">
+<<<<<<< HEAD
                                                         <div className="p-8 bg-gradient-to-br from-purple-900 via-purple-800 to-purple-900 text-white relative overflow-hidden">
                                                                 <div className="absolute top-0 right-0 w-64 h-64 bg-purple-500/10 rounded-full -translate-y-1/2 translate-x-1/2 blur-3xl" />
                                                                 <div className="relative z-10 flex items-center gap-4">
                                                                         <div className="p-3 bg-white/10 backdrop-blur-md rounded-2xl border border-white/10">
                                                                                 <Mail size={24} className="text-purple-400" />
+=======
+                                                        <div className="p-8 bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 text-white relative overflow-hidden">
+                                                                <div className="absolute top-0 right-0 w-64 h-64 bg-blue-500/10 rounded-full -translate-y-1/2 translate-x-1/2 blur-3xl" />
+                                                                <div className="relative z-10 flex items-center gap-4">
+                                                                        <div className="p-3 bg-white/10 backdrop-blur-md rounded-2xl border border-white/10">
+                                                                                <Mail size={24} className="text-blue-400" />
+>>>>>>> preview
                                                                         </div>
                                                                         <div>
                                                                                 <CardTitle className="text-2xl font-black tracking-tight">Cấu hình OTP / 2FA</CardTitle>
                                                                                 <div className="flex items-center gap-2 mt-1">
+<<<<<<< HEAD
                                                                                         <p className="text-slate-400 text-sm font-medium">
                                                                                                 Bật xác thực 2 lớp cho đăng nhập người dùng
                                                                                         </p>
@@ -250,6 +346,13 @@ export default function SettingsPage() {
                                                                                                 <Badge
                                                                                                         variant="outline"
                                                                                                         className={`ml-2 text-[10px] ${isSyncing ? 'animate-pulse bg-purple-500/10 text-purple-400 border-purple-400/20' : 'bg-green-500/10 text-green-400 border-green-400/20'}`}
+=======
+                                                                                        <p className="text-slate-400 text-sm font-medium">Bật xác thực 2 lớp cho đăng nhập người dùng</p>
+                                                                                        {isProd && (
+                                                                                                <Badge
+                                                                                                        variant="outline"
+                                                                                                        className={`ml-2 text-[10px] ${isSyncing ? 'animate-pulse bg-blue-500/10 text-blue-400 border-blue-400/20' : 'bg-green-500/10 text-green-400 border-green-400/20'}`}
+>>>>>>> preview
                                                                                                 >
                                                                                                         {isSyncing ? 'Đang lưu...' : 'Đã đồng bộ Cloud'}
                                                                                                 </Badge>
@@ -269,8 +372,14 @@ export default function SettingsPage() {
                                                                         </div>
                                                                         <Switch
                                                                                 checked={otpSettings.enable_2fa}
+<<<<<<< HEAD
                                                                                 onCheckedChange={(checked) => setOtpSettings({ ...otpSettings, enable_2fa: checked })}
                                                                                 className="data-[state=checked]:bg-purple-600"
+=======
+                                                                                disabled={!canManageSettings}
+                                                                                onCheckedChange={(checked) => setOtpSettings({ ...otpSettings, enable_2fa: checked })}
+                                                                                className="data-[state=checked]:bg-[#2563EB]"
+>>>>>>> preview
                                                                         />
                                                                 </div>
 
@@ -283,7 +392,13 @@ export default function SettingsPage() {
                                                                                         min={1}
                                                                                         max={60}
                                                                                         value={otpSettings.otp_expiry_minutes}
+<<<<<<< HEAD
                                                                                         onChange={(e) => setOtpSettings({ ...otpSettings, otp_expiry_minutes: parseInt(e.target.value) || 5 })}
+=======
+                                                                                        onChange={(e) =>
+                                                                                                setOtpSettings({ ...otpSettings, otp_expiry_minutes: parseInt(e.target.value) || 5 })
+                                                                                        }
+>>>>>>> preview
                                                                                         className="mt-2"
                                                                                 />
                                                                                 <p className="text-sm text-slate-500 mt-1">OTP sẽ hết hạn sau số phút này</p>
@@ -309,7 +424,13 @@ export default function SettingsPage() {
                                                                                         min={10}
                                                                                         max={300}
                                                                                         value={otpSettings.otp_resend_cooldown_seconds}
+<<<<<<< HEAD
                                                                                         onChange={(e) => setOtpSettings({ ...otpSettings, otp_resend_cooldown_seconds: parseInt(e.target.value) || 30 })}
+=======
+                                                                                        onChange={(e) =>
+                                                                                                setOtpSettings({ ...otpSettings, otp_resend_cooldown_seconds: parseInt(e.target.value) || 30 })
+                                                                                        }
+>>>>>>> preview
                                                                                         className="mt-2"
                                                                                 />
                                                                                 <p className="text-sm text-slate-500 mt-1">Thời gian chờ giữa các lần gửi lại</p>
@@ -322,7 +443,13 @@ export default function SettingsPage() {
                                                                                         min={3}
                                                                                         max={10}
                                                                                         value={otpSettings.max_otp_attempts}
+<<<<<<< HEAD
                                                                                         onChange={(e) => setOtpSettings({ ...otpSettings, max_otp_attempts: parseInt(e.target.value) || 5 })}
+=======
+                                                                                        onChange={(e) =>
+                                                                                                setOtpSettings({ ...otpSettings, max_otp_attempts: parseInt(e.target.value) || 5 })
+                                                                                        }
+>>>>>>> preview
                                                                                         className="mt-2"
                                                                                 />
                                                                                 <p className="text-sm text-slate-500 mt-1">Số lần nhập sai tối đa trước khi khóa</p>
@@ -331,8 +458,13 @@ export default function SettingsPage() {
 
                                                                 <button
                                                                         onClick={handleSaveOtpSettings}
+<<<<<<< HEAD
                                                                         disabled={isSyncing}
                                                                         className="w-full py-3 bg-purple-600 hover:bg-purple-700 text-white font-semibold rounded-xl transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+=======
+                                                                        disabled={isSyncing || !canManageSettings}
+                                                                        className="w-full py-3 bg-[#2563EB] hover:bg-blue-700 text-white font-semibold rounded-xl transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+>>>>>>> preview
                                                                 >
                                                                         {isSyncing ? 'Đang lưu...' : 'Lưu cài đặt OTP'}
                                                                 </button>

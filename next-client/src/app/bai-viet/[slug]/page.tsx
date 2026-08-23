@@ -3,28 +3,66 @@ import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { ArrowLeft, Eye } from 'lucide-react';
 import UserLayout from '@/layouts/UserLayout';
+<<<<<<< HEAD
 import { getPostBySlugId, getPublicPosts } from '@/lib/api/posts';
 import { buildPostHref } from '@/lib/utils';
 import PostSidebar from './PostSidebar';
 
 export const runtime = 'edge';
 export const revalidate = 3600;
+=======
+import { getPostBySlugId, getPublicPosts, type PostItem } from '@/lib/api/posts';
+import { buildPostHref } from '@/lib/utils';
+import PostSidebar from './PostSidebar';
+import PostViewIncrementor from './PostViewIncrementor';
+>>>>>>> preview
 
 import { siteConfig } from '@/config/site';
 
 const SITE_URL = siteConfig.domain;
 
+<<<<<<< HEAD
 export async function generateMetadata({
         params,
 }: {
         params: { slug: string };
 }): Promise<Metadata> {
+=======
+export async function generateStaticParams() {
+        try {
+                const pageSize = 100;
+                let page = 1;
+                let posts: Array<PostItem> = [];
+                let total = 0;
+
+                do {
+                        const res = await getPublicPosts({ page, pageSize });
+                        const fetchedItems = res.items ?? [];
+                        const filtered = fetchedItems.filter((p) => p.status === 'published');
+                        posts = [...posts, ...filtered];
+                        total = res.total;
+                        page += 1;
+                        if (fetchedItems.length < pageSize) break;
+                } while (posts.length < total);
+
+                return posts.map((post) => ({ slug: post.slug ? `${post.slug}-${post.id}` : String(post.id) }));
+        } catch {
+                return [];
+        }
+}
+
+export async function generateMetadata({ params }: { params: { slug: string } }): Promise<Metadata> {
+>>>>>>> preview
         const post = await getPostBySlugId(params.slug).catch(() => null);
 
         if (!post || post.status !== 'published') {
                 return {
                         title: 'Bài Viết Không Tồn Tại',
+<<<<<<< HEAD
                         robots: { index: false, follow: false },
+=======
+                        robots: { index: false, follow: false }
+>>>>>>> preview
                 };
         }
 
@@ -45,16 +83,25 @@ export async function generateMetadata({
                         description,
                         type: 'article',
                         url: canonicalUrl,
+<<<<<<< HEAD
                         publishedTime: post.published_at,
                         modifiedTime: post.updated_at,
                         locale: 'vi_VN',
                         siteName: 'Cinesphere',
                         images: [{ url: ogImage, width: 1200, height: 630, alt: seoTitle }],
+=======
+                        publishedTime: post.published_at ? new Date(post.published_at).toISOString() : undefined,
+                        modifiedTime: post.updated_at ? new Date(post.updated_at).toISOString() : undefined,
+                        locale: 'vi_VN',
+                        siteName: 'Cinesphere',
+                        images: [{ url: ogImage, width: 1200, height: 630, alt: seoTitle }]
+>>>>>>> preview
                 },
                 twitter: {
                         card: 'summary_large_image',
                         title: seoTitle,
                         description,
+<<<<<<< HEAD
                         images: [ogImage],
                 },
         };
@@ -66,11 +113,24 @@ export default async function PostDetailPage({
         params: { slug: string };
 }) {
         const post = await getPostBySlugId(params.slug).catch(() => null);
+=======
+                        images: [ogImage]
+                }
+        };
+}
+
+export default async function PostDetailPage({ params }: { params: { slug: string } }) {
+        const [post, allPostsRes] = await Promise.all([
+                getPostBySlugId(params.slug).catch(() => null),
+                getPublicPosts({ page: 1, pageSize: 13 }).catch(() => null),
+        ]);
+>>>>>>> preview
 
         if (!post || post.status !== 'published') {
                 notFound();
         }
 
+<<<<<<< HEAD
         const relatedPosts = await getPublicPosts({ page: 1, pageSize: 12 })
                 .then((r) =>
                         r.items
@@ -78,6 +138,11 @@ export default async function PostDetailPage({
                                 .slice(0, 3)
                 )
                 .catch(() => []);
+=======
+        const relatedPosts = (allPostsRes?.items ?? [])
+                .filter((p) => p.status === 'published' && p.id !== post.id)
+                .slice(0, 3);
+>>>>>>> preview
 
         const postUrl = `${SITE_URL}${buildPostHref(post)}`;
 
@@ -88,19 +153,47 @@ export default async function PostDetailPage({
                 description: post.meta_description?.trim() || post.excerpt?.trim() || '',
                 keywords: post.meta_keywords || '',
                 image: post.og_image || post.featured_image || `${SITE_URL}/logo.svg`,
+<<<<<<< HEAD
                 datePublished: post.published_at || post.created_at,
                 dateModified: post.updated_at || post.published_at || post.created_at,
+=======
+                datePublished: post.published_at
+                        ? new Date(post.published_at).toISOString()
+                        : post.created_at
+                                ? new Date(post.created_at).toISOString()
+                                : undefined,
+                dateModified: post.updated_at
+                        ? new Date(post.updated_at).toISOString()
+                        : post.published_at
+                                ? new Date(post.published_at).toISOString()
+                                : undefined,
+>>>>>>> preview
                 author: { '@type': 'Organization', name: 'Cinesphere', url: SITE_URL },
                 publisher: {
                         '@type': 'Organization',
                         name: 'Cinesphere',
+<<<<<<< HEAD
                         logo: { '@type': 'ImageObject', url: `${SITE_URL}/logo.svg` },
                 },
                 mainEntityOfPage: { '@type': 'WebPage', '@id': postUrl },
+=======
+                        logo: { '@type': 'ImageObject', url: `${SITE_URL}/logo.svg` }
+                },
+                mainEntityOfPage: { '@type': 'WebPage', '@id': postUrl },
+                breadcrumb: {
+                        '@type': 'BreadcrumbList',
+                        itemListElement: [
+                                { '@type': 'ListItem', position: 1, name: 'Trang chủ', item: SITE_URL },
+                                { '@type': 'ListItem', position: 2, name: 'Tin tức', item: `${SITE_URL}/bai-viet` },
+                                { '@type': 'ListItem', position: 3, name: post.title, item: postUrl },
+                        ],
+                },
+>>>>>>> preview
         };
 
         return (
                 <UserLayout className="bg-gradient-dark">
+<<<<<<< HEAD
                         <script
                                 type="application/ld+json"
                                 dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
@@ -108,6 +201,13 @@ export default async function PostDetailPage({
                         <main className="pb-16">
                                 {/* Back button */}
                                 <div className="container mx-auto px-4 md:px-6 lg:px-8 pt-20 md:pt-24">
+=======
+                        <PostViewIncrementor postId={post.id} />
+                        <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
+                        <main className="pb-16">
+                                {/* Back button */}
+                                <div className="container mx-auto px-4 md:px-6 lg:px-8 pt-28 md:pt-36">
+>>>>>>> preview
                                         <Link
                                                 href="/bai-viet"
                                                 className="inline-flex items-center gap-2 text-slate-300 hover:text-white hover:bg-white/10 bg-transparent px-3 py-2 rounded-md transition-colors text-sm"
@@ -140,11 +240,17 @@ export default async function PostDetailPage({
                                                                 Bài Viết
                                                         </span>
                                                         <span className="text-slate-300 text-xs uppercase tracking-widest font-semibold">
+<<<<<<< HEAD
                                                                 {new Date(
                                                                         post.published_at || post.created_at || Date.now()
                                                                 ).toLocaleDateString('vi-VN', {
                                                                         month: 'long',
                                                                         year: 'numeric',
+=======
+                                                                {new Date(post.published_at || post.created_at || Date.now()).toLocaleDateString('vi-VN', {
+                                                                        month: 'long',
+                                                                        year: 'numeric'
+>>>>>>> preview
                                                                 })}
                                                         </span>
                                                 </div>
@@ -179,17 +285,25 @@ export default async function PostDetailPage({
                                                                                 __html: (post.content || '').replace(
                                                                                         /<img(?![^>]*\balt=)([^>]*)(\/?>)/gi,
                                                                                         `<img alt="${post.title}"$1$2`
+<<<<<<< HEAD
                                                                                 ),
+=======
+                                                                                )
+>>>>>>> preview
                                                                         }}
                                                                 />
                                                         </div>
                                                 </article>
 
+<<<<<<< HEAD
                                                 <PostSidebar
                                                         postId={post.id}
                                                         postTitle={post.title}
                                                         postUrl={postUrl}
                                                 />
+=======
+                                                <PostSidebar postId={post.id} postTitle={post.title} postUrl={postUrl} />
+>>>>>>> preview
                                         </div>
                                 </div>
 
@@ -214,9 +328,13 @@ export default async function PostDetailPage({
                                                                                 )}
                                                                                 <p className="text-white font-bold line-clamp-2">{item.title}</p>
                                                                                 <p className="text-slate-400 text-xs mt-2">
+<<<<<<< HEAD
                                                                                         {new Date(
                                                                                                 item.published_at || item.created_at || Date.now()
                                                                                         ).toLocaleDateString('vi-VN')}
+=======
+                                                                                        {new Date(item.published_at || item.created_at || Date.now()).toLocaleDateString('vi-VN')}
+>>>>>>> preview
                                                                                 </p>
                                                                         </Link>
                                                                 ))}

@@ -3,8 +3,19 @@ import { getToys, deleteToyApi } from '@/lib/api';
 import AdminLayout from '@/admin/layouts/AdminLayout';
 import ToysContent from '@/components/admin/content/ToysContent';
 import AdminEditModal from '@/components/admin/AdminEditModal';
+<<<<<<< HEAD
 
 export default function ToysPage() {
+=======
+import { useStaffStore } from '@/store/staffStore';
+import { useNavigate } from 'react-router-dom';
+
+export default function ToysPage() {
+        const navigate = useNavigate();
+        const staff = useStaffStore((state) => state.staff);
+        const clearStaff = useStaffStore((state) => state.clearStaff);
+        const [activeTab, setActiveTab] = useState('toys');
+>>>>>>> preview
         const [toys, setToys] = useState<any[]>([]);
         const [totalToys, setTotalToys] = useState(0);
         const [toysPage, setToysPage] = useState(1);
@@ -85,6 +96,7 @@ export default function ToysPage() {
                 setIsLoading(false);
         };
 
+<<<<<<< HEAD
         return (
                 <AdminLayout
                         active={'toys' as any}
@@ -96,6 +108,20 @@ export default function ToysPage() {
                                 window.dispatchEvent(new Event('admin-auth-changed'));
                                 window.location.href = '/';
                         }}
+=======
+        const handleLogout = () => {
+                localStorage.removeItem('staffToken');
+                clearStaff();
+                navigate('/login');
+        };
+
+        return (
+                <AdminLayout
+                        active={activeTab as any}
+                        setActive={setActiveTab as any}
+                        adminEmailState={staff?.email || 'admin@email.com'}
+                        handleLogout={handleLogout}
+>>>>>>> preview
                 >
                         <ToysContent
                                 data={toys}

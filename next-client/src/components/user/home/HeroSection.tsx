@@ -2,6 +2,7 @@
 
 import { useMemo, useState, useEffect, useRef, useCallback } from 'react';
 import { LazyMotion, domAnimation, m, AnimatePresence, useMotionValue, useSpring, useTransform } from 'framer-motion';
+<<<<<<< HEAD
 import { Play, Sparkles, Waves, Clock, Star, Calendar, Ticket } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -13,6 +14,29 @@ import { Button } from '@/components/ui/button';
 // Local static assets served from Next.js public/ folder
 const heroImage1 = '/images/1.webp';
 const heroImage9 = '/images/9.webp';
+=======
+import { Play, Sparkles, Waves, Clock, Star, Calendar, Ticket, Gamepad2 } from 'lucide-react';
+import { useRouter, useSearchParams } from 'next/navigation';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import {
+        AlertDialog,
+        AlertDialogAction,
+        AlertDialogCancel,
+        AlertDialogContent,
+        AlertDialogDescription,
+        AlertDialogFooter,
+        AlertDialogHeader,
+        AlertDialogTitle
+} from '@/components/ui/alert-dialog';
+import { Checkbox } from '@/components/ui/checkbox';
+import { useQuery } from '@tanstack/react-query';
+import { movieStore } from '@/store/movieStore';
+import { getMovieById, getActiveMoviesToday } from '@/lib/api/movies';
+import { optimizeCloudinaryUrl, optimizeCloudinaryVideoUrl, getCloudinaryThumbnail } from '@/lib/utils';
+import { Button } from '@/components/ui/button';
+import { useBranch } from '@/hooks/useBranch';
+import { setCookie } from '@/lib/cookies';
+>>>>>>> preview
 
 export default function HeroSection({
         initialMovies = [],
@@ -53,20 +77,37 @@ export default function HeroSection({
                 pointerY.set(y);
         };
 
+<<<<<<< HEAD
         const [currentPosterIndex, setCurrentPosterIndex] = useState(0);
+=======
+>>>>>>> preview
         const videoRef = useRef<HTMLVideoElement>(null);
         const videoContainerRef = useRef<HTMLDivElement>(null);
         const [isVideoPlaying, setIsVideoPlaying] = useState(false);
         const router = useRouter();
+<<<<<<< HEAD
+=======
+        const searchParams = useSearchParams();
+>>>>>>> preview
         const [selectedMovieId, setSelectedMovieId] = useState<number | null>(null);
         const [isModalOpen, setIsModalOpen] = useState(false);
         const [isLoadingDetails, setIsLoadingDetails] = useState(false);
         const [storeUpdateTrigger, setStoreUpdateTrigger] = useState(0);
+<<<<<<< HEAD
         const SECTION_ID = 'hero-main';
+=======
+        const [showBranchConfirmDialog, setShowBranchConfirmDialog] = useState(false);
+        const SECTION_ID = 'hero-main';
+        const { selectedBranch, dontShowConfirm, toggleDontShowConfirm } = useBranch();
+>>>>>>> preview
 
         // Prefetch booking page để tránh lag khi user bấm đặt vé
         useEffect(() => {
                 router.prefetch('/booking');
+<<<<<<< HEAD
+=======
+                router.prefetch('/vr');
+>>>>>>> preview
         }, [router]);
 
         const [isDesktopHero, setIsDesktopHero] = useState(false);
@@ -88,6 +129,7 @@ export default function HeroSection({
         );
 
         const [hasStarted, setHasStarted] = useState(false);
+<<<<<<< HEAD
         const moviePosters = useMemo(() => [heroImage1, heroImage9], []);
         const movies = initialMovies;
 
@@ -125,6 +167,15 @@ export default function HeroSection({
                 }, 5000);
                 return () => clearInterval(interval);
         }, [moviePosters.length]);
+=======
+
+        const { data: movies = initialMovies } = useQuery({
+                queryKey: ['activeMovies', selectedBranch?.id],
+                queryFn: () => getActiveMoviesToday(selectedBranch?.id),
+                initialData: initialMovies,
+                staleTime: 0 // Fetch real-time data when branch changes
+        });
+>>>>>>> preview
 
         useEffect(() => {
                 const video = videoRef.current;
@@ -221,11 +272,28 @@ export default function HeroSection({
                                                         poster: movie.cover_image
                                                 })
                                         );
+<<<<<<< HEAD
+=======
+                                        setCookie('selected_branch_id', String(selectedBranch?.id ?? ''), 60 * 60 * 24 * 30);
+>>>>>>> preview
                                 }
                         } catch { }
                 }
                 setIsModalOpen(false);
+<<<<<<< HEAD
                 router.push('/booking');
+=======
+
+                // Show branch confirmation dialog if not disabled
+                if (!dontShowConfirm && selectedBranch) {
+                        setShowBranchConfirmDialog(true);
+                        return;
+                }
+
+                const params = new URLSearchParams(searchParams.toString());
+                setCookie('selected_branch_id', String(selectedBranch?.id ?? ''), 60 * 60 * 24 * 30);
+                router.push(`/booking${params.toString() ? `?${params.toString()}` : ''}`);
+>>>>>>> preview
         };
 
         const movieDetails = useMemo(() => {
@@ -237,6 +305,7 @@ export default function HeroSection({
                 <LazyMotion features={domAnimation} strict>
                         <section
                                 id="hero"
+<<<<<<< HEAD
                                 className="relative min-h-screen overflow-hidden bg-gradient-to-br from-[#050915] via-[#0b1226] to-[#0e1b3d] text-white pt-24"
                                 onMouseMove={isDesktopHero ? onMove : undefined}
                                 onMouseEnter={isDesktopHero ? onMouseEnter : undefined}
@@ -253,6 +322,24 @@ export default function HeroSection({
                                 />
 
                                 <div className="container mx-auto px-4 relative z-10 min-h-[calc(100vh-6rem)] flex flex-col justify-center py-20">
+=======
+                                className="relative min-h-[85vh] lg:min-h-screen overflow-hidden bg-gradient-to-b from-[#030712] via-[#070b1e] to-[#050915] text-white pt-16 sm:pt-24"
+                                onMouseMove={isDesktopHero ? onMove : undefined}
+                                onMouseEnter={isDesktopHero ? onMouseEnter : undefined}
+                        >
+                                <div className="absolute inset-0 bg-black/40">
+                                        <div className="absolute inset-0 bg-[radial-gradient(circle_at_20%_20%,rgba(59,130,246,0.35),transparent_35%),radial-gradient(circle_at_80%_30%,rgba(236,72,153,0.25),transparent_40%),radial-gradient(circle_at_50%_70%,rgba(34,211,238,0.3),transparent_35%)]" />
+                                        <div className="absolute inset-0 bg-gradient-to-b from-transparent via-[#050915]/60 to-[#050915]" />
+                                </div>
+
+                                <div className="absolute -left-24 top-10 w-[520px] h-[520px] rounded-full bg-cyan-500/15 blur-[120px] animate-pulse pointer-events-none" />
+                                <m.div
+                                        className="absolute -right-16 top-32 w-[420px] h-[420px] rounded-full bg-fuchsia-500/15 blur-[120px] pointer-events-none"
+                                        style={{ x: blobX, y: blobY, translateZ: 0 }}
+                                />
+
+                                <div className="container mx-auto px-4 relative z-10 min-h-[calc(85vh-4rem)] lg:min-h-[calc(100vh-6rem)] flex flex-col justify-center py-8 sm:py-20">
+>>>>>>> preview
                                         <div className="grid lg:grid-cols-2 gap-10 lg:gap-12 items-center">
                                                 <m.div
                                                         initial={{ opacity: 0, x: -30 }}
@@ -278,8 +365,13 @@ export default function HeroSection({
                                                                 transition={{ delay: 0.4 }}
                                                                 className="text-lg md:text-xl text-gray-200 leading-relaxed max-w-2xl"
                                                         >
+<<<<<<< HEAD
                                                                 Dùng không gian nhỏ mô phỏng thế giới vô biên. Mỗi suất chiếu là một hành trình nhập vai với độ phân giải
                                                                 8K và âm thanh đa tầng bao quanh
+=======
+                                                                Dùng không gian nhỏ mô phỏng thế giới vô biên. Mỗi suất chiếu là một hành trình nhập vai với độ phân
+                                                                giải 8K và âm thanh đa tầng bao quanh
+>>>>>>> preview
                                                         </m.p>
 
                                                         <m.div
@@ -289,7 +381,11 @@ export default function HeroSection({
                                                                 className="flex flex-wrap items-center gap-4 pt-2"
                                                         >
                                                                 <Button
+<<<<<<< HEAD
                                                                         className="group rounded-2xl px-9 py-8 text-base md:text-lg font-semibold bg-gradient-to-r from-cyan-400 via-blue-600 to-fuchsia-500 hover:from-fuchsia-500 hover:via-cyan-400 hover:to-blue-600 text-white shadow-[0_0_40px_rgba(59,130,246,0.6)] transition-all duration-500 hover:shadow-[0_0_60px_rgba(236,72,153,0.8)] hover:scale-105"
+=======
+                                                                        className="group rounded-xl px-8 py-6 text-sm sm:text-base font-bold bg-gradient-to-r from-cyan-500 via-blue-600 to-fuchsia-500 hover:from-fuchsia-500 hover:via-cyan-400 hover:to-blue-600 text-white shadow-[0_0_30px_rgba(6,182,212,0.4)] transition-all duration-500 hover:shadow-[0_0_50px_rgba(236,72,153,0.6)] hover:scale-[1.02] active:scale-95"
+>>>>>>> preview
                                                                         onClick={() => {
                                                                                 const bookingSection = document.getElementById('promotions');
                                                                                 bookingSection?.scrollIntoView({ behavior: 'smooth' });
@@ -297,7 +393,23 @@ export default function HeroSection({
                                                                 >
                                                                         <span className="flex items-center gap-2">
                                                                                 Đặt vé ngay
+<<<<<<< HEAD
                                                                                 <Play className="h-5 w-5 group-hover:translate-x-1 transition-transform" />
+=======
+                                                                                <Play className="h-4 w-4 group-hover:translate-x-1 transition-transform" />
+                                                                        </span>
+                                                                </Button>
+                                                                <Button
+                                                                        className="group rounded-xl px-8 py-6 text-sm sm:text-base font-bold bg-gradient-to-r from-purple-600 via-fuchsia-600 to-pink-600 hover:from-pink-600 hover:via-purple-600 hover:to-fuchsia-600 text-white shadow-[0_0_30px_rgba(168,85,247,0.4)] transition-all duration-500 hover:shadow-[0_0_50px_rgba(236,72,153,0.6)] hover:scale-[1.02] active:scale-95"
+                                                                        onClick={() => {
+                                                                                const vrSection = document.getElementById('vr');
+                                                                                vrSection?.scrollIntoView({ behavior: 'smooth' });
+                                                                        }}
+                                                                >
+                                                                        <span className="flex items-center gap-2">
+                                                                                <Gamepad2 className="h-5 w-5" />
+                                                                                Trải nghiệm VR
+>>>>>>> preview
                                                                         </span>
                                                                 </Button>
                                                         </m.div>
@@ -429,6 +541,51 @@ export default function HeroSection({
                                         </div>
                                 </div>
                         </section>
+<<<<<<< HEAD
+=======
+
+                        {/* Branch confirmation dialog */}
+                        <AlertDialog open={showBranchConfirmDialog} onOpenChange={setShowBranchConfirmDialog}>
+                                <AlertDialogContent className="bg-[#0f172a] border-white/10 text-white">
+                                        <AlertDialogHeader>
+                                                <AlertDialogTitle className="text-xl font-bold text-white">Xác nhận chi nhánh</AlertDialogTitle>
+                                                <AlertDialogDescription className="text-gray-300">
+                                                        Bạn đang đặt vé tại chi nhánh <span className="font-bold text-blue-400">{selectedBranch?.name}</span>.
+                                                        <br />
+                                                        <br />
+                                                        Nếu muốn đổi chi nhánh, hãy chọn ở dropdown trên header trước khi đặt vé.
+                                                </AlertDialogDescription>
+                                        </AlertDialogHeader>
+                                        <AlertDialogFooter className="flex-col items-stretch gap-2">
+                                                <div className="flex items-center gap-2">
+                                                        <Checkbox
+                                                                id="dont-show-branch-confirm-hero"
+                                                                checked={dontShowConfirm}
+                                                                onCheckedChange={(checked) => toggleDontShowConfirm(checked as boolean)}
+                                                        />
+                                                        <label htmlFor="dont-show-branch-confirm-hero" className="text-sm text-gray-300 cursor-pointer">
+                                                                Không nhắc lại lần sau
+                                                        </label>
+                                                </div>
+                                                <div className="flex gap-2 mt-2">
+                                                        <AlertDialogCancel className="bg-white/5 border-white/10 text-gray-300 hover:bg-white/10 hover:text-white flex-1">
+                                                                Hủy bỏ
+                                                        </AlertDialogCancel>
+                                                        <AlertDialogAction
+                                                                onClick={() => {
+                                                                        setShowBranchConfirmDialog(false);
+                                                                        const params = new URLSearchParams(searchParams.toString());
+                                                                        router.push(`/booking${params.toString() ? `?${params.toString()}` : ''}`);
+                                                                }}
+                                                                className="bg-blue-600 hover:bg-blue-700 text-white flex-1"
+                                                        >
+                                                                Tiếp tục
+                                                        </AlertDialogAction>
+                                                </div>
+                                        </AlertDialogFooter>
+                                </AlertDialogContent>
+                        </AlertDialog>
+>>>>>>> preview
                 </LazyMotion>
         );
 }

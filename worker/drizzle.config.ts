@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 import { defineConfig } from 'drizzle-kit';
 
 export default defineConfig({
@@ -11,3 +12,15 @@ export default defineConfig({
                 token: ''
         }
 });
+=======
+import { defineConfig } from 'drizzle-kit';
+
+export default defineConfig({
+        schema: './src/schema.ts',
+        out: './drizzle',
+        dialect: 'sqlite',
+        dbCredentials: {
+                url: './local.db'
+        }
+});
+>>>>>>> preview

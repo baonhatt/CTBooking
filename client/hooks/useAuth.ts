@@ -5,9 +5,24 @@ export function useAuth() {
                 return loginApi({ email, password });
         }
 
+<<<<<<< HEAD
         async function logout() {
                 return logoutApi();
         }
+=======
+  async function logout() {
+    return logoutApi();
+  }
+
+  async function register(
+    email: string,
+    password: string,
+    name?: string,
+    options?: { gender?: string; dob?: string; phone?: string }
+  ) {
+    return registerApi({ email, password, name, ...(options || {}) });
+  }
+>>>>>>> preview
 
         async function register(
                 email: string,
@@ -22,9 +37,13 @@ export function useAuth() {
                 return forgetPassApi({ email });
         }
 
+<<<<<<< HEAD
         async function resetPass(token: string, newPassword: string) {
                 return resetPasswordApi({ token, newPassword });
         }
 
         return { login, logout, register, forgetPass, resetPass };
+=======
+  return { login, logout, register, forgetPass, resetPass };
+>>>>>>> preview
 }

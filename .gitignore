@@ -35,11 +35,25 @@ worker/.wrangler/
 
 # Next.js build output - KHÔNG commit!
 next-client/.next/
+<<<<<<< HEAD
+=======
+next-client/.open-next/
+>>>>>>> preview
 next-client/.vercel/
 
 # Media and Database - KHÔNG commit!
 uploads/
+<<<<<<< HEAD
 *.sql
 *.sqlite
 *.sqlite-shm
 *.sqlite-wal
+=======
+*.sqlite
+*.sqlite-shm
+*.sqlite-wal
+*.sql
+!worker/migrations/*.sql
+
+
+>>>>>>> preview

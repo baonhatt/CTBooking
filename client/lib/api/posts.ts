@@ -13,9 +13,18 @@ export async function getPosts(options?: {
         if (options?.q) params.set('q', options.q);
         if (options?.status) params.set('status', options.status);
 
+<<<<<<< HEAD
         return request<{ items: any[]; page: number; pageSize: number; total: number }>(`/api/admin/posts?${params.toString()}`, {
                 signal: options?.signal
         });
+=======
+        return request<{ items: any[]; page: number; pageSize: number; total: number }>(
+                `/api/admin/posts?${params.toString()}`,
+                {
+                        signal: options?.signal
+                }
+        );
+>>>>>>> preview
 }
 
 // Public list posts (default: published-only on server)
@@ -75,8 +84,13 @@ export async function updatePostApi(
         });
 }
 
+<<<<<<< HEAD
 export async function deletePostApi(id: number) {
         return request<any>(`/api/posts/${id}`, {
+=======
+export async function deletePostApi(id: number, hardDelete?: boolean) {
+        return request<any>(`/api/posts/${id}${hardDelete ? '?hardDelete=true' : ''}`, {
+>>>>>>> preview
                 method: 'DELETE'
         });
 }

@@ -1,6 +1,12 @@
+<<<<<<< HEAD
 import { eq, and, gte, lt } from 'drizzle-orm';
 import { mailQueue } from './mail-queue';
 import { getOTPEmailTemplate } from './email-templates';
+=======
+import { eq, and, gte, lt, isNull } from 'drizzle-orm';
+import { mailQueue } from './mail-queue';
+import { getOTPEmailTemplate, getStaffPasswordChangeOTPTemplate } from './email-templates';
+>>>>>>> preview
 import { formatDateForDb } from './date-utils';
 
 export function generateOTP(length: number = 6): string {
@@ -67,6 +73,7 @@ export async function createOTPRecord(
         expiredAt.setMinutes(expiredAt.getMinutes() + expiryMinutes);
 
         // Delete existing OTP tokens for this account (invalidate old OTPs)
+<<<<<<< HEAD
         await anyDb
                 .delete(tables.tokens)
                 .where(
@@ -75,6 +82,9 @@ export async function createOTPRecord(
                                 eq(tables.tokens.type, 'otp')
                         )
                 );
+=======
+        await anyDb.delete(tables.tokens).where(and(eq(tables.tokens.account_id, accountId), eq(tables.tokens.type, 'otp')));
+>>>>>>> preview
 
         // Insert new OTP token
         const inserted = await anyDb
@@ -98,11 +108,15 @@ export async function validateOTP(
         otp: string
 ): Promise<{ valid: boolean; attempts?: number; error?: string }> {
         const tokenRecord = await anyDb.query.tokens.findFirst({
+<<<<<<< HEAD
                 where: and(
                         eq(tables.tokens.account_id, accountId),
                         eq(tables.tokens.type, 'otp'),
                         eq(tables.tokens.token, otp)
                 )
+=======
+                where: and(eq(tables.tokens.account_id, accountId), eq(tables.tokens.type, 'otp'), eq(tables.tokens.token, otp))
+>>>>>>> preview
         });
 
         if (!tokenRecord) {
@@ -122,6 +136,7 @@ export async function validateOTP(
         return { valid: true };
 }
 
+<<<<<<< HEAD
 export async function deleteOTP(
         anyDb: any,
         tables: { tokens: any },
@@ -135,6 +150,10 @@ export async function deleteOTP(
                                 eq(tables.tokens.type, 'otp')
                         )
                 );
+=======
+export async function deleteOTP(anyDb: any, tables: { tokens: any }, accountId: number) {
+        await anyDb.delete(tables.tokens).where(and(eq(tables.tokens.account_id, accountId), eq(tables.tokens.type, 'otp')));
+>>>>>>> preview
 }
 
 export async function canResendOTP(
@@ -144,10 +163,14 @@ export async function canResendOTP(
         cooldownSeconds: number
 ): Promise<{ canResend: boolean; secondsRemaining?: number }> {
         const tokenRecord = await anyDb.query.tokens.findFirst({
+<<<<<<< HEAD
                 where: and(
                         eq(tables.tokens.account_id, accountId),
                         eq(tables.tokens.type, 'otp')
                 ),
+=======
+                where: and(eq(tables.tokens.account_id, accountId), eq(tables.tokens.type, 'otp')),
+>>>>>>> preview
                 orderBy: (tokens: any, { desc }) => [desc(tokens.created_at)]
         });
 
@@ -168,3 +191,118 @@ export async function canResendOTP(
                 secondsRemaining: cooldownSeconds - elapsedSeconds
         };
 }
+<<<<<<< HEAD
+=======
+
+// Staff OTP functions for password change
+export async function sendStaffPasswordChangeOTP(
+        anyDb: any,
+        tables: { staffTokens: any; email_logs?: any },
+        staffId: number,
+        staffName: string,
+        staffEmail: string,
+        expiryMinutes: number = 5,
+        sendMailFn?: (to: string, subject: string, html: string) => Promise<any>,
+        context?: { waitUntil: (promise: Promise<any>) => void }
+) {
+        const otp = generateOTP();
+        const expiredAt = new Date();
+        expiredAt.setMinutes(expiredAt.getMinutes() + expiryMinutes);
+
+        // Delete existing OTP tokens for this staff
+        await anyDb.delete(tables.staffTokens).where(
+                and(eq(tables.staffTokens.staffId, staffId), eq(tables.staffTokens.type, 'otp'), isNull(tables.staffTokens.revokedAt))
+        );
+
+        // Insert new OTP token
+        await anyDb.insert(tables.staffTokens).values({
+                staffId,
+                type: 'otp',
+                token: otp,
+                expiredAt: expiredAt.toISOString(),
+                createdAt: new Date().toISOString()
+        });
+
+        // Send OTP email
+        const html = getStaffPasswordChangeOTPTemplate({
+                staffName,
+                otp,
+                expiryMinutes
+        });
+
+        try {
+                await mailQueue.add(
+                        async () => {
+                                try {
+                                        const mailer = sendMailFn;
+                                        if (mailer) {
+                                                await mailer(staffEmail, '🔐 Mã Xác Thực Thay Đổi Mật Khẩu - CINESPHERE', html);
+                                                console.log(`[Staff OTP] Sent OTP to ${staffEmail}`);
+                                        } else {
+                                                console.warn('[Staff OTP] No mailer provided, skipping email');
+                                        }
+                                } catch (e) {
+                                        console.error(`[Staff OTP] Failed to send OTP to ${staffEmail}`, e);
+                                        throw e;
+                                }
+                        },
+                        {
+                                db: anyDb,
+                                recipient: staffEmail,
+                                subject: '🔐 Mã Xác Thực Thay Đổi Mật Khẩu - CINESPHERE',
+                                emailType: 'staff_otp',
+                                recipientType: 'staff',
+                                staffId: staffId,
+                                emailLogsTable: tables.email_logs
+                        },
+                        context
+                );
+                return { success: true };
+        } catch (error) {
+                console.error('[Staff OTP] Error adding to mail queue:', error);
+                return { success: false, error };
+        }
+}
+
+export async function validateStaffOTP(
+        anyDb: any,
+        tables: { staffTokens: any },
+        staffId: number,
+        otp: string
+): Promise<{ valid: boolean; error?: string }> {
+        const tokenRecord = await anyDb.query.staffTokens.findFirst({
+                where: and(
+                        eq(tables.staffTokens.staffId, staffId),
+                        eq(tables.staffTokens.type, 'otp'),
+                        eq(tables.staffTokens.token, otp),
+                        isNull(tables.staffTokens.revokedAt)
+                )
+        });
+
+        if (!tokenRecord) {
+                return { valid: false, error: 'OTP không đúng' };
+        }
+
+        // Check expiry
+        if (tokenRecord.expiredAt) {
+                const expiredAt = new Date(tokenRecord.expiredAt);
+                if (expiredAt < new Date()) {
+                        // Revoke expired OTP
+                        await anyDb
+                                .update(tables.staffTokens)
+                                .set({ revokedAt: new Date().toISOString(), revokeReason: 'expired' })
+                                .where(eq(tables.staffTokens.id, tokenRecord.id));
+                        return { valid: false, error: 'OTP đã hết hạn' };
+                }
+        }
+
+        return { valid: true };
+}
+
+export async function deleteStaffOTP(anyDb: any, tables: { staffTokens: any }, staffId: number) {
+        await anyDb
+                .update(tables.staffTokens)
+                .set({ revokedAt: new Date().toISOString(), revokeReason: 'used' })
+                .where(and(eq(tables.staffTokens.staffId, staffId), eq(tables.staffTokens.type, 'otp'), isNull(tables.staffTokens.revokedAt)));
+}
+>>>>>>> preview

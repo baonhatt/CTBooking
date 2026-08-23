@@ -3,6 +3,10 @@ import type { Metadata } from 'next';
 import UserLayout from '@/layouts/UserLayout';
 import HeroSection from '@/components/user/home/HeroSection';
 import FilmCarousel from '@/components/user/home/FilmCarousel';
+<<<<<<< HEAD
+=======
+import VRShowcase from '@/components/user/home/VRShowcase';
+>>>>>>> preview
 import PromotionShowcase from '@/components/user/home/PromotionShowcase';
 import TechnologyBanner from '@/components/user/home/TechnologyBanner';
 import ProductSection from '@/components/user/home/ProductSection';
@@ -11,12 +15,18 @@ import ClearStorageOnMount from '@/components/user/home/ClearStorageOnMount';
 import { getActiveMoviesToday } from '@/lib/api/movies';
 import { getSiteMediaApi } from '@/lib/api/uploads';
 import { getActiveTickets, getActiveToys } from '@/lib/api/products';
+<<<<<<< HEAD
+=======
+import { getVRPackages } from '@/lib/api/vr-packages';
+import { getDefaultBranch, getPublicBranches } from '@/lib/api/branches';
+>>>>>>> preview
 
 import { siteConfig } from '@/config/site';
 
 const SITE_URL = siteConfig.domain;
 
 export const metadata: Metadata = {
+<<<<<<< HEAD
         title: 'Cinesphere | Trải Nghiệm Điện Ảnh Đỉnh Cao',
         description:
                 'Đặt vé xem phim trực tuyến tại Cinesphere. Khám phá các siêu phẩm bom tấn với công nghệ chiếu rạp hiện đại nhất.',
@@ -25,6 +35,16 @@ export const metadata: Metadata = {
                 title: 'Cinesphere | Trải Nghiệm Điện Ảnh Đỉnh Cao',
                 description:
                         'Đặt vé xem phim trực tuyến nhanh chóng, tiện lợi. Hệ thống rạp chiếu phim hiện đại với âm thanh hình ảnh sống động.',
+=======
+        title: 'Cinesphere | Trải Nghiệm Điện Ảnh & VR Đỉnh Cao',
+        description:
+                'Đặt vé xem phim & trải nghiệm thực tế ảo VR 8K/9D trực tuyến tại Cinesphere. Khám phá các siêu phẩm bom tấn với công nghệ chiếu rạp hiện đại nhất.',
+        alternates: { canonical: SITE_URL },
+        openGraph: {
+                title: 'Cinesphere | Trải Nghiệm Điện Ảnh & VR Đỉnh Cao',
+                description:
+                        'Đặt vé xem phim trực tuyến nhanh chóng, tiện lợi. Hệ thống rạp chiếu phim hiện đại với âm thanh hình ảnh sống động và phòng chơi VR 8K/9D siêu thực.',
+>>>>>>> preview
                 type: 'website',
                 url: SITE_URL,
                 locale: 'vi_VN',
@@ -34,6 +54,7 @@ export const metadata: Metadata = {
                                 url: '/og-default.jpg',
                                 width: 1200,
                                 height: 630,
+<<<<<<< HEAD
                                 alt: 'Cinesphere - Trải Nghiệm Điện Ảnh Đỉnh Cao',
                         },
                 ],
@@ -56,6 +77,52 @@ export default async function Home() {
                 getSiteMediaApi({ active: true }).catch(() => ({ items: [] })),
                 getActiveTickets().catch(() => ({ items: [] })),
                 getActiveToys().catch(() => ({ items: [] }))
+=======
+                                alt: 'Cinesphere - Trải Nghiệm Điện Ảnh & VR Đỉnh Cao'
+                        }
+                ]
+        },
+        twitter: {
+                card: 'summary_large_image',
+                title: 'Cinesphere | Trải Nghiệm Điện Ảnh & VR Đỉnh Cao',
+                description:
+                        'Đặt vé xem phim trực tuyến nhanh chóng, tiện lợi. Hệ thống rạp chiếu phim hiện đại với âm thanh hình ảnh sống động và phòng chơi VR 8K/9D siêu thực.',
+                images: ['/og-default.jpg']
+        }
+};
+
+// ISR: trang chủ cache 5 phút, sau đó revalidate từ server
+export const revalidate = 300;
+
+export default async function Home({ searchParams }: { searchParams: { branch_id?: string } }) {
+        // Fetch default branch for server-side rendering
+        let effectiveBranchId: number | undefined = undefined;
+        try {
+                const [{ branch: defaultBranch }, { items: publicBranches }] = await Promise.all([
+                        getDefaultBranch(),
+                        getPublicBranches()
+                ]);
+
+                if (searchParams.branch_id) {
+                        effectiveBranchId = Number(searchParams.branch_id);
+                } else if (defaultBranch) {
+                        effectiveBranchId = defaultBranch.id;
+                } else if (publicBranches && publicBranches.length > 0) {
+                        // Fallback to the first available open branch if no default or URL param
+                        effectiveBranchId = publicBranches[0].id;
+                }
+        } catch (error) {
+                console.error('Error fetching branches for home page:', error);
+        }
+
+        // Fetch all initial data in parallel with branch filter
+        const [activeMovies, siteMediaRes, ticketsRes, toysRes, vrRes] = await Promise.all([
+                getActiveMoviesToday(effectiveBranchId).catch(() => []),
+                getSiteMediaApi({ active: true }).catch(() => ({ items: [] })),
+                getActiveTickets(effectiveBranchId).catch(() => ({ items: [] })),
+                getActiveToys().catch(() => ({ items: [] })),
+                getVRPackages(effectiveBranchId).catch(() => ({ items: [] }))
+>>>>>>> preview
         ]);
 
         const items = siteMediaRes.items || [];
@@ -76,6 +143,10 @@ export default async function Home() {
                                 <Suspense fallback={<div className="min-h-[200px]" />}>
                                         {/* Pass initial data to the interactive Client Components */}
                                         <FilmCarousel initialFilms={activeMovies} />
+<<<<<<< HEAD
+=======
+                                        <VRShowcase initialPackages={vrRes.items || []} />
+>>>>>>> preview
                                         <PromotionShowcase initialCombos={ticketsRes.items || []} />
                                         <TechnologyBanner initialMainItem={techMainItem} initialListItems={techListItems} />
                                         <ProductSection initialProducts={toysRes.items || []} />

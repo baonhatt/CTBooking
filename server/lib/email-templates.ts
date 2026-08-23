@@ -7,6 +7,13 @@ export function getBookingEmailTemplate(data: {
         durationMin?: string; // Nhận chuỗi JSON: "[10, 12, 5]"
         ticketPackageName?: string;
         expiryDate?: string | Date;
+<<<<<<< HEAD
+=======
+        branchName?: string;
+        branchAddress?: string;
+        branchPhone?: string;
+        branchSettings?: string;
+>>>>>>> preview
 }): string {
         // 1. XỬ LÝ DỮ LIỆU JSON TỪ API
         let movieTitles: string[] = [];
@@ -20,6 +27,18 @@ export function getBookingEmailTemplate(data: {
                 durations = data.durationMin ? [data.durationMin] : ['--'];
         }
 
+<<<<<<< HEAD
+=======
+        // Parse branch settings for hotline
+        let hotline = data.branchPhone || '1900-xxxx';
+        if (data.branchSettings) {
+                try {
+                        const settings = JSON.parse(data.branchSettings);
+                        if (settings.hotline) hotline = settings.hotline;
+                } catch (e) { }
+        }
+
+>>>>>>> preview
         // 2. TẠO LIST PHIM THEO LAYOUT MỚI
         const moviesHtml = movieTitles
                 .map(
@@ -77,6 +96,19 @@ export function getBookingEmailTemplate(data: {
             </div>
 
             <div class="section-title">CHI TIẾT ĐƠN HÀNG</div>
+<<<<<<< HEAD
+=======
+            ${data.branchName ? `
+            <div class="row">
+                <span class="label">Chi nhánh:</span>
+                <span class="value">${data.branchName}</span>
+            </div>
+            <div class="row">
+                <span class="label">Địa chỉ:</span>
+                <span class="value" style="font-size: 12px;">${data.branchAddress || ''}</span>
+            </div>
+            ` : ''}
+>>>>>>> preview
             <div class="row">
                 <span class="label">Số lượng vé:</span>
                 <span class="value">${data.ticketCount} vé</span>
@@ -118,7 +150,11 @@ export function getBookingEmailTemplate(data: {
 
         <div class="footer">
             <p><strong>CINESPHERE - Rạp chiếu phim hiện đại</strong></p>
+<<<<<<< HEAD
             <p>Email: cinesphere0629@gmail.com | Hotline: 1900-xxxx</p>
+=======
+            <p>Email: cinesphere0629@gmail.com | Hotline: ${hotline}</p>
+>>>>>>> preview
             <p style="margin-top: 10px; opacity: 0.6;">Đây là email tự động, vui lòng không trả lời email này.</p>
         </div>
     </div>
@@ -401,3 +437,184 @@ export function getOTPEmailTemplate(data: {
 </html>
   `;
 }
+<<<<<<< HEAD
+=======
+
+// Shared mail layout for staff emails
+function getStaffEmailLayout(content: string, subtitle: string): string {
+	return `
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CINESPHERE Admin System</title>
+  <style>
+    body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f5f7fb; margin: 0; padding: 0; }
+    .container { max-width: 600px; margin: 20px auto; background-color: #ffffff; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.06); overflow: hidden; }
+    .header { background: linear-gradient(135deg, #1e293b 0%, #334155 100%); color: white; padding: 26px 20px; text-align: center; }
+    .header h1 { margin: 0; font-size: 22px; font-weight: 700; letter-spacing: 1px; }
+    .header p { margin: 6px 0 0 0; font-size: 13px; color: #94a3b8; }
+    .content { padding: 28px; color: #334155; }
+    .greeting { font-size: 15px; margin-bottom: 16px; color: #1e293b; }
+    .info-box { background: #f8fafc; border: 1px solid #e2e8f0; border-left: 4px solid #3b82f6; border-radius: 8px; padding: 16px; margin: 20px 0; }
+    .info-row { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px dashed #e2e8f0; }
+    .info-row:last-child { border-bottom: none; }
+    .info-label { color: #64748b; font-size: 13px; }
+    .info-value { font-weight: 600; color: #0f172a; font-size: 13px; }
+    .password-box { background: #f1f5f9; border: 2px dashed #cbd5e1; border-radius: 10px; padding: 20px; text-align: center; margin: 20px 0; }
+    .password-label { font-size: 12px; color: #64748b; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px; }
+    .password-value { font-size: 32px; font-weight: 800; color: #0f172a; font-family: monospace; letter-spacing: 4px; line-height: 1; }
+    .warning { background: #fffbeb; border-left: 4px solid #f59e0b; padding: 14px; border-radius: 6px; margin: 20px 0; font-size: 13px; color: #92400e; }
+    .footer { background-color: #f8fafc; padding: 16px; text-align: center; font-size: 12px; color: #94a3b8; border-top: 1px solid #e2e8f0; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <h1>🎬 CINESPHERE ADMIN</h1>
+      <p>${subtitle}</p>
+    </div>
+
+    <div class="content">
+      ${content}
+    </div>
+
+    <div class="footer">
+      <p><strong>CINESPHERE Admin Portal</strong> • Hệ thống quản trị nội bộ</p>
+      <p style="margin-top: 6px; opacity: 0.8;">Đây là email tự động từ hệ thống quản trị, vui lòng không trả lời.</p>
+    </div>
+  </div>
+</body>
+</html>
+  `;
+}
+
+export function getStaffAccountCreatedTemplate(data: {
+        staffName: string;
+        email: string;
+        password: string;
+        loginUrl?: string;
+}): string {
+        const loginUrl = data.loginUrl || 'https://cinesphere.com.vn/admin/login';
+
+        const content = `
+      <div class="greeting">
+        Xin chào <strong>${data.staffName}</strong>,
+      </div>
+
+      <p style="font-size: 15px; line-height: 1.6;">
+        Tài khoản nhân viên của bạn đã được tạo thành công. Dưới đây là thông tin đăng nhập của bạn:
+      </p>
+
+      <div class="info-box">
+        <div class="info-row">
+          <span class="info-label">Email:</span>
+          <span class="info-value">${data.email}</span>
+        </div>
+      </div>
+
+      <div class="password-box">
+        <div class="password-label">Mật khẩu của bạn</div>
+        <div class="password-value">${data.password}</div>
+      </div>
+
+      <div class="warning">
+        ⚠️ <strong>Lưu ý quan trọng:</strong>
+        <ul style="margin: 10px 0 0 0; padding-left: 20px;">
+          <li>Vui lòng đổi mật khẩu ngay sau lần đăng nhập đầu tiên</li>
+          <li>Không chia sẻ mật khẩu này với bất kỳ ai</li>
+          <li>Đăng nhập tại: <a href="${loginUrl}" style="color: #667eea;">${loginUrl}</a></li>
+        </ul>
+      </div>
+
+      <p style="font-size: 13px; color: #6b7280; margin-top: 20px;">
+        Cần hỗ trợ? Vui lòng liên hệ quản trị viên hoặc đội ngũ hỗ trợ qua email: cinesphere0629@gmail.com
+      </p>
+  `;
+
+        return getStaffEmailLayout(content, 'Tài khoản nhân viên mới');
+}
+
+export function getStaffPasswordResetTemplate(data: {
+        staffName: string;
+        email: string;
+        newPassword: string;
+        loginUrl?: string;
+}): string {
+        const loginUrl = data.loginUrl || 'https://cinesphere.com.vn/admin/login';
+
+        const content = `
+      <div class="greeting">
+        Xin chào <strong>${data.staffName}</strong>,
+      </div>
+
+      <p style="font-size: 15px; line-height: 1.6;">
+        Mật khẩu của bạn đã được đặt lại. Dưới đây là thông tin đăng nhập mới:
+      </p>
+
+      <div class="info-box">
+        <div class="info-row">
+          <span class="info-label">Email:</span>
+          <span class="info-value">${data.email}</span>
+        </div>
+      </div>
+
+      <div class="password-box">
+        <div class="password-label">Mật khẩu mới của bạn</div>
+        <div class="password-value">${data.newPassword}</div>
+      </div>
+
+      <div class="warning">
+        ⚠️ <strong>Lưu ý quan trọng:</strong>
+        <ul style="margin: 10px 0 0 0; padding-left: 20px;">
+          <li>Vui lòng đổi mật khẩu ngay sau lần đăng nhập tiếp theo</li>
+          <li>Không chia sẻ mật khẩu này với bất kỳ ai</li>
+          <li>Đăng nhập tại: <a href="${loginUrl}" style="color: #667eea;">${loginUrl}</a></li>
+        </ul>
+      </div>
+
+      <p style="font-size: 13px; color: #6b7280; margin-top: 20px;">
+        Cần hỗ trợ? Vui lòng liên hệ quản trị viên hoặc đội ngũ hỗ trợ qua email: cinesphere0629@gmail.com
+      </p>
+  `;
+
+        return getStaffEmailLayout(content, 'Đặt lại mật khẩu nhân viên');
+}
+
+export function getStaffPasswordChangeOTPTemplate(data: {
+        staffName: string;
+        otp: string;
+        expiryMinutes: number;
+}): string {
+        const content = `
+      <div class="greeting">
+        Xin chào <strong>${data.staffName}</strong>,
+      </div>
+
+      <p style="font-size: 15px; line-height: 1.6;">
+        Chúng tôi nhận được yêu cầu thay đổi mật khẩu cho tài khoản của bạn. Để hoàn tất thay đổi, vui lòng nhập mã xác thực sau:
+      </p>
+
+      <div class="password-box">
+        <div class="password-label">Mã Xác Thực (OTP)</div>
+        <div class="password-value">${data.otp}</div>
+      </div>
+
+      <div class="warning">
+        ⚠️ <strong>Lưu ý quan trọng:</strong>
+        <ul style="margin: 10px 0 0 0; padding-left: 20px;">
+          <li>Mã này sẽ hết hạn sau <strong>${data.expiryMinutes} phút</strong></li>
+          <li>Không chia sẻ mã này với bất kỳ ai, kể cả nhân viên CINESPHERE</li>
+          <li>Nếu bạn không yêu cầu thay đổi mật khẩu, vui lòng bỏ qua email này</li>
+        </ul>
+      </div>
+
+      <p style="font-size: 13px; color: #6b7280; margin-top: 20px;">
+        Cần hỗ trợ? Vui lòng liên hệ quản trị viên hoặc đội ngũ hỗ trợ qua email: cinesphere0629@gmail.com
+      </p>
+  `;
+
+        return getStaffEmailLayout(content, 'Xác thực thay đổi mật khẩu');
+}
+>>>>>>> preview
