@@ -155,6 +155,38 @@ const generateRandomCode = () => {
     return s;
 };
 
+const toLocalDatetimeString = (dateStr: string | Date | null | undefined): string => {
+    if (!dateStr) return '';
+    const d = new Date(dateStr);
+    if (isNaN(d.getTime())) return '';
+    const pad = (n: number) => n.toString().padStart(2, '0');
+    const year = d.getFullYear();
+    const month = pad(d.getMonth() + 1);
+    const day = pad(d.getDate());
+    const hours = pad(d.getHours());
+    const minutes = pad(d.getMinutes());
+    return `${year}-${month}-${day}T${hours}:${minutes}`;
+};
+
+const fromLocalDatetimeString = (val: string): string | null => {
+    if (!val) return null;
+    const d = new Date(val);
+    if (isNaN(d.getTime())) return null;
+    return d.toISOString();
+};
+
+const getTodayStartIso = () => {
+    const d = new Date();
+    d.setHours(0, 0, 0, 0);
+    return d.toISOString();
+};
+
+const getTodayEndIso = () => {
+    const d = new Date();
+    d.setHours(23, 59, 59, 999);
+    return d.toISOString();
+};
+
 export default function VouchersContent(props: Props) {
     const navigate = useNavigate();
     const permissions = useStaffPermissions();
@@ -185,9 +217,9 @@ export default function VouchersContent(props: Props) {
         setScopeFilter,
         branches = [],
         selectedBranchId = null,
-        setSelectedBranchId = () => {},
+        setSelectedBranchId = () => { },
         selectedSaleId = 'all',
-        setSelectedSaleId = () => {},
+        setSelectedSaleId = () => { },
         searchText,
         setSearchText,
         isDeletedView = false,
@@ -207,6 +239,29 @@ export default function VouchersContent(props: Props) {
     const [selectedVoucher, setSelectedVoucher] = useState<VoucherItem | null>(null);
     const [localSearchText, setLocalSearchText] = useState(searchText);
     const [voucherToToggle, setVoucherToToggle] = useState<{ id: number; currentStatus: boolean } | null>(null);
+    const [isPermanent, setIsPermanent] = useState(false);
+
+    useEffect(() => {
+        if (isEditOpen && editData) {
+            if (!editData.id || editData.id === 0) {
+                // When creating new voucher: if no dates provided, initialize to today start & end
+                if (!editData.valid_from && !editData.valid_until) {
+                    setEditData({
+                        ...editData,
+                        valid_from: getTodayStartIso(),
+                        valid_until: getTodayEndIso()
+                    });
+                    setIsPermanent(false);
+                } else {
+                    setIsPermanent(false);
+                }
+            } else {
+                // When editing existing: permanent if both are empty/null or valid_until is null
+                const isPerm = !editData.valid_until && !editData.valid_from;
+                setIsPermanent(isPerm);
+            }
+        }
+    }, [isEditOpen, editData?.id]);
 
     useEffect(() => {
         listStaffOptionsApi().then((res) => {
@@ -217,7 +272,7 @@ export default function VouchersContent(props: Props) {
                     email: s.email
                 })));
             }
-        }).catch(() => {});
+        }).catch(() => { });
     }, []);
 
     useEffect(() => {
@@ -261,7 +316,7 @@ export default function VouchersContent(props: Props) {
                             try {
                                 const parsed = JSON.parse(pkg.branch_ids);
                                 if (Array.isArray(parsed)) pkgBranchArr = parsed;
-                            } catch {}
+                            } catch { }
                         }
                         if (pkgBranchArr.length === 0 && (pkg.branch_id === undefined || pkg.branch_id === null)) {
                             return true;
@@ -270,10 +325,10 @@ export default function VouchersContent(props: Props) {
                     });
                 }
                 setVrPackages(packages);
-            }).catch(() => {});
+            }).catch(() => { });
             getAdminBranchOptions({ includeInactive: true }).then((res) => {
                 setBranchOptions(res.items || []);
-            }).catch(() => {});
+            }).catch(() => { });
         }
     }, [isEditOpen, editData?.scope, JSON.stringify(editData?.branch_ids)]);
 
@@ -359,18 +414,29 @@ export default function VouchersContent(props: Props) {
             ? Number(payload.min_order_value)
             : 0;
         payload.usage_limit = payload.usage_limit ? Number(payload.usage_limit) : null;
-        payload.per_user_limit = payload.per_user_limit ? Number(payload.per_user_limit) : 1;
         payload.is_active = !!payload.is_active;
-        payload.applicable_ticket_package_ids =
-            Array.isArray(payload.applicable_ticket_package_ids) &&
-            payload.applicable_ticket_package_ids.length > 0
-                ? payload.applicable_ticket_package_ids
-                : null;
-        payload.excluded_ticket_package_ids =
-            Array.isArray(payload.excluded_ticket_package_ids) &&
-            payload.excluded_ticket_package_ids.length > 0
-                ? payload.excluded_ticket_package_ids
-                : null;
+        if (isPermanent) {
+            payload.valid_from = null;
+            payload.valid_until = null;
+        } else {
+            payload.valid_from = payload.valid_from || null;
+            payload.valid_until = payload.valid_until || null;
+        }
+        if (payload.scope === 'all') {
+            payload.applicable_ticket_package_ids = null;
+            payload.excluded_ticket_package_ids = null;
+        } else {
+            payload.applicable_ticket_package_ids =
+                Array.isArray(payload.applicable_ticket_package_ids) &&
+                    payload.applicable_ticket_package_ids.length > 0
+                    ? payload.applicable_ticket_package_ids
+                    : null;
+            payload.excluded_ticket_package_ids =
+                Array.isArray(payload.excluded_ticket_package_ids) &&
+                    payload.excluded_ticket_package_ids.length > 0
+                    ? payload.excluded_ticket_package_ids
+                    : null;
+        }
 
         setIsSaving(true);
         try {
@@ -408,290 +474,229 @@ export default function VouchersContent(props: Props) {
 
     return (
         <div className="space-y-6 font-sans">
-            {/* HEADER + TOOLBAR CARD (gộp 1 khối theo chuẩn Transactions) */}
-            <div className="flex flex-col gap-4 bg-white p-6 rounded-2xl border shadow-sm">
-                <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-                    <div className="flex flex-col gap-1">
-                        <h3 className="text-lg font-bold text-slate-900 flex items-center gap-2">
-                            {isDeletedView ? (
-                                <Trash2 className="w-5 h-5 text-rose-500" />
-                            ) : (
-                                <Tag className="w-5 h-5 text-purple-600" />
+            {/* PAGE HEADER */}
+            <div className="flex items-center justify-between">
+                <div>
+                    <h1 className="text-xl font-bold text-slate-800">
+                        {isDeletedView ? 'Quản lý voucher đã xóa' : 'Quản lý vouchers'}
+                    </h1>
+                    <p className="text-sm text-slate-400 mt-0.5">
+                        {isDeletedView
+                            ? `Tổng cộng ${data.length} voucher trong thùng rác`
+                            : `Tổng cộng ${data.length} voucher trong hệ thống`}
+                    </p>
+                </div>
+            </div>
+
+            {/* TOOLBAR */}
+            <div className="flex flex-col xl:flex-row justify-between items-start xl:items-center gap-4 bg-white p-4 rounded-2xl border border-gray-200 shadow-sm">
+                <div className="flex flex-wrap items-center gap-3 flex-1 w-full xl:w-auto">
+                    {/* Search Form */}
+                    <form
+                        onSubmit={handleSearchSubmit}
+                        className="flex flex-1 min-w-[260px] max-w-md gap-2"
+                    >
+                        <div className="relative flex-1">
+                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 w-4 h-4" />
+                            <input
+                                type="text"
+                                placeholder="Tìm mã hoặc tên voucher..."
+                                value={localSearchText}
+                                onChange={(e) => setLocalSearchText(e.target.value)}
+                                className="w-full pl-10 pr-8 py-2 bg-slate-50 border border-slate-200 focus:bg-white focus:ring-2 focus:ring-purple-500 rounded-xl transition-all outline-none text-sm h-10"
+                            />
+                            {localSearchText && (
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        setLocalSearchText('');
+                                        setSearchText('');
+                                        setPage(1);
+                                    }}
+                                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                                    title="Xóa tìm kiếm"
+                                >
+                                    <X className="w-4 h-4" />
+                                </button>
                             )}
-                            {isDeletedView ? 'Vouchers đã xóa' : 'Quản lý Vouchers (Ưu đãi)'}
-                            <Badge
-                                variant="secondary"
-                                className="rounded-full bg-slate-100 text-slate-600 px-2 py-0 h-5 text-[10px] font-bold"
-                            >
-                                {data.length}
-                            </Badge>
-                        </h3>
-                        <p className="text-xs text-slate-500">
-                            {isDeletedView
-                                ? 'Xem và phục hồi các voucher đã chuyển vào thùng rác.'
-                                : 'Quản lý mã ưu đãi, giảm giá áp dụng cho VR, Phim hoặc Tất cả dịch vụ.'}
-                        </p>
-                    </div>
-                    <div className="flex items-center gap-2 w-full md:w-auto justify-end">
-                        {!isDeletedView && (
-                            <Button
-                                variant="outline"
-                                size="icon"
-                                className="text-slate-400 hover:text-rose-600 hover:bg-rose-50 hover:border-rose-100 w-11 h-11 rounded-xl transition-all shadow-sm shrink-0"
-                                title="Đặt lại bộ lọc"
-                                onClick={() => {
-                                    setLocalSearchText('');
-                                    setSearchText('');
-                                    setScopeFilter('vr');
-                                    setShowActiveOnly(true);
-                                    setPage(1);
-                                    toast.info('Đã đặt lại bộ lọc');
-                                }}
-                            >
-                                <FilterX size={18} />
-                            </Button>
-                        )}
+                        </div>
                         <Button
-                            variant="outline"
-                            size="icon"
-                            onClick={onRefresh}
-                            className="rounded-xl shadow-sm hover:rotate-180 transition-transform duration-500 shrink-0 h-11 w-11"
-                            title="Làm mới"
+                            type="submit"
+                            className="bg-purple-600 hover:bg-purple-700 text-white rounded-xl text-xs font-semibold px-4 flex items-center gap-1.5 shrink-0 h-10 shadow-sm"
                         >
-                            <RefreshCw className={`w-4 h-4 ${isLoading ? 'animate-spin' : ''}`} />
+                            <Search className="w-3.5 h-3.5" /> Tìm kiếm
                         </Button>
+                    </form>
+
+                    {/* Scope Filter Pills */}
+                    <div className="flex items-center bg-slate-100 p-1 rounded-xl border border-slate-200 h-10">
+                        <button
+                            type="button"
+                            onClick={() => { setScopeFilter('all'); setPage(1); }}
+                            className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+                                scopeFilter === 'all'
+                                    ? 'bg-white text-slate-900 shadow-sm'
+                                    : 'text-slate-500 hover:text-slate-900'
+                            }`}
+                        >
+                            Tất cả
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => { setScopeFilter('vr'); setPage(1); }}
+                            className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all flex items-center gap-1.5 ${
+                                scopeFilter === 'vr'
+                                    ? 'bg-purple-600 text-white shadow-sm'
+                                    : 'text-slate-500 hover:text-slate-900'
+                            }`}
+                        >
+                            <Gamepad2 className="w-3.5 h-3.5" /> Chỉ VR
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => { setScopeFilter('movie'); setPage(1); }}
+                            className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all flex items-center gap-1.5 ${
+                                scopeFilter === 'movie'
+                                    ? 'bg-blue-600 text-white shadow-sm'
+                                    : 'text-slate-500 hover:text-slate-900'
+                            }`}
+                        >
+                            <Film className="w-3.5 h-3.5" /> Chỉ Phim
+                        </button>
                     </div>
+
+                    {/* Active filter switch */}
+                    {!isDeletedView && (
+                        <div className="flex items-center gap-2 px-3 py-1.5 bg-slate-50 rounded-xl border border-slate-200 h-10">
+                            <span className="text-[10px] font-bold text-slate-500 uppercase whitespace-nowrap">
+                                Chỉ hiện khả dụng
+                            </span>
+                            <Switch
+                                checked={showActiveOnly}
+                                onCheckedChange={setShowActiveOnly}
+                                className="data-[state=checked]:bg-green-500 data-[state=unchecked]:bg-gray-300 cursor-pointer"
+                            />
+                        </div>
+                    )}
                 </div>
 
-                <div className="h-px bg-slate-100 my-0.5" />
-
-                {/* Row 1: Search + (Scope Pills + Active Switch) */}
-                <div className="space-y-3">
-                    <div className="flex flex-wrap items-center gap-3">
-                        {/* Search Form */}
-                        <form
-                            onSubmit={handleSearchSubmit}
-                            className="flex flex-1 min-w-[300px] max-w-lg gap-2"
+                {/* Right actions */}
+                <div className="flex flex-wrap items-center gap-2.5 w-full xl:w-auto justify-start xl:justify-end">
+                    {branches.length > 0 ? (
+                        <select
+                            value={String(selectedBranchId ?? 'all')}
+                            onChange={(e) => {
+                                setSelectedBranchId(e.target.value === 'all' ? 'all' : Number(e.target.value));
+                                setPage(1);
+                            }}
+                            className="bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs font-semibold focus:ring-2 focus:ring-purple-500 outline-none shadow-sm cursor-pointer h-10"
                         >
-                            <div className="relative flex-1">
-                                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 w-4 h-4" />
-                                <Input
-                                    placeholder="Tìm mã voucher hoặc tên chương trình..."
-                                    value={localSearchText}
-                                    onChange={(e) => setLocalSearchText(e.target.value)}
-                                    className="pl-10 pr-9 h-11 bg-slate-50 border-transparent focus:bg-white focus:ring-2 focus:ring-blue-500 rounded-xl transition-all"
-                                />
-                                {localSearchText && (
-                                    <button
-                                        type="button"
-                                        onClick={() => {
-                                            setLocalSearchText('');
-                                            setSearchText('');
-                                            setPage(1);
-                                        }}
-                                        className="absolute right-2 top-1/2 -translate-y-1/2 w-7 h-7 rounded-md flex items-center justify-center text-slate-400 hover:text-slate-600 hover:bg-slate-200/70 transition-colors"
-                                        title="Xóa tìm kiếm"
-                                    >
-                                        <X className="w-4 h-4" />
-                                    </button>
-                                )}
-                            </div>
-                            <Button
-                                type="submit"
-                                className="h-11 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-semibold px-4 flex items-center gap-1.5 shrink-0"
-                            >
-                                <Search className="w-4 h-4" /> Tìm kiếm
-                            </Button>
-                        </form>
+                            {isSuperAdmin && <option value="all">Tất cả chi nhánh</option>}
+                            {branches.map((b) => (
+                                <option key={b.id} value={String(b.id)}>
+                                    {b.name}
+                                </option>
+                            ))}
+                        </select>
+                    ) : null}
 
-                        <div className="flex flex-wrap items-center gap-2">
-                            {/* Scope Pills (theo chuẩn Transactions: shadow active) */}
-                            <div className="flex items-center gap-1 p-1 bg-slate-50 rounded-xl border border-slate-200 h-11">
-                                <button
-                                    type="button"
-                                    onClick={() => { setScopeFilter('all'); setPage(1); }}
-                                    className={`px-3 h-8 rounded-lg text-xs font-bold transition-all ${
-                                        scopeFilter === 'all'
-                                            ? 'bg-slate-800 text-white shadow-sm'
-                                            : 'text-slate-500 hover:text-slate-700 hover:bg-white'
-                                    }`}
-                                >
-                                    Tất cả
-                                </button>
-                                <button
-                                    type="button"
-                                    onClick={() => { setScopeFilter('vr'); setPage(1); }}
-                                    className={`px-3 h-8 rounded-lg text-xs font-bold transition-all flex items-center gap-1 ${
-                                        scopeFilter === 'vr'
-                                            ? 'bg-purple-600 text-white shadow-sm shadow-purple-200'
-                                            : 'text-slate-500 hover:text-purple-600 hover:bg-white'
-                                    }`}
-                                >
-                                    <Gamepad2 size={12} /> Chỉ VR
-                                </button>
-                                <button
-                                    type="button"
-                                    onClick={() => { setScopeFilter('movie'); setPage(1); }}
-                                    className={`px-3 h-8 rounded-lg text-xs font-bold transition-all flex items-center gap-1 ${
-                                        scopeFilter === 'movie'
-                                            ? 'bg-blue-600 text-white shadow-sm shadow-blue-200'
-                                            : 'text-slate-500 hover:text-blue-600 hover:bg-white'
-                                    }`}
-                                >
-                                    <Film size={12} /> Chỉ Phim
-                                </button>
-                            </div>
+                    {staffList.length > 0 && (
+                        <select
+                            value={String(selectedSaleId ?? 'all')}
+                            onChange={(e) => {
+                                setSelectedSaleId(e.target.value);
+                                setPage(1);
+                            }}
+                            className="bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs font-semibold focus:ring-2 focus:ring-purple-500 outline-none shadow-sm cursor-pointer h-10"
+                        >
+                            <option value="all">Tất cả Sale</option>
+                            {staffList.map((st) => (
+                                <option key={st.id} value={String(st.id)}>
+                                    {st.fullname}
+                                </option>
+                            ))}
+                        </select>
+                    )}
 
-                            {!isDeletedView && (
-                                <div className="flex items-center gap-3 px-4 py-2 bg-slate-50 rounded-xl border border-slate-200 h-11">
-                                    <ToggleRight size={14} className="text-slate-400" />
-                                    <span className="text-xs font-medium text-slate-500 whitespace-nowrap">
-                                        Chỉ voucher đang bật
-                                    </span>
-                                    <Switch
-                                        checked={showActiveOnly}
-                                        onCheckedChange={setShowActiveOnly}
-                                        className="data-[state=checked]:bg-green-500 data-[state=unchecked]:bg-slate-300 cursor-pointer"
-                                    />
-                                </div>
-                            )}
-                        </div>
-                    </div>
+                    {!isDeletedView && hasPermission('vouchers', 'view_deleted') && (
+                        <Button
+                            variant="outline"
+                            onClick={() => navigate('/deleted/vouchers')}
+                            className="rounded-xl flex items-center gap-2 h-10 px-4 shadow-sm border-slate-200 text-slate-700 hover:bg-slate-50"
+                        >
+                            <Trash2 className="w-4 h-4 text-slate-500" />
+                            <span className="hidden sm:inline text-xs font-semibold">Xem đã xóa</span>
+                        </Button>
+                    )}
 
-                    {/* Row 2: Branch select + Sale select + Action buttons (Refresh, Trash, Create) */}
-                    <div className="flex flex-wrap items-center justify-between gap-3">
-                        <div className="flex flex-wrap items-center gap-3">
-                            {branches.length > 0 ? (
-                                <div className="flex items-center gap-2 pl-3 pr-1 py-1.5 bg-slate-50 rounded-xl border border-slate-200 h-11">
-                                    <Tag size={14} className="text-slate-400" />
-                                    <Select
-                                        value={String(selectedBranchId ?? 'all')}
-                                        onValueChange={(val) => {
-                                            setSelectedBranchId(val === 'all' ? 'all' : Number(val));
-                                            setPage(1);
-                                        }}
-                                    >
-                                        <SelectTrigger className="h-8 w-full sm:w-[190px] border-0 bg-transparent shadow-none p-0 focus:ring-0 text-xs text-slate-600">
-                                            <SelectValue placeholder="Chi nhánh" />
-                                        </SelectTrigger>
-                                        <SelectContent className="rounded-xl border-slate-200">
-                                            <SelectItem value="all">🌐 Tất cả chi nhánh</SelectItem>
-                                            {branches.map((b) => (
-                                                <SelectItem key={b.id} value={String(b.id)}>🏬 {b.name}</SelectItem>
-                                            ))}
-                                        </SelectContent>
-                                    </Select>
-                                </div>
-                            ) : (
-                                <div className="flex items-center gap-2 h-11 px-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium text-slate-500">
-                                    <Loader2 className="w-4 h-4 animate-spin text-purple-600" />
-                                    <span>Đang tải chi nhánh...</span>
-                                </div>
-                            )}
+                    {isDeletedView && (
+                        <Button
+                            variant="outline"
+                            onClick={() => navigate('/vouchers')}
+                            className="rounded-xl flex items-center gap-2 h-10 px-4 shadow-sm border-slate-200"
+                        >
+                            <RotateCcw className="w-4 h-4" />
+                            <span className="text-xs font-semibold">Về danh sách</span>
+                        </Button>
+                    )}
 
-                            {/* Sale filter */}
-                            {staffList.length > 0 && (
-                                <div className="flex items-center gap-2 pl-3 pr-1 py-1.5 bg-slate-50 rounded-xl border border-slate-200 h-11">
-                                    <span className="text-xs">👤</span>
-                                    <Select
-                                        value={String(selectedSaleId ?? 'all')}
-                                        onValueChange={(val) => {
-                                            setSelectedSaleId(val);
-                                            setPage(1);
-                                        }}
-                                    >
-                                        <SelectTrigger className="h-8 w-full sm:w-[180px] border-0 bg-transparent shadow-none p-0 focus:ring-0 text-xs text-slate-600">
-                                            <SelectValue placeholder="Tất cả Sale" />
-                                        </SelectTrigger>
-                                        <SelectContent className="rounded-xl border-slate-200">
-                                            <SelectItem value="all">👤 Tất cả Sale</SelectItem>
-                                            {staffList.map((st) => (
-                                                <SelectItem key={st.id} value={String(st.id)}>
-                                                    {st.fullname}
-                                                </SelectItem>
-                                            ))}
-                                        </SelectContent>
-                                    </Select>
-                                </div>
-                            )}
-                        </div>
+                    {!isDeletedView && hasPermission('vouchers', 'create') && (
+                        <Button
+                            onClick={onCreate}
+                            className="bg-purple-600 hover:bg-purple-700 rounded-xl shadow-sm gap-2 text-white h-10 px-5 font-semibold text-xs transition-all whitespace-nowrap"
+                        >
+                            <Plus className="w-4 h-4" />
+                            {scopeFilter === 'movie'
+                                ? 'Thêm voucher Phim'
+                                : scopeFilter === 'all'
+                                    ? 'Thêm voucher'
+                                    : 'Thêm voucher VR'}
+                        </Button>
+                    )}
 
-                        <div className="flex flex-wrap items-center gap-2">
-                            {!isDeletedView && hasPermission('vouchers', 'view_deleted') && (
-                                <Button
-                                    variant="outline"
-                                    onClick={() => navigate('/deleted/vouchers')}
-                                    className="h-11 rounded-xl flex items-center gap-2 px-4 shadow-sm border-slate-200"
-                                >
-                                    <Trash2 className="w-4 h-4" />
-                                    <span className="hidden sm:inline text-sm text-slate-600 font-medium">Xem đã xóa</span>
-                                </Button>
-                            )}
-                            {isDeletedView && (
-                                <Button
-                                    variant="outline"
-                                    onClick={() => navigate('/vouchers')}
-                                    className="h-11 rounded-xl flex items-center gap-2 px-4 shadow-sm border-slate-200"
-                                >
-                                    <RotateCcw className="w-4 h-4" />
-                                    <span className="text-sm font-medium">Về danh sách</span>
-                                </Button>
-                            )}
-                            {!isDeletedView && hasPermission('vouchers', 'create') && (
-                                <Button
-                                    onClick={onCreate}
-                                    className={`h-11 rounded-xl shadow-sm gap-2 text-white px-5 font-medium whitespace-nowrap ${
-                                        scopeFilter === 'movie'
-                                            ? 'bg-blue-600 hover:bg-blue-700 shadow-blue-200'
-                                            : scopeFilter === 'all'
-                                                ? 'bg-indigo-600 hover:bg-indigo-700 shadow-indigo-200'
-                                                : 'bg-purple-600 hover:bg-purple-700 shadow-purple-200'
-                                    }`}
-                                >
-                                    <Plus className="w-4 h-4" />
-                                    {scopeFilter === 'movie'
-                                        ? 'Thêm voucher Phim'
-                                        : scopeFilter === 'all'
-                                            ? 'Thêm voucher'
-                                            : 'Thêm voucher VR'}
-                                </Button>
-                            )}
-                        </div>
-                    </div>
+                    <Button
+                        variant="outline"
+                        size="icon"
+                        onClick={onRefresh}
+                        className="rounded-xl shadow-sm hover:rotate-180 transition-transform duration-500 shrink-0 h-10 w-10 border-slate-200"
+                        title="Làm mới"
+                    >
+                        <RefreshCw className={`w-4 h-4 ${isLoading ? 'animate-spin' : ''}`} />
+                    </Button>
                 </div>
             </div>
 
             {/* TABLE */}
-            <Card className="border border-gray-200 rounded-xl shadow-sm bg-white">
+            <Card className="border border-gray-200 rounded-xl shadow-sm bg-white overflow-hidden">
                 <CardContent className="p-0">
                     <Table>
-                        <TableHeader className="bg-sky-50/80 border-b border-sky-100">
+                        <TableHeader className="bg-gray-50 border-b border-gray-200">
                             <TableRow className="hover:bg-transparent border-none">
-                                <TableHead className="text-xs font-bold text-sky-900 uppercase py-3.5">
+                                <TableHead className="text-xs font-semibold text-gray-600 uppercase py-3.5">
                                     Mã voucher
                                 </TableHead>
-                                <TableHead className="text-xs font-bold text-sky-900 uppercase py-3.5">
+                                <TableHead className="text-xs font-semibold text-gray-600 uppercase py-3.5">
                                     Tên chương trình
                                 </TableHead>
-                                <TableHead className="text-xs font-bold text-sky-900 uppercase py-3.5">
-                                    Sale phụ trách
+                                <TableHead className="text-xs font-semibold text-gray-600 uppercase py-3.5">
+                                    Phạm vi & Sale
                                 </TableHead>
-                                <TableHead className="text-xs font-bold text-sky-900 uppercase py-3.5">
-                                    Giảm giá
+                                <TableHead className="text-xs font-semibold text-gray-600 uppercase py-3.5">
+                                    Mức giảm
                                 </TableHead>
-                                <TableHead className="text-xs font-bold text-sky-900 uppercase py-3.5">
-                                    Đã dùng / Doanh thu
+                                <TableHead className="text-xs font-semibold text-gray-600 uppercase py-3.5">
+                                    Đã dùng / Giới hạn
                                 </TableHead>
-                                <TableHead className="text-xs font-bold text-sky-900 uppercase py-3.5 min-w-[160px]">
-                                    Hiệu lực
+                                <TableHead className="text-xs font-semibold text-gray-600 uppercase py-3.5 min-w-[150px]">
+                                    Thời gian hiệu lực
                                 </TableHead>
-                                <TableHead className="text-xs font-bold text-sky-900 uppercase py-3.5 min-w-[120px]">
+                                <TableHead className="text-xs font-semibold text-gray-600 uppercase py-3.5 min-w-[120px]">
                                     Chi nhánh
                                 </TableHead>
-                                <TableHead className="text-center text-xs font-bold text-sky-900 uppercase py-3.5">
+                                <TableHead className="text-center text-xs font-semibold text-gray-600 uppercase py-3.5">
                                     Trạng thái
                                 </TableHead>
-                                <TableHead className="text-right text-xs font-bold text-sky-900 uppercase py-3.5 pr-6">
+                                <TableHead className="text-right text-xs font-semibold text-gray-600 uppercase py-3.5 pr-6">
                                     Thao tác
                                 </TableHead>
                             </TableRow>
@@ -737,16 +742,14 @@ export default function VouchersContent(props: Props) {
                                         return (
                                             <TableRow
                                                 key={v.id}
-                                                className={`group hover:bg-purple-50/40 ${
+                                                className={`group hover:bg-gray-50/80 transition-colors border-b border-gray-100 ${
                                                     expired ? 'opacity-60' : future ? 'opacity-70' : ''
                                                 }`}
                                             >
                                                 <TableCell>
-                                                    <div className="flex items-center gap-2">
-                                                        <span className="inline-flex items-center px-2 py-1 rounded-md bg-purple-100 text-purple-700 border border-purple-200 font-mono font-bold text-xs tracking-wider">
-                                                            {v.code}
-                                                        </span>
-                                                    </div>
+                                                    <span className="inline-flex items-center px-2.5 py-1 rounded-lg bg-purple-50 text-purple-700 border border-purple-200 font-mono font-bold text-xs tracking-wider">
+                                                        {v.code}
+                                                    </span>
                                                 </TableCell>
                                                 <TableCell>
                                                     <div>
@@ -761,33 +764,42 @@ export default function VouchersContent(props: Props) {
                                                     </div>
                                                 </TableCell>
                                                 <TableCell>
-                                                    {v.sale_name ? (
-                                                        <div className="flex items-center gap-2">
-                                                            <div className="w-6 h-6 rounded-full bg-blue-100 text-blue-700 flex items-center justify-center text-[11px] font-bold shrink-0">
-                                                                {v.sale_name.charAt(0).toUpperCase()}
-                                                            </div>
-                                                            <div className="min-w-0">
-                                                                <p className="text-xs font-semibold text-slate-800 truncate">{v.sale_name}</p>
-                                                                {v.sale_email && <p className="text-[10px] text-slate-400 truncate">{v.sale_email}</p>}
-                                                            </div>
+                                                    <div className="flex flex-col gap-1">
+                                                        <div>
+                                                            {v.scope === 'movie' ? (
+                                                                <Badge variant="outline" className="border-blue-200 bg-blue-50 text-blue-700 text-[10px] font-semibold gap-1">
+                                                                    <Film size={10} /> Phim
+                                                                </Badge>
+                                                            ) : v.scope === 'all' ? (
+                                                                <Badge variant="outline" className="border-indigo-200 bg-indigo-50 text-indigo-700 text-[10px] font-semibold gap-1">
+                                                                    <TicketIcon size={10} /> Toàn đơn
+                                                                </Badge>
+                                                            ) : (
+                                                                <Badge variant="outline" className="border-purple-200 bg-purple-50 text-purple-700 text-[10px] font-semibold gap-1">
+                                                                    <Gamepad2 size={10} /> VR
+                                                                </Badge>
+                                                            )}
                                                         </div>
-                                                    ) : (
-                                                        <span className="text-slate-400 text-xs italic">Voucher chung</span>
-                                                    )}
+                                                        {v.sale_name ? (
+                                                            <p className="text-[10px] text-slate-500 truncate max-w-[120px]" title={v.sale_name}>
+                                                                👤 {v.sale_name}
+                                                            </p>
+                                                        ) : null}
+                                                    </div>
                                                 </TableCell>
                                                 <TableCell>
                                                     {v.discount_type === 'percent' ? (
-                                                        <Badge variant="outline" className="border-orange-300 bg-orange-50 text-orange-700 text-xs font-bold gap-1">
+                                                        <Badge variant="outline" className="border-amber-300 bg-amber-50 text-amber-800 text-xs font-bold gap-1">
                                                             <Percent className="w-3 h-3" />
                                                             {v.discount_value}%
                                                             {v.max_discount ? (
-                                                                <span className="text-[10px] ml-0.5 opacity-70">
-                                                                    /tối đa {formatMoney(v.max_discount)}
+                                                                <span className="text-[10px] ml-0.5 opacity-75 font-normal">
+                                                                    (tối đa {formatMoney(v.max_discount)})
                                                                 </span>
                                                             ) : null}
                                                         </Badge>
                                                     ) : (
-                                                        <Badge variant="outline" className="border-emerald-300 bg-emerald-50 text-emerald-700 text-xs font-bold gap-1">
+                                                        <Badge variant="outline" className="border-emerald-300 bg-emerald-50 text-emerald-800 text-xs font-bold gap-1">
                                                             <CircleDollarSign className="w-3 h-3" />
                                                             {formatMoney(v.discount_value)}
                                                         </Badge>
@@ -795,42 +807,42 @@ export default function VouchersContent(props: Props) {
                                                 </TableCell>
                                                 <TableCell>
                                                     <div className="flex flex-col gap-0.5">
-                                                        <span className="text-sm font-medium text-slate-700">
-                                                            <span className="text-blue-600 font-bold">{used}</span>
+                                                        <span className="text-xs font-medium text-slate-700">
+                                                            <span className="text-purple-600 font-bold">{used}</span>
                                                             <span className="text-slate-400 mx-1">/</span>
-                                                            <span className={limit ? 'text-slate-700' : 'text-slate-400'}>
+                                                            <span className={limit ? 'text-slate-700 font-semibold' : 'text-slate-400'}>
                                                                 {limit ? Number(limit).toLocaleString() : '∞'}
                                                             </span>
                                                         </span>
                                                         {v.total_revenue !== undefined && v.total_revenue > 0 ? (
-                                                            <span className="text-[11px] font-semibold text-emerald-600">
+                                                            <span className="text-[10px] font-semibold text-emerald-600">
                                                                 Thu: {formatMoney(v.total_revenue)}
                                                             </span>
                                                         ) : null}
                                                         {v.per_user_limit ? (
                                                             <span className="text-[10px] text-slate-400">
-                                                                / 1 user: {v.per_user_limit} lượt
+                                                                {v.per_user_limit} lượt/user
                                                             </span>
                                                         ) : null}
                                                     </div>
                                                 </TableCell>
                                                 <TableCell>
-                                                    <div className="flex flex-col gap-0.5">
+                                                    <div className="flex flex-col gap-1">
                                                         {expired ? (
-                                                            <Badge variant="destructive" className="w-fit text-[10px] font-semibold gap-1 px-2 py-0.5">
+                                                            <Badge variant="destructive" className="w-fit text-[10px] font-semibold px-2 py-0.5">
                                                                 Hết hiệu lực
                                                             </Badge>
                                                         ) : future ? (
-                                                            <Badge variant="secondary" className="w-fit text-[10px] font-semibold gap-1 px-2 py-0.5">
-                                                                Chưa mở bán
+                                                            <Badge variant="secondary" className="w-fit text-[10px] font-semibold px-2 py-0.5">
+                                                                Chưa bắt đầu
                                                             </Badge>
                                                         ) : (
-                                                            <Badge variant="outline" className="w-fit text-[10px] font-semibold gap-1 px-2 py-0.5 border-green-300 text-green-700 bg-green-50">
+                                                            <Badge variant="outline" className="w-fit text-[10px] font-semibold px-2 py-0.5 border-emerald-300 text-emerald-700 bg-emerald-50">
                                                                 Đang hiệu lực
                                                             </Badge>
                                                         )}
-                                                        <span className="text-[11px] text-slate-500 flex items-center gap-1 mt-1">
-                                                            <CalendarDays className="w-3 h-3" />
+                                                        <span className="text-[11px] text-slate-500 flex items-center gap-1">
+                                                            <CalendarDays className="w-3 h-3 text-slate-400 shrink-0" />
                                                             {v.valid_from ? (
                                                                 <>
                                                                     {format(new Date(v.valid_from), 'dd/MM/yy')}
@@ -841,7 +853,7 @@ export default function VouchersContent(props: Props) {
                                                             ) : v.valid_until ? (
                                                                 <>→ hết {format(new Date(v.valid_until), 'dd/MM/yy')}</>
                                                             ) : (
-                                                                <span className="text-slate-400">Vĩnh viễn</span>
+                                                                <span className="text-slate-400 font-medium">Vĩnh viễn</span>
                                                             )}
                                                         </span>
                                                     </div>
@@ -862,9 +874,7 @@ export default function VouchersContent(props: Props) {
                                                         <div className="flex items-center justify-center">
                                                             {hasPermission('vouchers', 'toggle_status') ? (
                                                                 <AlertDialog
-                                                                    open={
-                                                                        voucherToToggle?.id === v.id
-                                                                    }
+                                                                    open={voucherToToggle?.id === v.id}
                                                                     onOpenChange={(open) => {
                                                                         if (!open) setVoucherToToggle(null);
                                                                     }}
@@ -872,12 +882,7 @@ export default function VouchersContent(props: Props) {
                                                                     <AlertDialogTrigger asChild>
                                                                         <Switch
                                                                             checked={!!v.is_active}
-                                                                            className="scale-100 transition-all border-2 border-transparent cursor-pointer shrink-0"
-                                                                            style={{
-                                                                                opacity: 1,
-                                                                                backgroundColor: v.is_active ? '#10b981' : '#d1d5db',
-                                                                                boxShadow: 'none'
-                                                                            }}
+                                                                            className="data-[state=checked]:bg-green-500 data-[state=unchecked]:bg-gray-300 cursor-pointer"
                                                                             onClick={(e) => {
                                                                                 e.preventDefault();
                                                                                 setVoucherToToggle({
@@ -922,7 +927,7 @@ export default function VouchersContent(props: Props) {
                                                                         </AlertDialogHeader>
                                                                         <AlertDialogFooter className="mt-3">
                                                                             <AlertDialogCancel
-                                                                                className="rounded-lg"
+                                                                                className="rounded-lg border-slate-200"
                                                                                 onClick={() => setVoucherToToggle(null)}
                                                                             >
                                                                                 Hủy
@@ -938,11 +943,10 @@ export default function VouchersContent(props: Props) {
                                                                                         );
                                                                                     }
                                                                                 }}
-                                                                                className={`rounded-lg text-white ${
-                                                                                    voucherToToggle?.currentStatus
+                                                                                className={`rounded-lg text-white ${voucherToToggle?.currentStatus
                                                                                         ? 'bg-red-600 hover:bg-red-700'
                                                                                         : 'bg-emerald-600 hover:bg-emerald-700'
-                                                                                }`}
+                                                                                    }`}
                                                                             >
                                                                                 {isTogglingId === v.id ? (
                                                                                     <span className="flex items-center gap-2">
@@ -959,16 +963,11 @@ export default function VouchersContent(props: Props) {
                                                                     </AlertDialogContent>
                                                                 </AlertDialog>
                                                             ) : (
-                                                                <Badge
-                                                                    variant="outline"
-                                                                    className={`text-[10px] ${
-                                                                        v.is_active
-                                                                            ? 'bg-green-50 text-green-700 border-green-200'
-                                                                            : 'bg-slate-100 text-slate-500 border-slate-200'
-                                                                    }`}
-                                                                >
-                                                                    {v.is_active ? 'Đang bật' : 'Đã tắt'}
-                                                                </Badge>
+                                                                <Switch
+                                                                    checked={!!v.is_active}
+                                                                    disabled
+                                                                    className="data-[state=checked]:bg-green-500 data-[state=unchecked]:bg-gray-300 opacity-40 cursor-not-allowed"
+                                                                />
                                                             )}
                                                         </div>
                                                     )}
@@ -1119,15 +1118,15 @@ export default function VouchersContent(props: Props) {
                                 </div>
                                 <div>
                                     <DialogTitle className="text-lg font-bold text-gray-900">
-                                        {editData?.id 
+                                        {editData?.id
                                             ? (editData?.scope === 'movie' ? 'Chỉnh sửa Voucher Phim' : editData?.scope === 'all' ? 'Chỉnh sửa Voucher Tổng hợp' : 'Chỉnh sửa Voucher VR')
                                             : (editData?.scope === 'movie' ? 'Thêm Voucher Phim Mới' : editData?.scope === 'all' ? 'Thêm Voucher Mới' : 'Thêm Voucher VR Mới')}
                                     </DialogTitle>
                                     <p className="text-xs text-slate-500 mt-0.5">
-                                        {editData?.scope === 'movie' 
-                                            ? 'Áp dụng cho Vé xem phim — Loại giảm, giới hạn & chi nhánh' 
-                                            : editData?.scope === 'all' 
-                                                ? 'Áp dụng cho Tất cả dịch vụ — Loại giảm, giới hạn & chi nhánh' 
+                                        {editData?.scope === 'movie'
+                                            ? 'Áp dụng cho Vé xem phim — Loại giảm, giới hạn & chi nhánh'
+                                            : editData?.scope === 'all'
+                                                ? 'Áp dụng cho Tất cả dịch vụ — Loại giảm, giới hạn & chi nhánh'
                                                 : 'Áp dụng cho Dịch vụ Trải nghiệm VR — Loại giảm, giới hạn & chi nhánh'}
                                     </p>
                                 </div>
@@ -1250,8 +1249,8 @@ export default function VouchersContent(props: Props) {
                                                 setEditData({
                                                     ...editData,
                                                     scope: val,
-                                                    applicable_ticket_package_ids: [],
-                                                    excluded_ticket_package_ids: []
+                                                    applicable_ticket_package_ids: null,
+                                                    excluded_ticket_package_ids: null
                                                 });
                                             }}
                                         >
@@ -1281,11 +1280,10 @@ export default function VouchersContent(props: Props) {
                                             onClick={() =>
                                                 setEditData({ ...editData, discount_type: 'percent' })
                                             }
-                                            className={`flex-1 py-2 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-2 ${
-                                                editData?.discount_type !== 'fixed'
+                                            className={`flex-1 py-2 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-2 ${editData?.discount_type !== 'fixed'
                                                     ? 'bg-white text-purple-700 shadow-sm border border-purple-200/80'
                                                     : 'text-purple-700/70 hover:text-purple-900'
-                                            }`}
+                                                }`}
                                         >
                                             <Percent className="w-4 h-4" /> Theo %
                                         </button>
@@ -1294,11 +1292,10 @@ export default function VouchersContent(props: Props) {
                                             onClick={() =>
                                                 setEditData({ ...editData, discount_type: 'fixed' })
                                             }
-                                            className={`flex-1 py-2 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-2 ${
-                                                editData?.discount_type === 'fixed'
+                                            className={`flex-1 py-2 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-2 ${editData?.discount_type === 'fixed'
                                                     ? 'bg-white text-emerald-700 shadow-sm border border-emerald-200/80'
                                                     : 'text-emerald-700/70 hover:text-emerald-900'
-                                            }`}
+                                                }`}
                                         >
                                             <CircleDollarSign className="w-4 h-4" /> Theo VND
                                         </button>
@@ -1433,29 +1430,57 @@ export default function VouchersContent(props: Props) {
                             {/* Cột phải: Hiệu lực / Áp dụng gói / Chi nhánh */}
                             <div className="space-y-4">
                                 {/* Validity Period */}
-                                <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-xs space-y-4">
-                                    <h3 className="text-xs font-bold text-gray-700 border-b pb-2 flex items-center gap-2">
-                                        <CalendarDays size={14} className="text-indigo-500" />
-                                        Thời gian hiệu lực
-                                    </h3>
+                                <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-xs space-y-3">
+                                    <div className="flex items-center justify-between border-b pb-2">
+                                        <h3 className="text-xs font-bold text-gray-700 flex items-center gap-2">
+                                            <CalendarDays size={14} className="text-indigo-500" />
+                                            Thời gian hiệu lực
+                                        </h3>
+                                        <div className="flex items-center space-x-2 bg-indigo-50/70 hover:bg-indigo-50 px-2.5 py-1 rounded-lg border border-indigo-100 transition-colors">
+                                            <Checkbox
+                                                id="voucher-is-permanent"
+                                                checked={isPermanent}
+                                                onCheckedChange={(checked) => {
+                                                    const nextPermanent = !!checked;
+                                                    setIsPermanent(nextPermanent);
+                                                    if (nextPermanent) {
+                                                        setEditData({
+                                                            ...editData,
+                                                            valid_from: null,
+                                                            valid_until: null
+                                                        });
+                                                    } else {
+                                                        setEditData({
+                                                            ...editData,
+                                                            valid_from: editData?.valid_from || getTodayStartIso(),
+                                                            valid_until: editData?.valid_until || getTodayEndIso()
+                                                        });
+                                                    }
+                                                }}
+                                            />
+                                            <label
+                                                htmlFor="voucher-is-permanent"
+                                                className="text-xs font-bold text-indigo-700 cursor-pointer select-none"
+                                            >
+                                                Áp dụng vĩnh viễn
+                                            </label>
+                                        </div>
+                                    </div>
 
-                                    <div className="grid grid-cols-2 gap-3">
+                                    <div className={`grid grid-cols-2 gap-3 transition-opacity ${isPermanent ? 'opacity-40 pointer-events-none' : ''}`}>
                                         <div>
                                             <Label className="text-xs font-semibold text-gray-700 mb-1.5 block">
                                                 Bắt đầu từ
                                             </Label>
                                             <Input
                                                 type="datetime-local"
-                                                value={
-                                                    editData?.valid_from
-                                                        ? new Date(editData.valid_from).toISOString().slice(0, 16)
-                                                        : ''
-                                                }
+                                                disabled={isPermanent}
+                                                value={toLocalDatetimeString(editData?.valid_from)}
                                                 onChange={(e) => {
                                                     const dt = e.target.value;
                                                     setEditData({
                                                         ...editData,
-                                                        valid_from: dt ? new Date(dt).toISOString() : null
+                                                        valid_from: dt ? fromLocalDatetimeString(dt) : null
                                                     });
                                                 }}
                                                 className="h-9.5 text-sm"
@@ -1467,16 +1492,13 @@ export default function VouchersContent(props: Props) {
                                             </Label>
                                             <Input
                                                 type="datetime-local"
-                                                value={
-                                                    editData?.valid_until
-                                                        ? new Date(editData.valid_until).toISOString().slice(0, 16)
-                                                        : ''
-                                                }
+                                                disabled={isPermanent}
+                                                value={toLocalDatetimeString(editData?.valid_until)}
                                                 onChange={(e) => {
                                                     const dt = e.target.value;
                                                     setEditData({
                                                         ...editData,
-                                                        valid_until: dt ? new Date(dt).toISOString() : null
+                                                        valid_until: dt ? fromLocalDatetimeString(dt) : null
                                                     });
                                                 }}
                                                 className="h-9.5 text-sm"
@@ -1484,12 +1506,14 @@ export default function VouchersContent(props: Props) {
                                         </div>
                                     </div>
                                     <p className="text-[10px] text-slate-400">
-                                        Để trống "Hết hạn" = voucher không bao giờ hết hạn; Để trống "Bắt đầu" = hiệu lực ngay lập tức.
+                                        {isPermanent
+                                            ? '✨ Voucher có hiệu lực vĩnh viễn (áp dụng ngay lập tức và không bao giờ hết hạn).'
+                                            : 'Voucher bắt đầu và kết thúc theo ngày giờ đã chọn ở trên.'}
                                     </p>
                                 </div>
 
-                                {/* Applied Ticket Packages based on Scope */}
-                                {(() => {
+                                {/* Applied Ticket Packages based on Scope (only for vr / movie, hidden for 'all') */}
+                                {editData?.scope && editData.scope !== 'all' ? (() => {
                                     const scopeType = editData?.scope || 'vr';
                                     const scopeConfig = {
                                         vr: {
@@ -1511,18 +1535,8 @@ export default function VouchersContent(props: Props) {
                                             borderClass: 'border-blue-100',
                                             textTheme: 'text-blue-800',
                                             hoverClass: 'hover:bg-blue-50 hover:border-blue-100'
-                                        },
-                                        all: {
-                                            title: 'Áp dụng cho gói vé cụ thể',
-                                            hint: 'Để trống = tất cả gói vé',
-                                            empty: 'Không có gói vé nào — vui lòng tạo ít nhất 1 gói vé trước',
-                                            icon: <TicketIcon size={14} className="text-indigo-600" />,
-                                            themeClass: 'border-indigo-100 bg-indigo-50/10 text-indigo-800',
-                                            borderClass: 'border-indigo-100',
-                                            textTheme: 'text-indigo-800',
-                                            hoverClass: 'hover:bg-indigo-50 hover:border-indigo-100'
                                         }
-                                    }[scopeType as 'vr' | 'movie' | 'all'] || {
+                                    }[scopeType as 'vr' | 'movie'] || {
                                         title: 'Áp dụng cho gói VR cụ thể',
                                         hint: 'Để trống = tất cả VR',
                                         empty: 'Không có gói VR — vui lòng tạo ít nhất 1 gói VR trước',
@@ -1546,8 +1560,8 @@ export default function VouchersContent(props: Props) {
                                     const mode: 'all' | 'whitelist' | 'blacklist' = hasAnyApplicable
                                         ? 'whitelist'
                                         : hasAnyExcluded
-                                        ? 'blacklist'
-                                        : 'all';
+                                            ? 'blacklist'
+                                            : 'all';
 
                                     return (
                                         <div className={`bg-white p-4 rounded-2xl border ${scopeConfig.borderClass} ${scopeConfig.themeClass.split(' ')[1] || ''} shadow-xs space-y-3`}>
@@ -1578,11 +1592,10 @@ export default function VouchersContent(props: Props) {
 
                                             {mode !== 'all' && (
                                                 <div
-                                                    className={`rounded-lg px-3 py-2 border text-[11px] flex items-center gap-2 ${
-                                                        mode === 'whitelist'
+                                                    className={`rounded-lg px-3 py-2 border text-[11px] flex items-center gap-2 ${mode === 'whitelist'
                                                             ? 'bg-green-50 border-green-200 text-green-700'
                                                             : 'bg-red-50 border-red-200 text-red-700'
-                                                    }`}
+                                                        }`}
                                                 >
                                                     {mode === 'whitelist' ? (
                                                         <>
@@ -1646,9 +1659,8 @@ export default function VouchersContent(props: Props) {
                                                                 </div>
                                                                 <label
                                                                     htmlFor={`vrpkg-apply-${pkg.id}`}
-                                                                    className={`text-xs font-medium leading-none cursor-pointer flex-1 truncate ${
-                                                                        applyDisabled && !applied ? 'text-slate-400' : 'text-slate-700'
-                                                                    }`}
+                                                                    className={`text-xs font-medium leading-none cursor-pointer flex-1 truncate ${applyDisabled && !applied ? 'text-slate-400' : 'text-slate-700'
+                                                                        }`}
                                                                     title={applyDisabled && !applied
                                                                         ? 'Bỏ hết Loại trừ → mới tick được Áp dụng'
                                                                         : undefined
@@ -1706,7 +1718,7 @@ export default function VouchersContent(props: Props) {
                                             </div>
                                         </div>
                                     );
-                                })()}
+                                })() : null}
 
                                 {/* Branches */}
                                 <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-xs space-y-3">
@@ -1783,13 +1795,12 @@ export default function VouchersContent(props: Props) {
                             <Button
                                 onClick={handleSave}
                                 disabled={isSaving}
-                                className={`${
-                                    editData?.scope === 'movie' 
-                                        ? 'bg-blue-600 hover:bg-blue-700' 
-                                        : editData?.scope === 'all' 
-                                            ? 'bg-indigo-600 hover:bg-indigo-700' 
+                                className={`${editData?.scope === 'movie'
+                                        ? 'bg-blue-600 hover:bg-blue-700'
+                                        : editData?.scope === 'all'
+                                            ? 'bg-indigo-600 hover:bg-indigo-700'
                                             : 'bg-purple-600 hover:bg-purple-700'
-                                } text-white rounded-lg px-6 gap-2`}
+                                    } text-white rounded-lg px-6 gap-2`}
                             >
                                 {isSaving ? (
                                     <Loader2 className="w-4 h-4 animate-spin" />
@@ -1841,152 +1852,152 @@ export default function VouchersContent(props: Props) {
                                     : [];
                                 return (
                                     <>
-                            {/* Info Grid */}
-                            <div className="grid grid-cols-2 md:grid-cols-3 gap-3 text-xs">
-                                <div className="bg-slate-50 rounded-xl p-3 border border-slate-100">
-                                    <p className="text-[10px] uppercase font-semibold text-slate-500 mb-1">Loại giảm</p>
-                                    <p className="font-bold text-slate-800">
-                                        {selectedVoucher.discount_type === 'percent' ? (
-                                            <>
-                                                {selectedVoucher.discount_value}%
-                                                {selectedVoucher.max_discount ? (
-                                                    <span className="text-[10px] text-slate-500 font-normal ml-1">
-                                                        (tối đa {formatMoney(selectedVoucher.max_discount)})
-                                                    </span>
+                                        {/* Info Grid */}
+                                        <div className="grid grid-cols-2 md:grid-cols-3 gap-3 text-xs">
+                                            <div className="bg-slate-50 rounded-xl p-3 border border-slate-100">
+                                                <p className="text-[10px] uppercase font-semibold text-slate-500 mb-1">Loại giảm</p>
+                                                <p className="font-bold text-slate-800">
+                                                    {selectedVoucher.discount_type === 'percent' ? (
+                                                        <>
+                                                            {selectedVoucher.discount_value}%
+                                                            {selectedVoucher.max_discount ? (
+                                                                <span className="text-[10px] text-slate-500 font-normal ml-1">
+                                                                    (tối đa {formatMoney(selectedVoucher.max_discount)})
+                                                                </span>
+                                                            ) : null}
+                                                        </>
+                                                    ) : (
+                                                        formatMoney(selectedVoucher.discount_value)
+                                                    )}
+                                                </p>
+                                            </div>
+                                            <div className="bg-slate-50 rounded-xl p-3 border border-slate-100">
+                                                <p className="text-[10px] uppercase font-semibold text-slate-500 mb-1">Đơn tối thiểu</p>
+                                                <p className="font-bold text-slate-800">{formatMoney(selectedVoucher.min_order_value || 0)}</p>
+                                            </div>
+                                            <div className="bg-slate-50 rounded-xl p-3 border border-slate-100">
+                                                <p className="text-[10px] uppercase font-semibold text-slate-500 mb-1">Đã dùng / Giới hạn</p>
+                                                <p className="font-bold text-slate-800">
+                                                    <span className="text-blue-600">{selectedVoucher.used_count ?? 0}</span> /{' '}
+                                                    {selectedVoucher.usage_limit ?? '∞'}
+                                                </p>
+                                            </div>
+                                            <div className="bg-slate-50 rounded-xl p-3 border border-slate-100">
+                                                <p className="text-[10px] uppercase font-semibold text-slate-500 mb-1">/1 user</p>
+                                                <p className="font-bold text-slate-800">{selectedVoucher.per_user_limit ?? 1} lượt</p>
+                                            </div>
+                                            <div className="bg-slate-50 rounded-xl p-3 border border-slate-100">
+                                                <p className="text-[10px] uppercase font-semibold text-slate-500 mb-1">Hiệu lực</p>
+                                                <p className="font-semibold text-slate-800">
+                                                    {selectedVoucher.valid_from
+                                                        ? format(new Date(selectedVoucher.valid_from), 'dd/MM/yy')
+                                                        : 'ngay'}
+                                                    {' → '}
+                                                    {selectedVoucher.valid_until
+                                                        ? format(new Date(selectedVoucher.valid_until), 'dd/MM/yy')
+                                                        : 'vĩnh viễn'}
+                                                </p>
+                                            </div>
+                                            <div className="bg-slate-50 rounded-xl p-3 border border-slate-100">
+                                                <p className="text-[10px] uppercase font-semibold text-slate-500 mb-1">Trạng thái</p>
+                                                <p className="font-bold text-slate-800">
+                                                    {selectedVoucher.is_active ? '✓ Bật' : '✗ Tắt'}
+                                                </p>
+                                            </div>
+                                        </div>
+
+                                        {/* Branch badge row */}
+                                        <div>
+                                            <Label className="text-[10px] font-bold uppercase text-slate-500 block mb-1.5">Chi nhánh áp dụng</Label>
+                                            <BranchIdsBadge
+                                                branch_ids={selectedVoucher.branch_ids}
+                                                branches={branches}
+                                                className="text-[11px]"
+                                            />
+                                        </div>
+
+                                        {/* Applied package lists */}
+                                        {(applied.length || excluded.length) && (
+                                            <div className="grid grid-cols-2 gap-3">
+                                                {applied.length ? (
+                                                    <div>
+                                                        <Label className="text-[10px] font-bold uppercase text-green-600 block mb-1.5">
+                                                            ✓ Áp dụng cho ({applied.length}) gói
+                                                        </Label>
+                                                        <div className="space-y-1 max-h-36 overflow-y-auto border border-green-100 rounded-xl p-2 bg-green-50/40">
+                                                            {applied.map((id) => (
+                                                                <Badge key={id} variant="outline" className="border-green-200 bg-white text-green-700 text-[10px]">
+                                                                    ID #{id}
+                                                                </Badge>
+                                                            ))}
+                                                        </div>
+                                                    </div>
                                                 ) : null}
-                                            </>
-                                        ) : (
-                                            formatMoney(selectedVoucher.discount_value)
+                                                {excluded.length ? (
+                                                    <div>
+                                                        <Label className="text-[10px] font-bold uppercase text-red-600 block mb-1.5">
+                                                            ✗ Loại trừ ({excluded.length}) gói
+                                                        </Label>
+                                                        <div className="space-y-1 max-h-36 overflow-y-auto border border-red-100 rounded-xl p-2 bg-red-50/40">
+                                                            {excluded.map((id) => (
+                                                                <Badge key={id} variant="outline" className="border-red-200 bg-white text-red-700 text-[10px]">
+                                                                    ID #{id}
+                                                                </Badge>
+                                                            ))}
+                                                        </div>
+                                                    </div>
+                                                ) : null}
+                                            </div>
                                         )}
-                                    </p>
-                                </div>
-                                <div className="bg-slate-50 rounded-xl p-3 border border-slate-100">
-                                    <p className="text-[10px] uppercase font-semibold text-slate-500 mb-1">Đơn tối thiểu</p>
-                                    <p className="font-bold text-slate-800">{formatMoney(selectedVoucher.min_order_value || 0)}</p>
-                                </div>
-                                <div className="bg-slate-50 rounded-xl p-3 border border-slate-100">
-                                    <p className="text-[10px] uppercase font-semibold text-slate-500 mb-1">Đã dùng / Giới hạn</p>
-                                    <p className="font-bold text-slate-800">
-                                        <span className="text-blue-600">{selectedVoucher.used_count ?? 0}</span> /{' '}
-                                        {selectedVoucher.usage_limit ?? '∞'}
-                                    </p>
-                                </div>
-                                <div className="bg-slate-50 rounded-xl p-3 border border-slate-100">
-                                    <p className="text-[10px] uppercase font-semibold text-slate-500 mb-1">/1 user</p>
-                                    <p className="font-bold text-slate-800">{selectedVoucher.per_user_limit ?? 1} lượt</p>
-                                </div>
-                                <div className="bg-slate-50 rounded-xl p-3 border border-slate-100">
-                                    <p className="text-[10px] uppercase font-semibold text-slate-500 mb-1">Hiệu lực</p>
-                                    <p className="font-semibold text-slate-800">
-                                        {selectedVoucher.valid_from
-                                            ? format(new Date(selectedVoucher.valid_from), 'dd/MM/yy')
-                                            : 'ngay'}
-                                        {' → '}
-                                        {selectedVoucher.valid_until
-                                            ? format(new Date(selectedVoucher.valid_until), 'dd/MM/yy')
-                                            : 'vĩnh viễn'}
-                                    </p>
-                                </div>
-                                <div className="bg-slate-50 rounded-xl p-3 border border-slate-100">
-                                    <p className="text-[10px] uppercase font-semibold text-slate-500 mb-1">Trạng thái</p>
-                                    <p className="font-bold text-slate-800">
-                                        {selectedVoucher.is_active ? '✓ Bật' : '✗ Tắt'}
-                                    </p>
-                                </div>
-                            </div>
 
-                            {/* Branch badge row */}
-                            <div>
-                                <Label className="text-[10px] font-bold uppercase text-slate-500 block mb-1.5">Chi nhánh áp dụng</Label>
-                                <BranchIdsBadge
-                                    branch_ids={selectedVoucher.branch_ids}
-                                    branches={branches}
-                                    className="text-[11px]"
-                                />
-                            </div>
-
-                            {/* Applied package lists */}
-                            {(applied.length || excluded.length) && (
-                                <div className="grid grid-cols-2 gap-3">
-                                    {applied.length ? (
-                                        <div>
-                                            <Label className="text-[10px] font-bold uppercase text-green-600 block mb-1.5">
-                                                ✓ Áp dụng cho ({applied.length}) gói
-                                            </Label>
-                                            <div className="space-y-1 max-h-36 overflow-y-auto border border-green-100 rounded-xl p-2 bg-green-50/40">
-                                                {applied.map((id) => (
-                                                    <Badge key={id} variant="outline" className="border-green-200 bg-white text-green-700 text-[10px]">
-                                                        ID #{id}
-                                                    </Badge>
-                                                ))}
+                                        {/* Recent redemptions */}
+                                        {recent.length > 0 && (
+                                            <div>
+                                                <Label className="text-[10px] font-bold uppercase text-slate-600 block mb-1.5">
+                                                    20 giao dịch redeem gần nhất
+                                                </Label>
+                                                <div className="border border-slate-100 rounded-xl overflow-hidden">
+                                                    <Table>
+                                                        <TableHeader className="bg-slate-50">
+                                                            <TableRow className="hover:bg-transparent border-none">
+                                                                <TableHead className="text-[10px] font-semibold uppercase py-2">Booking</TableHead>
+                                                                <TableHead className="text-[10px] font-semibold uppercase py-2">Discount</TableHead>
+                                                                <TableHead className="text-[10px] font-semibold uppercase py-2">Thời gian</TableHead>
+                                                            </TableRow>
+                                                        </TableHeader>
+                                                        <TableBody>
+                                                            {recent.map((r: any, i: number) => (
+                                                                <TableRow key={`rd-${r.id || i}`} className="hover:bg-slate-50 border-t border-slate-100">
+                                                                    <TableCell className="text-xs font-mono">#{r.booking_id}</TableCell>
+                                                                    <TableCell className="text-xs font-semibold text-green-700">
+                                                                        -{formatMoney(r.discount_amount_applied)}
+                                                                    </TableCell>
+                                                                    <TableCell className="text-[11px] text-slate-500">
+                                                                        {r.redeemed_at ? format(new Date(r.redeemed_at), 'dd/MM/yy HH:mm') : '-'}
+                                                                    </TableCell>
+                                                                </TableRow>
+                                                            ))}
+                                                        </TableBody>
+                                                    </Table>
+                                                </div>
                                             </div>
-                                        </div>
-                                    ) : null}
-                                    {excluded.length ? (
-                                        <div>
-                                            <Label className="text-[10px] font-bold uppercase text-red-600 block mb-1.5">
-                                                ✗ Loại trừ ({excluded.length}) gói
-                                            </Label>
-                                            <div className="space-y-1 max-h-36 overflow-y-auto border border-red-100 rounded-xl p-2 bg-red-50/40">
-                                                {excluded.map((id) => (
-                                                    <Badge key={id} variant="outline" className="border-red-200 bg-white text-red-700 text-[10px]">
-                                                        ID #{id}
-                                                    </Badge>
-                                                ))}
-                                            </div>
-                                        </div>
-                                    ) : null}
-                                </div>
-                            )}
+                                        )}
 
-                            {/* Recent redemptions */}
-                            {recent.length > 0 && (
-                                <div>
-                                    <Label className="text-[10px] font-bold uppercase text-slate-600 block mb-1.5">
-                                        20 giao dịch redeem gần nhất
-                                    </Label>
-                                    <div className="border border-slate-100 rounded-xl overflow-hidden">
-                                        <Table>
-                                            <TableHeader className="bg-slate-50">
-                                                <TableRow className="hover:bg-transparent border-none">
-                                                    <TableHead className="text-[10px] font-semibold uppercase py-2">Booking</TableHead>
-                                                    <TableHead className="text-[10px] font-semibold uppercase py-2">Discount</TableHead>
-                                                    <TableHead className="text-[10px] font-semibold uppercase py-2">Thời gian</TableHead>
-                                                </TableRow>
-                                            </TableHeader>
-                                            <TableBody>
-                                                {recent.map((r: any, i: number) => (
-                                                    <TableRow key={`rd-${r.id || i}`} className="hover:bg-slate-50 border-t border-slate-100">
-                                                        <TableCell className="text-xs font-mono">#{r.booking_id}</TableCell>
-                                                        <TableCell className="text-xs font-semibold text-green-700">
-                                                            -{formatMoney(r.discount_amount_applied)}
-                                                        </TableCell>
-                                                        <TableCell className="text-[11px] text-slate-500">
-                                                            {r.redeemed_at ? format(new Date(r.redeemed_at), 'dd/MM/yy HH:mm') : '-'}
-                                                        </TableCell>
-                                                    </TableRow>
-                                                ))}
-                                            </TableBody>
-                                        </Table>
-                                    </div>
-                                </div>
-                            )}
-
-                            {/* Audit */}
-                            <div className="bg-slate-50 border border-slate-100 rounded-xl p-3 text-[11px] text-slate-500 flex items-center justify-between">
-                                <span>
-                                    Tạo bởi: <b className="text-slate-700">{selectedVoucher.created_by_staff_name || '-'}</b>
-                                </span>
-                                <span>
-                                    Cập nhật lần cuối:{' '}
-                                    <b className="text-slate-700">
-                                        {selectedVoucher.updated_at
-                                            ? format(new Date(selectedVoucher.updated_at), 'dd/MM/yy HH:mm')
-                                            : '-'}
-                                    </b>{' '}
-                                    của <b className="text-slate-700">{selectedVoucher.updated_by_staff_name || '-'}</b>
-                                </span>
-                            </div>
+                                        {/* Audit */}
+                                        <div className="bg-slate-50 border border-slate-100 rounded-xl p-3 text-[11px] text-slate-500 flex items-center justify-between">
+                                            <span>
+                                                Tạo bởi: <b className="text-slate-700">{selectedVoucher.created_by_staff_name || '-'}</b>
+                                            </span>
+                                            <span>
+                                                Cập nhật lần cuối:{' '}
+                                                <b className="text-slate-700">
+                                                    {selectedVoucher.updated_at
+                                                        ? format(new Date(selectedVoucher.updated_at), 'dd/MM/yy HH:mm')
+                                                        : '-'}
+                                                </b>{' '}
+                                                của <b className="text-slate-700">{selectedVoucher.updated_by_staff_name || '-'}</b>
+                                            </span>
+                                        </div>
                                     </>
                                 );
                             })()}

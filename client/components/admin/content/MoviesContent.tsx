@@ -255,7 +255,7 @@ export default function MoviesContent({
                                                         onChange={(e) => setSelectedBranchId(e.target.value === 'all' ? 'all' : Number(e.target.value))}
                                                         className="bg-white border rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none shadow-sm cursor-pointer"
                                                 >
-                                                        <option value="all">Tất cả chi nhánh</option>
+                                                        {isSuperAdmin && <option value="all">Tất cả chi nhánh</option>}
                                                         {branches.map((branch) => (
                                                                 <option key={branch.id} value={branch.id}>
                                                                         {branch.name}

@@ -240,7 +240,7 @@ export default function TicketsContent(props: Props) {
                             onChange={(e) => setSelectedBranchId(e.target.value === 'all' ? 'all' : Number(e.target.value))}
                             className="bg-white border rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none shadow-sm cursor-pointer h-10"
                         >
-                            <option value="all">Tất cả chi nhánh</option>
+                            {isSuperAdmin && <option value="all">Tất cả chi nhánh</option>}
                             {branches.map((branch) => (
                                 <option key={branch.id} value={branch.id}>
                                     {branch.name}
@@ -1031,16 +1031,16 @@ export default function TicketsContent(props: Props) {
                                     </CardHeader>
                                     <CardContent className="px-4 pb-4">
                                         <div className="grid grid-cols-2 gap-3">
-                                            <div className="space-y-0.5">
-                                                <Label className="text-[10px] font-bold uppercase text-gray-400">Tên gói</Label>
+                                            <div className="space-y-1">
+                                                <Label className="text-[10px] font-bold uppercase text-gray-400 block">Tên gói</Label>
                                                 <div className="text-sm font-bold text-slate-800 truncate">{selectedTicket.name}</div>
                                             </div>
-                                            <div className="space-y-0.5">
-                                                <Label className="text-[10px] font-bold uppercase text-gray-400">Mã gói</Label>
+                                            <div className="space-y-1">
+                                                <Label className="text-[10px] font-bold uppercase text-gray-400 block">Mã gói</Label>
                                                 <div className="text-xs font-mono bg-slate-100 px-2 py-1 rounded w-fit">{selectedTicket.code || '-'}</div>
                                             </div>
-                                            <div className="space-y-0.5">
-                                                <Label className="text-[10px] font-bold uppercase text-gray-400">Phân loại</Label>
+                                            <div className="space-y-1">
+                                                <Label className="text-[10px] font-bold uppercase text-gray-400 block">Phân loại</Label>
                                                 <div>
                                                     {selectedTicket.type === 'vr' ? (
                                                         <Badge className="bg-purple-100 text-purple-700 border-purple-200 text-xs">Gói VR</Badge>
@@ -1049,11 +1049,13 @@ export default function TicketsContent(props: Props) {
                                                     )}
                                                 </div>
                                             </div>
-                                            <div className="space-y-0.5">
-                                                <Label className="text-[10px] font-bold uppercase text-gray-400">Trạng thái</Label>
-                                                <Badge className={selectedTicket.is_active ? 'bg-emerald-100 text-emerald-700 border-emerald-200 text-xs' : 'bg-gray-100 text-gray-500 border-gray-200 text-xs'}>
-                                                    {selectedTicket.is_active ? 'Hoạt động' : 'Ngừng'}
-                                                </Badge>
+                                            <div className="space-y-1">
+                                                <Label className="text-[10px] font-bold uppercase text-gray-400 block">Trạng thái</Label>
+                                                <div>
+                                                    <Badge className={selectedTicket.is_active ? 'bg-emerald-100 text-emerald-700 border-emerald-200 text-xs' : 'bg-gray-100 text-gray-500 border-gray-200 text-xs'}>
+                                                        {selectedTicket.is_active ? 'Hoạt động' : 'Ngừng'}
+                                                    </Badge>
+                                                </div>
                                             </div>
                                         </div>
                                     </CardContent>
@@ -1069,30 +1071,32 @@ export default function TicketsContent(props: Props) {
                                     </CardHeader>
                                     <CardContent className="px-4 pb-4">
                                         <div className="grid grid-cols-2 gap-3">
-                                            <div className="space-y-0.5">
-                                                <Label className="text-[10px] font-bold uppercase text-gray-400">Giá niêm yết</Label>
+                                            <div className="space-y-1">
+                                                <Label className="text-[10px] font-bold uppercase text-gray-400 block">Giá niêm yết</Label>
                                                 <div className="text-base font-black text-emerald-600">
                                                     {new Intl.NumberFormat('vi-VN').format(selectedTicket.price)} VNĐ
                                                 </div>
                                             </div>
-                                            <div className="space-y-0.5">
-                                                <Label className="text-[10px] font-bold uppercase text-gray-400">Chi nhánh</Label>
-                                                <BranchIdsBadge
-                                                    branch_ids={selectedTicket.branch_ids}
-                                                    branch_id={selectedTicket.branch_id}
-                                                    branches={branches || []}
-                                                />
+                                            <div className="space-y-1">
+                                                <Label className="text-[10px] font-bold uppercase text-gray-400 block">Chi nhánh</Label>
+                                                <div>
+                                                    <BranchIdsBadge
+                                                        branch_ids={selectedTicket.branch_ids}
+                                                        branch_id={selectedTicket.branch_id}
+                                                        branches={branches || []}
+                                                    />
+                                                </div>
                                             </div>
                                             {selectedTicket.type === 'vr' ? (
                                                 <>
-                                                    <div className="space-y-0.5">
-                                                        <Label className="text-[10px] font-bold uppercase text-gray-400">Thời lượng</Label>
+                                                    <div className="space-y-1">
+                                                        <Label className="text-[10px] font-bold uppercase text-gray-400 block">Thời lượng</Label>
                                                         <div className="text-xs font-bold text-purple-700 flex items-center gap-1">
                                                             <Clock className="w-3 h-3" /> {selectedTicket.duration_min || 30} phút
                                                         </div>
                                                     </div>
-                                                    <div className="space-y-0.5">
-                                                        <Label className="text-[10px] font-bold uppercase text-gray-400">Số người chơi</Label>
+                                                    <div className="space-y-1">
+                                                        <Label className="text-[10px] font-bold uppercase text-gray-400 block">Số người chơi</Label>
                                                         <div className="text-xs font-bold text-slate-700 flex items-center gap-1">
                                                             <Users className="w-3 h-3 text-slate-400" />
                                                             {selectedTicket.min_players || 1} - {selectedTicket.max_players || 'Không giới hạn'} người
@@ -1101,12 +1105,12 @@ export default function TicketsContent(props: Props) {
                                                 </>
                                             ) : (
                                                 <>
-                                                    <div className="space-y-0.5">
-                                                        <Label className="text-[10px] font-bold uppercase text-gray-400">Nhóm tối thiểu</Label>
+                                                    <div className="space-y-1">
+                                                        <Label className="text-[10px] font-bold uppercase text-gray-400 block">Nhóm tối thiểu</Label>
                                                         <div className="text-xs">{selectedTicket.min_group_size ?? 1}</div>
                                                     </div>
-                                                    <div className="space-y-0.5">
-                                                        <Label className="text-[10px] font-bold uppercase text-gray-400">Nhóm tối đa</Label>
+                                                    <div className="space-y-1">
+                                                        <Label className="text-[10px] font-bold uppercase text-gray-400 block">Nhóm tối đa</Label>
                                                         <div className="text-xs">{selectedTicket.max_group_size ?? '-'}</div>
                                                     </div>
                                                 </>

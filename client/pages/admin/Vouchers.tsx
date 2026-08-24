@@ -96,23 +96,27 @@ export default function VouchersPage() {
         });
         const [branches, setBranches] = useState<any[]>([]);
 
+        // Load branches accessible by staff (always, not just canViewBranches)
         useEffect(() => {
-                if (!canViewBranches) {
-                        setBranches([]);
-                        return;
-                }
                 (async () => {
                         try {
                                 const { items } = await getAdminBranchOptions({ includeInactive: true });
-                                setBranches(items);
-                                if (!staff?.isSuperAdmin && selectedBranchId === null && items.length > 0) {
-                                        setSelectedBranchId(items[0].id);
+                                setBranches(items || []);
+
+                                // If not superadmin, auto-select first branch when no valid branch is set
+                                if (!staff?.isSuperAdmin && items && items.length > 0) {
+                                        const hasValidSelection = selectedBranchId !== null && selectedBranchId !== 'all'
+                                                && items.some((b: any) => b.id === selectedBranchId);
+                                        if (!hasValidSelection) {
+                                                setSelectedBranchId(items[0].id);
+                                        }
                                 }
                         } catch (error) {
                                 console.error('Error loading branches:', error);
                         }
                 })();
-        }, [staff, canViewBranches, selectedBranchId]);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+        }, [staff]);
 
         const handleRefresh = async () => {
                 setIsLoading(true);
@@ -155,6 +159,18 @@ export default function VouchersPage() {
                 } catch { }
         }, [page, showActiveOnly, selectedBranchId, scopeFilter, searchText, selectedSaleId]);
 
+        const getTodayStartIso = () => {
+                const d = new Date();
+                d.setHours(0, 0, 0, 0);
+                return d.toISOString();
+        };
+
+        const getTodayEndIso = () => {
+                const d = new Date();
+                d.setHours(23, 59, 59, 999);
+                return d.toISOString();
+        };
+
         const openCreate = () => {
                 setEditData({
                         id: 0,
@@ -172,10 +188,10 @@ export default function VouchersPage() {
                         min_order_value: 0,
                         usage_limit: null,
                         per_user_limit: 1,
-                        valid_from: null,
-                        valid_until: null,
-                        applicable_ticket_package_ids: [],
-                        excluded_ticket_package_ids: [],
+                        valid_from: getTodayStartIso(),
+                        valid_until: getTodayEndIso(),
+                        applicable_ticket_package_ids: null,
+                        excluded_ticket_package_ids: null,
                         branch_ids: staff?.isSuperAdmin
                                 ? null
                                 : selectedBranchId && selectedBranchId !== 'all'

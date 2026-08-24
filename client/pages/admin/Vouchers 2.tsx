@@ -147,6 +147,18 @@ export default function VouchersPage() {
                 } catch { }
         }, [page, showActiveOnly, selectedBranchId, scopeFilter, searchText]);
 
+        const getTodayStartIso = () => {
+                const d = new Date();
+                d.setHours(0, 0, 0, 0);
+                return d.toISOString();
+        };
+
+        const getTodayEndIso = () => {
+                const d = new Date();
+                d.setHours(23, 59, 59, 999);
+                return d.toISOString();
+        };
+
         const openCreate = () => {
                 const newScope = scopeFilter === 'all' ? 'vr' : scopeFilter;
                 setEditData({
@@ -161,10 +173,10 @@ export default function VouchersPage() {
                         min_order_value: 0,
                         usage_limit: null,
                         per_user_limit: 1,
-                        valid_from: null,
-                        valid_until: null,
-                        applicable_ticket_package_ids: [],
-                        excluded_ticket_package_ids: [],
+                        valid_from: getTodayStartIso(),
+                        valid_until: getTodayEndIso(),
+                        applicable_ticket_package_ids: null,
+                        excluded_ticket_package_ids: null,
                         branch_ids: staff?.isSuperAdmin
                                 ? null
                                 : selectedBranchId && selectedBranchId !== 'all'

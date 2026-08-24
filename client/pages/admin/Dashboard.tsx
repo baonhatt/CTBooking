@@ -74,32 +74,41 @@ export default function DashboardPage() {
 
         // Branch filter
         const [selectedBranchId, setSelectedBranchId] = useState<number | 'all' | null>(() => {
+                const stored = localStorage.getItem('dashboard_selected_branch_id');
+                if (stored !== null) {
+                        return stored === 'all' ? 'all' : Number(stored);
+                }
                 if (staff?.isSuperAdmin) return 'all';
                 return null;
         });
         const [branches, setBranches] = useState<any[]>([]);
 
-        // Load branches when branch viewing is allowed
         useEffect(() => {
-                if (!canViewBranches) {
-                        setBranches([]);
-                        return;
+                if (selectedBranchId !== null && selectedBranchId !== undefined) {
+                        localStorage.setItem('dashboard_selected_branch_id', String(selectedBranchId));
                 }
+        }, [selectedBranchId]);
 
+        // Load branches accessible by staff
+        useEffect(() => {
                 (async () => {
                         try {
                                 const { items } = await getAdminBranchOptions({ includeInactive: true });
-                                setBranches(items);
+                                const branchItems = items || [];
+                                setBranches(branchItems);
 
-                                // If not superadmin, default to their first branch if none selected
-                                if (!staff?.isSuperAdmin && !selectedBranchId && items.length > 0) {
-                                        setSelectedBranchId(items[0].id);
+                                // If not superadmin, default to their first branch if none selected or invalid
+                                if (!staff?.isSuperAdmin && branchItems.length > 0) {
+                                        const isValid = selectedBranchId !== null && selectedBranchId !== 'all' && branchItems.some((b: any) => b.id === selectedBranchId);
+                                        if (!isValid && selectedBranchId !== 'all') {
+                                                setSelectedBranchId(branchItems[0].id);
+                                        }
                                 }
                         } catch (error) {
                                 console.error('Error loading branches:', error);
                         }
                 })();
-        }, [staff, canViewBranches, selectedBranchId]);
+        }, [staff]);
 
         const handleRefresh = () => {
                 setRefreshKey((prev) => prev + 1);

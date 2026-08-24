@@ -62,27 +62,27 @@ export default function MoviesPage() {
         const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
         const [movieToDelete, setMovieToDelete] = useState<number | null>(null);
 
-        // Load branches only when branch viewing is allowed
+        // Load branches accessible by staff (always, not just canViewBranches)
         useEffect(() => {
-                if (!canViewBranches) {
-                        setBranches([]);
-                        return;
-                }
-
                 (async () => {
                         try {
                                 const { items } = await getAdminBranchOptions({ includeInactive: true });
-                                setBranches(items);
+                                setBranches(items || []);
 
-                                // If not superadmin and no branch selected, default to first branch
-                                if (!staff?.isSuperAdmin && selectedBranchId === null && items.length > 0) {
-                                        setSelectedBranchId(items[0].id);
+                                // If not superadmin, auto-select first branch when no valid branch is set
+                                if (!staff?.isSuperAdmin && items && items.length > 0) {
+                                        const hasValidSelection = selectedBranchId !== null && selectedBranchId !== 'all'
+                                                && items.some((b: any) => b.id === selectedBranchId);
+                                        if (!hasValidSelection) {
+                                                setSelectedBranchId(items[0].id);
+                                        }
                                 }
                         } catch (error) {
                                 console.error('Error loading branches:', error);
                         }
                 })();
-        }, [staff, canViewBranches, selectedBranchId]);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+        }, [staff]);
 
         useEffect(() => {
                 (async () => {

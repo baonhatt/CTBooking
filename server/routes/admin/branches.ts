@@ -162,9 +162,9 @@ export async function listBranchesImpl(
 export async function listBranchOptionsImpl(
         anyDb: any,
         tables: { branches: any },
-        args?: { includeInactive?: boolean; onlyOpen?: boolean }
+        args?: { includeInactive?: boolean; onlyOpen?: boolean; restrictToBranchIds?: number[] | null }
 ) {
-        const { includeInactive = false, onlyOpen = false } = args || {};
+        const { includeInactive = false, onlyOpen = false, restrictToBranchIds = null } = args || {};
 
         let whereCondition = includeInactive
                 ? isNull(tables.branches.deleted_at)
@@ -173,6 +173,15 @@ export async function listBranchOptionsImpl(
         if (onlyOpen) {
                 const openCondition = eq(tables.branches.is_open, true);
                 whereCondition = whereCondition ? and(whereCondition, openCondition) : openCondition;
+        }
+
+        // Filter to only branches the staff can access
+        if (restrictToBranchIds !== null && restrictToBranchIds !== undefined) {
+                if (restrictToBranchIds.length === 0) {
+                        return { items: [] };
+                }
+                const branchFilter = inArray(tables.branches.id, restrictToBranchIds);
+                whereCondition = whereCondition ? and(whereCondition, branchFilter) : branchFilter;
         }
 
         const branches = await anyDb

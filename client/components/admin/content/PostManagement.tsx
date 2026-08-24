@@ -286,6 +286,7 @@ export const PostManagement = () => {
                         initialSnapshotRef.current = snapshotEditData({ ...editData, imageFile: undefined, ogImageFile: undefined });
                         setIsEditOpen(false);
                         fetchPosts();
+                        navigate('/posts');
                 } catch (error: any) {
                         toast.error('Lỗi', { description: error?.message || 'Có lỗi xảy ra' });
                 } finally {

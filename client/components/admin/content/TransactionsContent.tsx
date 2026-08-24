@@ -500,7 +500,7 @@ export default function TransactionsContent({
                                                                         onChange={(e) => setSelectedBranchId(e.target.value === 'all' ? 'all' : Number(e.target.value))}
                                                                         className="h-11 px-3 bg-white border rounded-xl text-xs w-40 cursor-pointer shadow-sm focus:ring-2 focus:ring-blue-500 outline-none"
                                                                 >
-                                                                        <option value="all">Tất cả chi nhánh</option>
+                                                                        {isSuperAdmin && <option value="all">Tất cả chi nhánh</option>}
                                                                         {branches.map((branch) => (
                                                                                 <option key={branch.id} value={branch.id}>
                                                                                         {branch.name}

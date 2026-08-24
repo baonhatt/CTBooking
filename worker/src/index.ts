@@ -4665,13 +4665,14 @@ app.get('/api/admin/branches/options', requireStaffAuth, async (c) => {
   try {
     const includeInactive = c.req.query('includeInactive') === 'true';
     const onlyOpen = c.req.query('onlyOpen') === 'true';
+    const restrictBranchIds = getRestrictBranchIds(c);
 
     const db = drizzle(c.env.cinema_db, { schema });
 
     const r = await listBranchOptionsImpl(
       db,
       { branches: schema.branches },
-      { includeInactive, onlyOpen }
+      { includeInactive, onlyOpen, restrictToBranchIds: restrictBranchIds }
     );
 
     return c.json(r);
@@ -6014,13 +6015,14 @@ app.get('/api/admin/vouchers', requireStaffAuth, requirePermission('vouchers', '
     const scope = c.req.query('scope') || '';
     const is_active = c.req.query('is_active');
     const sale_staff_id = c.req.query('sale_staff_id');
+    const restrictBranchIds = getRestrictBranchIds(c);
 
     const db = drizzle(c.env.cinema_db, { schema });
 
     const r = await listVouchersImpl(
       db,
       { vouchers: schema.vouchers, voucher_redemption_logs: schema.voucher_redemption_logs },
-      { page, pageSize, q, scope, is_active, sale_staff_id }
+      { page, pageSize, q, scope, is_active, sale_staff_id, restrictToBranchIds: restrictBranchIds }
     );
 
     return c.json(r, 200 as any);
@@ -6033,6 +6035,7 @@ app.get('/api/admin/vouchers', requireStaffAuth, requirePermission('vouchers', '
 app.get('/api/admin/vouchers/:id', requireStaffAuth, requirePermission('vouchers', 'view'), async (c) => {
   try {
     const id = Number(c.req.param('id'));
+    const restrictBranchIds = getRestrictBranchIds(c);
     const db = drizzle(c.env.cinema_db, { schema });
 
     const r = await getVoucherImpl(
@@ -6042,7 +6045,8 @@ app.get('/api/admin/vouchers/:id', requireStaffAuth, requirePermission('vouchers
         auditLogs: schema.auditLogs,
         voucher_redemption_logs: schema.voucher_redemption_logs
       },
-      id
+      id,
+      restrictBranchIds
     );
 
     if (!r) return c.json({ message: 'Voucher không tồn tại' }, 404 as any);
@@ -6080,6 +6084,7 @@ app.put('/api/admin/vouchers/:id', requireStaffAuth, requirePermission('vouchers
   try {
     const id = Number(c.req.param('id'));
     const body = await c.req.json().catch(() => ({}));
+    const restrictBranchIds = getRestrictBranchIds(c);
     const db = drizzle(c.env.cinema_db, { schema });
 
     const staffId = c.get('staffId');
@@ -6091,12 +6096,14 @@ app.put('/api/admin/vouchers/:id', requireStaffAuth, requirePermission('vouchers
       { vouchers: schema.vouchers, auditLogs: schema.auditLogs },
       id,
       body,
-      { id: staffId, email: staffEmail, fullname: staffFullname }
+      { id: staffId, email: staffEmail, fullname: staffFullname },
+      restrictBranchIds
     );
 
     return c.json(r, 200 as any);
   } catch (err: any) {
-    return c.json({ status: 'error', message: String(err?.message || 'Internal error') }, 500 as any);
+    const errStatus = Number(err?.statusCode) || 500;
+    return c.json({ status: 'error', message: String(err?.message || 'Internal error') }, errStatus as any);
   }
 });
 
@@ -6104,6 +6111,7 @@ app.put('/api/admin/vouchers/:id', requireStaffAuth, requirePermission('vouchers
 app.post('/api/admin/vouchers/:id/toggle-status', requireStaffAuth, requirePermission('vouchers', 'toggle_status'), async (c) => {
   try {
     const id = Number(c.req.param('id'));
+    const restrictBranchIds = getRestrictBranchIds(c);
     const db = drizzle(c.env.cinema_db, { schema });
 
     const staffId = c.get('staffId');
@@ -6114,7 +6122,8 @@ app.post('/api/admin/vouchers/:id/toggle-status', requireStaffAuth, requirePermi
       db,
       { vouchers: schema.vouchers, auditLogs: schema.auditLogs },
       id,
-      { id: staffId, email: staffEmail, fullname: staffFullname }
+      { id: staffId, email: staffEmail, fullname: staffFullname },
+      restrictBranchIds
     );
 
     return c.json(r, 200 as any);
@@ -6128,6 +6137,7 @@ app.post('/api/admin/vouchers/:id/toggle-status', requireStaffAuth, requirePermi
 app.delete('/api/admin/vouchers/:id', requireStaffAuth, requirePermission('vouchers', 'delete'), async (c) => {
   try {
     const id = Number(c.req.param('id'));
+    const restrictBranchIds = getRestrictBranchIds(c);
     const db = drizzle(c.env.cinema_db, { schema });
 
     const staffId = c.get('staffId');
@@ -6138,13 +6148,15 @@ app.delete('/api/admin/vouchers/:id', requireStaffAuth, requirePermission('vouch
       db,
       { vouchers: schema.vouchers, auditLogs: schema.auditLogs },
       id,
-      { id: staffId, email: staffEmail, fullname: staffFullname }
+      { id: staffId, email: staffEmail, fullname: staffFullname },
+      restrictBranchIds
     );
 
     if (!r) return c.json({ status: 'error', message: 'Voucher không tồn tại' }, 404 as any);
     return c.json(r, 200 as any);
   } catch (err: any) {
-    return c.json({ status: 'error', message: String(err?.message || 'Internal error') }, 500 as any);
+    const errStatus = Number(err?.statusCode) || 500;
+    return c.json({ status: 'error', message: String(err?.message || 'Internal error') }, errStatus as any);
   }
 });
 
@@ -6152,6 +6164,7 @@ app.delete('/api/admin/vouchers/:id', requireStaffAuth, requirePermission('vouch
 app.post('/api/admin/vouchers/:id/restore', requireStaffAuth, requirePermission('vouchers', 'restore'), async (c) => {
   try {
     const id = Number(c.req.param('id'));
+    const restrictBranchIds = getRestrictBranchIds(c);
     const db = drizzle(c.env.cinema_db, { schema });
 
     const staffId = c.get('staffId');
@@ -6162,7 +6175,8 @@ app.post('/api/admin/vouchers/:id/restore', requireStaffAuth, requirePermission(
       db,
       { vouchers: schema.vouchers, auditLogs: schema.auditLogs },
       id,
-      { id: staffId, email: staffEmail, fullname: staffFullname }
+      { id: staffId, email: staffEmail, fullname: staffFullname },
+      restrictBranchIds
     );
 
     return c.json(r, 200 as any);
@@ -6178,13 +6192,14 @@ app.get('/api/admin/deleted/vouchers', requireStaffAuth, requirePermission('vouc
     const page = Number(c.req.query('page') || 1);
     const pageSize = Number(c.req.query('pageSize') || 10);
     const search = String(c.req.query('q') || c.req.query('search') || '');
+    const restrictBranchIds = getRestrictBranchIds(c);
 
     const db = drizzle(c.env.cinema_db, { schema });
 
     const r = await listDeletedVouchersImpl(
       db,
       { vouchers: schema.vouchers },
-      { page, pageSize, search }
+      { page, pageSize, search, restrictToBranchIds: restrictBranchIds }
     );
 
     return c.json(r, 200 as any);
