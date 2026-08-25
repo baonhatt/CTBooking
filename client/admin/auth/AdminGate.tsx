@@ -10,7 +10,8 @@ import { useStaffPermission, useIsSuperAdmin } from '@/hooks/useStaffPermission'
 import { loginApi } from '@/lib/api/auth';
 import { request } from '@/lib/api/http';
 import { checkSuperAdminSetup } from '@/lib/api/admin';
-import { AlertCircle, ShieldAlert } from 'lucide-react';
+import iconCine from '@/assets/images/iconCine.svg';
+import { AlertCircle, ShieldAlert, Lock, Mail, Eye, EyeOff, Loader2, ArrowRight } from 'lucide-react';
 import { forceChangePasswordApi } from '@/lib/api/auth';
 import AdminIndex from '@/pages/admin/AdminIndex';
 import DashboardPage from '@/pages/admin/Dashboard';
@@ -74,6 +75,7 @@ const AdminLoginView = () => {
         const navigate = useNavigate();
         const [email, setEmail] = useState('');
         const [password, setPassword] = useState('');
+        const [showPassword, setShowPassword] = useState(false);
         const [loading, setLoading] = useState(false);
         const [error, setError] = useState('');
         const [isEmailFocused, setIsEmailFocused] = useState(false);
@@ -95,26 +97,55 @@ const AdminLoginView = () => {
                         } else {
                                 setError(data.message || 'Đăng nhập thất bại');
                         }
-                } catch (err) {
-                        setError('Lỗi kết nối server');
+                } catch (err: any) {
+                        setError(err?.message || 'Lỗi kết nối server');
                 } finally {
                         setLoading(false);
                 }
         }
 
         return (
-                <div className="min-h-screen flex items-center justify-center bg-background">
-                        <Card className="w-full max-w-sm bg-white">
-                                <CardHeader>
-                                        <CardTitle>Đăng nhập Admin</CardTitle>
-                                </CardHeader>
-                                <CardContent>
-                                        <div className="space-y-3">
-                                                <form onSubmit={handleLogin}>
-                                                        <div>
-                                                                <Label>Email</Label>
+                <div className="min-h-screen flex items-center justify-center bg-slate-950 relative overflow-hidden px-4 py-8 select-none">
+                        {/* Ambient Cinematic Background Glows */}
+                        <div className="absolute top-1/4 -left-32 w-96 h-96 bg-blue-600/20 rounded-full blur-3xl pointer-events-none" />
+                        <div className="absolute bottom-1/4 -right-32 w-96 h-96 bg-indigo-600/20 rounded-full blur-3xl pointer-events-none" />
+                        <div className="absolute inset-0 bg-[radial-gradient(#1e293b_1px,transparent_1px)] [background-size:24px_24px] opacity-40 pointer-events-none" />
+
+                        <div className="w-full max-w-md relative z-10">
+                                {/* Brand Header */}
+                                <div className="flex flex-col items-center text-center mb-8">
+                                        <div className="relative mb-3 group">
+                                                <div className="absolute -inset-1 bg-gradient-to-r from-blue-600 to-indigo-600 rounded-2xl blur-md opacity-70 group-hover:opacity-100 transition duration-500" />
+                                                <div className="relative h-16 w-16 bg-slate-900 rounded-2xl border border-slate-700/80 flex items-center justify-center shadow-xl p-3">
+                                                        <img src={iconCine} alt="CineSphere" className="h-full w-full object-contain" />
+                                                </div>
+                                        </div>
+                                        <h1 className="text-xl font-black tracking-widest text-white uppercase">CINESPHERE</h1>
+                                        <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 mt-1.5 rounded-full bg-slate-900/90 border border-slate-800 text-[10px] font-bold tracking-wider text-emerald-400 uppercase">
+                                                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse shadow-[0_0_8px_rgba(16,185,129,0.8)]" />
+                                                Management Portal
+                                        </div>
+                                </div>
+
+                                {/* Login Card */}
+                                <div className="bg-slate-900/80 backdrop-blur-2xl border border-slate-800/90 rounded-3xl p-6 sm:p-8 shadow-[0_25px_50px_-12px_rgba(0,0,0,0.7)]">
+                                        <div className="mb-6">
+                                                <h2 className="text-lg font-bold text-white">Đăng nhập tài khoản</h2>
+                                                <p className="text-xs text-slate-400 mt-1">Truy cập bảng điều khiển dành cho Ban Quản trị & Nhân viên</p>
+                                        </div>
+
+                                        <form onSubmit={handleLogin} className="space-y-4">
+                                                {/* Email Input */}
+                                                <div className="space-y-1.5">
+                                                        <Label className="text-xs font-semibold text-slate-300">Email quản trị</Label>
+                                                        <div className="relative group">
+                                                                <div className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-500 group-focus-within:text-blue-400 transition-colors">
+                                                                        <Mail className="h-4 w-4" />
+                                                                </div>
                                                                 <Input
-                                                                        className="text-black"
+                                                                        type="email"
+                                                                        placeholder="name@cinesphere.com"
+                                                                        className="bg-slate-950/70 border-slate-800/90 rounded-xl pl-10 pr-3 py-2.5 text-sm text-white placeholder:text-slate-600 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition-all"
                                                                         value={email}
                                                                         onChange={(e) => setEmail(e.target.value)}
                                                                         autoComplete={isEmailFocused ? 'email' : 'new-password'}
@@ -123,10 +154,19 @@ const AdminLoginView = () => {
                                                                         required
                                                                 />
                                                         </div>
-                                                        <div>
-                                                                <Label>Mật khẩu</Label>
+                                                </div>
+
+                                                {/* Password Input */}
+                                                <div className="space-y-1.5">
+                                                        <Label className="text-xs font-semibold text-slate-300">Mật khẩu</Label>
+                                                        <div className="relative group">
+                                                                <div className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-500 group-focus-within:text-blue-400 transition-colors">
+                                                                        <Lock className="h-4 w-4" />
+                                                                </div>
                                                                 <Input
-                                                                        type="password"
+                                                                        type={showPassword ? 'text' : 'password'}
+                                                                        placeholder="••••••••"
+                                                                        className="bg-slate-950/70 border-slate-800/90 rounded-xl pl-10 pr-10 py-2.5 text-sm text-white placeholder:text-slate-600 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition-all"
                                                                         value={password}
                                                                         onChange={(e) => setPassword(e.target.value)}
                                                                         autoComplete={isPasswordFocused ? 'current-password' : 'new-password'}
@@ -134,17 +174,52 @@ const AdminLoginView = () => {
                                                                         readOnly={!isPasswordFocused}
                                                                         required
                                                                 />
+                                                                <button
+                                                                        type="button"
+                                                                        onClick={() => setShowPassword(!showPassword)}
+                                                                        className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-300 transition-colors"
+                                                                >
+                                                                        {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                                                                </button>
                                                         </div>
-                                                        {error && <div className="text-red-500 text-sm">{error}</div>}
-                                                        <div className="flex justify-end">
-                                                                <Button disabled={loading} type="submit">
-                                                                        {loading ? 'Đang đăng nhập...' : 'Đăng nhập'}
-                                                                </Button>
+                                                </div>
+
+                                                {/* Error Message */}
+                                                {error && (
+                                                        <div className="flex items-start gap-2.5 bg-rose-500/10 border border-rose-500/25 p-3 rounded-xl text-rose-400 text-xs animate-in fade-in-50 duration-200">
+                                                                <AlertCircle className="h-4 w-4 shrink-0 mt-0.5" />
+                                                                <span>{error}</span>
                                                         </div>
-                                                </form>
-                                        </div>
-                                </CardContent>
-                        </Card>
+                                                )}
+
+                                                {/* Submit Button */}
+                                                <Button
+                                                        disabled={loading}
+                                                        type="submit"
+                                                        className="w-full mt-2 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-bold py-2.5 h-11 rounded-xl shadow-lg shadow-blue-600/25 hover:shadow-blue-600/40 transition-all duration-300 flex items-center justify-center gap-2 group cursor-pointer"
+                                                >
+                                                        {loading ? (
+                                                                <>
+                                                                        <Loader2 className="h-4 w-4 animate-spin" />
+                                                                        <span>Đang xác thực...</span>
+                                                                </>
+                                                        ) : (
+                                                                <>
+                                                                        <span>Đăng nhập hệ thống</span>
+                                                                        <ArrowRight className="h-4 w-4 group-hover:translate-x-1 transition-transform" />
+                                                                </>
+                                                        )}
+                                                </Button>
+                                        </form>
+                                </div>
+
+                                {/* Security Footer */}
+                                <div className="text-center mt-6 text-[11px] text-slate-500 flex items-center justify-center gap-1.5">
+                                        <span>🔒 Bảo mật chuẩn phân quyền RBAC</span>
+                                        <span>•</span>
+                                        <span>CineSphere System</span>
+                                </div>
+                        </div>
                 </div>
         );
 };
@@ -316,59 +391,107 @@ const ForcePasswordChangeView = ({ staff }: { staff: any }) => {
                         } else {
                                 setError(res.message || 'Có lỗi xảy ra');
                         }
-                } catch (err) {
-                        setError('Lỗi kết nối server');
+                } catch (err: any) {
+                        setError(err?.message || 'Lỗi kết nối server');
                 } finally {
                         setLoading(false);
                 }
         }
 
         return (
-                <div className="min-h-screen flex items-center justify-center bg-background p-4">
-                        <Card className="w-full max-w-sm bg-white shadow-xl">
-                                <CardHeader>
-                                        <CardTitle className="text-xl font-bold">Đổi mật khẩu lần đầu</CardTitle>
-                                </CardHeader>
-                                <CardContent>
-                                        <p className="text-sm text-gray-600 mb-6">
-                                                Tài khoản của bạn vừa được khởi tạo hoặc reset. Vui lòng đặt mật khẩu mới để bắt đầu sử dụng hệ thống.
-                                        </p>
+                <div className="min-h-screen flex items-center justify-center bg-slate-950 relative overflow-hidden px-4 py-8 select-none">
+                        <div className="absolute top-1/4 -left-32 w-96 h-96 bg-blue-600/20 rounded-full blur-3xl pointer-events-none" />
+                        <div className="absolute bottom-1/4 -right-32 w-96 h-96 bg-indigo-600/20 rounded-full blur-3xl pointer-events-none" />
+                        <div className="absolute inset-0 bg-[radial-gradient(#1e293b_1px,transparent_1px)] [background-size:24px_24px] opacity-40 pointer-events-none" />
+
+                        <div className="w-full max-w-md relative z-10">
+                                <div className="flex flex-col items-center text-center mb-8">
+                                        <div className="relative mb-3 group">
+                                                <div className="absolute -inset-1 bg-gradient-to-r from-blue-600 to-indigo-600 rounded-2xl blur-md opacity-70 group-hover:opacity-100 transition duration-500" />
+                                                <div className="relative h-16 w-16 bg-slate-900 rounded-2xl border border-slate-700/80 flex items-center justify-center shadow-xl p-3">
+                                                        <img src={iconCine} alt="CineSphere" className="h-full w-full object-contain" />
+                                                </div>
+                                        </div>
+                                        <h1 className="text-xl font-black tracking-widest text-white uppercase">CINESPHERE</h1>
+                                        <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 mt-1.5 rounded-full bg-slate-900/90 border border-slate-800 text-[10px] font-bold tracking-wider text-amber-400 uppercase">
+                                                <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" />
+                                                Bảo mật tài khoản
+                                        </div>
+                                </div>
+
+                                <div className="bg-slate-900/80 backdrop-blur-2xl border border-slate-800/90 rounded-3xl p-6 sm:p-8 shadow-[0_25px_50px_-12px_rgba(0,0,0,0.7)]">
+                                        <div className="mb-6">
+                                                <h2 className="text-lg font-bold text-white">Đổi mật khẩu lần đầu</h2>
+                                                <p className="text-xs text-slate-400 mt-1">
+                                                        Tài khoản của bạn vừa được khởi tạo hoặc thiết lập lại. Vui lòng đặt mật khẩu mới để tiếp tục.
+                                                </p>
+                                        </div>
+
                                         <form onSubmit={handleSubmit} className="space-y-4">
-                                                <div className="space-y-2">
-                                                        <Label htmlFor="new-password">Mật khẩu mới</Label>
-                                                        <Input
-                                                                id="new-password"
-                                                                type="password"
-                                                                value={newPassword}
-                                                                onChange={(e) => setNewPassword(e.target.value)}
-                                                                placeholder="Nhập mật khẩu mới"
-                                                                required
-                                                                autoFocus
-                                                        />
+                                                <div className="space-y-1.5">
+                                                        <Label className="text-xs font-semibold text-slate-300">Mật khẩu mới</Label>
+                                                        <div className="relative group">
+                                                                <div className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-500 group-focus-within:text-blue-400 transition-colors">
+                                                                        <Lock className="h-4 w-4" />
+                                                                </div>
+                                                                <Input
+                                                                        id="new-password"
+                                                                        type="password"
+                                                                        value={newPassword}
+                                                                        onChange={(e) => setNewPassword(e.target.value)}
+                                                                        placeholder="Nhập tối thiểu 6 ký tự"
+                                                                        className="bg-slate-950/70 border-slate-800/90 rounded-xl pl-10 pr-3 py-2.5 text-sm text-white placeholder:text-slate-600 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition-all"
+                                                                        required
+                                                                        autoFocus
+                                                                />
+                                                        </div>
                                                 </div>
-                                                <div className="space-y-2">
-                                                        <Label htmlFor="confirm-password">Xác nhận mật khẩu mới</Label>
-                                                        <Input
-                                                                id="confirm-password"
-                                                                type="password"
-                                                                value={confirmPassword}
-                                                                onChange={(e) => setConfirmPassword(e.target.value)}
-                                                                placeholder="Nhập lại mật khẩu mới"
-                                                                required
-                                                        />
+
+                                                <div className="space-y-1.5">
+                                                        <Label className="text-xs font-semibold text-slate-300">Xác nhận mật khẩu mới</Label>
+                                                        <div className="relative group">
+                                                                <div className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-500 group-focus-within:text-blue-400 transition-colors">
+                                                                        <Lock className="h-4 w-4" />
+                                                                </div>
+                                                                <Input
+                                                                        id="confirm-password"
+                                                                        type="password"
+                                                                        value={confirmPassword}
+                                                                        onChange={(e) => setConfirmPassword(e.target.value)}
+                                                                        placeholder="Nhập lại mật khẩu mới"
+                                                                        className="bg-slate-950/70 border-slate-800/90 rounded-xl pl-10 pr-3 py-2.5 text-sm text-white placeholder:text-slate-600 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition-all"
+                                                                        required
+                                                                />
+                                                        </div>
                                                 </div>
+
                                                 {error && (
-                                                        <div className="flex items-center gap-2 text-rose-500 text-xs font-medium bg-rose-50 p-2 rounded-lg border border-rose-100">
-                                                                <AlertCircle size={14} />
-                                                                {error}
+                                                        <div className="flex items-start gap-2.5 bg-rose-500/10 border border-rose-500/25 p-3 rounded-xl text-rose-400 text-xs animate-in fade-in-50 duration-200">
+                                                                <AlertCircle className="h-4 w-4 shrink-0 mt-0.5" />
+                                                                <span>{error}</span>
                                                         </div>
                                                 )}
-                                                <Button disabled={loading} type="submit" className="w-full">
-                                                        {loading ? 'Đang thực hiện...' : 'Đổi mật khẩu & Bắt đầu'}
+
+                                                <Button
+                                                        disabled={loading}
+                                                        type="submit"
+                                                        className="w-full mt-2 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-bold py-2.5 h-11 rounded-xl shadow-lg shadow-blue-600/25 hover:shadow-blue-600/40 transition-all duration-300 flex items-center justify-center gap-2 group cursor-pointer"
+                                                >
+                                                        {loading ? (
+                                                                <>
+                                                                        <Loader2 className="h-4 w-4 animate-spin" />
+                                                                        <span>Đang cập nhật...</span>
+                                                                </>
+                                                        ) : (
+                                                                <>
+                                                                        <span>Đổi mật khẩu & Bắt đầu</span>
+                                                                        <ArrowRight className="h-4 w-4 group-hover:translate-x-1 transition-transform" />
+                                                                </>
+                                                        )}
                                                 </Button>
                                         </form>
-                                </CardContent>
-                        </Card>
+                                </div>
+                        </div>
                 </div>
         );
 };

@@ -256,26 +256,36 @@ export default function AdminLayout({ active, setActive, handleLogout, children 
 
 	const showSidebar = filteredGroups.length > 0 || hasPermission('settings', 'view');
 	const layoutClass = showSidebar
-		? 'min-h-screen flex md:grid md:grid-cols-[280px_1fr] flex-col md:flex-row relative'
-		: 'min-h-screen flex flex-col relative';
+		? 'h-screen w-full overflow-hidden flex md:grid md:grid-cols-[260px_1fr] bg-slate-50'
+		: 'h-screen w-full overflow-hidden flex flex-col bg-slate-50';
+
+	const currentTabLabel = useMemo(() => {
+		if (active === 'settings') return 'Cấu hình Hệ thống';
+		if (active === 'profile') return 'Hồ sơ cá nhân';
+		for (const group of menuGroups) {
+			const item = group.items.find(i => i.key === active);
+			if (item) return item.label;
+		}
+		return 'Admin Dashboard';
+	}, [active]);
 
 	return (
 		<div className={layoutClass}>
 			{isSidebarOpen && (
-				<div className="fixed inset-0 bg-black/60 z-40 md:hidden" onClick={() => setIsSidebarOpen(false)} />
+				<div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-40 md:hidden transition-all" onClick={() => setIsSidebarOpen(false)} />
 			)}
 
 			{showSidebar && (
 				<aside
-					className={`fixed inset-y-0 left-0 z-50 w-[280px] transform transition-transform duration-300 ease-in-out md:relative md:translate-x-0
+					className={`fixed inset-y-0 left-0 z-50 w-[260px] transform transition-all duration-300 ease-in-out md:static md:translate-x-0
         ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'}
-        bg-gradient-to-b from-[#0a1530] via-[#0e1b3d] to-[#14284d] border-r border-white/10 p-3 text-white flex flex-col justify-between h-screen overflow-y-auto select-none
+        bg-slate-950 border-r border-slate-800 text-slate-300 flex flex-col h-screen select-none shadow-2xl md:shadow-none
       `}
 				>
-					<div>
-						<div className="flex flex-col mb-3 px-2 gap-1 relative pt-1">
+					<div className="flex-1 overflow-y-auto overflow-x-hidden p-4 scrollbar-thin scrollbar-thumb-slate-800 scrollbar-track-transparent">
+						<div className="flex flex-col mb-6 relative">
 							<button
-								className="absolute top-1 right-1 p-1 md:hidden text-white/70 hover:text-white"
+								className="absolute top-0 right-0 p-1 md:hidden text-slate-400 hover:text-white transition-colors"
 								onClick={() => setIsSidebarOpen(false)}
 							>
 								<X className="h-5 w-5" />
@@ -283,87 +293,75 @@ export default function AdminLayout({ active, setActive, handleLogout, children 
 							<div className="flex items-center gap-3">
 								<img src={iconCine} alt="CINESPHERE" className="h-9 w-auto" />
 								<div>
-									<div className="font-black tracking-widest text-sm text-blue-100">CINESPHERE</div>
-									<div className="text-[10px] font-semibold text-blue-400/90 uppercase tracking-wider flex items-center gap-1.5">
-										<span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
-										Management Portal
+									<div className="font-black tracking-widest text-sm text-white">CINESPHERE</div>
+									<div className="text-[10px] font-medium text-emerald-400/90 uppercase tracking-wider flex items-center gap-1.5 mt-0.5">
+										<span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse shadow-[0_0_8px_rgba(16,185,129,0.8)]"></span>
+										Workspace
 									</div>
 								</div>
 							</div>
 						</div>
 
-						<div className="px-2 mb-3">
-							<div className="relative">
-								<Search className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-white/40" />
+						<div className="mb-6">
+							<div className="relative group">
+								<Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-500 group-focus-within:text-blue-400 transition-colors" />
 								<input
 									type="search"
 									name="admin_sidebar_search_query"
 									id="admin_sidebar_search_query"
-									placeholder="Tìm kiếm danh mục..."
+									placeholder="Tìm kiếm..."
 									value={searchQuery}
 									onChange={(e) => setSearchQuery(e.target.value)}
 									autoComplete="off"
-									autoCorrect="off"
-									spellCheck={false}
-									data-lpignore="true"
-									data-form-type="other"
-									className="w-full bg-white/5 border border-white/10 rounded-lg pl-8 pr-3 py-1.5 text-xs text-white placeholder:text-white/40 focus:outline-none focus:border-blue-500/50 focus:bg-white/10 transition-all [&::-webkit-search-cancel-button]:hidden"
+									className="w-full bg-slate-900/50 border border-slate-800 rounded-xl pl-9 pr-3 py-2 text-sm text-slate-200 placeholder:text-slate-500 focus:outline-none focus:border-blue-500/50 focus:bg-slate-900 focus:ring-1 focus:ring-blue-500/50 transition-all [&::-webkit-search-cancel-button]:hidden"
 								/>
 								{searchQuery && (
 									<button
 										onClick={() => setSearchQuery('')}
-										className="absolute right-2 top-2 text-white/40 hover:text-white text-xs"
+										className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-300 text-sm"
 									>
-										×
+										<X className="h-3.5 w-3.5" />
 									</button>
 								)}
 							</div>
 						</div>
 
-						<div className="space-y-2 px-1">
+						<div className="space-y-6">
 							{filteredGroups.map((group) => {
 								const isOpen = openGroups[group.id] || searchQuery.trim() !== '';
-								const hasActiveChild = group.items.some((item) => item.key === active);
-
 								return (
-									<div key={group.id} className="rounded-lg overflow-hidden border border-white/5 bg-white/[0.02]">
+									<div key={group.id} className="flex flex-col">
 										<button
 											onClick={() => toggleGroup(group.id)}
-											className={`w-full flex items-center justify-between px-3 py-2 text-xs font-semibold tracking-normal transition-all ${hasActiveChild
-													? 'text-blue-300 bg-white/5 font-bold'
-													: 'text-white/80 hover:text-white hover:bg-white/5'
-												}`}
+											className="w-full flex items-center justify-between px-1 mb-2 text-xs font-bold uppercase tracking-wider text-slate-500 hover:text-slate-300 transition-colors group"
 										>
-											<div className="flex items-center gap-2 min-w-0 flex-1 pr-1">
-												<span className="shrink-0">{group.icon}</span>
-												<span className="truncate text-white/90 font-bold">{group.title}</span>
-											</div>
-											<div className="flex items-center gap-1.5 shrink-0">
-												<span className="text-[10px] bg-white/10 px-1.5 py-0.2 rounded-full font-mono text-white/60">
-													{group.items.length}
-												</span>
-												{isOpen ? (
-													<ChevronDown className="h-3.5 w-3.5 text-white/60 transition-transform duration-200" />
-												) : (
-													<ChevronRight className="h-3.5 w-3.5 text-white/40 transition-transform duration-200" />
-												)}
-											</div>
+											<span className="flex items-center gap-2">
+												{group.title}
+											</span>
+											{isOpen ? (
+												<ChevronDown className="h-3.5 w-3.5 text-slate-600 group-hover:text-slate-400 transition-transform" />
+											) : (
+												<ChevronRight className="h-3.5 w-3.5 text-slate-600 group-hover:text-slate-400 transition-transform" />
+											)}
 										</button>
 
 										{isOpen && (
-											<div className="ml-3 pl-2.5 border-l border-white/10 my-1 py-1 space-y-0.5 pr-2">
+											<div className="space-y-1">
 												{group.items.map((item) => {
 													const isActive = active === item.key;
 													return (
 														<button
 															key={item.key}
 															onClick={() => go(item.key)}
-															className={`w-full flex items-center gap-2.5 px-2.5 py-2 rounded-md text-xs font-medium transition-all duration-200 text-left ${isActive
-																	? 'bg-blue-600/30 text-white border-l-2 border-blue-400 shadow-sm font-semibold pl-2'
-																	: 'text-white/75 hover:text-white hover:bg-white/10'
+															className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 text-left relative overflow-hidden group ${isActive
+																	? 'text-blue-400 bg-blue-500/10'
+																	: 'text-slate-400 hover:text-slate-100 hover:bg-slate-800/50'
 																}`}
 														>
-															<span className="shrink-0">{item.icon}</span>
+															{isActive && (
+																<div className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-5 bg-blue-500 rounded-r-full" />
+															)}
+															<span className={`shrink-0 transition-colors ${isActive ? 'text-blue-400' : 'text-slate-500 group-hover:text-slate-300'}`}>{item.icon}</span>
 															<span className="truncate flex-1">{item.label}</span>
 														</button>
 													);
@@ -376,60 +374,83 @@ export default function AdminLayout({ active, setActive, handleLogout, children 
 						</div>
 					</div>
 
-					<div className="space-y-1.5 mt-auto pt-3 border-t border-white/10 px-1">
+					<div className="p-4 border-t border-slate-800/80 bg-slate-950 shrink-0">
 						{hasPermission('settings', 'view') && (
 							<button
 								onClick={() => go('settings')}
-								className={`w-full flex items-center gap-2 px-3 py-2 rounded-md text-xs font-medium transition-all ${active === 'settings' ? 'bg-blue-600/30 text-white font-semibold' : 'text-white/80 hover:bg-white/10 hover:text-white'
+								className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 ${active === 'settings'
+										? 'text-blue-400 bg-blue-500/10'
+										: 'text-slate-400 hover:text-slate-100 hover:bg-slate-800/50'
 									}`}
 							>
-								<Settings className="h-4 w-4 text-amber-400 shrink-0" />
+								<Settings className={`h-4 w-4 ${active === 'settings' ? 'text-blue-400' : 'text-slate-500'}`} />
 								<span>Cấu hình Hệ thống</span>
 							</button>
 						)}
-
-						<div
-							onClick={() => go('profile')}
-							className="px-2.5 py-2 flex items-center gap-2.5 text-white/80 bg-white/5 hover:bg-white/10 rounded-lg cursor-pointer transition-all border border-white/5 mt-1 group"
-							title="Bấm để xem hồ sơ và đổi mật khẩu"
-						>
-							<div className="h-8 w-8 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-xs font-bold text-white uppercase shadow shrink-0 border border-white/10">
-								{staffName?.charAt(0) || 'A'}
-							</div>
-							<div className="flex flex-col min-w-0 flex-1">
-								<div className="flex items-center justify-between gap-1">
-									<span className="text-xs font-semibold text-white truncate group-hover:text-blue-300 transition-colors">{staffName}</span>
-									<span className="text-[9px] font-bold text-emerald-400 bg-emerald-500/15 border border-emerald-500/30 rounded px-1.5 py-0.5 shrink-0">
-										{isSuperAdmin ? 'Super Admin' : 'Staff'}
-									</span>
-								</div>
-								<span className="text-[10px] text-white/60 truncate">{staffEmail}</span>
-							</div>
-						</div>
-
-						<Button
-							variant="destructive"
-							onClick={handleLogout}
-							className="w-full justify-start gap-2 bg-rose-500/10 hover:bg-rose-500 text-rose-400 hover:text-white border border-rose-500/20 transition-all duration-200 rounded-md px-3 h-9 text-xs font-semibold mt-1"
-						>
-							<LogOut className="h-3.5 w-3.5" /> Đăng xuất
-						</Button>
 					</div>
 				</aside>
 			)}
 
-			<main className="flex-1 bg-[#f8fafc] md:overflow-y-auto h-screen flex flex-col">
-				<div className="lg:hidden md:hidden w-full bg-white border-b border-gray-200 p-4 flex items-center justify-between sticky top-0 z-30 shadow-sm">
-					<div className="flex items-center gap-3">
-						<Button variant="ghost" size="icon" onClick={() => setIsSidebarOpen(true)}>
-							<Menu className="h-6 w-6 text-gray-700" />
-						</Button>
-						<span className="font-bold text-gray-800">Admin Dashboard</span>
+			<main className="flex-1 flex flex-col h-screen min-w-0 overflow-hidden relative">
+				{/* Desktop Topbar */}
+				<header className="hidden md:flex h-16 shrink-0 bg-white/80 backdrop-blur-xl border-b border-slate-200/60 sticky top-0 z-30 px-6 items-center justify-between shadow-sm/50">
+					<div className="flex items-center gap-4">
+						<div className="flex items-center gap-2 text-sm text-slate-500">
+							<LayoutDashboard className="h-4 w-4" />
+							<span className="text-slate-300">/</span>
+							<span className="font-semibold text-slate-800">{currentTabLabel}</span>
+						</div>
 					</div>
-					<img src={iconCine} alt="Logo" className="h-8 w-auto filter invert brightness-0" />
+
+					<div className="flex items-center gap-4">
+						<div className="h-6 w-px bg-slate-200" />
+						<div
+							className="flex items-center gap-3 cursor-pointer group hover:bg-slate-50 px-2 py-1.5 rounded-xl transition-colors border border-transparent hover:border-slate-200"
+							onClick={() => go('profile')}
+						>
+							<div className="flex flex-col items-end">
+								<span className="text-sm font-bold text-slate-800 group-hover:text-blue-600 transition-colors">{staffName}</span>
+								<span className="text-[10px] font-bold uppercase tracking-wider text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded">
+									{isSuperAdmin ? 'Super Admin' : 'Staff'}
+								</span>
+							</div>
+							<div className="h-9 w-9 rounded-full bg-gradient-to-tr from-blue-600 to-indigo-500 flex items-center justify-center text-sm font-bold text-white uppercase shadow-md border border-white/20">
+								{staffName?.charAt(0) || 'A'}
+							</div>
+						</div>
+						<Button
+							variant="ghost"
+							size="icon"
+							onClick={handleLogout}
+							className="text-slate-500 hover:text-rose-600 hover:bg-rose-50 rounded-xl"
+							title="Đăng xuất"
+						>
+							<LogOut className="h-5 w-5" />
+						</Button>
+					</div>
+				</header>
+
+				{/* Mobile Topbar */}
+				<div className="lg:hidden md:hidden shrink-0 w-full bg-white/80 backdrop-blur-xl border-b border-slate-200/60 p-4 flex items-center justify-between sticky top-0 z-30 shadow-sm/50">
+					<div className="flex items-center gap-3">
+						<Button variant="ghost" size="icon" onClick={() => setIsSidebarOpen(true)} className="rounded-xl">
+							<Menu className="h-6 w-6 text-slate-700" />
+						</Button>
+						<span className="font-bold text-slate-800 text-sm">{currentTabLabel}</span>
+					</div>
+					<div className="flex items-center gap-3">
+						<div className="h-8 w-8 rounded-full bg-gradient-to-tr from-blue-600 to-indigo-500 flex items-center justify-center text-xs font-bold text-white uppercase shadow-sm cursor-pointer" onClick={() => go('profile')}>
+							{staffName?.charAt(0) || 'A'}
+						</div>
+					</div>
 				</div>
 
-				<div className="p-4 md:p-6 overflow-y-auto flex-1">{children}</div>
+				{/* Main Content Area */}
+				<div className="p-4 md:p-8 overflow-y-auto flex-1 bg-slate-50/50">
+					<div className="max-w-7xl mx-auto">
+						{children}
+					</div>
+				</div>
 			</main>
 		</div>
 	);

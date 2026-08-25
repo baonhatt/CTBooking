@@ -39,8 +39,8 @@ export default function SetupSuperAdminPage() {
       } else {
         setError(data.message || 'Thiết lập thất bại');
       }
-    } catch (err) {
-      setError('Lỗi kết nối server');
+    } catch (err: any) {
+      setError(err?.message || 'Lỗi kết nối server');
     } finally {
       setLoading(false);
     }
