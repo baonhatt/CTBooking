@@ -76,7 +76,6 @@ export default function PromotionShowcase({ initialCombos = [] }: { initialCombo
   };
 
   const handleBookCombo = (combo: (typeof combos)[0]) => {
-    // Add to cart and open cart drawer
     cartStore.addItem({
       packageId: combo.id,
       type: 'movie',
@@ -88,7 +87,11 @@ export default function PromotionShowcase({ initialCombos = [] }: { initialCombo
       selected: true
     });
 
-    cartStore.openCart();
+    const params = new URLSearchParams(searchParams ? searchParams.toString() : '');
+    if (selectedBranch?.id && !params.has('branch_id')) {
+      params.set('branch_id', String(selectedBranch.id));
+    }
+    router.push(`/booking${params.toString() ? `?${params.toString()}` : ''}`);
   };
 
   return (

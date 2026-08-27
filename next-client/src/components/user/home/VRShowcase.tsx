@@ -1,6 +1,7 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useEffect } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -45,10 +46,16 @@ const safetyGuidelines = [
 ];
 
 export default function VRShowcase({ initialPackages = [] }: { initialPackages?: any[] }) {
+  const router = useRouter();
+  const searchParams = useSearchParams();
   const { selectedBranch } = useBranch();
   const [selectedGenre, setSelectedGenre] = useState<string>('all');
   const [selectedDetailPkg, setSelectedDetailPkg] = useState<any | null>(null);
   const [modalQty, setModalQty] = useState<number>(1);
+
+  useEffect(() => {
+    router.prefetch('/booking');
+  }, [router]);
 
   // Reactive refetch when branch changes
   const { data: vrRes } = useQuery({
@@ -129,7 +136,11 @@ export default function VRShowcase({ initialPackages = [] }: { initialPackages?:
       selected: true
     });
 
-    cartStore.openCart();
+    const params = new URLSearchParams(searchParams ? searchParams.toString() : '');
+    if (selectedBranch?.id && !params.has('branch_id')) {
+      params.set('branch_id', String(selectedBranch.id));
+    }
+    router.push(`/booking${params.toString() ? `?${params.toString()}` : ''}`);
   };
 
   const openDetailModal = (pkg: any) => {
