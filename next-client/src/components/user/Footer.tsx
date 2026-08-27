@@ -23,41 +23,44 @@ export default function Footer() {
 
         // Determine the map src for the iframe
         const mapSrc = useMemo(() => {
-                const manualEntry = (branchSettings.map_coords || branchSettings.map_query)?.trim();
+                const mapCoords = branchSettings.map_coords?.trim();
+                const mapQuery = branchSettings.map_query?.trim();
 
-                if (manualEntry) {
-                        // If it's a full Google Maps URL from browser address bar
-                        if (manualEntry.includes('google.com/maps') && !manualEntry.includes('output=embed')) {
-                                // Extract place name (most reliable for POIs)
-                                const placeMatch = manualEntry.match(/\/place\/([^\/\?]+)/);
-                                if (placeMatch) {
-                                        return `https://maps.google.com/maps?q=${placeMatch[1]}&hl=vi&z=16&output=embed`;
-                                }
-
-                                // Extract exact coordinates if place name not found
-                                const latMatch = manualEntry.match(/!3d(-?\d+\.\d+)/);
-                                const lngMatch = manualEntry.match(/!4d(-?\d+\.\d+)/);
-                                if (latMatch && lngMatch) {
-                                        return `https://maps.google.com/maps?q=${latMatch[1]},${lngMatch[1]}&hl=vi&z=16&output=embed`;
-                                }
-
-                                // Fallback to raw URL with embed param
-                                return manualEntry.includes('?') ? `${manualEntry}&output=embed` : `${manualEntry}?output=embed`;
-                        }
-
-                        // If it's already an embed link or a custom search term/coord
-                        if (manualEntry.includes('output=embed') || manualEntry.includes('/embed')) {
-                                return manualEntry;
-                        }
-
-                        return `https://maps.google.com/maps?q=${encodeURIComponent(manualEntry)}&hl=vi&z=16&output=embed`;
+                // 1. If mapCoords is coordinates "lat,lng" (e.g. "10.7705748, 106.6699228")
+                const coordMatch = mapCoords?.match(/^(-?\d+\.\d+)\s*,\s*(-?\d+\.\d+)$/);
+                if (coordMatch) {
+                        return `https://maps.google.com/maps?q=${coordMatch[1]},${coordMatch[2]}&hl=vi&z=16&output=embed`;
                 }
 
-                // Fallback sequence: Branch Name -> Company Name -> Address
-                const fallbackQuery = selectedBranch?.name ||
-                        branchSettings.company_name ||
-                        selectedBranch?.address ||
-                        'Vạn Hạnh Mall, số 11 đường Sư Vạn Hạnh, Quận 10, Thành phố Hồ Chí Minh';
+                // 2. If it's a full Google Maps place/dir URL containing /place/ or !3d / !4d
+                if (mapCoords && mapCoords.includes('google.com/maps')) {
+                        const placeMatch = mapCoords.match(/\/place\/([^\/\?]+)/);
+                        if (placeMatch) {
+                                return `https://maps.google.com/maps?q=${placeMatch[1]}&hl=vi&z=16&output=embed`;
+                        }
+                        const latMatch = mapCoords.match(/!3d(-?\d+\.\d+)/);
+                        const lngMatch = mapCoords.match(/!4d(-?\d+\.\d+)/);
+                        if (latMatch && lngMatch) {
+                                return `https://maps.google.com/maps?q=${latMatch[1]},${lngMatch[1]}&hl=vi&z=16&output=embed`;
+                        }
+                }
+
+                // 3. If it's already an embed link
+                if (mapCoords && (mapCoords.includes('output=embed') || mapCoords.includes('/embed'))) {
+                        return mapCoords;
+                }
+
+                // 4. If mapQuery is provided and is NOT a URL, use it
+                if (mapQuery && !mapQuery.startsWith('http://') && !mapQuery.startsWith('https://')) {
+                        return `https://maps.google.com/maps?q=${encodeURIComponent(mapQuery)}&hl=vi&z=16&output=embed`;
+                }
+
+                // 5. Fallback sequence: Address + Branch Name -> Address -> Branch Name
+                const address = selectedBranch?.address?.trim();
+                const branchName = selectedBranch?.name?.trim();
+                const fallbackQuery = address && branchName
+                        ? `${address}, ${branchName}`
+                        : (address || branchName || 'Vạn Hạnh Mall, số 11 đường Sư Vạn Hạnh, Quận 10, Thành phố Hồ Chí Minh');
 
                 return `https://maps.google.com/maps?q=${encodeURIComponent(fallbackQuery)}&hl=vi&z=16&output=embed`;
         }, [branchSettings, selectedBranch]);
