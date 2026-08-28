@@ -299,67 +299,106 @@ const getCloudHelpers = (c: Context, env: Bindings) => {
 
 const app = new Hono<{ Variables: Variables; Bindings: Bindings }>();
 
-// DEBUG: Global Request Logger
+// 1. CORS Middleware - MUST BE THE VERY FIRST MIDDLEWARE
+app.use(
+  '*',
+  cors({
+    origin: (origin, c) => {
+      if (!origin) return 'https://cinesphere.com.vn';
 
+      // 1. Allow localhost & 127.0.0.1 for development
+      try {
+        const url = new URL(origin);
+        if (
+          url.hostname === 'localhost' ||
+          url.hostname === '127.0.0.1' ||
+          url.hostname.endsWith('.localhost')
+        ) {
+          return origin;
+        }
+
+        // 2. Allow all cinesphere.com.vn domains & subdomains
+        if (url.hostname === 'cinesphere.com.vn' || url.hostname.endsWith('.cinesphere.com.vn')) {
+          return origin;
+        }
+
+        // 3. Allow all Cloudflare Pages domains & subdomains (*.pages.dev)
+        if (url.hostname === 'pages.dev' || url.hostname.endsWith('.pages.dev')) {
+          return origin;
+        }
+
+        // 4. Allow all Cloudflare Workers domains (*.workers.dev)
+        if (url.hostname === 'workers.dev' || url.hostname.endsWith('.workers.dev')) {
+          return origin;
+        }
+      } catch {
+        // ignore parse error
+      }
+
+      // Default fallback: echo origin if available, otherwise prod domain
+      return origin || 'https://cinesphere.com.vn';
+    },
+    allowMethods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH', 'HEAD'],
+    allowHeaders: [
+      'Content-Type',
+      'Authorization',
+      'Accept',
+      'Origin',
+      'Referer',
+      'User-Agent',
+      'X-Requested-With',
+      'Access-Control-Request-Headers',
+      'Access-Control-Request-Method',
+      'x-branch-id',
+      'x-staff-token',
+      'x-client-version'
+    ],
+    exposeHeaders: ['Content-Type', 'Authorization', 'X-KV-Cache', 'ETag'],
+    maxAge: 86400,
+    credentials: true
+  })
+);
+
+// 2. DEBUG: Global Request Logger
 app.use('*', async (c, next) => {
   const url = new URL(c.req.url);
-
   const isL = isLocal(c.req.url);
-
   console.log(`[Worker Request] ${c.req.method} ${url.pathname} (Local: ${isL})`);
-
   await next();
 });
 
-// Serve local uploads during development - MOVE TO TOP
-
+// 3. Serve local uploads during development
 app.get('/uploads/*', async (c) => {
   if (!isLocal(c.req.url)) return c.notFound();
 
   try {
     const fs = await import('node:fs');
-
     const path = await import('node:path');
-
     const urlPath = new URL(c.req.url).pathname;
-
     const relativePath = urlPath.replace(/^\//, '');
-
     const filePath = path.resolve(process.cwd(), relativePath);
 
     // 1. Download if missing and on localhost
-
     if (!fs.existsSync(filePath)) {
       console.log(`[Worker Downloader] Missing file: ${urlPath}`);
-
       const cloudName = 'dzp3rbeix';
-
       const ext = path.extname(urlPath).toLowerCase();
-
       const isVideo = ['.mp4', '.webm', '.mov', '.m4v'].includes(ext);
-
       const resourceType = isVideo ? 'video' : 'image';
-
       const publicPath = urlPath.replace('/uploads/', '');
-
       const cloudinaryUrl = `https://res.cloudinary.com/${cloudName}/${resourceType}/upload/${publicPath}`;
 
       try {
         const targetDir = path.dirname(filePath);
-
         if (!fs.existsSync(targetDir)) {
           fs.mkdirSync(targetDir, { recursive: true });
         }
 
         const response = await fetch(cloudinaryUrl);
-
         if (response.ok) {
           const arrayBuffer = await response.arrayBuffer();
-
           const buffer = Buffer.from(arrayBuffer);
-
           fs.writeFileSync(filePath, buffer);
-
           console.log(`[Worker Downloader] Saved to: ${filePath}`);
         } else {
           console.error(`[Worker Downloader] Cloudinary failed (${response.status}): ${cloudinaryUrl}`);
@@ -370,19 +409,15 @@ app.get('/uploads/*', async (c) => {
     }
 
     // 2. Serve the file
-
     if (fs.existsSync(filePath)) {
       const ext = path.extname(filePath).toLowerCase();
-
       const mimeMap: Record<string, string> = {
         '.jpg': 'image/jpeg',
         '.jpeg': 'image/jpeg',
         '.png': 'image/png',
-
         '.gif': 'image/gif',
         '.webp': 'image/webp',
         '.svg': 'image/svg+xml',
-
         '.mp4': 'video/mp4',
         '.webm': 'video/webm',
         '.mov': 'video/quicktime'
@@ -391,7 +426,6 @@ app.get('/uploads/*', async (c) => {
       return new Response(fs.readFileSync(filePath), {
         headers: {
           'Content-Type': mimeMap[ext] || 'application/octet-stream',
-
           'Access-Control-Allow-Origin': '*'
         }
       });
@@ -402,83 +436,6 @@ app.get('/uploads/*', async (c) => {
 
   return c.notFound();
 });
-
-app.use(
-  '*',
-
-  cors({
-    origin: (origin, c) => {
-      if (!origin) return 'https://cinesphere.com.vn';
-
-      // Allow localhost for development automatically
-
-      try {
-        const url = new URL(c.req.url);
-
-        if (url.hostname === 'localhost' || url.hostname === '127.0.0.1') {
-          if (origin.startsWith('http://localhost:') || origin.startsWith('http://127.0.0.1:')) {
-            return origin;
-          }
-        }
-      } catch {}
-
-      const allowedExact = new Set([
-        'https://cinesphere.com.vn',
-
-        'https://www.cinesphere.com.vn',
-
-        'https://api.cinesphere.com.vn', // API domain
-
-        'https://admin.cinesphere.com.vn', // Admin domain
-
-        'https://cinema-pages.pages.dev', // Pages production
-
-        'https://cinema-next-pages.pages.dev', // Next.js user client production
-
-        'https://cinema-next.pages.dev', // Next.js user client (actual .pages.dev URL)
-
-        'https://cinema-admin-pages.pages.dev' // Admin client production
-      ]);
-
-      if (allowedExact.has(origin)) return origin;
-
-      // Allow all preview subdomains for cinema-pages, cinema-next-pages, cinema-admin-pages on pages.dev
-
-      try {
-        const url = new URL(origin);
-
-        if (
-          url.hostname === 'cinema-pages.pages.dev' ||
-          url.hostname.endsWith('.cinema-pages.pages.dev') ||
-          url.hostname === 'cinema-next-pages.pages.dev' ||
-          url.hostname.endsWith('.cinema-next-pages.pages.dev') ||
-          url.hostname === 'cinema-next.pages.dev' ||
-          url.hostname.endsWith('.cinema-next.pages.dev') ||
-          url.hostname === 'cinema-admin-pages.pages.dev' ||
-          url.hostname.endsWith('.cinema-admin-pages.pages.dev')
-        ) {
-          return origin;
-        }
-      } catch {
-        // ignore parse error, fall back to default
-      }
-
-      // Fallback: default to prod domain
-
-      return 'https://cinesphere.com.vn';
-    },
-
-    allowMethods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
-
-    allowHeaders: ['Content-Type', 'Authorization', 'Accept', 'Origin', 'Referer', 'Access-Control-Request-Headers'],
-
-    exposeHeaders: ['Content-Type', 'Authorization', 'X-KV-Cache'],
-
-    maxAge: 86400,
-
-    credentials: true
-  })
-);
 
 // Global Error Handler for debugging preview issues
 
