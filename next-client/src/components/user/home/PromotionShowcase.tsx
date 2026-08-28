@@ -103,79 +103,80 @@ export default function PromotionShowcase({ initialCombos = [] }: { initialCombo
       <div className="absolute left-10 top-10 w-96 h-96 bg-amber-500/10 blur-[130px] pointer-events-none" />
       <div className="absolute right-0 bottom-0 w-[450px] h-[450px] bg-cyan-500/12 blur-[130px] pointer-events-none" />
 
-      <div className="container mx-auto px-4 relative z-10">
-        <div className="text-center max-w-3xl mx-auto mb-12 space-y-3">
-          <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-amber-500/15 border border-amber-500/30 text-amber-300 text-xs font-bold uppercase tracking-widest backdrop-blur-md shadow-[0_0_20px_rgba(245,158,11,0.2)]">
-            <Sparkles className="w-4 h-4 text-amber-400" />
+      <div className="container mx-auto px-3 sm:px-4 relative z-10">
+        <div className="text-center max-w-3xl mx-auto mb-6 sm:mb-12 space-y-2 sm:space-y-3">
+          <div className="inline-flex items-center gap-1.5 sm:gap-2 px-3 py-1 sm:px-3.5 sm:py-1.5 rounded-full bg-amber-500/15 border border-amber-500/30 text-amber-300 text-[10px] sm:text-xs font-bold uppercase tracking-widest backdrop-blur-md shadow-[0_0_20px_rgba(245,158,11,0.2)]">
+            <Sparkles className="w-3.5 h-3.5 text-amber-400" />
             <span>Ưu Đãi Suất Chiếu</span>
           </div>
-          <h2 className="text-3xl sm:text-4xl md:text-5xl font-black text-white tracking-tight leading-tight">
+          <h2 className="text-2xl sm:text-4xl md:text-5xl font-black text-white tracking-tight leading-tight">
             Chọn gói phù hợp
           </h2>
         </div>
 
         {combos.length === 0 ? (
-          <div className="text-center py-16 px-4 bg-slate-900/40 rounded-3xl border border-white/10 backdrop-blur-md max-w-xl mx-auto space-y-3">
-            <p className="text-sm text-slate-400">Chưa có gói vé nào khả dụng tại chi nhánh này.</p>
+          <div className="text-center py-12 sm:py-16 px-4 bg-slate-900/40 rounded-3xl border border-white/10 backdrop-blur-md max-w-xl mx-auto space-y-3">
+            <p className="text-xs sm:text-sm text-slate-400">Chưa có gói vé nào khả dụng tại chi nhánh này.</p>
           </div>
         ) : (
           <div className="mx-auto max-w-7xl">
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+            <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-2.5 sm:gap-6">
               {combos.map((combo: (typeof combos)[0], index: number) => (
                 <motion.div
                   key={combo.id}
-                  initial={{ opacity: 0, y: 30 }}
+                  initial={{ opacity: 0, y: 20 }}
                   whileInView={{ opacity: 1, y: 0 }}
                   viewport={{ once: true }}
                   transition={{
-                    delay: index * 0.08,
-                    duration: 0.45
+                    delay: index * 0.05,
+                    duration: 0.4
                   }}
                   className="h-full"
                 >
-                  <div className="h-full relative overflow-hidden rounded-2xl p-6 bg-slate-900/70 border border-white/10 backdrop-blur-xl hover:border-amber-400/40 hover:shadow-[0_0_35px_rgba(245,158,11,0.2)] group transition-all duration-300 flex flex-col justify-between">
-                    <div className="absolute top-0 right-0 px-3 py-1 bg-amber-500/20 border-b border-l border-amber-500/30 text-amber-300 text-[10px] font-extrabold uppercase tracking-widest rounded-bl-xl">
+                  <div className="h-full relative overflow-hidden rounded-xl sm:rounded-2xl p-3 sm:p-6 bg-slate-900/80 border border-white/10 backdrop-blur-xl hover:border-amber-400/40 hover:shadow-[0_0_35px_rgba(245,158,11,0.2)] group transition-all duration-300 flex flex-col justify-between">
+                    {/* Badge */}
+                    <div className="absolute top-0 right-0 px-2 py-0.5 sm:px-3 sm:py-1 bg-amber-500/20 border-b border-l border-amber-500/30 text-amber-300 text-[8px] sm:text-[10px] font-extrabold uppercase tracking-wider rounded-bl-lg sm:rounded-bl-xl">
                       Gói Phim
                     </div>
 
-                    <div className="space-y-4">
+                    <div className="space-y-2 sm:space-y-4">
                       <div>
-                        <span className="text-[11px] uppercase font-bold text-amber-400/80 tracking-wider">
+                        <span className="text-[9px] sm:text-[11px] uppercase font-bold text-amber-400/80 tracking-wider">
                           CineSphere Combo
                         </span>
-                        <h3 className="text-xl font-black text-white group-hover:text-amber-200 transition-colors mt-0.5">
+                        <h3 className="text-xs sm:text-xl font-black text-white group-hover:text-amber-200 transition-colors mt-0.5 line-clamp-2 min-h-[2rem] sm:min-h-0">
                           {combo.name}
                         </h3>
                       </div>
 
-                      <div className="py-2 border-y border-white/10">
-                        <span className="text-[11px] text-slate-400 block">Giá trọn gói</span>
-                        <span className="text-3xl font-black text-transparent bg-clip-text bg-gradient-to-r from-amber-200 via-orange-300 to-yellow-100">
+                      <div className="py-1.5 sm:py-2 border-y border-white/10">
+                        <span className="text-[9px] sm:text-[11px] text-slate-400 block">Giá trọn gói</span>
+                        <span className="text-base sm:text-2xl lg:text-3xl font-black text-transparent bg-clip-text bg-gradient-to-r from-amber-200 via-orange-300 to-yellow-100">
                           {combo.price.toLocaleString('vi-VN')}₫
                         </span>
                       </div>
 
-                      <p className="text-xs text-slate-300 leading-relaxed min-h-[2.5rem]">
+                      <p className="text-[10px] sm:text-xs text-slate-300 leading-relaxed line-clamp-2 min-h-[1.75rem] sm:min-h-[2.5rem]">
                         Vé trải nghiệm CINESPHERE kèm quà tặng ánh sáng lưu niệm.
                       </p>
                     </div>
 
-                    <div className="pt-6 mt-4 border-t border-white/10 flex items-center gap-2">
+                    <div className="pt-3 sm:pt-6 mt-2 sm:mt-4 border-t border-white/10 flex items-center gap-1.5 sm:gap-2">
                       <Button
                         type="button"
                         variant="outline"
                         size="sm"
                         onClick={() => handleAddToCart(combo)}
                         title="Thêm gói vé vào giỏ hàng"
-                        className="h-10 px-3 rounded-xl bg-white/[0.05] hover:bg-white/[0.12] text-amber-300 hover:text-white border-white/15 transition-all shrink-0"
+                        className="h-8 sm:h-10 px-2 sm:px-3 rounded-lg sm:rounded-xl bg-white/[0.05] hover:bg-white/[0.12] text-amber-300 hover:text-white border-white/15 transition-all shrink-0"
                       >
-                        <ShoppingCart className="w-4 h-4" />
+                        <ShoppingCart className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                       </Button>
                       <Button
                         type="button"
                         size="sm"
                         onClick={() => handleBookCombo(combo)}
-                        className="flex-1 h-10 rounded-xl bg-gradient-to-r from-amber-500 via-orange-500 to-amber-600 hover:from-amber-600 hover:to-orange-600 text-white font-bold text-xs shadow-[0_0_20px_rgba(245,158,11,0.3)] hover:scale-[1.02] active:scale-95 transition-all"
+                        className="flex-1 h-8 sm:h-10 rounded-lg sm:rounded-xl bg-gradient-to-r from-amber-500 via-orange-500 to-amber-600 hover:from-amber-600 hover:to-orange-600 text-white font-bold text-[11px] sm:text-xs shadow-[0_0_15px_rgba(245,158,11,0.25)] hover:scale-[1.02] active:scale-95 transition-all"
                       >
                         Đặt ngay
                       </Button>

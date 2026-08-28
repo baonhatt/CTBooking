@@ -23,8 +23,13 @@ import {
   History,
   Info,
   HelpCircle,
-  Loader2
+  Loader2,
+  Upload,
+  Image as ImageIcon,
+  ExternalLink
 } from 'lucide-react';
+import { uploadDirectToCloudinary } from '@/lib/api/uploads';
+import { optimizeCloudinaryUrl } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -63,6 +68,7 @@ interface Branch {
   is_default: boolean;
   is_active: boolean;
   is_open: boolean;
+  banner_images?: string | string[] | null;
   settings?: string;
   movie_count: number;
   package_count: number;
@@ -873,6 +879,81 @@ export default function BranchesPage() {
                       </div>
                     </CardContent>
                   </Card>
+                  {/* Banners Preview */}
+                  <Card className="border-slate-200 shadow-sm bg-white overflow-hidden">
+                    <div className="bg-indigo-50 px-4 py-2 border-b border-indigo-100 flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <ImageIcon className="w-4 h-4 text-indigo-600" />
+                        <h3 className="text-xs font-bold text-indigo-800 uppercase tracking-wider">
+                          Ảnh Banner Hero Landing Page
+                        </h3>
+                      </div>
+                      {(() => {
+                        let banners: string[] = [];
+                        try {
+                          if (selectedBranch.banner_images) {
+                            banners = Array.isArray(selectedBranch.banner_images)
+                              ? selectedBranch.banner_images
+                              : JSON.parse(selectedBranch.banner_images);
+                          }
+                        } catch {}
+                        return (
+                          <Badge variant="secondary" className="text-[10px] font-bold">
+                            {banners.length} ảnh
+                          </Badge>
+                        );
+                      })()}
+                    </div>
+                    <CardContent className="p-4">
+                      {(() => {
+                        let banners: string[] = [];
+                        try {
+                          if (selectedBranch.banner_images) {
+                            banners = Array.isArray(selectedBranch.banner_images)
+                              ? selectedBranch.banner_images
+                              : JSON.parse(selectedBranch.banner_images);
+                          }
+                        } catch {}
+                        if (banners.length === 0) {
+                          return (
+                            <div className="text-center py-6 text-slate-400 italic text-sm">
+                              Chưa có ảnh banner riêng (đang dùng banner mặc định của hệ thống)
+                            </div>
+                          );
+                        }
+                        return (
+                          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                            {banners.map((url, idx) => (
+                              <div
+                                key={idx}
+                                className="relative group rounded-xl overflow-hidden border border-slate-200 aspect-[16/9] bg-slate-900 shadow-xs"
+                              >
+                                <img
+                                  src={optimizeCloudinaryUrl(url, 600) || url}
+                                  alt={`Banner ${idx + 1}`}
+                                  className="w-full h-full object-cover transition-transform group-hover:scale-105"
+                                />
+                                <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                                  <a
+                                    href={url}
+                                    target="_blank"
+                                    rel="noreferrer"
+                                    className="p-1.5 bg-white/90 hover:bg-white text-slate-800 rounded-lg shadow-sm"
+                                    title="Xem ảnh gốc"
+                                  >
+                                    <ExternalLink className="w-3.5 h-3.5" />
+                                  </a>
+                                </div>
+                                <span className="absolute bottom-1.5 left-1.5 px-1.5 py-0.5 rounded bg-black/60 backdrop-blur-xs text-[10px] font-bold text-white">
+                                  #{idx + 1}
+                                </span>
+                              </div>
+                            ))}
+                          </div>
+                        );
+                      })()}
+                    </CardContent>
+                  </Card>
                 </div>
               </div>
             </div>
@@ -893,8 +974,12 @@ function BranchEditModal({ isOpen, onClose, data, onSave, branches }: any) {
     is_default: false,
     is_active: true,
     is_open: true,
+    banner_images: '',
     settings: ''
   });
+  const [bannerImages, setBannerImages] = useState<string[]>([]);
+  const [isUploadingBanner, setIsUploadingBanner] = useState(false);
+  const [manualBannerUrl, setManualBannerUrl] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [isCodeEditable, setIsCodeEditable] = useState(false);
   const [showQrUrlField, setShowQrUrlField] = useState(false);
@@ -928,6 +1013,20 @@ function BranchEditModal({ isOpen, onClose, data, onSave, branches }: any) {
       const isFirstBranch = branches.length === 0 && data.id === 0;
       const isOnlyBranch = branches.length === 1 && data.id !== 0;
 
+      let initialBanners: string[] = [];
+      try {
+        if (data.banner_images) {
+          initialBanners = Array.isArray(data.banner_images)
+            ? data.banner_images
+            : JSON.parse(data.banner_images);
+        }
+      } catch {
+        if (typeof data.banner_images === 'string' && data.banner_images.startsWith('http')) {
+          initialBanners = [data.banner_images];
+        }
+      }
+      setBannerImages(initialBanners);
+
       setFormData({
         name: data.name || '',
         code: data.code || '',
@@ -937,6 +1036,7 @@ function BranchEditModal({ isOpen, onClose, data, onSave, branches }: any) {
         is_default: isFirstBranch || isOnlyBranch || data.is_default || false,
         is_active: data.is_active ?? true,
         is_open: data.is_open ?? true,
+        banner_images: JSON.stringify(initialBanners),
         settings: data.settings || ''
       });
 
@@ -1148,6 +1248,150 @@ function BranchEditModal({ isOpen, onClose, data, onSave, branches }: any) {
                     placeholder="email@chinhanh.com"
                   />
                 </div>
+              </div>
+            </section>
+
+            {/* SECTION: HERO BANNER CAROUSEL */}
+            <section className="space-y-4">
+              <div className="flex items-center justify-between pb-2 border-b border-slate-100">
+                <div className="flex items-center gap-2">
+                  <div className="p-1.5 bg-indigo-50 rounded-lg text-indigo-600">
+                    <ImageIcon className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <h3 className="font-bold text-slate-800 text-sm">Ảnh Banner Chi Nhánh (Hero Carousel Trang Chủ)</h3>
+                    <p className="text-xs text-slate-500">Tải lên danh sách ảnh banner để tự động hiển thị trên Carousel đầu trang Landing Page</p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <label className="cursor-pointer">
+                    <input
+                      type="file"
+                      accept="image/*"
+                      multiple
+                      className="hidden"
+                      disabled={isUploadingBanner}
+                      onChange={async (e) => {
+                        const files = e.target.files;
+                        if (!files || files.length === 0) return;
+                        try {
+                          setIsUploadingBanner(true);
+                          const uploadedUrls: string[] = [];
+                          for (let i = 0; i < files.length; i++) {
+                            const res = await uploadDirectToCloudinary(files[i], 'branch_banners');
+                            uploadedUrls.push(res.url);
+                          }
+                          const nextImages = [...bannerImages, ...uploadedUrls];
+                          setBannerImages(nextImages);
+                          setFormData((prev) => ({ ...prev, banner_images: JSON.stringify(nextImages) }));
+                          toast.success(`Đã tải lên ${uploadedUrls.length} ảnh banner thành công`);
+                        } catch (err: any) {
+                          toast.error(err.message || 'Tải ảnh banner thất bại');
+                        } finally {
+                          setIsUploadingBanner(false);
+                          e.target.value = '';
+                        }
+                      }}
+                    />
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      disabled={isUploadingBanner}
+                      className="h-8 text-xs border-indigo-200 text-indigo-700 hover:bg-indigo-50 flex items-center gap-1.5 rounded-xl"
+                      asChild
+                    >
+                      <span>
+                        {isUploadingBanner ? (
+                          <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                        ) : (
+                          <Upload className="w-3.5 h-3.5" />
+                        )}
+                        Upload ảnh lên Cloudinary
+                      </span>
+                    </Button>
+                  </label>
+                </div>
+              </div>
+
+              {/* Banner List & Add by URL */}
+              <div className="space-y-3 bg-slate-50/70 p-4 rounded-2xl border border-slate-100">
+                <div className="flex gap-2 items-center">
+                  <input
+                    type="url"
+                    placeholder="Hoặc dán URL ảnh trực tiếp (https://...)"
+                    value={manualBannerUrl}
+                    onChange={(e) => setManualBannerUrl(e.target.value)}
+                    className="flex-1 px-4 py-2 border border-slate-200 rounded-xl text-sm bg-white focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none"
+                  />
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    size="sm"
+                    onClick={() => {
+                      if (!manualBannerUrl.trim()) return;
+                      const next = [...bannerImages, manualBannerUrl.trim()];
+                      setBannerImages(next);
+                      setFormData((prev) => ({ ...prev, banner_images: JSON.stringify(next) }));
+                      setManualBannerUrl('');
+                      toast.success('Đã thêm banner');
+                    }}
+                    className="h-9 rounded-xl text-xs font-semibold px-4"
+                  >
+                    Thêm URL
+                  </Button>
+                </div>
+
+                {bannerImages.length > 0 ? (
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 pt-2">
+                    {bannerImages.map((url, idx) => (
+                      <div
+                        key={idx}
+                        className="relative group rounded-xl overflow-hidden border border-slate-200 aspect-[16/9] bg-slate-900 shadow-xs"
+                      >
+                        <img
+                          src={optimizeCloudinaryUrl(url, 600) || url}
+                          alt={`Banner ${idx + 1}`}
+                          className="w-full h-full object-cover transition-transform group-hover:scale-105"
+                        />
+                        <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
+                          <a
+                            href={url}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="p-1.5 bg-white/90 hover:bg-white text-slate-800 rounded-lg shadow-sm"
+                            title="Xem ảnh gốc"
+                          >
+                            <ExternalLink className="w-3.5 h-3.5" />
+                          </a>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const next = bannerImages.filter((_, i) => i !== idx);
+                              setBannerImages(next);
+                              setFormData((prev) => ({ ...prev, banner_images: JSON.stringify(next) }));
+                            }}
+                            className="p-1.5 bg-rose-600 hover:bg-rose-700 text-white rounded-lg shadow-sm cursor-pointer"
+                            title="Xóa banner này"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                        <span className="absolute bottom-1.5 left-1.5 px-1.5 py-0.5 rounded bg-black/70 backdrop-blur-xs text-[10px] font-bold text-white">
+                          #{idx + 1}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-center py-6 border-2 border-dashed border-slate-200 rounded-xl bg-white/60">
+                    <ImageIcon className="w-8 h-8 text-slate-300 mx-auto mb-2" />
+                    <p className="text-xs text-slate-500 font-medium">Chưa có ảnh banner nào cho chi nhánh này</p>
+                    <p className="text-[11px] text-slate-400 mt-0.5">
+                      Bấm nút "Upload ảnh lên Cloudinary" hoặc dán URL ảnh để thêm vào danh sách
+                    </p>
+                  </div>
+                )}
               </div>
             </section>
 

@@ -19,6 +19,7 @@ interface Branch {
   is_default: boolean;
   is_active: boolean;
   is_open: boolean;
+  banner_images?: string | string[] | null;
   settings?: string;
 }
 

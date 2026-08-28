@@ -469,7 +469,7 @@ export default function AdminLayout({
 
         {/* Main Content Area */}
         <div className={`p-4 md:p-6 overflow-y-auto flex-1 bg-slate-50/50 ${contentClassName || ''}`}>
-          <div className={fullWidth ? 'w-full' : 'max-w-7xl mx-auto w-full'}>{children}</div>
+          <div className={fullWidth ? 'w-full' : 'max-w-8xl mx-auto w-full'}>{children}</div>
         </div>
       </main>
     </div>

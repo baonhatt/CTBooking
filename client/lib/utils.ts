@@ -8,19 +8,22 @@ export function cn(...inputs: ClassValue[]) {
 // Helper to ensure valid quality values
 function getAutoQuality(q: string) {
   if (q && q.startsWith('auto')) return q;
-  return 'auto:eco';
+  return 'auto:best';
 }
 
 export function optimizeCloudinaryUrl(
   url: string,
   width?: number,
-  quality: string = 'auto:eco',
+  quality: string = 'auto:best',
   cacheMaxAge?: number // in seconds, default: 86400 (1 day)
 ) {
   if (!url || !url.includes('cloudinary.com')) return url;
 
-  const parts = url.split('/upload/');
-  if (parts.length !== 2) return url;
+  // Convert .heic or .heif to .jpg so all web browsers can display it
+  const formattedUrl = url.replace(/\.(heic|heif)$/i, '.jpg');
+
+  const parts = formattedUrl.split('/upload/');
+  if (parts.length !== 2) return formattedUrl;
 
   const pathSegments = parts[1].split('/');
   const versionIndex = pathSegments.findIndex((seg) => seg.match(/^v\d+$/));
@@ -32,7 +35,7 @@ export function optimizeCloudinaryUrl(
         ? pathSegments.slice(1).join('/')
         : parts[1];
 
-  const transformations = ['f_auto', `q_${getAutoQuality(quality)}`, 'c_limit'];
+  const transformations = ['f_auto', `q_${getAutoQuality(quality)}`, 'dpr_auto', 'c_limit'];
 
   if (width) {
     transformations.push(`w_${width}`);

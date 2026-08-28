@@ -195,6 +195,7 @@ export async function listBranchOptionsImpl(
       is_default: tables.branches.is_default,
       is_open: tables.branches.is_open,
       is_active: tables.branches.is_active,
+      banner_images: tables.branches.banner_images,
       settings: tables.branches.settings
     })
     .from(tables.branches)
@@ -272,11 +273,12 @@ export async function createBranchImpl(
     is_default?: boolean;
     is_active?: boolean;
     is_open?: boolean;
+    banner_images?: string;
     settings?: string;
   },
   staffInfo?: { id: number; email: string; fullname: string }
 ) {
-  const { name, code, address, phone, email, is_default, is_active, is_open, settings } = args;
+  const { name, code, address, phone, email, is_default, is_active, is_open, banner_images, settings } = args;
   const now = new Date();
 
   // Check if this is the first branch
@@ -304,6 +306,7 @@ export async function createBranchImpl(
       is_default: finalIsDefault,
       is_active: is_active ?? true,
       is_open: is_open ?? true,
+      banner_images: banner_images || null,
       settings: settings || null,
       created_at: formatDateForDb(now),
       updated_at: formatDateForDb(now)
@@ -344,6 +347,7 @@ export async function updateBranchImpl(
     is_default?: boolean;
     is_active?: boolean;
     is_open?: boolean;
+    banner_images?: string;
     settings?: string;
   },
   staffInfo?: { id: number; email: string; fullname: string }
@@ -353,7 +357,7 @@ export async function updateBranchImpl(
     return null;
   }
 
-  const { name, code, address, phone, email, is_default, is_active, is_open, settings } = args;
+  const { name, code, address, phone, email, is_default, is_active, is_open, banner_images, settings } = args;
   const now = new Date();
   const data: any = { updated_at: formatDateForDb(now) };
 
@@ -363,6 +367,7 @@ export async function updateBranchImpl(
   if (phone !== undefined) data.phone = phone;
   if (email !== undefined) data.email = email;
   if (is_active !== undefined) data.is_active = is_active;
+  if (banner_images !== undefined) data.banner_images = banner_images;
   if (is_open !== undefined) {
     if (is_open === false) {
       if (existing.is_default) {
@@ -396,7 +401,7 @@ export async function updateBranchImpl(
     await anyDb
       .update(tables.branches)
       .set({ is_default: false, updated_at: formatDateForDb(now) })
-      .where(and(eq(tables.branches.is_default, true), eq(tables.branches.id, id)));
+      .where(eq(tables.branches.is_default, true));
     data.is_default = true;
   }
 

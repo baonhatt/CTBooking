@@ -351,6 +351,34 @@ export default function BookingPage() {
     return Object.keys(errors).length === 0;
   };
 
+  const isFormValid = useMemo(() => {
+    if (selectedItems.length === 0) return false;
+    if (movieItems.length > 0 && availableMovies.length > 0 && selectedMovieIds.length === 0) return false;
+    if (!name.trim() || name.trim().length < 2) return false;
+    if (!phone.trim() || phone.length !== 10 || !phone.startsWith('0') || Boolean(phoneError)) return false;
+    if (
+      !email.trim() ||
+      !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) ||
+      !/@(gmail\.com|outlook\.com|hotmail\.com|yahoo\.com|icloud\.com)$/i.test(email) ||
+      Boolean(emailError)
+    ) {
+      return false;
+    }
+    if (!confirmChecked) return false;
+    return true;
+  }, [
+    selectedItems.length,
+    movieItems.length,
+    availableMovies.length,
+    selectedMovieIds.length,
+    name,
+    phone,
+    phoneError,
+    email,
+    emailError,
+    confirmChecked
+  ]);
+
   const handleCheckoutSubmit = () => {
     if (isProcessing) return;
     if (selectedItems.length === 0) {
@@ -1275,9 +1303,9 @@ export default function BookingPage() {
                     <div className="pt-2">
                       <Button
                         type="button"
-                        disabled={isProcessing || selectedItems.length === 0}
+                        disabled={isProcessing || !isFormValid}
                         onClick={handleCheckoutSubmit}
-                        className="w-full h-14 bg-gradient-to-r from-cyan-400 via-blue-500 to-purple-600 hover:from-cyan-300 hover:via-blue-400 hover:to-purple-500 text-black font-extrabold text-base rounded-xl shadow-[0_0_25px_rgba(6,182,212,0.35)] hover:shadow-[0_0_35px_rgba(6,182,212,0.5)] transition-all duration-300 active:scale-[0.98] disabled:opacity-50"
+                        className="w-full h-14 bg-gradient-to-r from-cyan-400 via-blue-500 to-purple-600 hover:from-cyan-300 hover:via-blue-400 hover:to-purple-500 text-black font-extrabold text-base rounded-xl shadow-[0_0_25px_rgba(6,182,212,0.35)] hover:shadow-[0_0_35px_rgba(6,182,212,0.5)] transition-all duration-300 active:scale-[0.98] disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:scale-100 disabled:shadow-none"
                       >
                         {isProcessing ? (
                           <span className="flex items-center justify-center gap-2 text-white">
@@ -1291,6 +1319,11 @@ export default function BookingPage() {
                           </span>
                         )}
                       </Button>
+                      {!isFormValid && selectedItems.length > 0 && (
+                        <p className="text-[11px] text-amber-400/90 text-center mt-2 font-medium">
+                          💡 Vui lòng hoàn tất thông tin nhận vé & đồng ý điều khoản để thanh toán
+                        </p>
+                      )}
                     </div>
                   </CardContent>
                 </Card>
@@ -1311,9 +1344,9 @@ export default function BookingPage() {
               </div>
               <Button
                 type="button"
-                disabled={isProcessing}
+                disabled={isProcessing || !isFormValid}
                 onClick={handleCheckoutSubmit}
-                className="px-6 h-12 bg-gradient-to-r from-cyan-400 to-blue-500 hover:from-cyan-300 hover:to-blue-400 text-black font-extrabold text-sm rounded-xl shadow-lg active:scale-95 transition-all"
+                className="px-6 h-12 bg-gradient-to-r from-cyan-400 to-blue-500 hover:from-cyan-300 hover:to-blue-400 text-black font-extrabold text-sm rounded-xl shadow-lg active:scale-95 transition-all disabled:opacity-40 disabled:cursor-not-allowed disabled:shadow-none"
               >
                 Thanh toán
               </Button>

@@ -1,23 +1,36 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Phone, MessageCircle, Ticket, Headset, X } from 'lucide-react';
-import { useRouter, usePathname, useSearchParams } from 'next/navigation';
+import { Phone, MessageCircle, Headset, X, ChevronUp } from 'lucide-react';
+import { usePathname } from 'next/navigation';
 import { cn } from '@/lib/utils';
 import { useBranch } from '@/hooks/useBranch';
 import { useCart } from '@/store/cartStore';
 
 export default function FloatingActions() {
   const [isExpanded, setIsExpanded] = useState(false);
-  const router = useRouter();
+  const [showScrollTop, setShowScrollTop] = useState(false);
   const pathname = usePathname();
-  const searchParams = useSearchParams();
   const { selectedBranch } = useBranch();
   const { isOpen: isCartOpen } = useCart();
 
   // CHỈ HIỆN Ở TRANG CHỦ THEO YÊU CẦU CỦA USER
   const isHome = pathname === '/';
+
+  // Lắng nghe sự kiện cuộn trang để hiện nút Move to Top
+  useEffect(() => {
+    const handleScroll = () => {
+      setShowScrollTop(window.scrollY > 300);
+    };
+    window.addEventListener('scroll', handleScroll, { passive: true });
+    handleScroll();
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, []);
+
+  const scrollToTop = () => {
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
 
   // Parse branch settings to get specific hotline
   const branchSettings = useMemo(() => {
@@ -32,11 +45,6 @@ export default function FloatingActions() {
   // Nếu không phải trang chủ hoặc đang mở giỏ hàng thì không render
   if (!isHome || isCartOpen) return null;
 
-  const handleQuickBook = () => {
-    const params = new URLSearchParams(searchParams.toString());
-    router.push(`/booking${params.toString() ? `?${params.toString()}` : ''}`);
-  };
-
   const hotline = branchSettings.hotline || selectedBranch?.phone || '0366431179';
   const zaloPhone = hotline.replace(/\./g, '').replace(/\s/g, '');
 
@@ -45,30 +53,29 @@ export default function FloatingActions() {
   const showContactGroup = showZalo || showPhone;
 
   return (
-    <div className="fixed bottom-6 right-6 z-[40] flex flex-col gap-4 items-end">
+    <div className="fixed bottom-6 right-5 sm:right-6 z-[40] flex flex-col gap-3 items-end">
       <AnimatePresence>
-        {/* 1. NÚT ĐẶT VÉ (Luôn hiện ở Trang chủ) */}
-        <motion.button
-          key="book-fab"
-          onClick={handleQuickBook}
-          initial={{ opacity: 0, scale: 0.5, y: 20 }}
-          animate={{ opacity: 1, scale: 1, y: 0 }}
-          exit={{ opacity: 0, scale: 0.5, y: 20 }}
-          whileHover={{ scale: 1.05 }}
-          whileTap={{ scale: 0.95 }}
-          className="w-14 h-14 rounded-full bg-gradient-to-tr from-cyan-500 to-blue-600 text-white flex items-center justify-center shadow-[0_8px_30px_rgb(59,130,246,0.5)] border-2 border-white/30 relative overflow-hidden"
-        >
-          <motion.div
-            animate={{ scale: [1, 1.2, 1] }}
-            transition={{ repeat: Infinity, duration: 2 }}
-            className="absolute inset-0 bg-white/20"
-          />
-          <Ticket className="w-7 h-7 relative z-10" />
-        </motion.button>
+        {/* 1. NÚT MOVE TO TOP (Hiện khi cuộn xuống > 300px) */}
+        {showScrollTop && (
+          <motion.button
+            key="scroll-to-top"
+            onClick={scrollToTop}
+            initial={{ opacity: 0, scale: 0.5, y: 15 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.5, y: 15 }}
+            whileHover={{ scale: 1.1 }}
+            whileTap={{ scale: 0.9 }}
+            aria-label="Về đầu trang"
+            title="Về đầu trang"
+            className="w-11 h-11 sm:w-12 sm:h-12 rounded-full bg-slate-900/90 hover:bg-slate-800 backdrop-blur-md text-cyan-400 hover:text-white border border-cyan-500/40 hover:border-cyan-400 shadow-[0_4px_20px_rgba(6,182,212,0.35)] flex items-center justify-center transition-all cursor-pointer group"
+          >
+            <ChevronUp className="w-5 h-5 sm:w-6 sm:h-6 group-hover:-translate-y-0.5 transition-transform" />
+          </motion.button>
+        )}
 
         {/* 2. CỤM NÚT LIÊN HỆ (Thu gọn/Mở rộng) */}
         {showContactGroup && (
-          <div className="relative flex flex-col items-end gap-3">
+          <div className="relative flex flex-col items-end gap-2.5">
             {/* Các nút con hiện ra khi bấm mở rộng */}
             <AnimatePresence>
               {isExpanded && (
@@ -76,7 +83,7 @@ export default function FloatingActions() {
                   initial={{ opacity: 0, y: 10, scale: 0.8 }}
                   animate={{ opacity: 1, y: 0, scale: 1 }}
                   exit={{ opacity: 0, y: 10, scale: 0.8 }}
-                  className="flex flex-col gap-3 mb-1"
+                  className="flex flex-col gap-2.5 mb-0.5"
                 >
                   {/* Nút Zalo */}
                   {showZalo && (
@@ -86,10 +93,10 @@ export default function FloatingActions() {
                       rel="noopener noreferrer"
                       whileHover={{ scale: 1.1 }}
                       whileTap={{ scale: 0.9 }}
-                      className="w-12 h-12 rounded-full bg-[#0068ff] text-white flex items-center justify-center shadow-lg border border-white/20"
+                      className="w-11 h-11 sm:w-12 sm:h-12 rounded-full bg-[#0068ff] text-white flex items-center justify-center shadow-lg border border-white/20"
                       title="Chat Zalo"
                     >
-                      <MessageCircle className="w-6 h-6" />
+                      <MessageCircle className="w-5 h-5 sm:w-6 sm:h-6" />
                     </motion.a>
                   )}
 
@@ -99,10 +106,10 @@ export default function FloatingActions() {
                       href={`tel:${hotline}`}
                       whileHover={{ scale: 1.1 }}
                       whileTap={{ scale: 0.9 }}
-                      className="w-12 h-12 rounded-full bg-emerald-500 text-white flex items-center justify-center shadow-lg border border-white/20"
+                      className="w-11 h-11 sm:w-12 sm:h-12 rounded-full bg-emerald-500 text-white flex items-center justify-center shadow-lg border border-white/20"
                       title="Gọi Hotline"
                     >
-                      <Phone className="w-6 h-6" />
+                      <Phone className="w-5 h-5 sm:w-6 sm:h-6" />
                     </motion.a>
                   )}
                 </motion.div>
@@ -116,12 +123,13 @@ export default function FloatingActions() {
               animate={{ opacity: 1, scale: 1 }}
               whileHover={{ scale: 1.1 }}
               whileTap={{ scale: 0.9 }}
+              aria-label={isExpanded ? 'Đóng liên hệ' : 'Mở liên hệ'}
               className={cn(
-                'w-12 h-12 rounded-full flex items-center justify-center shadow-lg border border-white/20 transition-colors duration-300',
-                isExpanded ? 'bg-gray-800 text-white' : 'bg-white/10 backdrop-blur-md text-white'
+                'w-11 h-11 sm:w-12 sm:h-12 rounded-full flex items-center justify-center shadow-lg border border-white/20 transition-colors duration-300 cursor-pointer',
+                isExpanded ? 'bg-gray-800 text-white' : 'bg-slate-900/80 backdrop-blur-md text-white hover:bg-slate-800'
               )}
             >
-              {isExpanded ? <X className="w-6 h-6" /> : <Headset className="w-6 h-6" />}
+              {isExpanded ? <X className="w-5 h-5 sm:w-6 sm:h-6" /> : <Headset className="w-5 h-5 sm:w-6 sm:h-6 text-purple-400" />}
             </motion.button>
           </div>
         )}

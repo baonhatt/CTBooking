@@ -2,7 +2,7 @@
 
 import { useMemo, useState, useEffect, useRef, useCallback } from 'react';
 import { LazyMotion, domAnimation, m, AnimatePresence, useMotionValue, useSpring, useTransform } from 'framer-motion';
-import { Play, Sparkles, Waves, Clock, Star, Calendar, Ticket, Gamepad2 } from 'lucide-react';
+import { Play, Sparkles, Waves, Clock, Star, Calendar, Ticket, Gamepad2, ChevronLeft, ChevronRight, Image as ImageIcon, MapPin, Eye } from 'lucide-react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import {
@@ -64,8 +64,8 @@ export default function HeroSection({
   };
 
   const videoRef = useRef<HTMLVideoElement>(null);
-  const videoContainerRef = useRef<HTMLDivElement>(null);
   const [isVideoPlaying, setIsVideoPlaying] = useState(false);
+  const [isVideoModalOpen, setIsVideoModalOpen] = useState(false);
   const router = useRouter();
   const searchParams = useSearchParams();
   const [selectedMovieId, setSelectedMovieId] = useState<number | null>(null);
@@ -100,8 +100,6 @@ export default function HeroSection({
     [heroMedia, isDesktopHero]
   );
 
-  const [hasStarted, setHasStarted] = useState(false);
-
   const { data: movies = initialMovies } = useQuery({
     queryKey: ['activeMovies', selectedBranch?.id],
     queryFn: () => getActiveMoviesToday(selectedBranch?.id),
@@ -109,116 +107,61 @@ export default function HeroSection({
     staleTime: 0 // Fetch real-time data when branch changes
   });
 
-  useEffect(() => {
-    const video = videoRef.current;
-    if (!video) return;
-    const PREVIEW_TIME = 1;
-    const handleLoadedMetadata = () => {
-      video.currentTime = PREVIEW_TIME;
-    };
-    video.addEventListener('loadedmetadata', handleLoadedMetadata);
-    video.pause();
-    setIsVideoPlaying(false);
-    if (video.readyState >= 1) {
-      video.currentTime = PREVIEW_TIME;
-    }
-    return () => {
-      video.removeEventListener('loadedmetadata', handleLoadedMetadata);
-    };
-  }, [heroVideoSrc]);
-
-  useEffect(() => {
-    const handleGlobalPlay = (e: any) => {
-      if (e.detail?.id !== SECTION_ID) {
-        if (videoRef.current && !videoRef.current.paused) {
-          videoRef.current.pause();
-          setIsVideoPlaying(false);
-        }
-      }
-    };
-    window.addEventListener('cinesphere-video-play', handleGlobalPlay);
-    return () => window.removeEventListener('cinesphere-video-play', handleGlobalPlay);
-  }, []);
-
-  const notifyGlobalPlay = useCallback(() => {
-    window.dispatchEvent(
-      new CustomEvent('cinesphere-video-play', {
-        detail: { id: SECTION_ID }
-      })
-    );
-  }, []);
-
-  useEffect(() => {
-    if (!videoContainerRef.current) return;
-    const observer = new IntersectionObserver(
-      (entries) => {
-        entries.forEach((entry) => {
-          if (!entry.isIntersecting) {
-            if (videoRef.current && !videoRef.current.paused) {
-              videoRef.current.pause();
-              setIsVideoPlaying(false);
-            }
-          }
-        });
-      },
-      { threshold: 0.1 }
-    );
-    observer.observe(videoContainerRef.current);
-    return () => observer.disconnect();
-  }, []);
-
-  const toggleVideoPlayback = async () => {
-    if (!hasStarted) {
-      setHasStarted(true);
-      setIsVideoPlaying(true);
-      notifyGlobalPlay();
-      return;
-    }
-    const video = videoRef.current;
-    if (!video) return;
+  // Extract and memoize branch banners
+  const branchBanners = useMemo<string[]>(() => {
+    if (!selectedBranch?.banner_images) return [];
     try {
-      if (video.paused) {
-        await video.play();
-        setIsVideoPlaying(true);
-        notifyGlobalPlay();
-      } else {
-        video.pause();
-        setIsVideoPlaying(false);
+      if (Array.isArray(selectedBranch.banner_images)) {
+        return selectedBranch.banner_images.filter((url) => typeof url === 'string' && url.trim().length > 0);
       }
-    } catch (error) {
-      console.error('Error toggling video playback:', error);
+      const parsed = JSON.parse(selectedBranch.banner_images);
+      if (Array.isArray(parsed)) {
+        return parsed.filter((url) => typeof url === 'string' && url.trim().length > 0);
+      }
+    } catch {
+      if (typeof selectedBranch.banner_images === 'string' && selectedBranch.banner_images.startsWith('http')) {
+        return [selectedBranch.banner_images];
+      }
     }
+    return [];
+  }, [selectedBranch]);
+
+  const activeBanners = branchBanners;
+
+  const [currentBannerIndex, setCurrentBannerIndex] = useState(0);
+  const [slideDirection, setSlideDirection] = useState(1);
+  const [isCarouselHovered, setIsCarouselHovered] = useState(false);
+
+  // Reset index when branch changes
+  useEffect(() => {
+    setCurrentBannerIndex(0);
+  }, [selectedBranch?.id]);
+
+  // Auto carousel slide timer (4.5s)
+  useEffect(() => {
+    if (isCarouselHovered || activeBanners.length <= 1) return;
+    const interval = setInterval(() => {
+      setSlideDirection(1);
+      setCurrentBannerIndex((prev) => (prev + 1) % activeBanners.length);
+    }, 4500);
+    return () => clearInterval(interval);
+  }, [isCarouselHovered, activeBanners.length]);
+
+  const handlePrevBanner = (e?: React.MouseEvent) => {
+    e?.stopPropagation();
+    setSlideDirection(-1);
+    setCurrentBannerIndex((prev) => (prev - 1 + activeBanners.length) % activeBanners.length);
   };
 
-  const handleBookTicket = () => {
-    if (!selectedMovieId) return;
-    if (movieDetails) {
-      try {
-        const movie = movies.find((m: any) => m.id === movieDetails.id);
-        if (movie) {
-          localStorage.setItem(
-            'selectedFilm',
-            JSON.stringify({
-              id: movie.id,
-              title: movie.title,
-              poster: movie.cover_image
-            })
-          );
-          setCookie('selected_branch_id', String(selectedBranch?.id ?? ''), 60 * 60 * 24 * 30);
-        }
-      } catch {}
-    }
-    setIsModalOpen(false);
+  const handleNextBanner = (e?: React.MouseEvent) => {
+    e?.stopPropagation();
+    setSlideDirection(1);
+    setCurrentBannerIndex((prev) => (prev + 1) % activeBanners.length);
+  };
 
-    // Show branch confirmation dialog if not disabled
-    if (!dontShowConfirm && selectedBranch) {
-      setShowBranchConfirmDialog(true);
-      return;
-    }
-
-    const params = new URLSearchParams(searchParams.toString());
-    setCookie('selected_branch_id', String(selectedBranch?.id ?? ''), 60 * 60 * 24 * 30);
-    router.push(`/booking${params.toString() ? `?${params.toString()}` : ''}`);
+  const handleBannerClick = () => {
+    const bookingSection = document.getElementById('promotions') || document.getElementById('films');
+    bookingSection?.scrollIntoView({ behavior: 'smooth' });
   };
 
   const movieDetails = useMemo(() => {
@@ -226,63 +169,199 @@ export default function HeroSection({
     return movieStore.getMovie(selectedMovieId);
   }, [selectedMovieId, storeUpdateTrigger]);
 
+  const slideVariants = {
+    enter: (direction: number) => ({
+      x: direction > 0 ? '100%' : '-100%',
+      opacity: 0,
+      scale: 0.95
+    }),
+    center: {
+      x: 0,
+      opacity: 1,
+      scale: 1,
+      transition: {
+        x: { type: 'spring' as const, stiffness: 300, damping: 30 },
+        opacity: { duration: 0.4 },
+        scale: { duration: 0.4 }
+      }
+    },
+    exit: (direction: number) => ({
+      x: direction > 0 ? '-100%' : '100%',
+      opacity: 0,
+      scale: 0.95,
+      transition: {
+        x: { type: 'spring' as const, stiffness: 300, damping: 30 },
+        opacity: { duration: 0.3 }
+      }
+    })
+  };
+
   return (
     <LazyMotion features={domAnimation} strict>
       <section
         id="hero"
-        className="relative min-h-[85vh] lg:min-h-screen overflow-hidden bg-gradient-to-b from-[#030712] via-[#070b1e] to-[#050915] text-white pt-16 sm:pt-24"
+        className="relative overflow-hidden bg-gradient-to-b from-[#030712] via-[#070b1e] to-[#050915] text-white"
         onMouseMove={isDesktopHero ? onMove : undefined}
-        onMouseEnter={isDesktopHero ? onMouseEnter : undefined}
       >
-        <div className="absolute inset-0 bg-black/40">
-          <div className="absolute inset-0 bg-[radial-gradient(circle_at_20%_20%,rgba(59,130,246,0.35),transparent_35%),radial-gradient(circle_at_80%_30%,rgba(236,72,153,0.25),transparent_40%),radial-gradient(circle_at_50%_70%,rgba(34,211,238,0.3),transparent_35%)]" />
-          <div className="absolute inset-0 bg-gradient-to-b from-transparent via-[#050915]/60 to-[#050915]" />
-        </div>
-
-        <div className="absolute -left-24 top-10 w-[520px] h-[520px] rounded-full bg-cyan-500/15 blur-[120px] animate-pulse pointer-events-none" />
+        {/* Cyber Ambient Background Glows */}
+        <div className="absolute -left-24 top-10 w-[520px] h-[520px] rounded-full bg-cyan-500/15 blur-[130px] animate-pulse pointer-events-none" />
         <m.div
-          className="absolute -right-16 top-32 w-[420px] h-[420px] rounded-full bg-fuchsia-500/15 blur-[120px] pointer-events-none"
+          className="absolute -right-20 top-40 w-[460px] h-[460px] rounded-full bg-fuchsia-500/15 blur-[140px] pointer-events-none"
           style={{ x: blobX, y: blobY, translateZ: 0 }}
         />
 
-        <div className="container mx-auto px-4 relative z-10 min-h-[calc(85vh-4rem)] lg:min-h-[calc(100vh-6rem)] flex flex-col justify-center py-8 sm:py-20">
-          <div className="grid lg:grid-cols-2 gap-10 lg:gap-12 items-center">
+        {/* ================= TOP SECTION: WIDESCREEN BANNER CAROUSEL (Chỉ hiện khi chi nhánh có banner) ================= */}
+        {branchBanners.length > 0 && (
+          <div className="container mx-auto px-4 sm:px-6 pt-24 sm:pt-28 pb-4">
+            <div
+              className="relative w-full aspect-[21/9] sm:aspect-[24/9] lg:aspect-[2.8/1] min-h-[220px] sm:min-h-[300px] lg:min-h-[380px] rounded-2xl sm:rounded-3xl overflow-hidden border border-white/20 bg-slate-950 shadow-[0_15px_50px_rgba(0,0,0,0.8)] group cursor-pointer"
+              onClick={handleBannerClick}
+              onMouseEnter={() => setIsCarouselHovered(true)}
+              onMouseLeave={() => setIsCarouselHovered(false)}
+            >
+              {/* Active Slide Banner Image with Smooth Animation */}
+              <AnimatePresence initial={false} custom={slideDirection} mode="popLayout">
+                <m.div
+                  key={currentBannerIndex}
+                  custom={slideDirection}
+                  variants={slideVariants}
+                  initial="enter"
+                  animate="center"
+                  exit="exit"
+                  className="absolute inset-0 w-full h-full"
+                >
+                  <img
+                    src={
+                      optimizeCloudinaryUrl(activeBanners[currentBannerIndex], 2560, 'auto:best') ||
+                      activeBanners[currentBannerIndex]
+                    }
+                    alt={`Cinesphere Banner ${currentBannerIndex + 1}`}
+                    className="w-full h-full object-cover object-center transition-transform duration-700 group-hover:scale-105"
+                    loading="eager"
+                    fetchPriority="high"
+                  />
+                  {/* Subtle dark gradient overlay at top & bottom edges of banner for badge legibility */}
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-black/40 pointer-events-none" />
+                </m.div>
+              </AnimatePresence>
+
+              {/* Top Badges Overlay */}
+              <div className="absolute top-3.5 sm:top-5 left-4 sm:left-6 right-4 sm:right-6 flex items-center justify-between z-20 pointer-events-none">
+                <div className="flex items-center gap-2 px-3 sm:px-4 py-1.5 rounded-full bg-black/60 backdrop-blur-md border border-white/20 shadow-md">
+                  <MapPin className="w-3.5 h-3.5 text-cyan-400 animate-bounce" />
+                  <span className="text-xs sm:text-sm font-bold text-white tracking-wide">
+                    {selectedBranch?.name || 'Cinesphere'}
+                  </span>
+                </div>
+
+                <div className="flex items-center gap-2 px-3 sm:px-4 py-1.5 rounded-full bg-cyan-950/85 backdrop-blur-md border border-cyan-500/50 shadow-md">
+                  <span className="w-2 h-2 rounded-full bg-cyan-400 animate-pulse shadow-[0_0_10px_rgba(34,211,238,0.9)]" />
+                  <span className="text-[11px] sm:text-xs font-black uppercase tracking-wider text-cyan-300">
+                    ✨ ƯU ĐÃI CHI NHÁNH
+                  </span>
+                </div>
+              </div>
+
+              {/* Side Navigation Arrows (2 Bên Cạnh Banner) */}
+              {activeBanners.length > 1 && (
+                <>
+                  <button
+                    type="button"
+                    onClick={handlePrevBanner}
+                    aria-label="Banner trước"
+                    className="absolute left-3 sm:left-5 top-1/2 -translate-y-1/2 z-30 p-2.5 sm:p-3.5 rounded-full bg-black/50 hover:bg-black/90 backdrop-blur-md border border-white/20 hover:border-cyan-400 text-white transition-all duration-300 hover:scale-110 active:scale-95 shadow-2xl flex items-center justify-center cursor-pointer group"
+                  >
+                    <ChevronLeft className="w-5 h-5 sm:w-6 sm:h-6 group-hover:-translate-x-0.5 transition-transform" />
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={handleNextBanner}
+                    aria-label="Banner tiếp theo"
+                    className="absolute right-3 sm:right-5 top-1/2 -translate-y-1/2 z-30 p-2.5 sm:p-3.5 rounded-full bg-black/50 hover:bg-black/90 backdrop-blur-md border border-white/20 hover:border-cyan-400 text-white transition-all duration-300 hover:scale-110 active:scale-95 shadow-2xl flex items-center justify-center cursor-pointer group"
+                  >
+                    <ChevronRight className="w-5 h-5 sm:w-6 sm:h-6 group-hover:translate-x-0.5 transition-transform" />
+                  </button>
+                </>
+              )}
+
+              {/* Bottom Slide Indicator Overlay */}
+              {activeBanners.length > 1 && (
+                <div className="absolute bottom-3 sm:bottom-4 right-4 sm:right-6 z-20 pointer-events-auto">
+                  <div className="flex items-center gap-1.5 bg-black/70 backdrop-blur-md px-3 py-1.5 rounded-full border border-white/20 shadow-lg">
+                    {activeBanners.map((_, idx) => (
+                      <button
+                        key={idx}
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setSlideDirection(idx > currentBannerIndex ? 1 : -1);
+                          setCurrentBannerIndex(idx);
+                        }}
+                        aria-label={`Chuyển đến banner ${idx + 1}`}
+                        className={`h-1.5 rounded-full transition-all duration-300 cursor-pointer ${
+                          idx === currentBannerIndex
+                            ? 'w-5 bg-gradient-to-r from-cyan-400 to-blue-500 shadow-[0_0_8px_rgba(6,182,212,0.8)]'
+                            : 'w-1.5 bg-white/30 hover:bg-white/60'
+                        }`}
+                      />
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* ================= BOTTOM SECTION: HERO SECTION CONTENT (TYPOGRAPHY, CTA & FEATURES) ================= */}
+        <div
+          className={`container mx-auto px-4 sm:px-6 py-8 sm:py-12 pb-14 sm:pb-18 relative z-10 ${
+            branchBanners.length === 0 ? 'pt-24 sm:pt-32' : ''
+          }`}
+        >
+          <div className="grid lg:grid-cols-12 gap-8 lg:gap-12 items-center">
+            {/* Left Column: Brand, Slogan, Description & CTA Action Buttons */}
             <m.div
               initial={{ opacity: 0, x: -30 }}
               animate={{ opacity: 1, x: 0 }}
               transition={{ duration: 0.8, ease: 'easeOut' }}
-              className="max-w-3xl space-y-6"
+              className="lg:col-span-7 space-y-6"
             >
-              <m.h1
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.3 }}
-                className="text-6xl md:text-6xl lg:text-7xl font-extrabold leading-none tracking-tight flex flex-col gap-2"
-              >
-                <span className="bg-gradient-to-r from-cyan-300 via-blue-400 to-fuchsia-400 bg-clip-text text-transparent drop-shadow-[0_10px_40px_rgba(56,189,248,0.5)] py-2">
-                  CINESPHERE
-                </span>
-                <span className="text-white text-3xl md:text-3xl lg:text-5xl">Huyễn cảnh không gian</span>
-              </m.h1>
+              <div className="space-y-3">
+                <m.h1
+                  initial={{ opacity: 0, y: 15 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.2 }}
+                  className="text-5xl sm:text-6xl lg:text-7xl font-black leading-none tracking-tight flex flex-col gap-1.5"
+                >
+                  <span className="bg-gradient-to-r from-cyan-300 via-blue-400 to-fuchsia-400 bg-clip-text text-transparent drop-shadow-[0_10px_40px_rgba(56,189,248,0.5)] py-1">
+                    CINESPHERE
+                  </span>
+                  <span className="text-white text-2xl sm:text-3xl lg:text-4xl font-bold tracking-tight">
+                    Huyễn cảnh không gian
+                  </span>
+                </m.h1>
 
-              <m.p
-                initial={{ opacity: 0, y: 20 }}
+                <m.p
+                  initial={{ opacity: 0, y: 15 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.3 }}
+                  className="text-base sm:text-lg text-gray-200 leading-relaxed max-w-2xl font-normal"
+                >
+                  Dùng không gian nhỏ mô phỏng thế giới vô biên. Mỗi suất chiếu là một hành trình nhập vai với độ phân
+                  giải 8K và âm thanh đa tầng bao quanh.
+                </m.p>
+              </div>
+
+              {/* Action Buttons */}
+              <m.div
+                initial={{ opacity: 0, y: 15 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.4 }}
-                className="text-lg md:text-xl text-gray-200 leading-relaxed max-w-2xl"
-              >
-                Dùng không gian nhỏ mô phỏng thế giới vô biên. Mỗi suất chiếu là một hành trình nhập vai với độ phân
-                giải 8K và âm thanh đa tầng bao quanh
-              </m.p>
-
-              <m.div
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.5 }}
-                className="flex flex-wrap items-center gap-4 pt-2"
+                className="flex flex-wrap items-center gap-4 pt-1"
               >
                 <Button
-                  className="group rounded-xl px-8 py-6 text-sm sm:text-base font-bold bg-gradient-to-r from-cyan-500 via-blue-600 to-fuchsia-500 hover:from-fuchsia-500 hover:via-cyan-400 hover:to-blue-600 text-white shadow-[0_0_30px_rgba(6,182,212,0.4)] transition-all duration-500 hover:shadow-[0_0_50px_rgba(236,72,153,0.6)] hover:scale-[1.02] active:scale-95"
+                  className="group rounded-xl px-8 py-6 text-sm sm:text-base font-bold bg-gradient-to-r from-cyan-500 via-blue-600 to-fuchsia-500 hover:from-fuchsia-500 hover:via-cyan-400 hover:to-blue-600 text-white shadow-[0_0_30px_rgba(6,182,212,0.4)] transition-all duration-300 hover:shadow-[0_0_40px_rgba(236,72,153,0.6)] hover:scale-[1.02] active:scale-95 cursor-pointer"
                   onClick={() => {
                     const bookingSection = document.getElementById('promotions');
                     bookingSection?.scrollIntoView({ behavior: 'smooth' });
@@ -293,8 +372,9 @@ export default function HeroSection({
                     <Play className="h-4 w-4 group-hover:translate-x-1 transition-transform" />
                   </span>
                 </Button>
+
                 <Button
-                  className="group rounded-xl px-8 py-6 text-sm sm:text-base font-bold bg-gradient-to-r from-purple-600 via-fuchsia-600 to-pink-600 hover:from-pink-600 hover:via-purple-600 hover:to-fuchsia-600 text-white shadow-[0_0_30px_rgba(168,85,247,0.4)] transition-all duration-500 hover:shadow-[0_0_50px_rgba(236,72,153,0.6)] hover:scale-[1.02] active:scale-95"
+                  className="group rounded-xl px-8 py-6 text-sm sm:text-base font-bold bg-gradient-to-r from-purple-600 via-fuchsia-600 to-pink-600 hover:from-pink-600 hover:via-purple-600 hover:to-fuchsia-600 text-white shadow-[0_0_30px_rgba(168,85,247,0.4)] transition-all duration-300 hover:shadow-[0_0_40px_rgba(236,72,153,0.6)] hover:scale-[1.02] active:scale-95 cursor-pointer"
                   onClick={() => {
                     const vrSection = document.getElementById('vr');
                     vrSection?.scrollIntoView({ behavior: 'smooth' });
@@ -305,135 +385,78 @@ export default function HeroSection({
                     Trải nghiệm VR
                   </span>
                 </Button>
-              </m.div>
 
-              <m.div
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.6 }}
-                className="grid grid-cols-1 sm:grid-cols-3 gap-4 max-w-2xl pt-4"
-              >
-                {[
-                  { icon: Waves, title: 'Âm thanh đa tầng', desc: 'Định vị 360° bao quanh' },
-                  { icon: Sparkles, title: 'Hiệu ứng vũ trụ', desc: 'Hào quang, photon, nebula' },
-                  { icon: Play, title: 'Độ phân giải 8K', desc: 'Màn hình đa chiều siêu nét' }
-                ].map(({ icon: Icon, title, desc }, idx) => (
-                  <m.div
-                    key={title}
-                    initial={{ opacity: 0, y: 24 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: 0.7 + idx * 0.1, duration: 0.45 }}
-                    whileHover={{ scale: 1.05, y: -5 }}
-                    className="glass-tile rounded-2xl p-5 border border-white/15 bg-white/10 backdrop-blur-md hover:border-cyan-300/50 transition-all duration-300 cursor-pointer"
-                    style={{ x: cardX, y: cardY, translateZ: 0 }}
+                {heroMedia?.url && (
+                  <Button
+                    variant="outline"
+                    className="rounded-xl px-5 py-6 text-sm font-semibold border-white/20 bg-white/5 hover:bg-white/10 hover:border-cyan-400 text-slate-100 transition-all flex items-center gap-2 cursor-pointer shadow-md"
+                    onClick={() => setIsVideoModalOpen(true)}
                   >
-                    <div className="flex flex-col gap-3">
-                      <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-cyan-400/80 to-fuchsia-500/80 flex items-center justify-center shadow-lg">
-                        <Icon className="h-6 w-6 text-white" />
-                      </div>
-                      <div>
-                        <p className="font-semibold text-white mb-1">{title}</p>
-                        <p className="text-sm text-gray-300">{desc}</p>
-                      </div>
-                    </div>
-                  </m.div>
-                ))}
+                    <Play className="h-4 w-4 text-cyan-400" />
+                    Xem Video 8K
+                  </Button>
+                )}
               </m.div>
             </m.div>
 
+            {/* Right Column: 3 Sci-Fi Feature Glass Tiles */}
             <m.div
               initial={{ opacity: 0, x: 30 }}
               animate={{ opacity: 1, x: 0 }}
-              transition={{ duration: 0.8, delay: 0.3, ease: 'easeOut' }}
-              className="relative z-40 w-full max-w-[min(100%,20rem)] sm:max-w-md mx-auto mt-4 lg:mt-0"
+              transition={{ duration: 0.8, delay: 0.2, ease: 'easeOut' }}
+              className="lg:col-span-5 grid grid-cols-1 sm:grid-cols-3 lg:grid-cols-1 gap-4"
             >
-              <div
-                ref={videoContainerRef}
-                className="relative w-full aspect-[9/16] rounded-2xl sm:rounded-3xl overflow-hidden border-2 border-white/20 bg-black backdrop-blur-xl shadow-2xl group cursor-pointer"
-                onClick={!hasStarted ? toggleVideoPlayback : undefined}
-              >
-                <AnimatePresence mode="wait">
-                  {!hasStarted ? (
-                    <m.div
-                      key="placeholder"
-                      initial={{ opacity: 1 }}
-                      exit={{ opacity: 0 }}
-                      className="absolute inset-0 z-10"
-                    >
-                      <img
-                        src={heroVideoThumbnail || heroMedia?.url}
-                        alt="Cinesphere Cinematic Experience"
-                        width={448}
-                        height={796}
-                        className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
-                        loading="eager"
-                        fetchPriority="high"
-                      />
-                      <div className="absolute inset-0 flex items-center justify-center bg-black/20 group-hover:bg-black/10 transition-colors">
-                        <div className="w-20 h-20 rounded-full bg-white/20 backdrop-blur-md flex items-center justify-center border-2 border-white/30 shadow-2xl group-hover:scale-110 transition-transform">
-                          <Play className="h-10 w-10 text-white ml-1" fill="white" />
-                        </div>
-                      </div>
-                    </m.div>
-                  ) : (
-                    <m.div
-                      key="video"
-                      initial={{ opacity: 0 }}
-                      animate={{ opacity: 1 }}
-                      className="absolute inset-0 z-0"
-                    >
-                      <video
-                        ref={videoRef}
-                        src={heroVideoSrc}
-                        className="w-full h-full object-cover bg-black"
-                        loop
-                        playsInline
-                        autoPlay
-                        onPlay={() => setIsVideoPlaying(true)}
-                        onPause={() => setIsVideoPlaying(false)}
-                      />
-                      <div
-                        className="absolute inset-0 z-10"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          toggleVideoPlayback();
-                        }}
-                      >
-                        <button
-                          className="absolute inset-0 flex items-center justify-center"
-                          aria-label={isVideoPlaying ? 'Pause video' : 'Play video'}
-                        >
-                          <m.div
-                            animate={{
-                              scale: isVideoPlaying ? 0 : 1,
-                              opacity: isVideoPlaying ? 0 : 1
-                            }}
-                            className="w-16 h-16 rounded-full bg-black/40 backdrop-blur-sm flex items-center justify-center border border-white/20"
-                          >
-                            <Play className="h-8 w-8 text-white ml-1" fill="white" />
-                          </m.div>
-                        </button>
-                      </div>
-                    </m.div>
-                  )}
-                </AnimatePresence>
-
-                <div className="absolute top-4 left-4 right-4 flex items-center justify-between z-30 pointer-events-none">
-                  <div className="w-2 h-2 rounded-full bg-green-400 shadow-[0_0_10px_rgba(34,197,94,0.8)] animate-pulse" />
-                  <div className="px-3 py-1 rounded-full bg-black/40 backdrop-blur-md border border-white/20">
-                    <span className="text-xs text-white font-medium">8K VISION</span>
+              {[
+                { icon: Waves, title: 'Âm thanh đa tầng', desc: 'Định vị 360° bao quanh không gian', color: 'from-cyan-400 to-blue-500' },
+                { icon: Sparkles, title: 'Hiệu ứng vũ trụ', desc: 'Hào quang, photon, tinh vân huyền ảo', color: 'from-fuchsia-500 to-purple-600' },
+                { icon: Play, title: 'Độ phân giải 8K', desc: 'Màn hình đa chiều siêu nét đỉnh cao', color: 'from-blue-400 to-cyan-500' }
+              ].map(({ icon: Icon, title, desc, color }, idx) => (
+                <m.div
+                  key={title}
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.3 + idx * 0.1, duration: 0.45 }}
+                  whileHover={{ scale: 1.03, x: 4 }}
+                  className="rounded-2xl p-4 sm:p-5 border border-white/15 bg-white/5 backdrop-blur-xl hover:border-cyan-400/50 hover:bg-white/10 transition-all duration-300 cursor-default shadow-lg flex items-center gap-4"
+                  style={{ x: cardX, y: cardY, translateZ: 0 }}
+                >
+                  <div className={`w-12 h-12 rounded-xl bg-gradient-to-br ${color} flex items-center justify-center shadow-md shrink-0`}>
+                    <Icon className="h-6 w-6 text-white" />
                   </div>
-                </div>
-
-                <div className="absolute bottom-0 left-0 right-0 p-6 bg-gradient-to-t from-black/80 to-transparent z-30 pointer-events-none">
-                  <p className="text-white font-semibold text-sm">Experience the Future</p>
-                  <p className="text-gray-300 text-xs">Phòng chiếu 360° Đa Chiều</p>
-                </div>
-              </div>
+                  <div>
+                    <p className="font-bold text-white text-base mb-0.5">{title}</p>
+                    <p className="text-xs sm:text-sm text-gray-300 font-normal">{desc}</p>
+                  </div>
+                </m.div>
+              ))}
             </m.div>
           </div>
         </div>
       </section>
+
+      {/* Video Preview Dialog */}
+      {heroMedia?.url && (
+        <Dialog open={isVideoModalOpen} onOpenChange={setIsVideoModalOpen}>
+          <DialogContent className="max-w-4xl bg-slate-950/95 border-white/10 text-white p-2 sm:p-4 rounded-2xl overflow-hidden">
+            <DialogHeader className="p-2 pb-0">
+              <DialogTitle className="text-lg font-bold text-white flex items-center gap-2">
+                <Play className="w-4 h-4 text-cyan-400" /> Video Giới Thiệu Cinesphere 8K
+              </DialogTitle>
+              <DialogDescription className="text-xs text-slate-400">
+                Không gian điện ảnh siêu thực & thế giới thực tế ảo nhập vai
+              </DialogDescription>
+            </DialogHeader>
+            <div className="aspect-video w-full rounded-xl overflow-hidden bg-black mt-3 border border-white/10">
+              <video
+                src={heroVideoSrc}
+                controls
+                autoPlay
+                className="w-full h-full object-contain"
+              />
+            </div>
+          </DialogContent>
+        </Dialog>
+      )}
 
       {/* Branch confirmation dialog */}
       <AlertDialog open={showBranchConfirmDialog} onOpenChange={setShowBranchConfirmDialog}>
