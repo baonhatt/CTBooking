@@ -7,138 +7,138 @@ import { useStaffStore } from '@/store/staffStore';
 import { useNavigate } from 'react-router-dom';
 
 export default function ToysPage() {
-        const navigate = useNavigate();
-        const staff = useStaffStore((state) => state.staff);
-        const clearStaff = useStaffStore((state) => state.clearStaff);
-        const [activeTab, setActiveTab] = useState('toys');
-        const [toys, setToys] = useState<any[]>([]);
-        const [totalToys, setTotalToys] = useState(0);
-        const [toysPage, setToysPage] = useState(1);
-        const pageSize = 10;
-        const [searchQuery, setSearchQuery] = useState('');
-        const [showActiveOnly, setShowActiveOnly] = useState(false);
-        const [isEditOpen, setIsEditOpen] = useState(false);
-        const [editType, setEditType] = useState<'toy' | null>(null);
-        const [editData, setEditData] = useState<any>({});
-        const [isLoading, setIsLoading] = useState(false);
+  const navigate = useNavigate();
+  const staff = useStaffStore((state) => state.staff);
+  const clearStaff = useStaffStore((state) => state.clearStaff);
+  const [activeTab, setActiveTab] = useState('toys');
+  const [toys, setToys] = useState<any[]>([]);
+  const [totalToys, setTotalToys] = useState(0);
+  const [toysPage, setToysPage] = useState(1);
+  const pageSize = 10;
+  const [searchQuery, setSearchQuery] = useState('');
+  const [showActiveOnly, setShowActiveOnly] = useState(false);
+  const [isEditOpen, setIsEditOpen] = useState(false);
+  const [editType, setEditType] = useState<'toy' | null>(null);
+  const [editData, setEditData] = useState<any>({});
+  const [isLoading, setIsLoading] = useState(false);
 
-        useEffect(() => {
-                (async () => {
-                        setIsLoading(true);
-                        const { items, total } = await getToys({
-                                page: toysPage,
-                                pageSize,
-                                q: searchQuery,
-                                status: showActiveOnly ? 'active' : 'all'
-                        });
-                        setToys(
-                                items.map((t: any) => ({
-                                        id: t.id,
-                                        name: t.name,
-                                        category: t.category,
-                                        price: Number(t.price),
-                                        stock: t.stock,
-                                        status: t.status,
-                                        image_url: t.image_url
-                                }))
-                        );
-                        setTotalToys(total);
-                        setIsLoading(false);
-                })();
-        }, [toysPage, pageSize, searchQuery, showActiveOnly]);
+  useEffect(() => {
+    (async () => {
+      setIsLoading(true);
+      const { items, total } = await getToys({
+        page: toysPage,
+        pageSize,
+        q: searchQuery,
+        status: showActiveOnly ? 'active' : 'all'
+      });
+      setToys(
+        items.map((t: any) => ({
+          id: t.id,
+          name: t.name,
+          category: t.category,
+          price: Number(t.price),
+          stock: t.stock,
+          status: t.status,
+          image_url: t.image_url
+        }))
+      );
+      setTotalToys(total);
+      setIsLoading(false);
+    })();
+  }, [toysPage, pageSize, searchQuery, showActiveOnly]);
 
-        const toysTotalPages = useMemo(() => Math.max(1, Math.ceil(totalToys / pageSize)), [totalToys]);
+  const toysTotalPages = useMemo(() => Math.max(1, Math.ceil(totalToys / pageSize)), [totalToys]);
 
-        const handleOpenEdit = (_type: 'toy', data: any) => {
-                setEditType('toy');
-                setEditData(data);
-                setIsEditOpen(true);
-        };
-        const handleOpenCreate = () => {
-                setEditType('toy');
-                setEditData({
-                        id: 0,
-                        name: '',
-                        category: '',
-                        price: 0,
-                        stock: 0,
-                        status: 'active',
-                        image_url: ''
-                });
-                setIsEditOpen(true);
-        };
+  const handleOpenEdit = (_type: 'toy', data: any) => {
+    setEditType('toy');
+    setEditData(data);
+    setIsEditOpen(true);
+  };
+  const handleOpenCreate = () => {
+    setEditType('toy');
+    setEditData({
+      id: 0,
+      name: '',
+      category: '',
+      price: 0,
+      stock: 0,
+      status: 'active',
+      image_url: ''
+    });
+    setIsEditOpen(true);
+  };
 
-        const handleRefresh = async () => {
-                setIsLoading(true);
-                const { items, total } = await getToys({
-                        page: toysPage,
-                        pageSize,
-                        q: searchQuery,
-                        status: showActiveOnly ? 'active' : 'all'
-                });
-                setToys(
-                        items.map((t: any) => ({
-                                id: t.id,
-                                name: t.name,
-                                category: t.category,
-                                price: Number(t.price),
-                                stock: t.stock,
-                                status: t.status,
-                                image_url: t.image_url
-                        }))
-                );
-                setTotalToys(total);
-                setIsLoading(false);
-        };
+  const handleRefresh = async () => {
+    setIsLoading(true);
+    const { items, total } = await getToys({
+      page: toysPage,
+      pageSize,
+      q: searchQuery,
+      status: showActiveOnly ? 'active' : 'all'
+    });
+    setToys(
+      items.map((t: any) => ({
+        id: t.id,
+        name: t.name,
+        category: t.category,
+        price: Number(t.price),
+        stock: t.stock,
+        status: t.status,
+        image_url: t.image_url
+      }))
+    );
+    setTotalToys(total);
+    setIsLoading(false);
+  };
 
-        const handleLogout = () => {
-                localStorage.removeItem('staffToken');
-                clearStaff();
-                navigate('/login');
-        };
+  const handleLogout = () => {
+    localStorage.removeItem('staffToken');
+    clearStaff();
+    navigate('/login');
+  };
 
-        return (
-                <AdminLayout
-                        active={activeTab as any}
-                        setActive={setActiveTab as any}
-                        adminEmailState={staff?.email || 'admin@email.com'}
-                        handleLogout={handleLogout}
-                >
-                        <ToysContent
-                                data={toys}
-                                totalPages={toysTotalPages}
-                                currentPage={toysPage}
-                                setPage={setToysPage}
-                                onEdit={handleOpenEdit}
-                                onCreate={handleOpenCreate}
-                                toysLength={totalToys}
-                                deleteToyApi={deleteToyApi as any}
-                                setToys={setToys}
-                                onRefresh={handleRefresh}
-                                searchQuery={searchQuery}
-                                onSearchChange={(query) => {
-                                        setSearchQuery(query);
-                                        setToysPage(1);
-                                }}
-                                isLoading={isLoading}
-                                showActiveOnly={showActiveOnly}
-                                setShowActiveOnly={setShowActiveOnly}
-                        />
-                        <AdminEditModal
-                                isEditOpen={isEditOpen}
-                                setIsEditOpen={setIsEditOpen}
-                                editType={editType as any}
-                                editData={editData}
-                                setEditData={setEditData}
-                                setUsers={() => { }}
-                                moviesLocal={[]}
-                                toLocalDateTimeString={(d: Date) => d.toISOString().slice(0, 16)}
-                                pageSize={pageSize}
-                                currentPage={toysPage}
-                                setMoviesLocal={() => { }}
-                                setMovieStatus={() => { }}
-                                setToys={setToys}
-                        />
-                </AdminLayout>
-        );
+  return (
+    <AdminLayout
+      active={activeTab as any}
+      setActive={setActiveTab as any}
+      adminEmailState={staff?.email || 'admin@email.com'}
+      handleLogout={handleLogout}
+    >
+      <ToysContent
+        data={toys}
+        totalPages={toysTotalPages}
+        currentPage={toysPage}
+        setPage={setToysPage}
+        onEdit={handleOpenEdit}
+        onCreate={handleOpenCreate}
+        toysLength={totalToys}
+        deleteToyApi={deleteToyApi as any}
+        setToys={setToys}
+        onRefresh={handleRefresh}
+        searchQuery={searchQuery}
+        onSearchChange={(query) => {
+          setSearchQuery(query);
+          setToysPage(1);
+        }}
+        isLoading={isLoading}
+        showActiveOnly={showActiveOnly}
+        setShowActiveOnly={setShowActiveOnly}
+      />
+      <AdminEditModal
+        isEditOpen={isEditOpen}
+        setIsEditOpen={setIsEditOpen}
+        editType={editType as any}
+        editData={editData}
+        setEditData={setEditData}
+        setUsers={() => {}}
+        moviesLocal={[]}
+        toLocalDateTimeString={(d: Date) => d.toISOString().slice(0, 16)}
+        pageSize={pageSize}
+        currentPage={toysPage}
+        setMoviesLocal={() => {}}
+        setMovieStatus={() => {}}
+        setToys={setToys}
+      />
+    </AdminLayout>
+  );
 }

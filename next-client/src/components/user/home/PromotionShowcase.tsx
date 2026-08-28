@@ -112,7 +112,6 @@ export default function PromotionShowcase({ initialCombos = [] }: { initialCombo
           <h2 className="text-3xl sm:text-4xl md:text-5xl font-black text-white tracking-tight leading-tight">
             Chọn gói phù hợp
           </h2>
-
         </div>
 
         {combos.length === 0 ? (
@@ -141,7 +140,9 @@ export default function PromotionShowcase({ initialCombos = [] }: { initialCombo
 
                     <div className="space-y-4">
                       <div>
-                        <span className="text-[11px] uppercase font-bold text-amber-400/80 tracking-wider">CineSphere Combo</span>
+                        <span className="text-[11px] uppercase font-bold text-amber-400/80 tracking-wider">
+                          CineSphere Combo
+                        </span>
                         <h3 className="text-xl font-black text-white group-hover:text-amber-200 transition-colors mt-0.5">
                           {combo.name}
                         </h3>

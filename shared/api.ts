@@ -143,7 +143,8 @@ export interface VoucherValidateRequest {
 export interface VoucherValidateResponse {
   valid: boolean;
   message?: string;
-  error_code?: 'VOUCHER_NOT_FOUND'
+  error_code?:
+    | 'VOUCHER_NOT_FOUND'
     | 'VOUCHER_INACTIVE'
     | 'VOUCHER_EXPIRED'
     | 'VOUCHER_USAGE_LIMIT_REACHED'
@@ -218,4 +219,3 @@ export interface VRBookingResponse {
   };
   error?: string;
 }
-

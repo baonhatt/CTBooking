@@ -13,9 +13,7 @@ export function setCookie(name: string, value: string, maxAgeSeconds?: number) {
 export function getCookie(name: string) {
   if (typeof document === 'undefined') return null;
   const prefix = `${encodeURIComponent(name)}=`;
-  const match = document.cookie
-    .split('; ')
-    .find((entry) => entry.startsWith(prefix));
+  const match = document.cookie.split('; ').find((entry) => entry.startsWith(prefix));
   return match ? decodeURIComponent(match.slice(prefix.length)) : null;
 }
 

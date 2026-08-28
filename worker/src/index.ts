@@ -138,7 +138,7 @@ import {
   listActiveVRPackagesImpl,
   validateVRBookingImpl,
   createVRBookingImpl,
-  getVRBookingByIdImpl,
+  getVRBookingByIdImpl
 } from '../../server/routes/user/vr-bookings';
 
 import { validateVoucherForVRImpl } from '../../server/routes/user/vouchers';
@@ -151,7 +151,7 @@ import {
   updateVoucherImpl,
   toggleVoucherStatusImpl,
   deleteVoucherImpl,
-  restoreVoucherImpl,
+  restoreVoucherImpl
 } from '../../server/routes/admin/vouchers';
 
 // import { getMailConfig, verifyMailProvider } from "../../server/routes/mail-service";
@@ -1117,7 +1117,10 @@ app.get('/api/admin/transactions', requireStaffAuth, requirePermission('transact
 
     const to = String(c.req.query('to') || '');
     const booking_type_raw = String(c.req.query('booking_type') || 'all');
-    const booking_type = (['all', 'movie', 'vr'].includes(booking_type_raw) ? booking_type_raw : 'all') as 'all' | 'movie' | 'vr';
+    const booking_type = (['all', 'movie', 'vr'].includes(booking_type_raw) ? booking_type_raw : 'all') as
+      | 'all'
+      | 'movie'
+      | 'vr';
     const branch_id_raw = c.req.query('branch_id');
     const branch_id = branch_id_raw && branch_id_raw !== 'all' ? Number(branch_id_raw) : undefined;
 
@@ -2443,10 +2446,14 @@ app.get('/api/schedule', async (c) => {
   try {
     const branchId = Number(c.req.query('branch_id') || 0);
     const db = drizzle(c.env.cinema_db, { schema });
-    const r = await getPublicScheduleImpl(db, {
-      showtimes: schema.showtimes,
-      movies: schema.movies
-    }, branchId);
+    const r = await getPublicScheduleImpl(
+      db,
+      {
+        showtimes: schema.showtimes,
+        movies: schema.movies
+      },
+      branchId
+    );
     return c.json(r, 200);
   } catch {
     return c.json({ status: 'error', message: 'Lỗi máy chủ nội bộ' }, 500);
@@ -3147,7 +3154,7 @@ app.get('/api/tickets', async (c) => {
     const includeInactive = c.req.query('includeInactive') === 'true';
 
     const typeRaw = c.req.query('type') || 'all';
-    const type = (typeRaw === 'movie' || typeRaw === 'vr') ? typeRaw : 'all';
+    const type = typeRaw === 'movie' || typeRaw === 'vr' ? typeRaw : 'all';
 
     const db = drizzle(c.env.cinema_db, { schema });
     const restrictBranchIds = getRestrictBranchIds(c);
@@ -3405,27 +3412,32 @@ app.get('/api/admin/deleted/tickets', requireStaffAuth, requirePermission('ticke
 });
 
 // POST /api/admin/tickets/:id/toggle-status
-app.post('/api/admin/tickets/:id/toggle-status', requireStaffAuth, requirePermission('tickets', 'toggle_status'), async (c) => {
-  try {
-    const id = Number(c.req.param('id'));
-    const db = drizzle(c.env.cinema_db, { schema });
-    const staffId = c.get('staffId');
-    const staffEmail = c.get('staffEmail');
-    const staffFullname = c.get('staffFullname');
+app.post(
+  '/api/admin/tickets/:id/toggle-status',
+  requireStaffAuth,
+  requirePermission('tickets', 'toggle_status'),
+  async (c) => {
+    try {
+      const id = Number(c.req.param('id'));
+      const db = drizzle(c.env.cinema_db, { schema });
+      const staffId = c.get('staffId');
+      const staffEmail = c.get('staffEmail');
+      const staffFullname = c.get('staffFullname');
 
-    const r = await toggleTicketStatusImpl(
-      db,
-      { ticket_packages: schema.ticket_packages, auditLogs: schema.auditLogs },
-      id,
-      c.env,
-      { id: staffId, email: staffEmail, fullname: staffFullname }
-    );
+      const r = await toggleTicketStatusImpl(
+        db,
+        { ticket_packages: schema.ticket_packages, auditLogs: schema.auditLogs },
+        id,
+        c.env,
+        { id: staffId, email: staffEmail, fullname: staffFullname }
+      );
 
-    return c.json(r, 200);
-  } catch (err: any) {
-    return c.json({ status: 'error', message: err.message || 'Lỗi máy chủ nội bộ' }, err.statusCode || 500);
+      return c.json(r, 200);
+    } catch (err: any) {
+      return c.json({ status: 'error', message: err.message || 'Lỗi máy chủ nội bộ' }, err.statusCode || 500);
+    }
   }
-});
+);
 
 // Create site media
 
@@ -4897,35 +4909,30 @@ app.post(
 );
 
 // Admin: Toggle branch open/close
-app.post(
-  '/api/admin/branches/:id/toggle-open',
-  requireStaffAuth,
-  requirePermission('branches', 'edit'),
-  async (c) => {
-    try {
-      const id = Number(c.req.param('id'));
-      const db = drizzle(c.env.cinema_db, { schema });
-      const staffId = c.get('staffId');
-      const staffEmail = c.get('staffEmail');
-      const staffFullname = c.get('staffFullname');
+app.post('/api/admin/branches/:id/toggle-open', requireStaffAuth, requirePermission('branches', 'edit'), async (c) => {
+  try {
+    const id = Number(c.req.param('id'));
+    const db = drizzle(c.env.cinema_db, { schema });
+    const staffId = c.get('staffId');
+    const staffEmail = c.get('staffEmail');
+    const staffFullname = c.get('staffFullname');
 
-      const r = await toggleBranchOpenImpl(
-        db,
-        {
-          branches: schema.branches,
-          auditLogs: schema.auditLogs,
-          bookings: schema.bookings
-        },
-        id,
-        { id: staffId, email: staffEmail, fullname: staffFullname }
-      );
+    const r = await toggleBranchOpenImpl(
+      db,
+      {
+        branches: schema.branches,
+        auditLogs: schema.auditLogs,
+        bookings: schema.bookings
+      },
+      id,
+      { id: staffId, email: staffEmail, fullname: staffFullname }
+    );
 
-      return c.json(r, 200);
-    } catch (err: any) {
-      return c.json({ status: 'error', message: String(err?.message || 'Internal error') }, 500);
-    }
+    return c.json(r, 200);
+  } catch (err: any) {
+    return c.json({ status: 'error', message: String(err?.message || 'Internal error') }, 500);
   }
-);
+});
 
 // POST /api/admin/branches/:id/restore
 app.post('/api/admin/branches/:id/restore', requireStaffAuth, requirePermission('branches', 'restore'), async (c) => {
@@ -5887,11 +5894,7 @@ app.get('/api/vr/packages', async (c) => {
     const branchId = c.req.query('branch_id') ? Number(c.req.query('branch_id')) : undefined;
     const db = drizzle(c.env.cinema_db, { schema });
 
-    const r = await listActiveVRPackagesImpl(
-      db,
-      { ticket_packages: schema.ticket_packages },
-      branchId
-    );
+    const r = await listActiveVRPackagesImpl(db, { ticket_packages: schema.ticket_packages }, branchId);
 
     return c.json(r, 200 as any);
   } catch (err: any) {
@@ -5918,10 +5921,7 @@ app.post('/api/vr/voucher/validate', async (c) => {
     return c.json(r, 200 as any);
   } catch (err: any) {
     const errStatus = Number(err?.statusCode) || 500;
-    return c.json(
-      { valid: false, message: String(err?.message || 'Internal error') },
-      errStatus as any
-    );
+    return c.json({ valid: false, message: String(err?.message || 'Internal error') }, errStatus as any);
   }
 });
 
@@ -5931,16 +5931,12 @@ app.post('/api/vr/validate-booking', async (c) => {
     const body = await c.req.json().catch(() => ({}));
     const db = drizzle(c.env.cinema_db, { schema });
 
-    const r = await validateVRBookingImpl(
-      db,
-      body,
-      {
-        ticket_packages: schema.ticket_packages,
-        vouchers: schema.vouchers,
-        voucher_redemption_logs: schema.voucher_redemption_logs,
-        users: schema.users
-      }
-    );
+    const r = await validateVRBookingImpl(db, body, {
+      ticket_packages: schema.ticket_packages,
+      vouchers: schema.vouchers,
+      voucher_redemption_logs: schema.voucher_redemption_logs,
+      users: schema.users
+    });
 
     const status = Number(r.status) || 200;
     const clone = { ...r };
@@ -5957,18 +5953,14 @@ app.post('/api/vr/create-booking', async (c) => {
     const body = await c.req.json().catch(() => ({}));
     const db = drizzle(c.env.cinema_db, { schema });
 
-    const r = await createVRBookingImpl(
-      db,
-      body,
-      {
-        ticket_packages: schema.ticket_packages,
-        vouchers: schema.vouchers,
-        voucher_redemption_logs: schema.voucher_redemption_logs,
-        users: schema.users,
-        bookings: schema.bookings,
-        booking_vr_items: schema.booking_vr_items
-      }
-    );
+    const r = await createVRBookingImpl(db, body, {
+      ticket_packages: schema.ticket_packages,
+      vouchers: schema.vouchers,
+      voucher_redemption_logs: schema.voucher_redemption_logs,
+      users: schema.users,
+      bookings: schema.bookings,
+      booking_vr_items: schema.booking_vr_items
+    });
 
     const status = Number(r.status) || 200;
     const clone: any = { ...r };
@@ -6066,12 +6058,11 @@ app.post('/api/admin/vouchers', requireStaffAuth, requirePermission('vouchers', 
     const staffEmail = c.get('staffEmail');
     const staffFullname = c.get('staffFullname');
 
-    const r = await createVoucherImpl(
-      db,
-      { vouchers: schema.vouchers, auditLogs: schema.auditLogs },
-      body,
-      { id: staffId, email: staffEmail, fullname: staffFullname }
-    );
+    const r = await createVoucherImpl(db, { vouchers: schema.vouchers, auditLogs: schema.auditLogs }, body, {
+      id: staffId,
+      email: staffEmail,
+      fullname: staffFullname
+    });
 
     return c.json(r, 201 as any);
   } catch (err: any) {
@@ -6108,30 +6099,35 @@ app.put('/api/admin/vouchers/:id', requireStaffAuth, requirePermission('vouchers
 });
 
 // POST /api/admin/vouchers/:id/toggle-status - Toggle active status
-app.post('/api/admin/vouchers/:id/toggle-status', requireStaffAuth, requirePermission('vouchers', 'toggle_status'), async (c) => {
-  try {
-    const id = Number(c.req.param('id'));
-    const restrictBranchIds = getRestrictBranchIds(c);
-    const db = drizzle(c.env.cinema_db, { schema });
+app.post(
+  '/api/admin/vouchers/:id/toggle-status',
+  requireStaffAuth,
+  requirePermission('vouchers', 'toggle_status'),
+  async (c) => {
+    try {
+      const id = Number(c.req.param('id'));
+      const restrictBranchIds = getRestrictBranchIds(c);
+      const db = drizzle(c.env.cinema_db, { schema });
 
-    const staffId = c.get('staffId');
-    const staffEmail = c.get('staffEmail');
-    const staffFullname = c.get('staffFullname');
+      const staffId = c.get('staffId');
+      const staffEmail = c.get('staffEmail');
+      const staffFullname = c.get('staffFullname');
 
-    const r = await toggleVoucherStatusImpl(
-      db,
-      { vouchers: schema.vouchers, auditLogs: schema.auditLogs },
-      id,
-      { id: staffId, email: staffEmail, fullname: staffFullname },
-      restrictBranchIds
-    );
+      const r = await toggleVoucherStatusImpl(
+        db,
+        { vouchers: schema.vouchers, auditLogs: schema.auditLogs },
+        id,
+        { id: staffId, email: staffEmail, fullname: staffFullname },
+        restrictBranchIds
+      );
 
-    return c.json(r, 200 as any);
-  } catch (err: any) {
-    const errStatus = Number(err?.statusCode) || 500;
-    return c.json({ status: 'error', message: String(err?.message || 'Internal error') }, errStatus as any);
+      return c.json(r, 200 as any);
+    } catch (err: any) {
+      const errStatus = Number(err?.statusCode) || 500;
+      return c.json({ status: 'error', message: String(err?.message || 'Internal error') }, errStatus as any);
+    }
   }
-});
+);
 
 // DELETE /api/admin/vouchers/:id - Soft delete voucher
 app.delete('/api/admin/vouchers/:id', requireStaffAuth, requirePermission('vouchers', 'delete'), async (c) => {

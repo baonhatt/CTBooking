@@ -25,10 +25,7 @@ export interface VRBookingRequest {
   pay_txt_code?: string;
 }
 
-export function getVRPackages(
-  branch_id?: number,
-  opts?: { signal?: AbortSignal }
-) {
+export function getVRPackages(branch_id?: number, opts?: { signal?: AbortSignal }) {
   let url = '/api/vr/packages';
   if (branch_id !== undefined && branch_id !== null) {
     url += `?branch_id=${branch_id}`;

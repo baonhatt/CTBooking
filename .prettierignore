@@ -27,11 +27,19 @@ yarn.lock
 *.svg
 *.webp
 *.pem
+*.exe
+*.dll
 
-# Database
+# Database & Wrangler
 *.sql
 *.db
-*.sqlite
+*.sqlite*
+*.toml
+.wrangler/**
+worker/.wrangler/**
+worker/drizzle/**
+worker/package.json
+worker/sqlite3.exe
 
 # Config files
 .env*

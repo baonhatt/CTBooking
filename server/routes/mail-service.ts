@@ -1,34 +1,29 @@
 /**
  * Universal Mail Service
- * Priority: 
+ * Priority:
  * 1. Brevo (if BREVO_API_KEY is present) - Used for Live/Preview
  * 2. Resend (if RESEND_API_KEY is present) - Used for Localhost
  */
 
-export async function sendMail(
-  toEmail: string,
-  subject: string,
-  html: string,
-  env?: any
-) {
+export async function sendMail(toEmail: string, subject: string, html: string, env?: any) {
   // Get keys from environment (Worker env or process.env)
   const brevoKey = String(env?.BREVO_API_KEY || process.env.BREVO_API_KEY || '');
   const resendKey = String(env?.RESEND_API_KEY || process.env.RESEND_API_KEY || '');
 
   const senderEmail = String(
-    env?.BREVO_SENDER_EMAIL || 
-    process.env.BREVO_SENDER_EMAIL || 
-    env?.GMAIL_SENDER_EMAIL || 
-    process.env.GMAIL_SENDER_EMAIL || 
-    'no-reply@cinesphere.com.vn'
+    env?.BREVO_SENDER_EMAIL ||
+      process.env.BREVO_SENDER_EMAIL ||
+      env?.GMAIL_SENDER_EMAIL ||
+      process.env.GMAIL_SENDER_EMAIL ||
+      'no-reply@cinesphere.com.vn'
   );
-  
+
   const senderName = String(
-    env?.BREVO_SENDER_NAME || 
-    process.env.BREVO_SENDER_NAME || 
-    env?.GMAIL_SENDER_NAME || 
-    process.env.GMAIL_SENDER_NAME || 
-    'CINESPHERE'
+    env?.BREVO_SENDER_NAME ||
+      process.env.BREVO_SENDER_NAME ||
+      env?.GMAIL_SENDER_NAME ||
+      process.env.GMAIL_SENDER_NAME ||
+      'CINESPHERE'
   );
 
   // 1. Brevo (Priority for Live/Preview)
@@ -57,7 +52,7 @@ export async function sendMail(
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${resendKey}`
+        Authorization: `Bearer ${resendKey}`
       },
       body: JSON.stringify(payload)
     });

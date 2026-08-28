@@ -168,11 +168,16 @@ export default function VRShowcase({ initialPackages = [] }: { initialPackages?:
           </div>
 
           <h2 className="text-3xl sm:text-4xl md:text-5xl font-black text-white tracking-tight leading-tight">
-            Khám Phá <span className="text-transparent bg-clip-text bg-gradient-to-r from-purple-400 via-fuchsia-400 to-pink-400">Đa Vũ Trụ VR</span> Đỉnh Cao
+            Khám Phá{' '}
+            <span className="text-transparent bg-clip-text bg-gradient-to-r from-purple-400 via-fuchsia-400 to-pink-400">
+              Đa Vũ Trụ VR
+            </span>{' '}
+            Đỉnh Cao
           </h2>
 
           <p className="text-slate-300 text-sm sm:text-base leading-relaxed">
-            Đắm chìm trong các tựa game và phim nhập vai tương tác 360°. Trang bị kính thực tế ảo Ultra HD, áo xúc giác Haptic Vest cảm nhận va chạm sống động đến từng miligiây.
+            Đắm chìm trong các tựa game và phim nhập vai tương tác 360°. Trang bị kính thực tế ảo Ultra HD, áo xúc giác
+            Haptic Vest cảm nhận va chạm sống động đến từng miligiây.
           </p>
         </div>
 
@@ -281,7 +286,8 @@ export default function VRShowcase({ initialPackages = [] }: { initialPackages?:
                       </h3>
 
                       <p className="text-slate-400 text-xs leading-relaxed line-clamp-2 min-h-[2.5rem]">
-                        {pkg.description || 'Trải nghiệm không gian ảo hóa 3D chân thực cao với trang bị xúc giác tiên tiến bậc nhất.'}
+                        {pkg.description ||
+                          'Trải nghiệm không gian ảo hóa 3D chân thực cao với trang bị xúc giác tiên tiến bậc nhất.'}
                       </p>
 
                       {/* Feature Highlights */}
@@ -311,7 +317,9 @@ export default function VRShowcase({ initialPackages = [] }: { initialPackages?:
                     {/* Price & Action Buttons */}
                     <div className="pt-4 border-t border-white/10 space-y-3">
                       <div className="flex items-baseline justify-between">
-                        <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Giá trọn gói</span>
+                        <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">
+                          Giá trọn gói
+                        </span>
                         <span className="text-2xl font-black text-transparent bg-clip-text bg-gradient-to-r from-purple-300 via-pink-300 to-white">
                           {formatMoney(Number(pkg.price || 0))}
                         </span>
@@ -450,7 +458,10 @@ export default function VRShowcase({ initialPackages = [] }: { initialPackages?:
                       ? selectedDetailPkg.features
                       : packageHighlights
                     ).map((feat: string, idx: number) => (
-                      <div key={idx} className="flex items-start gap-2 text-xs text-slate-300 bg-white/[0.03] p-2.5 rounded-lg border border-white/5">
+                      <div
+                        key={idx}
+                        className="flex items-start gap-2 text-xs text-slate-300 bg-white/[0.03] p-2.5 rounded-lg border border-white/5"
+                      >
                         <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 shrink-0 mt-0.5" />
                         <span>{feat}</span>
                       </div>
@@ -494,7 +505,10 @@ export default function VRShowcase({ initialPackages = [] }: { initialPackages?:
                     </button>
                   </div>
                   <span className="text-xs text-slate-400">
-                    = <span className="font-bold text-white">{formatMoney(Number(selectedDetailPkg.price || 0) * modalQty)}</span>
+                    ={' '}
+                    <span className="font-bold text-white">
+                      {formatMoney(Number(selectedDetailPkg.price || 0) * modalQty)}
+                    </span>
                   </span>
                 </div>
 

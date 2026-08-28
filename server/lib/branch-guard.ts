@@ -62,12 +62,12 @@ export function hasBranchAccess(
  * @returns Filtered array of items
  */
 export function filterItemsByBranchIds<T>(
-        items: T[],
-        branchIdsGetter: (item: T) => string | null | undefined,
-        staffBranchIds: number[] | undefined,
-        isSuperAdmin: boolean | undefined
+  items: T[],
+  branchIdsGetter: (item: T) => string | null | undefined,
+  staffBranchIds: number[] | undefined,
+  isSuperAdmin: boolean | undefined
 ): T[] {
-        if (isSuperAdmin) return items;
-        if (!staffBranchIds || staffBranchIds.length === 0) return [];
-        return items.filter((item) => staffCanAccessBranchIds(branchIdsGetter(item), staffBranchIds, isSuperAdmin));
+  if (isSuperAdmin) return items;
+  if (!staffBranchIds || staffBranchIds.length === 0) return [];
+  return items.filter((item) => staffCanAccessBranchIds(branchIdsGetter(item), staffBranchIds, isSuperAdmin));
 }

@@ -6,7 +6,7 @@ import NextTopLoader from 'nextjs-toploader';
 
 const inter = Inter({
   subsets: ['latin', 'vietnamese'],
-  display: 'swap',
+  display: 'swap'
 });
 
 import { siteConfig } from '@/config/site';

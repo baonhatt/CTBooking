@@ -1,51 +1,51 @@
 export function getBookingEmailTemplate(data: {
-        bookingCode: string;
-        customerName: string;
-        movieTitle: string; // Nhận chuỗi JSON: "["Phim A", "Phim B"]"
-        ticketCount: number;
-        totalPrice: string;
-        durationMin?: string; // Nhận chuỗi JSON: "[10, 12, 5]"
-        ticketPackageName?: string;
-        expiryDate?: string | Date;
-        branchName?: string;
-        branchAddress?: string;
-        branchPhone?: string;
-        branchSettings?: string;
+  bookingCode: string;
+  customerName: string;
+  movieTitle: string; // Nhận chuỗi JSON: "["Phim A", "Phim B"]"
+  ticketCount: number;
+  totalPrice: string;
+  durationMin?: string; // Nhận chuỗi JSON: "[10, 12, 5]"
+  ticketPackageName?: string;
+  expiryDate?: string | Date;
+  branchName?: string;
+  branchAddress?: string;
+  branchPhone?: string;
+  branchSettings?: string;
 }): string {
-        // 1. XỬ LÝ DỮ LIỆU JSON TỪ API
-        let movieTitles: string[] = [];
-        let durations: string[] = [];
-        try {
-                movieTitles = JSON.parse(data.movieTitle || '[]');
-                durations = JSON.parse(data.durationMin || '[]');
-        } catch (e) {
-                // Fallback nếu không phải JSON
-                movieTitles = data.movieTitle ? [data.movieTitle] : ['Chưa xác định'];
-                durations = data.durationMin ? [data.durationMin] : ['--'];
-        }
+  // 1. XỬ LÝ DỮ LIỆU JSON TỪ API
+  let movieTitles: string[] = [];
+  let durations: string[] = [];
+  try {
+    movieTitles = JSON.parse(data.movieTitle || '[]');
+    durations = JSON.parse(data.durationMin || '[]');
+  } catch (e) {
+    // Fallback nếu không phải JSON
+    movieTitles = data.movieTitle ? [data.movieTitle] : ['Chưa xác định'];
+    durations = data.durationMin ? [data.durationMin] : ['--'];
+  }
 
-        // Parse branch settings for hotline
-        let hotline = data.branchPhone || '1900-xxxx';
-        if (data.branchSettings) {
-                try {
-                        const settings = JSON.parse(data.branchSettings);
-                        if (settings.hotline) hotline = settings.hotline;
-                } catch (e) { }
-        }
+  // Parse branch settings for hotline
+  let hotline = data.branchPhone || '1900-xxxx';
+  if (data.branchSettings) {
+    try {
+      const settings = JSON.parse(data.branchSettings);
+      if (settings.hotline) hotline = settings.hotline;
+    } catch (e) {}
+  }
 
-        // 2. TẠO LIST PHIM THEO LAYOUT MỚI
-        const moviesHtml = movieTitles
-                .map(
-                        (title, i) => `
+  // 2. TẠO LIST PHIM THEO LAYOUT MỚI
+  const moviesHtml = movieTitles
+    .map(
+      (title, i) => `
     <div style="padding: 12px 0; border-bottom: 1px dashed #eee; display: flex; justify-content: space-between; align-items: center;">
       <span style="color: #333; font-weight: 600;">🎬 ${title}</span>
       <span style="color: #666; font-size: 12px; background: #f5f5f5; padding: 2px 8px; border-radius: 4px;">${durations[i] || '--'} ph</span>
     </div>
   `
-                )
-                .join('');
+    )
+    .join('');
 
-        return `
+  return `
 <!DOCTYPE html>
 <html lang="vi">
 <head>
@@ -90,7 +90,9 @@ export function getBookingEmailTemplate(data: {
             </div>
 
             <div class="section-title">CHI TIẾT ĐƠN HÀNG</div>
-            ${data.branchName ? `
+            ${
+              data.branchName
+                ? `
             <div class="row">
                 <span class="label">Chi nhánh:</span>
                 <span class="value">${data.branchName}</span>
@@ -99,7 +101,9 @@ export function getBookingEmailTemplate(data: {
                 <span class="label">Địa chỉ:</span>
                 <span class="value" style="font-size: 12px;">${data.branchAddress || ''}</span>
             </div>
-            ` : ''}
+            `
+                : ''
+            }
             <div class="row">
                 <span class="label">Số lượng vé:</span>
                 <span class="value">${data.ticketCount} vé</span>
@@ -115,22 +119,22 @@ export function getBookingEmailTemplate(data: {
             <div class="row">
                 <span class="label">Ngày hết hạn:</span>
                 <span class="value">${(function () {
-                        try {
-                                const d = new Date(String(data.expiryDate));
-                                return (
-                                        d.getDate().toString().padStart(2, '0') +
-                                        '/' +
-                                        (d.getMonth() + 1).toString().padStart(2, '0') +
-                                        '/' +
-                                        d.getFullYear() +
-                                        ' ' +
-                                        d.getHours().toString().padStart(2, '0') +
-                                        ':' +
-                                        d.getMinutes().toString().padStart(2, '0')
-                                );
-                        } catch {
-                                return String(data.expiryDate);
-                        }
+                  try {
+                    const d = new Date(String(data.expiryDate));
+                    return (
+                      d.getDate().toString().padStart(2, '0') +
+                      '/' +
+                      (d.getMonth() + 1).toString().padStart(2, '0') +
+                      '/' +
+                      d.getFullYear() +
+                      ' ' +
+                      d.getHours().toString().padStart(2, '0') +
+                      ':' +
+                      d.getMinutes().toString().padStart(2, '0')
+                    );
+                  } catch {
+                    return String(data.expiryDate);
+                  }
                 })()}</span>
             </div>
 
@@ -151,7 +155,7 @@ export function getBookingEmailTemplate(data: {
 }
 
 export function getResetPasswordEmailTemplate(link: string): string {
-        return `
+  return `
 <!DOCTYPE html>
 <html lang="vi">
 <head>
@@ -267,21 +271,21 @@ export function getResetPasswordEmailTemplate(link: string): string {
 }
 
 export function getWelcomeEmailTemplate(
-        data: {
-                customerName: string;
-                email: string;
-        },
-        baseUrlStr?: string
+  data: {
+    customerName: string;
+    email: string;
+  },
+  baseUrlStr?: string
 ): string {
-        // Use provided baseUrl or fallback to env or default
-        let baseUrl = baseUrlStr;
-        if (!baseUrl && typeof process !== 'undefined' && process.env) {
-                baseUrl = process.env.VITE_SERVER_BASE_URL;
-        }
-        if (!baseUrl) baseUrl = 'https://cinesphere.com.vn';
+  // Use provided baseUrl or fallback to env or default
+  let baseUrl = baseUrlStr;
+  if (!baseUrl && typeof process !== 'undefined' && process.env) {
+    baseUrl = process.env.VITE_SERVER_BASE_URL;
+  }
+  if (!baseUrl) baseUrl = 'https://cinesphere.com.vn';
 
-        const homeUrl = `${baseUrl}/`;
-        return `
+  const homeUrl = `${baseUrl}/`;
+  return `
 <!DOCTYPE html>
 <html lang="vi">
 <head>
@@ -352,12 +356,12 @@ export function getWelcomeEmailTemplate(
 }
 
 export function getOTPEmailTemplate(data: {
-        customerName: string;
-        email: string;
-        otp: string;
-        expiryMinutes: number;
+  customerName: string;
+  email: string;
+  otp: string;
+  expiryMinutes: number;
 }): string {
-        return `
+  return `
 <!DOCTYPE html>
 <html lang="vi">
 <head>
@@ -427,7 +431,7 @@ export function getOTPEmailTemplate(data: {
 
 // Shared mail layout for staff emails
 function getStaffEmailLayout(content: string, subtitle: string): string {
-	return `
+  return `
 <!DOCTYPE html>
 <html lang="vi">
 <head>
@@ -476,14 +480,14 @@ function getStaffEmailLayout(content: string, subtitle: string): string {
 }
 
 export function getStaffAccountCreatedTemplate(data: {
-        staffName: string;
-        email: string;
-        password: string;
-        loginUrl?: string;
+  staffName: string;
+  email: string;
+  password: string;
+  loginUrl?: string;
 }): string {
-        const loginUrl = data.loginUrl || 'https://cinesphere.com.vn/login';
+  const loginUrl = data.loginUrl || 'https://cinesphere.com.vn/login';
 
-        const content = `
+  const content = `
       <div class="greeting">
         Xin chào <strong>${data.staffName}</strong>,
       </div>
@@ -518,18 +522,18 @@ export function getStaffAccountCreatedTemplate(data: {
       </p>
   `;
 
-        return getStaffEmailLayout(content, 'Tài khoản nhân viên mới');
+  return getStaffEmailLayout(content, 'Tài khoản nhân viên mới');
 }
 
 export function getStaffPasswordResetTemplate(data: {
-        staffName: string;
-        email: string;
-        newPassword: string;
-        loginUrl?: string;
+  staffName: string;
+  email: string;
+  newPassword: string;
+  loginUrl?: string;
 }): string {
-        const loginUrl = data.loginUrl || 'https://cinesphere.com.vn/login';
+  const loginUrl = data.loginUrl || 'https://cinesphere.com.vn/login';
 
-        const content = `
+  const content = `
       <div class="greeting">
         Xin chào <strong>${data.staffName}</strong>,
       </div>
@@ -564,15 +568,15 @@ export function getStaffPasswordResetTemplate(data: {
       </p>
   `;
 
-        return getStaffEmailLayout(content, 'Đặt lại mật khẩu nhân viên');
+  return getStaffEmailLayout(content, 'Đặt lại mật khẩu nhân viên');
 }
 
 export function getStaffPasswordChangeOTPTemplate(data: {
-        staffName: string;
-        otp: string;
-        expiryMinutes: number;
+  staffName: string;
+  otp: string;
+  expiryMinutes: number;
 }): string {
-        const content = `
+  const content = `
       <div class="greeting">
         Xin chào <strong>${data.staffName}</strong>,
       </div>
@@ -600,5 +604,5 @@ export function getStaffPasswordChangeOTPTemplate(data: {
       </p>
   `;
 
-        return getStaffEmailLayout(content, 'Xác thực thay đổi mật khẩu');
+  return getStaffEmailLayout(content, 'Xác thực thay đổi mật khẩu');
 }

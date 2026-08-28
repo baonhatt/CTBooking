@@ -113,7 +113,6 @@ export function logSystemError(context: string, error: any, payload?: any) {
 
 // sendMail was moved to server/routes/mail-service.ts
 
-
 export function formatCurrencyVi(amount: number): string {
   return `${Number(amount || 0).toLocaleString('vi-VN')}Ä‘`;
 }

@@ -320,12 +320,8 @@ export default function CartDrawer() {
                           {/* Price & Quantity Controls */}
                           <div className="flex items-center justify-between gap-2 mt-3 pt-2 border-t border-white/5">
                             <div>
-                              <span className="text-xs text-slate-400">
-                                {formatMoney(item.price)}₫
-                              </span>
-                              <div className="text-sm font-extrabold text-white">
-                                {formatMoney(itemTotal)}₫
-                              </div>
+                              <span className="text-xs text-slate-400">{formatMoney(item.price)}₫</span>
+                              <div className="text-sm font-extrabold text-white">{formatMoney(itemTotal)}₫</div>
                             </div>
 
                             {/* Quantity buttons */}
@@ -336,9 +332,7 @@ export default function CartDrawer() {
                               >
                                 <Minus className="w-3 h-3" />
                               </button>
-                              <span className="w-8 text-center text-xs font-bold text-white">
-                                {item.quantity}
-                              </span>
+                              <span className="w-8 text-center text-xs font-bold text-white">{item.quantity}</span>
                               <button
                                 onClick={() => updateQuantity(item.id, item.quantity + 1)}
                                 className="w-7 h-7 flex items-center justify-center hover:bg-white/15 text-slate-200 hover:text-white transition-colors"

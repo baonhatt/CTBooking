@@ -1,15 +1,15 @@
-import React from "react";
-import AIAnalyticsPanel from "./AIAnalyticsPanel";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Skeleton } from "@/components/ui/skeleton";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { 
-  Film, 
-  Package, 
-  Users, 
-  CreditCard, 
-  TrendingUp, 
+import React from 'react';
+import AIAnalyticsPanel from './AIAnalyticsPanel';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Skeleton } from '@/components/ui/skeleton';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import {
+  Film,
+  Package,
+  Users,
+  CreditCard,
+  TrendingUp,
   TrendingDown,
   Loader2,
   RefreshCcw,
@@ -297,9 +297,7 @@ export default function DashboardContent({
                 }}
                 className="bg-transparent text-slate-900 font-bold text-sm border-none focus:ring-0 cursor-pointer outline-none pr-1"
               >
-                <option value="all">
-                  Tất cả chi nhánh ({branches.length})
-                </option>
+                <option value="all">Tất cả chi nhánh ({branches.length})</option>
                 {branches.map((b) => (
                   <option key={b.id} value={String(b.id)}>
                     {b.name}
@@ -820,16 +818,16 @@ export default function DashboardContent({
             </div>
           </div>
           <BarChart
-              data={revenueByMonthData.map((d) => ({
-                ...d,
-                label: monthNames[d.month - 1],
-              }))}
-              dataKey="revenue"
-              colorScheme="single"
-              max={Math.max(...revenueByMonthData.map(d => d.revenue), 1000000)}
-            />
-          </Card>
-       </div>
+            data={revenueByMonthData.map((d) => ({
+              ...d,
+              label: monthNames[d.month - 1]
+            }))}
+            dataKey="revenue"
+            colorScheme="single"
+            max={Math.max(...revenueByMonthData.map((d) => d.revenue), 1000000)}
+          />
+        </Card>
+      </div>
 
       {/* AI Analytics Panel */}
       <AIAnalyticsPanel />

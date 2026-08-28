@@ -13,10 +13,10 @@ const EDGE_LINE = `export const runtime = 'edge';`;
 // Thêm tất cả dynamic route (ƒ) từ build output vào đây
 // Xem trong build log phần "Route (app)" — cột ƒ (Dynamic)
 const TARGET_FILES = [
-  'src/app/page.tsx',                    // /index
-  'src/app/bai-viet/page.tsx',           // /bai-viet
-  'src/app/bai-viet/[slug]/page.tsx',    // /bai-viet/[slug]
-  'src/app/vr/page.tsx',                  // /vr
+  'src/app/page.tsx', // /index
+  'src/app/bai-viet/page.tsx', // /bai-viet
+  'src/app/bai-viet/[slug]/page.tsx', // /bai-viet/[slug]
+  'src/app/vr/page.tsx' // /vr
 ];
 
 let injected = 0;

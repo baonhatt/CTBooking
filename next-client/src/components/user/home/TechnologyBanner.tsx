@@ -7,8 +7,6 @@ import { optimizeCloudinaryVideoUrl, getCloudinaryThumbnail } from '@/lib/utils'
 import useEmblaCarousel from 'embla-carousel-react';
 import type { EmblaCarouselType } from 'embla-carousel';
 
-
-
 export default function TechnologyBanner({
   initialMainItem = null,
   initialListItems = []
