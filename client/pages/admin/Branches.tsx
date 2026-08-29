@@ -233,7 +233,7 @@ export default function BranchesPage() {
         window.location.href = '/';
       }}
     >
-      <div className="p-6 space-y-6">
+      <div className="space-y-6">
         {/* PAGE HEADER */}
         <div className="flex items-center justify-between">
           <div>
@@ -243,7 +243,7 @@ export default function BranchesPage() {
         </div>
 
         <div className="flex flex-col xl:flex-row justify-between items-start xl:items-center gap-4 bg-white p-4 rounded-2xl border border-gray-200 shadow-sm">
-          <form onSubmit={handleSearchBranch} className="flex flex-1 gap-2 max-w-xl">
+          <form onSubmit={handleSearchBranch} className="flex flex-1 w-full gap-2 max-w-xl">
             <div className="relative flex-1">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 w-4 h-4" />
               <input
@@ -276,7 +276,7 @@ export default function BranchesPage() {
             </Button>
           </form>
 
-          <div className="flex flex-wrap items-center gap-3">
+          <div className="flex flex-wrap items-center gap-3 w-full xl:w-auto">
             <div className="flex items-center gap-2 px-3 py-1.5 bg-slate-50 rounded-xl border border-slate-200">
               <span className="text-[10px] font-bold text-slate-500 uppercase">Chỉ hiện khả dụng</span>
               <Switch
@@ -322,7 +322,7 @@ export default function BranchesPage() {
           </Card>
         ) : (
           <Card className="border border-gray-200 rounded-xl shadow-sm bg-white">
-            <CardContent className="p-0">
+            <CardContent className="p-0 overflow-x-auto">
               <Table>
                 <TableHeader className="bg-gray-50">
                   <TableRow className="hover:bg-transparent border-none">

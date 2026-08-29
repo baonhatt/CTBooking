@@ -310,7 +310,7 @@ export default function StaffPage() {
         adminEmailState={staff?.email || 'admin@email.com'}
         handleLogout={handleLogout}
       >
-        <div className="p-6">
+        <div className="space-y-6">
           <Card>
             <CardHeader>
               <CardTitle>Quản lý nhân viên</CardTitle>
@@ -335,15 +335,15 @@ export default function StaffPage() {
       adminEmailState={staff?.email || 'admin@email.com'}
       handleLogout={handleLogout}
     >
-      <div className="p-6">
+      <div className="space-y-6">
         <Card>
           <CardHeader>
-            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+            <div className="flex flex-col xl:flex-row justify-between items-start xl:items-center gap-4">
               <div className="flex flex-col gap-1">
                 <CardTitle>Quản lý nhân viên</CardTitle>
                 <p className="text-xs text-slate-500">Tổng cộng {staffData?.total || 0} nhân viên trong hệ thống</p>
               </div>
-              <form onSubmit={handleSearchStaff} className="flex flex-1 w-full md:max-w-md gap-2 ml-auto">
+              <form onSubmit={handleSearchStaff} className="flex flex-1 w-full xl:max-w-md gap-2">
                 <div className="relative flex-1">
                   <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 w-4 h-4" />
                   <Input
@@ -376,7 +376,7 @@ export default function StaffPage() {
                   <RefreshCw className="h-4 w-4" />
                 </Button>
               </form>
-              <div className="flex gap-2">
+              <div className="flex flex-wrap items-center gap-2 w-full xl:w-auto">
                 {hasPermission('staff', 'view_deleted') && (
                   <Button
                     variant="outline"
@@ -429,7 +429,7 @@ export default function StaffPage() {
           </CardHeader>
           <CardContent>
             {/* Table */}
-            <div className="border rounded-lg">
+            <div className="border rounded-lg overflow-x-auto">
               <table className="w-full">
                 <thead>
                   <tr className="border-b bg-gray-50">

@@ -267,7 +267,7 @@ export default function AuditLogsPage() {
         adminEmailState={staff?.email || 'admin@email.com'}
         handleLogout={handleLogout}
       >
-        <div className="p-6 space-y-6">
+        <div className="space-y-6">
           <div className="flex items-center justify-between">
             <div>
               <h1 className="text-xl font-bold text-slate-800">Nhật ký hoạt động</h1>
@@ -295,7 +295,7 @@ export default function AuditLogsPage() {
       adminEmailState={staff?.email || 'admin@email.com'}
       handleLogout={handleLogout}
     >
-      <div className="p-6 space-y-6">
+      <div className="space-y-6">
         {/* PAGE HEADER */}
         <div className="flex items-center justify-between">
           <div>
@@ -305,7 +305,7 @@ export default function AuditLogsPage() {
         </div>
 
         <div className="flex flex-col xl:flex-row justify-between items-start xl:items-center gap-4 bg-white p-4 rounded-2xl border border-gray-200 shadow-sm">
-          <form onSubmit={handleSearchAudit} className="flex flex-1 gap-2 max-w-xl">
+          <form onSubmit={handleSearchAudit} className="flex flex-1 w-full gap-2 max-w-xl">
             <div className="relative flex-1">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 w-4 h-4" />
               <Input
@@ -337,7 +337,7 @@ export default function AuditLogsPage() {
             </Button>
           </form>
 
-          <div className="flex flex-wrap items-center gap-3">
+          <div className="flex flex-wrap items-center gap-3 w-full xl:w-auto">
             <Select value={filterStaff} onValueChange={setFilterStaff}>
               <SelectTrigger className="w-[180px] h-10">
                 <SelectValue placeholder="Nhân viên" />
@@ -381,13 +381,15 @@ export default function AuditLogsPage() {
               type="date"
               value={filterFromDate}
               onChange={(e) => setFilterFromDate(e.target.value)}
-              className="w-[150px] h-10 border border-gray-300 rounded-xl px-3 text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+              className="w-[140px] h-10 bg-slate-50 border-slate-200 rounded-xl text-sm"
+              placeholder="Từ ngày"
             />
             <Input
               type="date"
               value={filterToDate}
               onChange={(e) => setFilterToDate(e.target.value)}
-              className="w-[150px] h-10 border border-gray-300 rounded-xl px-3 text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+              className="w-[140px] h-10 bg-slate-50 border-slate-200 rounded-xl text-sm"
+              placeholder="Đến ngày"
             />
             <Button variant="outline" onClick={clearFilters} className="h-10">
               <FilterX className="w-4 h-4 mr-2" /> Xóa filter
@@ -397,7 +399,7 @@ export default function AuditLogsPage() {
 
         {/* TABLE */}
         <Card className="border border-gray-200 rounded-xl shadow-sm bg-white">
-          <CardContent className="p-0">
+          <CardContent className="p-0 overflow-x-auto">
             <Table>
               <TableHeader className="bg-gray-50">
                 <TableRow className="hover:bg-transparent border-none">

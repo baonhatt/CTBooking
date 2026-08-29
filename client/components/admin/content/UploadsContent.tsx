@@ -458,7 +458,7 @@ export default function UploadsContent() {
               </div>
             </div>
 
-            <div className="flex items-center gap-3 pt-4 border-t border-white/10">
+            <div className="flex flex-wrap items-center gap-3 pt-4 border-t border-white/10">
               <Button
                 disabled={!files.length || uploads.some((u) => u.status === 'uploading' || u.status === 'pending')}
                 onClick={checkAndPrepareUpload}
@@ -487,7 +487,7 @@ export default function UploadsContent() {
                 <RefreshCw className="w-5 h-5" />
               </Button>
 
-              <div className="flex-1" />
+              <div className="hidden sm:block sm:flex-1" />
 
               <Button
                 variant="outline"

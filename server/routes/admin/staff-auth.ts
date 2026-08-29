@@ -1,4 +1,4 @@
-import { eq, and, isNull } from 'drizzle-orm';
+import { eq, and, isNull, gt } from 'drizzle-orm';
 import bcrypt from 'bcryptjs';
 import {
   hashPassword,
@@ -77,7 +77,8 @@ export async function staffLoginImpl(db: any, tables: any, kv: any, body: { emai
     },
     permissions,
     branchIds,
-    token
+    token,
+    expiresAt: expiredAt
   };
 }
 
@@ -89,6 +90,46 @@ export async function staffLogoutImpl(db: any, tables: any, token: string) {
   await db.update(staffTokens).set({ revokedAt: now, revokeReason: 'logout' }).where(eq(staffTokens.token, token));
 
   return { status: 'success', message: 'Đăng xuất thành công' };
+}
+
+export async function staffExtendSessionImpl(db: any, tables: any, token: string) {
+  const { staffTokens, staffs } = tables;
+  const now = new Date().toISOString();
+
+  // Find active token
+  const [tokenRecord] = await db
+    .select()
+    .from(staffTokens)
+    .where(
+      and(
+        eq(staffTokens.token, token),
+        isNull(staffTokens.revokedAt),
+        gt(staffTokens.expiredAt, now)
+      )
+    )
+    .limit(1);
+
+  if (!tokenRecord) {
+    return { status: 'error', message: 'Phiên làm việc không tồn tại hoặc đã hết hạn' };
+  }
+
+  // Generate new expiry (extend by 24h from now)
+  const newExpiredAt = getStaffSessionExpiry();
+
+  // Update token expiration
+  await db
+    .update(staffTokens)
+    .set({ expiredAt: newExpiredAt })
+    .where(eq(staffTokens.id, tokenRecord.id));
+
+  // Update last active / last login
+  await db.update(staffs).set({ lastLoginAt: now }).where(eq(staffs.id, tokenRecord.staffId));
+
+  return {
+    status: 'success',
+    message: 'Gia hạn phiên làm việc thành công',
+    expiresAt: newExpiredAt
+  };
 }
 
 export async function staffGetMeImpl(db: any, tables: any, kv: any, staffId: number) {

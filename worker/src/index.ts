@@ -5083,6 +5083,41 @@ app.post('/api/admin/auth/logout', requireStaffAuth, async (c) => {
   }
 });
 
+// POST /api/admin/auth/extend-session - Extend current staff session
+
+app.post('/api/admin/auth/extend-session', requireStaffAuth, async (c) => {
+  try {
+    const { staffExtendSessionImpl } = await import('../../server/routes/admin/staff-auth');
+
+    const token =
+      c.req.header('cookie')?.match(/staff_session=([^;]+)/)?.[1] ||
+      c.req.header('Authorization')?.replace('Bearer ', '');
+
+    if (!token) return c.json({ status: 'error', message: 'Unauthorized' }, 401);
+
+    const db = drizzle(c.env.cinema_db, { schema });
+
+    const r = await staffExtendSessionImpl(
+      db,
+      {
+        staffTokens: schema.staffTokens,
+        staffs: schema.staffs
+      },
+      token
+    );
+
+    if (r.status === 'error') return c.json(r, 400);
+
+    // Refresh cookie expiry
+
+    c.header('Set-Cookie', `staff_session=${token}; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=86400`);
+
+    return c.json(r);
+  } catch (err: any) {
+    return c.json({ status: 'error', message: String(err?.message || 'Internal error') }, 500);
+  }
+});
+
 // GET /api/admin/auth/me - Get current staff info
 
 app.get('/api/admin/auth/me', requireStaffAuth, async (c) => {

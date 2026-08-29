@@ -137,6 +137,17 @@ export default function HeroSection({
     setCurrentBannerIndex(0);
   }, [selectedBranch?.id]);
 
+  // Preload banner images for silky smooth transitions
+  useEffect(() => {
+    if (!activeBanners || activeBanners.length <= 1) return;
+    activeBanners.forEach((url) => {
+      if (url) {
+        const img = new Image();
+        img.src = optimizeCloudinaryUrl(url, 2560, 'auto:best') || url;
+      }
+    });
+  }, [activeBanners]);
+
   // Auto carousel slide timer (4.5s)
   useEffect(() => {
     if (isCarouselHovered || activeBanners.length <= 1) return;
@@ -214,7 +225,7 @@ export default function HeroSection({
         {branchBanners.length > 0 && (
           <div className="container mx-auto px-4 sm:px-6 pt-24 sm:pt-28 pb-4">
             <div
-              className="relative w-full aspect-[21/9] sm:aspect-[24/9] lg:aspect-[2.8/1] min-h-[220px] sm:min-h-[300px] lg:min-h-[380px] rounded-2xl sm:rounded-3xl overflow-hidden border border-white/20 bg-slate-950 shadow-[0_15px_50px_rgba(0,0,0,0.8)] group cursor-pointer"
+              className="relative w-full aspect-[16/9] sm:aspect-[19/8] lg:aspect-[2.1/1] min-h-[240px] sm:min-h-[320px] lg:min-h-[400px] rounded-2xl sm:rounded-3xl overflow-hidden border border-white/20 bg-slate-950 shadow-[0_15px_50px_rgba(0,0,0,0.8)] group cursor-pointer"
               onClick={handleBannerClick}
               onMouseEnter={() => setIsCarouselHovered(true)}
               onMouseLeave={() => setIsCarouselHovered(false)}
@@ -228,20 +239,21 @@ export default function HeroSection({
                   initial="enter"
                   animate="center"
                   exit="exit"
-                  className="absolute inset-0 w-full h-full"
+                  className="absolute inset-0 w-full h-full flex items-center justify-center bg-slate-950"
                 >
+                  {/* Main Banner Image: Spans 100% full width from edge to edge */}
                   <img
                     src={
                       optimizeCloudinaryUrl(activeBanners[currentBannerIndex], 2560, 'auto:best') ||
                       activeBanners[currentBannerIndex]
                     }
                     alt={`Cinesphere Banner ${currentBannerIndex + 1}`}
-                    className="w-full h-full object-cover object-center transition-transform duration-700 group-hover:scale-105"
+                    className="w-full min-w-full h-full object-cover object-center transition-transform duration-700 group-hover:scale-[1.03]"
                     loading="eager"
                     fetchPriority="high"
                   />
                   {/* Subtle dark gradient overlay at top & bottom edges of banner for badge legibility */}
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-black/40 pointer-events-none" />
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-black/40 pointer-events-none z-10" />
                 </m.div>
               </AnimatePresence>
 

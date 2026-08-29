@@ -13,6 +13,7 @@ import { checkSuperAdminSetup } from '@/lib/api/admin';
 import iconCine from '@/assets/images/iconCine.svg';
 import { AlertCircle, ShieldAlert, Lock, Mail, Eye, EyeOff, Loader2, ArrowRight } from 'lucide-react';
 import { forceChangePasswordApi } from '@/lib/api/auth';
+import { SessionTimeoutModal } from '@/components/admin/SessionTimeoutModal';
 import AdminIndex from '@/pages/admin/AdminIndex';
 import DashboardPage from '@/pages/admin/Dashboard';
 import UsersPage from '@/pages/admin/Users';
@@ -101,7 +102,7 @@ const AdminLoginView = () => {
 
       if (data.status === 'success') {
         localStorage.setItem('staffToken', data.token);
-        setStaff(data.staff, data.permissions, data.branchIds, data.token);
+        setStaff(data.staff, data.permissions, data.branchIds, data.token, data.expiresAt);
         navigate('/', { replace: true });
       } else {
         setError(data.message || 'Đăng nhập thất bại');
@@ -329,6 +330,7 @@ export const AdminGate = () => {
 
   return (
     <div>
+      <SessionTimeoutModal />
       <Routes>
         <Route
           path="/"

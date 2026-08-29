@@ -165,7 +165,7 @@ export default function RolesPage() {
         adminEmailState={staff?.email || 'admin@email.com'}
         handleLogout={handleLogout}
       >
-        <div className="p-6">
+        <div className="space-y-6">
           <Card>
             <CardHeader>
               <CardTitle>Quản lý vai trò</CardTitle>
@@ -190,15 +190,15 @@ export default function RolesPage() {
       adminEmailState={staff?.email || 'admin@email.com'}
       handleLogout={handleLogout}
     >
-      <div className="p-6">
+      <div className="space-y-6">
         <Card>
           <CardHeader>
-            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+            <div className="flex flex-col xl:flex-row justify-between items-start xl:items-center gap-4">
               <div className="flex flex-col gap-1">
                 <CardTitle>Quản lý vai trò</CardTitle>
                 <p className="text-xs text-slate-500">Tổng cộng {roles.length} vai trò trong hệ thống</p>
               </div>
-              <form onSubmit={handleSearchRole} className="flex flex-1 w-full md:max-w-md gap-2 ml-auto">
+              <form onSubmit={handleSearchRole} className="flex flex-1 w-full xl:max-w-md gap-2">
                 <div className="relative flex-1">
                   <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 w-4 h-4" />
                   <input
@@ -230,7 +230,7 @@ export default function RolesPage() {
                   <RefreshCw className="h-4 w-4" />
                 </Button>
               </form>
-              <div className="flex gap-2">
+              <div className="flex flex-wrap items-center gap-2 w-full xl:w-auto">
                 {hasPermission('roles', 'view_deleted') && (
                   <Button
                     variant="outline"

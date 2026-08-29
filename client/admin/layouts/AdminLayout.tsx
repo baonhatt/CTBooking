@@ -27,8 +27,11 @@ import {
   UploadCloud,
   Search,
   Folder,
-  FolderOpen
+  FolderOpen,
+  PanelLeftClose,
+  PanelLeftOpen
 } from 'lucide-react';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { request } from '@/lib/api/http';
 import { useStaffPermissions, useIsSuperAdmin } from '@/hooks/useStaffPermission';
 import { useStaffStore } from '@/store/staffStore';
@@ -93,10 +96,22 @@ export default function AdminLayout({
 }: Props) {
   const navigate = useNavigate();
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [isCollapsed, setIsCollapsed] = useState<boolean>(() => {
+    if (typeof window === 'undefined') return false;
+    return localStorage.getItem('admin_sidebar_collapsed') === 'true';
+  });
   const [searchQuery, setSearchQuery] = useState('');
   const permissions = useStaffPermissions();
   const isSuperAdmin = useIsSuperAdmin();
   const staff = useStaffStore((state) => state.staff);
+
+  const toggleCollapsed = () => {
+    setIsCollapsed((prev) => {
+      const next = !prev;
+      localStorage.setItem('admin_sidebar_collapsed', String(next));
+      return next;
+    });
+  };
 
   const staffEmail = staff?.email || 'Admin';
   const staffName = staff?.fullname || staffEmail;
@@ -266,7 +281,9 @@ export default function AdminLayout({
 
   const showSidebar = filteredGroups.length > 0 || hasPermission('settings', 'view');
   const layoutClass = showSidebar
-    ? 'h-screen w-full overflow-hidden flex md:grid md:grid-cols-[260px_1fr] bg-slate-50'
+    ? `h-screen w-full overflow-hidden flex md:grid ${
+        isCollapsed ? 'md:grid-cols-[76px_1fr]' : 'md:grid-cols-[260px_1fr]'
+      } transition-[grid-template-columns] duration-300 bg-slate-50`
     : 'h-screen w-full overflow-hidden flex flex-col bg-slate-50';
 
   const currentTabLabel = useMemo(() => {
@@ -290,120 +307,207 @@ export default function AdminLayout({
 
       {showSidebar && (
         <aside
-          className={`fixed inset-y-0 left-0 z-50 w-[260px] transform transition-all duration-300 ease-in-out md:static md:translate-x-0
+          className={`fixed inset-y-0 left-0 z-50 transform transition-all duration-300 ease-in-out md:static md:translate-x-0
         ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'}
+        ${isCollapsed ? 'w-[260px] md:w-[76px]' : 'w-[260px]'}
         bg-slate-950 border-r border-slate-800 text-slate-300 flex flex-col h-screen select-none shadow-2xl md:shadow-none
       `}
         >
-          <div className="flex-1 overflow-y-auto overflow-x-hidden p-4 scrollbar-thin scrollbar-thumb-slate-800 scrollbar-track-transparent">
-            <div className="flex flex-col mb-6 relative">
+          <div className="flex-1 overflow-y-auto overflow-x-hidden p-3.5 scrollbar-thin scrollbar-thumb-slate-800 scrollbar-track-transparent">
+            {/* Header with Logo and Collapse Toggle */}
+            <div className="flex items-center justify-between mb-6 relative">
               <button
                 className="absolute top-0 right-0 p-1 md:hidden text-slate-400 hover:text-white transition-colors"
                 onClick={() => setIsSidebarOpen(false)}
               >
                 <X className="h-5 w-5" />
               </button>
-              <div className="flex items-center gap-3">
-                <img src={iconCine} alt="CINESPHERE" className="h-9 w-auto" />
-                <div>
-                  <div className="font-black tracking-widest text-sm text-white">CINESPHERE</div>
-                  <div className="text-[10px] font-medium text-emerald-400/90 uppercase tracking-wider flex items-center gap-1.5 mt-0.5">
-                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse shadow-[0_0_8px_rgba(16,185,129,0.8)]"></span>
-                    Workspace
-                  </div>
-                </div>
-              </div>
-            </div>
 
-            <div className="mb-6">
-              <div className="relative group">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-500 group-focus-within:text-blue-400 transition-colors" />
-                <input
-                  type="search"
-                  name="admin_sidebar_search_query"
-                  id="admin_sidebar_search_query"
-                  placeholder="Tìm kiếm..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  autoComplete="off"
-                  className="w-full bg-slate-900/50 border border-slate-800 rounded-xl pl-9 pr-3 py-2 text-sm text-slate-200 placeholder:text-slate-500 focus:outline-none focus:border-blue-500/50 focus:bg-slate-900 focus:ring-1 focus:ring-blue-500/50 transition-all [&::-webkit-search-cancel-button]:hidden"
-                />
-                {searchQuery && (
-                  <button
-                    onClick={() => setSearchQuery('')}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-300 text-sm"
-                  >
-                    <X className="h-3.5 w-3.5" />
-                  </button>
+              <div
+                className={`flex items-center gap-3 ${
+                  isCollapsed ? 'md:justify-center md:w-full' : ''
+                } cursor-pointer`}
+                onClick={() => isCollapsed && toggleCollapsed()}
+              >
+                <img src={iconCine} alt="CINESPHERE" className="h-9 w-auto shrink-0" />
+                {!isCollapsed && (
+                  <div className="min-w-0 transition-opacity duration-200">
+                    <div className="font-black tracking-widest text-sm text-white truncate">CINESPHERE</div>
+                    <div className="text-[10px] font-medium text-emerald-400/90 uppercase tracking-wider flex items-center gap-1.5 mt-0.5">
+                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse shadow-[0_0_8px_rgba(16,185,129,0.8)]"></span>
+                      Workspace
+                    </div>
+                  </div>
                 )}
               </div>
             </div>
 
-            <div className="space-y-6">
-              {filteredGroups.map((group) => {
-                const isOpen = openGroups[group.id] || searchQuery.trim() !== '';
-                return (
-                  <div key={group.id} className="flex flex-col">
+            {/* Search Box / Search Icon */}
+            {!isCollapsed ? (
+              <div className="mb-6">
+                <div className="relative group">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-500 group-focus-within:text-blue-400 transition-colors" />
+                  <input
+                    type="search"
+                    name="admin_sidebar_search_query"
+                    id="admin_sidebar_search_query"
+                    placeholder="Tìm kiếm..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    autoComplete="off"
+                    className="w-full bg-slate-900/50 border border-slate-800 rounded-xl pl-9 pr-3 py-2 text-sm text-slate-200 placeholder:text-slate-500 focus:outline-none focus:border-blue-500/50 focus:bg-slate-900 focus:ring-1 focus:ring-blue-500/50 transition-all [&::-webkit-search-cancel-button]:hidden"
+                  />
+                  {searchQuery && (
                     <button
-                      onClick={() => toggleGroup(group.id)}
-                      className="w-full flex items-center justify-between px-1 mb-2 text-xs font-bold uppercase tracking-wider text-slate-500 hover:text-slate-300 transition-colors group"
+                      onClick={() => setSearchQuery('')}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-300 text-sm"
                     >
-                      <span className="flex items-center gap-2">{group.title}</span>
-                      {isOpen ? (
-                        <ChevronDown className="h-3.5 w-3.5 text-slate-600 group-hover:text-slate-400 transition-transform" />
-                      ) : (
-                        <ChevronRight className="h-3.5 w-3.5 text-slate-600 group-hover:text-slate-400 transition-transform" />
-                      )}
+                      <X className="h-3.5 w-3.5" />
                     </button>
+                  )}
+                </div>
+              </div>
+            ) : (
+              <div className="mb-4 flex justify-center">
+                <TooltipProvider delayDuration={100}>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <button
+                        onClick={toggleCollapsed}
+                        className="p-2.5 rounded-xl text-slate-500 hover:text-slate-200 hover:bg-slate-800/50 transition-colors"
+                      >
+                        <Search className="h-4 w-4" />
+                      </button>
+                    </TooltipTrigger>
+                    <TooltipContent side="right" className="bg-slate-900 text-slate-200 border-slate-800">
+                      Tìm kiếm menu
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+              </div>
+            )}
 
-                    {isOpen && (
-                      <div className="space-y-1">
-                        {group.items.map((item) => {
-                          const isActive = active === item.key;
-                          return (
-                            <button
-                              key={item.key}
-                              onClick={() => go(item.key)}
-                              className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 text-left relative overflow-hidden group ${
-                                isActive
-                                  ? 'text-blue-400 bg-blue-500/10'
-                                  : 'text-slate-400 hover:text-slate-100 hover:bg-slate-800/50'
-                              }`}
-                            >
-                              {isActive && (
-                                <div className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-5 bg-blue-500 rounded-r-full" />
-                              )}
-                              <span
-                                className={`shrink-0 transition-colors ${isActive ? 'text-blue-400' : 'text-slate-500 group-hover:text-slate-300'}`}
+            {/* Menu Groups */}
+            <TooltipProvider delayDuration={150}>
+              <div className={isCollapsed ? 'space-y-3' : 'space-y-6'}>
+                {filteredGroups.map((group, groupIdx) => {
+                  const isOpen = openGroups[group.id] || searchQuery.trim() !== '';
+                  return (
+                    <div key={group.id} className="flex flex-col">
+                      {!isCollapsed ? (
+                        <button
+                          onClick={() => toggleGroup(group.id)}
+                          className="w-full flex items-center justify-between px-1 mb-2 text-xs font-bold uppercase tracking-wider text-slate-500 hover:text-slate-300 transition-colors group"
+                        >
+                          <span className="flex items-center gap-2">{group.title}</span>
+                          {isOpen ? (
+                            <ChevronDown className="h-3.5 w-3.5 text-slate-600 group-hover:text-slate-400 transition-transform" />
+                          ) : (
+                            <ChevronRight className="h-3.5 w-3.5 text-slate-600 group-hover:text-slate-400 transition-transform" />
+                          )}
+                        </button>
+                      ) : (
+                        groupIdx > 0 && <div className="my-2 border-t border-slate-800/80" />
+                      )}
+
+                      {(!isCollapsed ? isOpen : true) && (
+                        <div className="space-y-1">
+                          {group.items.map((item) => {
+                            const isActive = active === item.key;
+                            const buttonContent = (
+                              <button
+                                key={item.key}
+                                onClick={() => go(item.key)}
+                                className={`w-full flex items-center ${
+                                  isCollapsed
+                                    ? 'justify-center p-2.5 h-10 w-10 mx-auto'
+                                    : 'gap-3 px-3 py-2.5'
+                                } rounded-xl text-sm font-medium transition-all duration-200 text-left relative overflow-hidden group ${
+                                  isActive
+                                    ? 'text-blue-400 bg-blue-500/15 ring-1 ring-blue-500/30'
+                                    : 'text-slate-400 hover:text-slate-100 hover:bg-slate-800/50'
+                                }`}
                               >
-                                {item.icon}
-                              </span>
-                              <span className="truncate flex-1">{item.label}</span>
-                            </button>
-                          );
-                        })}
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
+                                {isActive && !isCollapsed && (
+                                  <div className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-5 bg-blue-500 rounded-r-full" />
+                                )}
+                                <span
+                                  className={`shrink-0 transition-colors ${
+                                    isActive ? 'text-blue-400' : 'text-slate-500 group-hover:text-slate-300'
+                                  }`}
+                                >
+                                  {item.icon}
+                                </span>
+                                {!isCollapsed && <span className="truncate flex-1">{item.label}</span>}
+                              </button>
+                            );
+
+                            if (isCollapsed) {
+                              return (
+                                <Tooltip key={item.key}>
+                                  <TooltipTrigger asChild>{buttonContent}</TooltipTrigger>
+                                  <TooltipContent
+                                    side="right"
+                                    className="bg-slate-900 text-slate-100 border-slate-800 font-medium z-50 shadow-xl"
+                                  >
+                                    {item.label}
+                                  </TooltipContent>
+                                </Tooltip>
+                              );
+                            }
+
+                            return buttonContent;
+                          })}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </TooltipProvider>
           </div>
 
-          <div className="p-4 border-t border-slate-800/80 bg-slate-950 shrink-0">
-            {hasPermission('settings', 'view') && (
-              <button
-                onClick={() => go('settings')}
-                className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 ${
-                  active === 'settings'
-                    ? 'text-blue-400 bg-blue-500/10'
-                    : 'text-slate-400 hover:text-slate-100 hover:bg-slate-800/50'
-                }`}
-              >
-                <Settings className={`h-4 w-4 ${active === 'settings' ? 'text-blue-400' : 'text-slate-500'}`} />
-                <span>Cấu hình Hệ thống</span>
-              </button>
-            )}
+          {/* Bottom Settings Button */}
+          <div className="p-3 border-t border-slate-800/80 bg-slate-950 shrink-0">
+            {hasPermission('settings', 'view') &&
+              (isCollapsed ? (
+                <TooltipProvider delayDuration={150}>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <button
+                        onClick={() => go('settings')}
+                        className={`w-10 h-10 mx-auto flex items-center justify-center rounded-xl text-sm font-medium transition-all duration-200 ${
+                          active === 'settings'
+                            ? 'text-blue-400 bg-blue-500/15 ring-1 ring-blue-500/30'
+                            : 'text-slate-400 hover:text-slate-100 hover:bg-slate-800/50'
+                        }`}
+                      >
+                        <Settings
+                          className={`h-4 w-4 ${active === 'settings' ? 'text-blue-400' : 'text-slate-500'}`}
+                        />
+                      </button>
+                    </TooltipTrigger>
+                    <TooltipContent
+                      side="right"
+                      className="bg-slate-900 text-slate-100 border-slate-800 font-medium z-50 shadow-xl"
+                    >
+                      Cấu hình Hệ thống
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+              ) : (
+                <button
+                  onClick={() => go('settings')}
+                  className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 ${
+                    active === 'settings'
+                      ? 'text-blue-400 bg-blue-500/10'
+                      : 'text-slate-400 hover:text-slate-100 hover:bg-slate-800/50'
+                  }`}
+                >
+                  <Settings className={`h-4 w-4 ${active === 'settings' ? 'text-blue-400' : 'text-slate-500'}`} />
+                  <span>Cấu hình Hệ thống</span>
+                </button>
+              ))}
           </div>
         </aside>
       )}
@@ -411,9 +515,18 @@ export default function AdminLayout({
       <main className="flex-1 flex flex-col h-screen min-w-0 overflow-hidden relative">
         {/* Desktop Topbar */}
         <header className="hidden md:flex h-16 shrink-0 bg-white/80 backdrop-blur-xl border-b border-slate-200/60 sticky top-0 z-30 px-6 items-center justify-between shadow-sm/50">
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-3">
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={toggleCollapsed}
+              className="text-slate-500 hover:text-slate-800 hover:bg-slate-100 rounded-xl h-9 w-9"
+              title={isCollapsed ? 'Mở rộng sidebar' : 'Thu gọn sidebar (Chỉ hiện icon)'}
+            >
+              {isCollapsed ? <PanelLeftOpen className="h-5 w-5" /> : <PanelLeftClose className="h-5 w-5" />}
+            </Button>
             <div className="flex items-center gap-2 text-sm text-slate-500">
-              <LayoutDashboard className="h-4 w-4" />
+              <LayoutDashboard className="h-4 w-4 text-slate-400" />
               <span className="text-slate-300">/</span>
               <span className="font-semibold text-slate-800">{currentTabLabel}</span>
             </div>
