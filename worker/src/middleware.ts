@@ -88,7 +88,6 @@ export async function requireStaffAuth(c: Context, next: Next) {
     const { permissions, branchIds, isSuperAdmin } = await loadStaffPermissions(
       db,
       schema,
-      c.env.KV_BINDING,
       tokenRecord.staff.id
     );
 

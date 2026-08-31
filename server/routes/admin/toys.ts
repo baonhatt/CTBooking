@@ -127,9 +127,7 @@ export async function createToyImpl(
 
   if (!toy) throw new Error('Không thể tạo đồ chơi');
 
-  if (RUN_ENV && RUN_ENV.KV_BINDING) {
-    await RUN_ENV.KV_BINDING.delete('activeToys');
-  }
+
 
   const auditNew = buildAuditPayload(toy);
 
@@ -203,9 +201,7 @@ export async function updateToyImpl(
     deleter(oldToy.image_url).catch((e) => console.error('Failed to delete old toy image:', e));
   }
 
-  if (RUN_ENV && RUN_ENV.KV_BINDING) {
-    await RUN_ENV.KV_BINDING.delete('activeToys');
-  }
+
 
   const auditOld = buildAuditPayload(oldToy);
   const auditNew = buildAuditPayload(toy || (await anyDb.query.toys.findFirst({ where: eq(tables.toys.id, id) })));
@@ -259,9 +255,7 @@ export async function deleteToyImpl(
     })
     .where(eq(tables.toys.id, id));
 
-  if (RUN_ENV && RUN_ENV.KV_BINDING) {
-    await RUN_ENV.KV_BINDING.delete('activeToys');
-  }
+
 
   const auditOld = buildAuditPayload(existing);
 

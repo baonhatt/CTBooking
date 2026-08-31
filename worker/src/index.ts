@@ -10,7 +10,7 @@ import * as schema from './schema';
 
 import { eq, desc, asc, and, like, or, sql, count } from 'drizzle-orm';
 
-import type { D1Database, R2Bucket, KVNamespace } from '@cloudflare/workers-types';
+import type { D1Database, R2Bucket } from '@cloudflare/workers-types';
 
 import { requireAuth, requireStaffAuth, requirePermission } from './middleware';
 
@@ -218,7 +218,7 @@ type Bindings = {
 
   r2_cinemastore: R2Bucket;
 
-  KV_BINDING: KVNamespace;
+
 
   CLOUDINARY_CLOUD_NAME: string;
 
@@ -510,7 +510,7 @@ app.post('/api/login', async (c) => {
 
       calculateSessionExpiry,
 
-      c.env.KV_BINDING,
+      null,
 
       mailer,
 
@@ -657,7 +657,7 @@ app.post('/api/resend-otp', async (c) => {
 
       body,
 
-      c.env.KV_BINDING,
+      null,
 
       mailer,
 
@@ -950,7 +950,7 @@ app.post('/api/admin/login_old', async (c) => {
 
                         calculateSessionExpiry,
 
-                        c.env.KV_BINDING,
+                        null,
 
                         mailer,
 
@@ -1361,7 +1361,7 @@ app.get('/api/admin/users', requireStaffAuth, requirePermission('users', 'view')
 
 app.get('/api/admin/settings', requireStaffAuth, requirePermission('settings', 'view'), async (c) => {
   try {
-    const r = await getAdminSettingsImpl(c.env.KV_BINDING);
+    const r = await getAdminSettingsImpl();
 
     return c.json(r);
   } catch (err: any) {
@@ -1373,7 +1373,7 @@ app.post('/api/admin/settings', requireStaffAuth, requirePermission('settings', 
   try {
     const body = await c.req.json().catch(() => ({}));
 
-    const r = await updateAdminSettingsImpl(c.env.KV_BINDING, body);
+    const r = await updateAdminSettingsImpl(null, body);
 
     return c.json(r);
   } catch (err: any) {
@@ -1929,39 +1929,9 @@ app.get('/api/bookings-code/:code', requireStaffAuth, requirePermission('ticket_
 
   const windowMs = Number(c.env.VITE_RATE_LIMIT_BOOKING_CHECK_WINDOWMS) || 60000;
 
-  const rlKey = `rl_booking_code:${ip}`;
-
-  const current = await c.env.KV_BINDING?.get(rlKey);
-
-  const count = current ? parseInt(current) : 0;
-
-  if (count >= max) {
-    const retrySec = Math.ceil(windowMs / 1000);
-
-    c.header('Retry-After', String(retrySec));
-
-    c.header('X-RateLimit-Limit', String(max));
-
-    c.header('X-RateLimit-Remaining', '0');
-
-    return c.json(
-      {
-        status: 'error',
-
-        message: `Quá nhiều yêu cầu, vui lòng thử lại sau ${retrySec}s`
-      },
-
-      429
-    );
-  }
-
-  // Tăng count và set TTL
-
-  await c.env.KV_BINDING?.put(rlKey, String(count + 1), { expirationTtl: Math.ceil(windowMs / 1000) });
-
   c.header('X-RateLimit-Limit', String(max));
 
-  c.header('X-RateLimit-Remaining', String(Math.max(0, max - (count + 1))));
+  c.header('X-RateLimit-Remaining', String(max));
 
   c.header('X-RateLimit-WindowMS', String(windowMs));
 
@@ -5041,7 +5011,7 @@ app.post('/api/admin/auth/login', async (c) => {
         rolePermissions: schema.rolePermissions,
         permissions: schema.permissions
       },
-      c.env.KV_BINDING,
+      null,
       body
     );
 
@@ -5138,7 +5108,7 @@ app.get('/api/admin/auth/me', requireStaffAuth, async (c) => {
         rolePermissions: schema.rolePermissions,
         permissions: schema.permissions
       },
-      c.env.KV_BINDING,
+      null,
       staffId
     );
 
@@ -5172,7 +5142,7 @@ app.post('/api/admin/auth/change-password', requireStaffAuth, async (c) => {
         rolePermissions: schema.rolePermissions,
         permissions: schema.permissions
       },
-      c.env.KV_BINDING,
+      null,
       staffId,
       body
     );
@@ -5204,7 +5174,7 @@ app.post('/api/admin/auth/force-change-password', requireStaffAuth, async (c) =>
         staffTokens: schema.staffTokens,
         auditLogs: schema.auditLogs
       },
-      c.env.KV_BINDING,
+      null,
       staffId,
       body
     );
@@ -5261,7 +5231,7 @@ app.post('/api/admin/auth/change-password-with-otp', requireStaffAuth, async (c)
     const r = await staffChangePasswordWithOTP(
       db,
       { staffs: schema.staffs, staffTokens: schema.staffTokens, auditLogs: schema.auditLogs },
-      c.env.KV_BINDING,
+      null,
       staffId,
       body
     );
@@ -5307,7 +5277,7 @@ app.post('/api/admin/auth/reset-password', async (c) => {
     const r = await staffResetPasswordImpl(
       db,
       { staffs: schema.staffs, staffTokens: schema.staffTokens, auditLogs: schema.auditLogs },
-      c.env.KV_BINDING,
+      null,
       body
     );
 
@@ -5414,7 +5384,7 @@ app.post('/api/admin/staff', requireStaffAuth, requirePermission('staff', 'creat
         email_logs: schema.email_logs,
         auditLogs: schema.auditLogs
       },
-      c.env.KV_BINDING,
+      null,
       body,
       {
         isSuperAdmin: c.get('isSuperAdmin'),
@@ -5456,7 +5426,7 @@ app.put('/api/admin/staff/:id', requireStaffAuth, requirePermission('staff', 'ed
         staffBranches: schema.staffBranches,
         auditLogs: schema.auditLogs
       },
-      c.env.KV_BINDING,
+      null,
       id,
       body,
       {
@@ -5572,7 +5542,7 @@ app.post(
           email_logs: schema.email_logs,
           auditLogs: schema.auditLogs
         },
-        c.env.KV_BINDING,
+        null,
         id,
         body,
         c.env,

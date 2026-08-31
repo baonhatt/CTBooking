@@ -69,9 +69,6 @@ export async function createMovieImpl(
     let movie: any = Array.isArray(movieInsert) ? movieInsert[0] : movieInsert;
     if (!movie) throw new Error('Không thể tạo phim');
 
-    if (RUN_ENV && RUN_ENV.KV_BINDING) {
-      await RUN_ENV.KV_BINDING.delete('active_movies_v2');
-    }
 
     const auditNew = buildAuditPayload(movie);
 
@@ -317,9 +314,6 @@ export async function deleteMovieImpl(
     .set({ is_active: false, deleted_at: new Date().toISOString(), deleted_by_staff_id: staffInfo?.id })
     .where(eq(tables.movies.id, id));
 
-  if (RUN_ENV && RUN_ENV.KV_BINDING) {
-    await RUN_ENV.KV_BINDING.delete('active_movies_v2');
-  }
 
   const auditOld = buildAuditPayload(existing);
   const auditNew = buildAuditPayload({
@@ -557,10 +551,6 @@ export async function updateMovieStatusImpl(
   } catch (error) {
     console.error('Error updating movie status:', error);
     throw error;
-  } finally {
-    if (RUN_ENV && RUN_ENV.KV_BINDING) {
-      await RUN_ENV.KV_BINDING.delete('active_movies_v2');
-    }
   }
 }
 

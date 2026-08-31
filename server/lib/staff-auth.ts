@@ -25,9 +25,10 @@ export function getStaffSessionExpiry(): string {
 export async function loadStaffPermissions(
   db: any,
   tables: any,
-  kv: any,
-  staffId: number
+  arg3: any,
+  arg4?: number
 ): Promise<{ permissions: Array<{ module: string; action: string }>; branchIds: number[]; isSuperAdmin: boolean }> {
+  const staffId = typeof arg4 === 'number' ? arg4 : Number(arg3);
   const { staffs, staffRoles, staffBranches, roles, rolePermissions, permissions } = tables;
 
   // Get staff info
@@ -70,12 +71,6 @@ export async function loadStaffPermissions(
   return result;
 }
 
-export async function invalidateStaffPermissionCache(kv: any, staffId: number): Promise<void> {
-  try {
-    if (kv && typeof kv.delete === 'function') {
-      await kv.delete(`staff_perms:${staffId}`);
-    }
-  } catch (e) {
-    // Ignore KV errors
-  }
+export async function invalidateStaffPermissionCache(_kv?: any, _staffId?: number): Promise<void> {
+  // No-op: KV caching disabled
 }

@@ -70,13 +70,6 @@ migrations_dir = "migrations"
 
 
 
-[[kv_namespaces]]
-
-binding = "KV_BINDING"
-
-id = "e2a5a9184efb40afb73b7a17a41c9328"
-
-
 
 [ai]
 
@@ -165,13 +158,6 @@ migrations_dir = "migrations"
 # Local dev (wrangler dev --env preview): connect to remote preview D1 instead of local SQLite
 remote = true
 
-
-
-[[env.preview.kv_namespaces]]
-
-binding = "KV_BINDING"
-
-id = "e2a5a9184efb40afb73b7a17a41c9328"
 
 
 

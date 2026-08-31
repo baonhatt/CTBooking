@@ -426,11 +426,7 @@ export async function createTicketPackageImpl(
   // In our worker setup, we use full URL as cache key.
   // We need to clear `${origin}/api/active-ticket-packages`.
 
-  if (RUN_ENV && RUN_ENV.KV_BINDING) {
-    // Direct KV delete if possible? No, we used Cache API or KV put manually.
-    // If we manual `KV.put("activeTicketPackages")` in worker, we should delete it here.
-    await RUN_ENV.KV_BINDING.delete('activeTicketPackages');
-  }
+
 
   const auditNew = buildAuditPayload(item);
 
@@ -601,9 +597,7 @@ export async function updateTicketPackageImpl(
     item = await anyDb.query.ticket_packages.findFirst({ where: eq(tables.ticket_packages.id, id) });
   }
 
-  if (RUN_ENV && RUN_ENV.KV_BINDING) {
-    await RUN_ENV.KV_BINDING.delete('activeTicketPackages');
-  }
+
 
   const auditOld = buildAuditPayload(existing);
   const auditNew = buildAuditPayload(item);
@@ -675,9 +669,7 @@ export async function deleteTicketPackageImpl(
       })
       .where(eq(tables.ticket_packages.id, id));
 
-    if (RUN_ENV && RUN_ENV.KV_BINDING) {
-      await RUN_ENV.KV_BINDING.delete('activeTicketPackages');
-    }
+
 
     // Log audit action
     if (staffInfo) {
@@ -853,9 +845,7 @@ export async function toggleTicketStatusImpl(
     })
     .where(eq(tables.ticket_packages.id, id));
 
-  if (RUN_ENV && RUN_ENV.KV_BINDING) {
-    await RUN_ENV.KV_BINDING.delete('activeTicketPackages');
-  }
+
 
   const auditOld = buildAuditPayload(existing);
   const auditNew = buildAuditPayload({ ...existing, is_active: newStatus });

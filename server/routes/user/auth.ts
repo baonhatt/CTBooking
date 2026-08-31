@@ -59,8 +59,8 @@ export async function loginWithSessionImpl(
   });
 
   // Check 2FA settings
-  const settingsResult = await getAdminSettingsImpl(kv);
-  const settings = settingsResult.settings || {};
+  const settingsResult = await getAdminSettingsImpl();
+  const settings = (settingsResult.settings as any) || {};
   const enable2FA = settings.otp_settings?.enable_2fa === true;
   const otpExpiryMinutes = settings.otp_settings?.otp_expiry_minutes || 5;
   const otpLength = settings.otp_settings?.otp_length || 6;
@@ -213,8 +213,8 @@ export async function resendOTPImpl(
   });
 
   // Get settings for cooldown
-  const settingsResult = await getAdminSettingsImpl(kv);
-  const settings = settingsResult.settings || {};
+  const settingsResult = await getAdminSettingsImpl();
+  const settings = (settingsResult.settings as any) || {};
   console.log('[RESEND OTP] Settings loaded:', JSON.stringify(settings));
   const cooldownSeconds = settings.otp_settings?.otp_resend_cooldown_seconds || 30;
   const otpExpiryMinutes = settings.otp_settings?.otp_expiry_minutes || 5;

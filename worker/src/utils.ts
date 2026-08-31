@@ -5,24 +5,6 @@ export const RL_WINDOW_MS = 60_000;
 // export const attempts = new Map<string, number[]>(); // Removed in-memory map
 
 export async function checkRateLimitKV(env: any, ip: string): Promise<boolean> {
-  if (!env.KV_BINDING) return true; // Skip if KV not available
-  const key = `rate_limit:${ip}`;
-  const now = Date.now();
-
-  const historyStr = await env.KV_BINDING.get(key);
-  let history: number[] = historyStr ? JSON.parse(historyStr) : [];
-
-  // Filter old requests
-  history = history.filter((ts) => now - ts < RL_WINDOW_MS);
-
-  if (history.length >= RL_MAX) {
-    return false;
-  }
-
-  history.push(now);
-  // Save with TTL = 60s
-  await env.KV_BINDING.put(key, JSON.stringify(history), { expirationTtl: 60 });
-
   return true;
 }
 
