@@ -363,11 +363,7 @@ export default function FilmCarousel({ initialFilms = [], onSelectFilm }: FilmCa
                     }}
                     className="group relative w-full rounded-3xl overflow-hidden border border-white/10 bg-slate-900 backdrop-blur-lg shadow-[0_0_30px_rgba(59,130,246,0.2)] hover:shadow-[0_0_40px_rgba(236,72,153,0.25)] transition-all duration-300"
                   >
-                    <div className="relative h-80 w-full overflow-hidden will-change-transform">
-                      <div
-                        className="absolute inset-0 bg-center bg-cover blur-md object-cover scale-110 opacity-30"
-                        style={{ backgroundImage: `url(${optimizeCloudinaryUrl(film.poster, 100, 'auto:low')})` }}
-                      />
+                    <div className="relative h-80 w-full overflow-hidden will-change-transform bg-slate-950">
                       <img
                         src={optimizeCloudinaryUrl(film.poster, 400)}
                         srcSet={generateCloudinarySrcSet(film.poster, [300, 400, 600])}

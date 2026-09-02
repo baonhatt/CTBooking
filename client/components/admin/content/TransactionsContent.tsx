@@ -689,7 +689,7 @@ export default function TransactionsContent({
                         <TableCell className="font-mono text-xs text-gray-500">#{t.id}</TableCell>
                         <TableCell>
                           <div
-                            className="text-[12px] font-medium text-slate-600 max-w-[120px] truncate"
+                            className="text-[12px] font-medium text-slate-600 whitespace-nowrap min-w-[150px]"
                             title={branches.find((b) => b.id === t.branch_id)?.name || 'Tất cả chi nhánh'}
                           >
                             {branches.find((b) => b.id === t.branch_id)?.name || (

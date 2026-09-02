@@ -137,16 +137,17 @@ export default function HeroSection({
     setCurrentBannerIndex(0);
   }, [selectedBranch?.id]);
 
-  // Preload banner images for silky smooth transitions
+  // Preload only next banner image at responsive resolution
   useEffect(() => {
     if (!activeBanners || activeBanners.length <= 1) return;
-    activeBanners.forEach((url) => {
-      if (url) {
-        const img = new Image();
-        img.src = optimizeCloudinaryUrl(url, 2560, 'auto:best') || url;
-      }
-    });
-  }, [activeBanners]);
+    const nextIndex = (currentBannerIndex + 1) % activeBanners.length;
+    const nextUrl = activeBanners[nextIndex];
+    if (nextUrl) {
+      const img = new Image();
+      const targetWidth = isDesktopHero ? 1600 : 768;
+      img.src = optimizeCloudinaryUrl(nextUrl, targetWidth, 'auto:good') || nextUrl;
+    }
+  }, [activeBanners, currentBannerIndex, isDesktopHero]);
 
   // Auto carousel slide timer (4.5s)
   useEffect(() => {
@@ -244,8 +245,11 @@ export default function HeroSection({
                   {/* Main Banner Image: Spans 100% full width from edge to edge */}
                   <img
                     src={
-                      optimizeCloudinaryUrl(activeBanners[currentBannerIndex], 2560, 'auto:best') ||
-                      activeBanners[currentBannerIndex]
+                      optimizeCloudinaryUrl(
+                        activeBanners[currentBannerIndex],
+                        isDesktopHero ? 1600 : 768,
+                        'auto:good'
+                      ) || activeBanners[currentBannerIndex]
                     }
                     alt={`Cinesphere Banner ${currentBannerIndex + 1}`}
                     className="w-full min-w-full h-full object-cover object-center transition-transform duration-700 group-hover:scale-[1.03]"

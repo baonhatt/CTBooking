@@ -17,13 +17,13 @@ export function buildPostHref(post: { slug?: string; id: number }) {
 // Helper to ensure valid quality values
 function getAutoQuality(q: string) {
   if (q && q.startsWith('auto')) return q;
-  return 'auto:best';
+  return 'auto:good';
 }
 
 export function optimizeCloudinaryUrl(
   url: string | null | undefined,
   width?: number,
-  quality: string = 'auto:best',
+  quality: string = 'auto:good',
   cacheMaxAge?: number // in seconds, default: 86400 (1 day)
 ): string | undefined {
   if (!url) return undefined;

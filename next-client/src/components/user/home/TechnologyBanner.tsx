@@ -18,7 +18,7 @@ export default function TechnologyBanner({
   const mainVisual = useMemo(
     () => ({
       type: 'video' as const,
-      src: mainVideoUrl ? optimizeCloudinaryVideoUrl(mainVideoUrl, 1080) : '',
+      src: mainVideoUrl ? optimizeCloudinaryVideoUrl(mainVideoUrl, 720, 'auto:low') : '',
       thumbnail: mainVideoUrl ? getCloudinaryThumbnail(mainVideoUrl, 480) : ''
     }),
     [mainVideoUrl]
