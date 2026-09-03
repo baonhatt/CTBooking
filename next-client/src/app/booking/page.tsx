@@ -201,6 +201,23 @@ export default function BookingPage() {
           branchId: activeBranchId
         });
       }
+    } else if (ticketPackages.length > 0 && searchParams.get('movie_id')) {
+      const movieIdParam = searchParams.get('movie_id');
+      const foundPkg = ticketPackages.find((t: any) =>
+        (t.movies || []).some((m: any) => Number(m.id) === Number(movieIdParam))
+      ) || ticketPackages[0];
+
+      if (foundPkg) {
+        setDirectBookingItem({
+          packageId: foundPkg.id,
+          type: 'movie',
+          name: foundPkg.name,
+          price: Number(foundPkg.price || 0),
+          movies: foundPkg.movies,
+          quantity: Math.max(1, qtyParam),
+          branchId: activeBranchId
+        });
+      }
     }
   }, [searchParams, vrPackages, ticketPackages, activeBranchId]);
 
@@ -247,12 +264,15 @@ export default function BookingPage() {
     return Array.from(moviesMap.values());
   }, [movieItems, ticketPackages]);
 
-  // Auto-select first movie if movies exist and none selected
+  // Auto-select movie: prioritize movie_id from query params, otherwise first available
   useEffect(() => {
-    if (availableMovies.length > 0 && selectedMovieIds.length === 0) {
+    const movieIdParam = searchParams.get('movie_id');
+    if (movieIdParam && availableMovies.some((m: any) => Number(m.id) === Number(movieIdParam))) {
+      setSelectedMovieIds([Number(movieIdParam)]);
+    } else if (availableMovies.length > 0 && selectedMovieIds.length === 0) {
       setSelectedMovieIds([availableMovies[0].id]);
     }
-  }, [availableMovies, selectedMovieIds.length]);
+  }, [availableMovies, searchParams, selectedMovieIds.length]);
 
   const selectedMovie = useMemo(() => {
     return availableMovies.find((m) => selectedMovieIds.includes(m.id)) || availableMovies[0];

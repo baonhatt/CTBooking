@@ -1,7 +1,7 @@
 'use client';
 
-import { useState, useMemo, useEffect } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { useState, useMemo } from 'react';
+import { motion, AnimatePresence, useScroll, useSpring, useTransform, useMotionValueEvent } from 'framer-motion';
 import { Phone, MessageCircle, Headset, X, ChevronUp } from 'lucide-react';
 import { usePathname } from 'next/navigation';
 import { cn } from '@/lib/utils';
@@ -11,7 +11,6 @@ import { useCart } from '@/store/cartStore';
 export default function FloatingActions() {
   const [isExpanded, setIsExpanded] = useState(false);
   const [showScrollTop, setShowScrollTop] = useState(false);
-  const [scrollProgress, setScrollProgress] = useState(0);
   const pathname = usePathname();
   const { selectedBranch } = useBranch();
   const { isOpen: isCartOpen } = useCart();
@@ -19,31 +18,25 @@ export default function FloatingActions() {
   // CHỈ HIỆN Ở TRANG CHỦ THEO YÊU CẦU CỦA USER
   const isHome = pathname === '/';
 
-  // Lắng nghe sự kiện cuộn trang để tính % cuộn & hiện nút Move to Top (kiểu Cloudflare)
-  useEffect(() => {
-    const handleScroll = () => {
-      const scrollY = window.scrollY;
-      const totalHeight = document.documentElement.scrollHeight - window.innerHeight;
-      if (totalHeight > 0) {
-        const progress = Math.min(100, Math.max(0, (scrollY / totalHeight) * 100));
-        setScrollProgress(progress);
-      }
-      setShowScrollTop(scrollY > 200);
-    };
+  // Lắng nghe cuộn trang mượt mà qua Framer Motion (Hardware Accelerated 60 FPS)
+  const { scrollY, scrollYProgress } = useScroll();
+  const smoothProgress = useSpring(scrollYProgress, {
+    stiffness: 250,
+    damping: 30,
+    restDelta: 0.001
+  });
 
-    window.addEventListener('scroll', handleScroll, { passive: true });
-    handleScroll();
-    return () => window.removeEventListener('scroll', handleScroll);
-  }, []);
+  const radius = 21;
+  const circumference = 2 * Math.PI * radius; // ~131.95
+  const strokeDashoffset = useTransform(smoothProgress, [0, 1], [circumference, 0]);
+
+  useMotionValueEvent(scrollY, 'change', (latest) => {
+    setShowScrollTop(latest > 200);
+  });
 
   const scrollToTop = () => {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
-
-  // SVG Progress Ring calculations (Radius: 21, Circumference: 2 * PI * 21 = ~131.95)
-  const radius = 21;
-  const circumference = 2 * Math.PI * radius;
-  const strokeDashoffset = circumference - (scrollProgress / 100) * circumference;
 
   // Parse branch settings to get specific hotline
   const branchSettings = useMemo(() => {
@@ -68,7 +61,7 @@ export default function FloatingActions() {
   return (
     <div className="fixed bottom-6 right-5 sm:right-6 z-[40] flex flex-col gap-3 items-end">
       <AnimatePresence>
-        {/* 1. NÚT MOVE TO TOP VỚI VÒNG TIẾN TRÌNH TRÒN (Cloudflare Style) */}
+        {/* 1. NÚT MOVE TO TOP VỚI VÒNG TIẾN TRÌNH TRÒN (Cloudflare Style 60 FPS) */}
         {showScrollTop && (
           <motion.button
             key="scroll-to-top"
@@ -78,8 +71,8 @@ export default function FloatingActions() {
             exit={{ opacity: 0, scale: 0.5, y: 15 }}
             whileHover={{ scale: 1.1 }}
             whileTap={{ scale: 0.9 }}
-            aria-label={`Về đầu trang (${Math.round(scrollProgress)}%)`}
-            title={`Về đầu trang (${Math.round(scrollProgress)}%)`}
+            aria-label="Về đầu trang"
+            title="Về đầu trang"
             className="relative w-12 h-12 rounded-full bg-slate-950/90 hover:bg-slate-900 backdrop-blur-md text-cyan-400 hover:text-white shadow-[0_4px_25px_rgba(6,182,212,0.4)] flex items-center justify-center transition-all cursor-pointer group"
           >
             {/* SVG Circular Progress Ring */}
@@ -103,7 +96,7 @@ export default function FloatingActions() {
               />
 
               {/* Active Progress Ring */}
-              <circle
+              <motion.circle
                 cx="24"
                 cy="24"
                 r={radius}
@@ -111,9 +104,8 @@ export default function FloatingActions() {
                 strokeWidth="3"
                 fill="none"
                 strokeDasharray={circumference}
-                strokeDashoffset={strokeDashoffset}
+                style={{ strokeDashoffset }}
                 strokeLinecap="round"
-                className="transition-[stroke-dashoffset] duration-150 ease-out"
               />
             </svg>
 
