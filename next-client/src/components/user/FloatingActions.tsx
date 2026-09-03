@@ -11,6 +11,7 @@ import { useCart } from '@/store/cartStore';
 export default function FloatingActions() {
   const [isExpanded, setIsExpanded] = useState(false);
   const [showScrollTop, setShowScrollTop] = useState(false);
+  const [scrollProgress, setScrollProgress] = useState(0);
   const pathname = usePathname();
   const { selectedBranch } = useBranch();
   const { isOpen: isCartOpen } = useCart();
@@ -18,11 +19,18 @@ export default function FloatingActions() {
   // CHỈ HIỆN Ở TRANG CHỦ THEO YÊU CẦU CỦA USER
   const isHome = pathname === '/';
 
-  // Lắng nghe sự kiện cuộn trang để hiện nút Move to Top
+  // Lắng nghe sự kiện cuộn trang để tính % cuộn & hiện nút Move to Top (kiểu Cloudflare)
   useEffect(() => {
     const handleScroll = () => {
-      setShowScrollTop(window.scrollY > 300);
+      const scrollY = window.scrollY;
+      const totalHeight = document.documentElement.scrollHeight - window.innerHeight;
+      if (totalHeight > 0) {
+        const progress = Math.min(100, Math.max(0, (scrollY / totalHeight) * 100));
+        setScrollProgress(progress);
+      }
+      setShowScrollTop(scrollY > 200);
     };
+
     window.addEventListener('scroll', handleScroll, { passive: true });
     handleScroll();
     return () => window.removeEventListener('scroll', handleScroll);
@@ -31,6 +39,11 @@ export default function FloatingActions() {
   const scrollToTop = () => {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
+
+  // SVG Progress Ring calculations (Radius: 21, Circumference: 2 * PI * 21 = ~131.95)
+  const radius = 21;
+  const circumference = 2 * Math.PI * radius;
+  const strokeDashoffset = circumference - (scrollProgress / 100) * circumference;
 
   // Parse branch settings to get specific hotline
   const branchSettings = useMemo(() => {
@@ -55,7 +68,7 @@ export default function FloatingActions() {
   return (
     <div className="fixed bottom-6 right-5 sm:right-6 z-[40] flex flex-col gap-3 items-end">
       <AnimatePresence>
-        {/* 1. NÚT MOVE TO TOP (Hiện khi cuộn xuống > 300px) */}
+        {/* 1. NÚT MOVE TO TOP VỚI VÒNG TIẾN TRÌNH TRÒN (Cloudflare Style) */}
         {showScrollTop && (
           <motion.button
             key="scroll-to-top"
@@ -65,11 +78,46 @@ export default function FloatingActions() {
             exit={{ opacity: 0, scale: 0.5, y: 15 }}
             whileHover={{ scale: 1.1 }}
             whileTap={{ scale: 0.9 }}
-            aria-label="Về đầu trang"
-            title="Về đầu trang"
-            className="w-11 h-11 sm:w-12 sm:h-12 rounded-full bg-slate-900/90 hover:bg-slate-800 backdrop-blur-md text-cyan-400 hover:text-white border border-cyan-500/40 hover:border-cyan-400 shadow-[0_4px_20px_rgba(6,182,212,0.35)] flex items-center justify-center transition-all cursor-pointer group"
+            aria-label={`Về đầu trang (${Math.round(scrollProgress)}%)`}
+            title={`Về đầu trang (${Math.round(scrollProgress)}%)`}
+            className="relative w-12 h-12 rounded-full bg-slate-950/90 hover:bg-slate-900 backdrop-blur-md text-cyan-400 hover:text-white shadow-[0_4px_25px_rgba(6,182,212,0.4)] flex items-center justify-center transition-all cursor-pointer group"
           >
-            <ChevronUp className="w-5 h-5 sm:w-6 sm:h-6 group-hover:-translate-y-0.5 transition-transform" />
+            {/* SVG Circular Progress Ring */}
+            <svg className="absolute inset-0 w-full h-full -rotate-90 pointer-events-none" viewBox="0 0 48 48">
+              <defs>
+                <linearGradient id="cloudflare-progress-grad" x1="0%" y1="0%" x2="100%" y2="100%">
+                  <stop offset="0%" stopColor="#22d3ee" />
+                  <stop offset="50%" stopColor="#3b82f6" />
+                  <stop offset="100%" stopColor="#f97316" />
+                </linearGradient>
+              </defs>
+
+              {/* Background Track Ring */}
+              <circle
+                cx="24"
+                cy="24"
+                r={radius}
+                className="stroke-white/15"
+                strokeWidth="3"
+                fill="none"
+              />
+
+              {/* Active Progress Ring */}
+              <circle
+                cx="24"
+                cy="24"
+                r={radius}
+                stroke="url(#cloudflare-progress-grad)"
+                strokeWidth="3"
+                fill="none"
+                strokeDasharray={circumference}
+                strokeDashoffset={strokeDashoffset}
+                strokeLinecap="round"
+                className="transition-[stroke-dashoffset] duration-150 ease-out"
+              />
+            </svg>
+
+            <ChevronUp className="w-5 h-5 group-hover:-translate-y-0.5 transition-transform z-10" />
           </motion.button>
         )}
 
