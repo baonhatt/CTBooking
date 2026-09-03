@@ -248,6 +248,7 @@ export async function listTransactionsImpl(
       voucher_id: tx.voucher_id,
       voucher_code: tx.voucher_code_snapshot || row.voucher?.code || null,
       voucher_discount_amount: Number(tx.voucher_discount_amount || 0),
+      payment_expires_at: tx.payment_expires_at || null,
       sale_staff_id,
       sale_name,
       sale_email

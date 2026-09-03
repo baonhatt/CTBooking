@@ -72,6 +72,13 @@ export default function CartDrawer() {
   const handleProceedToBooking = () => {
     if (selectedItems.length === 0) return;
 
+    // Clear any previous direct booking single item from sessionStorage
+    try {
+      sessionStorage.removeItem('directBookingItem');
+    } catch (e) {
+      console.error('Error clearing direct booking item', e);
+    }
+
     // Check if there are movie tickets or VR packages in selected items
     const selectedMovieItem = selectedItems.find((i) => i.type === 'movie');
     const selectedVrItems = selectedItems.filter((i) => i.type === 'vr');
@@ -109,6 +116,12 @@ export default function CartDrawer() {
     closeCart();
 
     const params = new URLSearchParams(searchParams.toString());
+    params.delete('direct');
+    params.delete('package_id');
+    params.delete('ticket_package_id');
+    params.delete('vr_package_id');
+    params.delete('qty');
+
     if (selectedBranch?.id) {
       params.set('branch_id', String(selectedBranch.id));
     }

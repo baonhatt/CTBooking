@@ -974,12 +974,24 @@ export async function getBookingByCodeImpl(anyDb: any, codeRaw: string, tables: 
     } catch {}
   }
 
+  let branch_name = null;
+  if (booking.branch_id && (tables as any).branches) {
+    try {
+      const br = await anyDb.query.branches.findFirst({
+        where: eq((tables as any).branches.id, booking.branch_id)
+      });
+      branch_name = br?.name || null;
+    } catch {}
+  }
+
   return {
     status: 200,
     id: booking.id,
     booking_code: booking.booking_code,
     payment_status: booking.payment_status,
     user_id: booking.user_id,
+    branch_id: booking.branch_id || null,
+    branch_name: branch_name || (booking.branch_id ? `Chi nhánh #${booking.branch_id}` : null),
     name: booking.name,
     phone: booking.phone,
     email: booking.email,

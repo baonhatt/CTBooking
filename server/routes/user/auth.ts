@@ -384,13 +384,6 @@ export async function registerImpl(
       user: { id: newUser.id, email },
       emailSent: true
     };
-
-    return {
-      status: 200,
-      message: 'Đăng ký thành công',
-      user: { id: newUser.id, email },
-      emailSent: true
-    };
   } catch (err: any) {
     return { status: 500, message: `Server error: ${err?.message || String(err)}` };
   }

@@ -23,8 +23,8 @@ export default function ProductSection({ initialProducts = [] }: { initialProduc
       className="relative py-20 bg-gradient-to-b from-[#050915] via-[#0b0f24] to-[#030712] overflow-hidden"
     >
       <div className="absolute inset-0 neon-noise opacity-50 pointer-events-none" />
-      <div className="absolute -left-10 top-16 w-96 h-96 bg-purple-500/15 blur-[140px] pointer-events-none" />
-      <div className="absolute right-0 bottom-10 w-96 h-96 bg-cyan-500/15 blur-[140px] pointer-events-none" />
+      <div className="absolute -left-10 top-16 w-[550px] h-[550px] rounded-full bg-[radial-gradient(circle,_rgba(147,51,234,0.18)_0%,_transparent_70%)] pointer-events-none" />
+      <div className="absolute right-0 bottom-10 w-[550px] h-[550px] rounded-full bg-[radial-gradient(circle,_rgba(6,182,212,0.18)_0%,_transparent_70%)] pointer-events-none" />
 
       <div className="container mx-auto px-4 relative z-10">
         <div className="flex flex-col md:flex-row items-start md:items-end justify-between mb-12 gap-4">

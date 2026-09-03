@@ -88,29 +88,16 @@ export const cartStore = {
   },
 
   openCart() {
-    const now = Date.now();
-    if (now - lastDrawerActionTime < DRAWER_COOLDOWN_MS && isCartDrawerOpen) return;
-    lastDrawerActionTime = now;
-    if (!isCartDrawerOpen) {
-      isCartDrawerOpen = true;
-      notifyDrawerListeners(true);
-    }
+    isCartDrawerOpen = true;
+    notifyDrawerListeners(true);
   },
 
   closeCart() {
-    const now = Date.now();
-    if (now - lastDrawerActionTime < DRAWER_COOLDOWN_MS && !isCartDrawerOpen) return;
-    lastDrawerActionTime = now;
-    if (isCartDrawerOpen) {
-      isCartDrawerOpen = false;
-      notifyDrawerListeners(false);
-    }
+    isCartDrawerOpen = false;
+    notifyDrawerListeners(false);
   },
 
   toggleCart() {
-    const now = Date.now();
-    if (now - lastDrawerActionTime < DRAWER_COOLDOWN_MS) return;
-    lastDrawerActionTime = now;
     isCartDrawerOpen = !isCartDrawerOpen;
     notifyDrawerListeners(isCartDrawerOpen);
   },
@@ -259,9 +246,9 @@ export function useCart() {
     };
   }, []);
 
-  const totalItemsCount = items.reduce((sum, item) => sum + item.quantity, 0);
+  const totalItemsCount = items.length;
   const selectedItems = items.filter((item) => item.selected);
-  const selectedCount = selectedItems.reduce((sum, item) => sum + item.quantity, 0);
+  const selectedCount = selectedItems.length;
   const selectedSubtotal = selectedItems.reduce((sum, item) => sum + item.price * item.quantity, 0);
   const isAllSelected = items.length > 0 && items.every((item) => item.selected);
 

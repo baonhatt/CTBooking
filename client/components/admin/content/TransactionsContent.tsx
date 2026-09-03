@@ -77,7 +77,49 @@ interface Tx {
   sale_staff_id?: number | null;
   sale_name?: string | null;
   sale_email?: string | null;
+  payment_expires_at?: string | null;
 }
+
+// Helper Countdown Component cho Transaction Modal
+const CountdownTimer = ({ targetDate }: { targetDate: string }) => {
+  const [timeLeft, setTimeLeft] = useState<{ minutes: number; seconds: number } | null>(null);
+
+  useEffect(() => {
+    if (!targetDate) return;
+    const target = new Date(targetDate).getTime();
+
+    const updateTimer = () => {
+      const now = new Date().getTime();
+      const diff = target - now;
+
+      if (diff <= 0) {
+        setTimeLeft({ minutes: 0, seconds: 0 });
+      } else {
+        const minutes = Math.floor(diff / (1000 * 60));
+        const seconds = Math.floor((diff % (1000 * 60)) / 1000);
+        setTimeLeft({ minutes, seconds });
+      }
+    };
+
+    updateTimer();
+    const t = setInterval(updateTimer, 1000);
+    return () => clearInterval(t);
+  }, [targetDate]);
+
+  if (!timeLeft) return null;
+  const isDanger = timeLeft.minutes === 0 && timeLeft.seconds < 30;
+
+  return (
+    <div
+      className={`font-mono font-black text-[11px] px-2 py-0.5 rounded-full border -mb-[1px] tracking-tight ${
+        isDanger ? 'bg-red-50 text-red-600 border-red-200 animate-pulse' : 'bg-orange-50 text-orange-600 border-orange-200'
+      }`}
+    >
+      {String(timeLeft.minutes).padStart(2, '0')}:{String(timeLeft.seconds).padStart(2, '0')}
+    </div>
+  );
+};
+
 interface Props {
   data: Tx[];
   totalPages: number;
@@ -608,8 +650,20 @@ export default function TransactionsContent({
                 : data.map((t) => {
                     // 1. Tối ưu logic xác định trạng thái hiển thị
                     const getStatusConfig = () => {
-                      // Trường hợp 1: Thanh toán thất bại/Đã hủy
-                      if (t.paymentStatus === 'failed') {
+                      // Trường hợp 1: Thanh toán quá hạn (expired)
+                      if (t.paymentStatus === 'expired') {
+                        return {
+                          text: 'Đã Hết Hạn',
+                          style: 'border-slate-300 bg-slate-100 text-slate-600',
+                          icon: <Clock size={10} className="mr-1 mt-[1px]" />,
+                          modalIcon: <Clock size={14} />,
+                          ticketText: 'Đã Hết Hạn',
+                          ticketStyle: 'bg-slate-200 text-slate-700 border-slate-300'
+                        };
+                      }
+
+                      // Trường hợp 2: Thanh toán thất bại hoặc Đã Hủy
+                      if (t.paymentStatus === 'failed' || t.paymentStatus === 'cancelled') {
                         return {
                           text: 'Đã Hủy',
                           style: 'border-red-200 bg-red-50 text-red-700',
@@ -620,7 +674,7 @@ export default function TransactionsContent({
                         };
                       }
 
-                      // Trường hợp 2: Chờ thanh toán
+                      // Trường hợp 3: Chờ thanh toán
                       if (t.paymentStatus === 'pending') {
                         return {
                           text: 'Chờ Thanh Toán',
@@ -632,7 +686,7 @@ export default function TransactionsContent({
                         };
                       }
 
-                      // Trường hợp 3: Đã thanh toán (Cần check thêm expired và is_used)
+                      // Trường hợp 4: Đã thanh toán (Cần check thêm expired và is_used)
                       if (t.paymentStatus === 'paid') {
                         // Ưu tiên check Đã sử dụng
                         if (t.is_used) {
@@ -844,9 +898,8 @@ export default function TransactionsContent({
 
       {/* --- MODAL CHI TIẾT GIAO DỊCH (TỐI ƯU TOÀN DIỆN) --- */}
       <Dialog open={isDetailsOpen} onOpenChange={setIsDetailsOpen}>
-        {/* ✅ THAY ĐỔI: max-w-[700px] → max-w-6xl (rộng hơn) */}
-        {/* ✅ THAY ĐỔI: max-h-[92vh] → max-h-[95vh] (cao hơn) */}
-        <DialogContent className="max-w-6xl p-0 border border-gray-200 shadow-xl rounded-xl overflow-hidden bg-white flex flex-col max-h-[95vh] [&>button]:hidden">
+        {/* ✅ THAY ĐỔI: max-w-6xl -> max-w-4xl để layout gọn hơn */}
+        <DialogContent className="max-w-4xl p-0 border border-gray-200 shadow-xl rounded-xl overflow-hidden bg-white flex flex-col max-h-[95vh] [&>button]:hidden">
           {/* HEADER CỐ ĐỊNH */}
           <div className="bg-white p-6 border-b shrink-0">
             <div className="flex justify-between items-start">
@@ -891,14 +944,28 @@ export default function TransactionsContent({
 
                   if (paymentStatus === 'pending') {
                     return (
-                      <div className="bg-yellow-50 text-yellow-600 px-3 py-1.5 rounded-full border border-yellow-100 flex items-center gap-2">
-                        <Timer size={14} className="text-yellow-600 animate-pulse" />
-                        <span className="text-[11px] font-medium tracking-tight">Chờ thanh toán</span>
+                      <div className="flex items-center gap-2">
+                        {txDetails?.payment_expires_at && (
+                          <CountdownTimer targetDate={txDetails.payment_expires_at} />
+                        )}
+                        <div className="bg-yellow-50 text-yellow-600 px-3 py-1.5 rounded-full border border-yellow-100 flex items-center gap-2">
+                          <Timer size={14} className="text-yellow-600 animate-pulse" />
+                          <span className="text-[11px] font-medium tracking-tight">Chờ thanh toán</span>
+                        </div>
                       </div>
                     );
                   }
 
-                  if (paymentStatus === 'failed') {
+                  if (paymentStatus === 'expired') {
+                    return (
+                      <div className="bg-slate-100 text-slate-600 px-3 py-1.5 rounded-full border border-slate-200 flex items-center gap-2">
+                        <Clock size={14} className="text-slate-600" />
+                        <span className="text-[11px] font-medium tracking-tight">Đã hết hạn</span>
+                      </div>
+                    );
+                  }
+
+                  if (paymentStatus === 'failed' || paymentStatus === 'cancelled') {
                     return (
                       <div className="bg-red-50 text-red-600 px-3 py-1.5 rounded-full border border-red-100 flex items-center gap-2">
                         <XCircle size={14} className="text-red-600" />
@@ -980,59 +1047,51 @@ export default function TransactionsContent({
                           {/* Bảng chi tiết vr_items */}
                           {txDetails.vr_items && txDetails.vr_items.length > 0 ? (
                             <div className="border border-purple-100 rounded-lg overflow-hidden bg-white">
-                              <Table className="[&_td]:py-2.5 [&_th]:py-2.5">
-                                <TableHeader className="bg-purple-50/60">
-                                  <TableRow className="hover:bg-transparent border-none">
-                                    <TableHead className="text-[11px] font-bold uppercase text-purple-700">
-                                      Tên gói VR
-                                    </TableHead>
-                                    <TableHead className="text-center text-[11px] font-bold uppercase text-purple-700 w-14">
-                                      SL
-                                    </TableHead>
-                                    <TableHead className="text-right text-[11px] font-bold uppercase text-purple-700 w-28">
-                                      Đơn giá
-                                    </TableHead>
-                                    <TableHead className="text-right text-[11px] font-bold uppercase text-purple-700 w-32">
-                                      Thành tiền
-                                    </TableHead>
-                                  </TableRow>
-                                </TableHeader>
-                                <TableBody>
+                              <table className="w-full text-xs text-left border-collapse">
+                                <thead className="bg-purple-50/60 text-purple-700">
+                                  <tr className="border-none">
+                                    <th className="py-2 px-2.5 font-bold uppercase text-[10px]">Tên gói VR</th>
+                                    <th className="py-2 px-1 font-bold uppercase text-[10px] text-center w-8">SL</th>
+                                    <th className="py-2 px-1.5 font-bold uppercase text-[10px] text-right">Đơn giá</th>
+                                    <th className="py-2 px-2.5 font-bold uppercase text-[10px] text-right">Thành tiền</th>
+                                  </tr>
+                                </thead>
+                                <tbody>
                                   {txDetails.vr_items.map((it: any, idx: number) => {
                                     const qty = Number(it.quantity || 1);
                                     const unit = Number(it.discounted_unit_price ?? it.unit_price ?? 0);
                                     const line = Number(it.line_total ?? unit * qty);
                                     return (
-                                      <TableRow
+                                      <tr
                                         key={it.id || `vr-${idx}`}
                                         className="border-t border-purple-50 hover:bg-transparent"
                                       >
-                                        <TableCell className="py-2.5">
-                                          <div className="flex items-center gap-2">
-                                            <div className="w-6 h-6 rounded-md bg-purple-100 flex items-center justify-center shrink-0">
+                                        <td className="py-2 px-2.5">
+                                          <div className="flex items-center gap-1.5">
+                                            <div className="w-5 h-5 rounded-md bg-purple-100 flex items-center justify-center shrink-0">
                                               <Gamepad2 className="w-3 h-3 text-purple-600" />
                                             </div>
-                                            <span className="text-sm font-semibold text-slate-800 leading-tight">
+                                            <span className="text-xs font-semibold text-slate-800 leading-tight">
                                               {it.package_name ||
                                                 it.ticket_package?.name ||
                                                 `Gói VR #${it.ticket_package_id || idx + 1}`}
                                             </span>
                                           </div>
-                                        </TableCell>
-                                        <TableCell className="text-center font-bold text-slate-700 text-sm py-2.5">
-                                          × {qty}
-                                        </TableCell>
-                                        <TableCell className="text-right text-[12px] text-slate-600 py-2.5">
+                                        </td>
+                                        <td className="py-2 px-1 text-center font-bold text-slate-700 text-xs">
+                                          ×{qty}
+                                        </td>
+                                        <td className="py-2 px-1.5 text-right text-[11px] text-slate-600">
                                           {unit.toLocaleString('vi-VN')}đ
-                                        </TableCell>
-                                        <TableCell className="text-right font-bold text-purple-700 text-sm py-2.5">
+                                        </td>
+                                        <td className="py-2 px-2.5 text-right font-bold text-purple-700 text-xs">
                                           {line.toLocaleString('vi-VN')}đ
-                                        </TableCell>
-                                      </TableRow>
+                                        </td>
+                                      </tr>
                                     );
                                   })}
-                                </TableBody>
-                              </Table>
+                                </tbody>
+                              </table>
                             </div>
                           ) : (
                             <div className="text-center py-4 text-slate-400 text-sm bg-purple-50/20 rounded-lg border border-purple-100 border-dashed">
@@ -1070,59 +1129,51 @@ export default function TransactionsContent({
                           {/* Nếu có danh sách chi tiết vr_items */}
                           {txDetails.vr_items && txDetails.vr_items.length > 0 ? (
                             <div className="border border-amber-200/60 rounded-lg overflow-hidden bg-white">
-                              <Table className="[&_td]:py-2.5 [&_th]:py-2.5">
-                                <TableHeader className="bg-amber-50/70">
-                                  <TableRow className="hover:bg-transparent border-none">
-                                    <TableHead className="text-[11px] font-bold uppercase text-amber-800">
-                                      Tên gói / Vé
-                                    </TableHead>
-                                    <TableHead className="text-center text-[11px] font-bold uppercase text-amber-800 w-14">
-                                      SL
-                                    </TableHead>
-                                    <TableHead className="text-right text-[11px] font-bold uppercase text-amber-800 w-28">
-                                      Đơn giá
-                                    </TableHead>
-                                    <TableHead className="text-right text-[11px] font-bold uppercase text-amber-800 w-32">
-                                      Thành tiền
-                                    </TableHead>
-                                  </TableRow>
-                                </TableHeader>
-                                <TableBody>
+                              <table className="w-full text-xs text-left border-collapse">
+                                <thead className="bg-amber-50/70 text-amber-800">
+                                  <tr className="border-none">
+                                    <th className="py-2 px-2.5 font-bold uppercase text-[10px]">Tên gói / Vé</th>
+                                    <th className="py-2 px-1 font-bold uppercase text-[10px] text-center w-8">SL</th>
+                                    <th className="py-2 px-1.5 font-bold uppercase text-[10px] text-right">Đơn giá</th>
+                                    <th className="py-2 px-2.5 font-bold uppercase text-[10px] text-right">Thành tiền</th>
+                                  </tr>
+                                </thead>
+                                <tbody>
                                   {txDetails.vr_items.map((it: any, idx: number) => {
                                     const qty = Number(it.quantity || 1);
                                     const unit = Number(it.discounted_unit_price ?? it.unit_price ?? 0);
                                     const line = Number(it.line_total ?? unit * qty);
                                     return (
-                                      <TableRow
+                                      <tr
                                         key={it.id || `item-${idx}`}
                                         className="border-t border-amber-100/60 hover:bg-transparent"
                                       >
-                                        <TableCell className="py-2.5">
-                                          <div className="flex items-center gap-2">
-                                            <div className="w-6 h-6 rounded-md bg-amber-100 flex items-center justify-center shrink-0">
+                                        <td className="py-2 px-2.5">
+                                          <div className="flex items-center gap-1.5">
+                                            <div className="w-5 h-5 rounded-md bg-amber-100 flex items-center justify-center shrink-0">
                                               <TicketIcon className="w-3 h-3 text-amber-700" />
                                             </div>
-                                            <span className="text-sm font-semibold text-slate-800 leading-tight">
+                                            <span className="text-xs font-semibold text-slate-800 leading-tight">
                                               {it.package_name ||
                                                 txDetails.ticket_package?.name ||
                                                 `Gói vé #${idx + 1}`}
                                             </span>
                                           </div>
-                                        </TableCell>
-                                        <TableCell className="text-center font-bold text-slate-700 text-sm py-2.5">
-                                          × {qty}
-                                        </TableCell>
-                                        <TableCell className="text-right text-[12px] text-slate-600 py-2.5">
+                                        </td>
+                                        <td className="py-2 px-1 text-center font-bold text-slate-700 text-xs">
+                                          ×{qty}
+                                        </td>
+                                        <td className="py-2 px-1.5 text-right text-[11px] text-slate-600">
                                           {unit.toLocaleString('vi-VN')}đ
-                                        </TableCell>
-                                        <TableCell className="text-right font-bold text-amber-900 text-sm py-2.5">
+                                        </td>
+                                        <td className="py-2 px-2.5 text-right font-bold text-amber-900 text-xs">
                                           {line.toLocaleString('vi-VN')}đ
-                                        </TableCell>
-                                      </TableRow>
+                                        </td>
+                                      </tr>
                                     );
                                   })}
-                                </TableBody>
-                              </Table>
+                                </tbody>
+                              </table>
                             </div>
                           ) : (
                             <div className="flex justify-between">

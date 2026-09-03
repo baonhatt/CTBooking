@@ -241,8 +241,8 @@ export default function TechnologyBanner({
       className="relative py-20 bg-gradient-to-b from-[#060915] via-[#080d21] to-[#050915] overflow-hidden"
     >
       <div className="absolute inset-0 neon-noise opacity-50 pointer-events-none" />
-      <div className="absolute -left-10 top-16 w-96 h-96 bg-cyan-500/15 blur-[140px] pointer-events-none" />
-      <div className="absolute right-0 bottom-10 w-96 h-96 bg-purple-500/15 blur-[140px] pointer-events-none" />
+      <div className="absolute -left-10 top-16 w-[550px] h-[550px] rounded-full bg-[radial-gradient(circle,_rgba(6,182,212,0.18)_0%,_transparent_70%)] pointer-events-none" />
+      <div className="absolute right-0 bottom-10 w-[550px] h-[550px] rounded-full bg-[radial-gradient(circle,_rgba(147,51,234,0.18)_0%,_transparent_70%)] pointer-events-none" />
 
       <div className="container mx-auto px-4 relative z-10">
         <motion.div
@@ -473,21 +473,16 @@ export default function TechnologyBanner({
                               className="absolute inset-0 z-10"
                               onClick={() => togglePlay(gi)}
                             >
-                              {item.thumbnail?.includes('cloudinary.com') ||
-                              !item.thumbnail?.match(/\.(mp4|webm|mov|ogg)$/i) ? (
-                                <img
-                                  src={item.thumbnail}
-                                  alt={item.title}
-                                  className="w-full h-full object-cover opacity-70 group-hover:opacity-100 transition-all duration-500 group-hover:scale-105"
-                                  loading="lazy"
-                                />
-                              ) : (
-                                <video
-                                  src={item.thumbnail}
-                                  preload="metadata"
-                                  className="w-full h-full object-cover opacity-70 group-hover:opacity-100 transition-opacity"
-                                />
-                              )}
+                              <img
+                                src={
+                                  item.thumbnail?.match(/\.(mp4|webm|mov|ogg)$/i) || item.thumbnail?.includes('/video/upload/')
+                                    ? getCloudinaryThumbnail(item.src || item.thumbnail, 360)
+                                    : item.thumbnail || getCloudinaryThumbnail(item.src, 360)
+                                }
+                                alt={item.title}
+                                className="w-full h-full object-cover opacity-70 group-hover:opacity-100 transition-all duration-500 group-hover:scale-105"
+                                loading="lazy"
+                              />
                               <div className="absolute inset-0 flex items-center justify-center">
                                 <div className="w-14 h-14 rounded-full bg-white/10 backdrop-blur-md flex items-center justify-center border-2 border-white/30 shadow-2xl group-hover:scale-110 transition-all duration-300">
                                   <Play className="h-7 w-7 text-white ml-1" fill="white" />

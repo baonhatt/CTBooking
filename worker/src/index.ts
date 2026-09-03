@@ -97,7 +97,7 @@ import { createVnpayPaymentImpl, vnpayIpnImpl } from '../../server/routes/user/v
 
 import {
   listUserTransactionsImpl,
-  getUserProfileByEmailImpl,
+  getUserProfileByAccountIdImpl,
   updateUserProfileImpl
 } from '../../server/routes/user/users';
 
@@ -2617,11 +2617,10 @@ app.get('/api/users/:id', async (c) => {
 
 app.get('/api/users-profile', requireAuth, async (c) => {
   try {
-    const emailRaw = String(c.req.query('email') || '');
-
+    const accountId = c.get('accountId');
     const db = drizzle(c.env.cinema_db, { schema });
 
-    const r = await getUserProfileByEmailImpl(db, { accounts: schema.accounts, users: schema.users }, emailRaw);
+    const r = await getUserProfileByAccountIdImpl(db, { accounts: schema.accounts, users: schema.users }, accountId);
 
     const status = typeof (r as any).status === 'number' ? (r as any).status : 200;
 
@@ -2648,6 +2647,7 @@ app.post('/api/users-profile', requireAuth, async (c) => {
     const db = drizzle(c.env.cinema_db, { schema });
 
     const body = await c.req.json().catch(() => ({}));
+    body.accountId = c.get('accountId');
 
     const r = await updateUserProfileImpl(
       db,
@@ -2682,6 +2682,7 @@ app.post('/api/users-password', requireAuth, async (c) => {
     const db = drizzle(c.env.cinema_db, { schema });
 
     const body = await c.req.json().catch(() => ({}));
+    body.accountId = c.get('accountId');
 
     const r = await changePasswordImpl(db, { accounts: schema.accounts }, body as any);
 
@@ -2705,6 +2706,7 @@ app.post('/api/users-password', requireAuth, async (c) => {
 
 app.get('/api/usersprofile/transactions', requireAuth, async (c) => {
   try {
+    const accountId = c.get('accountId');
     const email = String(c.req.query('email') || '');
 
     const status = String(c.req.query('status') || 'paid');
@@ -2738,7 +2740,7 @@ app.get('/api/usersprofile/transactions', requireAuth, async (c) => {
         ticket_packages: schema.ticket_packages
       },
 
-      { email, status, page, pageSize, sort, dir, payment_method, from, to }
+      { accountId, email, status, page, pageSize, sort, dir, payment_method, from, to }
     );
 
     return c.json(r, 200);

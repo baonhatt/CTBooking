@@ -3,7 +3,7 @@
 import { useMemo, useState, useEffect } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
-import { cn } from '@/lib/utils';
+import { cn, optimizeCloudinaryUrl } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -62,7 +62,7 @@ export default function VRShowcase({ initialPackages = [] }: { initialPackages?:
     queryKey: ['vrPackages', selectedBranch?.id],
     queryFn: () => getVRPackages(selectedBranch?.id),
     initialData: { items: initialPackages },
-    staleTime: 0
+    staleTime: 5 * 60 * 1000 // 5 minutes cache to prevent duplicate client refetch on mount
   });
 
   const packagesData: any[] = vrRes?.items ?? initialPackages;
@@ -122,24 +122,29 @@ export default function VRShowcase({ initialPackages = [] }: { initialPackages?:
   };
 
   const handleBookNow = (pkg: any, quantity: number = 1) => {
-    cartStore.addItem({
-      packageId: pkg.id,
-      type: 'vr',
-      name: pkg.name,
-      price: Number(pkg.price || 0),
-      quantity: quantity,
-      cover_image: pkg.cover_image,
-      duration_min: pkg.duration_min,
-      vr_genre: pkg.vr_genre,
-      features: pkg.features || [],
-      branchId: selectedBranch?.id,
-      selected: true
-    });
+    try {
+      sessionStorage.setItem(
+        'directBookingItem',
+        JSON.stringify({
+          packageId: pkg.id,
+          type: 'vr',
+          name: pkg.name,
+          price: Number(pkg.price || 0),
+          quantity: quantity,
+          cover_image: pkg.cover_image,
+          duration_min: pkg.duration_min,
+          vr_genre: pkg.vr_genre,
+          features: pkg.features || [],
+          branchId: selectedBranch?.id
+        })
+      );
+    } catch {}
 
     const params = new URLSearchParams(searchParams ? searchParams.toString() : '');
     if (selectedBranch?.id && !params.has('branch_id')) {
       params.set('branch_id', String(selectedBranch.id));
     }
+    params.set('direct', '1');
     router.push(`/booking${params.toString() ? `?${params.toString()}` : ''}`);
   };
 
@@ -153,11 +158,11 @@ export default function VRShowcase({ initialPackages = [] }: { initialPackages?:
       id="vr"
       className="relative py-20 bg-gradient-to-b from-[#050915] via-[#0c0821] to-[#050915] overflow-hidden"
     >
-      {/* Background neon glows & ambient lighting */}
+      {/* Background neon glows & ambient lighting - Zero-overhead CSS Radial Gradients */}
       <div className="absolute inset-0 neon-noise pointer-events-none opacity-60" />
-      <div className="absolute left-1/4 top-10 w-[500px] h-[500px] bg-purple-600/15 blur-[140px] pointer-events-none" />
-      <div className="absolute right-10 bottom-10 w-[450px] h-[450px] bg-fuchsia-600/12 blur-[130px] pointer-events-none" />
-      <div className="absolute -left-20 bottom-1/3 w-[350px] h-[350px] bg-cyan-500/10 blur-[120px] pointer-events-none" />
+      <div className="absolute left-1/4 top-10 w-[600px] h-[600px] rounded-full bg-[radial-gradient(circle,_rgba(147,51,234,0.18)_0%,_transparent_70%)] pointer-events-none" />
+      <div className="absolute right-10 bottom-10 w-[550px] h-[550px] rounded-full bg-[radial-gradient(circle,_rgba(192,38,211,0.16)_0%,_transparent_70%)] pointer-events-none" />
+      <div className="absolute -left-20 bottom-1/3 w-[450px] h-[450px] rounded-full bg-[radial-gradient(circle,_rgba(6,182,212,0.15)_0%,_transparent_70%)] pointer-events-none" />
 
       <div className="container mx-auto px-3 sm:px-4 relative z-10">
         {/* Section Header */}
@@ -239,10 +244,14 @@ export default function VRShowcase({ initialPackages = [] }: { initialPackages?:
                   <div className="relative aspect-[16/10] w-full overflow-hidden bg-slate-950 flex items-center justify-center">
                     {hasImage ? (
                       <img
-                        src={imageUrl}
+                        src={optimizeCloudinaryUrl(imageUrl, 600)}
                         alt={pkg.name}
                         className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
                         loading="lazy"
+                        onError={(e) => {
+                          (e.target as HTMLImageElement).src =
+                            'https://images.unsplash.com/photo-1593508512255-86ab42a8e620?auto=format&fit=crop&w=800&q=80';
+                        }}
                       />
                     ) : (
                       <div className="w-full h-full bg-gradient-to-br from-purple-950/70 via-slate-900 to-fuchsia-950/70 flex flex-col items-center justify-center gap-1 sm:gap-2 p-2 sm:p-4 text-center">

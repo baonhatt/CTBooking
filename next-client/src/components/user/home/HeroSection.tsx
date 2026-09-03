@@ -104,7 +104,7 @@ export default function HeroSection({
     queryKey: ['activeMovies', selectedBranch?.id],
     queryFn: () => getActiveMoviesToday(selectedBranch?.id),
     initialData: initialMovies,
-    staleTime: 0 // Fetch real-time data when branch changes
+    staleTime: 5 * 60 * 1000 // 5 minutes cache to prevent duplicate client refetch on mount
   });
 
   // Extract and memoize branch banners
@@ -215,10 +215,10 @@ export default function HeroSection({
         className="relative overflow-hidden bg-gradient-to-b from-[#030712] via-[#070b1e] to-[#050915] text-white"
         onMouseMove={isDesktopHero ? onMove : undefined}
       >
-        {/* Cyber Ambient Background Glows */}
-        <div className="absolute -left-24 top-10 w-[520px] h-[520px] rounded-full bg-cyan-500/15 blur-[130px] animate-pulse pointer-events-none" />
+        {/* Cyber Ambient Background Glows - Ultra-fast CSS Radial Gradients (0% GPU blur overhead) */}
+        <div className="absolute -left-32 -top-10 w-[650px] h-[650px] rounded-full bg-[radial-gradient(circle,_rgba(6,182,212,0.22)_0%,_transparent_70%)] pointer-events-none" />
         <m.div
-          className="absolute -right-20 top-40 w-[460px] h-[460px] rounded-full bg-fuchsia-500/15 blur-[140px] pointer-events-none"
+          className="absolute -right-32 top-20 w-[600px] h-[600px] rounded-full bg-[radial-gradient(circle,_rgba(217,70,239,0.2)_0%,_transparent_70%)] pointer-events-none"
           style={{ x: blobX, y: blobY, translateZ: 0 }}
         />
 

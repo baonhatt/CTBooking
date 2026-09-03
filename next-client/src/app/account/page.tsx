@@ -6,7 +6,7 @@ import Link from 'next/link';
 import UserLayout from '@/layouts/UserLayout';
 import ProtectedRoute from '@/components/ProtectedRoute';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Calendar, CheckCircle2, Clock, Copy, Lock, Mars, ShieldCheck, User, Venus } from 'lucide-react';
+import { Calendar, CheckCircle2, Clock, Copy, Lock, Mars, ShieldCheck, User, Venus, XCircle } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -671,6 +671,14 @@ export default function Account() {
                                                 <div className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
                                                 Sẵn sàng sử dụng {t.remainingTimeLabel}
                                               </span>
+                                            ) : t.payment_status === 'expired' ? (
+                                              <span className="text-slate-400 font-medium flex items-center gap-2 px-2 py-1 bg-slate-400/5 rounded-lg border border-slate-400/20">
+                                                <Clock size={14} /> Hết hạn thanh toán
+                                              </span>
+                                            ) : t.payment_status === 'failed' || t.payment_status === 'cancelled' ? (
+                                              <span className="text-rose-400 font-medium flex items-center gap-2 px-2 py-1 bg-rose-400/5 rounded-lg border border-rose-400/20">
+                                                <XCircle size={14} /> Đã hủy thanh toán
+                                              </span>
                                             ) : (
                                               <span
                                                 className={`px-2 py-1 rounded-lg border flex items-center gap-2 font-medium ${
@@ -889,7 +897,7 @@ export default function Account() {
                         </h2>
                       </div>
 
-                      {selectedTx.payment_status === 'paid' && (
+                      {selectedTx.payment_status === 'paid' ? (
                         <span
                           className={`text-[10px] px-2.5 py-1 rounded-full border font-bold tracking-tight ${
                             selectedTx.is_used
@@ -900,6 +908,18 @@ export default function Account() {
                           }`}
                         >
                           {selectedTx.is_used ? 'ĐÃ DÙNG' : selectedTx.isExpired ? 'ĐÃ HẾT HẠN' : 'KHẢ DỤNG'}
+                        </span>
+                      ) : selectedTx.payment_status === 'expired' ? (
+                        <span className="text-[10px] px-2.5 py-1 rounded-full border font-bold tracking-tight border-slate-500/30 text-slate-400 bg-slate-500/5">
+                          ĐÃ HẾT HẠN TT
+                        </span>
+                      ) : selectedTx.payment_status === 'failed' || selectedTx.payment_status === 'cancelled' ? (
+                        <span className="text-[10px] px-2.5 py-1 rounded-full border font-bold tracking-tight border-rose-500/30 text-rose-400 bg-rose-500/5">
+                          ĐÃ HỦY TT
+                        </span>
+                      ) : (
+                        <span className="text-[10px] px-2.5 py-1 rounded-full border font-bold tracking-tight border-amber-500/30 text-amber-400 bg-amber-500/5">
+                          CHỜ TT
                         </span>
                       )}
                     </div>

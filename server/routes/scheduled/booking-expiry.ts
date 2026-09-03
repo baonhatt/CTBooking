@@ -14,10 +14,14 @@ export async function expireStaleBookingsImpl(
     vouchers: any;
   }
 ): Promise<{ expired_count: number; voucher_releases: number }> {
-  const nowIso = formatDateForDb(new Date());
+  const now = new Date();
+  const nowIso = formatDateForDb(now);
+  const tenMinAgoIso = formatDateForDb(new Date(now.getTime() - 10 * 60 * 1000));
 
   // 1. Batch expire all pending bookings past their deadline in a single UPDATE
-  //    RETURNING gives us the IDs and voucher_ids of what was expired.
+  //    Handles both:
+  //    - New bookings: payment_expires_at < nowIso
+  //    - Legacy bookings (NULL payment_expires_at): created_at < 10 minutes ago
   const expiredRows = await anyDb
     .update(tables.bookings)
     .set({
@@ -27,9 +31,16 @@ export async function expireStaleBookingsImpl(
     .where(
       and(
         eq(tables.bookings.payment_status, 'pending'),
-        isNotNull(tables.bookings.payment_expires_at),
-        // payment_expires_at is stored as ISO text; SQLite datetime() comparison works on ISO strings
-        lt(tables.bookings.payment_expires_at, nowIso)
+        or(
+          and(
+            isNotNull(tables.bookings.payment_expires_at),
+            lt(tables.bookings.payment_expires_at, nowIso)
+          ),
+          and(
+            isNull(tables.bookings.payment_expires_at),
+            lt(tables.bookings.created_at, tenMinAgoIso)
+          )
+        )
       )
     )
     .returning({ id: tables.bookings.id, voucher_id: tables.bookings.voucher_id });

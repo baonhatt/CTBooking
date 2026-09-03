@@ -35,7 +35,7 @@ export default function PromotionShowcase({ initialCombos = [] }: { initialCombo
     queryKey: ['activeTickets', selectedBranch?.id],
     queryFn: () => getActiveTickets(selectedBranch?.id),
     initialData: { items: initialCombos, total: initialCombos.length },
-    staleTime: 0
+    staleTime: 5 * 60 * 1000 // 5 minutes cache to prevent duplicate client refetch on mount
   });
 
   const combosData = ticketsRes?.items ?? initialCombos;
@@ -76,21 +76,26 @@ export default function PromotionShowcase({ initialCombos = [] }: { initialCombo
   };
 
   const handleBookCombo = (combo: (typeof combos)[0]) => {
-    cartStore.addItem({
-      packageId: combo.id,
-      type: 'movie',
-      name: combo.name,
-      price: combo.price,
-      movies: combo.movies,
-      quantity: 1,
-      branchId: selectedBranch?.id,
-      selected: true
-    });
+    try {
+      sessionStorage.setItem(
+        'directBookingItem',
+        JSON.stringify({
+          packageId: combo.id,
+          type: 'movie',
+          name: combo.name,
+          price: combo.price,
+          movies: combo.movies,
+          quantity: 1,
+          branchId: selectedBranch?.id
+        })
+      );
+    } catch {}
 
     const params = new URLSearchParams(searchParams ? searchParams.toString() : '');
     if (selectedBranch?.id && !params.has('branch_id')) {
       params.set('branch_id', String(selectedBranch.id));
     }
+    params.set('direct', '1');
     router.push(`/booking${params.toString() ? `?${params.toString()}` : ''}`);
   };
 
@@ -100,8 +105,8 @@ export default function PromotionShowcase({ initialCombos = [] }: { initialCombo
       className="relative py-20 bg-gradient-to-b from-[#050915] via-[#0b1026] to-[#060915] overflow-hidden"
     >
       <div className="absolute inset-0 neon-noise pointer-events-none opacity-60" />
-      <div className="absolute left-10 top-10 w-96 h-96 bg-amber-500/10 blur-[130px] pointer-events-none" />
-      <div className="absolute right-0 bottom-0 w-[450px] h-[450px] bg-cyan-500/12 blur-[130px] pointer-events-none" />
+      <div className="absolute left-10 top-10 w-[550px] h-[550px] rounded-full bg-[radial-gradient(circle,_rgba(245,158,11,0.15)_0%,_transparent_70%)] pointer-events-none" />
+      <div className="absolute right-0 bottom-0 w-[550px] h-[550px] rounded-full bg-[radial-gradient(circle,_rgba(6,182,212,0.16)_0%,_transparent_70%)] pointer-events-none" />
 
       <div className="container mx-auto px-3 sm:px-4 relative z-10">
         <div className="text-center max-w-3xl mx-auto mb-6 sm:mb-12 space-y-2 sm:space-y-3">

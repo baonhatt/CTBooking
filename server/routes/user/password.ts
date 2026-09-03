@@ -127,13 +127,13 @@ export async function resetPasswordImpl(
 export async function changePasswordImpl(
   anyDb: any,
   tables: { accounts: any },
-  payload: { email?: string; oldPassword?: string; newPassword?: string }
+  payload: { accountId?: number; email?: string; oldPassword?: string; newPassword?: string }
 ) {
-  const { email, oldPassword, newPassword } = payload;
-  if (!email || !oldPassword || !newPassword) {
+  const { accountId, oldPassword, newPassword } = payload;
+  if (!accountId || !oldPassword || !newPassword) {
     return { status: 400, message: 'Thiếu thông tin đổi mật khẩu' };
   }
-  const account = await anyDb.query.accounts.findFirst({ where: eq(tables.accounts.email, email) });
+  const account = await anyDb.query.accounts.findFirst({ where: eq(tables.accounts.id, accountId) });
   if (!account || !account.password) {
     return { status: 404, message: 'Không tìm thấy tài khoản' };
   }

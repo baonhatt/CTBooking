@@ -68,12 +68,7 @@ export default function BookingPage() {
   const { selectedBranch } = useBranch();
   const {
     items: allCartItems,
-    selectedItems,
-    movieItems,
-    vrItems,
-    movieSubtotal,
-    vrSubtotal,
-    selectedSubtotal,
+    selectedItems: cartSelectedItems,
     updateQuantity,
     removeItem,
     openCart,
@@ -95,6 +90,7 @@ export default function BookingPage() {
   const [confirmChecked, setConfirmChecked] = useState(false);
   const [showEmailConfirmDialog, setShowEmailConfirmDialog] = useState(false);
   const [showPaymentConfirmDialog, setShowPaymentConfirmDialog] = useState(false);
+  const [directBookingItem, setDirectBookingItem] = useState<any | null>(null);
 
   // Prefetch target routes
   useEffect(() => {
@@ -150,14 +146,37 @@ export default function BookingPage() {
     }));
   }, [ticketsData]);
 
-  // Auto-seed legacy query params into cartStore if cart was empty
+  // Load direct booking item if available (from sessionStorage or searchParams)
   useEffect(() => {
+    const isDirect = searchParams.get('direct') === '1';
+
+    if (!isDirect) {
+      setDirectBookingItem(null);
+      try {
+        sessionStorage.removeItem('directBookingItem');
+      } catch {}
+      return;
+    }
+
+    try {
+      const rawDirect = sessionStorage.getItem('directBookingItem');
+      if (rawDirect) {
+        const parsed = JSON.parse(rawDirect);
+        if (parsed?.packageId) {
+          setDirectBookingItem(parsed);
+          return;
+        }
+      }
+    } catch {}
+
+    const pkgId = searchParams.get('package_id') || searchParams.get('ticket_package_id');
     const vrPkgId = searchParams.get('vr_package_id');
     const qtyParam = Number(searchParams.get('qty') || 1);
-    if (vrPkgId && allCartItems.length === 0) {
+
+    if (vrPkgId && vrPackages.length > 0) {
       const foundVr = vrPackages.find((v: any) => Number(v.id) === Number(vrPkgId));
       if (foundVr) {
-        cartStore.addItem({
+        setDirectBookingItem({
           packageId: foundVr.id,
           type: 'vr',
           name: foundVr.name,
@@ -166,33 +185,52 @@ export default function BookingPage() {
           duration_min: foundVr.duration_min,
           vr_genre: foundVr.vr_genre,
           quantity: Math.max(1, qtyParam),
-          branchId: activeBranchId,
-          selected: true
+          branchId: activeBranchId
+        });
+      }
+    } else if (pkgId && ticketPackages.length > 0) {
+      const foundPkg = ticketPackages.find((t: any) => Number(t.id) === Number(pkgId));
+      if (foundPkg) {
+        setDirectBookingItem({
+          packageId: foundPkg.id,
+          type: 'movie',
+          name: foundPkg.name,
+          price: Number(foundPkg.price || 0),
+          movies: foundPkg.movies,
+          quantity: Math.max(1, qtyParam),
+          branchId: activeBranchId
         });
       }
     }
+  }, [searchParams, vrPackages, ticketPackages, activeBranchId]);
 
-    try {
-      const rawTicket = localStorage.getItem('selectedTicketPackage');
-      if (rawTicket && allCartItems.length === 0) {
-        const parsed = JSON.parse(rawTicket);
-        if (parsed?.id) {
-          cartStore.addItem({
-            packageId: parsed.id,
-            type: 'movie',
-            name: parsed.name,
-            price: Number(parsed.price || 0),
-            cover_image: parsed.cover_image,
-            movies: parsed.movies,
-            quantity: 1,
-            branchId: activeBranchId,
-            selected: true
-          });
-          localStorage.removeItem('selectedTicketPackage');
+  const selectedItems = useMemo(() => {
+    if (directBookingItem) {
+      return [
+        {
+          id: `direct_${directBookingItem.type}_${directBookingItem.packageId}`,
+          packageId: directBookingItem.packageId,
+          type: directBookingItem.type,
+          name: directBookingItem.name,
+          price: Number(directBookingItem.price || 0),
+          quantity: directBookingItem.quantity || 1,
+          selected: true,
+          cover_image: directBookingItem.cover_image,
+          duration_min: directBookingItem.duration_min,
+          vr_genre: directBookingItem.vr_genre,
+          movies: directBookingItem.movies || [],
+          features: directBookingItem.features || [],
+          branchId: directBookingItem.branchId
         }
-      }
-    } catch {}
-  }, [searchParams, vrPackages, allCartItems.length, activeBranchId]);
+      ];
+    }
+    return cartSelectedItems;
+  }, [directBookingItem, cartSelectedItems]);
+
+  const movieItems = useMemo(() => selectedItems.filter((i) => i.type === 'movie'), [selectedItems]);
+  const vrItems = useMemo(() => selectedItems.filter((i) => i.type === 'vr'), [selectedItems]);
+  const movieSubtotal = useMemo(() => movieItems.reduce((s, i) => s + i.price * i.quantity, 0), [movieItems, selectedItems]);
+  const vrSubtotal = useMemo(() => vrItems.reduce((s, i) => s + i.price * i.quantity, 0), [vrItems, selectedItems]);
 
   // Available movies for selected movie packages
   const availableMovies = useMemo(() => {
@@ -532,9 +570,13 @@ export default function BookingPage() {
         voucher_discount_amount: voucherDiscount
       };
 
-      // Clear purchased items from Cart
+      // Clear purchased items from Cart or direct booking item
       try {
-        clearSelected();
+        if (directBookingItem) {
+          sessionStorage.removeItem('directBookingItem');
+        } else {
+          clearSelected();
+        }
       } catch {}
 
       localStorage.setItem(
@@ -829,7 +871,18 @@ export default function BookingPage() {
                                 <div className="flex items-center gap-1 bg-white/5 border border-white/10 rounded-xl p-1 shadow-inner">
                                   <button
                                     type="button"
-                                    onClick={() => updateQuantity(item.id, item.quantity - 1)}
+                                    onClick={() => {
+                                      if (directBookingItem) {
+                                        const newQty = Math.max(1, directBookingItem.quantity - 1);
+                                        const updated = { ...directBookingItem, quantity: newQty };
+                                        setDirectBookingItem(updated);
+                                        try {
+                                          sessionStorage.setItem('directBookingItem', JSON.stringify(updated));
+                                        } catch {}
+                                      } else {
+                                        updateQuantity(item.id, item.quantity - 1);
+                                      }
+                                    }}
                                     className="w-7 h-7 rounded-lg hover:bg-white/10 text-slate-300 hover:text-white flex items-center justify-center transition-colors disabled:opacity-30"
                                     disabled={item.quantity <= 1}
                                     title="Giảm số lượng"
@@ -839,7 +892,18 @@ export default function BookingPage() {
                                   <span className="w-8 text-center text-xs font-black text-white">{item.quantity}</span>
                                   <button
                                     type="button"
-                                    onClick={() => updateQuantity(item.id, item.quantity + 1)}
+                                    onClick={() => {
+                                      if (directBookingItem) {
+                                        const newQty = directBookingItem.quantity + 1;
+                                        const updated = { ...directBookingItem, quantity: newQty };
+                                        setDirectBookingItem(updated);
+                                        try {
+                                          sessionStorage.setItem('directBookingItem', JSON.stringify(updated));
+                                        } catch {}
+                                      } else {
+                                        updateQuantity(item.id, item.quantity + 1);
+                                      }
+                                    }}
                                     className="w-7 h-7 rounded-lg bg-cyan-500/20 hover:bg-cyan-500/30 text-cyan-300 flex items-center justify-center transition-colors shadow-xs"
                                     title="Tăng số lượng"
                                   >
@@ -857,7 +921,16 @@ export default function BookingPage() {
                                 {/* Trash Button */}
                                 <button
                                   type="button"
-                                  onClick={() => removeItem(item.id)}
+                                  onClick={() => {
+                                    if (directBookingItem) {
+                                      setDirectBookingItem(null);
+                                      try {
+                                        sessionStorage.removeItem('directBookingItem');
+                                      } catch {}
+                                    } else {
+                                      removeItem(item.id);
+                                    }
+                                  }}
                                   className="p-2 text-slate-400 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-colors"
                                   title="Xóa mục này"
                                 >

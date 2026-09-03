@@ -65,13 +65,12 @@ export default function FilmCarousel({ initialFilms = [], onSelectFilm }: FilmCa
   );
 
   const { selectedBranch } = useBranch();
-  // staleTime = 0: coi dữ liệu luôn cũ => refetch ngay khi đổi branch
   const { data: activeFilms = initialFilms } = useQuery({
     queryKey: ['activeMovies', selectedBranch?.id],
     queryFn: () => getActiveMoviesToday(selectedBranch?.id),
     initialData: initialFilms,
     enabled: mounted,
-    staleTime: 0
+    staleTime: 5 * 60 * 1000 // 5 minutes cache to prevent duplicate client refetch on mount
   });
 
   const films = useMemo(() => {
@@ -289,8 +288,8 @@ export default function FilmCarousel({ initialFilms = [], onSelectFilm }: FilmCa
       className="relative py-20 px-2 bg-gradient-to-b from-[#050915] via-[#070b1e] to-[#050915] overflow-hidden"
     >
       <div className="absolute inset-0 opacity-60 neon-noise pointer-events-none" />
-      <div className="absolute -left-10 -top-10 w-72 h-72 rounded-full bg-cyan-500/15 blur-3xl pointer-events-none" />
-      <div className="absolute right-0 bottom-0 w-96 h-96 rounded-full bg-fuchsia-500/10 blur-[120px] pointer-events-none" />
+      <div className="absolute -left-20 -top-10 w-[500px] h-[500px] rounded-full bg-[radial-gradient(circle,_rgba(6,182,212,0.18)_0%,_transparent_70%)] pointer-events-none" />
+      <div className="absolute right-0 bottom-0 w-[550px] h-[550px] rounded-full bg-[radial-gradient(circle,_rgba(217,70,239,0.15)_0%,_transparent_70%)] pointer-events-none" />
 
       <div className="container mx-auto px-4 relative z-10">
         <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-6 mb-12">

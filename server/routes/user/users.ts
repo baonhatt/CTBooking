@@ -5,6 +5,7 @@ export async function updateUserProfileImpl(
   anyDb: any,
   tables: { accounts: any; users: any },
   payload: {
+    accountId?: number;
     email?: string;
     name?: string;
     phone?: string;
@@ -12,10 +13,10 @@ export async function updateUserProfileImpl(
     dob?: string;
   }
 ) {
-  const { email, name, phone, gender, dob } = payload;
-  if (!email) return { status: 400, message: 'Thiếu email' };
+  const { accountId, name, phone, gender, dob } = payload;
+  if (!accountId) return { status: 401, message: 'Unauthorized' };
   const account = await anyDb.query.accounts.findFirst({
-    where: eq(tables.accounts.email, email)
+    where: eq(tables.accounts.id, accountId)
   });
   if (!account) return { status: 404, message: 'Không tìm thấy tài khoản' };
   const dobDate = (() => {
@@ -61,29 +62,15 @@ export async function updateUserProfileImpl(
       phone: user.phone,
       gender: user.gender ?? null,
       dob: user.dob ?? null,
-      email
+      email: account.email
     }
   };
 }
 
-export async function getUserProfileByEmailImpl(anyDb: any, tables: { accounts: any; users: any }, emailRaw: string) {
-  // 1. Chuẩn hóa email đầu vào
-  const email = (() => {
-    try {
-      return decodeURIComponent(emailRaw || '')
-        .trim()
-        .toLowerCase();
-    } catch {
-      return String(emailRaw || '')
-        .trim()
-        .toLowerCase();
-    }
-  })();
+export async function getUserProfileByAccountIdImpl(anyDb: any, tables: { accounts: any; users: any }, accountId: number) {
+  if (!accountId) return { status: 401, message: 'Unauthorized' };
 
-  if (!email) return { status: 400, message: 'Thiếu email' };
-
-  // 2. Sử dụng JOIN để lấy dữ liệu trong 1 câu query
-  // Dùng sql`lower(...)` để bỏ qua phân biệt hoa thường của D1
+  // Sử dụng JOIN để lấy dữ liệu trong 1 câu query
   const result = await anyDb
     .select({
       account: tables.accounts,
@@ -91,7 +78,7 @@ export async function getUserProfileByEmailImpl(anyDb: any, tables: { accounts: 
     })
     .from(tables.accounts)
     .leftJoin(tables.users, eq(tables.accounts.user_id, tables.users.id))
-    .where(sql`lower(${tables.accounts.email}) = ${email}`)
+    .where(eq(tables.accounts.id, accountId))
     .limit(1);
 
   const data = result[0];
@@ -123,7 +110,8 @@ export async function listUserTransactionsImpl(
   anyDb: any,
   tables: { accounts: any; bookings: any; movies: any; ticket_packages: any }, // Thêm bảng vào đây
   args: {
-    email: string;
+    accountId?: number;
+    email?: string;
     status: string;
     page: number;
     pageSize: number;
@@ -134,23 +122,14 @@ export async function listUserTransactionsImpl(
     to?: string;
   }
 ) {
-  const { email: emailRaw, status, page, pageSize, sort, dir, payment_method, from: fromStr, to: toStr } = args;
+  const { accountId, status, page, pageSize, sort, dir, payment_method, from: fromStr, to: toStr } = args;
   const skip = (page - 1) * pageSize;
 
-  // 1. Chuẩn hóa Email (D1/SQLite rất nhạy cảm hoa thường)
-  const email = decodeURIComponent(emailRaw || '')
-    .trim()
-    .toLowerCase();
-  if (!email) return { items: [], page, pageSize, total: 0 };
+  if (!accountId) return { items: [], page, pageSize, total: 0 };
 
-  // 2. Tìm Account bằng sql`lower` để chắc chắn khớp trên D1
-  const account = (
-    await anyDb
-      .select()
-      .from(tables.accounts)
-      .where(sql`lower(${tables.accounts.email}) = ${email}`)
-      .limit(1)
-  )[0];
+  const account = await anyDb.query.accounts.findFirst({
+    where: eq(tables.accounts.id, accountId)
+  });
 
   if (!account) return { items: [], page, pageSize, total: 0 };
 
