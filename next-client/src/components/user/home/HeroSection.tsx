@@ -401,7 +401,19 @@ export default function HeroSection({
                 </Button>
 
                 <Button
-                  className="group rounded-xl px-8 py-6 text-sm sm:text-base font-bold bg-gradient-to-r from-purple-600 via-fuchsia-600 to-pink-600 hover:from-pink-600 hover:via-purple-600 hover:to-fuchsia-600 text-white shadow-[0_0_30px_rgba(168,85,247,0.4)] transition-all duration-300 hover:shadow-[0_0_40px_rgba(236,72,153,0.6)] hover:scale-[1.02] active:scale-95 cursor-pointer"
+                  variant="outline"
+                  className="rounded-xl px-6 py-6 text-sm sm:text-base font-bold border-cyan-400/40 bg-cyan-500/10 hover:bg-cyan-500/20 hover:border-cyan-400 text-cyan-300 transition-all flex items-center gap-2 cursor-pointer shadow-md"
+                  onClick={() => {
+                    const scheduleSection = document.getElementById('schedule');
+                    scheduleSection?.scrollIntoView({ behavior: 'smooth' });
+                  }}
+                >
+                  <Calendar className="h-5 w-5 text-cyan-400" />
+                  Lịch chiếu hôm nay
+                </Button>
+
+                <Button
+                  className="group rounded-xl px-8 py-6 text-sm sm:text-base font-bold bg-gradient-to-r from-purple-600 via-fuchsia-600 to-pink-600 hover:from-pink-600 hover:via-purple-600 hover:to-fuchsia-600 text-white shadow-[0_0_30px_rgba(168,85,247,0.4)] transition-all duration-300 hover:scale-[1.02] active:scale-95 cursor-pointer"
                   onClick={() => {
                     const vrSection = document.getElementById('vr');
                     vrSection?.scrollIntoView({ behavior: 'smooth' });

@@ -7,6 +7,8 @@ import HeroSection from '@/components/user/home/HeroSection';
 import FilmCarousel from '@/components/user/home/FilmCarousel';
 import ClearStorageOnMount from '@/components/user/home/ClearStorageOnMount';
 
+const MovieScheduleSection = dynamic(() => import('@/components/user/home/MovieScheduleSection'));
+
 const VRShowcase = dynamic(() => import('@/components/user/home/VRShowcase'));
 const PromotionShowcase = dynamic(() => import('@/components/user/home/PromotionShowcase'));
 const TechnologyBanner = dynamic(() => import('@/components/user/home/TechnologyBanner'));
@@ -104,6 +106,7 @@ export default async function Home({ searchParams }: { searchParams: { branch_id
         <Suspense fallback={<div className="min-h-[200px]" />}>
           {/* Pass initial data to the interactive Client Components */}
           <FilmCarousel initialFilms={activeMovies} />
+          <MovieScheduleSection />
           <VRShowcase initialPackages={vrRes.items || []} />
           <PromotionShowcase initialCombos={ticketsRes.items || []} />
           <TechnologyBanner initialMainItem={techMainItem} initialListItems={techListItems} />

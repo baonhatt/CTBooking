@@ -126,6 +126,15 @@ export default function Header({
   // Utilities
   const scrollToSection = (id: string) => {
     if (id === 'schedule') {
+      const scheduleEl = document.getElementById('schedule');
+      if (scheduleEl) {
+        const headerEl = document.querySelector('header') as HTMLElement | null;
+        const headerOffset = headerEl?.offsetHeight || 72;
+        const rect = scheduleEl.getBoundingClientRect();
+        const absoluteTop = window.scrollY + rect.top;
+        window.scrollTo({ top: Math.max(0, absoluteTop - headerOffset), behavior: 'smooth' });
+        return;
+      }
       setIsScheduleOpen(true);
       return;
     }

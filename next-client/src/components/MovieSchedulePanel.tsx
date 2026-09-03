@@ -158,7 +158,7 @@ export default function MovieSchedulePanel({ isOpen, onClose, branchId, branchNa
         ref={panelRef}
         className={`
           fixed z-[75]
-          bottom-0 left-0 right-0 max-h-[85dvh]
+          bottom-0 left-0 right-0 h-[85dvh] max-h-[85dvh]
           lg:bottom-auto lg:top-0 lg:left-auto lg:right-0 lg:h-screen lg:w-[400px] lg:max-h-screen
           transition-all duration-500 ease-[cubic-bezier(0.32,0.72,0,1)]
           ${
@@ -224,7 +224,7 @@ export default function MovieSchedulePanel({ isOpen, onClose, branchId, branchNa
           )}
 
           {/* Schedule Slots Body (Purely View-only) */}
-          <div className="flex-1 overflow-y-auto overscroll-contain schedule-scroll px-4 lg:px-5 py-4 space-y-4">
+          <div className="flex-1 overflow-y-auto touch-pan-y overscroll-contain schedule-scroll px-4 lg:px-5 py-4 space-y-4">
             {isLoading ? (
               <div className="flex items-center justify-center py-16 text-slate-400 gap-2 text-sm">
                 <Loader2 className="w-4 h-4 animate-spin text-cyan-400" />
