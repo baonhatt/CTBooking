@@ -141,8 +141,6 @@ import {
   getVRBookingByIdImpl
 } from '../../server/routes/user/vr-bookings';
 
-import { validateVoucherForVRImpl } from '../../server/routes/user/vouchers';
-
 import {
   listVouchersImpl,
   listDeletedVouchersImpl,
@@ -153,6 +151,10 @@ import {
   deleteVoucherImpl,
   restoreVoucherImpl
 } from '../../server/routes/admin/vouchers';
+
+import { validateVoucherForVRImpl } from '../../server/routes/user/vouchers';
+import { expireStaleBookingsImpl } from '../../server/routes/scheduled/booking-expiry';
+
 
 // import { getMailConfig, verifyMailProvider } from "../../server/routes/mail-service";
 
@@ -6166,4 +6168,37 @@ app.get('/api/admin/deleted/vouchers', requireStaffAuth, requirePermission('vouc
   }
 });
 
-export default app;
+// POST/GET /api/admin/scheduled/trigger-booking-expiry - Trigger cronjob manually for testing
+app.all('/api/admin/scheduled/trigger-booking-expiry', requireStaffAuth, async (c) => {
+  try {
+    const db = drizzle(c.env.cinema_db, { schema });
+    const result = await expireStaleBookingsImpl(db, {
+      bookings: schema.bookings,
+      vouchers: schema.vouchers
+    });
+    return c.json({
+      status: 'success',
+      message: `Đã chạy cronjob dọn dẹp đơn quá hạn thành công.`,
+      result
+    }, 200 as any);
+  } catch (err: any) {
+    return c.json({ status: 'error', message: String(err?.message || 'Internal error') }, 500 as any);
+  }
+});
+
+export default {
+  fetch: app.fetch,
+  async scheduled(event: any, env: Bindings, ctx: any) {
+    console.log(`[Scheduled Cron] Running stale booking expiry task at ${new Date().toISOString()}`);
+    try {
+      const db = drizzle(env.cinema_db, { schema });
+      const result = await expireStaleBookingsImpl(db, {
+        bookings: schema.bookings,
+        vouchers: schema.vouchers
+      });
+      console.log(`[Scheduled Cron] Task completed: expired ${result.expired_count} booking(s), released ${result.voucher_releases} voucher usage(s)`);
+    } catch (err) {
+      console.error('[Scheduled Cron] Task failed:', err);
+    }
+  }
+};

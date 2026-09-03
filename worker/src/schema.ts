@@ -124,7 +124,9 @@ export const bookings = sqliteTable('bookings', {
   voucher_code_snapshot: text('voucher_code_snapshot'),
   voucher_discount_amount: real('voucher_discount_amount').default(0),
   booking_type: text('booking_type').default('movie'), // 'movie' | 'vr'
-  original_total_price: real('original_total_price')
+  original_total_price: real('original_total_price'),
+  // Booking auto-expiry: set to now+10min when booking is created, cleared when paid
+  payment_expires_at: text('payment_expires_at')
 });
 
 export const toys = sqliteTable('toys', {

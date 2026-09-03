@@ -12,7 +12,9 @@ workers_dev = true
 
 preview_urls = true
 
-
+[triggers]
+# Runs every 5 minutes to auto-expire pending bookings and release voucher slots
+crons = ["*/5 * * * *"]
 
 [vars]
 

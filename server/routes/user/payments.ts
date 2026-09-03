@@ -4,6 +4,7 @@ import { generateBookingCode, getBookingEmailTemplate } from '../../lib/booking-
 import { mailQueue } from '../../lib/mail-queue';
 import { formatDateForDb } from '../../lib/date-utils';
 import { redeemVoucherAfterPaymentImpl, validateVoucherForVRImpl } from './vouchers';
+import { releaseVoucherForCancelledBooking } from '../scheduled/booking-expiry';
 
 class HttpError extends Error {
   status: number;
@@ -341,6 +342,34 @@ export async function createPaymentImpl(
     const bookingType = hasVR ? 'combo_vr' : 'movie';
     const branchIdToSave = validation.ticketPackage?.branch_id || branch_id || null;
 
+    // Payment expires in 10 minutes from now
+    const paymentExpiresAt = formatDateForDb(new Date(nowIso.getTime() + 10 * 60 * 1000));
+
+    // If a voucher is used, lock the usage slot NOW (atomically) before creating the booking.
+    // This prevents race conditions where two users both see 'available' and both get the discount.
+    // The slot will be released by the cronjob if payment is not completed within 10 minutes,
+    // or by the cancel endpoint if the user manually cancels.
+    if (voucherDetails?.id && tables.vouchers) {
+      const lockResult = await anyDb
+        .update(tables.vouchers)
+        .set({ used_count: sql`used_count + 1`, updated_at: formatDateForDb(nowIso) })
+        .where(
+          and(
+            eq(tables.vouchers.id, voucherDetails.id),
+            or(
+              isNull(tables.vouchers.usage_limit),
+              sql`${tables.vouchers.used_count} < ${tables.vouchers.usage_limit}`
+            )
+          )
+        )
+        .returning({ used_count: tables.vouchers.used_count });
+
+      // If 0 rows updated, another user grabbed the last slot — reject this booking
+      if (!lockResult || (Array.isArray(lockResult) && lockResult.length === 0)) {
+        return { status: 409, message: 'Mã giảm giá vừa hết lượt sử dụng, vui lòng đặt lại không dùng mã.' };
+      }
+    }
+
     // Try to use .returning() to get the inserted row when supported (Postgres).
     // Fallback to the existing query approach for DBs that don't support returning (D1/SQLite).
     const insertedBooking = await anyDb
@@ -368,6 +397,7 @@ export async function createPaymentImpl(
         ticket_unit_price: validation.ticketPackage?.price ? Number(validation.ticketPackage.price) : null,
         branch_id: branchIdToSave,
         pay_txt_code: pay_txt_code_dt,
+        payment_expires_at: paymentExpiresAt,
         created_at: formatDateForDb(nowIso),
         updated_at: formatDateForDb(nowIso)
       })
@@ -594,6 +624,8 @@ export async function updatePaymentImpl(
       updatePayload.paid_at = formatDateForDb(validPaidAt);
       updatePayload.expiry_date = formatDateForDb(new Date(validPaidAt.getTime() + expiryDays * 24 * 60 * 60 * 1000));
       updatePayload.booking_code = bookingCode;
+      // Clear the payment deadline — booking is now confirmed paid
+      updatePayload.payment_expires_at = null;
     }
 
     // 4. Update và lấy kết quả mới nhất
@@ -627,6 +659,18 @@ export async function updatePaymentImpl(
           );
         } catch (e) {
           console.error('[updatePayment] Redeem voucher lỗi (không rollback, booking đã paid)', e);
+        }
+      }
+    } else if (payment_status === 'failed' || payment_status === 'cancelled' || payment_status === 'expired') {
+      // If payment failed/cancelled and booking had locked a voucher while pending, release it
+      if (booking.voucher_id && vouchersTable) {
+        try {
+          await releaseVoucherForCancelledBooking(anyDb, { vouchers: vouchersTable }, {
+            voucher_id: Number(booking.voucher_id),
+            previous_payment_status: String(booking.payment_status || 'pending').toLowerCase()
+          });
+        } catch (e) {
+          console.error('[updatePayment] Release voucher error:', e);
         }
       }
     }

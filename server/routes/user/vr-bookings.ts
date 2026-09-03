@@ -1,4 +1,4 @@
-import { eq, and, inArray, isNull, sql } from 'drizzle-orm';
+import { eq, and, or, inArray, isNull, sql } from 'drizzle-orm';
 import type { VRBookingRequest, VRBookingResponse, VRPackageLineItem } from '../../../shared/api';
 import { formatDateForDb } from '../../lib/date-utils';
 import { validateVoucherForVRImpl, matchesBranch } from './vouchers';
@@ -182,6 +182,31 @@ export async function createVRBookingImpl(
     } catch {}
 
     const voucher_applied = validated.voucher_result;
+
+    // Payment expires in 10 minutes from booking creation
+    const paymentExpiresAt = formatDateForDb(new Date(nowIso.getTime() + 10 * 60 * 1000));
+
+    // Lock voucher usage slot atomically BEFORE creating the booking
+    if (voucher_applied?.voucher_details?.id) {
+      const lockResult = await anyDb
+        .update(tables.vouchers)
+        .set({ used_count: sql`used_count + 1`, updated_at: formatDateForDb(nowIso) })
+        .where(
+          and(
+            eq(tables.vouchers.id, voucher_applied.voucher_details.id),
+            or(
+              isNull(tables.vouchers.usage_limit),
+              sql`${tables.vouchers.used_count} < ${tables.vouchers.usage_limit}`
+            )
+          )
+        )
+        .returning({ used_count: tables.vouchers.used_count });
+
+      if (!lockResult || (Array.isArray(lockResult) && lockResult.length === 0)) {
+        return { success: false, error: 'Mã giảm giá vừa hết lượt sử dụng, vui lòng đặt lại không dùng mã.', status: 409 };
+      }
+    }
+
     const inserted = await anyDb
       .insert(tables.bookings)
       .values({
@@ -207,6 +232,7 @@ export async function createVRBookingImpl(
         ticket_unit_price: null,
         branch_id: branch_id || null,
         pay_txt_code: pay_txt_code || null,
+        payment_expires_at: paymentExpiresAt,
         created_at: formatDateForDb(nowIso),
         updated_at: formatDateForDb(nowIso)
       })

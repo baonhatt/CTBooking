@@ -394,20 +394,9 @@ export async function redeemVoucherAfterPaymentImpl(
     }
   }
 
-  // Atomic update: only increment if usage_limit is null or used_count < usage_limit
-  await anyDb
-    .update(tables.vouchers)
-    .set({ used_count: sql`used_count + 1`, updated_at: formatDateForDb(new Date()) })
-    .where(
-      and(
-        eq(tables.vouchers.id, voucher_id),
-        or(
-          isNull(tables.vouchers.usage_limit),
-          sql`${tables.vouchers.used_count} < ${tables.vouchers.usage_limit}`
-        )
-      )
-    );
-
+  // used_count was already atomically incremented when the booking was CREATED (voucher slot locked).
+  // Here we only write the audit log to record that the voucher was successfully redeemed with payment.
+  // DO NOT increment used_count again here.
   await anyDb.insert(tables.voucher_redemption_logs).values({
     voucher_id,
     booking_id,
