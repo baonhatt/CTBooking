@@ -144,11 +144,11 @@ export default function MovieSchedulePanel({ isOpen, onClose, branchId, branchNa
 
   return (
     <>
-      {/* Backdrop z-[70] & click to close */}
+      {/* Backdrop z-[9990] & click to close */}
       <div
         aria-hidden="true"
         onClick={onClose}
-        className={`fixed inset-0 z-[70] bg-black/80 backdrop-blur-md transition-opacity duration-300 ${
+        className={`fixed inset-0 z-[9990] bg-black/80 backdrop-blur-md transition-opacity duration-300 ${
           isOpen ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'
         }`}
       />
@@ -157,7 +157,7 @@ export default function MovieSchedulePanel({ isOpen, onClose, branchId, branchNa
       <div
         ref={panelRef}
         className={`
-          fixed z-[75]
+          fixed z-[9995]
           bottom-0 left-0 right-0 h-[85dvh] max-h-[85dvh]
           lg:bottom-auto lg:top-0 lg:left-auto lg:right-0 lg:h-screen lg:w-[400px] lg:max-h-screen
           transition-all duration-500 ease-[cubic-bezier(0.32,0.72,0,1)]

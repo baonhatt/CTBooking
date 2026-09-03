@@ -17,7 +17,7 @@ export default function PostsSearchClient({ initialPosts }: { initialPosts: Post
   }, [initialPosts, q]);
 
   return (
-    <div className="mt-6 lg:mt-0 flex flex-col sm:flex-row items-stretch sm:items-center gap-4 lg:gap-8 relative z-50">
+    <div className="mt-6 lg:mt-0 flex flex-col sm:flex-row items-stretch sm:items-center gap-4 lg:gap-8 relative z-20">
       <div className="relative w-full sm:w-64 lg:w-80 group">
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
         <input
