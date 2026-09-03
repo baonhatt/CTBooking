@@ -34,14 +34,31 @@ export default function Account() {
     email: string;
     gender?: string;
     dob?: string;
-  }>({ name: '', phone: '', email: '', gender: '', dob: '' });
+  }>(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        const raw = getCookie('userProfile') || localStorage.getItem('userProfile');
+        if (raw) {
+          const p = JSON.parse(raw);
+          return {
+            name: p?.name || '',
+            phone: p?.phone || '',
+            email: p?.email || '',
+            gender: p?.gender || '',
+            dob: p?.dob || ''
+          };
+        }
+      } catch {}
+    }
+    return { name: '', phone: '', email: '', gender: '', dob: '' };
+  });
   const [isPwdOpen, setIsPwdOpen] = useState(false);
   const [oldPwd, setOldPwd] = useState('');
   const [newPwd, setNewPwd] = useState('');
   const [confirmPwd, setConfirmPwd] = useState('');
 
   const [transactions, setTransactions] = useState<any[]>([]);
-  const [isLoadingTx, setIsLoadingTx] = useState(false);
+  const [isLoadingTx, setIsLoadingTx] = useState(true);
   const [isDetailOpen, setIsDetailOpen] = useState(false);
   const [selectedTx, setSelectedTx] = useState<any | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
@@ -110,39 +127,23 @@ export default function Account() {
   };
 
   useEffect(() => {
-    try {
-      const raw = getCookie('userProfile') || localStorage.getItem('userProfile');
-      let email = '';
-      let name = '';
-      let phone = '';
-      let gender = '';
-      let dob = '';
-      if (raw) {
-        try {
-          const p = JSON.parse(raw);
-          email = p?.email || email;
-          name = p?.name || name;
-          phone = p?.phone || phone;
-          gender = p?.gender || gender;
-          dob = p?.dob || dob;
-        } catch {}
-      }
-      setProfile({
-        name: name || '',
-        phone: phone || '',
-        email: email || '',
-        gender: gender || '',
-        dob: dob || ''
-      });
-    } catch {}
-  }, []);
+    const email = profile.email;
+    if (!email) {
+      setIsLoadingTx(false);
+      return;
+    }
 
-  useEffect(() => {
-    (async () => {
-      try {
-        const email = profile.email;
-        if (!email) return;
-        const data = await getUserProfileByEmailApi(email);
+    let isMounted = true;
+    setIsLoadingTx(true);
+
+    // Parallel fetch profile details and transactions
+    Promise.all([
+      getUserProfileByEmailApi(email).catch(() => null),
+      getUserTransactionsApi({ email, status: 'paid' }).catch(() => ({ items: [] }))
+    ]).then(([data, txRes]) => {
+      if (!isMounted) return;
+
+      if (data) {
         const dobStr = (() => {
           try {
             if (!data?.dob) return '';
@@ -161,93 +162,82 @@ export default function Account() {
           gender: (data?.gender as any) || p.gender || '',
           dob: dobStr || p.dob || ''
         }));
-      } catch (e: any) {
-        // silent
       }
-    })();
-  }, [profile.email]);
 
-  useEffect(() => {
-    (async () => {
-      try {
-        setIsLoadingTx(true);
-        const email = profile.email;
-        if (!email) return;
-        const { items } = await getUserTransactionsApi({
-          email,
-          status: 'paid'
-        });
-        const mapped =
-          (items || []).map((t: any) => ({
-            ...t,
-            poster: t?.poster || t?.cover_image || t?.coverImage || t?.poster_url,
-            date: (() => {
-              try {
-                const src = t?.paid_at || t?.created_at;
-                return src ? new Date(src) : null;
-              } catch {
-                return null;
-              }
-            })(),
-            dateDisplay: (() => {
-              try {
-                const dsrc = t?.paid_at || t?.created_at;
-                if (!dsrc) return '';
-                const d = new Date(dsrc);
-                const dd = String(d.getDate()).padStart(2, '0');
-                const mm = String(d.getMonth() + 1).padStart(2, '0');
-                const yyyy = d.getFullYear();
-                const hh = String(d.getHours()).padStart(2, '0');
-                const min = String(d.getMinutes()).padStart(2, '0');
-                return `${dd}/${mm}/${yyyy} ${hh}:${min}`;
-              } catch {
-                return '';
-              }
-            })(),
-            isExpired: (() => {
-              try {
-                if (!t.expiry_date) return false;
-                return new Date(t.expiry_date).getTime() < Date.now();
-              } catch {
-                return false;
-              }
-            })(),
-            remainingTimeLabel: (() => {
-              try {
-                if (!t.expiry_date || t.is_used || t.payment_status !== 'paid') return null;
-                const expiry = new Date(t.expiry_date).getTime();
-                const now = Date.now();
-                const diff = expiry - now;
-                if (diff <= 0) return 'Đã hết hạn';
+      const items = txRes?.items || [];
+      const mapped =
+        items.map((t: any) => ({
+          ...t,
+          poster: t?.poster || t?.cover_image || t?.coverImage || t?.poster_url,
+          date: (() => {
+            try {
+              const src = t?.paid_at || t?.created_at;
+              return src ? new Date(src) : null;
+            } catch {
+              return null;
+            }
+          })(),
+          dateDisplay: (() => {
+            try {
+              const dsrc = t?.paid_at || t?.created_at;
+              if (!dsrc) return '';
+              const d = new Date(dsrc);
+              const dd = String(d.getDate()).padStart(2, '0');
+              const mm = String(d.getMonth() + 1).padStart(2, '0');
+              const yyyy = d.getFullYear();
+              const hh = String(d.getHours()).padStart(2, '0');
+              const min = String(d.getMinutes()).padStart(2, '0');
+              return `${dd}/${mm}/${yyyy} ${hh}:${min}`;
+            } catch {
+              return '';
+            }
+          })(),
+          isExpired: (() => {
+            try {
+              if (!t.expiry_date) return false;
+              return new Date(t.expiry_date).getTime() < Date.now();
+            } catch {
+              return false;
+            }
+          })(),
+          remainingTimeLabel: (() => {
+            try {
+              if (!t.expiry_date || t.is_used || t.payment_status !== 'paid') return null;
+              const expiry = new Date(t.expiry_date).getTime();
+              const now = Date.now();
+              const diff = expiry - now;
+              if (diff <= 0) return 'Đã hết hạn';
 
-                const dayMs = 24 * 60 * 60 * 1000;
-                const hourMs = 60 * 60 * 1000;
-                const minMs = 60 * 1000;
+              const dayMs = 24 * 60 * 60 * 1000;
+              const hourMs = 60 * 60 * 1000;
+              const minMs = 60 * 1000;
 
-                if (diff >= dayMs) {
-                  return `(còn ${Math.ceil(diff / dayMs)} ngày)`;
-                } else if (diff >= hourMs) {
-                  return `(còn ${Math.floor(diff / hourMs)} giờ)`;
-                } else {
-                  return `(còn ${Math.max(1, Math.floor(diff / minMs))} phút)`;
-                }
-              } catch {
-                return null;
+              if (diff >= dayMs) {
+                return `(còn ${Math.ceil(diff / dayMs)} ngày)`;
+              } else if (diff >= hourMs) {
+                return `(còn ${Math.floor(diff / hourMs)} giờ)`;
+              } else {
+                return `(còn ${Math.max(1, Math.floor(diff / minMs))} phút)`;
               }
-            })()
-          })) || [];
-        mapped.sort((a: any, b: any) => {
-          const tA = a.date ? a.date.getTime() : 0;
-          const tB = b.date ? b.date.getTime() : 0;
-          return tB - tA;
-        });
-        setTransactions(mapped);
-      } catch (e: any) {
-        console.error(e);
-      } finally {
-        setIsLoadingTx(false);
-      }
-    })();
+            } catch {
+              return null;
+            }
+          })()
+        })) || [];
+
+      mapped.sort((a: any, b: any) => {
+        const tA = a.date ? a.date.getTime() : 0;
+        const tB = b.date ? b.date.getTime() : 0;
+        return tB - tA;
+      });
+
+      setTransactions(mapped);
+      setIsLoadingTx(false);
+    });
+
+    return () => {
+      isMounted = false;
+    };
   }, [profile.email]);
 
   useEffect(() => {

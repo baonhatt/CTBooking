@@ -1,8 +1,13 @@
-'use client';
 import { Button } from '@/components/ui/button';
-import { Menu, X } from 'lucide-react';
+import { Check, ChevronDown, MapPin, Menu, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Sheet, SheetContent, SheetTrigger, SheetClose, SheetTitle, SheetDescription } from '@/components/ui/sheet';
+import {
+  DropdownMenu,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+  DropdownMenuItem
+} from '@/components/ui/dropdown-menu';
 
 interface MobileMenuProps {
   navItems: Array<{ label: string; target: string }>;
@@ -73,26 +78,58 @@ export function MobileMenu({
           </div>
 
           {/* Branch selector */}
-          {branches.length > 0 && (
-            <div className={cn('mb-4', isBookingFlow && 'opacity-60')}>
-              <label className="text-xs font-bold text-white/50 uppercase tracking-widest mb-2 block">Chi nhánh</label>
-              <select
-                value={selectedBranch?.id || ''}
-                disabled={isBookingFlow}
-                onChange={(e) => {
-                  selectBranch(Number(e.target.value));
-                }}
-                className={cn(
-                  'w-full bg-white/10 border border-white/20 rounded-lg px-4 py-3 text-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500',
-                  isBookingFlow ? 'cursor-not-allowed' : 'cursor-pointer'
-                )}
-              >
-                {branches.map((branch) => (
-                  <option key={branch.id} value={branch.id} className="bg-gray-900 text-white">
-                    {branch.name}
-                  </option>
-                ))}
-              </select>
+          {branches.length > 0 && selectedBranch && (
+            <div className={cn('mb-5', isBookingFlow && 'opacity-60')}>
+              <div className="flex items-center justify-between mb-2 px-1">
+                <span className="text-[11px] font-bold text-cyan-400 uppercase tracking-widest flex items-center gap-1.5">
+                  <MapPin className="w-3.5 h-3.5 text-cyan-400" /> Chi Nhánh
+                </span>
+                {isBookingFlow && <span className="text-[10px] text-amber-400 font-medium">Đang đặt vé</span>}
+              </div>
+              <DropdownMenu>
+                <DropdownMenuTrigger
+                  disabled={isBookingFlow}
+                  className={cn(
+                    'w-full flex items-center justify-between px-4 py-3 rounded-xl bg-white/10 hover:bg-white/15 border border-white/20 text-white text-sm font-semibold transition-all duration-200 backdrop-blur-md outline-none focus:outline-none select-none group',
+                    isBookingFlow ? 'cursor-not-allowed' : 'cursor-pointer'
+                  )}
+                >
+                  <div className="flex items-center gap-2.5 truncate">
+                    <MapPin className="w-4 h-4 text-cyan-400 shrink-0" />
+                    <span className="truncate">{selectedBranch.name}</span>
+                  </div>
+                  <ChevronDown className="w-4 h-4 text-slate-400 shrink-0 transition-transform duration-200 group-data-[state=open]:rotate-180" />
+                </DropdownMenuTrigger>
+                <DropdownMenuContent
+                  side="bottom"
+                  align="start"
+                  className="w-[calc(100vw-3rem)] max-w-sm bg-[#0b1226]/95 backdrop-blur-2xl border border-white/20 p-1.5 shadow-[0_20px_50px_rgba(0,0,0,0.8)] rounded-2xl z-[100]"
+                >
+                  <div className="space-y-1 max-h-52 overflow-y-auto custom-scrollbar">
+                    {branches.map((branch) => {
+                      const isSelected = selectedBranch?.id === branch.id;
+                      return (
+                        <DropdownMenuItem
+                          key={branch.id}
+                          onClick={() => selectBranch(branch.id)}
+                          className={cn(
+                            'flex items-center justify-between px-3.5 py-3 rounded-xl cursor-pointer text-sm font-semibold transition-all duration-200 outline-none',
+                            isSelected
+                              ? 'bg-gradient-to-r from-cyan-500/20 to-blue-500/10 text-cyan-300 border border-cyan-500/30'
+                              : 'text-slate-300 hover:text-white focus:bg-white/10 focus:text-white border border-transparent'
+                          )}
+                        >
+                          <div className="flex items-center gap-2.5 truncate">
+                            <MapPin className={cn('w-4 h-4 shrink-0', isSelected ? 'text-cyan-400' : 'text-slate-400')} />
+                            <span className="truncate">{branch.name}</span>
+                          </div>
+                          {isSelected && <Check className="w-4 h-4 text-cyan-400 shrink-0 ml-2" />}
+                        </DropdownMenuItem>
+                      );
+                    })}
+                  </div>
+                </DropdownMenuContent>
+              </DropdownMenu>
             </div>
           )}
 

@@ -30,7 +30,13 @@ import {
   AlertDialogHeader,
   AlertDialogTitle
 } from '@/components/ui/alert-dialog';
-import { Calendar, ChevronDown, Gamepad2, MapPin, ShoppingCart } from 'lucide-react';
+import {
+  DropdownMenu,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+  DropdownMenuItem
+} from '@/components/ui/dropdown-menu';
+import { Calendar, Check, ChevronDown, Gamepad2, MapPin, ShoppingCart } from 'lucide-react';
 import { useCart } from '@/store/cartStore';
 const LoginDialog = dynamic(() => import('@/components/LoginDialog'), { ssr: false });
 const RegisterDialog = dynamic(() => import('@/components/RegisterDialog'), { ssr: false });
@@ -100,8 +106,9 @@ export default function Header({
   const [isLoggedIn, setIsLoggedIn] = useState(false);
 
   useEffect(() => {
-    const token = getCookie('token');
-    setIsLoggedIn(!!token);
+    const token = getCookie('userToken') || getCookie('token') || (typeof window !== 'undefined' ? localStorage.getItem('userToken') : null);
+    const hasProfile = getCookie('userProfile') || (typeof window !== 'undefined' ? localStorage.getItem('userProfile') : null);
+    setIsLoggedIn(!!(token || hasProfile || userName));
   }, [userName]);
 
   // Dialog states
@@ -264,28 +271,52 @@ export default function Header({
         <div className="flex items-center gap-2.5 sm:gap-3.5 animate-fade-in delay-200 shrink-0">
           {/* Branch Selector Chip */}
           {selectedBranch && branches.length > 1 && (
-            <div
-              className={cn('relative hidden sm:flex items-center', isBookingFlow && 'opacity-60 cursor-not-allowed')}
-            >
-              <MapPin className="w-3.5 h-3.5 text-cyan-400 absolute left-3 pointer-events-none" />
-              <select
-                value={selectedBranch.id}
-                onChange={(e) => handleBranchChange(Number(e.target.value))}
+            <DropdownMenu>
+              <DropdownMenuTrigger
                 disabled={isBookingFlow}
-                aria-label="Chọn chi nhánh"
                 className={cn(
-                  'appearance-none bg-white/[0.07] hover:bg-white/[0.12] border border-white/15 rounded-full pl-8 pr-7 py-1.5 text-xs font-semibold text-slate-200 hover:text-white transition-all backdrop-blur-md',
-                  isBookingFlow ? 'cursor-not-allowed' : 'cursor-pointer'
+                  'group relative hidden sm:flex items-center gap-2 px-3.5 py-1.5 rounded-full text-xs font-semibold text-slate-200 hover:text-white transition-all duration-300 bg-white/[0.07] hover:bg-white/[0.14] border border-white/15 hover:border-cyan-400/50 backdrop-blur-md outline-none focus:outline-none select-none',
+                  isBookingFlow ? 'opacity-60 cursor-not-allowed' : 'cursor-pointer'
                 )}
               >
-                {branches.map((branch) => (
-                  <option key={branch.id} value={branch.id} className="bg-slate-900 text-white">
-                    {branch.name}
-                  </option>
-                ))}
-              </select>
-              <ChevronDown className="w-3 h-3 text-slate-400 absolute right-2.5 pointer-events-none" />
-            </div>
+                <MapPin className="w-3.5 h-3.5 text-cyan-400 group-hover:scale-110 transition-transform" />
+                <span className="max-w-[140px] truncate">{selectedBranch.name}</span>
+                <ChevronDown className="w-3 h-3 text-slate-400 group-hover:text-white transition-transform duration-200 group-data-[state=open]:rotate-180" />
+              </DropdownMenuTrigger>
+              <DropdownMenuContent
+                side="bottom"
+                align="end"
+                className="bg-[#0b1226]/95 backdrop-blur-2xl border border-white/15 p-1.5 min-w-[200px] shadow-[0_20px_50px_rgba(0,0,0,0.6)] animate-in fade-in-0 zoom-in-95 rounded-2xl z-[100]"
+              >
+                <div className="px-3 py-2 text-[10px] uppercase font-bold text-cyan-400/80 tracking-widest border-b border-white/5 mb-1 flex items-center justify-between">
+                  <span>Chọn Chi Nhánh</span>
+                  <MapPin className="w-3 h-3 text-cyan-400/60" />
+                </div>
+                <div className="space-y-1">
+                  {branches.map((branch) => {
+                    const isSelected = branch.id === selectedBranch.id;
+                    return (
+                      <DropdownMenuItem
+                        key={branch.id}
+                        onClick={() => handleBranchChange(branch.id)}
+                        className={cn(
+                          'flex items-center justify-between px-3 py-2.5 rounded-xl cursor-pointer text-xs font-semibold transition-all duration-200 outline-none',
+                          isSelected
+                            ? 'bg-gradient-to-r from-cyan-500/20 to-blue-500/10 text-cyan-300 border border-cyan-500/30'
+                            : 'text-slate-300 hover:text-white focus:bg-white/10 focus:text-white border border-transparent'
+                        )}
+                      >
+                        <div className="flex items-center gap-2 truncate">
+                          <MapPin className={cn("w-3.5 h-3.5 shrink-0", isSelected ? "text-cyan-400" : "text-slate-400")} />
+                          <span className="truncate">{branch.name}</span>
+                        </div>
+                        {isSelected && <Check className="w-4 h-4 text-cyan-400 shrink-0 ml-2" />}
+                      </DropdownMenuItem>
+                    );
+                  })}
+                </div>
+              </DropdownMenuContent>
+            </DropdownMenu>
           )}
 
           {/* Shopping Cart Button */}

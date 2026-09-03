@@ -382,6 +382,10 @@ export async function updateStaffImpl(
   }
 
   if (!callerIsSuperAdmin) {
+    if ((body as any).isSuperAdmin !== undefined) {
+      return { status: 'error', message: 'Chỉ Super Admin mới được thay đổi quyền Super Admin' };
+    }
+
     if (roleIds !== undefined) {
       return { status: 'error', message: 'Chỉ Super Admin mới được thay đổi role của nhân viên' };
     }
@@ -428,6 +432,9 @@ export async function updateStaffImpl(
   if (avatar !== undefined) updateData.avatar = avatar;
   if (isActive !== undefined) updateData.isActive = isActive;
   if (forcePasswordChange !== undefined) updateData.forcePasswordChange = forcePasswordChange;
+  if (callerIsSuperAdmin && (body as any).isSuperAdmin !== undefined) {
+    updateData.isSuperAdmin = Boolean((body as any).isSuperAdmin);
+  }
 
   await db.update(staffs).set(updateData).where(eq(staffs.id, id));
 

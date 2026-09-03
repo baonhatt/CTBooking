@@ -921,118 +921,6 @@ app.post('/api/admin/login', (c) => {
   );
 });
 
-/* Old handler removed for security
-app.post('/api/admin/login_old', async (c) => {
-
-        try {
-
-                const db = drizzle(c.env.cinema_db, { schema });
-
-                const body = await c.req.json().catch(() => ({}));
-
-                const mailer = getMailer(c);
-
-                        const res = await sendMail(c.env, to, sub, html);
-
-                        if (!res.ok) throw new Error(`Email failed: ${res.status} ${res.body}`);
-
-                        return res;
-
-                };
-
-                const r = await loginWithSessionImpl(
-
-                        db,
-
-                        { accounts: schema.accounts, users: schema.users, tokens: schema.tokens, email_logs: schema.email_logs },
-
-                        { ...body, days: 1 },
-
-                        generateSessionToken,
-
-                        calculateSessionExpiry,
-
-                        null,
-
-                        mailer,
-
-                        { waitUntil: (promise) => c.executionCtx.waitUntil(promise) }
-
-                );
-
-                const status = typeof (r as any).status === 'number' ? (r as any).status : 200;
-
-
-
-                if (status === 200 && (r as any).requires_otp) {
-
-                        return c.json({
-
-                                status: 'success',
-
-                                requires_otp: true,
-
-                                message: (r as any).message,
-
-                                temp_account_id: (r as any).temp_account_id,
-
-                                email: (r as any).email
-
-                        }, 200);
-
-                }
-
-
-
-                if (status === 200 && (r as any).user) {
-
-                        // Set cookie với Max-Age 1 ngày (86400 seconds)
-
-                        const isLocalEnv = isLocal(c.req.url);
-
-                        const cookieOptions = isLocalEnv
-
-                                ? 'Path=/; HttpOnly; SameSite=Lax; Max-Age=86400' // 1 day
-
-                                : 'Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=86400'; // 1 day
-
-
-
-                        c.header('Set-Cookie', `session_token=${(r as any).token}; ${cookieOptions}`);
-
-
-
-                        return c.json({
-
-                                status: 'success',
-
-                                message: (r as any).message,
-
-                                user: (r as any).user,
-
-                                token: (r as any).token
-
-                        }, 200);
-
-                }
-
-
-
-                const payload = {
-
-                        ...(r as any),
-
-                        status: status >= 400 ? 'error' : 'success'
-
-                };
-
-                return c.json(payload as any, status as any);
-
-        } catch {
-                return c.json({ status: 'error', message: 'Lỗi máy chủ nội bộ' }, 500);
-        }
-}); */
-
 app.get('/api/admin/revenue', requireStaffAuth, requirePermission('dashboard', 'view_revenue'), async (c) => {
   try {
     const from = String(c.req.query('from') || '');
@@ -2501,7 +2389,7 @@ app.delete('/api/showtimes/:id', requireStaffAuth, requirePermission('showtimes'
 
 // GET /api/users?page=1&pageSize=20&q=search_term
 
-app.get('/api/users', async (c) => {
+app.get('/api/users', requireStaffAuth, requirePermission('users', 'view'), async (c) => {
   try {
     const page = Number(c.req.query('page') || 1);
 
@@ -2573,7 +2461,7 @@ app.get('/api/admin/email-logs', requireStaffAuth, requirePermission('email_logs
 
 // GET /api/users/:id
 
-app.get('/api/users/:id', async (c) => {
+app.get('/api/users/:id', requireStaffAuth, requirePermission('users', 'view_detail'), async (c) => {
   try {
     const id = Number(c.req.param('id'));
 
@@ -6171,7 +6059,7 @@ app.get('/api/admin/deleted/vouchers', requireStaffAuth, requirePermission('vouc
 });
 
 // POST/GET /api/admin/scheduled/trigger-booking-expiry - Trigger cronjob manually for testing
-app.all('/api/admin/scheduled/trigger-booking-expiry', requireStaffAuth, async (c) => {
+app.all('/api/admin/scheduled/trigger-booking-expiry', requireStaffAuth, requirePermission('settings', 'manage'), async (c) => {
   try {
     const db = drizzle(c.env.cinema_db, { schema });
     const result = await expireStaleBookingsImpl(db, {

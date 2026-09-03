@@ -5,6 +5,8 @@ import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
 import { getCookie } from '@/lib/cookies';
 
+import PageLoading from '@/components/PageLoading';
+
 interface Props {
   children: React.ReactNode;
 }
@@ -12,7 +14,7 @@ interface Props {
 /**
  * Client-side route guard - Check cookie/localStorage for userToken
  * Sử dụng cho các trang client cần login (ví dụ: /account)
- * Chỉ check localStorage, không gọi API (nhanh)
+ * Chỉ check localStorage/cookie, không gọi API (nhanh)
  */
 export default function ProtectedRoute({ children }: Props) {
   const router = useRouter();
@@ -30,13 +32,9 @@ export default function ProtectedRoute({ children }: Props) {
     }
   }, [router]);
 
-  // Show loading while checking auth
+  // Show styled page loading while checking auth
   if (isCheckingAuth) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
-      </div>
-    );
+    return <PageLoading />;
   }
 
   return <>{children}</>;
