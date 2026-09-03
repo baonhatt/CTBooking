@@ -286,7 +286,8 @@ export default function BookingPage() {
         code,
         vr_items,
         branch_id: selectedBranch?.id,
-        booking_type
+        booking_type,
+        order_total_before: originalTotalPrice
       });
 
       if (res?.valid) {
@@ -671,20 +672,20 @@ export default function BookingPage() {
           </div>
 
           {/* Header Title Bar */}
-          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8 pb-6 border-b border-white/10">
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 sm:gap-6 mb-6 sm:mb-8 pb-5 sm:pb-6 border-b border-white/10">
             <div>
-              <div className="flex items-center gap-3">
-                <span className="p-2.5 rounded-2xl bg-gradient-to-br from-cyan-500/20 to-blue-500/20 border border-cyan-500/30 text-cyan-400 shadow-[0_0_20px_rgba(6,182,212,0.2)]">
-                  <ShoppingCart className="w-6 h-6" />
+              <div className="flex items-start sm:items-center gap-3 sm:gap-4">
+                <span className="shrink-0 p-2.5 sm:p-3 rounded-xl sm:rounded-2xl bg-gradient-to-br from-cyan-500/20 to-blue-500/20 border border-cyan-500/30 text-cyan-400 shadow-[0_0_20px_rgba(6,182,212,0.2)]">
+                  <ShoppingCart className="w-5 h-5 sm:w-6 sm:h-6" />
                 </span>
-                <div>
-                  <h1 className="text-2xl sm:text-3xl font-black text-white tracking-wide flex items-center gap-2.5 flex-wrap">
-                    Xác Nhận Đơn Hàng
-                    <span className="text-xs font-bold px-3 py-1 rounded-full bg-cyan-500/15 border border-cyan-500/30 text-cyan-300">
+                <div className="space-y-1.5 sm:space-y-2">
+                  <h1 className="text-xl sm:text-3xl font-black text-white tracking-wide flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3 items-start">
+                    <span>Xác Nhận Đơn Hàng</span>
+                    <span className="text-[10px] sm:text-xs font-bold px-2.5 py-1 sm:px-3 sm:py-1 rounded-full bg-cyan-500/15 border border-cyan-500/30 text-cyan-300">
                       {selectedItems.length} dịch vụ đã chọn
                     </span>
                   </h1>
-                  <p className="text-xs sm:text-sm text-slate-400 mt-1">
+                  <p className="text-xs sm:text-sm text-slate-400">
                     Chi nhánh:{' '}
                     <span className="text-cyan-300 font-semibold">
                       {selectedBranch?.name || 'CineSphere Mega Mall'}
@@ -694,11 +695,11 @@ export default function BookingPage() {
               </div>
             </div>
 
-            <div className="flex items-center gap-3">
+            <div className="hidden md:flex items-center gap-3">
               <Button
                 variant="outline"
                 onClick={openCart}
-                className="h-10 text-xs px-4 border-white/15 bg-white/5 hover:bg-white/10 text-slate-300 hover:text-white rounded-xl font-bold flex items-center gap-2"
+                className="h-11 text-xs px-5 border-white/15 bg-white/5 hover:bg-white/10 text-slate-300 hover:text-white rounded-xl font-bold flex items-center justify-center gap-2 transition-all"
               >
                 <ShoppingCart className="w-4 h-4 text-cyan-400" />
                 <span>Chỉnh sửa giỏ hàng</span>

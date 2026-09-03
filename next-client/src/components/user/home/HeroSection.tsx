@@ -240,6 +240,17 @@ export default function HeroSection({
                   initial="enter"
                   animate="center"
                   exit="exit"
+                  drag="x"
+                  dragConstraints={{ left: 0, right: 0 }}
+                  dragElastic={1}
+                  onDragEnd={(e, { offset, velocity }) => {
+                    const swipe = Math.abs(offset.x) * velocity.x;
+                    if (swipe < -10000) {
+                      handleNextBanner();
+                    } else if (swipe > 10000) {
+                      handlePrevBanner();
+                    }
+                  }}
                   className="absolute inset-0 w-full h-full flex items-center justify-center bg-slate-950"
                 >
                   {/* Main Banner Image: Spans 100% full width from edge to edge */}
@@ -262,7 +273,7 @@ export default function HeroSection({
               </AnimatePresence>
 
               {/* Top Badges Overlay */}
-              <div className="absolute top-3.5 sm:top-5 left-4 sm:left-6 right-4 sm:right-6 flex items-center justify-between z-20 pointer-events-none">
+              <div className="absolute top-3.5 sm:top-5 left-4 sm:left-6 right-4 sm:right-6 hidden sm:flex items-center justify-between z-20 pointer-events-none">
                 <div className="flex items-center gap-2 px-3 sm:px-4 py-1.5 rounded-full bg-black/60 backdrop-blur-md border border-white/20 shadow-md">
                   <MapPin className="w-3.5 h-3.5 text-cyan-400 animate-bounce" />
                   <span className="text-xs sm:text-sm font-bold text-white tracking-wide">
@@ -285,7 +296,7 @@ export default function HeroSection({
                     type="button"
                     onClick={handlePrevBanner}
                     aria-label="Banner trước"
-                    className="absolute left-3 sm:left-5 top-1/2 -translate-y-1/2 z-30 p-2.5 sm:p-3.5 rounded-full bg-black/50 hover:bg-black/90 backdrop-blur-md border border-white/20 hover:border-cyan-400 text-white transition-all duration-300 hover:scale-110 active:scale-95 shadow-2xl flex items-center justify-center cursor-pointer group"
+                    className="hidden sm:flex absolute left-3 sm:left-5 top-1/2 -translate-y-1/2 z-30 p-2.5 sm:p-3.5 rounded-full bg-black/50 hover:bg-black/90 backdrop-blur-md border border-white/20 hover:border-cyan-400 text-white transition-all duration-300 hover:scale-110 active:scale-95 shadow-2xl items-center justify-center cursor-pointer group"
                   >
                     <ChevronLeft className="w-5 h-5 sm:w-6 sm:h-6 group-hover:-translate-x-0.5 transition-transform" />
                   </button>
@@ -294,7 +305,7 @@ export default function HeroSection({
                     type="button"
                     onClick={handleNextBanner}
                     aria-label="Banner tiếp theo"
-                    className="absolute right-3 sm:right-5 top-1/2 -translate-y-1/2 z-30 p-2.5 sm:p-3.5 rounded-full bg-black/50 hover:bg-black/90 backdrop-blur-md border border-white/20 hover:border-cyan-400 text-white transition-all duration-300 hover:scale-110 active:scale-95 shadow-2xl flex items-center justify-center cursor-pointer group"
+                    className="hidden sm:flex absolute right-3 sm:right-5 top-1/2 -translate-y-1/2 z-30 p-2.5 sm:p-3.5 rounded-full bg-black/50 hover:bg-black/90 backdrop-blur-md border border-white/20 hover:border-cyan-400 text-white transition-all duration-300 hover:scale-110 active:scale-95 shadow-2xl items-center justify-center cursor-pointer group"
                   >
                     <ChevronRight className="w-5 h-5 sm:w-6 sm:h-6 group-hover:translate-x-0.5 transition-transform" />
                   </button>

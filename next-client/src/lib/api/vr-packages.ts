@@ -11,6 +11,7 @@ export interface VoucherValidateRequest {
   branch_id?: number;
   user_id?: number;
   booking_type?: 'vr' | 'movie' | 'all';
+  order_total_before?: number;
 }
 
 export interface VRBookingRequest {

@@ -1,4 +1,4 @@
-import { eq, and, count, isNull, sql } from 'drizzle-orm';
+import { eq, and, count, isNull, sql, inArray } from 'drizzle-orm';
 import type { VoucherValidateResponse, VRPackageItem } from '../../../shared/api';
 import { formatDateForDb } from '../../lib/date-utils';
 import { parseVoucherMetadata } from '../admin/vouchers';
@@ -109,16 +109,14 @@ export async function validateVoucherForVRImpl(
   }
 
   // Compute totals (if order_total_before not supplied)
-  let order_total = typeof _orderArg === 'number' ? _orderArg : 0;
+  let order_total = typeof _orderArg === 'number' && _orderArg > 0 ? _orderArg : 0;
   if (order_total <= 0 && vr_items && vr_items.length > 0) {
     const vrPackageIds = vr_items.map((i) => i.vr_package_id);
     if (vrPackageIds.length > 0) {
       const pkgs = await anyDb
         .select({ id: tables.ticket_packages.id, price: tables.ticket_packages.price })
         .from(tables.ticket_packages)
-        .where(eq(tables.ticket_packages.id, vrPackageIds[0]));
-      // NOTE: Only using first for rough estimate; real total calculated in createVRBooking flow
-      // This is only for min_order check; actual check happens at booking time too
+        .where(inArray(tables.ticket_packages.id, vrPackageIds));
       for (const it of vr_items) {
         const pk = pkgs.find((p: any) => p.id === it.vr_package_id);
         if (pk) order_total += Number(pk.price) * it.quantity;

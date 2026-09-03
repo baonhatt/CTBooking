@@ -11,7 +11,7 @@ export async function checkRateLimitKV(env: any, ip: string): Promise<boolean> {
 export async function withCache(
   request: Request,
   env: any,
-  ctx: any, // ThÃªm tham sá»‘ ctx (Ä‘Ã³ chÃ­nh lÃ  c.executionCtx)
+  ctx: any, // Thêm tham số ctx (đó chính là c.executionCtx)
   handler: () => Promise<Response>,
   ttl = 900
 ) {
@@ -31,8 +31,8 @@ export async function withCache(
       response = new Response(originalResponse.body, originalResponse);
       response.headers.set('Cache-Control', `public, no-cache, s-maxage=${ttl}, must-revalidate`);
 
-      // Sá»¬ Dá»¤NG ctx.waitUntil á»ž ÄÃ‚Y:
-      // Viá»‡c ghi vÃ o cache sáº½ khÃ´ng lÃ m cháº­m request cá»§a khÃ¡ch
+      // SỬ DỤNG Y: Ở ĐÂY:
+      // Việc ghi vào cache sẽ không làm chậm request của khách
       ctx.waitUntil(cache.put(cacheKey, response.clone()));
     } else {
       return originalResponse;
@@ -96,7 +96,7 @@ export function logSystemError(context: string, error: any, payload?: any) {
 // sendMail was moved to server/routes/mail-service.ts
 
 export function formatCurrencyVi(amount: number): string {
-  return `${Number(amount || 0).toLocaleString('vi-VN')}Ä‘`;
+  return `${Number(amount || 0).toLocaleString('vi-VN')}đ`;
 }
 
 export function getBookingEmailTemplate(
@@ -104,11 +104,11 @@ export function getBookingEmailTemplate(
   data: {
     bookingCode: string;
     customerName: string;
-    movieTitle: string; // Nháº­n chuá»—i JSON: "["Phim A","Phim B"]"
+    movieTitle: string; // Nhận chuỗi JSON: "["Phim A","Phim B"]"
     ticketCount: number;
     totalPrice: string;
     movieImage?: string;
-    durationMin?: number | string; // Nháº­n chuá»—i JSON: "[10, 12]"
+    durationMin?: number | string; // Nhận chuỗi JSON: "[10, 12]"
     ticketPackageName?: string;
     expiryDate?: string | Date | null;
     branchName?: string;
@@ -117,7 +117,7 @@ export function getBookingEmailTemplate(
     branchSettings?: string;
   }
 ): string {
-  // 1. Xá»¬ LÃ PARSE JSON CHO DANH SÃCH PHIM
+  // 1. XỬ LÝ PARSE JSON CHO DANH SÁCH PHIM
   let movieTitles: string[] = [];
   let durations: string[] = [];
 
@@ -138,12 +138,12 @@ export function getBookingEmailTemplate(
     } catch (e) {}
   }
 
-  // 2. Táº O HTML DANH SÃCH PHIM (Äá»“ng bá»™ giao diá»‡n Admin)
+  // 2. TẠO HTML DANH SÁCH PHIM (Đồng bộ giao diện Admin)
   const moviesListHtml = movieTitles
     .map(
       (title, index) => `
     <div style="display: flex; justify-content: space-between; align-items: center; padding: 10px 12px; margin-bottom: 6px; background-color: #f8f9fa; border-radius: 6px; border: 1px solid #edf2f7;">
-        <span style="font-weight: 600; color: #2d3748; font-size: 14px;">ðŸŽ¬ ${title}</span>
+        <span style="font-weight: 600; color: #2d3748; font-size: 14px;">🎬 ${title}</span>
         <span style="font-size: 11px; color: #a0aec0; font-weight: bold; background: #fff; padding: 2px 6px; border-radius: 4px; border: 1px solid #e2e8f0;">
           ${durations[index] || '--'} ph
         </span>
@@ -152,11 +152,11 @@ export function getBookingEmailTemplate(
     )
     .join('');
 
-  // 3. Xá»¬ LÃ CÃC THÃ€NH PHáº¦N KHÃC
+  // 3. XỬ LÝ CÁC THÀNH PHẦN KHÁC
   const pkgHtml = data.ticketPackageName
     ? `
     <div class="detail-row">
-        <span class="detail-label">Loáº¡i vÃ©:</span>
+        <span class="detail-label">Loại vé:</span>
         <span class="detail-value" style="color: #4a5568;">${data.ticketPackageName}</span>
     </div>`
     : ``;
@@ -164,11 +164,11 @@ export function getBookingEmailTemplate(
   const branchHtml = data.branchName
     ? `
     <div class="detail-row">
-        <span class="detail-label">Chi nhá»›nh:</span>
+        <span class="detail-label">Chi nhánh:</span>
         <span class="detail-value" style="color: #4a5568;">${data.branchName}</span>
     </div>
     <div class="detail-row">
-        <span class="detail-label">Äá»‹a chá»‰:</span>
+        <span class="detail-label">Địa chỉ:</span>
         <span class="detail-value" style="color: #4a5568; font-size: 12px;">${data.branchAddress || ''}</span>
     </div>`
     : ``;
@@ -176,7 +176,7 @@ export function getBookingEmailTemplate(
   const expiryHtml = data.expiryDate
     ? `
     <div class="detail-row">
-        <span class="detail-label">NgÃ y háº¿t háº¡n:</span>
+        <span class="detail-label">Ngày hết hạn:</span>
         <span class="detail-value" style="color: #e53e3e;">${(() => {
           try {
             const d = new Date(String(data.expiryDate));
@@ -581,7 +581,7 @@ export async function pingIndexNow(env: any, urls: string[]): Promise<void> {
         urlList: urls
       })
     });
-    console.log(`[IndexNow] ping ${urls.join(', ')} â†’ ${res.status}`);
+    console.log(`[IndexNow] ping ${urls.join(', ')} → ${res.status}`);
   } catch (e) {
     console.error('[IndexNow] ping failed:', e);
   }
@@ -601,10 +601,10 @@ export const formatDateForDb = (date: Date | string | null) => {
   const dateObj = date instanceof Date ? date : new Date(date);
   const iso = dateObj.toISOString();
 
-  // Táº¥t cáº£ logic Ä‘Ã£ chuyá»ƒn sang Cloudflare Worker + D1 (SQLite)
-  // D1 yÃªu cáº§u timestamp Ä‘Æ°á»£c insert dÆ°á»›i dáº¡ng chuá»—i
-  // SQLite chuáº©n format: YYYY-MM-DD HH:MM:SS (khÃ´ng cÃ³ milliseconds)
-  // Khá»›p vá»›i CURRENT_TIMESTAMP máº·c Ä‘á»‹nh cá»§a SQLite
+  // Tất cả logic đã chuyển sang Cloudflare Worker + D1 (SQLite)
+  // D1 yêu cầu timestamp được insert dưới dạng chuỗi
+  // SQLite chuẩn format: YYYY-MM-DD HH:MM:SS (không có milliseconds)
+  // Khớp với CURRENT_TIMESTAMP mặc định của SQLite
   return iso.replace('T', ' ').replace('Z', '').split('.')[0];
 };
 

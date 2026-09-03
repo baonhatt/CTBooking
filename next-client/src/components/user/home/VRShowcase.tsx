@@ -325,39 +325,41 @@ export default function VRShowcase({ initialPackages = [] }: { initialPackages?:
                         </span>
                       </div>
 
+                      <Button
+                        type="button"
+                        size="sm"
+                        onClick={() => handleBookNow(pkg, 1)}
+                        className="w-full bg-gradient-to-r from-purple-600 via-fuchsia-600 to-pink-600 hover:from-pink-600 hover:to-purple-600 text-white text-[11px] sm:text-sm font-bold rounded-lg sm:rounded-xl h-8 sm:h-10 shadow-[0_0_15px_rgba(168,85,247,0.3)] hover:scale-[1.02] active:scale-95 transition-all"
+                      >
+                        <Zap className="w-3.5 h-3.5 sm:w-4 sm:h-4 mr-1.5" />
+                        ĐẶT NGAY
+                      </Button>
+
                       <div className="grid grid-cols-2 gap-1.5 sm:gap-2">
                         <Button
                           type="button"
                           variant="outline"
                           size="sm"
                           onClick={() => openDetailModal(pkg)}
-                          className="w-full bg-white/[0.05] hover:bg-white/[0.12] text-slate-200 hover:text-white border-white/15 text-[10px] sm:text-xs font-bold rounded-lg sm:rounded-xl h-8 sm:h-10 transition-all px-1.5"
+                          className="w-full bg-white/[0.05] hover:bg-white/[0.12] text-slate-300 hover:text-white border-white/10 text-[9px] sm:text-xs font-semibold rounded-lg sm:rounded-xl h-7 sm:h-8 transition-all px-1 flex items-center justify-center"
+                          title="Chi tiết"
                         >
-                          <Info className="w-3 h-3 sm:w-3.5 sm:h-3.5 mr-1 text-purple-400" />
-                          Chi tiết
+                          <Info className="w-3.5 h-3.5 sm:mr-1 text-purple-400" />
+                          <span className="hidden sm:inline">Chi tiết</span>
                         </Button>
 
                         <Button
                           type="button"
+                          variant="outline"
                           size="sm"
-                          onClick={() => handleBookNow(pkg, 1)}
-                          className="w-full bg-gradient-to-r from-purple-600 via-fuchsia-600 to-pink-600 hover:from-pink-600 hover:to-purple-600 text-white text-[10px] sm:text-xs font-bold rounded-lg sm:rounded-xl h-8 sm:h-10 shadow-[0_0_15px_rgba(168,85,247,0.3)] hover:scale-[1.02] active:scale-95 transition-all px-1.5"
+                          onClick={() => handleAddToCart(pkg, 1)}
+                          className="w-full bg-purple-500/10 hover:bg-purple-500/20 text-purple-300 border-purple-500/20 text-[9px] sm:text-xs font-semibold rounded-lg sm:rounded-xl h-7 sm:h-8 transition-all px-1 flex items-center justify-center"
+                          title="Thêm vào giỏ"
                         >
-                          <Zap className="w-3 h-3 sm:w-3.5 sm:h-3.5 mr-1" />
-                          Đặt ngay
+                          <ShoppingCart className="w-3.5 h-3.5 sm:mr-1" />
+                          <span className="hidden sm:inline">Thêm giỏ</span>
                         </Button>
                       </div>
-
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => handleAddToCart(pkg, 1)}
-                        className="w-full text-[10px] sm:text-[11px] text-purple-300 hover:text-purple-200 hover:bg-purple-500/10 h-7 sm:h-8 rounded-lg font-semibold"
-                      >
-                        <ShoppingCart className="w-3 h-3 sm:w-3.5 sm:h-3.5 mr-1" />
-                        Thêm vào giỏ
-                      </Button>
                     </div>
                   </div>
                 </Card>
