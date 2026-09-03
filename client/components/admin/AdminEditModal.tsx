@@ -1,6 +1,16 @@
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle
+} from '@/components/ui/alert-dialog';
 import { Button } from '@/components/ui/button';
-import { Calendar, Eye, Loader2, Lock, Plus, X } from 'lucide-react';
+import { Calendar, Eye, Loader2, Lock, Plus, ShieldAlert, X } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import React, { useEffect, useState } from 'react';
@@ -44,6 +54,8 @@ const AdminEditModal: React.FC<AdminEditModalProps> = (props) => {
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [isDragging, setIsDragging] = useState(false);
   const [branches, setBranches] = useState<any[]>([]);
+  const [originalToyPrice, setOriginalToyPrice] = useState<number | null>(null);
+  const [confirmSaveData, setConfirmSaveData] = useState<{ changes: string[]; onConfirm: () => Promise<void> } | null>(null);
   const {
     isEditOpen,
     setIsEditOpen,
@@ -60,6 +72,15 @@ const AdminEditModal: React.FC<AdminEditModalProps> = (props) => {
     currentPage,
     branches: branchesProp
   } = props;
+
+  // Track original toy price when opening edit modal for a toy
+  useEffect(() => {
+    if (isEditOpen && editType === 'toy' && editData?.id) {
+      setOriginalToyPrice(Number(editData.price || 0));
+    } else {
+      setOriginalToyPrice(null);
+    }
+  }, [isEditOpen, editType, editData?.id]);
 
   // Load branches when modal opens (only if not provided as prop)
   useEffect(() => {
@@ -913,9 +934,9 @@ const AdminEditModal: React.FC<AdminEditModalProps> = (props) => {
                 disabled={isSaving}
                 className="h-10 bg-blue-600 hover:bg-blue-700 min-w-[140px] rounded-lg shadow-lg shadow-blue-500/20 transition-all active:scale-95"
                 onClick={async () => {
-                  try {
-                    setIsSaving(true);
-                    if (!editData.id || editData.id === 0) {
+                  const executeSaveToy = async () => {
+                    try {
+                      setIsSaving(true);
                       let imageBase64: string | undefined = undefined;
                       if (editData.imageFile) {
                         const file = editData.imageFile as File;
@@ -925,44 +946,51 @@ const AdminEditModal: React.FC<AdminEditModalProps> = (props) => {
                           r.readAsDataURL(file);
                         });
                       }
-                      await createToyApi({
-                        name: editData.name,
-                        category: editData.category,
-                        price: Number(editData.price || 0),
-                        stock: Number(editData.stock || 0),
-                        status: editData.status,
-                        image_url: editData.image_url,
-                        image_base64: imageBase64
-                      });
-                    } else {
-                      let imageBase64: string | undefined = undefined;
-                      if (editData.imageFile) {
-                        const file = editData.imageFile as File;
-                        imageBase64 = await new Promise<string>((resolve) => {
-                          const r = new FileReader();
-                          r.onload = () => resolve(String(r.result));
-                          r.readAsDataURL(file);
+                      if (!editData.id || editData.id === 0) {
+                        await createToyApi({
+                          name: editData.name,
+                          category: editData.category,
+                          price: Number(editData.price || 0),
+                          stock: Number(editData.stock || 0),
+                          status: editData.status,
+                          image_url: editData.image_url,
+                          image_base64: imageBase64
+                        });
+                      } else {
+                        await updateToyApi(Number(editData.id), {
+                          name: editData.name,
+                          category: editData.category,
+                          price: Number(editData.price || 0),
+                          stock: Number(editData.stock || 0),
+                          status: editData.status,
+                          image_url: editData.image_url,
+                          image_base64: imageBase64
                         });
                       }
-                      await updateToyApi(Number(editData.id), {
-                        name: editData.name,
-                        category: editData.category,
-                        price: Number(editData.price || 0),
-                        stock: Number(editData.stock || 0),
-                        status: editData.status,
-                        image_url: editData.image_url,
-                        image_base64: imageBase64
+                      await refetch('toy');
+                      toast.success('Thành công', {
+                        description: editData.id ? 'Cập nhật đồ chơi thành công' : 'Thêm đồ chơi mới thành công'
                       });
+                      setConfirmSaveData(null);
+                      setIsDirty(false);
+                      setIsEditOpen(false);
+                    } catch (err: any) {
+                      toast.error(err.message || 'Lưu thất bại');
+                    } finally {
+                      setIsSaving(false);
                     }
-                    await refetch('toy');
-                    toast.success('Thành công', {
-                      description: editData.id ? 'Cập nhật đồ chơi thành công' : 'Thêm đồ chơi mới thành công'
-                    });
-                    setIsDirty(false);
-                    setIsEditOpen(false);
-                  } finally {
-                    setIsSaving(false);
+                  };
+
+                  const newPrice = Number(editData.price || 0);
+                  if (editData.id && originalToyPrice !== null && originalToyPrice !== newPrice) {
+                    const changes = [
+                      `Giá sản phẩm: ${originalToyPrice.toLocaleString('vi-VN')}đ → ${newPrice.toLocaleString('vi-VN')}đ`
+                    ];
+                    setConfirmSaveData({ changes, onConfirm: executeSaveToy });
+                    return;
                   }
+
+                  await executeSaveToy();
                 }}
               >
                 {isSaving ? (
@@ -977,6 +1005,46 @@ const AdminEditModal: React.FC<AdminEditModalProps> = (props) => {
           </div>
         )}
       </DialogContent>
+      {/* DIALOG XÁC NHẬN SỬA ĐỒ CHƠI / SẢN PHẨM */}
+      <AlertDialog open={!!confirmSaveData} onOpenChange={(open) => !open && setConfirmSaveData(null)}>
+        <AlertDialogContent className="rounded-2xl font-sans bg-white max-w-md">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="text-slate-900 flex items-center gap-2">
+              <ShieldAlert className="w-5 h-5 text-amber-500" />
+              Xác nhận thay đổi giá sản phẩm
+            </AlertDialogTitle>
+            <AlertDialogDescription asChild className="text-slate-600 text-sm mt-2">
+              <div>
+                <p className="mb-3">
+                  Bạn đang thay đổi thông tin giá niêm yết của sản phẩm/bắp nước <strong>{editData?.name}</strong>:
+                </p>
+                <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 space-y-1 text-xs text-amber-900 font-medium mb-3">
+                  {confirmSaveData?.changes.map((c, i) => (
+                    <div key={i} className="flex items-center gap-1.5">
+                      <span className="w-1.5 h-1.5 rounded-full bg-amber-500 shrink-0" />
+                      <span>{c}</span>
+                    </div>
+                  ))}
+                </div>
+                <p className="text-xs text-slate-500 italic">
+                  Giá mới sẽ có hiệu lực ngay lập tức khi khách hàng đặt đồ uống/bắp nước/đồ chơi đi kèm.
+                </p>
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+
+          <AlertDialogFooter className="mt-4">
+            <AlertDialogCancel className="rounded-xl border-slate-200">Hủy bỏ</AlertDialogCancel>
+            <AlertDialogAction
+              disabled={isSaving}
+              onClick={() => confirmSaveData && confirmSaveData.onConfirm()}
+              className="rounded-xl text-white bg-amber-600 hover:bg-amber-700 font-medium"
+            >
+              {isSaving ? 'Đang lưu...' : 'Xác nhận lưu'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </Dialog>
   );
 };

@@ -207,20 +207,28 @@ async function validateBookingInput(
 
   // Validate Voucher (if provided and vouchers table exists)
   if (voucher_code && tables.vouchers) {
-    try {
-      const vRes = await validateVoucherForVRImpl(anyDb, tables as any, {
-        code: voucher_code,
-        vr_items: vr_items || [],
-        branch_id: targetBranchId,
-        user_id: user?.id ?? undefined,
-        order_total_before: originalTotalPrice
-      });
-      if (vRes.valid && vRes.discount_amount) {
-        voucherDiscountAmount = Math.min(originalTotalPrice, vRes.discount_amount);
-        voucherDetails = vRes.voucher_details;
-      }
-    } catch (vErr) {
-      console.warn('Voucher validation ignored error:', vErr);
+    // Build vr_price_map from already-fetched VR package data
+    const vrPriceMap = new Map<number, number>();
+    for (const it of vrItemsDetails) vrPriceMap.set(it.vr_package_id, it.unit_price);
+
+    const vRes = await validateVoucherForVRImpl(anyDb, tables as any, {
+      code: voucher_code,
+      vr_items: vr_items || [],
+      ticket_package_id: ticketPackage?.id ? Number(ticketPackage.id) : undefined,
+      movie_subtotal: movieTotalPrice,   // unitPrice × ticketCount (correct total)
+      vr_subtotal: vrTotalPrice,
+      vr_price_map: vrPriceMap,
+      branch_id: targetBranchId,
+      user_id: user?.id ?? undefined,
+      email: emailBook || userEmail,
+      order_total_before: originalTotalPrice
+    });
+    if (!vRes.valid) {
+      throw new HttpError(400, vRes.message || 'Mã giảm giá không hợp lệ');
+    }
+    if (vRes.valid && vRes.discount_amount) {
+      voucherDiscountAmount = Math.min(originalTotalPrice, vRes.discount_amount);
+      voucherDetails = vRes.voucher_details;
     }
   }
 

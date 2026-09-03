@@ -1,4 +1,4 @@
-import { eq, and, count, isNull, sql, inArray } from 'drizzle-orm';
+import { eq, and, or, count, isNull, sql, inArray } from 'drizzle-orm';
 import type { VoucherValidateResponse, VRPackageItem } from '../../../shared/api';
 import { formatDateForDb } from '../../lib/date-utils';
 import { parseVoucherMetadata } from '../admin/vouchers';
@@ -34,16 +34,36 @@ export async function validateVoucherForVRImpl(
     vouchers: any;
     voucher_redemption_logs: any;
     ticket_packages: any;
+    bookings?: any;
   },
   args: {
     code: string;
+    /** VR packages in cart: { vr_package_id, quantity } */
     vr_items?: VRPackageItem[];
+    /** Movie ticket package id (if booking includes film tickets) */
+    ticket_package_id?: number;
+    /** Pre-computed movie subtotal (price × qty). If supplied, DB lookup is skipped */
+    movie_subtotal?: number;
+    /** Pre-computed VR subtotal (sum of all vr_items × qty). If supplied, DB lookup is skipped */
+    vr_subtotal?: number;
+    /** Pre-fetched VR package price map: packageId → unit price. Avoids duplicate DB round-trips */
+    vr_price_map?: Map<number, number>;
     branch_id?: number;
     user_id?: number;
+    email?: string;
     order_total_before?: number;
   }
 ): Promise<VoucherValidateResponse> {
-  const { code, vr_items = [], branch_id, user_id, order_total_before: _orderArg } = args;
+  const {
+    code,
+    vr_items = [],
+    ticket_package_id,
+    branch_id,
+    user_id,
+    email,
+    order_total_before: _orderArg,
+    vr_price_map
+  } = args;
 
   if (!code || !code.trim()) {
     return { valid: false, message: 'Vui lòng nhập mã giảm giá', error_code: 'VOUCHER_NOT_FOUND' };
@@ -62,22 +82,26 @@ export async function validateVoucherForVRImpl(
     return { valid: false, message: 'Mã giảm giá chưa được kích hoạt', error_code: 'VOUCHER_INACTIVE' };
   }
 
-  // SCOPE validation will be handled dynamically below based on order contents.
-
-  // DATE validity
-  const nowIso = new Date().toISOString();
-  if (voucher.valid_from && nowIso < voucher.valid_from) {
-    return {
-      valid: false,
-      message: `Mã giảm giá sẽ có hiệu lực từ ${new Date(voucher.valid_from).toLocaleString('vi-VN')}`,
-      error_code: 'VOUCHER_NOT_YET_VALID'
-    };
+  // 1. DATE validity (Timestamp numerical comparison)
+  const nowMs = Date.now();
+  if (voucher.valid_from) {
+    const validFromMs = new Date(voucher.valid_from).getTime();
+    if (!isNaN(validFromMs) && nowMs < validFromMs) {
+      return {
+        valid: false,
+        message: `Mã giảm giá sẽ có hiệu lực từ ${new Date(voucher.valid_from).toLocaleString('vi-VN')}`,
+        error_code: 'VOUCHER_NOT_YET_VALID'
+      };
+    }
   }
-  if (voucher.valid_until && nowIso > voucher.valid_until) {
-    return { valid: false, message: 'Mã giảm giá đã hết hạn', error_code: 'VOUCHER_EXPIRED' };
+  if (voucher.valid_until) {
+    const validUntilMs = new Date(voucher.valid_until).getTime();
+    if (!isNaN(validUntilMs) && nowMs > validUntilMs) {
+      return { valid: false, message: 'Mã giảm giá đã hết hạn', error_code: 'VOUCHER_EXPIRED' };
+    }
   }
 
-  // Usage limit (global)
+  // 2. Usage limit (global)
   if (voucher.usage_limit !== null && voucher.usage_limit !== undefined) {
     if ((voucher.used_count || 0) >= Number(voucher.usage_limit)) {
       return {
@@ -88,43 +112,89 @@ export async function validateVoucherForVRImpl(
     }
   }
 
-  // Per-user limit (query redemption_logs)
-  if (user_id && voucher.per_user_limit !== null && voucher.per_user_limit !== undefined) {
-    const [perUserCountRes] = await anyDb
-      .select({ count: count() })
-      .from(tables.voucher_redemption_logs)
-      .where(
-        and(
-          eq(tables.voucher_redemption_logs.voucher_id, voucher.id),
-          eq(tables.voucher_redemption_logs.user_id, user_id)
-        )
-      );
-    if ((perUserCountRes?.count || 0) >= Number(voucher.per_user_limit)) {
+  // 3. Per-user limit (supports logged in user_id OR guest email)
+  if (voucher.per_user_limit !== null && voucher.per_user_limit !== undefined) {
+    let perUserCount = 0;
+    if (user_id) {
+      const [perUserCountRes] = await anyDb
+        .select({ count: count() })
+        .from(tables.voucher_redemption_logs)
+        .where(
+          and(
+            eq(tables.voucher_redemption_logs.voucher_id, voucher.id),
+            eq(tables.voucher_redemption_logs.user_id, user_id)
+          )
+        );
+      perUserCount = perUserCountRes?.count || 0;
+    } else if (email && email.trim() && tables.bookings) {
+      const [perEmailCountRes] = await anyDb
+        .select({ count: count() })
+        .from(tables.voucher_redemption_logs)
+        .innerJoin(tables.bookings, eq(tables.voucher_redemption_logs.booking_id, tables.bookings.id))
+        .where(
+          and(
+            eq(tables.voucher_redemption_logs.voucher_id, voucher.id),
+            sql`LOWER(${tables.bookings.email}) = LOWER(${email.trim()})`
+          )
+        );
+      perUserCount = perEmailCountRes?.count || 0;
+    }
+
+    if (perUserCount >= Number(voucher.per_user_limit)) {
       return {
         valid: false,
-        message: `Bạn đã sử dụng mã này ${voucher.per_user_limit} lần (giới hạn)`,
+        message: `Mã giảm giá đã đạt giới hạn sử dụng (${voucher.per_user_limit} lần/khách hàng)`,
         error_code: 'VOUCHER_PER_USER_LIMIT_REACHED'
       };
     }
   }
 
-  // Compute totals (if order_total_before not supplied)
-  let order_total = typeof _orderArg === 'number' && _orderArg > 0 ? _orderArg : 0;
-  if (order_total <= 0 && vr_items && vr_items.length > 0) {
+  // 4. Build package price map and compute item subtotals (movie vs vr)
+  // Use pre-fetched map if available to avoid duplicate DB queries
+  const resolvedVrPriceMap: Map<number, number> = new Map();
+  if (vr_price_map && vr_price_map.size > 0) {
+    for (const [id, price] of vr_price_map.entries()) resolvedVrPriceMap.set(id, price);
+  } else if (vr_items && vr_items.length > 0) {
     const vrPackageIds = vr_items.map((i) => i.vr_package_id);
     if (vrPackageIds.length > 0) {
       const pkgs = await anyDb
         .select({ id: tables.ticket_packages.id, price: tables.ticket_packages.price })
         .from(tables.ticket_packages)
         .where(inArray(tables.ticket_packages.id, vrPackageIds));
-      for (const it of vr_items) {
-        const pk = pkgs.find((p: any) => p.id === it.vr_package_id);
-        if (pk) order_total += Number(pk.price) * it.quantity;
-      }
+      for (const p of pkgs) resolvedVrPriceMap.set(p.id, Number(p.price || 0));
     }
   }
 
-  // SCOPE: verify compatibility with items
+  let computed_vr_subtotal = args.vr_subtotal || 0;
+  if (computed_vr_subtotal <= 0) {
+    for (const it of vr_items) {
+      const price = resolvedVrPriceMap.get(it.vr_package_id) || 0;
+      computed_vr_subtotal += price * it.quantity;
+    }
+  }
+
+  let computed_movie_subtotal = args.movie_subtotal || 0;
+  // track movie unit price for partial applicable calculation
+  let movieUnitPrice = 0;
+  if (computed_movie_subtotal <= 0 && ticket_package_id) {
+    const moviePkg = await anyDb
+      .select({ id: tables.ticket_packages.id, price: tables.ticket_packages.price })
+      .from(tables.ticket_packages)
+      .where(eq(tables.ticket_packages.id, ticket_package_id));
+    if (moviePkg[0]) {
+      movieUnitPrice = Number(moviePkg[0].price || 0);
+      computed_movie_subtotal = movieUnitPrice;
+    }
+  } else if (computed_movie_subtotal > 0) {
+    movieUnitPrice = computed_movie_subtotal;
+  }
+
+  let order_total = typeof _orderArg === 'number' && _orderArg > 0
+    ? _orderArg
+    : computed_vr_subtotal + computed_movie_subtotal;
+
+  // 5. SCOPE validation and eligible subtotal computation
+  let eligible_subtotal = order_total;
   if (voucher.scope === 'vr') {
     if (!vr_items || vr_items.length === 0) {
       return {
@@ -133,35 +203,21 @@ export async function validateVoucherForVRImpl(
         error_code: 'VOUCHER_SCOPE_MISMATCH'
       };
     }
+    eligible_subtotal = computed_vr_subtotal > 0 ? computed_vr_subtotal : order_total;
   } else if (voucher.scope === 'movie') {
-    let hasMovieTickets = true;
-    if (order_total > 0 && vr_items && vr_items.length > 0) {
-      let vrItemsTotal = 0;
-      const vrPackageIds = vr_items.map((i) => i.vr_package_id);
-      if (vrPackageIds.length > 0) {
-        const pkgs = await anyDb
-          .select({ id: tables.ticket_packages.id, price: tables.ticket_packages.price })
-          .from(tables.ticket_packages)
-          .where(eq(tables.ticket_packages.id, vrPackageIds[0]));
-        for (const it of vr_items) {
-          const pk = pkgs.find((p: any) => p.id === it.vr_package_id);
-          if (pk) vrItemsTotal += Number(pk.price) * it.quantity;
-        }
-      }
-      if (order_total <= vrItemsTotal) {
-        hasMovieTickets = false;
-      }
-    }
-    if (!hasMovieTickets) {
+    const hasMovie = (ticket_package_id && ticket_package_id > 0) || computed_movie_subtotal > 0 || (order_total > computed_vr_subtotal);
+    if (!hasMovie) {
       return {
         valid: false,
         message: 'Mã giảm giá này chỉ áp dụng cho vé xem phim',
         error_code: 'VOUCHER_SCOPE_MISMATCH'
       };
     }
+    eligible_subtotal = computed_movie_subtotal > 0 ? computed_movie_subtotal : (order_total - computed_vr_subtotal);
+    if (eligible_subtotal <= 0) eligible_subtotal = order_total;
   }
 
-  // Min order value
+  // 6. Min order value (checked against total order or eligible subtotal)
   const minOrder = Number(voucher.min_order_value || 0);
   if (minOrder > 0 && order_total < minOrder) {
     return {
@@ -172,33 +228,74 @@ export async function validateVoucherForVRImpl(
     };
   }
 
-  // Applicable ticket_package_ids
+  // 7. Applicable / Excluded ticket_package_ids
+  //
+  // EXCLUDED (hard block): if any item in cart is in excluded list → reject entire voucher
+  // APPLICABLE (soft whitelist): voucher discount only applies to the subtotal of packages in the list.
+  //   Packages NOT in the list remain at full price and are NOT blocked from booking.
   const applicable = parseNullableJsonArray(voucher.applicable_ticket_package_ids);
   const excluded = parseNullableJsonArray(voucher.excluded_ticket_package_ids);
-  if (applicable.length > 0 && vr_items.length > 0) {
-    for (const it of vr_items) {
-      if (!applicable.includes(it.vr_package_id)) {
-        return {
-          valid: false,
-          message: 'Mã giảm giá này không áp dụng cho tất cả gói VR bạn đã chọn',
-          error_code: 'VOUCHER_PACKAGE_NOT_APPLICABLE'
-        };
+
+  // --- Hard block: excluded packages ---
+  if (excluded.length > 0) {
+    if (vr_items && vr_items.length > 0) {
+      for (const it of vr_items) {
+        if (excluded.includes(it.vr_package_id)) {
+          return {
+            valid: false,
+            message: 'Một số gói VR trong giỏ hàng bị loại trừ khỏi mã giảm giá này',
+            error_code: 'VOUCHER_PACKAGE_EXCLUDED'
+          };
+        }
       }
     }
-  }
-  if (excluded.length > 0 && vr_items.length > 0) {
-    for (const it of vr_items) {
-      if (excluded.includes(it.vr_package_id)) {
-        return {
-          valid: false,
-          message: 'Gói VR đã chọn bị loại trừ khỏi mã giảm giá này',
-          error_code: 'VOUCHER_PACKAGE_NOT_APPLICABLE'
-        };
-      }
+    if (ticket_package_id && excluded.includes(ticket_package_id)) {
+      return {
+        valid: false,
+        message: 'Gói vé phim đã chọn bị loại trừ khỏi mã giảm giá này',
+        error_code: 'VOUCHER_PACKAGE_EXCLUDED'
+      };
     }
   }
 
-  // Branch match
+  // --- Soft whitelist: applicable packages → narrow eligible_subtotal ---
+  // If applicable list is set, recalculate eligible_subtotal as only the sum of packages in the list.
+  // IMPORTANT: applicable packages are also constrained by scope:
+  //   - scope=vr → only VR items from applicable list count
+  //   - scope=movie → only movie ticket from applicable list counts
+  //   - scope=all → both VR and movie from applicable list count
+  if (applicable.length > 0) {
+    let partial_eligible = 0;
+
+    // VR items eligible (only if scope allows VR)
+    if (voucher.scope === 'vr' || voucher.scope === 'all') {
+      for (const it of vr_items) {
+        if (applicable.includes(it.vr_package_id)) {
+          const price = resolvedVrPriceMap.get(it.vr_package_id) || 0;
+          partial_eligible += price * it.quantity;
+        }
+      }
+    }
+
+    // Movie ticket eligible (only if scope allows movie)
+    if ((voucher.scope === 'movie' || voucher.scope === 'all') && ticket_package_id && applicable.includes(ticket_package_id)) {
+      partial_eligible += movieUnitPrice;
+    }
+
+    if (partial_eligible <= 0) {
+      // None of the cart items matching scope are in the applicable list → voucher cannot be used
+      return {
+        valid: false,
+        message: 'Mã giảm giá này không áp dụng cho các gói trong giỏ hàng của bạn',
+        error_code: 'VOUCHER_PACKAGE_NOT_APPLICABLE'
+      };
+    }
+
+    // Override eligible_subtotal with the partial amount
+    eligible_subtotal = partial_eligible;
+  }
+
+  // 8. Branch match
   if (!matchesBranch(voucher.branch_ids, branch_id)) {
     return {
       valid: false,
@@ -207,14 +304,14 @@ export async function validateVoucherForVRImpl(
     };
   }
 
-  // CALCULATE DISCOUNT
+  // 9. CALCULATE DISCOUNT (applied to eligible_subtotal)
   let discount_amount = 0;
   const dType = voucher.discount_type;
   const dValue = Number(voucher.discount_value || 0);
   if (dType === 'fixed') {
-    discount_amount = dValue;
+    discount_amount = Math.min(dValue, eligible_subtotal);
   } else if (dType === 'percent') {
-    discount_amount = Math.round(((order_total * dValue) / 100) * 100) / 100;
+    discount_amount = Math.round(((eligible_subtotal * dValue) / 100) * 100) / 100;
     const maxDisc = Number(voucher.max_discount || 0);
     if (maxDisc > 0 && discount_amount > maxDisc) discount_amount = maxDisc;
   }
@@ -257,7 +354,7 @@ export async function validateVoucherForVRImpl(
 }
 
 /**
- * Actually "redeem" a voucher — increment used_count and insert redemption_log.
+ * Actually "redeem" a voucher — increment used_count atomically and insert redemption_log.
  * Called ONLY AFTER booking payment confirmed successful (updatePaymentImpl).
  */
 export async function redeemVoucherAfterPaymentImpl(
@@ -297,10 +394,19 @@ export async function redeemVoucherAfterPaymentImpl(
     }
   }
 
+  // Atomic update: only increment if usage_limit is null or used_count < usage_limit
   await anyDb
     .update(tables.vouchers)
     .set({ used_count: sql`used_count + 1`, updated_at: formatDateForDb(new Date()) })
-    .where(eq(tables.vouchers.id, voucher_id));
+    .where(
+      and(
+        eq(tables.vouchers.id, voucher_id),
+        or(
+          isNull(tables.vouchers.usage_limit),
+          sql`${tables.vouchers.used_count} < ${tables.vouchers.usage_limit}`
+        )
+      )
+    );
 
   await anyDb.insert(tables.voucher_redemption_logs).values({
     voucher_id,

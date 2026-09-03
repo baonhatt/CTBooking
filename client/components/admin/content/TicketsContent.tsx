@@ -16,7 +16,8 @@ import {
   Upload,
   Image,
   Users,
-  Sparkles
+  Sparkles,
+  ShieldAlert
 } from 'lucide-react';
 import { format, formatDistanceToNow } from 'date-fns';
 import { vi } from 'date-fns/locale';
@@ -163,6 +164,7 @@ export default function TicketsContent(props: Props) {
   const [toggleDialogOpen, setToggleDialogOpen] = useState(false);
   const [ticketToToggle, setTicketToToggle] = useState<{ id: number; currentStatus: boolean } | null>(null);
   const [isTogglingStatus, setIsTogglingStatus] = useState(false);
+  const [confirmSaveData, setConfirmSaveData] = useState<{ payload: any; changes: string[] } | null>(null);
 
   // Fetch movies when dialog opens or branch changes
   React.useEffect(() => {
@@ -1010,16 +1012,44 @@ export default function TicketsContent(props: Props) {
                     max_players: editData.max_players ? Number(editData.max_players) : undefined
                   };
 
-                  if (!editData?.id) {
-                    await createTicketApi(payload);
-                  } else {
-                    await updateTicketApi(Number(editData.id), payload);
+                  const executeSaveTicket = async (p: any) => {
+                    setIsSaving(true);
+                    try {
+                      if (!editData?.id) {
+                        await createTicketApi(p);
+                      } else {
+                        await updateTicketApi(Number(editData.id), p);
+                      }
+                      await onRefresh();
+                      toast.success('Thành công', {
+                        description: editData?.id ? 'Cập nhật thành công' : 'Thêm gói thành công'
+                      });
+                      setConfirmSaveData(null);
+                      setIsEditOpen(false);
+                    } catch (err: any) {
+                      toast.error(err.message || 'Lưu thất bại');
+                    } finally {
+                      setIsSaving(false);
+                    }
+                  };
+
+                  if (editData?.id) {
+                    const originalItem = data.find((t) => t.id === editData.id);
+                    if (originalItem) {
+                      const changes: string[] = [];
+                      if (Number(originalItem.price) !== Number(payload.price)) {
+                        changes.push(
+                          `Giá niêm yết gói: ${Number(originalItem.price).toLocaleString('vi-VN')}đ → ${Number(payload.price).toLocaleString('vi-VN')}đ`
+                        );
+                      }
+                      if (changes.length > 0) {
+                        setConfirmSaveData({ payload, changes });
+                        return;
+                      }
+                    }
                   }
-                  await onRefresh();
-                  toast.success('Thành công', {
-                    description: editData?.id ? 'Cập nhật thành công' : 'Thêm gói thành công'
-                  });
-                  setIsEditOpen(false);
+
+                  await executeSaveTicket(payload);
                 } catch (err: any) {
                   toast.error(err.message || 'Lưu thất bại');
                 } finally {
@@ -1327,6 +1357,60 @@ export default function TicketsContent(props: Props) {
               ) : (
                 'Đồng ý kích hoạt'
               )}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+      {/* Confirm Price Edit Alert Dialog */}
+      <AlertDialog open={!!confirmSaveData} onOpenChange={(open) => !open && setConfirmSaveData(null)}>
+        <AlertDialogContent className="rounded-2xl font-sans bg-white max-w-md">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="text-slate-900 flex items-center gap-2">
+              <ShieldAlert className="w-5 h-5 text-amber-500" />
+              Xác nhận thay đổi giá gói vé
+            </AlertDialogTitle>
+            <AlertDialogDescription asChild className="text-slate-600 text-sm mt-2">
+              <div>
+                <p className="mb-3">
+                  Bạn đang điều chỉnh thông tin giá niêm yết của gói <strong>{editData?.name}</strong>:
+                </p>
+                <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 space-y-1 text-xs text-amber-900 font-medium mb-3">
+                  {confirmSaveData?.changes.map((c, i) => (
+                    <div key={i} className="flex items-center gap-1.5">
+                      <span className="w-1.5 h-1.5 rounded-full bg-amber-500 shrink-0" />
+                      <span>{c}</span>
+                    </div>
+                  ))}
+                </div>
+                <p className="text-xs text-slate-500 italic">
+                  Giá mới sẽ có hiệu lực ngay lập tức khi khách hàng xem và chọn mua gói vé này trên giao diện booking.
+                </p>
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter className="mt-4">
+            <AlertDialogCancel className="rounded-xl border-slate-200">Hủy bỏ</AlertDialogCancel>
+            <AlertDialogAction
+              disabled={isSaving}
+              onClick={async () => {
+                if (confirmSaveData) {
+                  setIsSaving(true);
+                  try {
+                    await updateTicketApi(Number(editData.id), confirmSaveData.payload);
+                    await onRefresh();
+                    toast.success('Thành công', { description: 'Cập nhật gói thành công' });
+                    setConfirmSaveData(null);
+                    setIsEditOpen(false);
+                  } catch (err: any) {
+                    toast.error(err.message || 'Lưu thất bại');
+                  } finally {
+                    setIsSaving(false);
+                  }
+                }
+              }}
+              className="rounded-xl text-white bg-amber-600 hover:bg-amber-700 font-medium"
+            >
+              {isSaving ? 'Đang lưu...' : 'Xác nhận lưu'}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

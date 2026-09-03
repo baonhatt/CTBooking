@@ -101,9 +101,15 @@ export async function validateVRBookingInput(
   // Voucher (nếu có)
   let voucher_result: any = { valid: false };
   if (voucher_code && voucher_code.trim()) {
+    // Build vr_price_map from already-fetched package data to avoid duplicate DB queries
+    const vrPriceMap = new Map<number, number>();
+    for (const p of pkgs) vrPriceMap.set(p.id, Number(p.price || 0));
+
     voucher_result = await validateVoucherForVRImpl(anyDb, tables, {
       code: voucher_code,
       vr_items,
+      vr_subtotal: original_total,
+      vr_price_map: vrPriceMap,
       branch_id,
       order_total_before: original_total
     });

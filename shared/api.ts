@@ -152,6 +152,7 @@ export interface VoucherValidateResponse {
     | 'VOUCHER_MIN_ORDER_NOT_REACHED'
     | 'VOUCHER_SCOPE_MISMATCH'
     | 'VOUCHER_PACKAGE_NOT_APPLICABLE'
+    | 'VOUCHER_PACKAGE_EXCLUDED'
     | 'VOUCHER_BRANCH_MISMATCH'
     | 'VOUCHER_NOT_YET_VALID';
   discount_amount?: number;

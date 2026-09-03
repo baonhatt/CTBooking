@@ -428,6 +428,13 @@ export async function updateVoucherImpl(
     email: targetSaleEmail
   });
 
+  const targetDiscountType = args.discount_type !== undefined ? args.discount_type : existing.discount_type;
+  const targetDiscountValue =
+    args.discount_value !== undefined ? Number(args.discount_value) : Number(existing.discount_value || 0);
+  if (targetDiscountType === 'percent' && targetDiscountValue > 100) {
+    throw new Error('Phần trăm giảm không được vượt quá 100%');
+  }
+
   const data: any = { updated_at: formatDateForDb(new Date()) };
   if (args.code !== undefined) data.code = (args.code || '').trim().toUpperCase();
   if (args.name !== undefined) data.name = args.name;

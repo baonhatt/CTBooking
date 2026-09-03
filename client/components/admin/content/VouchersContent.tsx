@@ -19,7 +19,8 @@ import {
   RotateCcw,
   Loader2,
   Search,
-  FilterX
+  FilterX,
+  ShieldAlert
 } from 'lucide-react';
 import { format, formatDistanceToNow, isAfter, isBefore } from 'date-fns';
 import { vi } from 'date-fns/locale';
@@ -233,6 +234,7 @@ export default function VouchersContent(props: Props) {
   const [localSearchText, setLocalSearchText] = useState(searchText);
   const [voucherToToggle, setVoucherToToggle] = useState<{ id: number; currentStatus: boolean } | null>(null);
   const [isPermanent, setIsPermanent] = useState(false);
+  const [confirmSaveData, setConfirmSaveData] = useState<{ payload: any; changes: string[] } | null>(null);
 
   useEffect(() => {
     if (isEditOpen && editData) {
@@ -372,6 +374,32 @@ export default function VouchersContent(props: Props) {
     }
   };
 
+  const formatMoney = (n: number | null | undefined) => {
+    if (n === null || n === undefined || isNaN(Number(n))) return '0₫';
+    return Number(n).toLocaleString('vi-VN') + '₫';
+  };
+
+  const executeSave = async (payload: any) => {
+    setIsSaving(true);
+    try {
+      if (editData.id && editData.id > 0) {
+        await updateVoucherApi(editData.id, payload);
+        toast.success('Cập nhật voucher thành công');
+      } else {
+        await createVoucherApi(payload);
+        toast.success('Tạo voucher thành công');
+      }
+      setConfirmSaveData(null);
+      setIsEditOpen(false);
+      setEditData(null);
+      onRefresh();
+    } catch (err: any) {
+      toast.error(err.message || 'Lưu voucher thất bại');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
   const handleSave = async () => {
     if (!editData) return;
     const payload = { ...editData };
@@ -433,28 +461,43 @@ export default function VouchersContent(props: Props) {
           : null;
     }
 
-    setIsSaving(true);
-    try {
-      if (editData.id && editData.id > 0) {
-        await updateVoucherApi(editData.id, payload);
-        toast.success('Cập nhật voucher thành công');
-      } else {
-        await createVoucherApi(payload);
-        toast.success('Tạo voucher thành công');
-      }
-      setIsEditOpen(false);
-      setEditData(null);
-      onRefresh();
-    } catch (err: any) {
-      toast.error(err.message || 'Lưu voucher thất bại');
-    } finally {
-      setIsSaving(false);
-    }
-  };
+    if (editData.id && editData.id > 0) {
+      const originalItem = data.find((v) => v.id === editData.id);
+      if (originalItem) {
+        const changes: string[] = [];
+        if (originalItem.discount_type !== payload.discount_type) {
+          changes.push(
+            `Loại giảm giá: ${originalItem.discount_type === 'percent' ? 'Phần trăm (%)' : 'Số tiền cố định (đ)'} → ${payload.discount_type === 'percent' ? 'Phần trăm (%)' : 'Số tiền cố định (đ)'}`
+          );
+        }
+        if (Number(originalItem.discount_value) !== Number(payload.discount_value)) {
+          const oldVal =
+            originalItem.discount_type === 'percent'
+              ? `${originalItem.discount_value}%`
+              : formatMoney(originalItem.discount_value);
+          const newVal =
+            payload.discount_type === 'percent' ? `${payload.discount_value}%` : formatMoney(payload.discount_value);
+          changes.push(`Mức giảm giá: ${oldVal} → ${newVal}`);
+        }
+        if (Number(originalItem.max_discount || 0) !== Number(payload.max_discount || 0)) {
+          changes.push(
+            `Giảm tối đa: ${formatMoney(originalItem.max_discount)} → ${formatMoney(payload.max_discount)}`
+          );
+        }
+        if (Number(originalItem.min_order_value || 0) !== Number(payload.min_order_value || 0)) {
+          changes.push(
+            `Đơn hàng tối thiểu: ${formatMoney(originalItem.min_order_value)} → ${formatMoney(payload.min_order_value)}`
+          );
+        }
 
-  const formatMoney = (n: number | null | undefined) => {
-    if (n === null || n === undefined || isNaN(Number(n))) return '0₫';
-    return Number(n).toLocaleString('vi-VN') + '₫';
+        if (changes.length > 0) {
+          setConfirmSaveData({ payload, changes });
+          return;
+        }
+      }
+    }
+
+    await executeSave(payload);
   };
 
   const isExpired = (v: VoucherItem) => {
@@ -2024,6 +2067,46 @@ export default function VouchersContent(props: Props) {
           )}
         </DialogContent>
       </Dialog>
+      {/* DIALOG XÁC NHẬN SỬA TRƯỜNG QUAN TRỌNG */}
+      <AlertDialog open={!!confirmSaveData} onOpenChange={(open) => !open && setConfirmSaveData(null)}>
+        <AlertDialogContent className="rounded-2xl font-sans bg-white max-w-md">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="text-slate-900 flex items-center gap-2">
+              <ShieldAlert className="w-5 h-5 text-amber-500" />
+              Xác nhận thay đổi Voucher
+            </AlertDialogTitle>
+            <AlertDialogDescription asChild className="text-slate-600 text-sm mt-2">
+              <div>
+                <p className="mb-3">
+                  Bạn đang thay đổi các thông số quan trọng của voucher <strong>{editData?.code}</strong>:
+                </p>
+                <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 space-y-1 text-xs text-amber-900 font-medium mb-3">
+                  {confirmSaveData?.changes.map((c, i) => (
+                    <div key={i} className="flex items-center gap-1.5">
+                      <span className="w-1.5 h-1.5 rounded-full bg-amber-500 shrink-0" />
+                      <span>{c}</span>
+                    </div>
+                  ))}
+                </div>
+                <p className="text-xs text-slate-500 italic">
+                  Thay đổi này sẽ tác động trực tiếp đến mức ưu đãi khi khách hàng áp dụng voucher cho các đơn hàng mới.
+                </p>
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+
+          <AlertDialogFooter className="mt-4">
+            <AlertDialogCancel className="rounded-xl border-slate-200">Hủy bỏ</AlertDialogCancel>
+            <AlertDialogAction
+              disabled={isSaving}
+              onClick={() => confirmSaveData && executeSave(confirmSaveData.payload)}
+              className="rounded-xl text-white bg-amber-600 hover:bg-amber-700 font-medium"
+            >
+              {isSaving ? 'Đang lưu...' : 'Xác nhận lưu'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
