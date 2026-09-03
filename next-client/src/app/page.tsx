@@ -1,14 +1,16 @@
 import { Suspense } from 'react';
 export const runtime = 'edge';
 import type { Metadata } from 'next';
+import dynamic from 'next/dynamic';
 import UserLayout from '@/layouts/UserLayout';
 import HeroSection from '@/components/user/home/HeroSection';
 import FilmCarousel from '@/components/user/home/FilmCarousel';
-import VRShowcase from '@/components/user/home/VRShowcase';
-import PromotionShowcase from '@/components/user/home/PromotionShowcase';
-import TechnologyBanner from '@/components/user/home/TechnologyBanner';
-import ProductSection from '@/components/user/home/ProductSection';
 import ClearStorageOnMount from '@/components/user/home/ClearStorageOnMount';
+
+const VRShowcase = dynamic(() => import('@/components/user/home/VRShowcase'));
+const PromotionShowcase = dynamic(() => import('@/components/user/home/PromotionShowcase'));
+const TechnologyBanner = dynamic(() => import('@/components/user/home/TechnologyBanner'));
+const ProductSection = dynamic(() => import('@/components/user/home/ProductSection'));
 
 import { getActiveMoviesToday } from '@/lib/api/movies';
 import { getSiteMediaApi } from '@/lib/api/uploads';

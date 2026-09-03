@@ -346,48 +346,58 @@ export default function Header({
         </div>
       </div>
 
-      <LoginDialog
-        isOpen={isLoginOpen}
-        onOpenChange={setIsLoginOpen}
-        onRegister={openRegister}
-        onForgetPassword={openForgetPass}
-        auth={auth}
-        setUserName={setUserName}
-        setErrorModal={setErrorModal}
-      />
+      {isLoginOpen && (
+        <LoginDialog
+          isOpen={isLoginOpen}
+          onOpenChange={setIsLoginOpen}
+          onRegister={openRegister}
+          onForgetPassword={openForgetPass}
+          auth={auth}
+          setUserName={setUserName}
+          setErrorModal={setErrorModal}
+        />
+      )}
 
-      <RegisterDialog
-        isOpen={isRegisterOpen}
-        onOpenChange={setIsRegisterOpen}
-        onLogin={openLogin}
-        auth={auth}
-        setUserName={setUserName}
-        setErrorModal={setErrorModal}
-      />
+      {isRegisterOpen && (
+        <RegisterDialog
+          isOpen={isRegisterOpen}
+          onOpenChange={setIsRegisterOpen}
+          onLogin={openLogin}
+          auth={auth}
+          setUserName={setUserName}
+          setErrorModal={setErrorModal}
+        />
+      )}
 
-      <ForgetPasswordDialog
-        isOpen={isForgetPassOpen}
-        onOpenChange={setIsForgetPassOpen}
-        onBackToLogin={() => {
-          setIsForgetPassOpen(false);
-          setIsLoginOpen(true);
-        }}
-        auth={auth}
-      />
+      {isForgetPassOpen && (
+        <ForgetPasswordDialog
+          isOpen={isForgetPassOpen}
+          onOpenChange={setIsForgetPassOpen}
+          onBackToLogin={() => {
+            setIsForgetPassOpen(false);
+            setIsLoginOpen(true);
+          }}
+          auth={auth}
+        />
+      )}
 
-      <ErrorModal
-        open={errorModal.open}
-        title={errorModal.title}
-        message={errorModal.message}
-        onOpenChange={(open) => setErrorModal((prev) => ({ ...prev, open }))}
-      />
+      {errorModal.open && (
+        <ErrorModal
+          open={errorModal.open}
+          title={errorModal.title}
+          message={errorModal.message}
+          onOpenChange={(open) => setErrorModal((prev) => ({ ...prev, open }))}
+        />
+      )}
 
-      <MovieSchedulePanel
-        isOpen={isScheduleOpen}
-        onClose={() => setIsScheduleOpen(false)}
-        branchId={selectedBranch?.id}
-        branchName={selectedBranch?.name}
-      />
+      {isScheduleOpen && (
+        <MovieSchedulePanel
+          isOpen={isScheduleOpen}
+          onClose={() => setIsScheduleOpen(false)}
+          branchId={selectedBranch?.id}
+          branchName={selectedBranch?.name}
+        />
+      )}
 
       <AlertDialog open={showBranchConfirm} onOpenChange={setShowBranchConfirm}>
         <AlertDialogContent className="bg-slate-900 border-slate-800 text-white">
