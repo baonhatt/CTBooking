@@ -650,15 +650,15 @@ export default function TransactionsContent({
                 : data.map((t) => {
                     // 1. Tối ưu logic xác định trạng thái hiển thị
                     const getStatusConfig = () => {
-                      // Trường hợp 1: Thanh toán quá hạn (expired)
+                      // Trường hợp 1: Thanh toán quá hạn (expired - chưa thanh toán)
                       if (t.paymentStatus === 'expired') {
                         return {
                           text: 'Đã Hết Hạn',
-                          style: 'border-slate-300 bg-slate-100 text-slate-600',
-                          icon: <Clock size={10} className="mr-1 mt-[1px]" />,
-                          modalIcon: <Clock size={14} />,
+                          style: 'border-slate-200 bg-slate-100 text-slate-500 font-medium',
+                          icon: <Clock size={10} className="mr-1 mt-[1px] text-slate-400" />,
+                          modalIcon: <Clock size={14} className="text-slate-400" />,
                           ticketText: 'Đã Hết Hạn',
-                          ticketStyle: 'bg-slate-200 text-slate-700 border-slate-300'
+                          ticketStyle: 'bg-slate-100 text-slate-500 border-slate-200'
                         };
                       }
 
@@ -700,15 +700,15 @@ export default function TransactionsContent({
                           };
                         }
 
-                        // Check Hết hạn
+                        // Check Hết hạn (Đã thanh toán nhưng quá hạn sử dụng vé)
                         if (t.expired) {
                           return {
                             text: 'Đã Quá Hạn',
-                            style: 'border-slate-300 bg-slate-100 text-slate-600',
-                            icon: <Clock size={10} className="mr-1 mt-[1px]" />,
-                            modalIcon: <Clock size={14} />,
+                            style: 'border-amber-300 bg-amber-50 text-amber-800 font-bold',
+                            icon: <Clock size={10} className="mr-1 mt-[1px] text-amber-600" />,
+                            modalIcon: <Clock size={14} className="text-amber-600" />,
                             ticketText: 'Đã Quá Hạn',
-                            ticketStyle: 'bg-slate-600 text-white border-slate-700 font-bold'
+                            ticketStyle: 'bg-amber-100 text-amber-800 border-amber-300 font-bold'
                           };
                         }
 
@@ -928,9 +928,9 @@ export default function TransactionsContent({
                     }
                     if (isExpired) {
                       return (
-                        <div className="bg-gray-100 text-gray-600 px-3 py-1.5 rounded-full border border-gray-200 flex items-center gap-2">
-                          <Clock size={14} className="text-gray-600" />
-                          <span className="text-[11px] font-medium tracking-tight">Đã quá hạn</span>
+                        <div className="bg-amber-50 text-amber-800 px-3 py-1.5 rounded-full border border-amber-300 flex items-center gap-2 font-bold shadow-xs">
+                          <Clock size={14} className="text-amber-600" />
+                          <span className="text-[11px] tracking-tight">Đã quá hạn</span>
                         </div>
                       );
                     }
@@ -958,9 +958,9 @@ export default function TransactionsContent({
 
                   if (paymentStatus === 'expired') {
                     return (
-                      <div className="bg-slate-100 text-slate-600 px-3 py-1.5 rounded-full border border-slate-200 flex items-center gap-2">
-                        <Clock size={14} className="text-slate-600" />
-                        <span className="text-[11px] font-medium tracking-tight">Đã hết hạn</span>
+                      <div className="bg-slate-100 text-slate-500 px-3 py-1.5 rounded-full border border-slate-200 flex items-center gap-2 font-medium">
+                        <Clock size={14} className="text-slate-400" />
+                        <span className="text-[11px] tracking-tight">Đã hết hạn</span>
                       </div>
                     );
                   }
