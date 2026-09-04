@@ -234,10 +234,13 @@ export default function VouchersContent(props: Props) {
   const [localSearchText, setLocalSearchText] = useState(searchText);
   const [voucherToToggle, setVoucherToToggle] = useState<{ id: number; currentStatus: boolean } | null>(null);
   const [isPermanent, setIsPermanent] = useState(false);
+  const [isCodeEditable, setIsCodeEditable] = useState(false);
   const [confirmSaveData, setConfirmSaveData] = useState<{ payload: any; changes: string[] } | null>(null);
 
   useEffect(() => {
     if (isEditOpen && editData) {
+      // Always reset code editability when dialog opens
+      setIsCodeEditable(false);
       if (!editData.id || editData.id === 0) {
         // When creating new voucher: if no dates provided, initialize to today start & end
         if (!editData.valid_from && !editData.valid_until) {
@@ -1233,18 +1236,36 @@ export default function VouchersContent(props: Props) {
                             code: e.target.value.replace(/[^a-zA-Z0-9_\-]/g, '')
                           })
                         }
-                        className="h-9.5 text-sm flex-1 font-mono uppercase tracking-wider font-semibold"
+                        disabled={!isCodeEditable}
+                        className={`h-9.5 text-sm flex-1 font-mono uppercase tracking-wider font-semibold ${!isCodeEditable ? 'bg-gray-100 text-gray-600' : ''}`}
                         maxLength={30}
                       />
-                      <Button
-                        type="button"
-                        variant="outline"
-                        onClick={() => setEditData({ ...editData, code: generateRandomCode() })}
-                        className="h-9.5 px-3.5 gap-1.5 border-purple-200 text-purple-700 hover:bg-purple-50"
-                      >
-                        <Sparkles className="w-3.5 h-3.5" />
-                        Tự tạo
-                      </Button>
+                      {/* Only allow editing code on NEW vouchers: show pencil + auto-gen */}
+                      {(!editData?.id || editData.id === 0) && (
+                        <>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="icon"
+                            onClick={() => setIsCodeEditable(!isCodeEditable)}
+                            className="h-9.5 w-9.5 shrink-0"
+                            title={isCodeEditable ? 'Khóa mã' : 'Sửa mã'}
+                          >
+                            <Pencil className="w-3.5 h-3.5" />
+                          </Button>
+                          {isCodeEditable && (
+                            <Button
+                              type="button"
+                              variant="outline"
+                              onClick={() => setEditData({ ...editData, code: generateRandomCode() })}
+                              className="h-9.5 px-3 gap-1.5 border-purple-200 text-purple-700 hover:bg-purple-50 shrink-0"
+                            >
+                              <Sparkles className="w-3.5 h-3.5" />
+                              Tự tạo
+                            </Button>
+                          )}
+                        </>
+                      )}
                     </div>
                   </div>
 

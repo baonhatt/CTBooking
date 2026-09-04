@@ -143,7 +143,7 @@ const qrCodeUrl = createVietQRCode({
   accountName: "CONG TY CINESPHERE",
   bankBin: "970436", // Vietcombank
   amount: 150000,
-  description: "CINESPHERE ORDER123456",
+  description: "CS172543883901",
   template: "compact2",
 });
 

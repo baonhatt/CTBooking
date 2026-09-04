@@ -1,5 +1,5 @@
 import { PaymentRequest } from '@shared/api';
-import { eq, and, asc, desc, isNull, or, inArray, sql } from 'drizzle-orm';
+import { eq, and, asc, desc, isNull, or, inArray, sql, like } from 'drizzle-orm';
 import { generateBookingCode, getBookingEmailTemplate } from '../../lib/booking-utils';
 import { mailQueue } from '../../lib/mail-queue';
 import { formatDateForDb } from '../../lib/date-utils';
@@ -946,25 +946,48 @@ export async function getBookingByIdImpl(
   };
 }
 
+function buildCodeSearchConditions(normalizedCode: string, bookingsTable: any) {
+  const digitsMatch = normalizedCode.match(/\d{6,}/);
+
+  if (digitsMatch) {
+    const digits = digitsMatch[0];
+    return or(
+      eq(bookingsTable.booking_code, normalizedCode),
+      like(bookingsTable.booking_code, `%${digits}%`),
+      like(bookingsTable.pay_txt_code, `%${digits}%`),
+      inArray(bookingsTable.pay_txt_code, [
+        normalizedCode,
+        `CS${digits}`,
+        `CP${digits}`,
+        `CINESPHERE${digits}`,
+        digits
+      ]),
+      inArray(bookingsTable.booking_code, [
+        normalizedCode,
+        `CS${digits}`,
+        `CP${digits}`,
+        `CINESPHERE${digits}`,
+        digits
+      ])
+    );
+  }
+
+  return or(
+    eq(bookingsTable.booking_code, normalizedCode),
+    eq(bookingsTable.pay_txt_code, normalizedCode),
+    like(bookingsTable.booking_code, `%${normalizedCode}%`),
+    like(bookingsTable.pay_txt_code, `%${normalizedCode}%`)
+  );
+}
+
 export async function getBookingByCodeImpl(anyDb: any, codeRaw: string, tables: { bookings: any }) {
   const code = String(codeRaw || '');
   if (!code || code.trim() === '') return { status: 400, message: 'Thiếu mã vé' };
   const normalizedCode = code.trim().toUpperCase();
-
-  // Extract exact CS + timestamp pattern if present
-  // Pattern: CS followed by 10 digits (timestamp in seconds) + 2 digits (random) = 12 digits total
-  const codeMatch = normalizedCode.match(/CS\d{12}/);
-  const exactCode = codeMatch ? codeMatch[0] : normalizedCode;
-
   const bookingsTable = tables.bookings;
-  const booking = await anyDb.query.bookings.findFirst({
-    where: or(
-      // Điều kiện 1: booking_code khớp
-      eq(bookingsTable.booking_code, exactCode),
 
-      // Điều kiện 2: pay_txt_code khớp VÀ method là vietqr
-      and(eq(bookingsTable.pay_txt_code, exactCode), eq(bookingsTable.payment_method, 'vietqr'))
-    ),
+  const booking = await anyDb.query.bookings.findFirst({
+    where: buildCodeSearchConditions(normalizedCode, bookingsTable),
     with: {
       user: {
         columns: {
@@ -1055,11 +1078,13 @@ export async function confirmUseTicketImpl(
     if (!code || !code.trim()) return { status: 400, message: 'Vui lòng nhập mã vé' };
     const normalizedCode = code.trim().toUpperCase();
     const bookingsTable = tables.bookings;
+    const searchCondition = buildCodeSearchConditions(normalizedCode, bookingsTable);
+
     const booking = await anyDb.query.bookings.findFirst({
       where:
         restrictToBranchIds && restrictToBranchIds.length > 0
-          ? and(eq(bookingsTable.booking_code, normalizedCode), inArray(bookingsTable.branch_id, restrictToBranchIds))
-          : eq(bookingsTable.booking_code, normalizedCode)
+          ? and(searchCondition, inArray(bookingsTable.branch_id, restrictToBranchIds))
+          : searchCondition
     });
 
     if (!booking) return { status: 404, message: 'Không tìm thấy vé' };

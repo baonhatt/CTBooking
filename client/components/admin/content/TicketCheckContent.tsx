@@ -142,9 +142,6 @@ export default function TicketCheckContent() {
       return;
     }
     let searchCode = code.trim().toUpperCase();
-    if (/^\d+$/.test(searchCode)) {
-      searchCode = `CINESPHERE${searchCode}`;
-    }
 
     if (!searchCode) {
       setError('Vui lòng nhập mã vé hoặc đơn hàng');
@@ -335,8 +332,7 @@ export default function TicketCheckContent() {
             <p className="font-medium mb-1">Hướng dẫn đối soát nhanh:</p>
             <p>
               Nếu khách thanh toán qua Ngân hàng, tìm nội dung có mã{' '}
-              <span className="font-mono font-bold bg-amber-200 px-1 rounded text-orange-700">CINESPHERE</span> khớp với
-              ID.
+              <span className="font-mono font-bold bg-amber-200 px-1 rounded text-orange-700">CS...</span> (ví dụ: CS172543883901) hoặc Mã vé / ID đơn hàng.
             </p>
           </div>
         </div>
