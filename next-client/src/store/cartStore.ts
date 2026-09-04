@@ -104,6 +104,15 @@ export const cartStore = {
 
   addItem(item: Omit<CartItem, 'id' | 'selected'> & { selected?: boolean }) {
     const items = getStoredItems();
+    
+    // Check if adding item from a different branch
+    if (item.branchId && items.length > 0) {
+      const hasDifferentBranch = items.some((i) => i.branchId && i.branchId !== item.branchId);
+      if (hasDifferentBranch) {
+        console.warn('Giỏ hàng có sản phẩm thuộc chi nhánh khác.');
+      }
+    }
+
     const id = `${item.type}_${item.packageId}`;
     const existingIndex = items.findIndex((i) => i.id === id);
 
@@ -118,7 +127,8 @@ export const cartStore = {
               price: item.price ?? i.price,
               name: item.name ?? i.name,
               cover_image: item.cover_image ?? i.cover_image,
-              movies: item.movies ?? i.movies
+              movies: item.movies ?? i.movies,
+              branchId: item.branchId ?? i.branchId
             }
           : i
       );

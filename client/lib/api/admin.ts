@@ -292,7 +292,7 @@ export async function listDeletedVouchersApi(filters: VoucherListFilters = {}) {
     page: number;
     pageSize: number;
     total: number;
-  }>(`/api/admin/vouchers/deleted${qs ? `?${qs}` : ''}`);
+  }>(`/api/admin/deleted/vouchers${qs ? `?${qs}` : ''}`);
 }
 
 export async function listStaffOptionsApi() {

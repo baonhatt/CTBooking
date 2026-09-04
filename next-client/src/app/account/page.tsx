@@ -637,7 +637,11 @@ export default function Account() {
                                             </span>
                                             <span className="opacity-30">|</span>
                                             <span className="text-gray-300 font-medium bg-white/5 px-2 py-0.5 rounded">
-                                              {movieCount} phim
+                                              {t.booking_type === 'vr'
+                                                ? `${t.quantity} lượt VR`
+                                                : t.booking_type === 'combo_vr'
+                                                  ? `${movieCount} phim + ${t.quantity} VR`
+                                                  : `${movieCount} phim`}
                                             </span>
                                           </div>
                                         </div>

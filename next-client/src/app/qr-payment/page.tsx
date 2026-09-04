@@ -198,6 +198,30 @@ export default function QRPaymentPage() {
     router.replace('/success-payment');
   };
 
+  // --- Auto Polling Logic (every 15s) ---
+  useEffect(() => {
+    const bId = paymentData?.bookingId || paymentData?.booking_id;
+    if (!bId || timeLeft <= 0) return;
+
+    const intervalId = setInterval(async () => {
+      try {
+        const baseUrl = process.env.NEXT_PUBLIC_SERVER_BASE_URL || '';
+        const res = await fetch(`${baseUrl}/api/bookings/${bId}`, { cache: 'no-store' });
+        if (res.ok) {
+          const booking = await res.json();
+          if (booking.payment_status === 'paid') {
+            clearInterval(intervalId);
+            handleSuccess();
+          }
+        }
+      } catch (error) {
+        console.error('Auto polling error:', error);
+      }
+    }, 15000);
+
+    return () => clearInterval(intervalId);
+  }, [paymentData, timeLeft]);
+
   const handleExpired = async () => {
     const data = paymentDataRef.current;
     const bId = data?.bookingId || data?.booking_id;

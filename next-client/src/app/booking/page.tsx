@@ -24,8 +24,6 @@ import {
   getVRPackages,
   VRPackageItem,
   createBookingApi,
-  createMomoPaymentApi,
-  createVnpayPaymentApi,
   API_BASE_URL,
   SERVER_BASE_URL,
   validateBookingApi,
@@ -52,7 +50,6 @@ import {
   Tag,
   ShoppingCart,
   Trash2,
-  Check,
   CheckCircle2,
   ShieldCheck,
   QrCode,
@@ -80,13 +77,12 @@ export default function BookingPage() {
   const [phoneError, setPhoneError] = useState<string>('');
   const [email, setEmail] = useState<string>('');
   const [emailError, setEmailError] = useState<string>('');
-  const [paymentMethod, setPaymentMethod] = useState<'vietqr' | 'momo' | 'vnpay'>('vietqr');
+  const paymentMethod = 'vietqr' as const;
   const [isProcessing, setIsProcessing] = useState(false);
   const [formErrors, setFormErrors] = useState<{ [key: string]: string }>({});
   const [voucherCode, setVoucherCode] = useState<string>('');
   const [voucherValidating, setVoucherValidating] = useState(false);
   const [appliedVoucher, setAppliedVoucher] = useState<any>(null);
-  const [selectedMovieIds, setSelectedMovieIds] = useState<number[]>([]);
   const [confirmChecked, setConfirmChecked] = useState(false);
   const [showEmailConfirmDialog, setShowEmailConfirmDialog] = useState(false);
   const [showPaymentConfirmDialog, setShowPaymentConfirmDialog] = useState(false);
@@ -264,32 +260,21 @@ export default function BookingPage() {
     return Array.from(moviesMap.values());
   }, [movieItems, ticketPackages]);
 
-  // Auto-select movie: prioritize movie_id from query params, otherwise first available
-  useEffect(() => {
-    const movieIdParam = searchParams.get('movie_id');
-    if (movieIdParam && availableMovies.some((m: any) => Number(m.id) === Number(movieIdParam))) {
-      setSelectedMovieIds([Number(movieIdParam)]);
-    } else if (availableMovies.length > 0 && selectedMovieIds.length === 0) {
-      setSelectedMovieIds([availableMovies[0].id]);
-    }
-  }, [availableMovies, searchParams, selectedMovieIds.length]);
+  // No movie selection needed – single-room rotating model, just show info
 
-  const selectedMovie = useMemo(() => {
-    return availableMovies.find((m) => selectedMovieIds.includes(m.id)) || availableMovies[0];
-  }, [availableMovies, selectedMovieIds]);
-
-  // Load user profile if saved
+  // Load user profile if saved – run once on mount only
   useEffect(() => {
     try {
       const profRaw = getCookie('userProfile') || localStorage.getItem('userProfile');
       if (profRaw) {
         const p = JSON.parse(profRaw);
-        if (!email && p?.email) setEmail(p.email);
-        if (!name && p?.name) setName(p.name);
-        if (!phone && p?.phone) setPhone(p.phone);
+        if (p?.email) setEmail((prev) => prev || p.email);
+        if (p?.name) setName((prev) => prev || p.name);
+        if (p?.phone) setPhone((prev) => prev || p.phone);
       }
     } catch {}
-  }, [email, name, phone]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Auto clear form errors
   useEffect(() => {
@@ -376,9 +361,6 @@ export default function BookingPage() {
       errors.cart = 'Giỏ hàng của bạn đang trống. Vui lòng chọn ít nhất 1 dịch vụ.';
     }
 
-    if (movieItems.length > 0 && availableMovies.length > 0 && selectedMovieIds.length === 0) {
-      errors.movies = 'Vui lòng chọn bộ phim bạn muốn trải nghiệm';
-    }
 
     if (!name.trim()) {
       errors.name = 'Vui lòng nhập họ và tên';
@@ -412,7 +394,6 @@ export default function BookingPage() {
 
   const isFormValid = useMemo(() => {
     if (selectedItems.length === 0) return false;
-    if (movieItems.length > 0 && availableMovies.length > 0 && selectedMovieIds.length === 0) return false;
     if (!name.trim() || name.trim().length < 2) return false;
     if (!phone.trim() || phone.length !== 10 || !phone.startsWith('0') || Boolean(phoneError)) return false;
     if (
@@ -425,18 +406,7 @@ export default function BookingPage() {
     }
     if (!confirmChecked) return false;
     return true;
-  }, [
-    selectedItems.length,
-    movieItems.length,
-    availableMovies.length,
-    selectedMovieIds.length,
-    name,
-    phone,
-    phoneError,
-    email,
-    emailError,
-    confirmChecked
-  ]);
+  }, [selectedItems.length, name, phone, phoneError, email, emailError, confirmChecked]);
 
   const handleCheckoutSubmit = () => {
     if (isProcessing) return;
@@ -532,10 +502,8 @@ export default function BookingPage() {
           emailBook: email,
           phone,
           name,
-          movieId: selectedMovie?.id,
           ticketCount: totalMovieCount,
           ticketPackageId: mainMoviePkg.packageId,
-          combo: selectedMovieIds.map(String),
           vr_items,
           voucher_code: appliedVoucher ? voucherCode.trim() : undefined,
           branch_id: selectedBranch?.id
@@ -551,13 +519,11 @@ export default function BookingPage() {
           emailBook: email,
           phone,
           name,
-          movieId: selectedMovie?.id,
           ticketCount: totalMovieCount,
           paymentMethod,
           totalPrice: canonicalTotal,
           ticketPackageId: mainMoviePkg.packageId,
           pay_txt_code: orderId,
-          combo: selectedMovieIds.map(String),
           vr_items,
           voucher_code: appliedVoucher ? voucherCode.trim() : undefined,
           branch_id: selectedBranch?.id
@@ -567,7 +533,7 @@ export default function BookingPage() {
 
       const summary = {
         orderId,
-        movie: movieItems.length > 0 ? selectedMovie?.title : 'Gói Trải Nghiệm VR',
+        movie: movieItems.length > 0 ? (movieItems[0]?.movies?.[0]?.title || movieItems[0]?.name || '') : 'Gói Trải Nghiệm VR',
         name,
         phone,
         email,
@@ -579,9 +545,9 @@ export default function BookingPage() {
         vr_items: selectedVrList,
         booking_type: movieItems.length === 0 ? 'vr' : vr_items.length > 0 ? 'combo_vr' : 'movie',
         method: paymentMethod,
-        poster: movieItems.length > 0 ? selectedMovie?.cover_image || '' : selectedVrList[0]?.cover_image || '',
-        duration: movieItems.length > 0 ? (selectedMovie?.duration_min ? `${selectedMovie.duration_min}` : '') : '',
-        genres: movieItems.length > 0 ? selectedMovie?.genres || '' : '',
+        poster: movieItems[0]?.cover_image || selectedVrList[0]?.cover_image || '',
+        duration: '',
+        genres: '',
         ticketPackageId: movieItems[0]?.packageId,
         ticketPackageName: movieItems.map((m) => `${m.name} x${m.quantity}`).join(', ') || 'Gói VR',
         branch_id: selectedBranch?.id,
@@ -608,93 +574,23 @@ export default function BookingPage() {
         })
       );
 
-      if (paymentMethod === 'vietqr') {
-        localStorage.setItem(
-          'qrPaymentData',
-          JSON.stringify({
-            ...summary,
-            booking_id: booking?.id,
-            user_id: booking?.user_id,
-            totalAmount: canonicalTotal,
-            movieTitle: summary.movie,
-            ticketType: summary.ticketPackageName,
-            branch_id: selectedBranch?.id,
-            branch_name: selectedBranch?.name,
-            branch_settings: selectedBranch?.settings
-          })
-        );
-        localStorage.removeItem('qrPaymentEndTime');
-        router.push('/qr-payment');
-        return;
-      }
-
-      if (paymentMethod === 'momo') {
-        const extraDataEncoded = btoa(
-          unescape(
-            encodeURIComponent(
-              JSON.stringify({
-                ...summary,
-                booking_id: booking?.id,
-                user_id: booking?.user_id
-              })
-            )
-          )
-        );
-        const partnerCode = process.env.NEXT_PUBLIC_MOMO_PARTNER_CODE || '';
-        const partnerName = process.env.NEXT_PUBLIC_MOMO_PARTNER_NAME || 'CineSphere';
-        const storeId = process.env.NEXT_PUBLIC_MOMO_STORE_ID || 'devstore';
-        const clientBase = process.env.NEXT_PUBLIC_CLIENT_BASE_URL || window.location.origin;
-        const serverBase = SERVER_BASE_URL || clientBase;
-        const redirectPath = process.env.NEXT_PUBLIC_MOMO_REDIRECT_URL || '/checkout';
-        const ipnPath = process.env.NEXT_PUBLIC_MOMO_IPN_URL || '/api/momo/ipn';
-        const redirectUrl = `${clientBase}${redirectPath}`;
-        const ipnUrl = `${serverBase}${ipnPath}`;
-        const accessKey = process.env.NEXT_PUBLIC_MOMO_ACCESS_KEY || '';
-        const secretKey = process.env.NEXT_PUBLIC_MOMO_SECRET_KEY || '';
-        const requestId = Date.now().toString();
-        const payload: any = {
-          partnerCode,
-          partnerName,
-          storeId,
-          requestId,
-          amount: canonicalTotal,
-          orderId,
-          orderInfo: `${summary.movie} | ${summary.quantity} vé`,
-          redirectUrl,
-          ipnUrl,
-          lang: 'vi',
-          extraData: extraDataEncoded,
-          requestType: 'captureWallet',
-          signature: '',
-          accessKey,
-          secretKey
-        };
-
-        const res = await createMomoPaymentApi(payload);
-        if (res?.payUrl) {
-          window.location.href = res.payUrl;
-          return;
-        }
-        throw new Error('Không nhận được liên kết thanh toán MoMo');
-      }
-
-      if (paymentMethod === 'vnpay') {
-        const clientBaseForVnp = process.env.NEXT_PUBLIC_CLIENT_BASE_URL || window.location.origin;
-        const returnPathForVnp = process.env.NEXT_PUBLIC_VNPAY_RETURN_URL || '/checkout';
-        const returnUrl = `${clientBaseForVnp}${returnPathForVnp}`;
-        const res = await createVnpayPaymentApi({
-          amount: canonicalTotal,
-          orderId,
-          orderInfo: String(booking?.id || orderId),
-          locale: 'vn',
-          returnUrl
-        });
-        if (res?.payUrl) {
-          window.location.href = res.payUrl;
-          return;
-        }
-        throw new Error('Không nhận được liên kết thanh toán VNPay');
-      }
+      localStorage.setItem(
+        'qrPaymentData',
+        JSON.stringify({
+          ...summary,
+          booking_id: booking?.id,
+          user_id: booking?.user_id,
+          totalAmount: canonicalTotal,
+          movieTitle: summary.movie,
+          ticketType: summary.ticketPackageName,
+          branch_id: selectedBranch?.id,
+          branch_name: selectedBranch?.name,
+          branch_settings: selectedBranch?.settings
+        })
+      );
+      localStorage.removeItem('qrPaymentEndTime');
+      router.push('/qr-payment');
+      return;
     } catch (err: any) {
       console.error('Booking failed:', err);
       toast.error('Đặt vé thất bại', {
@@ -965,93 +861,57 @@ export default function BookingPage() {
                   </CardContent>
                 </Card>
 
-                {/* 2. CHỌN PHIM TRẢI NGHIỆM (Chỉ hiện khi trong giỏ có gói vé xem phim) */}
-                {movieItems.length > 0 && (
+                {/* 2. PHIM ĐANG CHIẾU (Info-only – rạp 1 phòng xoay vòng) */}
+                {movieItems.length > 0 && availableMovies.length > 0 && (
                   <Card className="bg-slate-900/60 backdrop-blur-xl border border-white/10 rounded-2xl overflow-hidden shadow-2xl animate-in fade-in duration-300">
                     <CardHeader className="bg-white/[0.03] border-b border-white/10 py-4 px-5 sm:px-6">
                       <CardTitle className="text-base sm:text-lg font-bold text-white flex items-center justify-between">
                         <div className="flex items-center gap-2.5">
                           <span className="w-1.5 h-6 bg-gradient-to-b from-blue-400 to-cyan-500 rounded-full" />
-                          <span>Chọn Phim Áp Dụng Cho Suất Xem</span>
+                          <span>Phim Đang Chiếu</span>
                         </div>
                         <span className="text-xs text-cyan-400 font-semibold">
-                          {availableMovies.length} phim khả dụng
+                          {availableMovies.length} phim
                         </span>
                       </CardTitle>
                     </CardHeader>
 
-                    <CardContent className="p-5 sm:p-6 space-y-4">
-                      {availableMovies.length > 0 ? (
-                        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3.5">
-                          {availableMovies.map((m: any) => {
-                            const isSelected = selectedMovieIds.includes(m.id);
-
-                            return (
-                              <div
-                                key={m.id}
-                                onClick={() => {
-                                  setSelectedMovieIds([m.id]);
-                                  if (formErrors.movies) {
-                                    setFormErrors((prev) => ({ ...prev, movies: '' }));
-                                  }
+                    <CardContent className="p-5 sm:p-6">
+                      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3.5">
+                        {availableMovies.map((m: any) => (
+                          <div
+                            key={m.id}
+                            className="group relative rounded-xl overflow-hidden border border-white/10 bg-white/5 shadow-md"
+                          >
+                            <div className="aspect-[2/3] relative overflow-hidden bg-slate-950">
+                              <img
+                                src={optimizeCloudinaryUrl(m.cover_image, 300)}
+                                alt={m.title}
+                                loading="lazy"
+                                className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                                onError={(e) => {
+                                  (e.target as HTMLImageElement).src =
+                                    'https://images.unsplash.com/photo-1489599849927-2ee91cede3ba?w=400&q=80';
                                 }}
-                                className={`group relative rounded-xl overflow-hidden cursor-pointer transition-all duration-300 shadow-md ${
-                                  isSelected
-                                    ? 'ring-2 ring-cyan-400 border-2 border-cyan-400 bg-cyan-500/15 scale-[1.02] shadow-[0_0_20px_rgba(6,182,212,0.3)]'
-                                    : 'border border-white/10 bg-white/5 hover:border-cyan-400/50 hover:bg-white/10'
-                                }`}
-                              >
-                                <div className="aspect-[2/3] relative overflow-hidden bg-slate-950">
-                                  <img
-                                    src={optimizeCloudinaryUrl(m.cover_image, 300)}
-                                    alt={m.title}
-                                    loading="lazy"
-                                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-                                    onError={(e) => {
-                                      (e.target as HTMLImageElement).src =
-                                        'https://images.unsplash.com/photo-1489599849927-2ee91cede3ba?w=400&q=80';
-                                    }}
-                                  />
-
-                                  {/* Checkmark Tag */}
-                                  {isSelected && (
-                                    <div className="absolute top-2 right-2 z-10 w-6 h-6 bg-gradient-to-r from-cyan-400 to-blue-500 rounded-full flex items-center justify-center border-2 border-slate-900 shadow-lg text-black">
-                                      <Check className="w-3.5 h-3.5 stroke-[3]" />
-                                    </div>
+                              />
+                              <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/30 to-transparent opacity-90" />
+                              <div className="absolute bottom-0 p-2.5 w-full space-y-1">
+                                <p className="text-xs font-black text-white leading-tight line-clamp-1">
+                                  {m.title}
+                                </p>
+                                <div className="flex items-center gap-1.5">
+                                  <span className="px-1.5 py-0.5 rounded bg-cyan-500/20 text-[9px] text-cyan-300 font-bold border border-cyan-500/30">
+                                    {m.duration_min ? `${m.duration_min} Phút` : '8K'}
+                                  </span>
+                                  {m.genres && (
+                                    <span className="text-[9px] text-slate-400 truncate">{m.genres}</span>
                                   )}
-
-                                  <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/30 to-transparent opacity-90" />
-
-                                  <div className="absolute bottom-0 p-2.5 w-full space-y-1">
-                                    <p className="text-xs font-black text-white leading-tight line-clamp-1 group-hover:text-cyan-300 transition-colors">
-                                      {m.title}
-                                    </p>
-                                    <div className="flex items-center gap-1.5">
-                                      <span className="px-1.5 py-0.2 rounded bg-cyan-500/20 text-[9px] text-cyan-300 font-bold border border-cyan-500/30">
-                                        {m.duration_min ? `${m.duration_min} Phút` : '8K'}
-                                      </span>
-                                      {m.genres && (
-                                        <span className="text-[9px] text-slate-400 truncate">{m.genres}</span>
-                                      )}
-                                    </div>
-                                  </div>
                                 </div>
                               </div>
-                            );
-                          })}
-                        </div>
-                      ) : (
-                        <div className="p-6 text-center border border-dashed border-white/10 rounded-xl text-slate-400 text-xs">
-                          Đang cập nhật danh sách phim cho gói vé này
-                        </div>
-                      )}
-
-                      {formErrors.movies && (
-                        <p className="text-orange-400 text-xs mt-1 animate-pulse flex items-center gap-1.5">
-                          <Info className="w-3.5 h-3.5" />
-                          {formErrors.movies}
-                        </p>
-                      )}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
                     </CardContent>
                   </Card>
                 )}
@@ -1233,87 +1093,17 @@ export default function BookingPage() {
                       )}
                     </div>
 
-                    {/* Payment Gateway Choices */}
-                    <div className="space-y-2.5 pt-2 border-t border-white/5">
-                      <Label className="text-xs font-semibold text-slate-300">Phương Thức Thanh Toán</Label>
-                      <div className="grid grid-cols-1 gap-2.5">
-                        {/* VietQR */}
-                        <button
-                          type="button"
-                          onClick={() => setPaymentMethod('vietqr')}
-                          className={`p-3.5 rounded-xl border flex items-center justify-between text-left transition-all ${
-                            paymentMethod === 'vietqr'
-                              ? 'bg-red-500/15 border-red-500/60 ring-1 ring-red-500/30 text-white'
-                              : 'bg-white/5 border-white/10 text-slate-300 hover:bg-white/10'
-                          }`}
-                        >
-                          <div className="flex items-center gap-3">
-                            <div className="w-9 h-9 rounded-xl bg-red-600 text-white flex items-center justify-center font-black text-xs shadow-md">
-                              <QrCode className="w-5 h-5" />
-                            </div>
-                            <div>
-                              <p className="font-bold text-sm text-white">Chuyển khoản VietQR</p>
-                              <p className="text-[11px] text-slate-400">Quét mã QR tự động 24/7 (Khuyên dùng)</p>
-                            </div>
-                          </div>
-                          {paymentMethod === 'vietqr' && (
-                            <span className="w-5 h-5 rounded-full bg-red-500 text-white flex items-center justify-center text-[10px] font-bold">
-                              ✓
-                            </span>
-                          )}
-                        </button>
-
-                        {/* MoMo */}
-                        {/* <button
-													type="button"
-													onClick={() => setPaymentMethod('momo')}
-													className={`p-3.5 rounded-xl border flex items-center justify-between text-left transition-all ${
-														paymentMethod === 'momo'
-															? 'bg-pink-500/15 border-pink-500/60 ring-1 ring-pink-500/30 text-white'
-															: 'bg-white/5 border-white/10 text-slate-300 hover:bg-white/10'
-													}`}
-												>
-													<div className="flex items-center gap-3">
-														<div className="w-9 h-9 rounded-xl bg-[#a50064] text-white flex items-center justify-center font-black text-xs shadow-md">
-															M
-														</div>
-														<div>
-															<p className="font-bold text-sm text-white">Ví điện tử MoMo</p>
-															<p className="text-[11px] text-slate-400">Thanh toán tức thì qua ứng dụng MoMo</p>
-														</div>
-													</div>
-													{paymentMethod === 'momo' && (
-														<span className="w-5 h-5 rounded-full bg-pink-500 text-white flex items-center justify-center text-[10px] font-bold">
-															✓
-														</span>
-													)}
-												</button> */}
-
-                        {/* VNPay */}
-                        {/* <button
-													type="button"
-													onClick={() => setPaymentMethod('vnpay')}
-													className={`p-3.5 rounded-xl border flex items-center justify-between text-left transition-all ${
-														paymentMethod === 'vnpay'
-															? 'bg-blue-500/15 border-blue-500/60 ring-1 ring-blue-500/30 text-white'
-															: 'bg-white/5 border-white/10 text-slate-300 hover:bg-white/10'
-													}`}
-												>
-													<div className="flex items-center gap-3">
-														<div className="w-9 h-9 rounded-xl bg-[#005baa] text-white flex items-center justify-center font-black text-xs shadow-md">
-															VNP
-														</div>
-														<div>
-															<p className="font-bold text-sm text-white">Cổng thanh toán VNPAY</p>
-															<p className="text-[11px] text-slate-400">Thẻ ATM nội địa, Visa, MasterCard</p>
-														</div>
-													</div>
-													{paymentMethod === 'vnpay' && (
-														<span className="w-5 h-5 rounded-full bg-blue-500 text-white flex items-center justify-center text-[10px] font-bold">
-															✓
-														</span>
-													)}
-												</button> */}
+                    {/* Phương thức thanh toán – chỉ VietQR */}
+                    <div className="pt-2 border-t border-white/5">
+                      <div className="p-3.5 rounded-xl border bg-red-500/15 border-red-500/60 ring-1 ring-red-500/30 flex items-center gap-3">
+                        <div className="w-9 h-9 rounded-xl bg-red-600 text-white flex items-center justify-center shadow-md shrink-0">
+                          <QrCode className="w-5 h-5" />
+                        </div>
+                        <div>
+                          <p className="font-bold text-sm text-white">Chuyển khoản VietQR</p>
+                          <p className="text-[11px] text-slate-400">Quét mã QR tự động 24/7 – xác nhận tức thì</p>
+                        </div>
+                        <span className="ml-auto w-5 h-5 rounded-full bg-red-500 text-white flex items-center justify-center text-[10px] font-bold shrink-0">✓</span>
                       </div>
                     </div>
                   </CardContent>

@@ -12,7 +12,7 @@ export async function createBookingApi(body: {
   totalPrice?: number;
   ticketPackageId?: number;
   pay_txt_code: string;
-  combo: string[];
+  combo?: string[];
   vr_items?: VRPackageItem[];
   voucher_code?: string;
   branch_id?: number;
@@ -31,7 +31,7 @@ export async function validateBookingApi(body: {
   movieId?: number;
   ticketCount: number;
   ticketPackageId?: number;
-  combo: string[];
+  combo?: string[];
   vr_items?: VRPackageItem[];
   voucher_code?: string;
   branch_id?: number;

@@ -169,13 +169,18 @@ export default function TicketCheckContent() {
     setUseLoading(true); // Bật hiệu ứng loading trên button
 
     try {
-      if (confirmType === 'checkin') {
-        // 1. Xử lý xác nhận vào cổng
-        const res = await useTicketApi(ticketInfo.booking_code);
+      if (confirmType === 'checkin' || (confirmType as string) === 'force_checkin') {
+        // 1. Xử lý xác nhận vào cổng (hỗ trợ cả vé bình thường và vé quá hạn)
+        const isForce = (confirmType as string) === 'force_checkin';
+        const res = await useTicketApi(ticketInfo.booking_code, isForce);
         if (res?.status === 'success') {
           const isVR = ticketInfo.booking_type === 'vr';
           toast.success('Thành công', {
-            description: isVR ? 'Đã xác nhận khách vào phòng VR' : 'Đã xác nhận cho khách vào cổng'
+            description: isForce
+              ? 'Đã duyệt du di cho vé quá hạn vào cổng thành công!'
+              : isVR
+                ? 'Đã xác nhận khách vào phòng VR'
+                : 'Đã xác nhận cho khách vào cổng'
           });
 
           // Cập nhật giao diện ngay lập tức
@@ -184,6 +189,7 @@ export default function TicketCheckContent() {
             is_used: true,
             can_use: false,
             valid: false,
+            expired: false,
             checked_in_at: new Date().toISOString()
           });
 
@@ -702,15 +708,37 @@ export default function TicketCheckContent() {
                         </label>
                       </div>
                     </div>
-                  ) : /* Trường hợp 1: Vé đã hết hạn (Khóa mọi hành động) */
+                  ) : /* Trường hợp 1: Vé đã hết hạn (Cho phép duyệt du di nếu chưa sử dụng) */
                   ticketInfo.expired ? (
-                    <div className="py-5 px-6 rounded-2xl bg-slate-200 text-slate-600 font-bold border border-slate-300 flex flex-col gap-2 shadow-inner">
-                      <div className="flex items-center justify-center gap-2">
-                        <AlertCircle size={24} />
-                        <span className="text-xl font-bold">Không thể sử dụng</span>
+                    ticketInfo.is_used ? (
+                      <div className="py-5 px-6 rounded-2xl bg-slate-200 text-slate-600 font-bold border border-slate-300 flex flex-col gap-2 shadow-inner">
+                        <div className="flex items-center justify-center gap-2">
+                          <AlertCircle size={24} />
+                          <span className="text-xl font-bold">Không thể sử dụng</span>
+                        </div>
+                        <p className="text-xs opacity-80">Vé này đã quá hạn dùng và đã từng được sử dụng</p>
                       </div>
-                      <p className="text-xs opacity-80">Vé này đã quá hạn dùng và bị vô hiệu hóa</p>
-                    </div>
+                    ) : (
+                      <div className="space-y-3">
+                        <div className="py-4 px-5 rounded-2xl bg-amber-50 text-amber-800 font-bold border border-amber-200 flex flex-col gap-1 shadow-xs">
+                          <div className="flex items-center justify-center gap-2 text-amber-700">
+                            <AlertTriangle size={20} />
+                            <span className="text-base font-bold">Vé đã hết hạn sử dụng</span>
+                          </div>
+                          <p className="text-xs text-amber-600 font-normal">Vé này đã quá hạn dùng nhưng chưa được sử dụng trước đây.</p>
+                        </div>
+                        <Button
+                          onClick={() => {
+                            setConfirmType('force_checkin' as any);
+                            setConfirmOpen(true);
+                          }}
+                          disabled={useLoading || !hasPermission('ticket_check', 'validate')}
+                          className="w-full h-14 bg-amber-600 hover:bg-amber-700 text-white font-bold text-base shadow-lg shadow-amber-200 rounded-xl"
+                        >
+                          <CheckCircle2 className="w-5 h-5 mr-2" /> Duyệt du di cho vào cổng
+                        </Button>
+                      </div>
+                    )
                   ) : /* Trường hợp 2: Chưa thanh toán HOẶC Đã hủy nhưng cho phép xác nhận */
                   ticketInfo.payment_status !== 'paid' ? (
                     <Button
@@ -805,13 +833,19 @@ export default function TicketCheckContent() {
         <AlertDialogContent className="rounded-2xl border-none shadow-2xl p-8">
           <AlertDialogHeader className="space-y-3">
             <AlertDialogTitle className="text-2xl font-bold text-slate-900">
-              {confirmType === 'checkin' ? '⚠️ Xác nhận vào cổng?' : '💰 Xác nhận thanh toán?'}
+              {confirmType === 'checkin'
+                ? '⚠️ Xác nhận vào cổng?'
+                : (confirmType as string) === 'force_checkin'
+                  ? '⚠️ Duyệt du di vé quá hạn?'
+                  : '💰 Xác nhận thanh toán?'}
             </AlertDialogTitle>
             <AlertDialogDescription className="text-slate-500 text-base leading-relaxed space-y-3">
               <p>
                 {confirmType === 'checkin'
                   ? `Bạn đang thực hiện cho ${ticketInfo?.ticket_count} khách vào cổng. Hành động này không thể hoàn tác.`
-                  : `Bạn đã đối soát thành công số tiền ${Number(ticketInfo?.total_price).toLocaleString('vi-VN')}đ cho ID #${ticketInfo?.id}?`}
+                  : (confirmType as string) === 'force_checkin'
+                    ? `Vé mã ${ticketInfo?.booking_code} đã hết hạn. Bạn có chắc chắn muốn duyệt du di cho khách vào cổng không? Thao tác này sẽ được lưu lại trong nhật ký hệ thống (Audit Log).`
+                    : `Bạn đã đối soát thành công số tiền ${Number(ticketInfo?.total_price).toLocaleString('vi-VN')}đ cho ID #${ticketInfo?.id}?`}
               </p>
               {isBranchMismatch && (
                 <div className="p-3.5 bg-amber-500/10 border border-amber-500/30 rounded-xl text-amber-900 text-xs font-semibold flex items-start gap-2.5 text-left mt-2">
@@ -836,7 +870,11 @@ export default function TicketCheckContent() {
               }}
               disabled={useLoading}
               className={`h-12 px-8 rounded-xl font-bold min-w-[160px] ${
-                confirmType === 'checkin' ? 'bg-green-600 hover:bg-green-700' : 'bg-amber-500 hover:bg-amber-600'
+                confirmType === 'checkin'
+                  ? 'bg-green-600 hover:bg-green-700'
+                  : (confirmType as string) === 'force_checkin'
+                    ? 'bg-amber-600 hover:bg-amber-700'
+                    : 'bg-amber-500 hover:bg-amber-600'
               }`}
             >
               {useLoading ? (

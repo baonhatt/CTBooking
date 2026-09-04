@@ -1852,10 +1852,16 @@ app.post('/api/bookings-use', requireStaffAuth, requirePermission('ticket_check'
   const body = await c.req.json().catch(() => ({}));
 
   const code = String((body as any)?.code || '');
+  const allowExpired = Boolean((body as any)?.allow_expired);
 
   const restrictBranchIds = getRestrictBranchIds(c);
+  const staffInfo = {
+    id: c.get('staffId'),
+    email: c.get('staffEmail'),
+    fullname: c.get('staffFullname')
+  };
 
-  const r = await confirmUseTicketImpl(db, code, tables, restrictBranchIds);
+  const r = await confirmUseTicketImpl(db, code, tables, restrictBranchIds, allowExpired, staffInfo);
 
   const status = (r as any)?.status === 'error' ? 400 : 200;
 
@@ -6042,6 +6048,7 @@ app.get('/api/admin/deleted/vouchers', requireStaffAuth, requirePermission('vouc
     const page = Number(c.req.query('page') || 1);
     const pageSize = Number(c.req.query('pageSize') || 10);
     const search = String(c.req.query('q') || c.req.query('search') || '');
+    const scope = c.req.query('scope') || '';
     const restrictBranchIds = getRestrictBranchIds(c);
 
     const db = drizzle(c.env.cinema_db, { schema });
@@ -6049,7 +6056,30 @@ app.get('/api/admin/deleted/vouchers', requireStaffAuth, requirePermission('vouc
     const r = await listDeletedVouchersImpl(
       db,
       { vouchers: schema.vouchers },
-      { page, pageSize, search, restrictToBranchIds: restrictBranchIds }
+      { page, pageSize, search, scope, restrictToBranchIds: restrictBranchIds }
+    );
+
+    return c.json(r, 200 as any);
+  } catch (err: any) {
+    return c.json({ status: 'error', message: String(err?.message || 'Internal error') }, 500 as any);
+  }
+});
+
+// Alias for deleted vouchers endpoint
+app.get('/api/admin/vouchers/deleted', requireStaffAuth, requirePermission('vouchers', 'view_deleted'), async (c) => {
+  try {
+    const page = Number(c.req.query('page') || 1);
+    const pageSize = Number(c.req.query('pageSize') || 10);
+    const search = String(c.req.query('q') || c.req.query('search') || '');
+    const scope = c.req.query('scope') || '';
+    const restrictBranchIds = getRestrictBranchIds(c);
+
+    const db = drizzle(c.env.cinema_db, { schema });
+
+    const r = await listDeletedVouchersImpl(
+      db,
+      { vouchers: schema.vouchers },
+      { page, pageSize, search, scope, restrictToBranchIds: restrictBranchIds }
     );
 
     return c.json(r, 200 as any);

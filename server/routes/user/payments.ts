@@ -5,6 +5,7 @@ import { mailQueue } from '../../lib/mail-queue';
 import { formatDateForDb } from '../../lib/date-utils';
 import { redeemVoucherAfterPaymentImpl, validateVoucherForVRImpl } from './vouchers';
 import { releaseVoucherForCancelledBooking } from '../scheduled/booking-expiry';
+import { logAuditAction } from '../../lib/audit-logger';
 
 class HttpError extends Error {
   status: number;
@@ -1027,8 +1028,10 @@ export async function getBookingByCodeImpl(anyDb: any, codeRaw: string, tables: 
 export async function confirmUseTicketImpl(
   anyDb: any,
   codeRaw: string,
-  tables: { bookings: any },
-  restrictToBranchIds: number[] | null = null
+  tables: { bookings: any; auditLogs?: any },
+  restrictToBranchIds: number[] | null = null,
+  allowExpired: boolean = false,
+  staffInfo?: { id: number; email: string; fullname: string } | null
 ) {
   try {
     const code = String(codeRaw || '');
@@ -1051,11 +1054,17 @@ export async function confirmUseTicketImpl(
       }
     }
     const isPaid = (booking.payment_status || '').toLowerCase() === 'paid';
+    if (!isPaid) return { status: 400, message: 'Vé chưa được thanh toán thành công' };
+    if (booking.is_used) return { status: 400, message: 'Vé này đã được sử dụng trước đó' };
+
     const paidAt = booking.paid_at ? new Date(booking.paid_at) : null;
     const expiryAt = booking.expiry_date ? new Date(booking.expiry_date as any) : null;
     const expired = Boolean(expiryAt && Date.now() > expiryAt.getTime());
-    const valid = Boolean(isPaid && paidAt && expiryAt && !expired && !booking.is_used);
-    if (!valid) return { status: 400, message: 'Vé không còn hiệu lực hoặc đã sử dụng' };
+
+    if (expired && !allowExpired) {
+      return { status: 400, message: 'Vé đã hết hạn sử dụng. Vui lòng bấm "Duyệt quá hạn" nếu muốn cho khách vào.' };
+    }
+
     // Update booking (tương thích với D1/SQLite không hỗ trợ .returning())
     const updatedRes = await anyDb
       .update(bookingsTable)
@@ -1070,9 +1079,31 @@ export async function confirmUseTicketImpl(
     const updated = Array.isArray(updatedRes) ? updatedRes[0] : updatedRes;
 
     if (!updated) return { status: 500, message: 'Không thể cập nhật trạng thái vé' };
+
+    // Log audit log if this check-in was forced for an expired ticket
+    if (expired && allowExpired && staffInfo && tables.auditLogs) {
+      try {
+        await logAuditAction(
+          anyDb,
+          tables.auditLogs,
+          'force_checkin',
+          'booking',
+          booking.id,
+          `Duyệt du di cho vé quá hạn vào cổng (Mã: ${booking.booking_code})`,
+          staffInfo.id,
+          staffInfo.email,
+          staffInfo.fullname,
+          JSON.stringify({ is_used: false, expired: true }),
+          JSON.stringify({ is_used: true, forced_by: staffInfo.email })
+        );
+      } catch (err) {
+        console.error('Audit log error on force check-in:', err);
+      }
+    }
+
     return {
       status: 200,
-      message: 'Xác nhận sử dụng vé thành công',
+      message: expired && allowExpired ? 'Đã duyệt du di cho vé quá hạn vào cổng' : 'Xác nhận sử dụng vé thành công',
       booking: { id: updated.id, is_used: updated.is_used }
     };
   } catch (err: any) {

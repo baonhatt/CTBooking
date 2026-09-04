@@ -100,13 +100,13 @@ export async function getBookingByCodeApi(code: string) {
   }>(`/api/bookings-code/${code}`);
 }
 
-export async function useTicketApi(code: string) {
+export async function useTicketApi(code: string, allowExpired: boolean = false) {
   return request<{
     status: string;
     message: string;
     booking: { id: number; is_used: boolean };
   }>(`/api/bookings-use`, {
     method: 'POST',
-    body: JSON.stringify({ code })
+    body: JSON.stringify({ code, allow_expired: allowExpired })
   });
 }

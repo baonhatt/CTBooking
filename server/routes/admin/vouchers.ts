@@ -164,16 +164,19 @@ export async function listVouchersImpl(
 export async function listDeletedVouchersImpl(
   anyDb: any,
   tables: { vouchers: any },
-  options: { page?: number; pageSize?: number; search?: string; restrictToBranchIds?: number[] | null } = {}
+  options: { page?: number; pageSize?: number; search?: string; scope?: string; restrictToBranchIds?: number[] | null } = {}
 ) {
   const { vouchers } = tables;
-  const { page = 1, pageSize = 10, search = '', restrictToBranchIds = null } = options;
+  const { page = 1, pageSize = 10, search = '', scope, restrictToBranchIds = null } = options;
   const conditions = [] as any[];
   if (search) {
     const lowerQ = search.toLowerCase();
     conditions.push(
       or(sql`LOWER(${vouchers.code}) LIKE ${`%${lowerQ}%`}`, sql`LOWER(${vouchers.name}) LIKE ${`%${lowerQ}%`}`)
     );
+  }
+  if (scope && scope !== 'all') {
+    conditions.push(eq(vouchers.scope, scope));
   }
   conditions.push(isNotNull(vouchers.deleted_at));
 

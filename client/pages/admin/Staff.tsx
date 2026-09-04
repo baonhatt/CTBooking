@@ -240,6 +240,14 @@ export default function StaffPage() {
   };
 
   const handleCreate = () => {
+    if (!formData.email?.trim() || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email.trim())) {
+      toast.error('Email không hợp lệ');
+      return;
+    }
+    if (!formData.fullname?.trim()) {
+      toast.error('Vui lòng nhập họ và tên');
+      return;
+    }
     const dataToSend = {
       ...formData,
       roleIds: formData.roleId ? [parseInt(formData.roleId)] : []
@@ -367,7 +375,7 @@ export default function StaffPage() {
                     setLocalSearch('');
                     setSearch('');
                     setFilterRole('');
-                    setFilterBranch('');
+                    setFilterBranch(staff?.isSuperAdmin ? 'all' : '');
                     queryClient.invalidateQueries({ queryKey: ['staff'] });
                   }}
                   className="h-10 w-10 hover:rotate-180 transition-transform duration-500 shrink-0"
@@ -670,7 +678,7 @@ export default function StaffPage() {
               <div className="space-y-4 py-4">
                 <div>
                   <Label>Email *</Label>
-                  <Input value={formData.email} onChange={(e) => setFormData({ ...formData, email: e.target.value })} />
+                  <Input value={formData.email} readOnly className="bg-slate-100 text-slate-500 cursor-not-allowed border-slate-200" />
                 </div>
                 <div>
                   <Label>Họ tên *</Label>
