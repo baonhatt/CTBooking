@@ -735,7 +735,7 @@ export default function TicketCheckContent() {
                           disabled={useLoading || !hasPermission('ticket_check', 'validate')}
                           className="w-full h-14 bg-amber-600 hover:bg-amber-700 text-white font-bold text-base shadow-lg shadow-amber-200 rounded-xl"
                         >
-                          <CheckCircle2 className="w-5 h-5 mr-2" /> Duyệt du di cho vào cổng
+                          <CheckCircle2 className="w-5 h-5 mr-2" /> Duyệt Vào Cổng Vé Hết Hạn
                         </Button>
                       </div>
                     )

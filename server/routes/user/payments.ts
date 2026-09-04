@@ -65,10 +65,6 @@ async function validateBookingInput(
   if (ticketCount > MAX_TICKET_PER_ORDER) {
     throw new HttpError(400, `Mỗi lượt chỉ đặt tối đa ${MAX_TICKET_PER_ORDER} vé.`);
   }
-  if (!combo || !Array.isArray(combo) || combo.length === 0) {
-    throw new HttpError(400, 'Vui lòng chọn ít nhất một bộ phim trong combo.');
-  }
-
   const usersTable = tables.users;
   const accountsTable = tables.accounts;
   const moviesTable = tables.movies;
@@ -90,22 +86,6 @@ async function validateBookingInput(
   const user = userResult[0];
   const userEmail = user?.email || email;
 
-  // Fetch all movies in the combo
-  const movies = await anyDb.query.movies.findMany({
-    where: and(
-      inArray(
-        moviesTable.id,
-        combo.map((id) => Number(id))
-      ),
-      eq(moviesTable.is_active, true),
-      isNull(moviesTable.deleted_at)
-    )
-  });
-
-  if (movies.length !== combo.length) {
-    throw new HttpError(404, 'Một số phim trong combo không hợp lệ hoặc đã ngừng hoạt động.');
-  }
-
   let ticketPackage: any = null;
   if (ticketPackageId) {
     ticketPackage = await anyDb.query.ticket_packages.findFirst({
@@ -125,6 +105,34 @@ async function validateBookingInput(
     });
     if (!ticketPackage) {
       throw new HttpError(400, 'Không tìm thấy gói vé khả dụng.');
+    }
+  }
+
+  // Determine combo IDs if passed explicitly or attached to ticketPackage
+  let comboIds: number[] = [];
+  if (combo && Array.isArray(combo) && combo.length > 0) {
+    comboIds = combo.map((id) => Number(id)).filter((id) => !isNaN(id));
+  } else if (ticketPackage?.combo) {
+    try {
+      const parsed = typeof ticketPackage.combo === 'string' ? JSON.parse(ticketPackage.combo) : ticketPackage.combo;
+      if (Array.isArray(parsed)) {
+        comboIds = parsed.map((id: any) => Number(id)).filter((id) => !isNaN(id));
+      }
+    } catch {}
+  }
+
+  let movies: any[] = [];
+  if (comboIds.length > 0) {
+    movies = await anyDb.query.movies.findMany({
+      where: and(
+        inArray(moviesTable.id, comboIds),
+        eq(moviesTable.is_active, true),
+        isNull(moviesTable.deleted_at)
+      )
+    });
+
+    if (combo && Array.isArray(combo) && combo.length > 0 && movies.length !== combo.length) {
+      throw new HttpError(404, 'Một số phim trong combo không hợp lệ hoặc đã ngừng hoạt động.');
     }
   }
 
@@ -327,10 +335,19 @@ export async function createPaymentImpl(
 
     const bookingsTable = tables.bookings;
 
-    // Format movie details as pipe-separated strings
-    const movieTitles = JSON.stringify(movies.map((m) => m.title));
-    const movieDurations = JSON.stringify(movies.map((m) => m.duration_min));
-    const moviePosters = JSON.stringify(movies.map((m) => m.cover_image));
+    // Format movie details as JSON strings
+    const movieTitles =
+      movies.length > 0
+        ? JSON.stringify(movies.map((m) => m.title))
+        : JSON.stringify([validation.ticketPackage?.name || 'Vé Phim 8K']);
+    const movieDurations =
+      movies.length > 0
+        ? JSON.stringify(movies.map((m) => m.duration_min))
+        : JSON.stringify([0]);
+    const moviePosters =
+      movies.length > 0
+        ? JSON.stringify(movies.map((m) => m.cover_image))
+        : JSON.stringify(['']);
 
     // Use explicit UTC ISO timestamps for created_at/updated_at để đồng bộ giữa Postgres & D1
     const nowIso = new Date();
