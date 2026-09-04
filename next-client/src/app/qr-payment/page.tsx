@@ -198,29 +198,38 @@ export default function QRPaymentPage() {
     router.replace('/success-payment');
   };
 
-  // --- Auto Polling Logic (every 15s) ---
+  // --- Auto Polling Logic (every 5s) ---
   useEffect(() => {
     const bId = paymentData?.bookingId || paymentData?.booking_id;
-    if (!bId || timeLeft <= 0) return;
+    if (!bId) return;
 
-    const intervalId = setInterval(async () => {
+    const checkPaymentStatus = async () => {
       try {
+        const savedEndTime = localStorage.getItem('qrPaymentEndTime');
+        const endTime = savedEndTime ? parseInt(savedEndTime, 10) : 0;
+        if (endTime && Date.now() >= endTime) return;
+
         const baseUrl = process.env.NEXT_PUBLIC_SERVER_BASE_URL || '';
         const res = await fetch(`${baseUrl}/api/bookings/${bId}`, { cache: 'no-store' });
         if (res.ok) {
           const booking = await res.json();
           if (booking.payment_status === 'paid') {
-            clearInterval(intervalId);
             handleSuccess();
           }
         }
       } catch (error) {
         console.error('Auto polling error:', error);
       }
-    }, 15000);
+    };
+
+    // Run immediate check on load / paymentData ready
+    checkPaymentStatus();
+
+    // Poll every 5s for fast response when customer transfers money
+    const intervalId = setInterval(checkPaymentStatus, 5000);
 
     return () => clearInterval(intervalId);
-  }, [paymentData, timeLeft]);
+  }, [paymentData]);
 
   const handleExpired = async () => {
     const data = paymentDataRef.current;

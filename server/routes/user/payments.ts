@@ -3,7 +3,7 @@ import { eq, and, asc, desc, isNull, or, inArray, sql, like } from 'drizzle-orm'
 import { generateBookingCode, getBookingEmailTemplate } from '../../lib/booking-utils';
 import { mailQueue } from '../../lib/mail-queue';
 import { formatDateForDb } from '../../lib/date-utils';
-import { redeemVoucherAfterPaymentImpl, validateVoucherForVRImpl } from './vouchers';
+import { redeemVoucherAfterPaymentImpl, validateVoucherForVRImpl, matchesBranch } from './vouchers';
 import { releaseVoucherForCancelledBooking } from '../scheduled/booking-expiry';
 import { logAuditAction } from '../../lib/audit-logger';
 
@@ -139,6 +139,9 @@ async function validateBookingInput(
   // Branch check: Ensure the branch is open
   let branchSettings: any = {};
   const targetBranchId = ticketPackage.branch_id || branch_id;
+  if (ticketPackage && !matchesBranch(ticketPackage.branch_ids, targetBranchId)) {
+    throw new HttpError(400, `Gói vé "${ticketPackage.name}" không áp dụng tại chi nhánh bạn chọn.`);
+  }
   if (targetBranchId) {
     const branch = await anyDb.query.branches.findFirst({
       where: and(eq(branchesTable.id, targetBranchId), isNull(branchesTable.deleted_at))
