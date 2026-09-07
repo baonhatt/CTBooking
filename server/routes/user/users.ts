@@ -136,13 +136,13 @@ export async function listUserTransactionsImpl(
   // 3. Xây dựng điều kiện lọc
   const conditions: any[] = [eq(tables.bookings.user_id, account.user_id)];
 
-  // Calculate 3 hours ago
-  const threeHoursAgo = new Date(Date.now() - 3 * 60 * 60 * 1000);
-  const threeHoursAgoStr = formatDateForDb(threeHoursAgo);
+  // Calculate 10 minutes ago
+  const tenMinutesAgo = new Date(Date.now() - 10 * 60 * 1000);
+  const tenMinutesAgoStr = formatDateForDb(tenMinutesAgo);
 
   const mainFilter = or(
     eq(tables.bookings.payment_status, 'paid'),
-    and(sql`lower(${tables.bookings.payment_status}) = 'pending'`, gte(tables.bookings.created_at, threeHoursAgoStr))
+    and(sql`lower(${tables.bookings.payment_status}) = 'pending'`, gte(tables.bookings.created_at, tenMinutesAgoStr))
   );
 
   conditions.push(mainFilter);
@@ -210,6 +210,9 @@ export async function listUserTransactionsImpl(
       ticket_package: b.ticket_package_name || '',
       quantity: Number(b.ticket_count || 0),
       amount: Number(b.total_price || 0),
+      original_amount: Number(b.original_total_price || b.total_price || 0),
+      discount_amount: Number(b.voucher_discount_amount || 0),
+      voucher_code: b.voucher_code_snapshot || null,
       ticket_unit_price: Number(b.ticket_unit_price || 0),
       method: b.payment_method || '',
       payment_status: b.payment_status || '',

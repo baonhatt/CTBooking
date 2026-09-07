@@ -617,7 +617,7 @@ export default function BranchesPage() {
 
       {/* Detail Dialog */}
       <Dialog open={isDetailDialogOpen} onOpenChange={setIsDetailDialogOpen}>
-        <DialogContent className="[&>button]:hidden max-w-4xl">
+        <DialogContent className="[&>button]:hidden bg-white sm:max-w-4xl max-h-[85vh] overflow-y-auto rounded-2xl">
           <DialogHeader className="flex flex-row items-center gap-3 space-y-0 pb-4 border-b">
             <DialogTitle className="text-lg font-bold text-slate-800">Chi tiết chi nhánh</DialogTitle>
             <div className="flex-1" />
@@ -1496,7 +1496,7 @@ function BranchEditModal({ isOpen, onClose, data, onSave, branches }: any) {
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div className="flex items-center justify-between bg-slate-50 p-2.5 rounded-lg border border-slate-100">
                       <span className="text-xs font-semibold text-slate-700 flex items-center gap-2">
-                        <div className="w-6 h-6 rounded bg-[#0068ff] text-white flex items-center justify-center">
+                        <div className="w-6 h-6 rounded bg-blue-600 text-white flex items-center justify-center">
                           <svg
                             xmlns="http://www.w3.org/2000/svg"
                             width="14"

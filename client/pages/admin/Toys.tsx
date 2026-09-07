@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { getToys, deleteToyApi } from '@/lib/api';
 import AdminLayout from '@/admin/layouts/AdminLayout';
 import ToysContent from '@/components/admin/content/ToysContent';
-import AdminEditModal from '@/components/admin/AdminEditModal';
+import { ToyEditModal } from '@/components/admin/dialogs/ToyEditModal';
 import { useStaffStore } from '@/store/staffStore';
 import { useNavigate } from 'react-router-dom';
 
@@ -18,7 +18,6 @@ export default function ToysPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [showActiveOnly, setShowActiveOnly] = useState(false);
   const [isEditOpen, setIsEditOpen] = useState(false);
-  const [editType, setEditType] = useState<'toy' | null>(null);
   const [editData, setEditData] = useState<any>({});
   const [isLoading, setIsLoading] = useState(false);
 
@@ -50,12 +49,10 @@ export default function ToysPage() {
   const toysTotalPages = useMemo(() => Math.max(1, Math.ceil(totalToys / pageSize)), [totalToys]);
 
   const handleOpenEdit = (_type: 'toy', data: any) => {
-    setEditType('toy');
     setEditData(data);
     setIsEditOpen(true);
   };
   const handleOpenCreate = () => {
-    setEditType('toy');
     setEditData({
       id: 0,
       name: '',
@@ -124,20 +121,13 @@ export default function ToysPage() {
         showActiveOnly={showActiveOnly}
         setShowActiveOnly={setShowActiveOnly}
       />
-      <AdminEditModal
+      <ToyEditModal
         isEditOpen={isEditOpen}
         setIsEditOpen={setIsEditOpen}
-        editType={editType as any}
         editData={editData}
         setEditData={setEditData}
-        setUsers={() => {}}
-        moviesLocal={[]}
-        toLocalDateTimeString={(d: Date) => d.toISOString().slice(0, 16)}
-        pageSize={pageSize}
-        currentPage={toysPage}
-        setMoviesLocal={() => {}}
-        setMovieStatus={() => {}}
         setToys={setToys}
+        onRefresh={handleRefresh}
       />
     </AdminLayout>
   );

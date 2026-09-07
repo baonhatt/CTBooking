@@ -11,6 +11,7 @@ import { toast } from 'sonner';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { request } from '@/lib/api/http';
+import { ConfirmDeleteDialog } from '@/components/admin/dialogs/ConfirmDeleteDialog';
 import { getAdminBranchOptions } from '@/lib/api';
 import AdminLayout from '@/admin/layouts/AdminLayout';
 import { useStaffStore } from '@/store/staffStore';
@@ -116,6 +117,7 @@ export default function StaffPage() {
     roleId: '',
     branchIds: [] as number[]
   });
+  const [errors, setErrors] = useState<Record<string, string>>({});
 
   // Alert dialogs moved below mutations
 
@@ -266,15 +268,19 @@ export default function StaffPage() {
       roleId: '',
       branchIds: []
     });
+    setErrors({});
   };
 
   const handleCreate = () => {
+    const newErrors: Record<string, string> = {};
     if (!formData.email?.trim() || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email.trim())) {
-      toast.error('Email không hợp lệ');
-      return;
+      newErrors.email = 'Email không hợp lệ';
     }
     if (!formData.fullname?.trim()) {
-      toast.error('Vui lòng nhập họ và tên');
+      newErrors.fullname = 'Vui lòng nhập họ và tên';
+    }
+    if (Object.keys(newErrors).length > 0) {
+      setErrors(newErrors);
       return;
     }
     const dataToSend = {
@@ -286,6 +292,14 @@ export default function StaffPage() {
 
   const handleUpdate = () => {
     if (!selectedStaff) return;
+    const newErrors: Record<string, string> = {};
+    if (!formData.fullname?.trim()) {
+      newErrors.fullname = 'Vui lòng nhập họ và tên';
+    }
+    if (Object.keys(newErrors).length > 0) {
+      setErrors(newErrors);
+      return;
+    }
     const dataToSend = {
       ...formData,
       roleIds: formData.roleId ? [parseInt(formData.roleId)] : []
@@ -589,7 +603,7 @@ export default function StaffPage() {
         {/* Create Dialog */}
         <CreateAlert />
         <Dialog open={isCreateDialogOpen} onOpenChange={handleCreateOpenChange}>
-          <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto [&>button]:hidden">
+          <DialogContent className="[&>button]:hidden bg-white sm:max-w-2xl max-h-[80vh] overflow-y-auto rounded-2xl">
             <DialogHeader className="flex flex-row items-center gap-3 space-y-0 pb-4 border-b">
               <DialogTitle className="text-lg font-bold text-slate-800">Tạo nhân viên mới</DialogTitle>
               <div className="flex-1" />
@@ -612,14 +626,27 @@ export default function StaffPage() {
               <div className="space-y-4 py-4">
                 <div>
                   <Label>Email *</Label>
-                  <Input value={formData.email} onChange={(e) => setFormData({ ...formData, email: e.target.value })} />
+                  <Input 
+                    value={formData.email} 
+                    onChange={(e) => {
+                      setFormData({ ...formData, email: e.target.value });
+                      if (errors.email) setErrors((prev) => ({ ...prev, email: '' }));
+                    }} 
+                    className={errors.email ? 'border-destructive' : ''}
+                  />
+                  {errors.email && <p className="text-destructive text-xs mt-1">{errors.email}</p>}
                 </div>
                 <div>
                   <Label>Họ tên *</Label>
                   <Input
                     value={formData.fullname}
-                    onChange={(e) => setFormData({ ...formData, fullname: e.target.value })}
+                    onChange={(e) => {
+                      setFormData({ ...formData, fullname: e.target.value });
+                      if (errors.fullname) setErrors((prev) => ({ ...prev, fullname: '' }));
+                    }}
+                    className={errors.fullname ? 'border-destructive' : ''}
                   />
+                  {errors.fullname && <p className="text-destructive text-xs mt-1">{errors.fullname}</p>}
                 </div>
                 <div>
                   <Label>Số điện thoại</Label>
@@ -686,7 +713,7 @@ export default function StaffPage() {
         {/* Edit Dialog */}
         <EditAlert />
         <Dialog open={isEditDialogOpen} onOpenChange={handleEditOpenChange}>
-          <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto [&>button]:hidden">
+          <DialogContent className="[&>button]:hidden bg-white sm:max-w-2xl max-h-[80vh] overflow-y-auto rounded-2xl">
             <DialogHeader className="flex flex-row items-center gap-3 space-y-0 pb-4 border-b">
               <DialogTitle className="text-lg font-bold text-slate-800">Chỉnh sửa nhân viên</DialogTitle>
               <div className="flex-1" />
@@ -715,8 +742,13 @@ export default function StaffPage() {
                   <Label>Họ tên *</Label>
                   <Input
                     value={formData.fullname}
-                    onChange={(e) => setFormData({ ...formData, fullname: e.target.value })}
+                    onChange={(e) => {
+                      setFormData({ ...formData, fullname: e.target.value });
+                      if (errors.fullname) setErrors((prev) => ({ ...prev, fullname: '' }));
+                    }}
+                    className={errors.fullname ? 'border-destructive' : ''}
                   />
+                  {errors.fullname && <p className="text-destructive text-xs mt-1">{errors.fullname}</p>}
                 </div>
                 <div>
                   <Label>Số điện thoại</Label>
@@ -799,46 +831,21 @@ export default function StaffPage() {
         </Dialog>
 
         {/* Delete Dialog */}
-        <Dialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
-          <DialogContent className="[&>button]:hidden">
-            <DialogHeader className="flex flex-row items-center gap-3 space-y-0 pb-4 border-b">
-              <DialogTitle className="text-lg font-bold text-slate-800">Xác nhận xóa</DialogTitle>
-              <div className="flex-1" />
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={() => setIsDeleteDialogOpen(false)}
-                className="h-8 w-8 rounded-full hover:bg-slate-100 text-slate-400 transition-colors"
-                title="Đóng"
-              >
-                <X className="w-5 h-5" />
-              </Button>
-            </DialogHeader>
-            <p className="py-4">
+        <ConfirmDeleteDialog
+          isOpen={isDeleteDialogOpen}
+          onOpenChange={setIsDeleteDialogOpen}
+          description={
+            <>
               Bạn có chắc chắn muốn xóa nhân viên "{selectedStaff?.fullname}"? Hành động này không thể hoàn tác.
-            </p>
-            <DialogFooter>
-              <Button
-                variant="ghost"
-                onClick={() => setIsDeleteDialogOpen(false)}
-                className="text-slate-500 hover:bg-slate-100"
-              >
-                Hủy
-              </Button>
-              <Button
-                onClick={handleDelete}
-                disabled={deleteMutation.isPending}
-                className="bg-red-600 hover:bg-red-700 min-w-[140px] rounded-xl shadow-lg shadow-red-500/20 transition-all active:scale-95"
-              >
-                {deleteMutation.isPending ? 'Đang xóa...' : 'Xóa'}
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
+            </>
+          }
+          onConfirm={handleDelete}
+          isDeleting={deleteMutation.isPending}
+        />
 
         {/* Reset Password Dialog */}
         <Dialog open={isResetPasswordDialogOpen} onOpenChange={setIsResetPasswordDialogOpen}>
-          <DialogContent className="[&>button]:hidden">
+          <DialogContent className="[&>button]:hidden bg-white sm:max-w-md rounded-2xl">
             <DialogHeader className="flex flex-row items-center gap-3 space-y-0 pb-4 border-b">
               <DialogTitle className="text-lg font-bold text-slate-800">Đặt lại mật khẩu</DialogTitle>
               <div className="flex-1" />
@@ -869,7 +876,7 @@ export default function StaffPage() {
 
         {/* Detail Dialog */}
         <Dialog open={isDetailDialogOpen} onOpenChange={setIsDetailDialogOpen}>
-          <DialogContent className="max-w-4xl max-h-[85vh] overflow-y-auto pr-2 custom-scrollbar [&>button]:hidden">
+          <DialogContent className="[&>button]:hidden bg-white sm:max-w-4xl max-h-[85vh] overflow-y-auto pr-2 custom-scrollbar rounded-2xl">
             <DialogHeader className="flex flex-row items-center gap-3 space-y-0 pb-4 border-b">
               <DialogTitle className="text-lg font-bold text-slate-800">Chi tiết nhân viên</DialogTitle>
               <div className="flex-1" />

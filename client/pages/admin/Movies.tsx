@@ -3,7 +3,7 @@ import { getMoviesAdmin, updateMovieStatus, getAdminBranchOptions, deleteMovieAp
 import AdminLayout from '@/admin/layouts/AdminLayout';
 import MoviesContent from '@/components/admin/content/MoviesContent';
 import { useStaffPermission } from '@/hooks/useStaffPermission';
-import AdminEditModal from '@/components/admin/AdminEditModal';
+import { MovieEditModal } from '@/components/admin/dialogs/MovieEditModal';
 import { toast } from 'sonner';
 import { useStaffStore } from '@/store/staffStore';
 import { useNavigate } from 'react-router-dom';
@@ -310,23 +310,13 @@ export default function MoviesPage() {
         setSelectedBranchId={setSelectedBranchId}
         onDelete={handleDelete}
       />
-      <AdminEditModal
+      <MovieEditModal
         isEditOpen={isEditOpen}
         setIsEditOpen={setIsEditOpen}
-        editType={editType as any}
         editData={editData}
         setEditData={setEditData}
-        setUsers={() => {}}
-        moviesLocal={moviesLocal}
-        toLocalDateTimeString={toLocalDateTimeString}
-        pageSize={pageSize}
-        currentPage={moviesPage}
-        setMoviesLocal={setMoviesLocal}
-        setMovieStatus={setMovieStatus}
-        setToys={() => {}}
-        onViewDetails={handleViewDetails}
+        branchesProp={branches}
         onRefresh={handleRefresh}
-        branches={branches}
       />
       <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
         <AlertDialogContent>

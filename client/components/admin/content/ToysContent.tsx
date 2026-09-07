@@ -345,7 +345,7 @@ export default function ToysContent({
 
       {/* Detail Dialog */}
       <Dialog open={isDetailDialogOpen} onOpenChange={setIsDetailDialogOpen}>
-        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto [&>button]:hidden">
+        <DialogContent className="[&>button]:hidden bg-white sm:max-w-4xl max-h-[90vh] overflow-y-auto rounded-2xl">
           <DialogHeader className="flex flex-row items-center gap-3 space-y-0 pb-4 border-b">
             <DialogTitle className="text-lg font-bold text-slate-800">Chi tiết đồ chơi</DialogTitle>
             <div className="flex-1" />

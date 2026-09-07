@@ -41,6 +41,7 @@ type BookingValidationResult = {
   voucherDiscountAmount: number;
   originalTotalPrice: number;
   totalPrice: number;
+  movieItemsDetails?: Array<{ package_id: number; quantity: number; price: number; name: string }>;
 };
 
 async function validateBookingInput(
@@ -56,8 +57,8 @@ async function validateBookingInput(
     voucher_redemption_logs?: any;
   }
 ): Promise<BookingValidationResult> {
-  const { email, emailBook, phone, name, combo, ticketCount, ticketPackageId, vr_items, voucher_code, branch_id } =
-    body;
+  let { ticketCount, ticketPackageId } = body;
+  const { email, emailBook, phone, name, combo, vr_items, voucher_code, branch_id } = body;
 
   if (!email || !phone || !emailBook || !name || !ticketCount || ticketCount <= 0) {
     throw new HttpError(400, 'Vui lòng nhập đầy đủ thông tin hợp lệ.');
@@ -87,7 +88,52 @@ async function validateBookingInput(
   const userEmail = user?.email || email;
 
   let ticketPackage: any = null;
-  if (ticketPackageId) {
+  let unitPrice = 0;
+  let movieTotalPrice = 0;
+  let movieItemsDetails: Array<{ package_id: number; quantity: number; price: number; name: string }> = [];
+  const movie_items = body.movie_items;
+
+  if (movie_items && Array.isArray(movie_items) && movie_items.length > 0) {
+    const pkgIds = movie_items.map((i: any) => i.package_id);
+    const pkgs = await anyDb.query.ticket_packages.findMany({
+      where: and(
+        inArray(ticketPackagesTable.id, pkgIds),
+        sql`(${ticketPackagesTable.type} IS NULL OR ${ticketPackagesTable.type} != 'vr')`
+      )
+    });
+    const pkgsMap = new Map(pkgs.map((p: any) => [p.id, p]));
+    let calculatedTicketCount = 0;
+
+    for (const item of movie_items) {
+      const pkg: any = pkgsMap.get(item.package_id);
+      if (!pkg || pkg.is_active === false || pkg.deleted_at !== null) {
+        throw new HttpError(404, `Gói vé phim (ID: ${item.package_id}) không tồn tại hoặc đã bị ẩn.`);
+      }
+      const targetBranchId = pkg.branch_id || branch_id;
+      if (!matchesBranch(pkg.branch_ids, targetBranchId)) {
+        throw new HttpError(400, `Gói vé "${pkg.name}" không áp dụng tại chi nhánh bạn chọn.`);
+      }
+      const price = Number(pkg.price || 0);
+      const qty = Math.max(1, Number(item.quantity || 1));
+      
+      movieTotalPrice += price * qty;
+      calculatedTicketCount += qty;
+
+      movieItemsDetails.push({
+        package_id: pkg.id,
+        quantity: qty,
+        price: price,
+        name: pkg.name
+      });
+    }
+
+    ticketPackageId = pkgs[0].id;
+    ticketPackage = pkgs[0];
+    unitPrice = Number(pkgs[0].price || 0);
+    // Override ticketCount with calculated value from payload items
+    ticketCount = calculatedTicketCount;
+
+  } else if (ticketPackageId) {
     ticketPackage = await anyDb.query.ticket_packages.findFirst({
       where: eq(ticketPackagesTable.id, ticketPackageId)
     });
@@ -163,11 +209,19 @@ async function validateBookingInput(
     }
   }
 
-  const unitPrice = Number(ticketPackage.price || 0);
-  if (!Number.isFinite(unitPrice) || unitPrice <= 0) {
-    throw new HttpError(400, 'Giá vé không hợp lệ.');
+  if (!movie_items || movie_items.length === 0) {
+    unitPrice = Number(ticketPackage.price || 0);
+    if (!Number.isFinite(unitPrice) || unitPrice <= 0) {
+      throw new HttpError(400, 'Giá vé không hợp lệ.');
+    }
+    movieTotalPrice = unitPrice * ticketCount;
+    movieItemsDetails.push({
+      package_id: ticketPackage.id,
+      quantity: ticketCount,
+      price: unitPrice,
+      name: ticketPackage.name
+    });
   }
-  const movieTotalPrice = unitPrice * ticketCount;
 
   // Process VR Items (if any)
   const vrItemsDetails: Array<{
@@ -263,7 +317,8 @@ async function validateBookingInput(
     voucherDetails,
     voucherDiscountAmount,
     originalTotalPrice,
-    totalPrice
+    totalPrice,
+    movieItemsDetails
   };
 }
 
@@ -304,7 +359,8 @@ export async function validateBookingImpl(
       originalTotalPrice: result.originalTotalPrice,
       voucherDiscountAmount: result.voucherDiscountAmount,
       voucherDetails: result.voucherDetails,
-      totalPrice: result.totalPrice
+      totalPrice: result.totalPrice,
+      movieItemsDetails: result.movieItemsDetails
     };
   } catch (err: any) {
     const status = err?.status || 500;
@@ -414,7 +470,10 @@ export async function createPaymentImpl(
         movie_title: movieTitles,
         movie_duration: movieDurations,
         movie_poster: moviePosters,
-        ticket_package_name: validation.ticketPackage?.name || null,
+        ticket_package_name:
+          validation.movieItemsDetails && validation.movieItemsDetails.length > 0
+            ? JSON.stringify(validation.movieItemsDetails)
+            : validation.ticketPackage?.name || null,
         ticket_unit_price: validation.ticketPackage?.price ? Number(validation.ticketPackage.price) : null,
         branch_id: branchIdToSave,
         pay_txt_code: pay_txt_code_dt,

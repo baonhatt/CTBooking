@@ -358,7 +358,7 @@ export default function UploadsContent() {
   };
 
   return (
-    <Card className="bg-gradient-to-br from-[#0e1b3d] to-[#15325f] text-white border border-white/10">
+    <Card className="bg-gradient-to-br from-slate-900 to-slate-800 text-white border border-white/10">
       <CardHeader className="pb-4">
         <CardTitle className="text-2xl font-bold">Uploads</CardTitle>
       </CardHeader>
@@ -438,7 +438,7 @@ export default function UploadsContent() {
               </Label>
               <div className="relative group">
                 <select
-                  className="w-full bg-[#1a2744] text-white border border-white/20 rounded-xl px-4 py-3 h-12 focus:outline-none focus:ring-2 focus:ring-blue-500/50 appearance-none cursor-pointer transition-all hover:border-white/30"
+                  className="w-full bg-slate-800 text-white border border-white/20 rounded-xl px-4 py-3 h-12 focus:outline-none focus:ring-2 focus:ring-blue-500/50 appearance-none cursor-pointer transition-all hover:border-white/30"
                   value={section}
                   onChange={(e) => setSection(e.target.value as any)}
                 >
@@ -750,7 +750,7 @@ export default function UploadsContent() {
             if (!val) setPlayingVideoId(null);
           }}
         >
-          <DialogContent className="bg-[#0b1224] text-white border-white/10 max-w-5xl w-[95vw] h-[85vh] flex flex-col p-0 overflow-hidden shadow-2xl [&>button]:hidden">
+          <DialogContent className="bg-slate-950 text-white border-white/10 max-w-5xl w-[95vw] h-[85vh] flex flex-col p-0 overflow-hidden shadow-2xl [&>button]:hidden">
             <DialogHeader className="p-6 border-b border-white/5 bg-white/5 flex flex-row items-center justify-between space-y-0">
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 rounded-xl bg-blue-500/10 flex items-center justify-center border border-blue-500/20">
@@ -778,7 +778,7 @@ export default function UploadsContent() {
                 {mediaItems.map((m) => (
                   <div
                     key={m.id}
-                    className="group relative rounded-2xl border border-white/10 bg-[#16213e] overflow-hidden flex flex-col transition-all hover:border-blue-500/50 hover:shadow-lg hover:shadow-blue-900/10 hover:-translate-y-1"
+                    className="group relative rounded-2xl border border-white/10 bg-slate-900 overflow-hidden flex flex-col transition-all hover:border-blue-500/50 hover:shadow-lg hover:shadow-blue-900/10 hover:-translate-y-1"
                   >
                     {/* Media Preview Area */}
                     <div className="aspect-video bg-black/40 relative flex items-center justify-center group-hover:bg-black/20 transition-colors">

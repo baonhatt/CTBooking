@@ -48,6 +48,7 @@ import { toast } from 'sonner';
 type PostRichTextEditorProps = {
   value: string;
   onChange: (value: string) => void;
+  disabled?: boolean;
 };
 
 function normalizeInitialContent(value?: string) {
@@ -87,7 +88,7 @@ function cloudinaryUploadPlugin(editor: any) {
   };
 }
 
-export function PostRichTextEditor({ value, onChange }: PostRichTextEditorProps) {
+export function PostRichTextEditor({ value, onChange, disabled }: PostRichTextEditorProps) {
   const [isUploadingImage, setIsUploadingImage] = useState(false);
   const editorRef = useRef<any>(null);
   const isLocal = typeof window !== 'undefined' && window.location.hostname === 'localhost';
@@ -241,6 +242,7 @@ export function PostRichTextEditor({ value, onChange }: PostRichTextEditorProps)
       <div className=" mb-2 post-editor-scroll rounded-xl border border-slate-200 bg-white shadow-sm [&_.ck.ck-editor]:border-0 [&_.ck.ck-editor__main>.ck-editor__editable]:min-h-[300px] [&_.ck.ck-editor__main>.ck-editor__editable]:border-0 [&_.ck.ck-editor__main>.ck-editor__editable]:px-4 [&_.ck.ck-editor__main>.ck-editor__editable]:py-3 [&_.ck.ck-editor__main>.ck-editor__editable]:text-sm [&_.ck.ck-editor__main>.ck-editor__editable]:leading-6 [&_.ck.ck-top_.ck-sticky-panel_.ck-toolbar]:border-0 [&_.ck.ck-toolbar]:border-0 [&_.ck.ck-toolbar]:border-b [&_.ck.ck-toolbar]:border-slate-200 [&_.ck.ck-toolbar]:bg-slate-50 [&_.ck-content_.image>img]:rounded-xl [&_.ck-content_.image>img]:max-w-full [&_.ck-content_.image>img]:h-auto">
         <CKEditor
           editor={ClassicEditor}
+          disabled={disabled}
           data={normalizeInitialContent(value)}
           config={editorConfig}
           onReady={(editor) => {

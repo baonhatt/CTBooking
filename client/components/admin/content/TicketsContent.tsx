@@ -1100,7 +1100,7 @@ export default function TicketsContent(props: Props) {
 
       {/* Detail Dialog */}
       <Dialog open={isDetailDialogOpen} onOpenChange={setIsDetailDialogOpen}>
-        <DialogContent className="max-w-4xl [&>button]:hidden rounded-2xl overflow-hidden p-0 border border-gray-200">
+        <DialogContent className="[&>button]:hidden bg-white max-w-4xl rounded-2xl overflow-hidden p-0 border border-gray-200">
           <DialogHeader className="flex flex-row items-center gap-3 space-y-0 px-6 py-4 border-b bg-white">
             <div
               className={`p-2 rounded-xl border ${

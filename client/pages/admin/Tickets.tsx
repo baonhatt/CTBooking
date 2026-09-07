@@ -9,6 +9,7 @@ import { toast } from 'sonner';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { X } from 'lucide-react';
+import { ConfirmDeleteDialog } from '@/components/admin/dialogs/ConfirmDeleteDialog';
 
 interface TicketPackage {
   id: number;
@@ -226,40 +227,16 @@ export default function TicketsPage() {
         isCodeEditable={isCodeEditable}
         setIsCodeEditable={setIsCodeEditable}
       />
-      <Dialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
-        <DialogContent className="[&>button]:hidden">
-          <DialogHeader className="flex flex-row items-center gap-3 space-y-0 pb-4 border-b">
-            <DialogTitle className="text-lg font-bold text-slate-800">Xác nhận xóa</DialogTitle>
-            <div className="flex-1" />
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => setIsDeleteDialogOpen(false)}
-              className="h-8 w-8 rounded-full hover:bg-slate-100 text-slate-400 transition-colors"
-            >
-              <X className="w-5 h-5" />
-            </Button>
-          </DialogHeader>
-          <p className="py-4">
+      <ConfirmDeleteDialog
+        isOpen={isDeleteDialogOpen}
+        onOpenChange={setIsDeleteDialogOpen}
+        description={
+          <>
             Bạn có chắc chắn muốn xóa gói vé "{ticketToDelete?.name}"? Hành động này không thể hoàn tác.
-          </p>
-          <DialogFooter>
-            <Button
-              variant="ghost"
-              onClick={() => setIsDeleteDialogOpen(false)}
-              className="text-slate-500 hover:bg-slate-100"
-            >
-              Hủy
-            </Button>
-            <Button
-              onClick={confirmDelete}
-              className="bg-red-600 hover:bg-red-700 min-w-[140px] rounded-xl shadow-lg shadow-red-500/20 transition-all active:scale-95"
-            >
-              Xóa
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+          </>
+        }
+        onConfirm={confirmDelete}
+      />
     </AdminLayout>
   );
 }

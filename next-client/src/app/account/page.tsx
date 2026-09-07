@@ -14,8 +14,6 @@ import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { toast } from 'sonner';
 import { updateUserProfileApi, changePasswordApi, getUserTransactionsApi, getUserProfileByEmailApi } from '@/lib/api';
-import { DatePicker } from 'antd';
-import dayjs from 'dayjs';
 import { getCookie, setCookie } from '@/lib/cookies';
 import {
   Pagination,
@@ -100,6 +98,41 @@ export default function Account() {
     }
   };
 
+  const handleContinuePayment = (t: any) => {
+    try {
+      if (!t.created_at) {
+        toast.error('Giao dịch thiếu thông tin thời gian khởi tạo.');
+        return;
+      }
+      
+      const createdTime = new Date(t.created_at).getTime();
+      const endTime = createdTime + 10 * 60 * 1000;
+      
+      if (Date.now() >= endTime) {
+        toast.error('Đơn hàng này đã quá giới hạn 10 phút và không thể thanh toán.');
+        return;
+      }
+
+      localStorage.setItem('qrPaymentEndTime', endTime.toString());
+      localStorage.setItem('qrPaymentData', JSON.stringify({
+        bookingId: t.booking_id || t.id,
+        orderId: t.booking_code,
+        booking_code: t.booking_code,
+        amount: t.amount,
+        totalAmount: t.amount,
+        quantity: t.quantity,
+        movieTitle: t.movie,
+        ticketType: t.ticket_package,
+        branch_name: t.branch_name || ''
+      }));
+
+      router.push('/qr-payment');
+    } catch (error) {
+      console.error('Continue payment error:', error);
+      toast.error('Đã xảy ra lỗi, vui lòng thử lại sau.');
+    }
+  };
+
   const parseData = (data: any) => {
     try {
       return typeof data === 'string' ? JSON.parse(data) : data;
@@ -139,7 +172,7 @@ export default function Account() {
     // Parallel fetch profile details and transactions
     Promise.all([
       getUserProfileByEmailApi(email).catch(() => null),
-      getUserTransactionsApi({ email, status: 'paid' }).catch(() => ({ items: [] }))
+      getUserTransactionsApi({ email, status: 'all' }).catch(() => ({ items: [] }))
     ]).then(([data, txRes]) => {
       if (!isMounted) return;
 
@@ -480,27 +513,16 @@ export default function Account() {
 
                           <div className="space-y-2">
                             <Label className="text-xs font-semibold text-gray-400 ml-1">Ngày sinh</Label>
-                            <DatePicker
-                              value={profile.dob ? dayjs(profile.dob) : null}
-                              onChange={(date) =>
+                            <Input
+                              type="date"
+                              value={profile.dob || ''}
+                              onChange={(e) =>
                                 setProfile((p) => ({
                                   ...p,
-                                  dob: date ? date.format('YYYY-MM-DD') : ''
+                                  dob: e.target.value
                                 }))
                               }
-                              format="DD/MM/YYYY"
-                              placeholder="Chọn ngày sinh"
-                              className="w-full h-11 bg-[#0f172a] border-white/10 hover:border-blue-500/50"
-                              style={{
-                                backgroundColor: '#0f172a',
-                                color: '#ffffff'
-                              }}
-                              styles={{
-                                input: {
-                                  color: '#ffffff'
-                                }
-                              }}
-                              suffixIcon={<Calendar size={16} className="text-gray-400" />}
+                              className="h-11 bg-[#0f172a] border-white/10 text-white focus:border-blue-500/50 transition-all cursor-pointer"
                             />
                           </div>
 
@@ -588,7 +610,7 @@ export default function Account() {
                         <div className="flex items-center justify-between">
                           <div className="text-xs text-gray-400 italic">
                             * Chỉ hiển thị {limitedTransactions.length} giao dịch gần nhất
-                            <br />* Các giao dịch chờ thanh toán sẽ tự động bị xóa sau 3 giờ nếu chưa hoàn tất
+                            <br />* Các giao dịch chờ thanh toán sẽ tự động hết hạn sau 10 phút nếu chưa hoàn tất
                           </div>
                         </div>
 
@@ -635,14 +657,22 @@ export default function Account() {
                                               <Calendar size={12} />
                                               {formatDateTime(t.created_at)}
                                             </span>
-                                            <span className="opacity-30">|</span>
-                                            <span className="text-gray-300 font-medium bg-white/5 px-2 py-0.5 rounded">
-                                              {t.booking_type === 'vr'
+                                            {(() => {
+                                              const text = t.booking_type === 'vr'
                                                 ? `${t.quantity} lượt VR`
                                                 : t.booking_type === 'combo_vr'
-                                                  ? `${movieCount} phim + ${t.quantity} VR`
-                                                  : `${movieCount} phim`}
-                                            </span>
+                                                  ? `${movieCount > 0 ? movieCount + ' phim + ' : ''}${t.quantity} VR`
+                                                  : movieCount > 0 ? `${movieCount} phim` : null;
+                                              
+                                              return text ? (
+                                                <>
+                                                  <span className="opacity-30">|</span>
+                                                  <span className="text-gray-300 font-medium bg-white/5 px-2 py-0.5 rounded">
+                                                    {text}
+                                                  </span>
+                                                </>
+                                              ) : null;
+                                            })()}
                                           </div>
                                         </div>
 
@@ -720,16 +750,28 @@ export default function Account() {
                                           </div>
                                         </div>
 
-                                        <Button
-                                          size="sm"
-                                          className="w-full md:w-full bg-blue-600 hover:bg-blue-500 text-white shadow-lg shadow-blue-900/20 h-10 px-8 rounded-xl font-bold transition-all active:scale-95"
-                                          onClick={() => {
-                                            setSelectedTx(t);
-                                            setIsDetailOpen(true);
-                                          }}
-                                        >
-                                          Xem Vé
-                                        </Button>
+                                        <div className="flex flex-col gap-2 w-full md:w-auto mt-2 md:mt-0">
+                                          {isVietQR && !isPaid && !t.isExpired && !t.is_used && t.payment_status === 'pending' ? (
+                                            <Button
+                                              size="sm"
+                                              className="w-full md:w-full bg-red-500 hover:bg-red-400 text-white shadow-lg shadow-red-900/20 h-10 px-8 rounded-xl font-bold transition-all active:scale-95"
+                                              onClick={() => handleContinuePayment(t)}
+                                            >
+                                              Thanh Toán Ngay
+                                            </Button>
+                                          ) : (
+                                            <Button
+                                              size="sm"
+                                              className="w-full md:w-full bg-blue-600 hover:bg-blue-500 text-white shadow-lg shadow-blue-900/20 h-10 px-8 rounded-xl font-bold transition-all active:scale-95"
+                                              onClick={() => {
+                                                setSelectedTx(t);
+                                                setIsDetailOpen(true);
+                                              }}
+                                            >
+                                              Xem Vé
+                                            </Button>
+                                          )}
+                                        </div>
                                       </div>
                                     </div>
                                   </div>
@@ -932,7 +974,15 @@ export default function Account() {
                               Gói dịch vụ
                             </p>
                             <h3 className="text-lg sm:text-xl font-black text-white">
-                              {selectedTx.ticket_package || 'Vé đơn'}
+                              {(() => {
+                                const pkgs = parseData(selectedTx.ticket_package);
+                                if (pkgs.length > 0) {
+                                  if (typeof pkgs[0] === 'object' && pkgs[0].name) {
+                                    return pkgs.map((p: any) => `${p.name} x${p.quantity}`).join(' + ');
+                                  }
+                                }
+                                return selectedTx.ticket_package || 'Vé đơn';
+                              })()}
                             </h3>
                           </div>
                           <div className="text-right">
@@ -943,21 +993,23 @@ export default function Account() {
                           </div>
                         </div>
 
-                        <div className="space-y-3">
-                          <p className="text-[10px] text-gray-500 uppercase font-bold tracking-wider">
-                            Danh sách phim:
-                          </p>
-                          <div className="flex flex-wrap gap-1.5">
-                            {parseData(selectedTx.movie).map((m: any, idx: number) => (
-                              <span
-                                key={idx}
-                                className="px-2.5 py-1 bg-white/5 border border-white/5 rounded-md text-[11px] text-gray-300 font-medium"
-                              >
-                                {m}
-                              </span>
-                            ))}
+                        {parseData(selectedTx.movie).length > 0 && (
+                          <div className="space-y-2 mt-4 pt-4 border-t border-white/5">
+                            <p className="text-[10px] text-gray-500 uppercase font-bold tracking-wider">
+                              Danh sách phim:
+                            </p>
+                            <div className="flex flex-wrap gap-1.5">
+                              {Array.from(new Set(parseData(selectedTx.movie))).map((m: any, idx: number) => (
+                                <span
+                                  key={idx}
+                                  className="px-2 py-1 bg-white/5 border border-white/5 rounded-md text-[10px] text-gray-400"
+                                >
+                                  {m}
+                                </span>
+                              ))}
+                            </div>
                           </div>
-                        </div>
+                        )}
                       </div>
                     </div>
 
@@ -1018,12 +1070,26 @@ export default function Account() {
                         )}
                       </div>
 
-                      <div className="col-span-2 flex justify-between items-center pt-4 mt-2 border-t border-white/5">
-                        <span className="text-xs font-bold text-gray-500 uppercase">Tổng thanh toán</span>
-                        <span className="text-3xl font-black text-blue-400 drop-shadow-[0_0_10px_rgba(59,130,246,0.3)]">
-                          {formatMoney(selectedTx.amount)}
-                          <span className="text-lg ml-0.5">₫</span>
-                        </span>
+                      <div className="col-span-2 flex flex-col gap-2 pt-4 mt-2 border-t border-white/5">
+                        {selectedTx.discount_amount > 0 && (
+                          <>
+                            <div className="flex justify-between items-center text-xs">
+                              <span className="text-gray-400 font-bold uppercase">Tổng tiền chưa giảm:</span>
+                              <span className="text-gray-300 font-medium">{formatMoney(selectedTx.original_amount)}₫</span>
+                            </div>
+                            <div className="flex justify-between items-center text-xs">
+                              <span className="text-emerald-400 font-bold uppercase">Voucher đã dùng ({selectedTx.voucher_code}):</span>
+                              <span className="text-emerald-400 font-medium">-{formatMoney(selectedTx.discount_amount)}₫</span>
+                            </div>
+                          </>
+                        )}
+                        <div className="flex justify-between items-center mt-2">
+                          <span className="text-xs font-bold text-gray-400 uppercase">Thực tế thanh toán:</span>
+                          <span className="text-3xl font-black text-blue-400 drop-shadow-[0_0_10px_rgba(59,130,246,0.3)]">
+                            {formatMoney(selectedTx.amount)}
+                            <span className="text-lg ml-0.5 text-blue-400/80">₫</span>
+                          </span>
+                        </div>
                       </div>
                     </div>
 

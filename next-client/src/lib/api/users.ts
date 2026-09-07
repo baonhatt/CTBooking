@@ -59,7 +59,7 @@ export async function changePasswordApi(body: { email: string; oldPassword: stri
   });
 }
 
-export async function getUserTransactionsApi(options: { email: string; status?: 'paid'; signal?: AbortSignal }) {
+export async function getUserTransactionsApi(options: { email: string; status?: 'paid' | 'all'; signal?: AbortSignal }) {
   const params = new URLSearchParams();
   params.set('email', options.email);
   if (options.status) params.set('status', options.status);

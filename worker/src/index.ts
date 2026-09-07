@@ -2602,8 +2602,7 @@ app.get('/api/usersprofile/transactions', requireAuth, async (c) => {
   try {
     const accountId = c.get('accountId');
     const email = String(c.req.query('email') || '');
-
-    const status = String(c.req.query('status') || 'paid');
+    const status = String(c.req.query('status') || 'all');
 
     const page = Number(c.req.query('page') || 1);
 

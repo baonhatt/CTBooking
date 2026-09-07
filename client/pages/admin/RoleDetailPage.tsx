@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
@@ -14,6 +14,7 @@ import { useStaffStore } from '@/store/staffStore';
 import { useIsSuperAdmin, useHasStaffPermission } from '@/hooks/useStaffPermission';
 import { X, FileText } from 'lucide-react';
 import { MODULES, ACTIONS, MODULE_LABELS, ACTION_LABELS, APPLICABLE_ACTIONS } from './roleConstants';
+import { ConfirmDeleteDialog } from '@/components/admin/dialogs/ConfirmDeleteDialog';
 
 interface Role {
   id: number;
@@ -47,7 +48,10 @@ export default function RoleDetailPage() {
   const canEditRole = hasPermission('roles', 'edit');
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [isSaveDialogOpen, setIsSaveDialogOpen] = useState(false);
-  const [isEditMode, setIsEditMode] = useState(false);
+
+  const [searchParams, setSearchParams] = useSearchParams();
+  const initialMode = searchParams.get('mode') || 'edit';
+  const [isEditMode, setIsEditMode] = useState(canEditRole ? initialMode === 'edit' : false);
   const [dirty, setDirty] = useState(false);
   const [permissionIds, setPermissionIds] = useState<number[]>([]);
   const headerRef = useRef<HTMLDivElement>(null);
@@ -142,10 +146,12 @@ export default function RoleDetailPage() {
 
   const handleEditMode = () => {
     setIsEditMode(true);
+    setSearchParams({ mode: 'edit' });
   };
 
   const handleCancelEdit = () => {
     setIsEditMode(false);
+    setSearchParams({ mode: 'view' });
     setDirty(false);
     // Reset permissionIds to original
     const role = (roleData as any)?.role;
@@ -426,43 +432,19 @@ export default function RoleDetailPage() {
         )}
 
         {/* Delete Dialog */}
-        <Dialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
-          <DialogContent className="[&>button]:hidden">
-            <DialogHeader className="flex flex-row items-center gap-3 space-y-0 pb-4 border-b">
-              <DialogTitle className="text-lg font-bold text-slate-800">Xác nhận xóa</DialogTitle>
-              <div className="flex-1" />
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={() => setIsDeleteDialogOpen(false)}
-                className="h-8 w-8 rounded-full hover:bg-slate-100 text-slate-400 transition-colors"
-              >
-                <X className="w-5 h-5" />
-              </Button>
-            </DialogHeader>
-            <p className="py-4">Bạn có chắc chắn muốn xóa vai trò "{role.name}"? Hành động này không thể hoàn tác.</p>
-            <DialogFooter>
-              <Button
-                variant="ghost"
-                onClick={() => setIsDeleteDialogOpen(false)}
-                className="text-slate-500 hover:bg-slate-100"
-              >
-                Hủy
-              </Button>
-              <Button
-                onClick={handleDelete}
-                disabled={deleteMutation.isPending}
-                className="bg-red-600 hover:bg-red-700 min-w-[140px] rounded-xl shadow-lg shadow-red-500/20 transition-all active:scale-95"
-              >
-                {deleteMutation.isPending ? 'Đang xóa...' : 'Xóa'}
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
+        <ConfirmDeleteDialog
+          isOpen={isDeleteDialogOpen}
+          onOpenChange={setIsDeleteDialogOpen}
+          description={
+            <>Bạn có chắc chắn muốn xóa vai trò "{role.name}"? Hành động này không thể hoàn tác.</>
+          }
+          onConfirm={handleDelete}
+          isDeleting={deleteMutation.isPending}
+        />
 
         {/* Save Confirm Dialog */}
         <Dialog open={isSaveDialogOpen} onOpenChange={setIsSaveDialogOpen}>
-          <DialogContent className="[&>button]:hidden">
+          <DialogContent className="[&>button]:hidden bg-white sm:max-w-md rounded-2xl">
             <DialogHeader className="flex flex-row items-center gap-3 space-y-0 pb-4 border-b">
               <DialogTitle className="text-lg font-bold text-slate-800">Xác nhận lưu thay đổi</DialogTitle>
               <div className="flex-1" />

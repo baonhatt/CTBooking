@@ -11,7 +11,7 @@ export async function listBranchesImpl(
   const { page, pageSize, q, includeInactive = false, onlyOpen = false } = args;
 
   let whereCondition = includeInactive
-    ? undefined
+    ? isNull(tables.branches.deleted_at)
     : and(eq(tables.branches.is_active, true), isNull(tables.branches.deleted_at));
 
   if (onlyOpen) {

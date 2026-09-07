@@ -15,6 +15,7 @@ import {
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { ConfirmDeleteDialog } from '@/components/admin/dialogs/ConfirmDeleteDialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
@@ -314,7 +315,7 @@ export default function ShowtimesContent({ branches, schedules, isLoading, onRef
 
       <EditorAlert />
       <Dialog open={!!editorBranch} onOpenChange={handleEditorOpenChange}>
-        <DialogContent className="[&>button]:hidden sm:max-w-3xl max-h-[90vh] overflow-hidden flex flex-col">
+        <DialogContent className="[&>button]:hidden sm:max-w-3xl max-h-[90vh] overflow-hidden flex flex-col bg-white rounded-2xl">
           <DialogHeader className="flex flex-row items-center gap-3 space-y-0 pb-4 border-b shrink-0">
             <div>
               <DialogTitle className="text-lg font-bold text-slate-800">Lịch chiếu · {editorBranch?.name}</DialogTitle>
@@ -516,38 +517,19 @@ export default function ShowtimesContent({ branches, schedules, isLoading, onRef
         </DialogContent>
       </Dialog>
 
-      <Dialog open={!!deleteTarget} onOpenChange={(open) => !open && setDeleteTarget(null)}>
-        <DialogContent className="[&>button]:hidden z-[60]">
-          <DialogHeader className="flex flex-row items-center gap-3 space-y-0 pb-4 border-b">
-            <DialogTitle className="text-lg font-bold text-slate-800">Xóa suất chiếu</DialogTitle>
-            <div className="flex-1" />
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => setDeleteTarget(null)}
-              className="h-8 w-8 rounded-full hover:bg-slate-100 text-slate-400"
-            >
-              <X className="w-5 h-5" />
-            </Button>
-          </DialogHeader>
-          <p className="py-4 text-sm text-slate-600">
+      <ConfirmDeleteDialog
+        isOpen={!!deleteTarget}
+        onOpenChange={(open) => !open && setDeleteTarget(null)}
+        description={
+          <>
             Xóa suất {deleteTarget?.start_time} – {deleteTarget?.end_time}
             {deleteTarget?.movie_title ? ` (${deleteTarget.movie_title})` : ''}? Không thể hoàn tác.
-          </p>
-          <DialogFooter>
-            <Button variant="ghost" onClick={() => setDeleteTarget(null)} className="text-slate-500">
-              Hủy
-            </Button>
-            <Button
-              onClick={handleDelete}
-              disabled={isSaving}
-              className="bg-red-600 hover:bg-red-700 min-w-[120px] rounded-xl"
-            >
-              {isSaving ? 'Đang xóa...' : 'Xóa suất'}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+          </>
+        }
+        onConfirm={handleDelete}
+        isDeleting={isSaving}
+        confirmText="Xóa suất"
+      />
     </div>
   );
 }

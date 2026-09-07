@@ -1,6 +1,6 @@
 import AdminLayout from '@/admin/layouts/AdminLayout';
 import UsersContent from '@/components/admin/content/UsersContent';
-import AdminEditModal from '@/components/admin/AdminEditModal';
+import { UserEditModal } from '@/components/admin/dialogs/UserEditModal';
 import React, { useMemo, useState, useEffect } from 'react';
 import { getUsers } from '@/lib/api';
 import { useStaffStore } from '@/store/staffStore';
@@ -18,19 +18,7 @@ export default function UsersPage() {
   const pageSize = 10;
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [editData, setEditData] = useState<any>(null);
-  const [moviesLocal, setMoviesLocal] = useState<any[]>([]);
-  const [movieStatus, setMovieStatus] = useState({});
   const [isLoading, setIsLoading] = useState(false);
-
-  function toLocalDateTimeString(date: Date) {
-    const pad = (n: number) => n.toString().padStart(2, '0');
-    const yyyy = date.getFullYear();
-    const mm = pad(date.getMonth() + 1);
-    const dd = pad(date.getDate());
-    const hh = pad(date.getHours());
-    const min = pad(date.getMinutes());
-    return `${yyyy}-${mm}-${dd}T${hh}:${min}`;
-  }
 
   useEffect(() => {
     (async () => {
@@ -114,20 +102,12 @@ export default function UsersPage() {
         onRefresh={handleRefresh}
         isLoading={isLoading}
       />
-      <AdminEditModal
-        editType={editData ? 'user' : null}
-        editData={editData}
-        setIsEditOpen={setIsEditOpen}
+      <UserEditModal
         isEditOpen={isEditOpen}
+        setIsEditOpen={setIsEditOpen}
+        editData={editData}
         setEditData={setEditData}
         setUsers={setUsers}
-        moviesLocal={moviesLocal}
-        toLocalDateTimeString={toLocalDateTimeString}
-        pageSize={pageSize}
-        currentPage={usersPage}
-        setMoviesLocal={setMoviesLocal}
-        setMovieStatus={setMovieStatus}
-        setToys={() => {}}
       />
     </AdminLayout>
   );

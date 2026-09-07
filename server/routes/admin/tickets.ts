@@ -76,7 +76,7 @@ export async function listTicketPackagesImpl(
 
   // 1. Xây dựng điều kiện where
   let whereCondition = includeInactive
-    ? undefined
+    ? isNull(tables.ticket_packages.deleted_at)
     : and(eq(tables.ticket_packages.is_active, true), isNull(tables.ticket_packages.deleted_at));
 
   // Type filter

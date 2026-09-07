@@ -36,6 +36,16 @@ import {
   PaginationPrevious
 } from '@/components/ui/pagination';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle
+} from '@/components/ui/alert-dialog';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
@@ -192,7 +202,11 @@ export const PostManagement = () => {
   };
 
   const handleEdit = (post: PostData) => {
-    navigate(`/posts/${post.id}/edit`);
+    navigate(`/posts/${post.id}/edit?mode=edit`);
+  };
+
+  const handleView = (post: PostData) => {
+    navigate(`/posts/${post.id}/edit?mode=view`);
   };
 
   const handleDelete = (post: PostData) => {
@@ -528,6 +542,17 @@ export const PostManagement = () => {
                       </span>
                     </TableCell>
                     <TableCell className="text-right pr-4">
+                      {/* ALWAYS SHOW VIEW BUTTON */}
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => handleView(post)}
+                        className="h-8 w-8 text-blue-600 hover:text-blue-700 hover:bg-blue-50 rounded-lg transition-colors"
+                        title="Xem chi tiết"
+                      >
+                        <Eye size={16} />
+                      </Button>
+                      
                       {hasPermission('posts', 'edit') && (
                         <Button
                           variant="ghost"
@@ -1084,29 +1109,41 @@ export const PostManagement = () => {
       </Dialog>
 
       {/* ── Delete Confirmation Dialog ─────────────────────────────────────── */}
-      <Dialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle>Xác nhận xóa bài viết</DialogTitle>
-          </DialogHeader>
-          <p className="py-4 text-sm text-slate-600">
-            Bạn có chắc chắn muốn xóa bài viết "{postToDelete?.title}"? Bài viết sẽ được chuyển sang trạng thái lưu trữ.
-          </p>
-          <div className="flex justify-end gap-2">
-            <Button variant="outline" onClick={() => setIsDeleteDialogOpen(false)}>
+      <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+        <AlertDialogContent className="rounded-2xl max-w-md font-sans bg-white">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="text-slate-900 text-lg font-bold">Xác nhận xóa bài viết</AlertDialogTitle>
+            <AlertDialogDescription className="text-slate-600 text-sm mt-2">
+              Bạn có chắc chắn muốn xóa bài viết "{postToDelete?.title}"? Bài viết sẽ được chuyển sang trạng thái lưu trữ.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter className="mt-4 flex flex-col sm:flex-row gap-2">
+            <AlertDialogCancel className="text-slate-500 hover:bg-slate-100 border-none rounded-xl mt-0 sm:mt-0">
               Hủy
-            </Button>
-            <Button variant="destructive" onClick={() => confirmDelete(false)}>
+            </AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-red-600 hover:bg-red-700 rounded-xl"
+              onClick={(e) => {
+                e.preventDefault();
+                confirmDelete(false);
+              }}
+            >
               Lưu trữ
-            </Button>
+            </AlertDialogAction>
             {isSuperAdmin && (
-              <Button variant="destructive" onClick={() => confirmDelete(true)} className="bg-red-700 hover:bg-red-800">
+              <AlertDialogAction
+                className="bg-red-700 hover:bg-red-800 rounded-xl"
+                onClick={(e) => {
+                  e.preventDefault();
+                  confirmDelete(true);
+                }}
+              >
                 Xóa vĩnh viễn
-              </Button>
+              </AlertDialogAction>
             )}
-          </div>
-        </DialogContent>
-      </Dialog>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };

@@ -1,5 +1,6 @@
 import React, { useEffect, useState, useRef } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
+import { useStaffPermissions, useIsSuperAdmin } from '@/hooks/useStaffPermission';
 import AdminLayout from '@/admin/layouts/AdminLayout';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -59,6 +60,18 @@ interface SectionState {
 export default function PostEditPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const isSuperAdmin = useIsSuperAdmin();
+  const permissions = useStaffPermissions();
+
+  const hasPermission = (module: string, action: string) => {
+    if (isSuperAdmin) return true;
+    return permissions.some((p) => p.module === module && p.action === action);
+  };
+  
+  const canEdit = hasPermission('posts', 'edit');
+  const initialMode = searchParams.get('mode') || 'edit';
+  const [isEditMode, setIsEditMode] = useState(canEdit ? initialMode === 'edit' : false);
   const [active, setActive] = useState<
     | 'dashboard'
     | 'users'
@@ -205,6 +218,7 @@ export default function PostEditPage() {
   }, [editData]);
 
   const handleSave = async (overrideStatus?: 'draft' | 'published' | 'archived') => {
+    if (!isEditMode) return;
     if (!editData.title?.trim()) {
       toast.error('Lỗi', { description: 'Vui lòng nhập tiêu đề' });
       return;
@@ -339,62 +353,79 @@ export default function PostEditPage() {
                 </div>
               </div>
               <div className="flex items-center gap-2">
-                {editData.status === 'published' ? (
+                {isEditMode ? (
                   <>
-                    <Button
-                      onClick={() => handleSave('archived')}
-                      disabled={isSaving}
-                      variant="outline"
-                      className="rounded-xl"
-                    >
-                      Gỡ xuất bản
-                    </Button>
-                    <Button
-                      onClick={() => handleSave()}
-                      disabled={isSaving}
-                      className="rounded-xl bg-blue-600 hover:bg-blue-700"
-                    >
-                      <Save className="w-4 h-4 mr-2" />
-                      {isSaving ? 'Đang lưu...' : 'Lưu'}
-                    </Button>
+                    <Button variant="outline" onClick={() => {
+                        setIsEditMode(false);
+                        setSearchParams({ mode: 'view' });
+                        if (initialSnapshotRef.current) {
+                           setEditData(JSON.parse(initialSnapshotRef.current));
+                        }
+                    }} disabled={isSaving} className="rounded-xl">Hủy</Button>
+                    {editData.status === 'published' ? (
+                      <>
+                        <Button
+                          onClick={() => handleSave('archived')}
+                          disabled={isSaving}
+                          variant="outline"
+                          className="rounded-xl"
+                        >
+                          Gỡ xuất bản
+                        </Button>
+                        <Button
+                          onClick={() => handleSave()}
+                          disabled={isSaving}
+                          className="rounded-xl bg-blue-600 hover:bg-blue-700"
+                        >
+                          <Save className="w-4 h-4 mr-2" />
+                          {isSaving ? 'Đang lưu...' : 'Lưu'}
+                        </Button>
+                      </>
+                    ) : editData.status === 'draft' ? (
+                      <>
+                        <Button
+                          onClick={() => handleSave('published')}
+                          disabled={isSaving}
+                          className="rounded-xl bg-emerald-600 hover:bg-emerald-700"
+                        >
+                          Xuất bản
+                        </Button>
+                        <Button onClick={() => handleSave()} disabled={isSaving} variant="outline" className="rounded-xl">
+                          <Save className="w-4 h-4 mr-2" />
+                          {isSaving ? 'Đang lưu...' : 'Lưu'}
+                        </Button>
+                      </>
+                    ) : editData.status === 'archived' ? (
+                      <>
+                        <Button
+                          onClick={() => handleSave('draft')}
+                          disabled={isSaving}
+                          variant="outline"
+                          className="rounded-xl"
+                        >
+                          Lưu nháp
+                        </Button>
+                        <Button
+                          onClick={() => handleSave('published')}
+                          disabled={isSaving}
+                          className="rounded-xl bg-emerald-600 hover:bg-emerald-700"
+                        >
+                          Xuất bản
+                        </Button>
+                        <Button onClick={() => handleSave()} disabled={isSaving} variant="outline" className="rounded-xl">
+                          <Save className="w-4 h-4 mr-2" />
+                          {isSaving ? 'Đang lưu...' : 'Lưu'}
+                        </Button>
+                      </>
+                    ) : null}
                   </>
-                ) : editData.status === 'draft' ? (
-                  <>
-                    <Button
-                      onClick={() => handleSave('published')}
-                      disabled={isSaving}
-                      className="rounded-xl bg-emerald-600 hover:bg-emerald-700"
-                    >
-                      Xuất bản
+                ) : (
+                  canEdit && (
+                    <Button onClick={() => { setIsEditMode(true); setSearchParams({ mode: 'edit' }); }} className="rounded-xl">
+                      Chỉnh sửa
                     </Button>
-                    <Button onClick={() => handleSave()} disabled={isSaving} variant="outline" className="rounded-xl">
-                      <Save className="w-4 h-4 mr-2" />
-                      {isSaving ? 'Đang lưu...' : 'Lưu'}
-                    </Button>
-                  </>
-                ) : editData.status === 'archived' ? (
-                  <>
-                    <Button
-                      onClick={() => handleSave('draft')}
-                      disabled={isSaving}
-                      variant="outline"
-                      className="rounded-xl"
-                    >
-                      Lưu nháp
-                    </Button>
-                    <Button
-                      onClick={() => handleSave('published')}
-                      disabled={isSaving}
-                      className="rounded-xl bg-emerald-600 hover:bg-emerald-700"
-                    >
-                      Xuất bản
-                    </Button>
-                    <Button onClick={() => handleSave()} disabled={isSaving} variant="outline" className="rounded-xl">
-                      <Save className="w-4 h-4 mr-2" />
-                      {isSaving ? 'Đang lưu...' : 'Lưu'}
-                    </Button>
-                  </>
-                ) : null}
+                  )
+                )}
               </div>
             </div>
           </div>
@@ -414,6 +445,7 @@ export default function PostEditPage() {
                       Tiêu đề bài viết
                     </Label>
                     <Input
+                      disabled={!isEditMode}
                       className={`mt-2 text-lg font-semibold ${isFieldChanged('title') ? 'border-amber-500 ring-1 ring-amber-500' : ''}`}
                       value={editData.title || ''}
                       onChange={(e) => setEditData({ ...editData, title: e.target.value })}
@@ -430,6 +462,7 @@ export default function PostEditPage() {
                     <div className="mt-2 flex items-center gap-2">
                       <span className="text-slate-400 text-sm">/bai-viet/</span>
                       <Input
+                        disabled={!isEditMode}
                         className={`flex-1 font-mono text-sm ${isFieldChanged('slug') ? 'border-amber-500 ring-1 ring-amber-500' : ''}`}
                         value={editData.slug || ''}
                         onChange={(e) => setEditData({ ...editData, slug: e.target.value })}
@@ -437,6 +470,7 @@ export default function PostEditPage() {
                       />
                       <Button
                         type="button"
+                        disabled={!isEditMode}
                         variant="outline"
                         size="icon"
                         onClick={() => setEditData({ ...editData, slug: makeSlug(editData.title || '') })}
@@ -455,6 +489,7 @@ export default function PostEditPage() {
                       className={`mt-2 ${isFieldChanged('content') ? 'border-amber-500 ring-1 ring-amber-500 rounded-lg' : ''}`}
                     >
                       <PostRichTextEditor
+                        disabled={!isEditMode}
                         value={editData.content || ''}
                         onChange={(content) => setEditData((prev) => ({ ...prev, content }))}
                       />
@@ -485,6 +520,7 @@ export default function PostEditPage() {
                         Bài nổi bật
                       </Label>
                       <Switch
+                        disabled={!isEditMode}
                         checked={editData.is_featured || false}
                         onCheckedChange={(checked) => setEditData({ ...editData, is_featured: checked })}
                         className="data-[state=checked]:bg-emerald-600"
@@ -496,6 +532,7 @@ export default function PostEditPage() {
                         Ngày đăng
                       </Label>
                       <Input
+                        disabled={!isEditMode}
                         type="datetime-local"
                         className={`mt-2 ${isFieldChanged('published_at') ? 'border-amber-500 ring-1 ring-amber-500' : ''}`}
                         value={editData.published_at ? new Date(editData.published_at).toISOString().slice(0, 16) : ''}
@@ -528,6 +565,7 @@ export default function PostEditPage() {
                         className={`mt-2 flex items-center gap-2 ${isFieldChanged('featured_image') ? 'border-amber-500 ring-1 ring-amber-500 p-2 rounded-lg' : ''}`}
                       >
                         <Input
+                          disabled={!isEditMode}
                           type="file"
                           accept="image/*"
                           onChange={(e) => {
@@ -542,7 +580,7 @@ export default function PostEditPage() {
                           variant="outline"
                           size="sm"
                           onClick={() => setEditData((prev) => ({ ...prev, featured_image: '', imageFile: undefined }))}
-                          disabled={!editData.featured_image}
+                          disabled={!isEditMode || !editData.featured_image}
                         >
                           Gỡ
                         </Button>
@@ -564,6 +602,7 @@ export default function PostEditPage() {
                         Tóm tắt
                       </Label>
                       <Textarea
+                        disabled={!isEditMode}
                         className={`mt-2 min-h-[80px] resize-y ${isFieldChanged('excerpt') ? 'border-amber-500 ring-1 ring-amber-500' : ''}`}
                         value={editData.excerpt || ''}
                         onChange={(e) => setEditData({ ...editData, excerpt: e.target.value })}
@@ -594,6 +633,7 @@ export default function PostEditPage() {
                       </Label>
                       <div className="mt-2 flex items-center gap-2">
                         <Input
+                          disabled={!isEditMode}
                           className={`flex-1 ${isFieldChanged('seo_title') ? 'border-amber-500 ring-1 ring-amber-500' : ''}`}
                           value={editData.seo_title || ''}
                           onChange={(e) => setEditData({ ...editData, seo_title: e.target.value })}
@@ -623,6 +663,7 @@ export default function PostEditPage() {
                       </Label>
                       <div className="mt-2 flex items-start gap-2">
                         <Textarea
+                          disabled={!isEditMode}
                           className={`flex-1 min-h-[80px] resize-y ${isFieldChanged('meta_description') ? 'border-amber-500 ring-1 ring-amber-500' : ''}`}
                           value={editData.meta_description || ''}
                           onChange={(e) => setEditData({ ...editData, meta_description: e.target.value })}
@@ -665,6 +706,7 @@ export default function PostEditPage() {
                         Từ khóa
                       </Label>
                       <Input
+                        disabled={!isEditMode}
                         className={`mt-2 ${isFieldChanged('meta_keywords') ? 'border-amber-500 ring-1 ring-amber-500' : ''}`}
                         value={editData.meta_keywords || ''}
                         onChange={(e) => setEditData({ ...editData, meta_keywords: e.target.value })}
@@ -680,6 +722,7 @@ export default function PostEditPage() {
                         className={`mt-2 flex items-center gap-2 ${isFieldChanged('og_image') ? 'border-amber-500 ring-1 ring-amber-500 p-2 rounded-lg' : ''}`}
                       >
                         <Input
+                          disabled={!isEditMode}
                           type="file"
                           accept="image/*"
                           onChange={(e) => {
@@ -705,6 +748,7 @@ export default function PostEditPage() {
                       </Label>
                       <div className="mt-2 flex items-center gap-2">
                         <Input
+                          disabled={!isEditMode}
                           className={`flex-1 ${isFieldChanged('canonical_url') ? 'border-amber-500 ring-1 ring-amber-500' : ''}`}
                           value={editData.canonical_url || ''}
                           onChange={(e) => setEditData({ ...editData, canonical_url: e.target.value })}
@@ -734,6 +778,7 @@ export default function PostEditPage() {
                         Loại nội dung
                       </Label>
                       <select
+                        disabled={!isEditMode}
                         className={`mt-2 w-full px-3 py-2 border border-slate-200 rounded-xl bg-white text-sm ${isFieldChanged('schema_type') ? 'border-amber-500 ring-1 ring-amber-500' : ''}`}
                         value={editData.schema_type || 'Article'}
                         onChange={(e) => setEditData({ ...editData, schema_type: e.target.value })}

@@ -60,6 +60,7 @@ export interface PaymentRequest {
   name: string;
   movieId?: number;
   combo?: number[];
+  movie_items?: { package_id: number; quantity: number }[];
   ticketCount: number;
   paymentMethod: 'cash' | 'momo' | 'vnpay' | 'vietqr';
   totalPrice?: number;

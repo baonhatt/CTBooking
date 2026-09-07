@@ -497,6 +497,7 @@ export default function BookingPage() {
       } else {
         // HAS MOVIE TICKETS (and optionally VR)
         const mainMoviePkg = movieItems[0];
+        const movie_items = movieItems.map(m => ({ package_id: m.packageId, quantity: m.quantity }));
         const validation = await validateBookingApi({
           email,
           emailBook: email,
@@ -504,6 +505,7 @@ export default function BookingPage() {
           name,
           ticketCount: totalMovieCount,
           ticketPackageId: mainMoviePkg.packageId,
+          movie_items,
           vr_items,
           voucher_code: appliedVoucher ? voucherCode.trim() : undefined,
           branch_id: selectedBranch?.id
@@ -524,6 +526,7 @@ export default function BookingPage() {
           totalPrice: canonicalTotal,
           ticketPackageId: mainMoviePkg.packageId,
           pay_txt_code: orderId,
+          movie_items,
           vr_items,
           voucher_code: appliedVoucher ? voucherCode.trim() : undefined,
           branch_id: selectedBranch?.id
@@ -549,7 +552,12 @@ export default function BookingPage() {
         duration: '',
         genres: '',
         ticketPackageId: movieItems[0]?.packageId,
-        ticketPackageName: movieItems.map((m) => `${m.name} x${m.quantity}`).join(', ') || 'Gói VR',
+        ticketPackageName:
+          movieItems.length > 0
+            ? JSON.stringify(
+                movieItems.map((m) => ({ package_id: m.packageId, name: m.name, quantity: m.quantity, price: m.price }))
+              )
+            : 'Gói VR',
         branch_id: selectedBranch?.id,
         branch_name: selectedBranch?.name,
         voucher_code: appliedVoucher?.voucher_details?.code || null,

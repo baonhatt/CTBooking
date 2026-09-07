@@ -14,6 +14,7 @@ import { request } from '@/lib/api/http';
 import AdminLayout from '@/admin/layouts/AdminLayout';
 import { useStaffStore } from '@/store/staffStore';
 import { useNavigate } from 'react-router-dom';
+import { ConfirmDeleteDialog } from '@/components/admin/dialogs/ConfirmDeleteDialog';
 
 interface Role {
   id: number;
@@ -190,6 +191,14 @@ export default function RolesPage() {
       adminEmailState={staff?.email || 'admin@email.com'}
       handleLogout={handleLogout}
     >
+      {seedMutation.isPending && (
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-white/80 backdrop-blur-sm">
+          <div className="flex flex-col items-center gap-4">
+            <div className="w-12 h-12 border-4 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
+            <p className="text-lg font-semibold text-slate-700 animate-pulse">Đang nạp cấu hình hệ thống...</p>
+          </div>
+        </div>
+      )}
       <div className="space-y-6">
         <Card>
           <CardHeader>
@@ -297,7 +306,7 @@ export default function RolesPage() {
                             variant="ghost"
                             size="icon"
                             className="h-8 w-8 text-blue-600 hover:text-blue-700 hover:bg-blue-50 flex-shrink-0"
-                            onClick={() => navigate(`/roles/${role.id}`)}
+                            onClick={() => navigate(`/roles/${role.id}?mode=view`)}
                             title="Chi tiết"
                           >
                             <Eye className="h-3.5 w-3.5" />
@@ -336,7 +345,7 @@ export default function RolesPage() {
 
         {/* Create Dialog */}
         <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
-          <DialogContent className="[&>button]:hidden">
+          <DialogContent className="[&>button]:hidden bg-white sm:max-w-md rounded-2xl">
             <DialogHeader className="flex flex-row items-center gap-3 space-y-0 pb-4 border-b">
               <DialogTitle className="text-lg font-bold text-slate-800">Tạo vai trò mới</DialogTitle>
               <div className="flex-1" />
@@ -396,42 +405,17 @@ export default function RolesPage() {
         </Dialog>
 
         {/* Delete Dialog */}
-        <Dialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
-          <DialogContent className="[&>button]:hidden">
-            <DialogHeader className="flex flex-row items-center gap-3 space-y-0 pb-4 border-b">
-              <DialogTitle className="text-lg font-bold text-slate-800">Xác nhận xóa</DialogTitle>
-              <div className="flex-1" />
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={() => setIsDeleteDialogOpen(false)}
-                className="h-8 w-8 rounded-full hover:bg-slate-100 text-slate-400 transition-colors"
-                title="Đóng"
-              >
-                <X className="w-5 h-5" />
-              </Button>
-            </DialogHeader>
-            <p className="py-4">
+        <ConfirmDeleteDialog
+          isOpen={isDeleteDialogOpen}
+          onOpenChange={setIsDeleteDialogOpen}
+          description={
+            <>
               Bạn có chắc chắn muốn xóa vai trò "{roleToDelete?.name}"? Hành động này không thể hoàn tác.
-            </p>
-            <DialogFooter>
-              <Button
-                variant="ghost"
-                onClick={() => setIsDeleteDialogOpen(false)}
-                className="text-slate-500 hover:bg-slate-100"
-              >
-                Hủy
-              </Button>
-              <Button
-                onClick={handleDelete}
-                disabled={deleteMutation.isPending}
-                className="bg-red-600 hover:bg-red-700 min-w-[140px] rounded-xl shadow-lg shadow-red-500/20 transition-all active:scale-95"
-              >
-                {deleteMutation.isPending ? 'Đang xóa...' : 'Xóa'}
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
+            </>
+          }
+          onConfirm={handleDelete}
+          isDeleting={deleteMutation.isPending}
+        />
       </div>
     </AdminLayout>
   );

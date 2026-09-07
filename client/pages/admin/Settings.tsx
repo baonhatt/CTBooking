@@ -290,7 +290,7 @@ export default function SettingsPage() {
                     checked={otpSettings.enable_2fa}
                     disabled={!canManageSettings}
                     onCheckedChange={(checked) => setOtpSettings({ ...otpSettings, enable_2fa: checked })}
-                    className="data-[state=checked]:bg-[#2563EB]"
+                    className="data-[state=checked]:bg-blue-600"
                   />
                 </div>
 
@@ -358,7 +358,7 @@ export default function SettingsPage() {
                 <button
                   onClick={handleSaveOtpSettings}
                   disabled={isSyncing || !canManageSettings}
-                  className="w-full py-3 bg-[#2563EB] hover:bg-blue-700 text-white font-semibold rounded-xl transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-xl transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {isSyncing ? 'Đang lưu...' : 'Lưu cài đặt OTP'}
                 </button>

@@ -23,7 +23,6 @@ export const PERMISSIONS_SEED = [
   // Users (khách hàng)
   { module: 'users', action: 'view', description: 'Xem danh sách khách hàng' },
   { module: 'users', action: 'view_detail', description: 'Xem chi tiết khách hàng' },
-  { module: 'users', action: 'export', description: 'Xuất dữ liệu khách hàng' },
 
   // Movies
   { module: 'movies', action: 'view', description: 'Xem danh sách phim' },
@@ -103,8 +102,7 @@ export const PERMISSIONS_SEED = [
   { module: 'vouchers', action: 'toggle_status', description: 'Bật/tắt trạng thái voucher' },
   { module: 'vouchers', action: 'delete', description: 'Xóa voucher' },
   { module: 'vouchers', action: 'view_deleted', description: 'Xem voucher đã xóa' },
-  { module: 'vouchers', action: 'restore', description: 'Khôi phục voucher đã xóa' },
-  { module: 'vouchers', action: 'export', description: 'Xuất dữ liệu vouchers' }
+  { module: 'vouchers', action: 'restore', description: 'Khôi phục voucher đã xóa' }
 ];
 
 export const ROLES_SEED = [
@@ -148,7 +146,6 @@ export const ROLES_SEED = [
       'vouchers:edit',
       'vouchers:toggle_status',
       'vouchers:delete',
-      'vouchers:export',
       'transactions:view',
       'transactions:export',
       'posts:view',
@@ -156,7 +153,6 @@ export const ROLES_SEED = [
       'posts:edit',
       'users:view',
       'users:view_detail',
-      'users:export',
       'staff:view',
       'branches:view',
       'branches:edit',
@@ -207,6 +203,7 @@ export const ROLES_SEED = [
       'vouchers:view_deleted',
       'vouchers:restore',
       'transactions:view',
+      'transactions:export',
       'branches:view',
       'branches:edit',
       'branches:toggle_status',
@@ -226,8 +223,6 @@ export const ROLES_SEED = [
       'staff:view_deleted',
       'staff:restore',
       'roles:view',
-      'roles:view_deleted',
-      'roles:restore',
       'email_logs:view',
       'uploads:view',
       'uploads:upload',

@@ -503,7 +503,7 @@ export default function AuditLogsPage() {
 
         {/* Detail Dialog */}
         <Dialog open={isDetailDialogOpen} onOpenChange={setIsDetailDialogOpen}>
-          <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
+          <DialogContent className="[&>button]:hidden bg-white sm:max-w-4xl max-h-[80vh] overflow-y-auto rounded-2xl">
             <DialogHeader>
               <DialogTitle>Chi tiết hoạt động</DialogTitle>
             </DialogHeader>

@@ -36,16 +36,16 @@ export async function listStaffImpl(
     .limit(pageSize)
     .offset(offset);
 
-  if (!includeInactive) {
-    query = query.where(and(eq(staffs.isActive, true), isNull(staffs.deletedAt)));
-  }
-
   if (q) {
     query = query.where(
       and(
-        includeInactive ? undefined : and(eq(staffs.isActive, true), isNull(staffs.deletedAt)),
+        includeInactive ? isNull(staffs.deletedAt) : and(eq(staffs.isActive, true), isNull(staffs.deletedAt)),
         sql`${staffs.email} LIKE ${'%' + q + '%'} OR ${staffs.fullname} LIKE ${'%' + q + '%'}`
       )
+    );
+  } else {
+    query = query.where(
+      includeInactive ? isNull(staffs.deletedAt) : and(eq(staffs.isActive, true), isNull(staffs.deletedAt))
     );
   }
 
@@ -77,11 +77,14 @@ export async function listStaffImpl(
     })
   );
 
-  // Get total count
   const [totalResult] = await db
     .select({ count: count() })
     .from(staffs)
-    .where(and(includeInactive ? undefined : eq(staffs.isActive, true), isNull(staffs.deletedAt)));
+    .where(
+      and(
+        includeInactive ? isNull(staffs.deletedAt) : and(eq(staffs.isActive, true), isNull(staffs.deletedAt))
+      )
+    );
 
   return {
     items: staffWithDetails,

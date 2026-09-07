@@ -349,7 +349,7 @@ export default function EmailLogsContent() {
 
       {/* Details Dialog */}
       <Dialog open={isDetailsOpen} onOpenChange={setIsDetailsOpen}>
-        <DialogContent className="max-w-2xl p-0 border-none shadow-2xl rounded-3xl flex flex-col overflow-hidden">
+        <DialogContent className="max-w-2xl p-0 border-none shadow-2xl rounded-2xl flex flex-col overflow-hidden bg-white [&>button]:hidden">
           <DialogHeader className="p-6 bg-white border-b border-gray-200 text-gray-900 shrink-0 relative overflow-hidden">
             <div className="absolute top-0 right-0 w-32 h-32 bg-blue-500/10 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2" />
             <div className="relative z-10 flex flex-col gap-4">
