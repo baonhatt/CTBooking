@@ -59,6 +59,7 @@ import { uploadDirectToCloudinary } from '@/lib/api/uploads';
 import { getMoviesAdmin } from '@/lib/api/movies';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useStaffPermissions, useIsSuperAdmin } from '@/hooks/useStaffPermission';
+import { useConfirmUnsaved } from '@/hooks/useConfirmUnsaved';
 
 interface TicketPackage {
   id: number;
@@ -165,6 +166,33 @@ export default function TicketsContent(props: Props) {
   const [ticketToToggle, setTicketToToggle] = useState<{ id: number; currentStatus: boolean } | null>(null);
   const [isTogglingStatus, setIsTogglingStatus] = useState(false);
   const [confirmSaveData, setConfirmSaveData] = useState<{ payload: any; changes: string[] } | null>(null);
+
+  const isDirty = React.useMemo(() => {
+    if (!isEditOpen || !editData) return false;
+    
+    if (!editData.id || editData.id === 0) {
+      return !!(editData.name || editData.price || editData.description);
+    }
+    
+    const original = data.find((t) => t.id === editData.id);
+    if (!original) return false;
+    
+    if (editData.name !== original.name) return true;
+    if (String(editData.price || '') !== String(original.price || '')) return true;
+    if (editData.description !== original.description) return true;
+    if (editData.type !== original.type) return true;
+    
+    return false;
+  }, [isEditOpen, editData, data]);
+
+  const { handleOpenChange: handleEditOpenChange, UnsavedAlert: EditAlert } = useConfirmUnsaved({
+    isDirty: isDirty,
+    isSubmitting: isSaving,
+    onConfirmClose: () => {
+      setIsEditOpen(false);
+      setEditData({});
+    }
+  });
 
   // Fetch movies when dialog opens or branch changes
   React.useEffect(() => {
@@ -540,7 +568,8 @@ export default function TicketsContent(props: Props) {
         </CardContent>
       </Card>
       {/* Create / Edit Dialog */}
-      <Dialog open={isEditOpen} onOpenChange={setIsEditOpen}>
+      <EditAlert />
+      <Dialog open={isEditOpen} onOpenChange={handleEditOpenChange}>
         <DialogContent className="max-w-[950px] max-h-[90vh] flex flex-col p-0 border border-gray-200 shadow-xl rounded-2xl overflow-hidden font-sans bg-white [&>button]:hidden">
           <DialogHeader className="px-6 py-4 bg-white border-b border-gray-200">
             <div className="flex items-center justify-between">
@@ -574,7 +603,7 @@ export default function TicketsContent(props: Props) {
               <Button
                 variant="ghost"
                 size="icon"
-                onClick={() => setIsEditOpen(false)}
+                onClick={() => handleEditOpenChange(false)}
                 className="h-8 w-8 text-gray-500 hover:text-gray-700"
               >
                 <X className="h-4 w-4" />
@@ -957,7 +986,7 @@ export default function TicketsContent(props: Props) {
 
           {/* Buttons */}
           <div className="flex justify-end gap-3 px-6 py-3.5 border-t bg-gray-50">
-            <Button variant="outline" onClick={() => setIsEditOpen(false)} disabled={isSaving} className="rounded-xl">
+            <Button variant="outline" onClick={() => handleEditOpenChange(false)} disabled={isSaving} className="rounded-xl">
               Hủy
             </Button>
             <Button

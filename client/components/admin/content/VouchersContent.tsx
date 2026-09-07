@@ -70,6 +70,7 @@ import {
 } from '@/lib/api';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useStaffPermissions, useIsSuperAdmin } from '@/hooks/useStaffPermission';
+import { useConfirmUnsaved } from '@/hooks/useConfirmUnsaved';
 
 interface VoucherItem {
   id: number;
@@ -236,6 +237,47 @@ export default function VouchersContent(props: Props) {
   const [isPermanent, setIsPermanent] = useState(false);
   const [isCodeEditable, setIsCodeEditable] = useState(false);
   const [confirmSaveData, setConfirmSaveData] = useState<{ payload: any; changes: string[] } | null>(null);
+
+  const isDirty = React.useMemo(() => {
+    if (!isEditOpen || !editData) return false;
+    
+    if (!editData.id || editData.id === 0) {
+      return !!(
+        (editData.name && editData.name.trim() !== '') ||
+        (editData.note && editData.note.trim() !== '') ||
+        (editData.description && editData.description.trim() !== '') ||
+        Number(editData.min_order_value || 0) > 0 ||
+        Number(editData.max_discount || 0) > 0 ||
+        Number(editData.usage_limit || 0) > 0 ||
+        editData.discount_type !== 'percent' ||
+        Number(editData.discount_value || 0) !== 10 ||
+        editData.scope !== 'all' ||
+        editData.sale_staff_id != null
+      );
+    }
+    
+    const original = data.find(v => v.id === editData.id);
+    if (!original) return false;
+    
+    if (editData.code !== original.code) return true;
+    if (editData.name !== original.name) return true;
+    if (String(editData.discount_type) !== String(original.discount_type)) return true;
+    if (Number(editData.discount_value || 0) !== Number(original.discount_value || 0)) return true;
+    if (editData.note !== original.note && editData.note !== original.description) return true;
+    if (Number(editData.max_discount || 0) !== Number(original.max_discount || 0)) return true;
+    if (Number(editData.min_order_value || 0) !== Number(original.min_order_value || 0)) return true;
+    
+    return false;
+  }, [isEditOpen, editData, data]);
+
+  const { handleOpenChange: handleEditOpenChange, UnsavedAlert: EditAlert } = useConfirmUnsaved({
+    isDirty: isDirty,
+    isSubmitting: isSaving,
+    onConfirmClose: () => {
+      setIsEditOpen(false);
+      setEditData({});
+    }
+  });
 
   useEffect(() => {
     if (isEditOpen && editData) {
@@ -1170,7 +1212,8 @@ export default function VouchersContent(props: Props) {
       </Card>
 
       {/* Create / Edit Modal */}
-      <Dialog open={isEditOpen} onOpenChange={setIsEditOpen}>
+      <EditAlert />
+      <Dialog open={isEditOpen} onOpenChange={handleEditOpenChange}>
         <DialogContent className="max-w-[1050px] max-h-[90vh] flex flex-col p-0 border border-gray-200 shadow-xl rounded-2xl overflow-hidden font-sans bg-white [&>button]:hidden">
           <DialogHeader className="px-6 py-4 bg-white border-b border-gray-200">
             <div className="flex items-center justify-between">
@@ -1204,7 +1247,7 @@ export default function VouchersContent(props: Props) {
               <Button
                 variant="ghost"
                 size="icon"
-                onClick={() => setIsEditOpen(false)}
+                onClick={() => handleEditOpenChange(false)}
                 className="h-8 w-8 text-gray-500 hover:text-gray-700"
               >
                 <X className="h-4 w-4" />

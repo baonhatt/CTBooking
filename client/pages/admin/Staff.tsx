@@ -16,6 +16,7 @@ import AdminLayout from '@/admin/layouts/AdminLayout';
 import { useStaffStore } from '@/store/staffStore';
 import { useNavigate } from 'react-router-dom';
 import { useStaffPermission, useStaffPermissions, useIsSuperAdmin } from '@/hooks/useStaffPermission';
+import { useConfirmUnsaved } from '@/hooks/useConfirmUnsaved';
 import {
   Info,
   X,
@@ -115,6 +116,9 @@ export default function StaffPage() {
     roleId: '',
     branchIds: [] as number[]
   });
+
+  // Alert dialogs moved below mutations
+
 
   // Fetch staff list
   const { data: staffData, isLoading: staffLoading } = useQuery({
@@ -226,6 +230,31 @@ export default function StaffPage() {
     },
     onError: (err: any) => {
       toast.error(err.message || 'Đặt lại mật khẩu thất bại');
+    }
+  });
+
+  const isCreateDirty = formData.email !== '' || formData.fullname !== '' || formData.phone !== '' || formData.roleId !== '' || formData.branchIds.length > 0;
+  const { handleOpenChange: handleCreateOpenChange, UnsavedAlert: CreateAlert } = useConfirmUnsaved({
+    isDirty: isCreateDirty,
+    isSubmitting: createMutation.isPending,
+    onConfirmClose: () => {
+      setIsCreateDialogOpen(false);
+      resetForm();
+    }
+  });
+
+  const isEditDirty = selectedStaff
+    ? formData.fullname !== selectedStaff.fullname ||
+      formData.phone !== (selectedStaff.phone || '') ||
+      formData.roleId !== (selectedStaff.roleIds && selectedStaff.roleIds.length > 0 ? String(selectedStaff.roleIds[0]) : '') ||
+      JSON.stringify(formData.branchIds.slice().sort()) !== JSON.stringify((selectedStaff.branchIds || []).slice().sort())
+    : false;
+  const { handleOpenChange: handleEditOpenChange, UnsavedAlert: EditAlert } = useConfirmUnsaved({
+    isDirty: isEditDirty,
+    isSubmitting: updateMutation.isPending,
+    onConfirmClose: () => {
+      setIsEditDialogOpen(false);
+      resetForm();
     }
   });
 
@@ -558,7 +587,8 @@ export default function StaffPage() {
         </Card>
 
         {/* Create Dialog */}
-        <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
+        <CreateAlert />
+        <Dialog open={isCreateDialogOpen} onOpenChange={handleCreateOpenChange}>
           <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto [&>button]:hidden">
             <DialogHeader className="flex flex-row items-center gap-3 space-y-0 pb-4 border-b">
               <DialogTitle className="text-lg font-bold text-slate-800">Tạo nhân viên mới</DialogTitle>
@@ -566,7 +596,7 @@ export default function StaffPage() {
               <Button
                 variant="ghost"
                 size="icon"
-                onClick={() => setIsCreateDialogOpen(false)}
+                onClick={() => handleCreateOpenChange(false)}
                 className="h-8 w-8 rounded-full hover:bg-slate-100 text-slate-400 transition-colors"
                 title="Đóng"
               >
@@ -636,7 +666,7 @@ export default function StaffPage() {
                 <Button
                   type="button"
                   variant="ghost"
-                  onClick={() => setIsCreateDialogOpen(false)}
+                  onClick={() => handleCreateOpenChange(false)}
                   className="text-slate-500 hover:bg-slate-100"
                 >
                   Hủy
@@ -654,7 +684,8 @@ export default function StaffPage() {
         </Dialog>
 
         {/* Edit Dialog */}
-        <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
+        <EditAlert />
+        <Dialog open={isEditDialogOpen} onOpenChange={handleEditOpenChange}>
           <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto [&>button]:hidden">
             <DialogHeader className="flex flex-row items-center gap-3 space-y-0 pb-4 border-b">
               <DialogTitle className="text-lg font-bold text-slate-800">Chỉnh sửa nhân viên</DialogTitle>
@@ -662,7 +693,7 @@ export default function StaffPage() {
               <Button
                 variant="ghost"
                 size="icon"
-                onClick={() => setIsEditDialogOpen(false)}
+                onClick={() => handleEditOpenChange(false)}
                 className="h-8 w-8 rounded-full hover:bg-slate-100 text-slate-400 transition-colors"
                 title="Đóng"
               >
@@ -750,7 +781,7 @@ export default function StaffPage() {
                 <Button
                   type="button"
                   variant="ghost"
-                  onClick={() => setIsEditDialogOpen(false)}
+                  onClick={() => handleEditOpenChange(false)}
                   className="text-slate-500 hover:bg-slate-100"
                 >
                   Hủy

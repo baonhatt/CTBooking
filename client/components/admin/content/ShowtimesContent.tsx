@@ -27,6 +27,7 @@ import {
   updateShowtimeApi,
   type ShowtimeItem
 } from '@/lib/api/showtimes';
+import { useConfirmUnsaved } from '@/hooks/useConfirmUnsaved';
 
 function addMinutesToTime(value: string, minutes: number): string | null {
   if (!/^\d{2}:\d{2}$/.test(value) || !Number.isFinite(minutes)) return null;
@@ -117,6 +118,24 @@ export default function ShowtimesContent({ branches, schedules, isLoading, onRef
     setDeleteTarget(null);
     setCopyFromBranchId('');
   };
+
+  const isDirty = useMemo(() => {
+    if (!editorBranch) return false;
+    if (editing) {
+      return (
+        form.movie_id !== editing.movie_id ||
+        form.start_time !== editing.start_time ||
+        form.end_time !== editing.end_time
+      );
+    }
+    return form.movie_id !== 0 || form.end_time !== '';
+  }, [editorBranch, editing, form]);
+
+  const { handleOpenChange: handleEditorOpenChange, UnsavedAlert: EditorAlert } = useConfirmUnsaved({
+    isDirty,
+    isSubmitting: isSaving,
+    onConfirmClose: closeEditor
+  });
 
   const handleMovieChange = (movieId: number) => {
     const movie = movies.find((m) => m.id === movieId);
@@ -293,7 +312,8 @@ export default function ShowtimesContent({ branches, schedules, isLoading, onRef
         </CardContent>
       </Card>
 
-      <Dialog open={!!editorBranch} onOpenChange={(open) => !open && closeEditor()}>
+      <EditorAlert />
+      <Dialog open={!!editorBranch} onOpenChange={handleEditorOpenChange}>
         <DialogContent className="[&>button]:hidden sm:max-w-3xl max-h-[90vh] overflow-hidden flex flex-col">
           <DialogHeader className="flex flex-row items-center gap-3 space-y-0 pb-4 border-b shrink-0">
             <div>
@@ -306,7 +326,7 @@ export default function ShowtimesContent({ branches, schedules, isLoading, onRef
             <Button
               variant="ghost"
               size="icon"
-              onClick={closeEditor}
+              onClick={() => handleEditorOpenChange(false)}
               className="h-8 w-8 rounded-full hover:bg-slate-100 text-slate-400"
             >
               <X className="w-5 h-5" />
