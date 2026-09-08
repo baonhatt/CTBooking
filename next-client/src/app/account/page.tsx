@@ -82,14 +82,7 @@ export interface UserTransactionItem {
   remainingTimeLabel?: string;
 }
 
-export const parsePackageName = (rawPkgStr?: string): string => {
-  if (!rawPkgStr) return 'Vé đơn';
-  const pkgs = parseMoviePackages(rawPkgStr);
-  if (pkgs.length === 1 && pkgs[0].name === 'Vé xem phim' && !rawPkgStr.trim().startsWith('[')) {
-    return rawPkgStr;
-  }
-  return pkgs.map((p) => `${p.name} x${p.quantity}`).join(' + ');
-};
+
 
 export default function Account() {
   const router = useRouter();
