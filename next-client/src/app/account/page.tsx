@@ -23,6 +23,73 @@ import {
   PaginationNext,
   PaginationPrevious
 } from '@/components/ui/pagination';
+import {
+  parseMoviePackages,
+  parseApplicableIds,
+  isLineDiscounted,
+  moviePackagesTotalQty,
+  moviePackageLineTotal,
+  vrLineTotal,
+  vrPackageId,
+  bookingTypeBadge,
+  voucherScopeLabel,
+  hasVrContent
+} from '@shared/booking-invoice';
+
+export interface VRItem {
+  id?: number;
+  booking_id?: number;
+  package_name: string;
+  quantity: number;
+  unit_price: number;
+  discounted_unit_price?: number;
+  line_total?: number;
+  vr_ticket_package_id?: number;
+  vr_package_id?: number;
+}
+
+export interface UserTransactionItem {
+  id: number;
+  booking_id: number;
+  booking_code: string;
+  pay_txt_code: string;
+  movie: string;
+  ticket_package: string;
+  quantity: number;
+  amount: number;
+  original_amount: number;
+  discount_amount: number;
+  voucher_code: string | null;
+  voucher_details?: {
+    scope?: string | null;
+    description?: string | null;
+    applicable_ids?: unknown;
+  } | null;
+  method: string;
+  payment_status: string;
+  booking_type?: 'movie' | 'vr' | 'combo_vr';
+  vr_items?: VRItem[];
+  ticket_unit_price?: number;
+  created_at: string;
+  paid_at?: string;
+  expiry_date?: string;
+  is_used: boolean;
+  updated_at?: string;
+  branch_name?: string;
+  branch_address?: string;
+  isExpired?: boolean;
+  expired?: boolean;
+  remainingTimeLabel?: string;
+}
+
+export const parsePackageName = (rawPkgStr?: string): string => {
+  if (!rawPkgStr) return 'Vé đơn';
+  const pkgs = parseMoviePackages(rawPkgStr);
+  if (pkgs.length === 1 && pkgs[0].name === 'Vé xem phim' && !rawPkgStr.trim().startsWith('[')) {
+    return rawPkgStr;
+  }
+  return pkgs.map((p) => `${p.name} x${p.quantity}`).join(' + ');
+};
 
 export default function Account() {
   const router = useRouter();
@@ -55,10 +122,10 @@ export default function Account() {
   const [newPwd, setNewPwd] = useState('');
   const [confirmPwd, setConfirmPwd] = useState('');
 
-  const [transactions, setTransactions] = useState<any[]>([]);
+  const [transactions, setTransactions] = useState<UserTransactionItem[]>([]);
   const [isLoadingTx, setIsLoadingTx] = useState(true);
   const [isDetailOpen, setIsDetailOpen] = useState(false);
-  const [selectedTx, setSelectedTx] = useState<any | null>(null);
+  const [selectedTx, setSelectedTx] = useState<UserTransactionItem | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
   const [tab, setTab] = useState<'history' | 'info'>('history');
   const pageSize = 5;
@@ -644,13 +711,28 @@ export default function Account() {
                                     <div className="flex flex-col md:flex-row justify-between gap-6">
                                       <div className="flex-1 space-y-4">
                                         <div className="space-y-1">
-                                          <div className="flex items-center gap-3">
-                                            <h3 className="text-lg font-bold text-white">
-                                              {t.ticket_package || 'Vé đơn'}
+                                          <div className="flex items-center gap-3 flex-wrap">
+                                            <h3 className="text-lg font-bold text-white uppercase">
+                                              {t.booking_type === 'vr' ? 'Trải nghiệm VR' : t.booking_type === 'combo_vr' ? 'Combo Phim + VR' : 'Gói vé phim'}
                                             </h3>
                                             <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-blue-500/10 text-blue-300 border border-blue-500/20 uppercase tracking-wider">
                                               {t.method}
                                             </span>
+                                            {(() => {
+                                              const badge = bookingTypeBadge(t.booking_type, t.vr_items);
+                                              if (badge === 'Phim') return null;
+                                              return (
+                                                <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-purple-500/10 text-purple-300 border border-purple-500/20 uppercase tracking-wider">
+                                                  {badge}
+                                                </span>
+                                              );
+                                            })()}
+                                            {Number(t.discount_amount) > 0 && (
+                                              <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-emerald-500/10 text-emerald-300 border border-emerald-500/20 uppercase tracking-wider">
+                                                {t.voucher_code ? `${t.voucher_code} ` : ''}
+                                                −{formatMoney(t.discount_amount)}₫
+                                              </span>
+                                            )}
                                           </div>
                                           <div className="flex items-center gap-3 text-xs text-gray-400">
                                             <span className="flex items-center gap-1.5">
@@ -658,10 +740,19 @@ export default function Account() {
                                               {formatDateTime(t.created_at)}
                                             </span>
                                             {(() => {
-                                              const text = t.booking_type === 'vr'
-                                                ? `${t.quantity} lượt VR`
+                                              const hasVRItems = Array.isArray(t.vr_items) && t.vr_items.length > 0;
+                                              const vrText = hasVRItems
+                                                ? t.vr_items.map((it: any) => `${it.package_name} (x${it.quantity})`).join(', ')
                                                 : t.booking_type === 'combo_vr'
-                                                  ? `${movieCount > 0 ? movieCount + ' phim + ' : ''}${t.quantity} VR`
+                                                  ? 'Không có chi tiết gói VR'
+                                                  : t.booking_type === 'vr'
+                                                    ? `${t.quantity} lượt VR`
+                                                    : null;
+
+                                              const text = t.booking_type === 'combo_vr'
+                                                ? `${movieCount > 0 ? movieCount + ' phim' : ''}${vrText ? ' + ' + vrText : ''}`
+                                                : t.booking_type === 'vr'
+                                                  ? vrText
                                                   : movieCount > 0 ? `${movieCount} phim` : null;
                                               
                                               return text ? (
@@ -745,8 +836,34 @@ export default function Account() {
                                             {formatMoney(t.amount)}
                                             <span className="text-sm ml-1 text-gray-400 font-normal">₫</span>
                                           </div>
+                                          {Number(t.discount_amount) > 0 && (
+                                            <div className="text-[10px] text-emerald-400/80 font-medium mt-0.5 line-through opacity-70">
+                                              {formatMoney(t.original_amount)}₫
+                                            </div>
+                                          )}
                                           <div className="text-[10px] text-gray-500 font-bold mt-1 uppercase opacity-80">
-                                            {t.quantity} Vé • {formatMoney(t.ticket_unit_price)}/vé
+                                            {(() => {
+                                              const badge = bookingTypeBadge(t.booking_type, t.vr_items);
+                                              if (badge === 'VR') {
+                                                const vrQty = (t.vr_items || []).reduce(
+                                                  (s: number, it: any) => s + Number(it.quantity || 0),
+                                                  0
+                                                );
+                                                return `${vrQty || t.quantity} lượt VR`;
+                                              }
+                                              if (badge === 'Combo') {
+                                                const moviePkgs = parseMoviePackages(t.ticket_package, {
+                                                  quantity: t.quantity
+                                                });
+                                                const movieQty = moviePackagesTotalQty(moviePkgs);
+                                                const vrQty = (t.vr_items || []).reduce(
+                                                  (s: number, it: any) => s + Number(it.quantity || 0),
+                                                  0
+                                                );
+                                                return `${movieQty} vé + ${vrQty} VR`;
+                                              }
+                                              return `${t.quantity} Vé`;
+                                            })()}
                                           </div>
                                         </div>
 
@@ -968,48 +1085,140 @@ export default function Account() {
                       <div
                         className={`bg-gradient-to-br from-white/10 to-white/[0.02] rounded-2xl p-4 sm:p-6 border border-white/10 shadow-inner transition-all duration-500 ${selectedTx.is_used ? 'grayscale opacity-50' : ''}`}
                       >
-                        <div className="flex justify-between items-end mb-6">
-                          <div>
-                            <p className="text-[10px] text-blue-400 uppercase font-bold tracking-widest mb-1 opacity-70">
-                              Gói dịch vụ
-                            </p>
-                            <h3 className="text-lg sm:text-xl font-black text-white">
-                              {(() => {
-                                const pkgs = parseData(selectedTx.ticket_package);
-                                if (pkgs.length > 0) {
-                                  if (typeof pkgs[0] === 'object' && pkgs[0].name) {
-                                    return pkgs.map((p: any) => `${p.name} x${p.quantity}`).join(' + ');
-                                  }
-                                }
-                                return selectedTx.ticket_package || 'Vé đơn';
-                              })()}
-                            </h3>
-                          </div>
-                          <div className="text-right">
-                            <p className="text-[10px] text-gray-400 uppercase font-bold mb-1 opacity-70">Số lượng</p>
-                            <p className="text-lg sm:text-xl font-black text-white leading-none">
-                              × {selectedTx.quantity}
-                            </p>
-                          </div>
-                        </div>
+                        {(() => {
+                          const discountAmount = Number(selectedTx.discount_amount || 0);
+                          const voucherScope = selectedTx.voucher_details?.scope || 'all';
+                          const applicableIds = parseApplicableIds(selectedTx.voucher_details?.applicable_ids);
+                          const moviePkgs = parseMoviePackages(selectedTx.ticket_package, {
+                            quantity: selectedTx.quantity
+                          });
+                          const isVrOnly = selectedTx.booking_type === 'vr';
+                          const showVr = hasVrContent(selectedTx.booking_type, selectedTx.vr_items);
 
-                        {parseData(selectedTx.movie).length > 0 && (
-                          <div className="space-y-2 mt-4 pt-4 border-t border-white/5">
-                            <p className="text-[10px] text-gray-500 uppercase font-bold tracking-wider">
-                              Danh sách phim:
-                            </p>
-                            <div className="flex flex-wrap gap-1.5">
-                              {Array.from(new Set(parseData(selectedTx.movie))).map((m: any, idx: number) => (
-                                <span
-                                  key={idx}
-                                  className="px-2 py-1 bg-white/5 border border-white/5 rounded-md text-[10px] text-gray-400"
-                                >
-                                  {m}
-                                </span>
-                              ))}
-                            </div>
-                          </div>
-                        )}
+                          return (
+                            <>
+                              <div className="flex justify-between items-end mb-4">
+                                <div>
+                                  <p className="text-[10px] text-blue-400 uppercase font-bold tracking-widest mb-1 opacity-70">
+                                    Chi tiết đơn
+                                  </p>
+                                  <h3 className="text-lg sm:text-xl font-black text-white">
+                                    {bookingTypeBadge(selectedTx.booking_type, selectedTx.vr_items)}
+                                  </h3>
+                                </div>
+                                <div className="text-right">
+                                  <p className="text-[10px] text-gray-400 uppercase font-bold mb-1 opacity-70">
+                                    Tổng SL
+                                  </p>
+                                  <p className="text-lg sm:text-xl font-black text-white leading-none">
+                                    × {selectedTx.quantity}
+                                  </p>
+                                </div>
+                              </div>
+
+                              {!isVrOnly && (
+                                <div className="space-y-2 mt-2">
+                                  <p className="text-[10px] text-blue-400 uppercase font-bold tracking-wider">
+                                    Gói vé phim
+                                  </p>
+                                  <div className="space-y-1.5">
+                                    {moviePkgs.map((pkg, idx) => {
+                                      const discounted = isLineDiscounted({
+                                        discountAmount,
+                                        scope: voucherScope,
+                                        applicableIds,
+                                        kind: 'movie',
+                                        packageId: pkg.package_id
+                                      });
+                                      return (
+                                        <div
+                                          key={idx}
+                                          className="flex justify-between items-center text-xs bg-white/5 border border-white/10 px-3 py-2 rounded-lg"
+                                        >
+                                          <span className="text-gray-200 font-medium">
+                                            {pkg.name}
+                                            {discounted ? (
+                                              <span className="inline-block ml-2 px-1.5 py-[2px] align-middle text-[8px] font-black text-rose-400 bg-rose-400/10 border border-rose-400/20 rounded">
+                                                ĐƯỢC GIẢM
+                                              </span>
+                                            ) : null}
+                                          </span>
+                                          <div className="flex items-center gap-3">
+                                            <span className="text-gray-500">x{pkg.quantity}</span>
+                                            <span className="text-white font-bold">
+                                              {formatMoney(moviePackageLineTotal(pkg))}₫
+                                            </span>
+                                          </div>
+                                        </div>
+                                      );
+                                    })}
+                                  </div>
+                                </div>
+                              )}
+
+                              {parseData(selectedTx.movie).length > 0 && (
+                                <div className="space-y-2 mt-4 pt-4 border-t border-white/5">
+                                  <p className="text-[10px] text-gray-500 uppercase font-bold tracking-wider">
+                                    Danh sách phim:
+                                  </p>
+                                  <div className="flex flex-wrap gap-1.5">
+                                    {Array.from(new Set(parseData(selectedTx.movie))).map((m: any, idx: number) => (
+                                      <span
+                                        key={idx}
+                                        className="px-2 py-1 bg-white/5 border border-white/5 rounded-md text-[10px] text-gray-400"
+                                      >
+                                        {m}
+                                      </span>
+                                    ))}
+                                  </div>
+                                </div>
+                              )}
+
+                              {showVr && (
+                                <div className="space-y-2 mt-4 pt-4 border-t border-white/5">
+                                  <p className="text-[10px] text-purple-400 uppercase font-bold tracking-wider flex items-center gap-1.5">
+                                    <span>Trải nghiệm VR:</span>
+                                  </p>
+                                  {selectedTx.vr_items && selectedTx.vr_items.length > 0 ? (
+                                    <div className="space-y-1.5">
+                                      {selectedTx.vr_items.map((vr, idx) => {
+                                        const discounted = isLineDiscounted({
+                                          discountAmount,
+                                          scope: voucherScope,
+                                          applicableIds,
+                                          kind: 'vr',
+                                          packageId: vrPackageId(vr)
+                                        });
+                                        return (
+                                          <div
+                                            key={idx}
+                                            className="flex justify-between items-center text-xs bg-purple-500/10 border border-purple-500/20 px-3 py-2 rounded-lg"
+                                          >
+                                            <span className="text-purple-200 font-medium">
+                                              {vr.package_name} (x{vr.quantity})
+                                              {discounted ? (
+                                                <span className="inline-block ml-2 px-1.5 py-[2px] align-middle text-[8px] font-black text-rose-400 bg-rose-400/10 border border-rose-400/20 rounded">
+                                                  ĐƯỢC GIẢM
+                                                </span>
+                                              ) : null}
+                                            </span>
+                                            <span className="text-purple-300 font-bold">
+                                              {formatMoney(vrLineTotal(vr))}₫
+                                            </span>
+                                          </div>
+                                        );
+                                      })}
+                                    </div>
+                                  ) : selectedTx.booking_type === 'combo_vr' ? (
+                                    <div className="p-3 bg-white/5 border border-white/5 rounded-lg text-center text-xs text-gray-400 italic">
+                                      Không có chi tiết gói VR
+                                    </div>
+                                  ) : null}
+                                </div>
+                              )}
+                            </>
+                          );
+                        })()}
                       </div>
                     </div>
 
@@ -1078,7 +1287,10 @@ export default function Account() {
                               <span className="text-gray-300 font-medium">{formatMoney(selectedTx.original_amount)}₫</span>
                             </div>
                             <div className="flex justify-between items-center text-xs">
-                              <span className="text-emerald-400 font-bold uppercase">Voucher đã dùng ({selectedTx.voucher_code}):</span>
+                              <span className="text-emerald-400 font-bold uppercase">
+                                {voucherScopeLabel(selectedTx.voucher_details?.scope)}
+                                {selectedTx.voucher_code ? ` (${selectedTx.voucher_code})` : ''}:
+                              </span>
                               <span className="text-emerald-400 font-medium">-{formatMoney(selectedTx.discount_amount)}₫</span>
                             </div>
                           </>

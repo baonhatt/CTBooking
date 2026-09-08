@@ -1,27 +1,18 @@
-export function getBookingEmailTemplate(data: {
-  bookingCode: string;
-  customerName: string;
-  movieTitle: string; // Nhận chuỗi JSON: "["Phim A", "Phim B"]"
-  ticketCount: number;
-  totalPrice: string;
-  durationMin?: string; // Nhận chuỗi JSON: "[10, 12, 5]"
-  ticketPackageName?: string;
-  expiryDate?: string | Date;
-  branchName?: string;
-  branchAddress?: string;
-  branchPhone?: string;
-  branchSettings?: string;
-}): string {
-  // 1. XỬ LÝ DỮ LIỆU JSON TỪ API
+export function getBookingEmailTemplate(baseUrlOrData: any, maybeData?: any): string {
+  const data = typeof baseUrlOrData === 'object' && baseUrlOrData !== null ? baseUrlOrData : maybeData || {};
+  const baseUrl =
+    typeof baseUrlOrData === 'string' ? baseUrlOrData : process.env.VITE_CLIENT_BASE_URL || 'https://cinesphere.com.vn';
+
+  // 1. XỬ LÝ PARSE JSON CHO DANH SÁCH PHIM
   let movieTitles: string[] = [];
   let durations: string[] = [];
+
   try {
     movieTitles = JSON.parse(data.movieTitle || '[]');
-    durations = JSON.parse(data.durationMin || '[]');
+    durations = JSON.parse(String(data.durationMin) || '[]');
   } catch (e) {
-    // Fallback nếu không phải JSON
-    movieTitles = data.movieTitle ? [data.movieTitle] : ['Chưa xác định'];
-    durations = data.durationMin ? [data.durationMin] : ['--'];
+    movieTitles = data.movieTitle ? [data.movieTitle] : [];
+    durations = data.durationMin ? [String(data.durationMin)] : [];
   }
 
   // Parse branch settings for hotline
@@ -33,17 +24,102 @@ export function getBookingEmailTemplate(data: {
     } catch (e) {}
   }
 
-  // 2. TẠO LIST PHIM THEO LAYOUT MỚI
-  const moviesHtml = movieTitles
-    .map(
-      (title, i) => `
-    <div style="padding: 12px 0; border-bottom: 1px dashed #eee; display: flex; justify-content: space-between; align-items: center;">
-      <span style="color: #333; font-weight: 600;">🎬 ${title}</span>
-      <span style="color: #666; font-size: 12px; background: #f5f5f5; padding: 2px 8px; border-radius: 4px;">${durations[i] || '--'} ph</span>
+  // 2. TẠO HTML DANH SÁCH PHIM — dạng table (tương thích Gmail/Outlook tốt hơn flex)
+  const moviesListHtml =
+    movieTitles.length > 0
+      ? `
+    <div class="section-title">DANH SÁCH PHIM TỰ CHỌN TRONG GÓI</div>
+    <div style="background-color: #f8f9fa; border-radius: 8px; padding: 6px 15px; margin-bottom: 20px; border: 1px solid #edf2f7;">
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse: collapse;">
+        ${movieTitles
+          .map(
+            (title, index) => `
+        <tr>
+            <td style="padding: 10px 0; ${index < movieTitles.length - 1 ? 'border-bottom: 1px dashed #e2e8f0;' : ''} font-size: 14px; color: #2d3748; font-weight: 600;">
+                🎬&nbsp;${title}
+            </td>
+            <td style="padding: 10px 0; ${index < movieTitles.length - 1 ? 'border-bottom: 1px dashed #e2e8f0;' : ''} font-size: 12px; color: #a0aec0; white-space: nowrap; text-align: right; padding-left: 12px;">
+                ${durations[index] || '--'} phút
+            </td>
+        </tr>
+        `
+          )
+          .join('')}
+        </table>
     </div>
   `
-    )
-    .join('');
+      : '';
+
+  // 3. HÀNG "CHI NHÁNH" / "ĐỊA CHỈ" — dạng <tr> để nằm trong table chung
+  const branchHtml = data.branchName
+    ? `
+    <tr>
+        <td style="padding: 12px 0; border-bottom: 1px solid #f7fafc; color: #718096; font-weight: 500;">Chi nhánh:</td>
+        <td style="padding: 12px 0; border-bottom: 1px solid #f7fafc; color: #1a202c; font-weight: 700; text-align: right;">${data.branchName}</td>
+    </tr>
+    <tr>
+        <td style="padding: 12px 0; border-bottom: 1px solid #f7fafc; color: #718096; font-weight: 500;">Địa chỉ:</td>
+        <td style="padding: 12px 0; border-bottom: 1px solid #f7fafc; color: #4a5568; font-weight: 700; font-size: 12px; text-align: right;">${data.branchAddress || ''}</td>
+    </tr>`
+    : ``;
+
+  // 4. HÀNG "NGÀY HẾT HẠN" — dạng <tr>
+  const expiryHtml = data.expiryDate
+    ? `
+    <tr>
+        <td style="padding: 12px 0; border-bottom: 1px solid #f7fafc; color: #718096; font-weight: 500;">Ngày hết hạn:</td>
+        <td style="padding: 12px 0; border-bottom: 1px solid #f7fafc; color: #e53e3e; font-weight: 700; text-align: right;">${(() => {
+          try {
+            const d = new Date(String(data.expiryDate));
+            return (
+              d.toLocaleDateString('vi-VN', {
+                timeZone: 'Asia/Ho_Chi_Minh'
+              }) +
+              ' ' +
+              d.toLocaleTimeString('vi-VN', {
+                hour: '2-digit',
+                minute: '2-digit',
+                timeZone: 'Asia/Ho_Chi_Minh'
+              })
+            );
+          } catch {
+            return String(data.expiryDate);
+          }
+        })()}</td>
+    </tr>`
+    : ``;
+
+  // 5. PHẦN TIỀN — chỉ còn 2 mục chính: Tổng tiền / Tổng thanh toán, có thể chèn thêm dòng Giảm giá nếu có voucher.
+  const rawOriginal = data.originalTotal ?? data.totalPrice;
+  const originalTotalStr = typeof rawOriginal === 'number' ? rawOriginal.toLocaleString('vi-VN') : rawOriginal;
+  const finalTotalStr = typeof data.totalPrice === 'number' ? data.totalPrice.toLocaleString('vi-VN') : data.totalPrice;
+
+  const priceSummaryHtml = `
+    <tr>
+        <td style="padding: 12px 0; border-bottom: 1px solid #f7fafc; color: #718096; font-weight: 500;">Tổng tiền:</td>
+        <td style="padding: 12px 0; border-bottom: 1px solid #f7fafc; color: #1a202c; font-weight: 700; text-align: right;">${originalTotalStr}đ</td>
+    </tr>
+    ${
+      data.discountAmt && data.discountAmt > 0
+        ? `
+    <tr>
+        <td style="padding: 12px 0; border-bottom: 1px solid #f7fafc; color: #718096; font-weight: 500;">Giảm giá${data.voucherCode ? ` (${data.voucherCode})` : ''}:</td>
+        <td style="padding: 12px 0; border-bottom: 1px solid #f7fafc; color: #38a169; font-weight: 700; text-align: right;">-${data.discountAmt.toLocaleString('vi-VN')}đ</td>
+    </tr>
+    `
+        : ''
+    }
+    <tr>
+        <td colspan="2" style="padding: 0;">
+            <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse: collapse; background: #fff5f5; border-left: 4px solid #e53e3e; margin: 5px 0; border-radius: 6px;">
+                <tr>
+                    <td style="padding: 10px 14px; color: #718096; font-weight: 500;"><strong>Tổng thanh toán:</strong></td>
+                    <td style="padding: 10px 14px; color: #e53e3e; font-weight: 700; font-size: 18px; text-align: right;"><strong>${finalTotalStr}đ</strong></td>
+                </tr>
+            </table>
+        </td>
+    </tr>
+  `;
 
   return `
 <!DOCTYPE html>
@@ -52,109 +128,75 @@ export function getBookingEmailTemplate(data: {
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <style>
-        body { font-family: 'Segoe UI', Arial, sans-serif; background-color: #f9f9f9; margin: 0; padding: 0; }
-        .wrapper { max-width: 600px; margin: 20px auto; background: #ffffff; border-radius: 8px; overflow: hidden; box-shadow: 0 4px 10px rgba(0,0,0,0.05); }
-        .header { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 30px; text-align: center; }
-        .header h1 { margin: 0; font-size: 26px; letter-spacing: 1px; }
-        .content { padding: 30px; line-height: 1.6; color: #444; }
-        .code-box { background: #f0f4ff; border: 2px dashed #667eea; border-radius: 8px; padding: 20px; text-align: center; margin: 20px 0; }
-        .code-label { font-size: 12px; color: #667eea; text-transform: uppercase; font-weight: bold; margin-bottom: 8px; }
-        .code-value { font-size: 36px; font-weight: 800; color: #764ba2; font-family: monospace; letter-spacing: 3px; }
-        .section-title { font-size: 14px; font-weight: bold; color: #764ba2; text-transform: uppercase; border-bottom: 2px solid #764ba2; padding-bottom: 5px; margin-top: 25px; }
-        .row { display: flex; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid #eee; font-size: 14px; }
-        .label { color: #888; }
-        .value { font-weight: 600; color: #222; }
-        .footer { background: #f4f4f4; padding: 20px; text-align: center; font-size: 12px; color: #888; }
+        body { font-family: 'Segoe UI', Arial, sans-serif; background-color: #f4f7f6; margin: 0; padding: 0; }
+        .container { max-width: 600px; margin: 20px auto; background-color: #ffffff; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.08); overflow: hidden; }
+        .header { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 40px 20px; text-align: center; }
+        .header h1 { margin: 0; font-size: 30px; letter-spacing: 2px; text-transform: uppercase; }
+        .content { padding: 30px; }
+        .booking-code-box { background-color: #f0f4ff; border: 2px dashed #667eea; padding: 25px; margin: 20px 0; border-radius: 10px; text-align: center; }
+        .booking-code { font-size: 40px; font-weight: 800; color: #667eea; font-family: 'Courier New', monospace; letter-spacing: 5px; }
+        .section-title { font-size: 13px; font-weight: 700; color: #4a5568; text-transform: uppercase; margin: 25px 0 15px; border-bottom: 2px solid #edf2f7; padding-bottom: 8px; }
+        .footer { background-color: #f8f9fa; padding: 25px; text-align: center; font-size: 12px; color: #a0aec0; border-top: 1px solid #edf2f7; }
     </style>
 </head>
 <body>
-    <div class="wrapper">
+    <div class="container">
         <div class="header">
-            <h1>🎬 CINESPHERE</h1>
-            <p style="margin: 5px 0 0; opacity: 0.8;">Xác nhận đặt vé thành công</p>
+            <h1>CINESPHERE</h1>
+            <p style="margin-top: 5px; opacity: 0.9;">XÁC NHẬN ĐẶT VÉ THÀNH CÔNG</p>
         </div>
-
         <div class="content">
-            <p>Xin chào <strong>${data.customerName}</strong>,</p>
-            <p>Cảm ơn bạn đã đặt vé tại CINESPHERE. Vui lòng sử dụng mã đặt vé sau để check-in tại rạp.</p>
-
-            <div class="code-box">
-                <div class="code-label">MÃ ĐẶT VÉ CỦA BẠN</div>
-                <div class="code-value">${data.bookingCode}</div>
-                <p style="font-size: 11px; color: #999; margin: 10px 0 0;">(Vui lòng lưu lại mã này để soát vé tại quầy)</p>
+            <div style="font-size: 16px; color: #2d3748; margin-bottom: 20px;">
+                Xin chào <strong>${data.customerName}</strong>,<br>
+                Đơn hàng của bạn đã được xác nhận. Vui lòng xuất trình mã vé dưới đây tại quầy soát vé.
+            </div>
+            
+            <div class="booking-code-box">
+                <div style="font-size: 12px; color: #718096; margin-bottom: 8px; font-weight: bold;">MÃ ĐẶT VÉ CỦA BẠN</div>
+                <div class="booking-code">${data.bookingCode}</div>
             </div>
 
-            <div class="section-title">THÔNG TIN PHIM</div>
-            <div style="margin-bottom: 20px;">
-                ${moviesHtml}
-            </div>
+            ${data.moviePackagesTableHtml || ''}
+            ${data.vrTableHtml || ''}
+            ${moviesListHtml}
 
-            <div class="section-title">CHI TIẾT ĐƠN HÀNG</div>
-            ${
-              data.branchName
-                ? `
-            <div class="row">
-                <span class="label">Chi nhánh:</span>
-                <span class="value">${data.branchName}</span>
-            </div>
-            <div class="row">
-                <span class="label">Địa chỉ:</span>
-                <span class="value" style="font-size: 12px;">${data.branchAddress || ''}</span>
-            </div>
-            `
-                : ''
-            }
-            <div class="row">
-                <span class="label">Số lượng vé:</span>
-                <span class="value">${data.ticketCount} vé</span>
-            </div>
-            <div class="row">
-                <span class="label">Loại vé:</span>
-                <span class="value">${data.ticketPackageName || 'Vé đơn'}</span>
-            </div>
-            <div class="row">
-                <span class="label">Tổng tiền:</span>
-                <span class="value" style="color: #e63946;">${data.totalPrice}đ</span>
-            </div>
-            <div class="row">
-                <span class="label">Ngày hết hạn:</span>
-                <span class="value">${(function () {
-                  try {
-                    const d = new Date(String(data.expiryDate));
-                    return (
-                      d.getDate().toString().padStart(2, '0') +
-                      '/' +
-                      (d.getMonth() + 1).toString().padStart(2, '0') +
-                      '/' +
-                      d.getFullYear() +
-                      ' ' +
-                      d.getHours().toString().padStart(2, '0') +
-                      ':' +
-                      d.getMinutes().toString().padStart(2, '0')
-                    );
-                  } catch {
-                    return String(data.expiryDate);
-                  }
-                })()}</span>
-            </div>
+            <div class="section-title">Chi tiết đơn hàng</div>
+            <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse: collapse; font-size: 14px;">
+                ${branchHtml}
+                <tr>
+                    <td style="padding: 12px 0; border-bottom: 1px solid #f7fafc; color: #718096; font-weight: 500;">Số lượng vé:</td>
+                    <td style="padding: 12px 0; border-bottom: 1px solid #f7fafc; text-align: right;">
+                        <span style="background: #fed7d7; color: #c53030; padding: 2px 8px; border-radius: 4px; font-weight: 700;">${data.ticketCount} VÉ</span>
+                    </td>
+                </tr>
+                <tr>
+                    <td style="padding: 12px 0; border-bottom: 1px solid #f7fafc; color: #718096; font-weight: 500;">Loại vé:</td>
+                    <td style="padding: 12px 0; border-bottom: 1px solid #f7fafc; color: #4a5568; font-weight: 700; text-align: right;">${data.bookingType === 'combo_vr' ? 'Gói Combo Phim + VR' : data.bookingType === 'vr' ? 'Gói Giải trí VR' : 'Gói Vé Phim'}</td>
+                </tr>
+                ${priceSummaryHtml}
+                ${expiryHtml}
+            </table>
 
-            <div style="background: #fff3cd; color: #856404; padding: 12px; border-radius: 4px; margin-top: 25px; font-size: 13px;">
-                ⏰ <strong>Lưu ý:</strong> Mang theo mã đặt vé để nhân viên xác nhận.
+            <div style="background-color: #fffaf0; border-left: 4px solid #f6ad55; padding: 15px; margin-top: 30px; border-radius: 4px;">
+                <p style="margin: 0; font-size: 13px; color: #9c4221;">
+                    ⏳ <strong>Lưu ý:</strong> Mang theo mã đặt vé để nhân viên quét xác nhận tại cổng.
+                </p>
             </div>
         </div>
-
         <div class="footer">
-            <p><strong>CINESPHERE - Rạp chiếu phim hiện đại</strong></p>
+            <p><strong>CINESPHERE - TRẢI NGHIỆM ĐIỆN ẢNH VŨ TRỤ</strong></p>
             <p>Email: cinesphere0629@gmail.com | Hotline: ${hotline}</p>
-            <p style="margin-top: 10px; opacity: 0.6;">Đây là email tự động, vui lòng không trả lời email này.</p>
+            <p style="margin-top: 15px;">Đây là email tự động, vui lòng không trả lời.</p>
         </div>
     </div>
 </body>
-</html>
-  `;
+</html>`;
 }
 
-export function getResetPasswordEmailTemplate(link: string): string {
+export function getResetPasswordEmailTemplate(link: string): string;
+export function getResetPasswordEmailTemplate(baseUrl: string, link: string): string;
+export function getResetPasswordEmailTemplate(arg1: string, arg2?: string): string {
+  const link = arg2 || arg1;
   return `
 <!DOCTYPE html>
 <html lang="vi">
@@ -253,7 +295,7 @@ export function getResetPasswordEmailTemplate(link: string): string {
 
             <div class="note">
                 <p>Nếu bạn không yêu cầu thay đổi mật khẩu, vui lòng bỏ qua email này hoặc liên hệ với bộ phận hỗ trợ qua email "cinesphere0629@gmail.com" để được giúp đỡ.</p>
-                <p>Trân trọng,<br>Đội ngũ Cinema App</p>
+                <p>Trân trọng,<br>Đội ngũ CINESPHERE</p>
             </div>
         </div>
 
@@ -270,14 +312,20 @@ export function getResetPasswordEmailTemplate(link: string): string {
   `;
 }
 
-export function getWelcomeEmailTemplate(
-  data: {
-    customerName: string;
-    email: string;
-  },
-  baseUrlStr?: string
-): string {
-  // Use provided baseUrl or fallback to env or default
+export function getWelcomeEmailTemplate(data: { customerName: string; email: string }, baseUrlStr?: string): string;
+export function getWelcomeEmailTemplate(baseUrlStr: string, data: { customerName: string; email: string }): string;
+export function getWelcomeEmailTemplate(arg1: any, arg2?: any): string {
+  let data: { customerName: string; email: string };
+  let baseUrlStr: string | undefined;
+
+  if (typeof arg1 === 'string') {
+    baseUrlStr = arg1;
+    data = arg2;
+  } else {
+    data = arg1;
+    baseUrlStr = arg2;
+  }
+
   let baseUrl = baseUrlStr;
   if (!baseUrl && typeof process !== 'undefined' && process.env) {
     baseUrl = process.env.VITE_SERVER_BASE_URL;

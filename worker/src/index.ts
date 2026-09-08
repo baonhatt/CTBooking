@@ -982,7 +982,8 @@ app.get('/api/admin/transactions', requireStaffAuth, requirePermission('transact
         accounts: schema.accounts,
         movies: schema.movies,
         ticket_packages: schema.ticket_packages,
-        vouchers: (schema as any).vouchers
+        vouchers: (schema as any).vouchers,
+        booking_vr_items: (schema as any).booking_vr_items
       },
       {
         page,
@@ -2630,7 +2631,11 @@ app.get('/api/usersprofile/transactions', requireAuth, async (c) => {
 
         movies: schema.movies,
 
-        ticket_packages: schema.ticket_packages
+        ticket_packages: schema.ticket_packages,
+
+        booking_vr_items: schema.booking_vr_items,
+
+        vouchers: schema.vouchers
       },
 
       { accountId, email, status, page, pageSize, sort, dir, payment_method, from, to }

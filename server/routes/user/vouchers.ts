@@ -42,6 +42,8 @@ export async function validateVoucherForVRImpl(
     vr_items?: VRPackageItem[];
     /** Movie ticket package id (if booking includes film tickets) */
     ticket_package_id?: number;
+    /** Movie items (array representation for multiple tickets in cart) */
+    movie_items?: Array<{ package_id: number; quantity: number; price: number }>;
     /** Pre-computed movie subtotal (price × qty). If supplied, DB lookup is skipped */
     movie_subtotal?: number;
     /** Pre-computed VR subtotal (sum of all vr_items × qty). If supplied, DB lookup is skipped */
@@ -176,17 +178,27 @@ export async function validateVoucherForVRImpl(
   let computed_movie_subtotal = args.movie_subtotal || 0;
   // track movie unit price for partial applicable calculation
   let movieUnitPrice = 0;
-  if (computed_movie_subtotal <= 0 && ticket_package_id) {
-    const moviePkg = await anyDb
-      .select({ id: tables.ticket_packages.id, price: tables.ticket_packages.price })
-      .from(tables.ticket_packages)
-      .where(eq(tables.ticket_packages.id, ticket_package_id));
-    if (moviePkg[0]) {
-      movieUnitPrice = Number(moviePkg[0].price || 0);
-      computed_movie_subtotal = movieUnitPrice;
+  
+  if (computed_movie_subtotal <= 0) {
+    if (args.movie_items && args.movie_items.length > 0) {
+      for (const item of args.movie_items) {
+        const p = Number(item.price || 0);
+        const q = Number(item.quantity || 1);
+        computed_movie_subtotal += p * q;
+        movieUnitPrice = p; // retain last package price as fallback
+      }
+    } else if (ticket_package_id) {
+      const moviePkg = await anyDb
+        .select({ id: tables.ticket_packages.id, price: tables.ticket_packages.price })
+        .from(tables.ticket_packages)
+        .where(eq(tables.ticket_packages.id, ticket_package_id));
+      if (moviePkg[0]) {
+        movieUnitPrice = Number(moviePkg[0].price || 0);
+        computed_movie_subtotal = movieUnitPrice; // Fallback assumes quantity 1 if movie_items is lacking
+      }
     }
   } else if (computed_movie_subtotal > 0) {
-    movieUnitPrice = computed_movie_subtotal;
+    movieUnitPrice = computed_movie_subtotal; // Note: if coming from args.movie_subtotal, this captures the full subtotal as fallback for partial_eligible
   }
 
   let order_total = typeof _orderArg === 'number' && _orderArg > 0
@@ -234,29 +246,7 @@ export async function validateVoucherForVRImpl(
   // APPLICABLE (soft whitelist): voucher discount only applies to the subtotal of packages in the list.
   //   Packages NOT in the list remain at full price and are NOT blocked from booking.
   const applicable = parseNullableJsonArray(voucher.applicable_ticket_package_ids);
-  const excluded = parseNullableJsonArray(voucher.excluded_ticket_package_ids);
-
-  // --- Hard block: excluded packages ---
-  if (excluded.length > 0) {
-    if (vr_items && vr_items.length > 0) {
-      for (const it of vr_items) {
-        if (excluded.includes(it.vr_package_id)) {
-          return {
-            valid: false,
-            message: 'Một số gói VR trong giỏ hàng bị loại trừ khỏi mã giảm giá này',
-            error_code: 'VOUCHER_PACKAGE_EXCLUDED'
-          };
-        }
-      }
-    }
-    if (ticket_package_id && excluded.includes(ticket_package_id)) {
-      return {
-        valid: false,
-        message: 'Gói vé phim đã chọn bị loại trừ khỏi mã giảm giá này',
-        error_code: 'VOUCHER_PACKAGE_EXCLUDED'
-      };
-    }
-  }
+  // EXCLUDED LOGIC REMOVED
 
   // --- Soft whitelist: applicable packages → narrow eligible_subtotal ---
   // If applicable list is set, recalculate eligible_subtotal as only the sum of packages in the list.
@@ -264,6 +254,10 @@ export async function validateVoucherForVRImpl(
   //   - scope=vr → only VR items from applicable list count
   //   - scope=movie → only movie ticket from applicable list counts
   //   - scope=all → both VR and movie from applicable list count
+  const meta = parseVoucherMetadata(voucher.description);
+  let dynamicDescription = meta.note || voucher.description || '';
+  const appliedPackageIds: number[] = [];
+  
   if (applicable.length > 0) {
     let partial_eligible = 0;
 
@@ -273,13 +267,24 @@ export async function validateVoucherForVRImpl(
         if (applicable.includes(it.vr_package_id)) {
           const price = resolvedVrPriceMap.get(it.vr_package_id) || 0;
           partial_eligible += price * it.quantity;
+          appliedPackageIds.push(it.vr_package_id);
         }
       }
     }
 
     // Movie ticket eligible (only if scope allows movie)
-    if ((voucher.scope === 'movie' || voucher.scope === 'all') && ticket_package_id && applicable.includes(ticket_package_id)) {
-      partial_eligible += movieUnitPrice;
+    if (voucher.scope === 'movie' || voucher.scope === 'all') {
+      if (args.movie_items && args.movie_items.length > 0) {
+        for (const item of args.movie_items) {
+          if (applicable.includes(item.package_id)) {
+            partial_eligible += (item.price || 0) * (item.quantity || 1);
+            appliedPackageIds.push(item.package_id);
+          }
+        }
+      } else if (ticket_package_id && applicable.includes(ticket_package_id)) {
+        partial_eligible += movieUnitPrice;
+        appliedPackageIds.push(ticket_package_id);
+      }
     }
 
     if (partial_eligible <= 0) {
@@ -293,6 +298,24 @@ export async function validateVoucherForVRImpl(
 
     // Override eligible_subtotal with the partial amount
     eligible_subtotal = partial_eligible;
+  }
+
+  // Fetch package names for dynamic UI description
+  if (applicable.length > 0 && appliedPackageIds.length > 0) {
+    try {
+      const pkgs = await anyDb
+        .select({ name: tables.ticket_packages.name })
+        .from(tables.ticket_packages)
+        .where(inArray(tables.ticket_packages.id, appliedPackageIds));
+        
+      const names = pkgs.map((p: any) => p.name).filter(Boolean);
+      if (names.length > 0) {
+        const label = `📌 Đã áp dụng cho: ${names.join(', ')}`;
+        dynamicDescription = dynamicDescription ? `${dynamicDescription}\n${label}` : label;
+      }
+    } catch (err) {
+      console.warn('Failed to fetch applied package names for voucher info:', err);
+    }
   }
 
   // 8. Branch match
@@ -317,8 +340,6 @@ export async function validateVoucherForVRImpl(
   }
   if (discount_amount > order_total) discount_amount = order_total;
 
-  const meta = parseVoucherMetadata(voucher.description);
-
   return {
     valid: true,
     message: meta.sale_name
@@ -332,7 +353,7 @@ export async function validateVoucherForVRImpl(
       id: voucher.id,
       code: voucher.code,
       name: voucher.name,
-      description: meta.note || voucher.description,
+      description: dynamicDescription,
       sale_staff_id: meta.sale_staff_id,
       sale_name: meta.sale_name,
       sale_email: meta.sale_email,

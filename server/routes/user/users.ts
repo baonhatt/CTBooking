@@ -108,7 +108,14 @@ export async function getUserProfileByAccountIdImpl(anyDb: any, tables: { accoun
 
 export async function listUserTransactionsImpl(
   anyDb: any,
-  tables: { accounts: any; bookings: any; movies: any; ticket_packages: any }, // Thêm bảng vào đây
+  tables: {
+    accounts: any;
+    bookings: any;
+    movies: any;
+    ticket_packages: any;
+    booking_vr_items?: any;
+    vouchers?: any;
+  },
   args: {
     accountId?: number;
     email?: string;
@@ -190,7 +197,61 @@ export async function listUserTransactionsImpl(
     .offset(skip)
     .limit(pageSize);
 
-  // 6. Map lại dữ liệu về cấu trúc cũ
+  // 5b. Batch-load VR items for returned bookings
+  const bookingIds = rows.map((r: any) => r.booking.id).filter(Boolean);
+  const vrItemsMap: Record<number, any[]> = {};
+
+  if (bookingIds.length > 0 && tables.booking_vr_items) {
+    try {
+      const vrRows = await anyDb
+        .select()
+        .from(tables.booking_vr_items)
+        .where(inArray(tables.booking_vr_items.booking_id, bookingIds));
+
+      for (const item of vrRows) {
+        const bId = Number(item.booking_id);
+        if (!vrItemsMap[bId]) vrItemsMap[bId] = [];
+        vrItemsMap[bId].push(item);
+      }
+    } catch (e) {
+      console.warn('[listUserTransactionsImpl] Could not batch load booking_vr_items:', e);
+    }
+  }
+
+  // 5c. Batch-load voucher details for bookings that used a voucher
+  const voucherIds = [
+    ...new Set(
+      rows
+        .map((r: any) => r.booking.voucher_id)
+        .filter((id: any) => id != null && Number(id) > 0)
+        .map((id: any) => Number(id))
+    )
+  ];
+  const voucherMap: Record<
+    number,
+    { scope: string; description: string | null; applicable_ids: any }
+  > = {};
+
+  if (voucherIds.length > 0 && tables.vouchers) {
+    try {
+      const voucherRows = await anyDb
+        .select()
+        .from(tables.vouchers)
+        .where(inArray(tables.vouchers.id, voucherIds));
+
+      for (const v of voucherRows) {
+        voucherMap[Number(v.id)] = {
+          scope: v.scope || 'all',
+          description: v.description || null,
+          applicable_ids: v.applicable_ticket_package_ids ?? null
+        };
+      }
+    } catch (e) {
+      console.warn('[listUserTransactionsImpl] Could not batch load vouchers:', e);
+    }
+  }
+
+  // 6. Map lại dữ liệu về cấu trúc chuẩn
   const now = new Date();
   const mapped = rows.map((row: any) => {
     const b = row.booking;
@@ -200,11 +261,14 @@ export async function listUserTransactionsImpl(
     const expiryAt = b.expiry_date ? new Date(b.expiry_date) : null;
     const expired = !!(expiryAt && now.getTime() > expiryAt.getTime());
     const daysLeft = expiryAt ? Math.ceil((expiryAt.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)) : null;
+    const voucherDetails =
+      b.voucher_id && voucherMap[Number(b.voucher_id)] ? voucherMap[Number(b.voucher_id)] : null;
 
     return {
       booking_id: b.id,
       booking_code: b.booking_code,
       pay_txt_code: b.pay_txt_code,
+      booking_type: b.booking_type || 'movie',
       user_id: b.user_id,
       movie: b.movie_title || '',
       ticket_package: b.ticket_package_name || '',
@@ -213,6 +277,7 @@ export async function listUserTransactionsImpl(
       original_amount: Number(b.original_total_price || b.total_price || 0),
       discount_amount: Number(b.voucher_discount_amount || 0),
       voucher_code: b.voucher_code_snapshot || null,
+      voucher_details: voucherDetails,
       ticket_unit_price: Number(b.ticket_unit_price || 0),
       method: b.payment_method || '',
       payment_status: b.payment_status || '',
@@ -228,7 +293,8 @@ export async function listUserTransactionsImpl(
       email: b.email,
       poster_url: b.movie_poster || '',
       combo: b.combo || '',
-      movie_duration: b.movie_duration || ''
+      movie_duration: b.movie_duration || '',
+      vr_items: vrItemsMap[b.id] || []
     };
   });
 

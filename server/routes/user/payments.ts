@@ -6,6 +6,7 @@ import { formatDateForDb } from '../../lib/date-utils';
 import { redeemVoucherAfterPaymentImpl, validateVoucherForVRImpl, matchesBranch } from './vouchers';
 import { releaseVoucherForCancelledBooking } from '../scheduled/booking-expiry';
 import { logAuditAction } from '../../lib/audit-logger';
+import { isLineDiscounted, voucherScopeLabel, parseApplicableIds, vrPackageId } from '@shared/booking-invoice';
 
 class HttpError extends Error {
   status: number;
@@ -115,7 +116,7 @@ async function validateBookingInput(
       }
       const price = Number(pkg.price || 0);
       const qty = Math.max(1, Number(item.quantity || 1));
-      
+
       movieTotalPrice += price * qty;
       calculatedTicketCount += qty;
 
@@ -132,7 +133,6 @@ async function validateBookingInput(
     unitPrice = Number(pkgs[0].price || 0);
     // Override ticketCount with calculated value from payload items
     ticketCount = calculatedTicketCount;
-
   } else if (ticketPackageId) {
     ticketPackage = await anyDb.query.ticket_packages.findFirst({
       where: eq(ticketPackagesTable.id, ticketPackageId)
@@ -170,11 +170,7 @@ async function validateBookingInput(
   let movies: any[] = [];
   if (comboIds.length > 0) {
     movies = await anyDb.query.movies.findMany({
-      where: and(
-        inArray(moviesTable.id, comboIds),
-        eq(moviesTable.is_active, true),
-        isNull(moviesTable.deleted_at)
-      )
+      where: and(inArray(moviesTable.id, comboIds), eq(moviesTable.is_active, true), isNull(moviesTable.deleted_at))
     });
 
     if (combo && Array.isArray(combo) && combo.length > 0 && movies.length !== combo.length) {
@@ -282,7 +278,8 @@ async function validateBookingInput(
       code: voucher_code,
       vr_items: vr_items || [],
       ticket_package_id: ticketPackage?.id ? Number(ticketPackage.id) : undefined,
-      movie_subtotal: movieTotalPrice,   // unitPrice × ticketCount (correct total)
+      movie_items: movieItemsDetails,
+      movie_subtotal: movieTotalPrice, // unitPrice × ticketCount (correct total)
       vr_subtotal: vrTotalPrice,
       vr_price_map: vrPriceMap,
       branch_id: targetBranchId,
@@ -399,14 +396,8 @@ export async function createPaymentImpl(
       movies.length > 0
         ? JSON.stringify(movies.map((m) => m.title))
         : JSON.stringify([validation.ticketPackage?.name || 'Vé Phim 8K']);
-    const movieDurations =
-      movies.length > 0
-        ? JSON.stringify(movies.map((m) => m.duration_min))
-        : JSON.stringify([0]);
-    const moviePosters =
-      movies.length > 0
-        ? JSON.stringify(movies.map((m) => m.cover_image))
-        : JSON.stringify(['']);
+    const movieDurations = movies.length > 0 ? JSON.stringify(movies.map((m) => m.duration_min)) : JSON.stringify([0]);
+    const moviePosters = movies.length > 0 ? JSON.stringify(movies.map((m) => m.cover_image)) : JSON.stringify(['']);
 
     // Use explicit UTC ISO timestamps for created_at/updated_at để đồng bộ giữa Postgres & D1
     const nowIso = new Date();
@@ -416,6 +407,17 @@ export async function createPaymentImpl(
     }
 
     const hasVR = vrItemsDetails && vrItemsDetails.length > 0;
+    let trueTicketCount = 0;
+    if (validation.movieItemsDetails && validation.movieItemsDetails.length > 0) {
+      trueTicketCount += validation.movieItemsDetails.reduce((sum, it) => sum + Number(it.quantity || 1), 0);
+    } else {
+      trueTicketCount += Number(ticketCount || 1);
+    }
+
+    if (hasVR) {
+      trueTicketCount += vrItemsDetails!.reduce((sum, it) => sum + Number(it.quantity || 1), 0);
+    }
+
     const bookingType = hasVR ? 'combo_vr' : 'movie';
     const branchIdToSave = validation.ticketPackage?.branch_id || branch_id || null;
 
@@ -433,10 +435,7 @@ export async function createPaymentImpl(
         .where(
           and(
             eq(tables.vouchers.id, voucherDetails.id),
-            or(
-              isNull(tables.vouchers.usage_limit),
-              sql`${tables.vouchers.used_count} < ${tables.vouchers.usage_limit}`
-            )
+            or(isNull(tables.vouchers.usage_limit), sql`${tables.vouchers.used_count} < ${tables.vouchers.usage_limit}`)
           )
         )
         .returning({ used_count: tables.vouchers.used_count });
@@ -455,7 +454,7 @@ export async function createPaymentImpl(
         user_id: userId,
         movie_id: null, // No single movie ID for combo
         ticket_package_id: validation.ticketPackage?.id ? Number(validation.ticketPackage.id) : null,
-        ticket_count: ticketCount,
+        ticket_count: trueTicketCount,
         total_price: Number(totalPrice),
         original_total_price: Number(originalTotalPrice || totalPrice),
         voucher_id: voucherDetails?.id || null,
@@ -491,42 +490,10 @@ export async function createPaymentImpl(
     // Insert line items into booking_vr_items
     const insertedItemsArr: any[] = [];
     if (tables.booking_vr_items) {
-      // 1. Insert movie ticket package if present
-      if (validation.ticketPackage) {
-        const pkgQty = ticketCount || 1;
-        const pkgPrice = Number(validation.ticketPackage.price || 0);
-        let pkgLineTotal = Number(totalPrice);
-        if (hasVR) {
-          const vrSubtotal = (vrItemsDetails || []).reduce((sum, it) => sum + Number(it.line_total || 0), 0);
-          pkgLineTotal = Math.max(0, Number(totalPrice) - vrSubtotal);
-        }
-        const pkgDiscount = Number(voucherDiscountAmount || 0);
-        const pkgDiscountedUnit = pkgQty > 0 ? +(pkgLineTotal / pkgQty).toFixed(2) : pkgPrice;
+      // Bỏ block insert vé phim vào bảng VR (đã xử lý JSON bên bookingsTable)
 
-        try {
-          const r = await anyDb
-            .insert(tables.booking_vr_items)
-            .values({
-              booking_id: bookingRow.id,
-              vr_ticket_package_id: Number(validation.ticketPackage.id),
-              quantity: pkgQty,
-              unit_price: pkgPrice,
-              package_name: validation.ticketPackage.name || 'Gói vé',
-              voucher_id: voucherDetails?.id || null,
-              discounted_unit_price: pkgDiscountedUnit,
-              line_total: pkgLineTotal,
-              voucher_discount_amount: pkgDiscount,
-              branch_id: branchIdToSave,
-              created_at: formatDateForDb(nowIso)
-            })
-            .returning();
-          if (r) insertedItemsArr.push(Array.isArray(r) ? r[0] : r);
-        } catch (err: any) {
-          console.error('Error inserting movie ticket item to booking_vr_items:', err);
-        }
-      }
+      // Insert VR items into booking_vr_items if present
 
-      // 2. Insert VR items into booking_vr_items if present
       if (hasVR) {
         for (const item of vrItemsDetails!) {
           try {
@@ -745,10 +712,14 @@ export async function updatePaymentImpl(
       // If payment failed/cancelled and booking had locked a voucher while pending, release it
       if (booking.voucher_id && vouchersTable) {
         try {
-          await releaseVoucherForCancelledBooking(anyDb, { vouchers: vouchersTable }, {
-            voucher_id: Number(booking.voucher_id),
-            previous_payment_status: String(booking.payment_status || 'pending').toLowerCase()
-          });
+          await releaseVoucherForCancelledBooking(
+            anyDb,
+            { vouchers: vouchersTable },
+            {
+              voucher_id: Number(booking.voucher_id),
+              previous_payment_status: String(booking.payment_status || 'pending').toLowerCase()
+            }
+          );
         } catch (e) {
           console.error('[updatePayment] Release voucher error:', e);
         }
@@ -758,79 +729,214 @@ export async function updatePaymentImpl(
     // 5. Gửi mail (Chỉ khi thanh toán thành công)
     if (isPaid) {
       // Determine booking_type
-      const isVR = booking.booking_type === 'vr';
+      const bookingType = booking.booking_type || 'movie';
+      const isVR = bookingType === 'vr';
+      const isComboVR = bookingType === 'combo_vr';
+
       // Sử dụng mailQueue để gửi mail ngầm, không chặn response
       mailQueue.add(
         async () => {
           try {
             let vr_items: any[] = [];
-            if (isVR && vrItemsTable) {
+            if ((isVR || isComboVR || (tables as any).booking_vr_items) && (tables as any).booking_vr_items) {
               try {
-                vr_items = await anyDb.query.booking_vr_items.findMany({
-                  where: eq(vrItemsTable.booking_id, booking.id)
-                });
-              } catch {}
+                vr_items = await anyDb
+                  .select()
+                  .from((tables as any).booking_vr_items)
+                  .where(eq((tables as any).booking_vr_items.booking_id, booking.id));
+              } catch (e) {
+                console.warn('[updatePayment] Error fetching booking_vr_items for mail:', e);
+              }
             }
 
-            if (isVR) {
-              // === VR-specific email ===
-              const originalTotal = Number(booking.original_total_price || booking.total_price || 0);
-              const discountAmt = Number(booking.voucher_discount_amount || 0);
-              const totalVR = Number(booking.total_price || 0);
-              const listVRHtml = (vr_items.length > 0 ? vr_items : [])
-                .map(
-                  (it: any) => `
-                                                                <tr>
-                                                                        <td style="padding:10px;border-bottom:1px solid #eee;">${it.package_name || 'Gói VR'}</td>
-                                                                        <td style="padding:10px;border-bottom:1px solid #eee;text-align:center;">${it.quantity || 1}</td>
-                                                                        <td style="padding:10px;border-bottom:1px solid #eee;text-align:right;">${(Number(it.unit_price) * (it.quantity || 1)).toLocaleString('vi-VN')}đ</td>
-                                                                        <td style="padding:10px;border-bottom:1px solid #eee;text-align:right;">${Number(it.line_total || Number(it.discounted_unit_price || it.unit_price) * (it.quantity || 1)).toLocaleString('vi-VN')}đ</td>
-                                                                </tr>
-                                                        `
-                )
+            const originalTotal = Number(booking.original_total_price || booking.total_price || 0);
+            const discountAmt = Number(booking.voucher_discount_amount || 0);
+            const totalPrice = Number(booking.total_price || 0);
+            const voucherCode = booking.voucher_code_snapshot || null;
+
+            let voucherScope = 'all';
+            let applicableIds: number[] = [];
+            if (booking.voucher_id && (tables as any).vouchers) {
+              try {
+                const vt = (tables as any).vouchers;
+                const v = await anyDb
+                  .select({ scope: vt.scope, applicable_ticket_package_ids: vt.applicable_ticket_package_ids })
+                  .from(vt)
+                  .where(eq(vt.id, booking.voucher_id))
+                  .limit(1);
+                if (v && v.length > 0) {
+                  voucherScope = v[0].scope || 'all';
+                  applicableIds = parseApplicableIds(v[0].applicable_ticket_package_ids);
+                }
+              } catch (e) {
+                console.warn('[updatePayment] Error fetching voucher scope for mail:', e);
+              }
+            }
+
+            // 1. Parse movie packages into table rows
+            let parsedPackages: any[] = [];
+            const rawPkg = booking.ticket_package_name || result.package_name;
+            if (rawPkg) {
+              try {
+                if (typeof rawPkg === 'string' && (rawPkg.startsWith('[') || rawPkg.startsWith('{'))) {
+                  const p = JSON.parse(rawPkg);
+                  parsedPackages = Array.isArray(p) ? p : [p];
+                }
+              } catch {}
+            }
+            if (parsedPackages.length === 0 && rawPkg) {
+              parsedPackages = [{ name: rawPkg, quantity: booking.ticket_count || 1 }];
+            }
+
+            // Build Movie Packages HTML Table
+            let moviePackagesTableHtml = '';
+            if (parsedPackages.length > 0 && !isVR) {
+              const rowsHtml = parsedPackages
+                .map((pkg: any) => {
+                  const pkgName = pkg.name || pkg.package_name || rawPkg || 'Gói vé';
+                  const qty = Number(pkg.quantity || booking.ticket_count || 1);
+                  const unitPrice = Number(pkg.unit_price || pkg.price || booking.ticket_unit_price || 0);
+                  const lineTotal = unitPrice > 0 ? unitPrice * qty : 0;
+                  const discounted = isLineDiscounted({
+                    discountAmount: discountAmt,
+                    scope: voucherScope,
+                    applicableIds,
+                    kind: 'movie',
+                    packageId: pkg.package_id || pkg.id || booking.ticket_package_id
+                  });
+                  const badgeHtml = discounted
+                    ? `<span style="color:#e11d48;font-size:10px;font-weight:bold;margin-left:6px;border:1px solid #fda4af;padding:1px 4px;border-radius:3px;background-color:#fff1f2;">ĐƯỢC GIẢM</span>`
+                    : '';
+                  return `
+                    <tr>
+                      <td style="padding:10px;border-bottom:1px solid #eee;">${pkgName}${badgeHtml}</td>
+                      <td style="padding:10px;border-bottom:1px solid #eee;text-align:center;">${qty}</td>
+                      <td style="padding:10px;border-bottom:1px solid #eee;text-align:right;">${unitPrice > 0 ? unitPrice.toLocaleString('vi-VN') + 'đ' : '--'}</td>
+                      <td style="padding:10px;border-bottom:1px solid #eee;text-align:right;">${lineTotal > 0 ? lineTotal.toLocaleString('vi-VN') + 'đ' : '--'}</td>
+                    </tr>
+                  `;
+                })
                 .join('');
+
+              moviePackagesTableHtml = `
+                <h3 style="margin-top:20px;color:#2563eb;font-size:14px;text-transform:uppercase;">Danh sách gói vé đã chọn</h3>
+                <table style="width:100%;border-collapse:collapse;margin-top:8px;font-size:13px;">
+                  <thead>
+                    <tr style="background:#f1f5f9;color:#475569;">
+                      <th style="padding:10px;text-align:left;">Gói vé</th>
+                      <th style="padding:10px;text-align:center;">SL</th>
+                      <th style="padding:10px;text-align:right;">Đơn giá</th>
+                      <th style="padding:10px;text-align:right;">Thành tiền</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    ${rowsHtml}
+                  </tbody>
+                </table>
+              `;
+            }
+
+            // 2. Build VR items HTML Table
+            let vrTableHtml = '';
+            if (isVR || isComboVR || vr_items.length > 0) {
+              let vrRowsHtml = '';
+              if (vr_items.length > 0) {
+                vrRowsHtml = vr_items
+                  .map((it: any) => {
+                    const discounted = isLineDiscounted({
+                      discountAmount: discountAmt,
+                      scope: voucherScope,
+                      applicableIds,
+                      kind: 'vr',
+                      packageId: vrPackageId(it)
+                    });
+                    const badgeHtml = discounted
+                      ? `<span style="color:#e11d48;font-size:10px;font-weight:bold;margin-left:6px;border:1px solid #fda4af;padding:1px 4px;border-radius:3px;background-color:#fff1f2;">ĐƯỢC GIẢM</span>`
+                      : '';
+                    return `
+                      <tr>
+                        <td style="padding:10px;border-bottom:1px solid #eee;">${it.package_name || 'Gói VR'}${badgeHtml}</td>
+                        <td style="padding:10px;border-bottom:1px solid #eee;text-align:center;">${it.quantity || 1}</td>
+                        <td style="padding:10px;border-bottom:1px solid #eee;text-align:right;">${Number(it.unit_price || it.discounted_unit_price || 0).toLocaleString('vi-VN')}đ</td>
+                        <td style="padding:10px;border-bottom:1px solid #eee;text-align:right;">${Number(it.line_total || Number(it.unit_price || 0) * (it.quantity || 1)).toLocaleString('vi-VN')}đ</td>
+                      </tr>
+                    `;
+                  })
+                  .join('');
+              } else if (isComboVR) {
+                // Orphan fallback notice
+                vrRowsHtml = `
+                  <tr>
+                    <td colspan="4" style="padding:12px;border-bottom:1px solid #eee;text-align:center;color:#94a3b8;font-style:italic;">
+                      Không có chi tiết gói VR
+                    </td>
+                  </tr>
+                `;
+              }
+
+              if (vrRowsHtml) {
+                vrTableHtml = `
+                  <h3 style="margin-top:20px;color:#7c3aed;font-size:14px;text-transform:uppercase;">🎮 Trải nghiệm VR kèm theo</h3>
+                  <table style="width:100%;border-collapse:collapse;margin-top:8px;font-size:13px;">
+                    <thead>
+                      <tr style="background:#f1f5f9;color:#475569;">
+                        <th style="padding:10px;text-align:left;">Gói VR</th>
+                        <th style="padding:10px;text-align:center;">SL</th>
+                        <th style="padding:10px;text-align:right;">Đơn giá</th>
+                        <th style="padding:10px;text-align:right;">Thành tiền</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      ${vrRowsHtml}
+                    </tbody>
+                  </table>
+                `;
+              }
+            }
+
+            // 3. Build consistent price breakdown HTML block
+            const priceBreakdownHtml = `
+              <div style="margin-top:20px;padding:15px;background:#f8fafc;border-radius:8px;text-align:right;font-size:14px;">
+                ${discountAmt > 0 ? `<p style="margin:4px 0;color:#64748b;">Tạm tính (Giá gốc): <b>${originalTotal.toLocaleString('vi-VN')}đ</b></p>` : ''}
+                ${discountAmt > 0 ? `<p style="margin:4px 0;color:#16a34a;">${voucherScopeLabel(voucherScope)} ${voucherCode ? `(${voucherCode})` : ''}: <b>- ${discountAmt.toLocaleString('vi-VN')}đ</b></p>` : ''}
+                <h3 style="margin:8px 0 0;color:#2563eb;font-size:18px;">Tổng thực tế thanh toán: ${totalPrice.toLocaleString('vi-VN')}đ</h3>
+              </div>
+            `;
+
+            // Clean formatted ticket package name string for legacy template summary
+            const cleanPackageName =
+              parsedPackages.length > 0
+                ? parsedPackages.map((p: any) => `${p.name || p.package_name || rawPkg} x${p.quantity || 1}`).join(', ')
+                : rawPkg || 'Vé đơn';
+
+            if (isVR) {
+              // === Pure VR Email ===
               const html = `
-                                                                <div style="font-family:Arial,sans-serif;max-width:640px;margin:auto;padding:20px;color:#222;">
-                                                                        <h2 style="color:#7c3aed;text-align:center;">🎮 CINESPHERE - XÁC NHẬN ĐẶT TRẢI NGHIỆM VR</h2>
-                                                                        <p>Xin chào <b>${booking.name || 'Khách hàng'}</b>, cảm ơn bạn đã trải nghiệm VR tại CineSphere!</p>
-                                                                        <div style="background:#f8fafc;padding:15px;border-radius:8px;margin:15px 0;">
-                                                                                <p style="margin:6px 0;"><b>Mã đơn:</b> ${bookingCode || ''}</p>
-                                                                                <p style="margin:6px 0;"><b>Liên hệ:</b> ${booking.phone} / ${booking.email}</p>
-                                                                                <p style="margin:6px 0;"><b>Ngày đặt:</b> ${new Date(booking.created_at).toLocaleString('vi-VN')}</p>
-                                                                                ${booking.voucher_code_snapshot ? `<p style="margin:6px 0;"><b>Voucher đã áp:</b> ${booking.voucher_code_snapshot} (giảm ${discountAmt.toLocaleString('vi-VN')}đ)</p>` : ''}
-                                                                                ${result.branch_name ? `<p style="margin:6px 0;"><b>Chi nhánh:</b> ${result.branch_name}${result.branch_address ? ' - ' + result.branch_address : ''}</p>` : ''}
-                                                                                ${updatedBooking?.expiry_date ? `<p style="margin:6px 0;"><b>Vui lòng sử dụng trước:</b> ${new Date(updatedBooking.expiry_date).toLocaleDateString('vi-VN')}</p>` : ''}
-                                                                        </div>
-                                                                        <h3 style="margin-top:20px;">Danh sách gói VR đã đặt</h3>
-                                                                        <table style="width:100%;border-collapse:collapse;margin-top:10px;">
-                                                                                <thead>
-                                                                                        <tr style="background:#f1f5f9;">
-                                                                                                <th style="padding:10px;text-align:left;">Gói</th>
-                                                                                                <th style="padding:10px;text-align:center;">SL</th>
-                                                                                                <th style="padding:10px;text-align:right;">Giá gốc</th>
-                                                                                                <th style="padding:10px;text-align:right;">Thành tiền</th>
-                                                                                        </tr>
-                                                                                </thead>
-                                                                                <tbody>
-                                                                                        ${listVRHtml}
-                                                                                </tbody>
-                                                                        </table>
-                                                                        <div style="margin-top:20px;text-align:right;">
-                                                                                ${discountAmt > 0 ? `<p style="margin:4px;">Tổng gốc: <b>${originalTotal.toLocaleString('vi-VN')}đ</b></p>` : ''}
-                                                                                ${discountAmt > 0 ? `<p style="margin:4px;color:#16a34a;">Giảm voucher: <b>- ${discountAmt.toLocaleString('vi-VN')}đ</b></p>` : ''}
-                                                                                <h3 style="color:#7c3aed;">Tổng thanh toán: ${totalVR.toLocaleString('vi-VN')}đ</h3>
-                                                                        </div>
-                                                                        <hr style="border:none;border-top:1px dashed #cbd5e1;margin:25px 0;">
-                                                                        <p style="font-size:13px;color:#64748b;text-align:center;">Hãy mang theo mã đơn hàng khi đến chi nhánh. Trân trọng!</p>
-                                                                </div>
-                                                        `;
+                <div style="font-family:Arial,sans-serif;max-width:640px;margin:auto;padding:20px;color:#222;">
+                  <h2 style="color:#7c3aed;text-align:center;">🎮 CINESPHERE - XÁC NHẬN ĐẶT TRẢI NGHIỆM VR</h2>
+                  <p>Xin chào <b>${booking.name || 'Khách hàng'}</b>, cảm ơn bạn đã trải nghiệm VR tại CineSphere!</p>
+                  <div style="background:#f8fafc;padding:15px;border-radius:8px;margin:15px 0;">
+                    <p style="margin:6px 0;"><b>Mã đơn:</b> ${bookingCode || ''}</p>
+                    <p style="margin:6px 0;"><b>Liên hệ:</b> ${booking.phone} / ${booking.email}</p>
+                    <p style="margin:6px 0;"><b>Ngày đặt:</b> ${new Date(booking.created_at).toLocaleString('vi-VN')}</p>
+                    ${result.branch_name ? `<p style="margin:6px 0;"><b>Chi nhánh:</b> ${result.branch_name}${result.branch_address ? ' - ' + result.branch_address : ''}</p>` : ''}
+                    ${updatedBooking?.expiry_date ? `<p style="margin:6px 0;"><b>Vui lòng sử dụng trước:</b> ${new Date(updatedBooking.expiry_date).toLocaleDateString('vi-VN')}</p>` : ''}
+                  </div>
+                  ${vrTableHtml}
+                  ${priceBreakdownHtml}
+                  <hr style="border:none;border-top:1px dashed #cbd5e1;margin:25px 0;">
+                  <p style="font-size:13px;color:#64748b;text-align:center;">Hãy mang theo mã đơn hàng khi đến chi nhánh. Trân trọng!</p>
+                </div>
+              `;
               const mailer = sendMailFn;
+              const effectiveOrderCode = booking.id || bookingCode || booking.pay_txt_code;
+              const confirmSubject = `Xác nhận thanh toán thành công đơn hàng #${effectiveOrderCode}`;
               if (mailer) {
-                await mailer(booking.email, `🎮 Xác nhận đặt trải nghiệm VR - CINESPHERE`, html);
+                await mailer(booking.email, confirmSubject, html);
                 console.log(`[MailQueue] Đã gửi VR mail xác nhận cho booking ${booking.id}`);
               }
             } else {
-              // === Original MOVIE email ===
+              // === MOVIE & COMBO_VR Email ===
               const templateData = {
                 bookingCode: bookingCode || '',
                 customerName: booking.name || 'Khách hàng',
@@ -838,23 +944,30 @@ export async function updatePaymentImpl(
                 ticketCount: booking.ticket_count,
                 totalPrice: Number(booking.total_price).toLocaleString('vi-VN'),
                 durationMin: booking.movie_duration,
-                ticketPackageName: result.package_name,
+                ticketPackageName: cleanPackageName,
                 expiryDate: updatedBooking?.expiry_date,
-                // Pass branch info to email template
                 branchName: result.branch_name,
                 branchAddress: result.branch_address,
                 branchPhone: result.branch_phone,
-                branchSettings: result.branch_settings
+                branchSettings: result.branch_settings,
+                moviePackagesTableHtml,
+                vrTableHtml,
+                originalTotal,
+                discountAmt,
+                voucherCode,
+                bookingType: booking.booking_type
               };
 
               const emailTemplate = getBookingEmailHtml
                 ? getBookingEmailHtml(templateData)
                 : getBookingEmailTemplate(templateData);
               const mailer = sendMailFn;
+              const effectiveOrderCode = bookingCode || booking.pay_txt_code || booking.id;
+              const confirmSubject = `Xác nhận đặt vé thành công cho đơn #${effectiveOrderCode}`;
 
               if (mailer) {
-                await mailer(booking.email, `🎬 Xác nhận đặt vé - CINESPHERE`, emailTemplate);
-                console.log(`[MailQueue] Đã gửi mail xác nhận cho booking ${booking.id}`);
+                await mailer(booking.email, confirmSubject, emailTemplate);
+                console.log(`[MailQueue] Đã gửi mail xác nhận cho booking ${booking.id} (${bookingType})`);
               } else {
                 console.warn('[Payments] No mailer provided, skipping confirmation email');
               }
@@ -867,10 +980,7 @@ export async function updatePaymentImpl(
         {
           db: anyDb,
           recipient: booking.email,
-          subject:
-            booking.booking_type === 'vr'
-              ? '🎮 Xác nhận đặt trải nghiệm VR - CINESPHERE'
-              : '🎬 Xác nhận đặt vé - CINESPHERE',
+          subject: `Xác nhận đặt vé thành công cho đơn #${bookingCode || booking.pay_txt_code || booking.id}`,
           emailType: 'booking_confirmation',
           userId: booking.user_id || undefined,
           bookingId: booking.id,
@@ -930,12 +1040,11 @@ export async function getBookingImpl(anyDb: any, id: number, tables: { bookings:
 export async function getBookingByIdImpl(
   anyDb: any,
   id: number,
-  tables: { bookings: any; movies: any; ticket_packages: any; branches: any }
+  tables: { bookings: any; movies: any; ticket_packages: any; branches: any; vouchers?: any }
 ) {
-  const { bookings, movies, ticket_packages, branches } = tables;
+  const { bookings, movies, ticket_packages, branches, vouchers } = tables;
 
-  // Sử dụng Join để lấy tất cả dữ liệu trong 1 Query duy nhất
-  const rows = await anyDb
+  let finalQuery = anyDb
     .select({
       // Booking fields
       id: bookings.id,
@@ -968,12 +1077,19 @@ export async function getBookingByIdImpl(
       branch_name: branches.name,
       branch_address: branches.address,
       branch_phone: branches.phone,
-      branch_settings: branches.settings
+      branch_settings: branches.settings,
+      // Voucher fields
+      voucher_scope: vouchers ? vouchers.scope : null,
+      voucher_description: vouchers ? vouchers.description : null,
+      voucher_applicable_ids: vouchers ? vouchers.applicable_ticket_package_ids : null
     })
     .from(bookings)
-    .leftJoin(branches, eq(bookings.branch_id, branches.id))
-    .where(eq(bookings.id, id))
-    .limit(1);
+    .leftJoin(branches, eq(bookings.branch_id, branches.id)) as any;
+
+  if (vouchers) {
+    finalQuery = finalQuery.leftJoin(vouchers, eq(bookings.voucher_id, vouchers.id));
+  }
+  const rows = await finalQuery.where(eq(bookings.id, id)).limit(1);
 
   const booking = rows[0];
   if (!booking) {
@@ -1004,17 +1120,36 @@ export async function getBookingByIdImpl(
           settings: booking.branch_settings
         }
       : null,
+    voucher_details: booking.voucher_scope
+      ? {
+          scope: booking.voucher_scope,
+          description: booking.voucher_description,
+          applicable_ids: booking.voucher_applicable_ids
+        }
+      : null,
     vr_items
   };
 }
 
 function buildCodeSearchConditions(normalizedCode: string, bookingsTable: any) {
-  const digitsMatch = normalizedCode.match(/\d{6,}/);
+  const conditions = [
+    eq(bookingsTable.booking_code, normalizedCode),
+    eq(bookingsTable.pay_txt_code, normalizedCode),
+    like(bookingsTable.booking_code, `%${normalizedCode}%`),
+    like(bookingsTable.pay_txt_code, `%${normalizedCode}%`)
+  ];
 
+  if (normalizedCode.startsWith('BK')) {
+    const idStr = normalizedCode.slice(2);
+    if (/^\d+$/.test(idStr)) {
+      conditions.push(eq(bookingsTable.id, Number(idStr)));
+    }
+  }
+
+  const digitsMatch = normalizedCode.match(/\d{6,}/);
   if (digitsMatch) {
     const digits = digitsMatch[0];
-    return or(
-      eq(bookingsTable.booking_code, normalizedCode),
+    conditions.push(
       like(bookingsTable.booking_code, `%${digits}%`),
       like(bookingsTable.pay_txt_code, `%${digits}%`),
       inArray(bookingsTable.pay_txt_code, [
@@ -1024,22 +1159,11 @@ function buildCodeSearchConditions(normalizedCode: string, bookingsTable: any) {
         `CINESPHERE${digits}`,
         digits
       ]),
-      inArray(bookingsTable.booking_code, [
-        normalizedCode,
-        `CS${digits}`,
-        `CP${digits}`,
-        `CINESPHERE${digits}`,
-        digits
-      ])
+      inArray(bookingsTable.booking_code, [normalizedCode, `CS${digits}`, `CP${digits}`, `CINESPHERE${digits}`, digits])
     );
   }
 
-  return or(
-    eq(bookingsTable.booking_code, normalizedCode),
-    eq(bookingsTable.pay_txt_code, normalizedCode),
-    like(bookingsTable.booking_code, `%${normalizedCode}%`),
-    like(bookingsTable.pay_txt_code, `%${normalizedCode}%`)
-  );
+  return or(...conditions);
 }
 
 export async function getBookingByCodeImpl(anyDb: any, codeRaw: string, tables: { bookings: any }) {
@@ -1087,6 +1211,22 @@ export async function getBookingByCodeImpl(anyDb: any, codeRaw: string, tables: 
     } catch {}
   }
 
+  let voucher_details: { scope: string; description: string | null; applicable_ids: any } | null = null;
+  if (booking.voucher_id && (tables as any).vouchers) {
+    try {
+      const v = await anyDb.query.vouchers.findFirst({
+        where: eq((tables as any).vouchers.id, booking.voucher_id)
+      });
+      if (v) {
+        voucher_details = {
+          scope: v.scope || 'all',
+          description: v.description || null,
+          applicable_ids: v.applicable_ticket_package_ids ?? null
+        };
+      }
+    } catch {}
+  }
+
   return {
     status: 200,
     id: booking.id,
@@ -1123,7 +1263,8 @@ export async function getBookingByCodeImpl(anyDb: any, codeRaw: string, tables: 
     validity_days: daysLeft,
     expired,
     checked_in_at: booking.checked_in_at,
-    vr_items
+    vr_items,
+    voucher_details
   };
 }
 

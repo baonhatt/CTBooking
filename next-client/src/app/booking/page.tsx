@@ -323,11 +323,13 @@ export default function BookingPage() {
     try {
       setVoucherValidating(true);
       const vr_items = vrItems.map((i) => ({ vr_package_id: i.packageId, quantity: i.quantity }));
+      const movie_items = movieItems.map((i) => ({ package_id: i.packageId, quantity: i.quantity, price: i.price }));
       const booking_type = movieItems.length > 0 && vrItems.length > 0 ? 'all' : movieItems.length > 0 ? 'movie' : 'vr';
 
       const res = await validateVrVoucher({
         code,
         vr_items,
+        movie_items,
         branch_id: selectedBranch?.id,
         booking_type,
         order_total_before: originalTotalPrice
@@ -497,7 +499,7 @@ export default function BookingPage() {
       } else {
         // HAS MOVIE TICKETS (and optionally VR)
         const mainMoviePkg = movieItems[0];
-        const movie_items = movieItems.map(m => ({ package_id: m.packageId, quantity: m.quantity }));
+        const movie_items = movieItems.map(m => ({ package_id: m.packageId, quantity: m.quantity, price: m.price }));
         const validation = await validateBookingApi({
           email,
           emailBook: email,
@@ -1062,6 +1064,11 @@ export default function BookingPage() {
                               <p className="text-[11px] text-emerald-300 font-bold">
                                 Đã giảm: -{voucherDiscount.toLocaleString('vi-VN')}₫
                               </p>
+                              {appliedVoucher?.voucher_details?.description && (
+                                <p className="text-[10px] text-emerald-400 mt-1 line-clamp-2" title={appliedVoucher.voucher_details.description}>
+                                  {appliedVoucher.voucher_details.description}
+                                </p>
+                              )}
                             </div>
                           </div>
                           <Button

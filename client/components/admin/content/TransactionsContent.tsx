@@ -15,6 +15,7 @@ import {
   PaginationPrevious
 } from '@/components/ui/pagination';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { useNavigate } from 'react-router-dom';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -49,14 +50,22 @@ import { toast } from 'sonner';
 import { formatDistanceToNow } from 'date-fns';
 import { vi } from 'date-fns/locale';
 import { useStaffPermissions, useIsSuperAdmin } from '@/hooks/useStaffPermission';
+import {
+  parseApplicableIds,
+  isLineDiscounted,
+  vrPackageId,
+  voucherScopeLabel
+} from '@shared/booking-invoice';
 
 interface Tx {
   id: string;
+  booking_code?: string;
   userId?: number | null;
   transactionId: string;
   email: string;
   userName: string;
   ticket_package_name: string;
+  vr_items?: Array<{ package_name: string; quantity: number }>;
   ticketCount: number;
   totalPrice: number;
   originalTotalPrice?: number;
@@ -120,6 +129,57 @@ const CountdownTimer = ({ targetDate }: { targetDate: string }) => {
   );
 };
 
+const parsePackageName = (name: string, t?: Tx) => {
+  const typeBadgeStr = t?.booking_type === 'vr' ? 'Trải nghiệm VR' : t?.booking_type === 'combo_vr' ? 'Combo Phim + VR' : 'Gói vé phim';
+  
+  let vrItemsList: React.ReactNode = null;
+  if (t?.booking_type === 'combo_vr' || t?.booking_type === 'vr') {
+    if (t.vr_items && t.vr_items.length > 0) {
+      vrItemsList = t.vr_items.map((it, idx) => (
+        <span key={`vr-${idx}`} className="truncate text-slate-500 mt-0.5 text-[11px]">
+          • {it.package_name} (x{it.quantity})
+        </span>
+      ));
+    }
+    if (!vrItemsList && t?.booking_type === 'combo_vr') {
+      vrItemsList = (
+        <span className="truncate text-slate-500 mt-0.5 text-[11px]">
+          • Kèm tùy chọn VR (x{Math.max((t?.ticketCount || 1) - 1, 1)})
+        </span>
+      );
+    }
+  }
+
+  let movieItemsList: React.ReactNode = null;
+  if (t?.booking_type !== 'vr') {
+    try {
+      const trimmed = (name || '').trim();
+      if (trimmed.startsWith('[') && trimmed.endsWith(']')) {
+        const parsed = JSON.parse(trimmed);
+        if (Array.isArray(parsed)) {
+          movieItemsList = parsed.map((item, idx) => (
+            <span key={idx} className="truncate text-slate-500 mt-0.5 text-[11px]">
+              • {item.name || 'Gói vé'} (x{item.quantity || 1})
+            </span>
+          ));
+        }
+      }
+    } catch (e) {}
+    
+    if (!movieItemsList) {
+      movieItemsList = <span className="truncate text-slate-500 mt-0.5 text-[11px]">• {name || '---'}</span>;
+    }
+  }
+  
+  return (
+    <div className="flex flex-col gap-0.5">
+      <span className="font-bold text-slate-800 text-xs uppercase">{typeBadgeStr}</span>
+      {movieItemsList}
+      {vrItemsList}
+    </div>
+  );
+};
+
 interface Props {
   data: Tx[];
   totalPages: number;
@@ -177,6 +237,7 @@ export default function TransactionsContent({
   selectedBranchId = null,
   setSelectedBranchId = () => {}
 }: Props) {
+  const navigate = useNavigate();
   const [isDetailsOpen, setIsDetailsOpen] = useState(false);
   const [selectedTxId, setSelectedTxId] = useState<number | null>(null);
   const [selectedTxSummary, setSelectedTxSummary] = useState<Tx | null>(null);
@@ -772,20 +833,26 @@ export default function TransactionsContent({
                           </div>
                         </TableCell>
                         <TableCell className="text-center">
-                          {t.booking_type === 'vr' ? (
-                            <Badge className="bg-purple-100 text-purple-700 border-purple-200 py-0.5 font-bold flex items-center gap-1 mx-auto w-fit">
+                          {t.booking_type === 'combo_vr' ? (
+                            <Badge className="bg-amber-100 text-amber-700 border-amber-200 py-0.5 font-bold flex items-center justify-center gap-1 mx-auto w-fit text-nowrap">
+                              <Film size={10} /> Phim, VR
+                            </Badge>
+                          ) : t.booking_type === 'vr' ? (
+                            <Badge className="bg-purple-100 text-purple-700 border-purple-200 py-0.5 font-bold flex items-center justify-center gap-1 mx-auto w-fit">
                               <Gamepad2 size={10} /> VR
                             </Badge>
                           ) : (
-                            <Badge className="bg-blue-100 text-blue-700 border-blue-200 py-0.5 font-bold flex items-center gap-1 mx-auto w-fit">
+                            <Badge className="bg-blue-100 text-blue-700 border-blue-200 py-0.5 font-bold flex items-center justify-center gap-1 mx-auto w-fit">
                               <Film size={10} /> Phim
                             </Badge>
                           )}
                         </TableCell>
-                        <TableCell className="max-w-[150px] truncate font-medium text-sm">
-                          {t.ticket_package_name}
+                        <TableCell className="min-w-[150px] font-medium text-[11px] text-slate-700 leading-tight">
+                          {parsePackageName(t.ticket_package_name, t)}
                         </TableCell>
-                        <TableCell className="text-center font-bold">{t.ticketCount}</TableCell>
+                        <TableCell className="text-center font-bold text-slate-800 text-sm">
+                          {t.ticketCount}
+                        </TableCell>
                         <TableCell className="font-bold text-blue-700">
                           <div>{t.totalPrice.toLocaleString('vi-VN')}đ</div>
                           {t.voucher_discount_amount && t.voucher_discount_amount > 0 ? (
@@ -837,14 +904,30 @@ export default function TransactionsContent({
                         </TableCell>
 
                         <TableCell className="text-right">
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => handleViewDetails(t)}
-                            className="h-8 hover:bg-blue-600 hover:text-white transition-all shadow-sm text-xs"
-                          >
-                            Xem chi tiết
-                          </Button>
+                          <div className="flex justify-end items-center gap-2">
+                            {(t.paymentStatus === 'paid' || t.paymentStatus === 'pending') && !t.is_used && !t.expired && (
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  navigate('/ticket-check?code=' + t.booking_code);
+                                }}
+                                className="h-8 text-blue-600 bg-blue-50 border-blue-200 hover:bg-blue-600 hover:text-white transition-all shadow-sm px-2.5"
+                                title="Soát vé nhanh"
+                              >
+                                <TicketIcon size={14} />
+                              </Button>
+                            )}
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handleViewDetails(t)}
+                              className="h-8 hover:bg-blue-600 hover:text-white transition-all shadow-sm text-xs"
+                            >
+                              Xem chi tiết
+                            </Button>
+                          </div>
                         </TableCell>
                       </TableRow>
                     );
@@ -976,6 +1059,8 @@ export default function TransactionsContent({
 
                   return null;
                 })()}
+
+
                 <button
                   onClick={() => setIsDetailsOpen(false)}
                   className="p-1.5 rounded-md hover:bg-gray-100 text-gray-500 hover:text-gray-700 transition-colors"
@@ -1061,6 +1146,13 @@ export default function TransactionsContent({
                                     const qty = Number(it.quantity || 1);
                                     const unit = Number(it.discounted_unit_price ?? it.unit_price ?? 0);
                                     const line = Number(it.line_total ?? unit * qty);
+                                    const discounted = isLineDiscounted({
+                                      discountAmount: Number(txDetails.voucher_info?.voucher_discount_amount || 0),
+                                      scope: txDetails.voucher_info?.scope,
+                                      applicableIds: parseApplicableIds(txDetails.voucher_info?.applicable_ids),
+                                      kind: 'vr',
+                                      packageId: vrPackageId(it)
+                                    });
                                     return (
                                       <tr
                                         key={it.id || `vr-${idx}`}
@@ -1075,6 +1167,11 @@ export default function TransactionsContent({
                                               {it.package_name ||
                                                 it.ticket_package?.name ||
                                                 `Gói VR #${it.ticket_package_id || idx + 1}`}
+                                              {discounted ? (
+                                                <span className="inline-block ml-1.5 px-1 py-[1px] align-middle text-[8px] font-black text-rose-600 bg-rose-50 border border-rose-200 rounded">
+                                                  ĐƯỢC GIẢM
+                                                </span>
+                                              ) : null}
                                             </span>
                                           </div>
                                         </td>
@@ -1125,104 +1222,209 @@ export default function TransactionsContent({
                           title={txDetails.booking_type === 'combo_vr' ? 'Gói Vé & VR Combo' : 'Gói & Phim'}
                           icon={<TicketIcon size={16} />}
                         />
-                        <div className="bg-amber-50/40 rounded-xl p-5 border border-amber-100 space-y-4 shadow-sm">
-                          {/* Nếu có danh sách chi tiết vr_items */}
-                          {txDetails.vr_items && txDetails.vr_items.length > 0 ? (
-                            <div className="border border-amber-200/60 rounded-lg overflow-hidden bg-white">
-                              <table className="w-full text-xs text-left border-collapse">
-                                <thead className="bg-amber-50/70 text-amber-800">
-                                  <tr className="border-none">
-                                    <th className="py-2 px-2.5 font-bold uppercase text-[10px]">Tên gói / Vé</th>
-                                    <th className="py-2 px-1 font-bold uppercase text-[10px] text-center w-8">SL</th>
-                                    <th className="py-2 px-1.5 font-bold uppercase text-[10px] text-right">Đơn giá</th>
-                                    <th className="py-2 px-2.5 font-bold uppercase text-[10px] text-right">Thành tiền</th>
-                                  </tr>
-                                </thead>
-                                <tbody>
-                                  {txDetails.vr_items.map((it: any, idx: number) => {
-                                    const qty = Number(it.quantity || 1);
-                                    const unit = Number(it.discounted_unit_price ?? it.unit_price ?? 0);
-                                    const line = Number(it.line_total ?? unit * qty);
-                                    return (
-                                      <tr
-                                        key={it.id || `item-${idx}`}
-                                        className="border-t border-amber-100/60 hover:bg-transparent"
-                                      >
-                                        <td className="py-2 px-2.5">
-                                          <div className="flex items-center gap-1.5">
-                                            <div className="w-5 h-5 rounded-md bg-amber-100 flex items-center justify-center shrink-0">
-                                              <TicketIcon className="w-3 h-3 text-amber-700" />
-                                            </div>
-                                            <span className="text-xs font-semibold text-slate-800 leading-tight">
-                                              {it.package_name ||
-                                                txDetails.ticket_package?.name ||
-                                                `Gói vé #${idx + 1}`}
-                                            </span>
-                                          </div>
-                                        </td>
-                                        <td className="py-2 px-1 text-center font-bold text-slate-700 text-xs">
-                                          ×{qty}
-                                        </td>
-                                        <td className="py-2 px-1.5 text-right text-[11px] text-slate-600">
-                                          {unit.toLocaleString('vi-VN')}đ
-                                        </td>
-                                        <td className="py-2 px-2.5 text-right font-bold text-amber-900 text-xs">
-                                          {line.toLocaleString('vi-VN')}đ
-                                        </td>
-                                      </tr>
-                                    );
-                                  })}
-                                </tbody>
-                              </table>
-                            </div>
-                          ) : (
-                            <div className="flex justify-between">
-                              <InfoRow
-                                label="Loại Vé"
-                                value={txDetails.ticket_package?.name || txDetails.ticket_package_name}
-                                bold
-                              />
-                              <span className="text-[14px] font-bold text-slate-600">
-                                {txDetails.ticket_package?.ticket_unit_price?.toLocaleString()}đ
-                              </span>
-                            </div>
-                          )}
+                        <div className="bg-blue-50/40 rounded-xl p-5 border border-blue-100 space-y-4 shadow-sm">
+                          {(() => {
+                            const discountAmount = Number(txDetails.voucher_info?.voucher_discount_amount || 0);
+                            const voucherScope = txDetails.voucher_info?.scope || 'all';
+                            const applicableIds = parseApplicableIds(txDetails.voucher_info?.applicable_ids);
+                            let isJsonArray = false;
+                            let parsedMovieItems: any[] = [];
+                            
+                            if (txDetails.ticket_package_name || txDetails.ticket_package?.name) {
+                              try {
+                                const rawString = (txDetails.ticket_package_name || txDetails.ticket_package?.name).trim();
+                                if (rawString.startsWith('[') && rawString.endsWith(']')) {
+                                  parsedMovieItems = JSON.parse(rawString);
+                                  if (Array.isArray(parsedMovieItems)) {
+                                    isJsonArray = true;
+                                  }
+                                }
+                              } catch (e) {}
+                            }
 
-                          {/* Danh sách phim combo nếu có */}
-                          {txDetails.ticket_package?.movies && txDetails.ticket_package.movies.length > 0 && (
-                            <div className="space-y-1 border-t border-amber-200/30 pt-3">
-                              <p className="text-xs text-gray-500 font-medium">Phim trong gói:</p>
-                              <div className="flex flex-wrap gap-1.5 min-h-[32px]">
-                                {txDetails.ticket_package?.movies?.map((m: any) => (
-                                  <Badge
-                                    key={m.id}
-                                    variant="outline"
-                                    className="bg-white text-[10px] border-amber-200 text-amber-800"
-                                  >
-                                    {m.title}
-                                  </Badge>
-                                ))}
+                            if (isJsonArray && parsedMovieItems.length > 0) {
+                              return (
+                                <div className="border border-blue-200/60 rounded-lg overflow-hidden bg-white">
+                                  <table className="w-full text-xs text-left border-collapse">
+                                    <thead className="bg-blue-50/70 text-blue-800">
+                                      <tr className="border-none">
+                                        <th className="py-2 px-2.5 font-bold uppercase text-[10px]">Tên gói / Vé</th>
+                                        <th className="py-2 px-1 font-bold uppercase text-[10px] text-center w-8">SL</th>
+                                        <th className="py-2 px-1.5 font-bold uppercase text-[10px] text-right">Đơn giá</th>
+                                        <th className="py-2 px-2.5 font-bold uppercase text-[10px] text-right">Thành tiền</th>
+                                      </tr>
+                                    </thead>
+                                    <tbody>
+                                      {parsedMovieItems.map((it: any, idx: number) => {
+                                        const qty = Number(it.quantity || 1);
+                                        const unit = Number(it.price || it.originalPrice || 0);
+                                        const line = unit * qty;
+                                        const discounted = isLineDiscounted({
+                                          discountAmount,
+                                          scope: voucherScope,
+                                          applicableIds,
+                                          kind: 'movie',
+                                          packageId: it.package_id
+                                        });
+                                        return (
+                                          <tr
+                                            key={`movie-item-${idx}`}
+                                            className="border-t border-blue-100/60 hover:bg-transparent"
+                                          >
+                                            <td className="py-2 px-2.5">
+                                              <div className="flex items-center gap-1.5">
+                                                <div className="w-5 h-5 rounded-md bg-blue-100 flex items-center justify-center shrink-0">
+                                                  <TicketIcon className="w-3 h-3 text-blue-700" />
+                                                </div>
+                                                <span className="text-[11px] font-semibold text-slate-800 leading-tight">
+                                                  {it.name || `Gói vé #${idx + 1}`}
+                                                  {discounted ? (
+                                                    <span className="inline-block ml-1.5 px-1 py-[1px] align-middle text-[8px] font-black text-rose-600 bg-rose-50 border border-rose-200 rounded">
+                                                      ĐƯỢC GIẢM
+                                                    </span>
+                                                  ) : null}
+                                                </span>
+                                              </div>
+                                            </td>
+                                            <td className="py-2 px-1 text-center font-bold text-slate-700 text-xs text-nowrap">
+                                              ×{qty}
+                                            </td>
+                                            <td className="py-2 px-1.5 text-right text-[11px] text-slate-600 text-nowrap">
+                                              {unit.toLocaleString('vi-VN')}
+                                            </td>
+                                            <td className="py-2 px-2.5 text-right font-bold text-blue-900 text-xs text-nowrap">
+                                              {line.toLocaleString('vi-VN')}
+                                            </td>
+                                          </tr>
+                                        );
+                                      })}
+                                    </tbody>
+                                  </table>
+                                </div>
+                              );
+                            }
+
+                            return (
+                              <div className="flex justify-between items-center bg-white border border-blue-100 rounded-lg p-3">
+                                <InfoRow
+                                  label="Loại Vé"
+                                  value={txDetails.ticket_package?.name || txDetails.ticket_package_name}
+                                  bold
+                                />
+                                <span className="text-[14px] font-bold text-blue-600">
+                                  {txDetails.ticket_package?.ticket_unit_price?.toLocaleString('vi-VN')}đ
+                                </span>
+                              </div>
+                            );
+                          })()}
+
+
+                          {/* Danh sách VR đi kèm nếu có (Combo VR) */}
+                          {txDetails.booking_type === 'combo_vr' && txDetails.vr_items && txDetails.vr_items.length > 0 && (
+                            <div className="space-y-1.5 border-t border-blue-200/30 pt-3">
+                              <p className="text-[11px] text-gray-500 font-bold uppercase">Gói VR đi kèm:</p>
+                              <div className="border border-purple-200/60 rounded-lg overflow-hidden bg-white">
+                                <table className="w-full text-xs text-left border-collapse">
+                                  <thead className="bg-purple-50/70 text-purple-800">
+                                    <tr className="border-none">
+                                      <th className="py-2 px-2.5 font-bold uppercase text-[10px]">Tên Dịch Vụ</th>
+                                      <th className="py-2 px-1 font-bold uppercase text-[10px] text-center w-8">SL</th>
+                                      <th className="py-2 px-1.5 font-bold uppercase text-[10px] text-right">Đơn giá</th>
+                                      <th className="py-2 px-2.5 font-bold uppercase text-[10px] text-right">Thành tiền</th>
+                                    </tr>
+                                  </thead>
+                                  <tbody>
+                                    {txDetails.vr_items.map((it: any, idx: number) => {
+                                      const qty = Number(it.quantity || 1);
+                                      const unit = Number(it.discounted_unit_price ?? it.unit_price ?? 0);
+                                      const line = Number(it.line_total ?? unit * qty);
+                                      const discounted = isLineDiscounted({
+                                        discountAmount: Number(txDetails.voucher_info?.voucher_discount_amount || 0),
+                                        scope: txDetails.voucher_info?.scope,
+                                        applicableIds: parseApplicableIds(txDetails.voucher_info?.applicable_ids),
+                                        kind: 'vr',
+                                        packageId: vrPackageId(it)
+                                      });
+                                      return (
+                                        <tr
+                                          key={it.id || `vr-${idx}`}
+                                          className="border-t border-purple-100/60 hover:bg-transparent"
+                                        >
+                                          <td className="py-2 px-2.5">
+                                            <div className="flex items-center gap-1.5">
+                                              <div className="w-5 h-5 rounded-md bg-purple-100 flex items-center justify-center shrink-0">
+                                                <Gamepad2 className="w-3 h-3 text-purple-700" />
+                                              </div>
+                                              <span className="text-[11px] font-semibold text-slate-800 leading-tight">
+                                                {it.package_name || `Gói VR #${idx + 1}`}
+                                                {discounted ? (
+                                                  <span className="inline-block ml-1.5 px-1 py-[1px] align-middle text-[8px] font-black text-rose-600 bg-rose-50 border border-rose-200 rounded">
+                                                    ĐƯỢC GIẢM
+                                                  </span>
+                                                ) : null}
+                                              </span>
+                                            </div>
+                                          </td>
+                                          <td className="py-2 px-1 text-center font-bold text-slate-700 text-xs text-nowrap">×{qty}</td>
+                                          <td className="py-2 px-1.5 text-right text-[11px] text-slate-600 text-nowrap">
+                                            {unit.toLocaleString('vi-VN')}
+                                          </td>
+                                          <td className="py-2 px-2.5 text-right font-bold text-purple-900 text-xs text-nowrap">
+                                            {line.toLocaleString('vi-VN')}
+                                          </td>
+                                        </tr>
+                                      );
+                                    })}
+                                  </tbody>
+                                </table>
                               </div>
                             </div>
                           )}
 
-                          <div className="flex justify-between items-end border-t border-amber-200/30 pt-3">
+                          <div className="flex justify-between items-end border-t border-blue-200/30 pt-3">
                             <InfoRow
                               label="Số lượng vé"
-                              value={
-                                txDetails.booking_details?.ticket_count ||
-                                (Array.isArray(txDetails.vr_items)
-                                  ? txDetails.vr_items.reduce((s: number, i: any) => s + Number(i.quantity || 0), 0)
-                                  : 1)
-                              }
+                              value={(function() {
+                                let sum = 0;
+                                let isParsed = false;
+                                if (txDetails.ticket_package_name || txDetails.ticket_package?.name) {
+                                  try {
+                                    const raw = (txDetails.ticket_package_name || txDetails.ticket_package?.name).trim();
+                                    if (raw.startsWith('[') && raw.endsWith(']')) {
+                                      const parsed = JSON.parse(raw);
+                                      if (Array.isArray(parsed)) {
+                                        sum += parsed.reduce((acc: number, it: any) => acc + Number(it.quantity || 1), 0);
+                                        isParsed = true;
+                                      }
+                                    }
+                                  } catch (e) {}
+                                }
+                                if (!isParsed) {
+                                  sum += Number(txDetails.booking_details?.ticket_count || 1);
+                                }
+                                if (txDetails.booking_type === 'combo_vr' && Array.isArray(txDetails.vr_items)) {
+                                  sum += txDetails.vr_items.reduce((acc: number, it: any) => acc + Number(it.quantity || 1), 0);
+                                }
+                                return sum > 0 ? sum : 1;
+                              })()}
                               large
-                              color="text-amber-700"
+                              color="text-blue-700"
                             />
-                            <div className="text-right">
-                              <p className="text-[10px] text-amber-600 uppercase font-bold">Tổng tiền</p>
-                              <p className="text-3xl font-black text-emerald-700">
-                                {txDetails.booking_details?.total_price?.toLocaleString()}đ
+                            <div className="text-right flex flex-col items-end">
+                              <p className="text-[10px] text-blue-600 uppercase font-bold">Tổng tiền</p>
+                              {txDetails.voucher_info?.voucher_discount_amount > 0 && (
+                                <p className="text-[13px] line-through text-slate-400 font-medium">
+                                  {txDetails.booking_details?.original_total_price?.toLocaleString('vi-VN')}đ
+                                </p>
+                              )}
+                              <p className="text-3xl font-black text-emerald-700 drop-shadow-sm">
+                                {txDetails.booking_details?.total_price?.toLocaleString('vi-VN')}đ
                               </p>
+                              {txDetails.voucher_info?.voucher_discount_amount > 0 && (
+                                <div className="mt-1 bg-emerald-50 text-emerald-600 font-bold text-[10px] px-2 py-0.5 rounded uppercase border border-emerald-100">
+                                  Giảm: -{txDetails.voucher_info.voucher_discount_amount.toLocaleString('vi-VN')}đ
+                                </div>
+                              )}
                             </div>
                           </div>
                         </div>
@@ -1321,8 +1523,8 @@ export default function TransactionsContent({
                       </div>
 
                       <div className="md:border-x md:px-8">
-                        <p className="text-[11px] text-blue-500 uppercase font-bold mb-2 italic">
-                          Mã đặt chỗ (Booking Code)
+                        <p className="text-[11px] text-blue-500 uppercase font-bold mb-2 italic whitespace-nowrap">
+                          Mã đặt chỗ
                         </p>
                         <div
                           className={`flex items-center gap-2 ${
@@ -1331,8 +1533,10 @@ export default function TransactionsContent({
                               : ''
                           }`}
                         >
-                          {txDetails.booking_details?.booking_code && (
+                          {txDetails.booking_details?.booking_code ? (
                             <CopyableText text={txDetails.booking_details.booking_code} label="mã đặt chỗ" />
+                          ) : (
+                            <span className="text-xs text-slate-400 font-medium italic">Chưa phát hành</span>
                           )}
                         </div>
                       </div>
@@ -1469,7 +1673,11 @@ export default function TransactionsContent({
                     color="text-purple-700"
                   />
                   <InfoRow
-                    label="Giảm giá"
+                    label={
+                      txDetails.voucher_info.scope
+                        ? voucherScopeLabel(txDetails.voucher_info.scope)
+                        : 'Giảm giá'
+                    }
                     value={
                       txDetails.voucher_info.voucher_discount_amount
                         ? `${Number(txDetails.voucher_info.voucher_discount_amount).toLocaleString('vi-VN')}đ`

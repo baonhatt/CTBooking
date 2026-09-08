@@ -105,6 +105,7 @@ export default function TransactionsPage() {
       setTransactions(
         items.map((t: any) => ({
           id: String(t.id),
+          booking_code: t.booking_code,
           userId: t.user_id,
           email: t.email,
           userName: t.userName,
@@ -127,7 +128,8 @@ export default function TransactionsPage() {
           paidAt: t.paidAt ? new Date(t.paidAt) : null,
           updatedAt: t.updatedAt ? new Date(t.updatedAt) : null,
           branch_id: t.branch_id,
-          booking_type: t.booking_type || 'movie'
+          booking_type: t.booking_type || 'movie',
+          vr_items: t.vr_items
         }))
       );
       setTotalTransactions(total);

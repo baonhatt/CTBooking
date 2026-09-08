@@ -26,6 +26,18 @@ import {
 import UserLayout from '@/layouts/UserLayout';
 import { API_BASE_URL, confirmBookingApi, getBookingByIdApi, getVRBookingById } from '@/lib/api';
 import { useAuthState } from '@/hooks/useAuthState';
+import {
+        parseMoviePackages,
+        parseApplicableIds,
+        isLineDiscounted,
+        moviePackageLineTotal,
+        moviePackagesTotalQty,
+        vrLineTotal,
+        vrPackageId,
+        hasVrContent,
+        bookingTypeBadge,
+        voucherScopeLabel
+} from '@shared/booking-invoice';
 
 export default function Checkout() {
         const router = useRouter();
@@ -127,14 +139,16 @@ export default function Checkout() {
                                                 setBookingCode((bookingData as any).booking_code);
                                         }
                                         const bookingType = (bookingData as any).booking_type || 'movie';
-                                        const vr = bookingType === 'vr';
-                                        let vrList: any[] = [];
-                                        if (vr) {
+                                        let vrList: any[] = Array.isArray((bookingData as any).vr_items)
+                                                ? (bookingData as any).vr_items
+                                                : [];
+                                        if (vrList.length === 0 && (bookingType === 'vr' || bookingType === 'combo_vr')) {
                                                 try {
                                                         const vrDetail = await getVRBookingById(Number(order.booking_id));
                                                         vrList = vrDetail?.vr_items || [];
                                                 } catch { }
                                         }
+                                        const vr = hasVrContent(bookingType, vrList);
                                         setIsVR(vr);
                                         setVrItems(vrList);
 
@@ -144,6 +158,11 @@ export default function Checkout() {
                                                 original_total_price: (bookingData as any).original_total_price ?? order.original_total_price,
                                                 voucher_discount_amount: (bookingData as any).voucher_discount_amount ?? order.voucher_discount_amount,
                                                 voucher_code_snapshot: (bookingData as any).voucher_code_snapshot ?? order.voucher_code_snapshot ?? order.voucher_code,
+                                                voucher_details:
+                                                        (bookingData as any).voucher_details ||
+                                                        (bookingData as any).voucherDetails ||
+                                                        order.voucher_details ||
+                                                        null,
                                                 payment_status: bookingData.payment_status ?? order.payment_status,
                                                 name: bookingData.name ?? order.name,
                                                 phone: bookingData.phone ?? order.phone,
@@ -261,79 +280,131 @@ export default function Checkout() {
                                                         </div>
 
                                                         {/* Booking & Ticket Details (PROMINENT TOP SECTION) */}
-                                                        <div className="p-4 bg-white/[0.02] border-b border-white/10 grid grid-cols-2 gap-x-6 gap-y-3">
-                                                                {/* Package / VR Type */}
-                                                                <div className="space-y-1">
-                                                                        <div className="flex items-center gap-1.5 text-slate-400">
-                                                                                {!isVR ? (
-                                                                                        <Ticket className="w-3.5 h-3.5 text-blue-400" />
-                                                                                ) : (
-                                                                                        <Gamepad2 className="w-3.5 h-3.5 text-purple-400" />
-                                                                                )}
-                                                                                <span className="text-[10px] md:text-xs uppercase font-bold tracking-wider text-slate-400">
-                                                                                        {!isVR ? 'Gói vé đã mua' : 'Loại đơn'}
-                                                                                </span>
-                                                                        </div>
-                                                                        <p className="text-base md:text-lg font-extrabold text-white">
-                                                                                {!isVR
-                                                                                        ? (order?.ticketPackageName || 'Vé đơn')
-                                                                                        : '🎮 Trải nghiệm VR'}
-                                                                        </p>
-                                                                </div>
-
-                                                                {/* Date/Expiry - Chỉ show cho phim */}
-                                                                {!isVR && order?.expiryDate && (
-                                                                        <div className="space-y-1 text-right">
-                                                                                <div className="flex items-center justify-end gap-1.5 text-slate-400">
-                                                                                        <Calendar className="w-3.5 h-3.5 text-amber-400" />
-                                                                                        <span className="text-[10px] md:text-xs uppercase font-bold tracking-wider text-slate-400">Hạn sử dụng</span>
-                                                                                </div>
-                                                                                <p className="text-base md:text-lg font-bold text-amber-400">
-                                                                                        {new Date(order.expiryDate).toLocaleDateString('vi-VN')}
-                                                                                </p>
-                                                                        </div>
-                                                                )}
-
-                                                                {/* VR Số lượng gói */}
-                                                                {isVR && vrItems?.length > 0 && (
-                                                                        <div className="space-y-1 text-right">
-                                                                                <div className="flex items-center justify-end gap-1.5 text-slate-400">
-                                                                                        <Ticket className="w-3.5 h-3.5 text-purple-400" />
-                                                                                        <span className="text-[10px] md:text-xs uppercase font-bold tracking-wider">Số loại gói</span>
-                                                                                </div>
-                                                                                <p className="text-base md:text-lg font-bold text-slate-200">
-                                                                                        {vrItems.length} gói
-                                                                                </p>
-                                                                        </div>
-                                                                )}
-
-                                                                {/* Unit Price */}
-                                                                <div className="space-y-0.5">
-                                                                        <span className="text-[10px] uppercase font-bold tracking-wider text-slate-500">
-                                                                                {!isVR ? 'Đơn giá' : 'Thành tiền / gói'}
-                                                                        </span>
-                                                                        <p className="text-sm font-semibold text-slate-300">
-                                                                                {!isVR
-                                                                                        ? `${formatMoney(order?.amount / (order?.quantity || 1))}₫`
-                                                                                        : (vrItems?.length === 1
-                                                                                                ? `${formatMoney(Number(vrItems[0]?.unit_price || vrItems[0]?.discounted_unit_price || order?.amount))}₫`
-                                                                                                : `${formatMoney(order?.amount)}₫ (tổng)`
-                                                                                        )}
-                                                                        </p>
-                                                                </div>
-
-                                                                {/* Quantity */}
-                                                                <div className="space-y-0.5 text-right">
-                                                                        <span className="text-[10px] uppercase font-bold tracking-wider text-slate-500">
-                                                                                {!isVR ? 'Số lượng' : 'Tổng lượt chơi'}
-                                                                        </span>
-                                                                        <p className="text-lg md:text-xl font-black text-white italic">
-                                                                                x{!isVR
-                                                                                        ? (order?.quantity || 1)
-                                                                                        : (vrItems?.reduce((s: number, i: any) => s + Number(i.quantity || 0), 0) || order?.quantity || 1)
+                                                        <div className="p-4 bg-white/[0.02] border-b border-white/10 space-y-3">
+                                                                {(() => {
+                                                                        const discountAmount = Number(order?.voucher_discount_amount || 0);
+                                                                        const voucherScope =
+                                                                                order?.voucher_details?.scope ||
+                                                                                order?.voucherDetails?.scope ||
+                                                                                'all';
+                                                                        const applicableIds = parseApplicableIds(
+                                                                                order?.voucher_details?.applicable_ids ||
+                                                                                        order?.voucherDetails?.applicable_ids
+                                                                        );
+                                                                        const moviePkgs = parseMoviePackages(
+                                                                                order?.ticketPackageName || order?.ticket_package,
+                                                                                {
+                                                                                        quantity: order?.quantity || order?.ticket_count || 1,
+                                                                                        price: Math.round(
+                                                                                                Number(order?.amount || 0) /
+                                                                                                        (order?.quantity || order?.ticket_count || 1)
+                                                                                        )
                                                                                 }
-                                                                        </p>
-                                                                </div>
+                                                                        );
+                                                                        const listVr = vrItems?.length ? vrItems : order?.vr_items || [];
+                                                                        const typeBadge = bookingTypeBadge(order?.booking_type, listVr);
+                                                                        const showMovie = order?.booking_type !== 'vr';
+
+                                                                        return (
+                                                                                <>
+                                                                                        <div className="flex items-center justify-between gap-2">
+                                                                                                <div className="flex items-center gap-1.5 text-slate-400">
+                                                                                                        {typeBadge === 'VR' ? (
+                                                                                                                <Gamepad2 className="w-3.5 h-3.5 text-purple-400" />
+                                                                                                        ) : (
+                                                                                                                <Ticket className="w-3.5 h-3.5 text-blue-400" />
+                                                                                                        )}
+                                                                                                        <span className="text-[10px] md:text-xs uppercase font-bold tracking-wider text-slate-400">
+                                                                                                                Chi tiết đơn ({typeBadge})
+                                                                                                        </span>
+                                                                                                </div>
+                                                                                                {order?.expiryDate && order?.booking_type !== 'vr' && (
+                                                                                                        <p className="text-xs font-bold text-amber-400">
+                                                                                                                HSD: {new Date(order.expiryDate).toLocaleDateString('vi-VN')}
+                                                                                                        </p>
+                                                                                                )}
+                                                                                        </div>
+
+                                                                                        {showMovie && (
+                                                                                                <div className="space-y-2 rounded-xl bg-white/[0.03] border border-white/5 p-3">
+                                                                                                        <div className="flex justify-between items-center text-[10px] text-gray-400 font-bold uppercase tracking-wider">
+                                                                                                                <span>Gói vé phim</span>
+                                                                                                                <span>{moviePackagesTotalQty(moviePkgs)} vé</span>
+                                                                                                        </div>
+                                                                                                        {moviePkgs.map((pkg, idx) => {
+                                                                                                                const discounted = isLineDiscounted({
+                                                                                                                        discountAmount,
+                                                                                                                        scope: voucherScope,
+                                                                                                                        applicableIds,
+                                                                                                                        kind: 'movie',
+                                                                                                                        packageId: pkg.package_id
+                                                                                                                });
+                                                                                                                return (
+                                                                                                                        <div key={idx} className="flex justify-between items-center text-sm">
+                                                                                                                                <span className="text-gray-200 font-medium max-w-[65%]">
+                                                                                                                                        {pkg.name}
+                                                                                                                                        {discounted ? (
+                                                                                                                                                <span className="inline-block ml-2 px-1.5 py-[2px] align-middle text-[8px] font-black text-rose-400 bg-rose-400/10 border border-rose-400/20 rounded">
+                                                                                                                                                        ĐƯỢC GIẢM
+                                                                                                                                                </span>
+                                                                                                                                        ) : null}
+                                                                                                                                </span>
+                                                                                                                                <div className="flex items-center gap-3 text-right">
+                                                                                                                                        <span className="text-xs text-gray-500">x{pkg.quantity}</span>
+                                                                                                                                        <span className="font-bold text-white tabular-nums">
+                                                                                                                                                {formatMoney(moviePackageLineTotal(pkg))}₫
+                                                                                                                                        </span>
+                                                                                                                                </div>
+                                                                                                                        </div>
+                                                                                                                );
+                                                                                                        })}
+                                                                                                </div>
+                                                                                        )}
+
+                                                                                        {(listVr.length > 0 || order?.booking_type === 'combo_vr' || isVR) && (
+                                                                                                <div className="space-y-2 rounded-xl bg-purple-500/10 border border-purple-500/20 p-3">
+                                                                                                        <div className="flex justify-between items-center text-[10px] text-purple-300 font-bold uppercase tracking-wider">
+                                                                                                                <span className="flex items-center gap-1">
+                                                                                                                        <Gamepad2 className="w-3 h-3" /> Gói VR
+                                                                                                                </span>
+                                                                                                                <span>{listVr.length} gói</span>
+                                                                                                        </div>
+                                                                                                        {listVr.length > 0 ? (
+                                                                                                                listVr.map((it: any, i: number) => {
+                                                                                                                        const discounted = isLineDiscounted({
+                                                                                                                                discountAmount,
+                                                                                                                                scope: voucherScope,
+                                                                                                                                applicableIds,
+                                                                                                                                kind: 'vr',
+                                                                                                                                packageId: vrPackageId(it)
+                                                                                                                        });
+                                                                                                                        return (
+                                                                                                                                <div key={i} className="flex justify-between items-center text-sm">
+                                                                                                                                        <span className="text-purple-100 font-medium max-w-[65%]">
+                                                                                                                                                {it.package_name || it.name || 'Gói VR'}
+                                                                                                                                                {discounted ? (
+                                                                                                                                                        <span className="inline-block ml-2 px-1.5 py-[2px] align-middle text-[8px] font-black text-rose-400 bg-rose-400/10 border border-rose-400/20 rounded">
+                                                                                                                                                                ĐƯỢC GIẢM
+                                                                                                                                                        </span>
+                                                                                                                                                ) : null}
+                                                                                                                                        </span>
+                                                                                                                                        <div className="flex items-center gap-3">
+                                                                                                                                                <span className="text-xs text-gray-500">x{it.quantity}</span>
+                                                                                                                                                <span className="text-purple-300 font-bold">
+                                                                                                                                                        {formatMoney(vrLineTotal(it))}₫
+                                                                                                                                                </span>
+                                                                                                                                        </div>
+                                                                                                                                </div>
+                                                                                                                        );
+                                                                                                                })
+                                                                                                        ) : (
+                                                                                                                <div className="text-slate-400 italic text-xs">Không có chi tiết gói VR</div>
+                                                                                                        )}
+                                                                                                </div>
+                                                                                        )}
+                                                                                </>
+                                                                        );
+                                                                })()}
                                                         </div>
 
                                                         {/* Movie List (Subtle & Secondary background info) */}
@@ -351,26 +422,6 @@ export default function Checkout() {
                                                                                                 {m.duration && <span className="text-[10px] text-slate-500">({m.duration}p)</span>}
                                                                                         </div>
                                                                                 ))}
-                                                                        </div>
-                                                                </div>
-                                                        )}
-
-                                                        {(vrItems?.length > 0 || (order?.vr_items && order.vr_items.length > 0)) && (
-                                                                <div className="p-3 bg-white/[0.01] border-b border-white/5 space-y-1.5">
-                                                                        <div className="flex items-center gap-1.5 text-purple-400">
-                                                                                <Gamepad2 className="w-3 h-3 text-purple-400" />
-                                                                                <span className="text-[10px] font-medium uppercase tracking-wider">Trải nghiệm VR kèm theo</span>
-                                                                        </div>
-                                                                        <div className="space-y-1 pl-4 text-xs text-slate-400">
-                                                                                {(vrItems?.length ? vrItems : (order?.vr_items || [])).map((it: any, i: number) => {
-                                                                                        const lineTotal = Number(it.line_total || it.unit_price * it.quantity || 0);
-                                                                                        return (
-                                                                                                <div key={i} className="flex items-center justify-between text-xs text-slate-300">
-                                                                                                        <span>{it.package_name || it.name || 'Gói VR'} x{it.quantity}</span>
-                                                                                                        {lineTotal > 0 && <span className="text-amber-400 font-semibold">{formatMoney(lineTotal)}₫</span>}
-                                                                                                </div>
-                                                                                        );
-                                                                                })}
                                                                         </div>
                                                                 </div>
                                                         )}
@@ -451,7 +502,10 @@ export default function Checkout() {
                                                                                         <div className="flex justify-between items-center text-emerald-400 font-semibold">
                                                                                                 <span className="flex items-center gap-1">
                                                                                                         <Sparkles className="w-3.5 h-3.5 text-emerald-400" />
-                                                                                                        Voucher giảm giá {order?.voucher_code_snapshot || order?.voucher_code ? `(${order.voucher_code_snapshot || order.voucher_code})` : ''}
+                                                                                                        {voucherScopeLabel(order?.voucher_details?.scope || order?.voucherDetails?.scope)}
+                                                                                                        {order?.voucher_code_snapshot || order?.voucher_code
+                                                                                                                ? ` (${order.voucher_code_snapshot || order.voucher_code})`
+                                                                                                                : ''}
                                                                                                 </span>
                                                                                                 <span>-{formatMoney(order?.voucher_discount_amount || 0)}₫</span>
                                                                                         </div>

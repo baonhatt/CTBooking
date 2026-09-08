@@ -20,7 +20,8 @@ import {
   Loader2,
   Search,
   FilterX,
-  ShieldAlert
+  ShieldAlert,
+  Copy
 } from 'lucide-react';
 import { format, formatDistanceToNow, isAfter, isBefore } from 'date-fns';
 import { vi } from 'date-fns/locale';
@@ -494,16 +495,13 @@ export default function VouchersContent(props: Props) {
     }
     if (payload.scope === 'all') {
       payload.applicable_ticket_package_ids = null;
-      payload.excluded_ticket_package_ids = null;
     } else {
-      payload.applicable_ticket_package_ids =
-        Array.isArray(payload.applicable_ticket_package_ids) && payload.applicable_ticket_package_ids.length > 0
-          ? payload.applicable_ticket_package_ids
-          : null;
-      payload.excluded_ticket_package_ids =
-        Array.isArray(payload.excluded_ticket_package_ids) && payload.excluded_ticket_package_ids.length > 0
-          ? payload.excluded_ticket_package_ids
-          : null;
+      // If user specifically cleared all checkboxes, they cannot save.
+      if (Array.isArray(payload.applicable_ticket_package_ids) && payload.applicable_ticket_package_ids.length === 0) {
+        toast.error('Vui lòng chọn ít nhất 1 gói áp dụng (hoặc chọn tất cả)');
+        return;
+      }
+      // If it has length > 0, keep it. If it is null, keep it as null (it means all).
     }
 
     if (editData.id && editData.id > 0) {
@@ -553,6 +551,12 @@ export default function VouchersContent(props: Props) {
   const isFuture = (v: VoucherItem) => {
     if (!v.valid_from) return false;
     return isBefore(new Date(), new Date(v.valid_from));
+  };
+
+  const handleCopyCode = (code: string) => {
+    if (!code) return;
+    navigator.clipboard.writeText(code);
+    toast.success('Đã sao chép mã voucher');
   };
 
   return (
@@ -845,8 +849,13 @@ export default function VouchersContent(props: Props) {
                       }`}
                     >
                       <TableCell>
-                        <span className="inline-flex items-center px-2.5 py-1 rounded-lg bg-purple-50 text-purple-700 border border-purple-200 font-mono font-bold text-xs tracking-wider">
+                        <span 
+                          onClick={() => handleCopyCode(v.code)}
+                          className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-purple-50/50 hover:bg-purple-100/80 text-purple-700 border border-purple-200 font-mono font-bold text-xs tracking-wider cursor-pointer active:scale-95 transition-all"
+                          title="Bấm để sao chép mã"
+                        >
                           {v.code}
+                          <Copy className="w-3 h-3 text-purple-400 opacity-70" />
                         </span>
                       </TableCell>
                       <TableCell>
@@ -990,7 +999,12 @@ export default function VouchersContent(props: Props) {
                                 <AlertDialogTrigger asChild>
                                   <Switch
                                     checked={!!v.is_active}
-                                    className="data-[state=checked]:bg-green-500 data-[state=unchecked]:bg-gray-300 cursor-pointer"
+                                    className="scale-100 transition-all border-2 border-transparent cursor-pointer"
+                                    style={{
+                                      opacity: 1,
+                                      backgroundColor: v.is_active ? '#10b981' : '#d1d5db',
+                                      boxShadow: 'none'
+                                    }}
                                     onClick={(e) => {
                                       e.preventDefault();
                                       setVoucherToToggle({
@@ -1070,7 +1084,12 @@ export default function VouchersContent(props: Props) {
                               <Switch
                                 checked={!!v.is_active}
                                 disabled
-                                className="data-[state=checked]:bg-green-500 data-[state=unchecked]:bg-gray-300 opacity-40 cursor-not-allowed"
+                                className="scale-100 transition-all cursor-not-allowed border-2 border-transparent"
+                                style={{
+                                  opacity: 0.4,
+                                  backgroundColor: v.is_active ? '#10b981' : '#d1d5db',
+                                  boxShadow: 'none'
+                                }}
                               />
                             )}
                           </div>
@@ -1269,7 +1288,7 @@ export default function VouchersContent(props: Props) {
                     <Label className="text-xs font-semibold text-gray-700 mb-1.5 block">
                       Mã voucher <span className="text-red-500">*</span>
                     </Label>
-                    <div className="flex gap-2">
+                    <div className="flex gap-2 items-center">
                       <Input
                         placeholder="VD: VR20OFF"
                         value={editData?.code || ''}
@@ -1283,6 +1302,18 @@ export default function VouchersContent(props: Props) {
                         className={`h-9.5 text-sm flex-1 font-mono uppercase tracking-wider font-semibold ${!isCodeEditable ? 'bg-gray-100 text-gray-600' : ''}`}
                         maxLength={30}
                       />
+                      {editData?.code && (
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="icon"
+                          onClick={() => handleCopyCode(editData.code)}
+                          className="h-9.5 w-9.5 shrink-0 text-gray-500 hover:text-gray-800"
+                          title="Sao chép mã"
+                        >
+                          <Copy className="w-3.5 h-3.5" />
+                        </Button>
+                      )}
                       {/* Only allow editing code on NEW vouchers: show pencil + auto-gen */}
                       {(!editData?.id || editData.id === 0) && (
                         <>
@@ -1292,7 +1323,7 @@ export default function VouchersContent(props: Props) {
                             size="icon"
                             onClick={() => setIsCodeEditable(!isCodeEditable)}
                             className="h-9.5 w-9.5 shrink-0"
-                            title={isCodeEditable ? 'Khóa mã' : 'Sửa mã'}
+                            title={isCodeEditable ? 'Khóa mã' : 'Nhập mã thủ công'}
                           >
                             <Pencil className="w-3.5 h-3.5" />
                           </Button>
@@ -1666,17 +1697,11 @@ export default function VouchersContent(props: Props) {
 
                       const appliedList: number[] = Array.isArray(editData?.applicable_ticket_package_ids)
                         ? editData.applicable_ticket_package_ids
-                        : [];
-                      const excludedList: number[] = Array.isArray(editData?.excluded_ticket_package_ids)
-                        ? editData.excluded_ticket_package_ids
-                        : [];
+                        : (editData?.applicable_ticket_package_ids === null || editData?.applicable_ticket_package_ids === undefined) ? vrPackages.map((p: any) => p.id) : [];
+                      
+                      const isAllChecked = vrPackages.length > 0 && appliedList.length === vrPackages.length;
                       const hasAnyApplicable = appliedList.length > 0;
-                      const hasAnyExcluded = excludedList.length > 0;
-                      const mode: 'all' | 'whitelist' | 'blacklist' = hasAnyApplicable
-                        ? 'whitelist'
-                        : hasAnyExcluded
-                          ? 'blacklist'
-                          : 'all';
+                      const mode: 'all' | 'whitelist' = isAllChecked ? 'all' : 'whitelist';
 
                       return (
                         <div
@@ -1697,14 +1722,6 @@ export default function VouchersContent(props: Props) {
                                 ✓ Chỉ áp {appliedList.length} gói
                               </Badge>
                             )}
-                            {mode === 'blacklist' && (
-                              <Badge
-                                variant="outline"
-                                className="text-[10px] border-red-300 bg-red-50 text-red-700 px-2 py-0 rounded-full"
-                              >
-                                ✗ Loại trừ {excludedList.length} gói
-                              </Badge>
-                            )}
                             {mode === 'all' && (
                               <Badge
                                 variant="outline"
@@ -1720,124 +1737,76 @@ export default function VouchersContent(props: Props) {
                             </span>
                           </div>
 
-                          {mode !== 'all' && (
-                            <div
-                              className={`rounded-lg px-3 py-2 border text-[11px] flex items-center gap-2 ${
-                                mode === 'whitelist'
-                                  ? 'bg-green-50 border-green-200 text-green-700'
-                                  : 'bg-red-50 border-red-200 text-red-700'
-                              }`}
-                            >
-                              {mode === 'whitelist' ? (
-                                <>
-                                  <CheckCircle2 className="w-3.5 h-3.5 shrink-0" />
-                                  <span>
-                                    <b>Chỉ áp gói:</b> bỏ hết tick cột Áp dụng → mới tick được Loại trừ.
-                                  </span>
-                                </>
-                              ) : (
-                                <>
-                                  <XCircle className="w-3.5 h-3.5 shrink-0" />
-                                  <span>
-                                    <b>Áp tất cả trừ:</b> bỏ hết tick cột Loại trừ → mới tick được Áp dụng.
-                                  </span>
-                                </>
-                              )}
-                            </div>
-                          )}
-
                           <div
-                            className={`border ${scopeConfig.borderClass} rounded-xl p-2.5 h-40 overflow-y-auto space-y-1.5 bg-white`}
+                            className={`border ${scopeConfig.borderClass} rounded-xl p-2.5 h-40 overflow-y-auto space-y-1.5 bg-white mt-2`}
                           >
                             {vrPackages.length === 0 ? (
                               <p className="text-xs text-gray-400 text-center py-6">{scopeConfig.empty}</p>
                             ) : (
-                              vrPackages.map((pkg) => {
-                                const applied = appliedList.includes(pkg.id);
-                                const excluded = excludedList.includes(pkg.id);
-                                const applyDisabled = excluded || hasAnyExcluded;
-                                const excludeDisabled = applied || hasAnyApplicable;
-                                return (
-                                  <div
-                                    key={pkg.id}
-                                    className={`flex items-center space-x-2 p-1.5 rounded-lg border border-transparent transition-colors ${scopeConfig.hoverClass}`}
-                                  >
-                                    <div className={applyDisabled && !applied ? 'opacity-60' : ''}>
-                                      <Checkbox
-                                        id={`vrpkg-apply-${pkg.id}`}
-                                        checked={applied}
-                                        disabled={applyDisabled}
-                                        onCheckedChange={(checked) => {
-                                          const curr = editData?.applicable_ticket_package_ids || [];
-                                          const nextApplied = checked
-                                            ? [...curr, pkg.id]
-                                            : curr.filter((id: number) => id !== pkg.id);
-                                          const nextEditData: any = {
-                                            ...editData,
-                                            applicable_ticket_package_ids: nextApplied.length > 0 ? nextApplied : null
-                                          };
-                                          if (nextApplied.length > 0 && hasAnyExcluded) {
-                                            nextEditData.excluded_ticket_package_ids = null;
-                                            toast.info('Đã chuyển Chỉ áp gói — danh sách Loại trừ đã xóa.');
-                                          }
-                                          setEditData(nextEditData);
-                                        }}
-                                      />
-                                    </div>
-                                    <label
-                                      htmlFor={`vrpkg-apply-${pkg.id}`}
-                                      className={`text-xs font-medium leading-none cursor-pointer flex-1 truncate ${
-                                        applyDisabled && !applied ? 'text-slate-400' : 'text-slate-700'
-                                      }`}
-                                      title={
-                                        applyDisabled && !applied
-                                          ? 'Bỏ hết Loại trừ → mới tick được Áp dụng'
-                                          : undefined
-                                      }
-                                    >
-                                      {pkg.name}
-                                      <span className="ml-1 text-[10px] text-slate-400">
-                                        ({formatMoney(pkg.price)})
-                                      </span>
-                                    </label>
-                                    <div className={excludeDisabled && !excluded ? 'opacity-60' : ''}>
-                                      <Checkbox
-                                        id={`vrpkg-ex-${pkg.id}`}
-                                        checked={excluded}
-                                        disabled={excludeDisabled}
-                                        onCheckedChange={(checked) => {
-                                          const curr = editData?.excluded_ticket_package_ids || [];
-                                          const nextExcluded = checked
-                                            ? [...curr, pkg.id]
-                                            : curr.filter((id: number) => id !== pkg.id);
-                                          if (nextExcluded.length > 0 && hasAnyApplicable) {
-                                            setEditData({
-                                              ...editData,
-                                              applicable_ticket_package_ids: null,
-                                              excluded_ticket_package_ids: nextExcluded.length > 0 ? nextExcluded : null
-                                            });
-                                            toast.info('Đã chuyển Loại trừ — các mục Áp dụng đã xóa.');
-                                          } else {
-                                            setEditData({
-                                              ...editData,
-                                              excluded_ticket_package_ids: nextExcluded.length > 0 ? nextExcluded : null
-                                            });
-                                          }
-                                        }}
-                                      />
-                                    </div>
-                                    {excluded ? (
-                                      <label
-                                        htmlFor={`vrpkg-ex-${pkg.id}`}
-                                        className="text-[10px] text-red-500 cursor-pointer font-semibold"
-                                        title="Bỏ chọn để hủy loại trừ gói này"
-                                      >
-                                        Loại trừ
-                                      </label>
-                                    ) : null}
+                              <>
+                                <div
+                                  className={`flex items-center space-x-2 p-1.5 rounded-lg border border-transparent transition-colors mb-2 bg-slate-50 ${scopeConfig.hoverClass}`}
+                                >
+                                  <div>
+                                    <Checkbox
+                                      id={`vrpkg-apply-all`}
+                                      checked={isAllChecked}
+                                      onCheckedChange={(checked) => {
+                                        setEditData({
+                                          ...editData,
+                                          applicable_ticket_package_ids: checked ? vrPackages.map((p: any) => p.id) : [],
+                                          excluded_ticket_package_ids: null
+                                        });
+                                      }}
+                                    />
                                   </div>
-                                );
-                              })
+                                  <label
+                                    htmlFor={`vrpkg-apply-all`}
+                                    className={`text-xs font-semibold leading-none cursor-pointer flex-1 text-slate-800`}
+                                  >
+                                    Chọn tất cả
+                                  </label>
+                                </div>
+                                {vrPackages.map((pkg) => {
+                                  const applied = appliedList.includes(pkg.id);
+                                  return (
+                                    <div
+                                      key={pkg.id}
+                                      className={`flex items-center space-x-2 p-1.5 rounded-lg border border-transparent transition-colors ${scopeConfig.hoverClass}`}
+                                    >
+                                      <div>
+                                        <Checkbox
+                                          id={`vrpkg-apply-${pkg.id}`}
+                                          checked={applied}
+                                          onCheckedChange={(checked) => {
+                                            const curr = appliedList;
+                                            const nextApplied = checked
+                                              ? [...curr, pkg.id]
+                                              : curr.filter((id: number) => id !== pkg.id);
+                                            
+                                            setEditData({
+                                              ...editData,
+                                              applicable_ticket_package_ids: nextApplied,
+                                              excluded_ticket_package_ids: null // ensure it's cleared if it ever existed
+                                            });
+                                          }}
+                                        />
+                                      </div>
+                                      <label
+                                        htmlFor={`vrpkg-apply-${pkg.id}`}
+                                        className={`text-xs font-medium leading-none cursor-pointer flex-1 truncate ${
+                                          applied ? 'text-slate-800 font-semibold' : 'text-slate-700'
+                                        }`}
+                                      >
+                                        {pkg.name}
+                                        <span className="ml-1 text-[10px] text-slate-400">
+                                          ({formatMoney(pkg.price)})
+                                        </span>
+                                      </label>
+                                    </div>
+                                  );
+                                })}
+                              </>
                             )}
                           </div>
                         </div>

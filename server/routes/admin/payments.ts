@@ -54,6 +54,7 @@ export async function listTransactionsImpl(
     movies: any;
     ticket_packages: any;
     vouchers?: any;
+    booking_vr_items?: any;
   },
   args: {
     page: number;
@@ -197,6 +198,29 @@ export async function listTransactionsImpl(
     .limit(pageSize)
     .offset(skip);
 
+  const vrBookingIds = Array.from(new Set(itemsRaw.map((r: any) => r.booking.id)));
+  let vrItemsByBooking: Record<number, Array<{ package_name: string; quantity: number }>> = {};
+  if (tables.booking_vr_items && vrBookingIds.length > 0) {
+    const vrRows = await anyDb
+      .select({
+        booking_id: tables.booking_vr_items.booking_id,
+        package_name: tables.booking_vr_items.package_name,
+        quantity: tables.booking_vr_items.quantity
+      })
+      .from(tables.booking_vr_items)
+      .where(inArray(tables.booking_vr_items.booking_id, vrBookingIds));
+
+    vrItemsByBooking = vrRows.reduce((acc: any, row: any) => {
+      const bid = row.booking_id;
+      if (!acc[bid]) acc[bid] = [];
+      acc[bid].push({
+        package_name: row.package_name || 'Gói VR',
+        quantity: Number(row.quantity || 1)
+      });
+      return acc;
+    }, {} as Record<number, Array<{ package_name: string; quantity: number }>>);
+  }
+
   const items = itemsRaw.map((row: any) => {
     const tx = row.booking;
     const now = new Date();
@@ -220,10 +244,29 @@ export async function listTransactionsImpl(
       } catch {}
     }
 
+    let parsedMovieQty = 0;
+    let hasParsed = false;
+    if (tx.ticket_package_name) {
+      try {
+        const raw = tx.ticket_package_name.trim();
+        if (raw.startsWith('[') && raw.endsWith(']')) {
+          const arr = JSON.parse(raw);
+          if (Array.isArray(arr)) {
+            parsedMovieQty = arr.reduce((acc: number, it: any) => acc + Number(it.quantity || 1), 0);
+            hasParsed = true;
+          }
+        }
+      } catch (e) {}
+    }
+    const vrItems = vrItemsByBooking[tx.id] || [];
+    const vrQty = vrItems.reduce((s: number, it: any) => s + Number(it.quantity || 0), 0);
+    const baseMovieQty = hasParsed ? parsedMovieQty : tx.ticket_count;
+    const finalTicketCount = (tx.booking_type === 'combo_vr' || tx.booking_type === 'vr') ? baseMovieQty + vrQty : baseMovieQty;
+
     return {
       id: tx.id,
       bookingId: tx.id,
-      booking_code: tx.booking_code || `BK${tx.id}`,
+      booking_code: tx.booking_code || tx.pay_txt_code || `BK${tx.id}`,
       user_id: tx.user_id,
       branch_id: tx.branch_id,
       email: tx.email || '',
@@ -231,7 +274,8 @@ export async function listTransactionsImpl(
       name: tx.name || row.user?.fullname || '',
       userName: row.user?.fullname || 'Khách Vãng Lai',
       ticket_package_name: tx.ticket_package_name || '',
-      ticketCount: tx.ticket_count,
+      vr_items: vrItems,
+      ticketCount: finalTicketCount,
       is_used: tx.is_used,
       totalPrice: Number(tx.total_price),
       originalTotalPrice: Number(tx.original_total_price || tx.total_price || 0),
@@ -408,17 +452,25 @@ export async function getTransactionByIdImpl(
   let sale_staff_id = null;
   let sale_name = null;
   let sale_email = null;
+  let voucher_scope: string | null = null;
+  let voucher_description: string | null = null;
+  let voucher_applicable_ids: any = null;
 
   if (booking.voucher_id && tables.vouchers) {
     try {
       const v = await anyDb.query.vouchers.findFirst({ where: eq(tables.vouchers.id, booking.voucher_id) });
-      if (v?.description) {
-        const trimmed = v.description.trim();
-        if (trimmed.startsWith('{') && trimmed.endsWith('}')) {
-          const meta = JSON.parse(trimmed);
-          sale_staff_id = meta.sale_staff_id ? Number(meta.sale_staff_id) : null;
-          sale_name = meta.sale_name || null;
-          sale_email = meta.sale_email || null;
+      if (v) {
+        voucher_scope = v.scope || 'all';
+        voucher_description = v.description || null;
+        voucher_applicable_ids = v.applicable_ticket_package_ids ?? null;
+        if (v.description) {
+          const trimmed = v.description.trim();
+          if (trimmed.startsWith('{') && trimmed.endsWith('}')) {
+            const meta = JSON.parse(trimmed);
+            sale_staff_id = meta.sale_staff_id ? Number(meta.sale_staff_id) : null;
+            sale_name = meta.sale_name || null;
+            sale_email = meta.sale_email || null;
+          }
         }
       }
     } catch {}
@@ -428,6 +480,7 @@ export async function getTransactionByIdImpl(
     id: booking.id,
     booking_type: bType,
     vr_items,
+    ticket_package_name: booking.ticket_package_name,
     user: {
       email_auth: account?.email || '',
       fullname: booking.name || 'Tên mặc định',
@@ -449,6 +502,9 @@ export async function getTransactionByIdImpl(
       voucher_code: booking.voucher_code_snapshot || null,
       voucher_discount_amount: Number(booking.voucher_discount_amount || 0),
       original_total_price: Number(booking.original_total_price || booking.total_price || 0),
+      scope: voucher_scope,
+      description: voucher_description,
+      applicable_ids: voucher_applicable_ids,
       sale_staff_id,
       sale_name,
       sale_email

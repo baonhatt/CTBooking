@@ -12,6 +12,18 @@ function parseJsonArrayNullable(value: any): string | null | undefined {
   return undefined;
 }
 
+export function parseJsonArrayOutput(val: any): any[] | null {
+  if (Array.isArray(val)) return val;
+  if (typeof val === 'string' && val.trim().length > 0) {
+    try {
+      const parsed = JSON.parse(val);
+      if (Array.isArray(parsed)) return parsed;
+    } catch {}
+  }
+  return null;
+}
+
+
 export function parseVoucherMetadata(desc: string | null | undefined): {
   note: string;
   sale_staff_id: number | null;
@@ -153,7 +165,10 @@ export async function listVouchersImpl(
         sale_name: meta.sale_name,
         sale_email: meta.sale_email,
         total_revenue,
-        used_count: redemptions_count
+        used_count: redemptions_count,
+        applicable_ticket_package_ids: parseJsonArrayOutput(v.applicable_ticket_package_ids),
+        applicable_user_ids: parseJsonArrayOutput(v.applicable_user_ids),
+        branch_ids: parseJsonArrayOutput(v.branch_ids)
       };
     })
   );
@@ -190,12 +205,19 @@ export async function listDeletedVouchersImpl(
   }
 
   const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
-  const items = await anyDb.query.vouchers.findMany({
+  const itemsRaw = await anyDb.query.vouchers.findMany({
     where: whereClause,
     orderBy: [desc(vouchers.deleted_at)],
     limit: pageSize,
     offset: (page - 1) * pageSize
   });
+  
+  const items = itemsRaw.map((v: any) => ({
+    ...v,
+    applicable_ticket_package_ids: parseJsonArrayOutput(v.applicable_ticket_package_ids),
+    applicable_user_ids: parseJsonArrayOutput(v.applicable_user_ids),
+    branch_ids: parseJsonArrayOutput(v.branch_ids)
+  }));
   const [countResult] = await anyDb.select({ count: count() }).from(vouchers).where(whereClause);
   return { status: 'success', items, total: countResult?.count || 0, page, pageSize };
 }
@@ -263,7 +285,10 @@ export async function getVoucherImpl(
     redemption_total_count: redemptionCountRes?.count || 0,
     recent_redemptions,
     created_by_staff_name: createLog?.staffFullname || null,
-    updated_by_staff_name: updateLog?.staffFullname || null
+    updated_by_staff_name: updateLog?.staffFullname || null,
+    applicable_ticket_package_ids: parseJsonArrayOutput(voucher.applicable_ticket_package_ids),
+    applicable_user_ids: parseJsonArrayOutput(voucher.applicable_user_ids),
+    branch_ids: parseJsonArrayOutput(voucher.branch_ids)
   };
 }
 
@@ -290,7 +315,6 @@ export async function createVoucherImpl(
     valid_until?: string;
     applicable_ticket_package_ids?: any;
     applicable_user_ids?: any;
-    excluded_ticket_package_ids?: any;
     branch_ids?: any;
   },
   staffInfo?: { id: number; email: string; fullname: string }
@@ -326,8 +350,6 @@ export async function createVoucherImpl(
     applicable_ticket_package_ids:
       (args.scope || 'all') === 'all' ? null : parseJsonArrayNullable(args.applicable_ticket_package_ids),
     applicable_user_ids: parseJsonArrayNullable(args.applicable_user_ids),
-    excluded_ticket_package_ids:
-      (args.scope || 'all') === 'all' ? null : parseJsonArrayNullable(args.excluded_ticket_package_ids),
     branch_ids: parseJsonArrayNullable(args.branch_ids),
     created_at: formatDateForDb(nowIso),
     updated_at: formatDateForDb(nowIso)
@@ -395,7 +417,6 @@ export async function updateVoucherImpl(
     valid_until?: string;
     applicable_ticket_package_ids?: any;
     applicable_user_ids?: any;
-    excluded_ticket_package_ids?: any;
     branch_ids?: any;
   },
   staffInfo?: { id: number; email: string; fullname: string },
@@ -457,12 +478,9 @@ export async function updateVoucherImpl(
   const targetScope = args.scope !== undefined ? args.scope : existing.scope;
   if (targetScope === 'all') {
     data.applicable_ticket_package_ids = null;
-    data.excluded_ticket_package_ids = null;
   } else {
     if (args.applicable_ticket_package_ids !== undefined)
       data.applicable_ticket_package_ids = parseJsonArrayNullable(args.applicable_ticket_package_ids);
-    if (args.excluded_ticket_package_ids !== undefined)
-      data.excluded_ticket_package_ids = parseJsonArrayNullable(args.excluded_ticket_package_ids);
   }
   if (args.applicable_user_ids !== undefined)
     data.applicable_user_ids = parseJsonArrayNullable(args.applicable_user_ids);
