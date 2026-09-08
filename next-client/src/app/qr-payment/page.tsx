@@ -267,7 +267,7 @@ export default function QRPaymentPage() {
         if (bId) {
             try {
                 const baseUrl = process.env.NEXT_PUBLIC_SERVER_BASE_URL || '';
-                const res = await fetch(`${baseUrl}/api/confirm-booking`, {
+                const res = await fetch(`${baseUrl}/api/cancel-booking`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
@@ -359,7 +359,7 @@ export default function QRPaymentPage() {
         if (bId) {
             try {
                 const baseUrl = process.env.NEXT_PUBLIC_SERVER_BASE_URL || '';
-                const res = await fetch(`${baseUrl}/api/confirm-booking`, {
+                const res = await fetch(`${baseUrl}/api/cancel-booking`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({

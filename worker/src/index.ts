@@ -1693,6 +1693,41 @@ app.post('/api/create-booking', async (c) => {
   }
 });
 
+// Cancel a pending booking (Public API used by users to cancel their own payment)
+app.post('/api/cancel-booking', async (c) => {
+  let body: any = {};
+  try {
+    const db = drizzle(c.env.cinema_db, { schema });
+    const tables = getD1Tables(schema);
+    body = await c.req.json().catch(() => ({}));
+
+    // Force payment_status to 'failed' for safety so public users cannot confirm bookings
+    const safeBody = {
+      ...body,
+      payment_status: 'failed'
+    };
+
+    const r = await updatePaymentImpl(
+      db,
+      safeBody as any,
+      undefined,
+      undefined,
+      tables,
+      c.executionCtx
+    );
+
+    const status = typeof (r as any).status === 'number' ? (r as any).status : 200;
+    const payload = {
+      ...(r as any),
+      status: status >= 400 ? 'error' : 'success'
+    };
+    return c.json(payload, status as any);
+  } catch (err: any) {
+    logSystemError('cancel-booking', err, body);
+    return c.json({ message: err?.message || 'Lỗi máy chủ nội bộ' }, 500);
+  }
+});
+
 // Confirm a booking after payment
 
 // POST /api/confirm-booking
