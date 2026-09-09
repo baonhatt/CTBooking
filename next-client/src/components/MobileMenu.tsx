@@ -48,9 +48,9 @@ export function MobileMenu({
         <Button
           variant="default"
           aria-label="Mở menu điều hướng"
-          className="bg-white/10 backdrop-blur-md border-white/20 text-white w-10 h-10 hover:bg-white/20 touch-manipulation select-none active:scale-95 transition-transform"
+          className="bg-white/10 backdrop-blur-md border-white/20 text-white h-8 w-8 sm:h-9 sm:w-9 p-0 rounded-full hover:bg-white/20 touch-manipulation select-none active:scale-95 transition-transform flex items-center justify-center"
         >
-          <Menu className="h-6 w-6" />
+          <Menu className="h-4 w-4 sm:h-5 sm:w-5" />
         </Button>
       </SheetTrigger>
 

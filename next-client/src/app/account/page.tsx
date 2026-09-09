@@ -705,9 +705,6 @@ export default function Account() {
                                                                                         <h3 className="text-lg font-bold text-white uppercase">
                                                                                             {t.booking_type === 'vr' ? 'Trải nghiệm VR' : t.booking_type === 'combo_vr' ? 'Combo Phim + VR' : 'Gói vé phim'}
                                                                                         </h3>
-                                                                                        <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-blue-500/10 text-blue-300 border border-blue-500/20 uppercase tracking-wider">
-                                                                                            {t.method}
-                                                                                        </span>
                                                                                         {(() => {
                                                                                             const badge = bookingTypeBadge(t.booking_type, t.vr_items);
                                                                                             if (badge === 'Phim') return null;
@@ -1235,31 +1232,6 @@ export default function Account() {
                                         <div className="grid grid-cols-2 gap-y-5 px-2 text-sm">
                                             <div className="space-y-1">
                                                 <p className="text-[10px] text-gray-500 font-bold uppercase tracking-tighter opacity-60">
-                                                    Mã đơn hàng
-                                                </p>
-                                                <div
-                                                    onClick={() => handleCopy(selectedTx.pay_txt_code)}
-                                                    className="flex items-center gap-2 cursor-pointer group/order"
-                                                    title="Click to copy"
-                                                >
-                                                    <span className="font-mono text-blue-300 font-bold tracking-tight italic whitespace-nowrap group-hover/order:text-blue-200 transition-colors">
-                                                        {selectedTx.pay_txt_code}
-                                                    </span>
-                                                    <div className="p-1 group-hover/order:bg-white/10 rounded text-gray-500 group-hover/order:text-white transition-colors">
-                                                        <Copy size={12} />
-                                                    </div>
-                                                </div>
-                                            </div>
-
-                                            <div className="space-y-1 text-right">
-                                                <p className="text-[10px] text-gray-500 font-bold uppercase tracking-tighter opacity-60">
-                                                    Phương thức
-                                                </p>
-                                                <p className="font-bold text-white uppercase">{selectedTx.method}</p>
-                                            </div>
-
-                                            <div className="space-y-1">
-                                                <p className="text-[10px] text-gray-500 font-bold uppercase tracking-tighter opacity-60">
                                                     {selectedTx.payment_status === 'paid' ? 'Ngày thanh toán' : 'Ngày đặt vé'}
                                                 </p>
                                                 <p className="text-white font-medium">
@@ -1269,25 +1241,21 @@ export default function Account() {
                                                 </p>
                                             </div>
 
-                                            <div className="space-y-1 text-right">
-                                                {selectedTx.is_used ? (
-                                                    <>
-                                                        <p className="text-[10px] text-blue-400 font-bold uppercase tracking-tighter">
-                                                            Đã dùng vào lúc
-                                                        </p>
-                                                        <p className="text-blue-300 font-bold italic">{formatDateTime(selectedTx.updated_at)}</p>
-                                                    </>
-                                                ) : (
-                                                    selectedTx.expiry_date && (
-                                                        <>
-                                                            <p className="text-[10px] text-gray-500 font-bold uppercase tracking-tighter opacity-60">
-                                                                Ngày hết hạn
-                                                            </p>
-                                                            <p className="text-red-400 font-bold">{formatDateTime(selectedTx.expiry_date)}</p>
-                                                        </>
-                                                    )
-                                                )}
-                                            </div>
+                                            {selectedTx.is_used ? (
+                                                <div className="space-y-1 text-right">
+                                                    <p className="text-[10px] text-blue-400 font-bold uppercase tracking-tighter">
+                                                        Đã dùng vào lúc
+                                                    </p>
+                                                    <p className="text-blue-300 font-bold italic">{formatDateTime(selectedTx.updated_at)}</p>
+                                                </div>
+                                            ) : selectedTx.expiry_date ? (
+                                                <div className="space-y-1 text-right">
+                                                    <p className="text-[10px] text-gray-500 font-bold uppercase tracking-tighter opacity-60">
+                                                        Ngày hết hạn
+                                                    </p>
+                                                    <p className="text-red-400 font-bold">{formatDateTime(selectedTx.expiry_date)}</p>
+                                                </div>
+                                            ) : null}
 
                                             <div className="col-span-2 flex flex-col gap-2 pt-4 mt-2 border-t border-white/5">
                                                 {selectedTx.discount_amount > 0 && (

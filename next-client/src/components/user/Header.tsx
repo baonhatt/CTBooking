@@ -237,15 +237,15 @@ export default function Header({
                         : 'bg-gradient-to-b from-black/90 via-black/60 to-transparent border-b border-white/5'
             )}
         >
-            <div className="container mx-auto px-3 sm:px-4 lg:px-8 py-3.5 flex items-center justify-between gap-2 sm:gap-4 max-w-full">
+            <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-3 sm:py-3.5 flex items-center justify-between gap-2 sm:gap-4">
                 {/* Logo */}
-                <div className="flex items-center gap-3 animate-fade-in shrink-0">
+                <div className="flex items-center gap-2 sm:gap-3 animate-fade-in shrink-0">
                     <img
                         onClick={handleLogoClick}
                         src="/logo.svg"
                         width={72}
                         height={72}
-                        className="cursor-pointer h-10 md:h-12 lg:h-14 w-auto drop-shadow-[0_0_20px_rgba(59,130,246,0.5)] transition-transform duration-300 hover:scale-105"
+                        className="cursor-pointer h-8 sm:h-10 md:h-12 lg:h-14 w-auto drop-shadow-[0_0_20px_rgba(59,130,246,0.5)] transition-transform duration-300 hover:scale-105"
                         alt="Cinesphere logo"
                     />
                 </div>
@@ -277,20 +277,20 @@ export default function Header({
                 </nav>
 
                 {/* Right Actions / Utilities Cluster */}
-                <div className="flex items-center gap-2.5 sm:gap-3.5 animate-fade-in delay-200 shrink-0">
+                <div className="flex items-center gap-1.5 sm:gap-3.5 animate-fade-in delay-200 shrink-0">
                     {/* Branch Selector Chip */}
                     {selectedBranch && branches.length > 1 && (
                         <DropdownMenu>
                             <DropdownMenuTrigger
                                 disabled={isBookingFlow}
                                 className={cn(
-                                    'group relative hidden sm:flex items-center gap-2 px-3.5 py-1.5 rounded-full text-xs font-semibold text-slate-200 hover:text-white transition-all duration-300 bg-white/[0.07] hover:bg-white/[0.14] border border-white/15 hover:border-cyan-400/50 backdrop-blur-md outline-none focus:outline-none select-none',
+                                    'group relative flex items-center gap-1 sm:gap-2 h-8 sm:h-9 px-2.5 sm:px-3.5 rounded-full text-[11px] sm:text-xs font-semibold text-slate-200 hover:text-white transition-all duration-300 bg-white/[0.07] hover:bg-white/[0.14] border border-white/15 hover:border-cyan-400/50 backdrop-blur-md outline-none focus:outline-none select-none',
                                     isBookingFlow ? 'opacity-60 cursor-not-allowed' : 'cursor-pointer'
                                 )}
                             >
-                                <MapPin className="w-3.5 h-3.5 text-cyan-400 group-hover:scale-110 transition-transform" />
-                                <span className="max-w-[140px] truncate">{selectedBranch.name}</span>
-                                <ChevronDown className="w-3 h-3 text-slate-400 group-hover:text-white transition-transform duration-200 group-data-[state=open]:rotate-180" />
+                                <MapPin className="w-3.5 h-3.5 text-cyan-400 group-hover:scale-110 transition-transform shrink-0" />
+                                <span className="max-w-[70px] min-[380px]:max-w-[100px] sm:max-w-[140px] truncate">{selectedBranch.name}</span>
+                                <ChevronDown className="w-3 h-3 text-slate-400 group-hover:text-white transition-transform duration-200 group-data-[state=open]:rotate-180 shrink-0" />
                             </DropdownMenuTrigger>
                             <DropdownMenuContent
                                 side="bottom"
@@ -333,7 +333,7 @@ export default function Header({
                         type="button"
                         onClick={openCart}
                         aria-label="Giỏ hàng"
-                        className="relative flex items-center gap-2 text-slate-200 hover:text-white transition-all duration-200 font-semibold text-xs px-3 sm:px-3.5 py-1.5 sm:py-2 rounded-full bg-white/[0.07] hover:bg-white/[0.14] border border-white/15 hover:border-cyan-400/50 hover:shadow-[0_0_15px_rgba(6,182,212,0.25)] touch-manipulation select-none active:scale-95 group"
+                        className="relative flex items-center justify-center gap-1.5 text-slate-200 hover:text-white transition-all duration-200 font-semibold text-xs h-8 sm:h-9 px-2.5 sm:px-3.5 rounded-full bg-white/[0.07] hover:bg-white/[0.14] border border-white/15 hover:border-cyan-400/50 hover:shadow-[0_0_15px_rgba(6,182,212,0.25)] touch-manipulation select-none active:scale-95 group"
                     >
                         <ShoppingCart className="w-4 h-4 text-cyan-400 group-hover:scale-110 transition-transform" />
                         <span className="hidden sm:inline">Giỏ hàng</span>
