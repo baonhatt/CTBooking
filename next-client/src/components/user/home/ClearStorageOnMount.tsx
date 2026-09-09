@@ -7,7 +7,7 @@ export default function ClearStorageOnMount() {
     try {
       localStorage.removeItem('pendingOrder');
       localStorage.removeItem('lastCheckoutOrder');
-      localStorage.removeItem('lastVnpayBookingId');
+
     } catch {}
   }, []);
 

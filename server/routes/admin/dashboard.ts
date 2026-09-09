@@ -1,4 +1,4 @@
-import { count, sum, eq, inArray, and, or, gte, lte, gt, sql, isNull } from 'drizzle-orm';
+import { count, sum, eq, inArray, and, or, gte, lte, gt, sql, isNull, isNotNull } from 'drizzle-orm';
 import { formatDateForDb } from '../../../server/lib/date-utils';
 import { sqlBranchIdsStaffAccessFilter } from '../../../server/lib/branch-ids';
 
@@ -16,7 +16,7 @@ function buildBranchMovieCondition(moviesTable: any, restrictToBranchIds: number
 
 export async function getDashboardMetricsImpl(
   anyDb: any,
-  tables: { movies: any; toys?: any; users: any; bookings: any; ticket_packages: any; branches?: any },
+  tables: { movies: any; toys?: any; users: any; bookings: any; ticket_packages: any; branches?: any; booking_vr_items?: any; voucher_redemption_logs?: any },
   topPeriod: string = 'week',
   year?: number,
   restrictToBranchIds: number[] | null = null
@@ -111,28 +111,7 @@ export async function getDashboardMetricsImpl(
         branchConditionBookings
       )
     );
-  const [revenueMomoYearAgg] = await anyDb
-    .select({ sum: sum(tables.bookings.total_price) })
-    .from(tables.bookings)
-    .where(
-      and(
-        inArray(tables.bookings.payment_status, ['paid']),
-        inArray(tables.bookings.payment_method, ['momo', 'MoMo']),
-        yearCondition,
-        branchConditionBookings
-      )
-    );
-  const [revenueVnpayYearAgg] = await anyDb
-    .select({ sum: sum(tables.bookings.total_price) })
-    .from(tables.bookings)
-    .where(
-      and(
-        inArray(tables.bookings.payment_status, ['paid']),
-        inArray(tables.bookings.payment_method, ['vnpay', 'VNPay']),
-        yearCondition,
-        branchConditionBookings
-      )
-    );
+
   const [revenueVietqrYearAgg] = await anyDb
     .select({ sum: sum(tables.bookings.total_price) })
     .from(tables.bookings)
@@ -147,8 +126,6 @@ export async function getDashboardMetricsImpl(
 
   const revenueByMethod = {
     cash: Number(revenueCashYearAgg?.sum || 0),
-    momo: Number(revenueMomoYearAgg?.sum || 0),
-    vnpay: Number(revenueVnpayYearAgg?.sum || 0),
     vietqr: Number(revenueVietqrYearAgg?.sum || 0)
   };
 
@@ -164,28 +141,7 @@ export async function getDashboardMetricsImpl(
         branchConditionBookings
       )
     );
-  const [momoYearAgg] = await anyDb
-    .select({ sum: sum(tables.bookings.total_price), count: count() })
-    .from(tables.bookings)
-    .where(
-      and(
-        inArray(tables.bookings.payment_status, ['paid']),
-        inArray(tables.bookings.payment_method, ['momo', 'MoMo']),
-        yearCondition,
-        branchConditionBookings
-      )
-    );
-  const [vnpayYearAgg] = await anyDb
-    .select({ sum: sum(tables.bookings.total_price), count: count() })
-    .from(tables.bookings)
-    .where(
-      and(
-        inArray(tables.bookings.payment_status, ['paid']),
-        inArray(tables.bookings.payment_method, ['vnpay', 'VNPay']),
-        yearCondition,
-        branchConditionBookings
-      )
-    );
+
   const [vietqrYearAgg] = await anyDb
     .select({ sum: sum(tables.bookings.total_price), count: count() })
     .from(tables.bookings)
@@ -200,8 +156,6 @@ export async function getDashboardMetricsImpl(
 
   const paymentStats = [
     { method: 'CASH', revenue: Number(cashYearAgg?.sum || 0), count: Number(cashYearAgg?.count || 0) },
-    { method: 'MOMO', revenue: Number(momoYearAgg?.sum || 0), count: Number(momoYearAgg?.count || 0) },
-    { method: 'VNPAY', revenue: Number(vnpayYearAgg?.sum || 0), count: Number(vnpayYearAgg?.count || 0) },
     { method: 'VIETQR', revenue: Number(vietqrYearAgg?.sum || 0), count: Number(vietqrYearAgg?.count || 0) }
   ].sort((a, b) => b.revenue - a.revenue);
 
@@ -229,10 +183,12 @@ export async function getDashboardMetricsImpl(
 
   const topBookings = await anyDb
     .select({
+      id: tables.bookings.id,
       ticket_package_id: tables.bookings.ticket_package_id,
-      total_price: tables.bookings.total_price,
       ticket_package_name: tables.bookings.ticket_package_name,
-      ticket_count: tables.bookings.ticket_count
+      ticket_count: tables.bookings.ticket_count,
+      ticket_unit_price: tables.bookings.ticket_unit_price,
+      booking_type: tables.bookings.booking_type,
     })
     .from(tables.bookings)
     .where(
@@ -253,17 +209,91 @@ export async function getDashboardMetricsImpl(
     );
 
   const map = new Map<number, { title: string; revenue: number; count: number }>();
+  
+  // 1. Process standard Movie bookings (potentially containing JSON arrays)
   for (const b of topBookings) {
-    const pkgId = b.ticket_package_id;
-    const title = b.ticket_package_name || 'Gói không tên';
-    const price = Number(b.total_price || 0);
-    const tCount = Number(b.ticket_count || 0);
-    if (pkgId) {
-      const prev = map.get(pkgId) || { title, revenue: 0, count: 0 };
-      prev.revenue += price;
-      prev.count += tCount;
-      prev.title = title || prev.title;
-      map.set(pkgId, prev);
+    if (b.booking_type === 'vr' || b.booking_type === 'combo_vr') continue; // Handled separately
+    
+    let items: any[] = [];
+    const nameStr = typeof b.ticket_package_name === 'string' ? b.ticket_package_name.trim() : '';
+
+    if (nameStr.startsWith('[') || nameStr.startsWith('{')) {
+      try {
+        const parsed = JSON.parse(nameStr);
+        items = Array.isArray(parsed) ? parsed : [parsed];
+      } catch {
+        // Fallback to simple logic if JSON parsing fails
+      }
+    }
+    
+    if (items.length > 0) {
+      // It's a multiplex booking
+      for (const it of items) {
+        const pkgId = Number(it.package_id);
+        const title = it.name || 'Gói không tên';
+        const price = Number(it.price || 0);
+        const tCount = Number(it.quantity || 1);
+        
+        if (pkgId && !isNaN(pkgId)) {
+          const prev = map.get(pkgId) || { title, revenue: 0, count: 0 };
+          prev.revenue += price * tCount;
+          prev.count += tCount;
+          prev.title = title || prev.title;
+          map.set(pkgId, prev);
+        }
+      }
+    } else {
+      // Simple booking
+      const pkgId = b.ticket_package_id;
+      const title = nameStr || 'Gói không tên';
+      const price = Number(b.ticket_unit_price || 0); // Using unit price instead of total_price
+      const tCount = Number(b.ticket_count || 0);
+      
+      if (pkgId) {
+        const prev = map.get(pkgId) || { title, revenue: 0, count: 0 };
+        prev.revenue += price * tCount;
+        prev.count += tCount;
+        prev.title = title || prev.title;
+        map.set(pkgId, prev);
+      }
+    }
+  }
+
+  // 2. Fetch and merge VR items
+  if (tables.booking_vr_items && topBookings.length > 0) {
+    const vrBookings = topBookings.filter((b) => b.booking_type === 'vr' || b.booking_type === 'combo_vr');
+    const vrBookingIds = vrBookings.map((b) => b.id);
+    
+    if (vrBookingIds.length > 0) {
+      // Split into chunks of 100 to avoid 'too many variables' error in SQL
+      const chunkSize = 100;
+      for (let i = 0; i < vrBookingIds.length; i += chunkSize) {
+        const chunk = vrBookingIds.slice(i, i + chunkSize);
+        const vrItems = await anyDb
+          .select({
+            vr_ticket_package_id: tables.booking_vr_items.vr_ticket_package_id,
+            package_name: tables.booking_vr_items.package_name,
+            quantity: tables.booking_vr_items.quantity,
+            unit_price: tables.booking_vr_items.unit_price,
+          })
+          .from(tables.booking_vr_items)
+          .where(inArray(tables.booking_vr_items.booking_id, chunk));
+
+        for (const it of vrItems) {
+          const pkgId = it.vr_ticket_package_id;
+          const title = it.package_name || 'Gói VR';
+          const price = Number(it.unit_price || 0);
+          const tCount = Number(it.quantity || 1);
+          
+          if (pkgId) {
+            const prev = map.get(pkgId) || { title, revenue: 0, count: 0 };
+            prev.revenue += price * tCount;
+            prev.count += tCount;
+            prev.title = title || prev.title;
+            map.set(pkgId, prev);
+          }
+        }
+      }
     }
   }
 
@@ -325,7 +355,7 @@ export async function getDashboardMetricsImpl(
     topVipUsers,
     ticketUsage: await (async () => {
       const [used] = await anyDb
-        .select({ count: count() })
+        .select({ sum: sum(tables.bookings.ticket_count) })
         .from(tables.bookings)
         .where(
           and(
@@ -336,27 +366,34 @@ export async function getDashboardMetricsImpl(
           )
         );
       const [total] = await anyDb
-        .select({ count: count() })
+        .select({ sum: sum(tables.bookings.ticket_count) })
         .from(tables.bookings)
         .where(and(inArray(tables.bookings.payment_status, ['paid']), yearCondition, branchConditionBookings));
-      return { used: used?.count || 0, total: total?.count || 0 };
+      return { used: Number(used?.sum || 0), total: Number(total?.sum || 0) };
     })(),
     paymentHealth: await (async () => {
-      const [paid] = await anyDb
-        .select({ count: count() })
-        .from(tables.bookings)
-        .where(and(inArray(tables.bookings.payment_status, ['paid']), yearCondition, branchConditionBookings));
-      const [pending] = await anyDb
-        .select({ count: count() })
-        .from(tables.bookings)
-        .where(and(inArray(tables.bookings.payment_status, ['pending']), yearCondition, branchConditionBookings));
-      const [failed] = await anyDb
-        .select({ count: count() })
+      const rows = await anyDb
+        .select({
+          status: tables.bookings.payment_status,
+          cnt: count()
+        })
         .from(tables.bookings)
         .where(
-          and(inArray(tables.bookings.payment_status, ['failed', 'expired']), yearCondition, branchConditionBookings)
-        );
-      return { paid: paid?.count || 0, pending: pending?.count || 0, failed: failed?.count || 0 };
+          and(
+            inArray(tables.bookings.payment_status, ['paid', 'pending', 'failed', 'expired']),
+            yearCondition,
+            branchConditionBookings
+          )
+        )
+        .groupBy(tables.bookings.payment_status);
+
+      let paid = 0, pending = 0, failed = 0;
+      for (const r of rows) {
+        if (r.status === 'paid') paid += Number(r.cnt || 0);
+        else if (r.status === 'pending') pending += Number(r.cnt || 0);
+        else failed += Number(r.cnt || 0);
+      }
+      return { paid, pending, failed };
     })(),
     bookingHours: await (async () => {
       // For cross-platform safety (Postgres vs SQLite/D1), we fetch hours of paid bookings and aggregate in JS
@@ -372,6 +409,122 @@ export async function getDashboardMetricsImpl(
         if (hour >= 0 && hour < 24) hours[hour]++;
       });
       return hours;
+    })(),
+    revenueBreakdown: await (async () => {
+      let movie = 0, vr = 0, combo = 0;
+      const allBookings = await anyDb
+        .select({
+           id: tables.bookings.id,
+           total_price: tables.bookings.total_price,
+           booking_type: tables.bookings.booking_type,
+           ticket_unit_price: tables.bookings.ticket_unit_price,
+           ticket_count: tables.bookings.ticket_count,
+           ticket_package_name: tables.bookings.ticket_package_name
+        })
+        .from(tables.bookings)
+        .where(and(inArray(tables.bookings.payment_status, ['paid']), yearCondition, branchConditionBookings));
+
+      // Fetch all VR items for these
+      let vrItemsData: any[] = [];
+      const vrBookingIds = allBookings.filter((b: any) => b.booking_type === 'vr' || b.booking_type === 'combo_vr').map((b: any) => b.id);
+      
+      if (tables.booking_vr_items && vrBookingIds.length > 0) {
+        const chunk = 100;
+        for (let i = 0; i < vrBookingIds.length; i += chunk) {
+          const slice = vrBookingIds.slice(i, i + chunk);
+          const chunkItems = await anyDb.select({
+             booking_id: tables.booking_vr_items.booking_id,
+             unit_price: tables.booking_vr_items.unit_price,
+             quantity: tables.booking_vr_items.quantity
+          }).from(tables.booking_vr_items).where(inArray(tables.booking_vr_items.booking_id, slice));
+          vrItemsData.push(...chunkItems);
+        }
+      }
+
+      for (const b of allBookings) {
+         let currentTicketRev = 0;
+         if (b.booking_type !== 'vr' && b.booking_type !== 'combo_vr') {
+            const nameStr = typeof b.ticket_package_name === 'string' ? b.ticket_package_name.trim() : '';
+            if (nameStr.startsWith('[') || nameStr.startsWith('{')) {
+              try {
+                const parsed = JSON.parse(nameStr);
+                const items = Array.isArray(parsed) ? parsed : [parsed];
+                for (const it of items) currentTicketRev += Number(it.price || 0) * Number(it.quantity || 1);
+              } catch {}
+            } else {
+               currentTicketRev += Number(b.ticket_unit_price || 0) * Number(b.ticket_count || 0);
+            }
+            movie += currentTicketRev;
+         }
+         
+         const bVrItems = vrItemsData.filter(v => v.booking_id === b.id);
+         let curVrRev = 0;
+         for (const v of bVrItems) curVrRev += Number(v.unit_price || 0) * Number(v.quantity || 1);
+         vr += curVrRev;
+
+         const currentComboRev = Number(b.total_price || 0) - (currentTicketRev + curVrRev);
+         if (currentComboRev > 0) combo += currentComboRev;
+      }
+      return { movie, vr, combo };
+    })(),
+    checkinTraffic: await (async () => {
+      const arr = Array(7).fill(0); // Sun(0) to Sat(6)
+      const res = await anyDb.select({ checked_in_at: tables.bookings.checked_in_at }).from(tables.bookings).where(and(inArray(tables.bookings.payment_status, ['paid']), eq(tables.bookings.is_used, true), isNotNull(tables.bookings.checked_in_at), yearCondition, branchConditionBookings));
+      res.forEach((r: any) => {
+         const d = new Date(r.checked_in_at).getDay();
+         if (d >= 0 && d <= 6) arr[d]++;
+      });
+      return arr;
+    })(),
+    voucherImpact: await (async () => {
+       if (!tables.voucher_redemption_logs) return 0;
+       
+       let yearConditionRedeemed = undefined as any;
+       if (year !== undefined) {
+         const yearStart = new Date(year, 0, 1, 0, 0, 0, 0);
+         const yearEnd = new Date(year, 11, 31, 23, 59, 59, 999);
+         yearConditionRedeemed = and(
+           gte(tables.voucher_redemption_logs.redeemed_at, formatDateForDb(yearStart)),
+           lte(tables.voucher_redemption_logs.redeemed_at, formatDateForDb(yearEnd))
+         );
+       }
+       
+       const [res] = await anyDb.select({ total: sum(tables.voucher_redemption_logs.discount_amount_applied) }).from(tables.voucher_redemption_logs).where(yearConditionRedeemed);
+       return Number(res?.total || 0);
+    })(),
+    ticketBurnRate: await (async () => {
+      let totalHoldMs = 0;
+      let count = 0;
+      const res = await anyDb.select({ paid_at: tables.bookings.paid_at, checked_in_at: tables.bookings.checked_in_at }).from(tables.bookings).where(and(inArray(tables.bookings.payment_status, ['paid']), eq(tables.bookings.is_used, true), isNotNull(tables.bookings.checked_in_at), isNotNull(tables.bookings.paid_at), yearCondition, branchConditionBookings));
+      res.forEach((r: any) => {
+         const diff = new Date(r.checked_in_at).getTime() - new Date(r.paid_at).getTime();
+         if (diff >= 0) { totalHoldMs += diff; count++; }
+      });
+      const avgHours = count > 0 ? (totalHoldMs / count / 3600000) : 0;
+      return avgHours;
+    })(),
+    customerRetention: await (async () => {
+       const usersInPeriod = await anyDb.select({ user_id: tables.bookings.user_id }).from(tables.bookings).where(and(inArray(tables.bookings.payment_status, ['paid']), isNotNull(tables.bookings.user_id), yearCondition, branchConditionBookings));
+       const distinctIds = Array.from(new Set(usersInPeriod.map((u: any) => u.user_id)));
+       if (distinctIds.length === 0) return { newUsers: 0, returningUsers: 0 };
+       
+       let newUsers = 0;
+       let returningUsers = 0;
+       const chunk = 100;
+       for(let i = 0; i<distinctIds.length; i+=chunk) {
+          const slice = distinctIds.slice(i, i+chunk);
+          const usrs = await anyDb.select({ id: tables.users.id, created_at: tables.users.created_at }).from(tables.users).where(inArray(tables.users.id, slice));
+          usrs.forEach((u: any) => {
+             const cAt = new Date(u.created_at);
+             if (year) {
+               if (cAt.getFullYear() === year) newUsers++;
+               else returningUsers++;
+             } else {
+               returningUsers++; // fallback when selecting 'all time'
+             }
+          });
+       }
+       return { newUsers, returningUsers };
     })()
   };
 }
@@ -431,14 +584,7 @@ export async function getRevenueByDateImpl(
     .select({ sum: sum(tables.bookings.total_price) })
     .from(tables.bookings)
     .where(and(whereCondition, inArray(tables.bookings.payment_method, ['cash', 'Cash'])));
-  const [revenueMomoAgg] = await anyDb
-    .select({ sum: sum(tables.bookings.total_price) })
-    .from(tables.bookings)
-    .where(and(whereCondition, inArray(tables.bookings.payment_method, ['momo', 'MoMo'])));
-  const [revenueVnpayAgg] = await anyDb
-    .select({ sum: sum(tables.bookings.total_price) })
-    .from(tables.bookings)
-    .where(and(whereCondition, inArray(tables.bookings.payment_method, ['vnpay', 'VNPay'])));
+
   const [revenueVietqrAgg] = await anyDb
     .select({ sum: sum(tables.bookings.total_price) })
     .from(tables.bookings)
@@ -450,8 +596,6 @@ export async function getRevenueByDateImpl(
     count: countVal,
     revenueByMethod: {
       cash: Number(revenueCashAgg?.sum || 0),
-      momo: Number(revenueMomoAgg?.sum || 0),
-      vnpay: Number(revenueVnpayAgg?.sum || 0),
       vietqr: Number(revenueVietqrAgg?.sum || 0)
     }
   };
@@ -547,14 +691,7 @@ export async function getRevenueByMonthImpl(
       .select({ sum: sum(tables.bookings.total_price) })
       .from(tables.bookings)
       .where(and(whereMonth, inArray(tables.bookings.payment_method, ['cash', 'Cash'])));
-    const [revenueMomoAgg] = await anyDb
-      .select({ sum: sum(tables.bookings.total_price) })
-      .from(tables.bookings)
-      .where(and(whereMonth, inArray(tables.bookings.payment_method, ['momo', 'MoMo'])));
-    const [revenueVnpayAgg] = await anyDb
-      .select({ sum: sum(tables.bookings.total_price) })
-      .from(tables.bookings)
-      .where(and(whereMonth, inArray(tables.bookings.payment_method, ['vnpay', 'VNPay'])));
+
     const [revenueVietqrAgg] = await anyDb
       .select({ sum: sum(tables.bookings.total_price) })
       .from(tables.bookings)
@@ -565,8 +702,6 @@ export async function getRevenueByMonthImpl(
       count: countRes?.count || 0,
       revenueByMethod: {
         cash: Number(revenueCashAgg?.sum || 0),
-        momo: Number(revenueMomoAgg?.sum || 0),
-        vnpay: Number(revenueVnpayAgg?.sum || 0),
         vietqr: Number(revenueVietqrAgg?.sum || 0)
       }
     };

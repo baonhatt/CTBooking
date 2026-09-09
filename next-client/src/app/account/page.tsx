@@ -124,8 +124,6 @@ export default function Account() {
   const pageSize = 5;
   const [detailCountdown, setDetailCountdown] = useState<string | null>(null);
   const PAYMENT_METHODS_DISPLAY: Record<string, string> = {
-    momo: 'Ví MoMo',
-    vnpay: 'VNPay',
     vietqr: 'Chuyển khoản VietQR',
     card: 'Thẻ ngân hàng'
   };

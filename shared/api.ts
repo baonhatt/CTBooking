@@ -62,7 +62,7 @@ export interface PaymentRequest {
   combo?: number[];
   movie_items?: { package_id: number; quantity: number }[];
   ticketCount: number;
-  paymentMethod: 'cash' | 'momo' | 'vnpay' | 'vietqr';
+  paymentMethod: 'cash' | 'vietqr';
   totalPrice?: number;
   ticketPackageId?: number;
   pay_txt_code?: string;
@@ -105,7 +105,7 @@ export interface VRBookingRequest {
   vr_items: VRPackageItem[];
   voucher_code?: string;
   branch_id?: number;
-  paymentMethod: 'cash' | 'momo' | 'vnpay' | 'vietqr';
+  paymentMethod: 'cash' | 'vietqr';
   pay_txt_code?: string;
 }
 

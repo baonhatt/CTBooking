@@ -12,7 +12,7 @@ import { eq, desc, asc, and, like, or, sql, count } from 'drizzle-orm';
 
 import type { D1Database, R2Bucket } from '@cloudflare/workers-types';
 
-import { requireAuth, requireStaffAuth, requirePermission } from './middleware';
+import { requireAuth, requireStaffAuth, requirePermission, rateLimiter } from './middleware';
 
 import { getAllActiveMoviesToday, listMovies, getMovie } from '../../server/routes/user/movies';
 
@@ -90,10 +90,6 @@ import {
 } from '../../server/routes/admin/site-media';
 
 import { getAdminSettingsImpl, updateAdminSettingsImpl } from '../../server/routes/admin/settings';
-
-import { createMomoPaymentImpl, momoIpnImpl } from '../../server/routes/user/momo';
-
-import { createVnpayPaymentImpl, vnpayIpnImpl } from '../../server/routes/user/vnpay';
 
 import {
   listUserTransactionsImpl,
@@ -269,7 +265,7 @@ type Bindings = {
   SUPER_ADMIN_PASSWORD: string;
   SUPER_ADMIN_FULLNAME: string;
 
-  AI: any; // Cloudflare Workers AI binding
+
 };
 
 const getCloudHelpers = (c: Context, env: Bindings) => {
@@ -300,6 +296,8 @@ const getCloudHelpers = (c: Context, env: Bindings) => {
 };
 
 const app = new Hono<{ Variables: Variables; Bindings: Bindings }>();
+
+
 
 // 1. CORS Middleware - MUST BE THE VERY FIRST MIDDLEWARE
 app.use(
@@ -360,6 +358,11 @@ app.use(
     credentials: true
   })
 );
+
+// API NAMESPACE LOCKS
+// Prevents any accidental exposition of admin or user endpoints due to missing trailing middlewares
+app.use('/api/admin/*', requireStaffAuth);
+
 
 // 2. DEBUG: Global Request Logger
 app.use('*', async (c, next) => {
@@ -493,7 +496,7 @@ app.get('/api/demo', (c) => {
 
 // Body: { email: string, password: string }
 
-app.post('/api/login', async (c) => {
+app.post('/api/login', rateLimiter(5, 60), async (c) => {
   try {
     const db = drizzle(c.env.cinema_db, { schema });
 
@@ -581,7 +584,7 @@ app.post('/api/login', async (c) => {
 
 // Body: { temp_account_id: number, otp: string }
 
-app.post('/api/validate-otp', async (c) => {
+app.post('/api/validate-otp', rateLimiter(5, 60), async (c) => {
   try {
     const db = drizzle(c.env.cinema_db, { schema });
 
@@ -644,7 +647,7 @@ app.post('/api/validate-otp', async (c) => {
 
 // Body: { temp_account_id: number, email: string }
 
-app.post('/api/resend-otp', async (c) => {
+app.post('/api/resend-otp', rateLimiter(5, 60), async (c) => {
   try {
     const db = drizzle(c.env.cinema_db, { schema });
 
@@ -1089,7 +1092,11 @@ app.get('/api/admin/dashboard/metrics', requireStaffAuth, requirePermission('das
 
         toys: schema.toys,
 
-        branches: schema.branches
+        branches: schema.branches,
+
+        booking_vr_items: schema.booking_vr_items,
+
+        voucher_redemption_logs: schema.voucher_redemption_logs
       },
 
       period,
@@ -3539,673 +3546,7 @@ app.get('/api/debug/test-mail', async (c) => {
   return c.json(res);
 });
 
-// Create MoMo payment request
 
-// POST /api/payments/momo/create
-
-// Body: { amount: number, orderId: string, orderInfo: string, ... }
-
-app.post('/api/momo/create-payment', async (c) => {
-  try {
-    const body = await c.req.json().catch(() => ({}));
-
-    // 1) redirectUrl: ưu tiên lấy từ client (để support preview domain), nhưng phải kiểm tra hostname
-
-    const rawRedirectFromClient = String((body as any)?.redirectUrl || '');
-
-    let redirectUrl = '';
-
-    const allowHost = (host: string) =>
-      host === 'cinesphere.com.vn' ||
-      host === 'www.cinesphere.com.vn' ||
-      host === 'cinema-pages.pages.dev' ||
-      host.endsWith('.cinema-pages.pages.dev');
-
-    if (rawRedirectFromClient) {
-      try {
-        const u = new URL(rawRedirectFromClient);
-
-        if (allowHost(u.hostname)) {
-          redirectUrl = u.toString();
-        }
-      } catch {
-        // ignore, sẽ fallback phía dưới
-      }
-    }
-
-    // Fallback: Thử lấy từ Origin header của request (Dynamic cho Preview)
-
-    if (!redirectUrl) {
-      const origin = c.req.header('Origin');
-
-      if (origin) {
-        try {
-          const u = new URL(origin);
-
-          if (allowHost(u.hostname)) {
-            const redirectPath = c.env.VITE_MOMO_REDIRECT_URL || '/checkout';
-
-            redirectUrl = `${origin}${redirectPath}`;
-          }
-        } catch {}
-      }
-    }
-
-    // Fallback: build từ env nếu client không gửi hoặc không hợp lệ
-
-    if (!redirectUrl) {
-      const clientBase = c.env.VITE_CLIENT_BASE_URL || 'https://cinesphere.com.vn';
-
-      const redirectPath = c.env.VITE_MOMO_REDIRECT_URL || '/checkout';
-
-      redirectUrl = redirectPath.startsWith('http') ? redirectPath : `${clientBase}${redirectPath}`;
-    }
-
-    // 2) ipnUrl: luôn dùng server base (không tin client, tránh bị đổi IPN)
-
-    const serverBase = c.env.VITE_SERVER_BASE_URL || 'https://cinesphere.com.vn';
-
-    const ipnPath = c.env.VITE_MOMO_IPN_URL || '/api/momo/ipn';
-
-    const ipnUrl = ipnPath.startsWith('http') ? ipnPath : `${serverBase}${ipnPath}`;
-
-    const config = {
-      partnerCode: c.env.VITE_MOMO_PARTNER_CODE,
-
-      accessKey: c.env.VITE_MOMO_ACCESS_KEY,
-
-      secretKey: c.env.VITE_MOMO_SECRET_KEY,
-
-      endpoint: c.env.VITE_MOMO_ENDPOINT,
-
-      redirectUrl,
-
-      ipnUrl
-    };
-
-    const r = await createMomoPaymentImpl({ ...body, ...config } as any);
-
-    const status = typeof (r as any).status === 'number' ? (r as any).status : 200;
-
-    const payload = {
-      ...(r as any),
-
-      status: status >= 400 ? 'error' : 'success'
-    };
-
-    return c.json(payload, status as any);
-  } catch (err: any) {
-    return c.json({ message: err?.message || 'Internal error' }, 500);
-  }
-});
-
-app.post('/api/momo/ipn', async (_c) => {
-  try {
-    const r = await momoIpnImpl();
-
-    return new Response(JSON.stringify(r), {
-      status: 200,
-
-      headers: { 'Content-Type': 'application/json' }
-    });
-  } catch {
-    return new Response(JSON.stringify({ result: false }), {
-      status: 500,
-
-      headers: { 'Content-Type': 'application/json' }
-    });
-  }
-});
-
-app.post('/api/vnpay/create-payment', async (c) => {
-  try {
-    const body = await c.req.json().catch(() => ({}));
-
-    const ip = c.req.header('CF-Connecting-IP') || '127.0.0.1';
-
-    // returnUrl phải là URL frontend (nơi user quay lại)
-
-    const rawReturnFromClient = String((body as any)?.returnUrl || '');
-
-    let returnUrl = '';
-
-    const allowHost = (host: string) =>
-      host === 'cinesphere.com.vn' ||
-      host === 'www.cinesphere.com.vn' ||
-      host === 'cinema-pages.pages.dev' ||
-      host.endsWith('.cinema-pages.pages.dev');
-
-    if (rawReturnFromClient) {
-      try {
-        const u = new URL(rawReturnFromClient);
-
-        if (allowHost(u.hostname)) {
-          returnUrl = u.toString();
-        }
-      } catch {
-        // ignore
-      }
-    }
-
-    // Fallback: Thử lấy từ Origin header
-
-    if (!returnUrl) {
-      const origin = c.req.header('Origin');
-
-      if (origin) {
-        try {
-          const u = new URL(origin);
-
-          if (allowHost(u.hostname)) {
-            const returnPath = c.env.VITE_VNPAY_RETURN_URL || '/checkout';
-
-            returnUrl = `${origin}${returnPath}`;
-          }
-        } catch {}
-      }
-    }
-
-    if (!returnUrl) {
-      const clientBase = c.env.VITE_CLIENT_BASE_URL || 'https://cinesphere.com.vn';
-
-      const returnPath = c.env.VITE_VNPAY_RETURN_URL || '/checkout';
-
-      returnUrl = returnPath.startsWith('http') ? returnPath : `${clientBase}${returnPath}`;
-    }
-
-    const config = {
-      tmnCode: c.env.VITE_VNPAY_TMN_CODE,
-
-      hashSecret: c.env.VITE_VNPAY_HASH_SECRET,
-
-      gateway: c.env.VITE_VNPAY_GATEWAY,
-
-      returnUrl
-    };
-
-    const r = await createVnpayPaymentImpl({ ...(body as any), ip, ...config });
-
-    const status = typeof (r as any).status === 'number' ? (r as any).status : 200;
-
-    const payload = {
-      ...(r as any),
-
-      status: status >= 400 ? 'error' : 'success'
-    };
-
-    return c.json(payload, status as any);
-  } catch (err: any) {
-    return c.json({ message: err?.message || 'Internal error' }, 500);
-  }
-});
-
-app.post('/api/vnpay/ipn', async (_c) => {
-  const r = await vnpayIpnImpl();
-
-  return new Response(JSON.stringify(r), {
-    status: 200,
-
-    headers: { 'Content-Type': 'application/json' }
-  });
-});
-
-// ===== AI ANALYTICS ENDPOINT =====
-
-// POST /api/ai-analytics
-
-// Body: { userMessage: string }
-
-app.post('/api/ai-analytics', async (c) => {
-  try {
-    if (!c.env.AI) {
-      return c.json({ error: 'AI binding khong kha dung.' }, 503);
-    }
-
-    const body = await c.req.json().catch(() => ({}));
-
-    const userMessage = String((body as any).userMessage || '').trim();
-
-    if (!userMessage) {
-      return c.json({ error: 'Thieu cau hoi (userMessage).' }, 400);
-    }
-
-    const db = drizzle(c.env.cinema_db, { schema });
-
-    // 1. Overall summary
-
-    const [sr] = await db
-
-      .select({
-        total_bookings: count(schema.bookings.id),
-
-        total_revenue: sql<number>`COALESCE(SUM(CASE WHEN ${schema.bookings.payment_status}='paid' THEN ${schema.bookings.total_price} ELSE 0 END),0)`,
-
-        paid_count: sql<number>`SUM(CASE WHEN ${schema.bookings.payment_status}='paid'    THEN 1 ELSE 0 END)`,
-
-        pending_count: sql<number>`SUM(CASE WHEN ${schema.bookings.payment_status}='pending' THEN 1 ELSE 0 END)`,
-
-        failed_count: sql<number>`SUM(CASE WHEN ${schema.bookings.payment_status}='failed'  THEN 1 ELSE 0 END)`,
-
-        used_tickets: sql<number>`SUM(CASE WHEN ${schema.bookings.is_used}=1 THEN 1 ELSE 0 END)`
-      })
-
-      .from(schema.bookings)
-
-      .all();
-
-    // 2. Revenue by payment method
-
-    const revenueByMethod = await db
-
-      .select({
-        method: schema.bookings.payment_method,
-
-        revenue: sql<number>`SUM(${schema.bookings.total_price})`,
-
-        cnt: count(schema.bookings.id)
-      })
-
-      .from(schema.bookings)
-
-      .where(eq(schema.bookings.payment_status, 'paid'))
-
-      .groupBy(schema.bookings.payment_method)
-
-      .all();
-
-    // 3. Top movies by bookings
-
-    const topMovies = await db
-
-      .select({
-        title: schema.bookings.movie_title,
-
-        bookings: count(schema.bookings.id),
-
-        revenue: sql<number>`SUM(CASE WHEN ${schema.bookings.payment_status}='paid' THEN ${schema.bookings.total_price} ELSE 0 END)`
-      })
-
-      .from(schema.bookings)
-
-      .where(sql`${schema.bookings.movie_title} IS NOT NULL`)
-
-      .groupBy(schema.bookings.movie_title)
-
-      .orderBy(desc(count(schema.bookings.id)))
-
-      .limit(10)
-
-      .all();
-
-    // 4. Peak booking hours (0-23)
-
-    const peakHours = await db
-
-      .select({
-        hour: sql<number>`CAST(strftime('%H',${schema.bookings.created_at}) AS INTEGER)`,
-
-        cnt: count(schema.bookings.id)
-      })
-
-      .from(schema.bookings)
-
-      .groupBy(sql`strftime('%H',${schema.bookings.created_at})`)
-
-      .orderBy(sql`strftime('%H',${schema.bookings.created_at})`)
-
-      .all();
-
-    // 5. Monthly revenue current year
-
-    const yr = new Date().getFullYear();
-
-    const monthlyRevenue = await db
-
-      .select({
-        month: sql<number>`CAST(strftime('%m',${schema.bookings.paid_at}) AS INTEGER)`,
-
-        revenue: sql<number>`SUM(${schema.bookings.total_price})`,
-
-        cnt: count(schema.bookings.id)
-      })
-
-      .from(schema.bookings)
-
-      .where(
-        and(
-          eq(schema.bookings.payment_status, 'paid'),
-
-          sql`strftime('%Y',${schema.bookings.paid_at})='${sql.raw(String(yr))}'`
-        )
-      )
-
-      .groupBy(sql`strftime('%m',${schema.bookings.paid_at})`)
-
-      .orderBy(sql`strftime('%m',${schema.bookings.paid_at})`)
-
-      .all();
-
-    // 6. Top ticket packages
-
-    const topPackages = await db
-
-      .select({
-        pkg: schema.bookings.ticket_package_name,
-
-        cnt: count(schema.bookings.id),
-
-        revenue: sql<number>`SUM(CASE WHEN ${schema.bookings.payment_status}='paid' THEN ${schema.bookings.total_price} ELSE 0 END)`
-      })
-
-      .from(schema.bookings)
-
-      .where(sql`${schema.bookings.ticket_package_name} IS NOT NULL`)
-
-      .groupBy(schema.bookings.ticket_package_name)
-
-      .orderBy(desc(count(schema.bookings.id)))
-
-      .limit(8)
-
-      .all();
-
-    // 7. Ticket Packages Catalog
-
-    const packagesCatalog = await db
-      .select({
-        name: schema.ticket_packages.name,
-
-        price: schema.ticket_packages.price,
-
-        combo: schema.ticket_packages.combo,
-
-        is_active: schema.ticket_packages.is_active
-      })
-      .from(schema.ticket_packages)
-      .all();
-
-    // 8. Active Movies
-
-    const activeMovies = await db
-      .select({
-        title: schema.movies.title
-      })
-      .from(schema.movies)
-      .where(eq(schema.movies.is_active, true))
-      .all();
-
-    // 9. Recent 30 Bookings
-
-    const recentBookings = await db
-      .select({
-        code: schema.bookings.booking_code,
-
-        name: schema.bookings.name,
-
-        email: schema.bookings.email,
-
-        movie: schema.bookings.movie_title,
-
-        pkg: schema.bookings.ticket_package_name,
-
-        price: schema.bookings.total_price,
-
-        status: schema.bookings.payment_status,
-
-        date: sql<string>`strftime('%Y-%m-%d %H:%M', ${schema.bookings.created_at})`
-      })
-      .from(schema.bookings)
-      .orderBy(desc(schema.bookings.created_at))
-      .limit(30)
-      .all();
-
-    // 10. Daily revenue last 30 days
-
-    const dailyRevenueRows = await db
-      .select({
-        date: sql<string>`strftime('%Y-%m-%d', ${schema.bookings.paid_at})`,
-
-        revenue: sql<number>`SUM(${schema.bookings.total_price})`,
-
-        cnt: count(schema.bookings.id)
-      })
-
-      .from(schema.bookings)
-
-      .where(
-        and(
-          eq(schema.bookings.payment_status, 'paid'),
-
-          sql`${schema.bookings.paid_at} IS NOT NULL`
-
-          // SQLite date comparison works with string comparison if formatted correctly.
-
-          // We will just fetch top 30 recent paid days to be safe across dialects.
-        )
-      )
-
-      .groupBy(sql`strftime('%Y-%m-%d', ${schema.bookings.paid_at})`)
-
-      .orderBy(desc(sql`strftime('%Y-%m-%d', ${schema.bookings.paid_at})`))
-
-      .limit(30)
-
-      .all();
-
-    // 11. Top users failed/cancelled
-
-    const failedUsersRows = await db
-      .select({
-        email: schema.bookings.email,
-
-        name: schema.bookings.name,
-
-        failed_count: count(schema.bookings.id)
-      })
-
-      .from(schema.bookings)
-
-      .where(sql`${schema.bookings.payment_status} IN ('failed', 'pending')`)
-
-      .groupBy(schema.bookings.email, schema.bookings.name)
-
-      .orderBy(desc(count(schema.bookings.id)))
-
-      .limit(10)
-
-      .all();
-
-    // 12. Toys catalog
-
-    const toysCatalog = await db
-      .select({
-        name: schema.toys.name,
-
-        stock: schema.toys.stock,
-
-        status: schema.toys.status,
-
-        price: schema.toys.price
-      })
-      .from(schema.toys)
-      .all();
-
-    const ctx = {
-      summary: {
-        total_bookings: Number(sr?.total_bookings ?? 0),
-
-        total_revenue_paid: Number(sr?.total_revenue ?? 0),
-
-        paid_bookings: Number(sr?.paid_count ?? 0),
-
-        pending_bookings: Number(sr?.pending_count ?? 0),
-
-        failed_bookings: Number(sr?.failed_count ?? 0),
-
-        tickets_used: Number(sr?.used_tickets ?? 0)
-      },
-
-      revenue_by_payment_method: revenueByMethod.map((r) => ({
-        method: r.method ?? 'unknown',
-        revenue: Number(r.revenue ?? 0),
-        count: Number(r.cnt ?? 0)
-      })),
-
-      top_movies: topMovies.map((r) => ({
-        title: r.title ?? 'N/A',
-        bookings: Number(r.bookings ?? 0),
-        revenue: Number(r.revenue ?? 0)
-      })),
-
-      peak_booking_hours: peakHours.map((r) => ({
-        hour: Number(r.hour ?? 0),
-        bookings: Number(r.cnt ?? 0)
-      })),
-
-      monthly_revenue: monthlyRevenue.map((r) => ({
-        month: Number(r.month ?? 0),
-        revenue: Number(r.revenue ?? 0),
-        count: Number(r.cnt ?? 0)
-      })),
-
-      top_ticket_packages: topPackages.map((r) => ({
-        package: r.pkg ?? 'N/A',
-        count: Number(r.cnt ?? 0),
-        revenue: Number(r.revenue ?? 0)
-      })),
-
-      // MỚI: Dữ liệu mở rộng để AI linh hoạt hơn
-
-      catalog_ticket_packages: packagesCatalog,
-
-      catalog_active_movies: activeMovies.map((m) => m.title),
-
-      catalog_toys_inventory: toysCatalog,
-
-      recent_30_bookings: recentBookings,
-
-      daily_revenue_last_30_days: dailyRevenueRows.map((r) => ({
-        date: r.date,
-        revenue: Number(r.revenue ?? 0),
-        count: Number(r.cnt ?? 0)
-      })),
-
-      top_users_failed_bookings: failedUsersRows.map((r) => ({
-        email: r.email,
-        name: r.name,
-        failed_count: Number(r.failed_count ?? 0)
-      }))
-    };
-
-    const systemPrompt = `Bạn là chuyên gia phân tích dữ liệu kinh doanh cho rạp chiếu phim CINESPHERE (chỉ có 1 phòng chiếu tại Việt Nam).
-
-Dưới đây là DỮ LIỆU THỰC TẾ mới nhất từ hệ thống database (trích xuất dạng JSON). Bạn PHẢI dùng dữ liệu này để trả lời câu hỏi của người dùng.
-
-
-
-DỮ LIỆU THỰC TẾ:
-
-${JSON.stringify(ctx, null, 2)}
-
-
-
-YÊU CẦU BẮT BUỘC KHÁC:
-
-1. LUÔN LUÔN giao tiếp và trả lời bằng TIẾNG VIỆT có dấu (Vietnamese).
-
-2. Phải trả về DUY NHẤT một chuỗi JSON hợp lệ. KHÔNG thêm bất kỳ văn bản ngoài JSON.
-
-3. KỸ NĂNG GHÉP DỮ LIỆU (JOIN DATA): Nếu user hỏi nhiều thông tin đan chéo (như tìm gói hot nhất, sau đó hiển thị danh sách các code đặt vé của gói đó kèm ngày tháng và combo), bạn PHẢI tìm data từ nhiều mảng khác nhau (ví dụ: dùng "top_ticket_packages" để biết gói hot, sau đó lọc trong "recent_30_bookings" để lấy code/date, và lấy "catalog_ticket_packages" để xem combo).
-
-
-
-Cấu trúc JSON bắt buộc phải tuân thủ:
-
-{
-
-  "internal_thought": "BẮT BUỘC: Viết ra suy luận của bạn từng bước bằng tiếng Việt trước khi tổng hợp data. Ví dụ: Bước 1: Tìm gói hot nhất. Bước 2: Lọc các booking có gói đó. Bước 3: Lấy thông tin ngày, code. Bước 4: Format output.",
-
-  "display_type": "table" | "dynamic_chart" | "summary",
-
-  "analysis_summary": "Câu trả lời thân thiện (100% tiếng Việt).",
-
-  "ui_config": {
-
-    "title": "Tiêu đề bảng/biểu đồ",
-
-    "chart_type": "bar" | "line" | "pie",
-
-    "x_axis_key": "tên key trục X",
-
-    "y_axis_key": "tên key trục Y",
-
-    "y_axis_label": "Nhãn trục Y",
-
-    "color": "#6366f1"
-
-  },
-
-  "processed_data": [
-
-    // TỰ DO TẠO CÁC PROPERTY MỚI BẰNG CÁCH GHÉP TỪ NHIỀU NGUỒN.
-
-    // VD: { "package": "Vé 1 người", "code": "B123", "date": "2026-01-01", "combo": "Bắp nước" }
-
-  ]
-
-}
-
-
-
-HƯỚNG DẪN CHỌN "display_type":
-
-- "dynamic_chart": Lưu đồ xu hướng, so sánh (doanh thu tháng, giờ cao điểm).
-
-- "table": Liệt kê chi tiết danh sách, lịch sử, so sánh có nhiều cột (VD: xem danh sách đơn hàng của 1 gói).
-
-- "summary": Câu hỏi dạng thảo luận, không cần bảng.`;
-
-    const aiResp: any = await c.env.AI.run('@cf/meta/llama-3-8b-instruct', {
-      messages: [
-        { role: 'system', content: systemPrompt },
-
-        { role: 'user', content: userMessage }
-      ],
-
-      max_tokens: 1500,
-
-      temperature: 0.3
-    });
-
-    const rawText = String(aiResp?.response ?? aiResp?.result ?? '');
-
-    let parsed: any;
-
-    try {
-      const m = rawText.match(/\{[\s\S]*\}/);
-
-      if (!m) throw new Error('no json');
-
-      parsed = JSON.parse(m[0]);
-    } catch {
-      parsed = {
-        display_type: 'summary',
-
-        analysis_summary: rawText || 'AI khong the phan tich. Vui long thu lai.',
-
-        ui_config: { title: 'Ket qua phan tich' },
-
-        processed_data: []
-      };
-    }
-
-    return c.json({ ok: true, result: parsed });
-  } catch (err: any) {
-    console.error('[ai-analytics]', err);
-
-    return c.json({ error: String(err?.message || 'Loi may chu noi bo') }, 500);
-  }
-});
 
 // ===== SITEMAP XML =====
 

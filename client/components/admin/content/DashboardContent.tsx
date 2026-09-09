@@ -1,5 +1,5 @@
 import React from 'react';
-import AIAnalyticsPanel from './AIAnalyticsPanel';
+
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
@@ -28,13 +28,18 @@ interface Metrics {
   totalUsers: number;
   totalTransactions: number;
   revenueTotal: number;
-  revenueByMethod: { cash: number; momo: number; vnpay: number; vietqr: number };
+  revenueByMethod: { cash: number; vietqr: number };
   topTicketsWeek: Array<{ id: number; title: string; revenue: number; count: number }>;
   paymentStats: Array<{ method: string; revenue: number; count: number }>;
   topVipUsers: Array<{ userId: number; email: string; totalSpent: number; bookingCount: number }>;
   ticketUsage: { used: number; total: number };
   paymentHealth: { paid: number; pending: number; failed: number };
   bookingHours: number[];
+  revenueBreakdown?: { movie: number; vr: number; combo: number };
+  checkinTraffic?: number[];
+  voucherImpact?: number;
+  ticketBurnRate?: number;
+  customerRetention?: { newUsers: number; returningUsers: number };
 }
 
 interface Props {
@@ -44,7 +49,7 @@ interface Props {
   dateRevenue: {
     total: number;
     count: number;
-    revenueByMethod: { cash: number; momo: number; vnpay: number; vietqr: number };
+    revenueByMethod: { cash: number; vietqr: number };
   };
   onApplyDateFilter: () => void;
   dateFilterType: 'year' | 'day' | 'month';
@@ -164,8 +169,8 @@ export default function DashboardContent({
     );
   };
 
-  const DonutChart = ({ data }: { data: { cash: number; momo: number; vnpay: number; vietqr: number } }) => {
-    const total = (data.cash || 0) + (data.momo || 0) + (data.vnpay || 0) + (data.vietqr || 0);
+  const DonutChart = ({ data }: { data: { cash: number; vietqr: number } }) => {
+    const total = (data.cash || 0) + (data.vietqr || 0);
     if (total === 0)
       return (
         <div className="flex flex-col items-center justify-center h-24 w-24 rounded-full border-2 border-dashed border-slate-100 italic text-[10px] text-slate-300">
@@ -175,8 +180,7 @@ export default function DashboardContent({
 
     const segments = [
       { key: 'VietQR', color: colors.teal, val: data.vietqr || 0 },
-      { key: 'MoMo', color: colors.secondary, val: data.momo || 0 },
-      { key: 'VNPay', color: colors.accent, val: data.vnpay || 0 },
+
       { key: 'Tiền mặt', color: colors.primary, val: data.cash || 0 }
     ].filter((s) => s.val > 0);
 
@@ -460,28 +464,59 @@ export default function DashboardContent({
               </div>
             )}
 
-            <div className="flex flex-col md:flex-row items-center justify-between gap-12 py-4 min-h-[160px]">
-              <div className="space-y-2 text-center md:text-left">
-                <p className="text-[11px] font-bold text-slate-400 uppercase tracking-[0.3em]">
-                  Của{' '}
-                  {dateFilterType === 'day'
-                    ? 'HÔM NAY'
-                    : dateFilterType === 'month'
-                      ? 'THÁNG NÀY'
-                      : `NĂM ${selectedYear}`}
-                </p>
-                <p className="text-4xl font-black text-slate-900 tracking-tight">
-                  {isRevenueLoading ? (
-                    <Skeleton className="h-12 w-48 rounded-xl" />
-                  ) : (
-                    `${dateRevenue.total.toLocaleString()} đ`
-                  )}
-                </p>
-                <p className="text-xs font-bold text-blue-600 bg-blue-50 inline-flex px-3 py-1 rounded-full uppercase tracking-widest">
-                  {dateRevenue.count} Giao dịch đã xác thực
-                </p>
+            <div className="flex flex-col md:flex-row items-center justify-between gap-12 py-4">
+              <div className="space-y-4 text-center md:text-left flex-1">
+                <div className="space-y-2">
+                  <p className="text-[11px] font-bold text-slate-400 uppercase tracking-[0.3em]">
+                    Của{' '}
+                    {dateFilterType === 'day'
+                      ? 'HÔM NAY'
+                      : dateFilterType === 'month'
+                        ? 'THÁNG NÀY'
+                        : `NĂM ${selectedYear}`}
+                  </p>
+                  <p className="text-4xl font-black text-slate-900 tracking-tight">
+                    {isRevenueLoading ? (
+                      <Skeleton className="h-12 w-48 rounded-xl" />
+                    ) : (
+                      `${dateRevenue.total.toLocaleString()} đ`
+                    )}
+                  </p>
+                  <div className="flex gap-2 justify-center md:justify-start">
+                    <p className="text-xs font-bold text-blue-600 bg-blue-50 inline-flex px-3 py-1 rounded-full uppercase tracking-widest">
+                      {dateRevenue.count} Giao dịch đã xác thực
+                    </p>
+                    {metrics.voucherImpact !== undefined && metrics.voucherImpact > 0 && (
+                      <p className="text-xs font-bold text-rose-600 bg-rose-50 inline-flex px-3 py-1 rounded-full uppercase tracking-widest" title="Customer Savings">
+                        Giảm giá {metrics.voucherImpact.toLocaleString()} đ
+                      </p>
+                    )}
+                  </div>
+                </div>
+
+                {metrics.revenueBreakdown && (
+                  <div className="pt-4 border-t border-slate-100 flex gap-6 text-left">
+                    <div>
+                      <p className="text-[10px] font-black text-slate-400 uppercase">Vé Phim</p>
+                      <p className="text-sm font-black text-slate-800">{metrics.revenueBreakdown.movie.toLocaleString()} đ</p>
+                    </div>
+                    <div>
+                      <p className="text-[10px] font-black text-slate-400 uppercase">Vé VR</p>
+                      <p className="text-sm font-black text-slate-800">{metrics.revenueBreakdown.vr.toLocaleString()} đ</p>
+                    </div>
+                    <div>
+                      <p className="text-[10px] font-black text-slate-400 uppercase">Combo / Khác</p>
+                      <p className="text-sm font-black text-slate-800">{metrics.revenueBreakdown.combo.toLocaleString()} đ</p>
+                    </div>
+                  </div>
+                )}
               </div>
-              <DonutChart data={dateRevenue.revenueByMethod} />
+              <div className="flex flex-col items-center">
+                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3">TỶ TRỌNG CỔNG THANH TOÁN</p>
+                <div className="scale-110">
+                  <DonutChart data={dateRevenue.revenueByMethod} />
+                </div>
+              </div>
             </div>
           </CardContent>
         </Card>
@@ -750,7 +785,38 @@ export default function DashboardContent({
               </div>
             </div>
 
-            {/* 3. Peak Hour Distribution */}
+            {/* 3. Ticket Burn Rate & Retention */}
+            <div className="grid grid-cols-2 gap-4 pb-2 border-b border-white/5">
+              <div className="space-y-2">
+                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Tốc độ tiêu thụ vé</p>
+                <p className="text-lg font-black text-slate-900">
+                  {metrics.ticketBurnRate !== undefined ? metrics.ticketBurnRate.toFixed(1) : 0} <span className="text-[10px] font-bold text-slate-400">GIỜ (AVG)</span>
+                </p>
+                <p className="text-[9px] text-slate-500 font-bold uppercase">TG khách giữ vé trước khi xem</p>
+              </div>
+              <div className="space-y-2">
+                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Giữ chân khách hàng</p>
+                <div className="flex gap-2 items-end">
+                  {metrics.customerRetention && (() => {
+                     const total = metrics.customerRetention.newUsers + metrics.customerRetention.returningUsers;
+                     const returningPct = total > 0 ? (metrics.customerRetention.returningUsers / total) * 100 : 0;
+                     return (
+                       <>
+                         <p className="text-lg font-black text-slate-900">{returningPct.toFixed(0)}% <span className="text-[10px] font-bold text-slate-400">KHÁCH CŨ</span></p>
+                       </>
+                     );
+                  })()}
+                </div>
+                {metrics.customerRetention && (
+                  <div className="h-1.5 w-full bg-slate-100 rounded-full overflow-hidden flex">
+                    <div className="bg-amber-400 h-full" style={{ width: `${(metrics.customerRetention.returningUsers / Math.max(metrics.customerRetention.newUsers + metrics.customerRetention.returningUsers, 1)) * 100}%` }} title="Khách cũ quay lại" />
+                    <div className="bg-blue-400 h-full" style={{ width: `${(metrics.customerRetention.newUsers / Math.max(metrics.customerRetention.newUsers + metrics.customerRetention.returningUsers, 1)) * 100}%` }} title="Khách mới" />
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* 4. Peak Hour Distribution */}
             <div className="space-y-4 pt-2">
               <div className="flex items-center justify-between">
                 <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest">
@@ -782,13 +848,41 @@ export default function DashboardContent({
                 <span>18h</span>
                 <span>23h</span>
               </div>
+              
+              {metrics.checkinTraffic && (
+                <div className="pt-2 mt-4 border-t border-slate-50">
+                  <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-3">
+                    Lưu lượng khách check-in (Theo Thứ)
+                  </p>
+                  <div className="flex items-end justify-between h-10 gap-2">
+                    {metrics.checkinTraffic.map((count, i) => {
+                      const max = Math.max(...metrics.checkinTraffic!, 1);
+                      const height = (count / max) * 100;
+                      const days = ['CN', 'T2', 'T3', 'T4', 'T5', 'T6', 'T7'];
+                      return (
+                        <div key={i} className="flex-1 flex flex-col items-center gap-1 group">
+                          <div
+                            className="w-full bg-emerald-100/80 hover:bg-emerald-500 transition-all duration-300 rounded-t-md relative"
+                            style={{ height: `${Math.max(height, 8)}%` }}
+                          >
+                             <div className="opacity-0 group-hover:opacity-100 absolute -top-8 left-1/2 -translate-x-1/2 bg-slate-900 text-white text-[8px] py-1 px-1.5 rounded whitespace-nowrap z-50 pointer-events-none transition-all shadow-lg">
+                               <span className="font-black">{days[i]}:</span> {count} quét
+                             </div>
+                          </div>
+                          <span className="text-[8px] font-bold text-slate-400">{days[i]}</span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         </Card>
       </div>
-      <div className="grid grid-cols-1 lg:grid-cols-1 gap-8 pt-4">
-        {/* 7-DAY BAR CHART FULL WIDTH */}
-        <Card className="bg-white border-none shadow-slate-200/50 shadow-xl rounded-2xl p-8 space-y-8">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 pt-4">
+        {/* 7-DAY BAR CHART */}
+        <Card className="bg-white border-none shadow-slate-200/50 shadow-xl rounded-2xl p-8 space-y-8 flex flex-col justify-between">
           <div className="flex justify-between items-center">
             <div>
               <h3 className="text-xl font-black text-slate-900 tracking-tight uppercase">
@@ -806,7 +900,7 @@ export default function DashboardContent({
         </Card>
 
         {/* MONTHLY CHART FULL WIDTH */}
-        <Card className="bg-white border-none shadow-slate-200/50 shadow-xl rounded-2xl p-8 space-y-8">
+        <Card className="bg-white border-none shadow-slate-200/50 shadow-xl rounded-2xl p-8 space-y-8 flex flex-col justify-between">
           <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
             <div className="space-y-1">
               <h3 className="text-xl font-black text-slate-900 tracking-tight uppercase">
@@ -829,8 +923,7 @@ export default function DashboardContent({
         </Card>
       </div>
 
-      {/* AI Analytics Panel */}
-      <AIAnalyticsPanel />
+
     </div>
   );
 }

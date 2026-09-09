@@ -10,23 +10,13 @@ import { Label } from '@/components/ui/label';
 import {
   Settings as SettingsIcon,
   LayoutDashboard,
-  Users,
-  Clapperboard,
-  CalendarClock,
-  Package,
-  Ticket,
-  CreditCard,
-  ScanLine,
-  Eye,
-  Mail,
-  FileText
+  Mail
 } from 'lucide-react';
 import { buildUrl, request } from '@/lib/api/http';
 import { useStaffPermission } from '@/hooks/useStaffPermission';
 
 interface AdminSettingsResponse {
   settings: {
-    hidden_tabs?: string[];
     otp_settings?: {
       enable_2fa: boolean;
       otp_expiry_minutes: number;
@@ -37,30 +27,11 @@ interface AdminSettingsResponse {
   };
 }
 
-const ALL_TABS = [
-  { key: 'dashboard', label: 'Bảng điều khiển', icon: LayoutDashboard },
-  { key: 'users', label: 'Người dùng', icon: Users },
-  { key: 'movies', label: 'Phim', icon: Clapperboard },
-  { key: 'showtimes', label: 'Lịch chiếu', icon: CalendarClock },
-  { key: 'toys', label: 'Đồ chơi', icon: Package },
-  { key: 'posts', label: 'Bài viết (Admin)', icon: FileText },
-  { key: 'tickets', label: 'Gói vé', icon: Ticket },
-  { key: 'transactions', label: 'Giao dịch', icon: CreditCard },
-  { key: 'ticket-check', label: 'Kiểm Tra Vé', icon: ScanLine },
-  { key: 'uploads', label: 'Uploads', icon: Clapperboard },
-  { key: 'email-logs', label: 'Email Logs', icon: Mail }
-];
-
 export default function SettingsPage() {
   const navigate = useNavigate();
   const staff = useStaffStore((state) => state.staff);
   const clearStaff = useStaffStore((state) => state.clearStaff);
   const [adminEmail, setAdminEmail] = useState('');
-  const [hiddenTabs, setHiddenTabs] = useState<string[]>(() => {
-    if (window.location.hostname !== 'localhost') return [];
-    const stored = localStorage.getItem('admin_sidebar_hidden_tabs');
-    return stored ? JSON.parse(stored) : [];
-  });
   const [otpSettings, setOtpSettings] = useState({
     enable_2fa: false,
     otp_expiry_minutes: 5,
@@ -85,48 +56,20 @@ export default function SettingsPage() {
   const fetchSettings = async () => {
     try {
       const data = await request<AdminSettingsResponse>('/api/admin/settings');
-      if (data && data.settings) {
-        if (Array.isArray(data.settings)) {
-          // Old format: just hidden tabs
-          setHiddenTabs(data.settings);
-        } else {
-          // New format: object with hidden_tabs and otp_settings
-          setHiddenTabs(data.settings.hidden_tabs || []);
-          if (data.settings.otp_settings) {
-            setOtpSettings(data.settings.otp_settings);
-          }
-        }
-        localStorage.setItem('admin_sidebar_hidden_tabs', JSON.stringify(data.settings.hidden_tabs || data.settings));
-        window.dispatchEvent(new Event('admin_sidebar_update'));
+      if (data && data.settings && data.settings.otp_settings) {
+        setOtpSettings(data.settings.otp_settings);
       }
     } catch (err) {
       console.error('Failed to fetch admin settings:', err);
     }
   };
 
-  const handleToggleTab = async (key: string) => {
-    if (!canManageSettings) {
-      return;
-    }
-
-    const newHidden = hiddenTabs.includes(key) ? hiddenTabs.filter((k) => k !== key) : [...hiddenTabs, key];
-
-    setHiddenTabs(newHidden);
-    localStorage.setItem('admin_sidebar_hidden_tabs', JSON.stringify(newHidden));
-
-    await saveSettings(newHidden, otpSettings);
-
-    // Trigger sidebar update
-    window.dispatchEvent(new Event('admin_sidebar_update'));
-    window.dispatchEvent(new Event('storage'));
-  };
-
   const handleSaveOtpSettings = async () => {
     if (!canManageSettings) return;
-    await saveSettings(hiddenTabs, otpSettings);
+    await saveSettings(otpSettings);
   };
 
-  const saveSettings = async (newHidden: string[], newOtpSettings: typeof otpSettings) => {
+  const saveSettings = async (newOtpSettings: typeof otpSettings) => {
     // Sync to server if in production
     if (isProd) {
       setIsSyncing(true);
@@ -134,7 +77,6 @@ export default function SettingsPage() {
         await request('/api/admin/settings', {
           method: 'POST',
           body: JSON.stringify({
-            hidden_tabs: newHidden,
             otp_settings: newOtpSettings
           })
         });
@@ -169,89 +111,15 @@ export default function SettingsPage() {
             <div>
               <h1 className="text-3xl font-black text-slate-900 tracking-tight leading-none mb-1">Cấu hình Hệ thống</h1>
               <p className="text-xs text-slate-400 font-bold uppercase tracking-[0.2em]">
-                Tùy chỉnh không gian làm việc của bạn
+                Tùy chỉnh hệ thống & xác thực
               </p>
             </div>
           </div>
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          {/* Left Column: UI Customization */}
+          {/* Left Column: OTP Settings */}
           <div className="lg:col-span-2 space-y-6">
-            <Card className="border-none shadow-2xl shadow-slate-200/50 rounded-[2rem] overflow-hidden bg-white">
-              <div className="p-8 bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 text-white relative overflow-hidden">
-                <div className="absolute top-0 right-0 w-64 h-64 bg-blue-500/10 rounded-full -translate-y-1/2 translate-x-1/2 blur-3xl" />
-                <div className="relative z-10 flex items-center gap-4">
-                  <div className="p-3 bg-white/10 backdrop-blur-md rounded-2xl border border-white/10">
-                    <Eye size={24} className="text-blue-400" />
-                  </div>
-                  <div>
-                    <CardTitle className="text-2xl font-black tracking-tight">Cấu hình Hiển thị Menu</CardTitle>
-                    <div className="flex items-center gap-2 mt-1">
-                      <p className="text-slate-400 text-sm font-medium">
-                        Bật/Tắt các đề mục trên thanh điều hướng để tối ưu hóa diện tích
-                      </p>
-                      {isProd && (
-                        <Badge
-                          variant="outline"
-                          className={`ml-2 text-[10px] ${isSyncing ? 'animate-pulse bg-blue-500/10 text-blue-400 border-blue-400/20' : 'bg-green-500/10 text-green-400 border-green-400/20'}`}
-                        >
-                          {isSyncing ? 'Đang lưu...' : 'Đã đồng bộ Cloud'}
-                        </Badge>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              </div>
-              <CardContent className="p-8">
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  {ALL_TABS.map((tab) => {
-                    const Icon = tab.icon;
-                    const isHidden = hiddenTabs.includes(tab.key);
-                    return (
-                      <div
-                        key={tab.key}
-                        className={`group flex items-center justify-between p-5 rounded-[1.5rem] border transition-all duration-500 ${
-                          isHidden
-                            ? 'bg-slate-50 border-slate-100'
-                            : 'bg-white border-slate-100 hover:border-blue-200 hover:shadow-xl hover:shadow-blue-50 cursor-pointer'
-                        }`}
-                        onClick={() => handleToggleTab(tab.key)}
-                      >
-                        <div className="flex items-center gap-4">
-                          <div
-                            className={`w-11 h-11 rounded-xl flex items-center justify-center transition-all duration-500 ${
-                              isHidden
-                                ? 'bg-slate-200 text-slate-400'
-                                : 'bg-blue-50 text-blue-600 group-hover:bg-blue-600 group-hover:text-white'
-                            }`}
-                          >
-                            <Icon size={20} />
-                          </div>
-                          <div className="flex flex-col">
-                            <span
-                              className={`font-black text-sm tracking-tight ${isHidden ? 'text-slate-400' : 'text-slate-900'}`}
-                            >
-                              {tab.label}
-                            </span>
-                            <span className="text-[9px] font-black uppercase tracking-widest text-slate-400">
-                              {isHidden ? 'Đang ẩn' : 'Hiển thị'}
-                            </span>
-                          </div>
-                        </div>
-                        <Switch
-                          checked={!isHidden}
-                          disabled={!canManageSettings}
-                          onCheckedChange={() => handleToggleTab(tab.key)}
-                          className="data-[state=checked]:bg-blue-600"
-                          onClick={(e) => e.stopPropagation()}
-                        />
-                      </div>
-                    );
-                  })}
-                </div>
-              </CardContent>
-            </Card>
 
             {/* OTP Settings Card */}
             <Card className="border-none shadow-2xl shadow-slate-200/50 rounded-[2rem] overflow-hidden bg-white">
@@ -371,11 +239,10 @@ export default function SettingsPage() {
             <Card className="border-none shadow-2xl shadow-slate-200/50 rounded-[2rem] bg-indigo-600 text-white p-8 relative overflow-hidden">
               <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full blur-2xl" />
               <h3 className="text-xl font-black mb-4 flex items-center gap-2">
-                <LayoutDashboard size={20} /> Mẹo nhỏ
+                <LayoutDashboard size={20} /> Bảo mật 2FA
               </h3>
               <p className="text-sm font-medium text-indigo-100 leading-[1.6]">
-                Bạn có thể ẩn đi những mục ít sử dụng như "Uploads" hoặc "Đồ chơi" để thanh điều hướng trông gọn gàng
-                hơn. Đừng lo, các mục này sẽ không bị xóa vĩnh viễn!
+                Bật xác thực hai lớp (2FA) giúp tăng cường bảo mật cho toàn bộ tài khoản nhân viên và người dùng khi đăng nhập vào hệ thống Cinesphere.
               </p>
             </Card>
 
@@ -383,11 +250,9 @@ export default function SettingsPage() {
               <div className="w-10 h-10 bg-blue-600 rounded-xl flex items-center justify-center text-white">
                 <SettingsIcon size={20} />
               </div>
-              <h4 className="text-lg font-black text-slate-900">Quyền riêng tư</h4>
+              <h4 className="text-lg font-black text-slate-900">Lưu ý cấu hình</h4>
               <p className="text-xs text-slate-600 font-medium leading-relaxed">
-                {isProd
-                  ? 'Cài đặt hiển thị này được đồng bộ trực tuyến (Workers KV) và sẽ tự động áp dụng khi bạn đăng nhập từ bất kỳ thiết bị nào.'
-                  : 'Cài đặt hiển thị này đang được lưu trữ cục bộ (LocalStorage) vì bạn đang ở môi trường phát triển.'}
+                Mọi thay đổi cấu hình OTP sẽ áp dụng ngay lập tức cho các lần tạo và gửi mã OTP tiếp theo.
               </p>
             </div>
           </div>

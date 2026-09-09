@@ -41,6 +41,11 @@ export async function requireAuth(c: Context, next: any) {
  * Sử dụng cho các admin routes cần staff authentication
  */
 export async function requireStaffAuth(c: Context, next: Next) {
+  // Exclude auth routes
+  if (c.req.path.startsWith('/api/admin/auth/')) {
+    return await next();
+  }
+
   try {
     const token =
       c.req.header('cookie')?.match(/staff_session=([^;]+)/)?.[1] ||
@@ -132,3 +137,36 @@ export function requirePermission(module: string, action: string) {
     await next();
   };
 }
+
+/**
+ * Rate Limiter Middleware
+ * Uses Cloudflare KV to limit requests by IP
+ */
+export function rateLimiter(limit: number, windowSeconds: number) {
+  return async (c: Context, next: Next) => {
+    // Attempt to get client IP
+    const ip = c.req.header('CF-Connecting-IP') || c.req.header('X-Forwarded-For') || 'unknown';
+    
+    // Allow local environments to bypass safely if needed, but here we just rate limit anyway
+    const route = new URL(c.req.url).pathname;
+    const kvKey = `rate_limit:${route}:${ip}`;
+    
+    try {
+      const currentVal = await c.env.CONFIG_KV.get(kvKey);
+      const count = currentVal ? parseInt(currentVal, 10) : 0;
+      
+      if (count >= limit) {
+        return c.json({ status: 'error', message: 'Too many requests, please try again later.' }, 429);
+      }
+      
+      // Increment and set expiration
+      await c.env.CONFIG_KV.put(kvKey, (count + 1).toString(), { expirationTtl: windowSeconds });
+    } catch (e) {
+      console.warn('Rate limiter KV error', e);
+      // Fail open if KV is disconnected
+    }
+    
+    await next();
+  };
+}
+

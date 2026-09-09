@@ -576,8 +576,7 @@ export default function TransactionsContent({
               >
                 <option value="">Tất cả phương thức</option>
                 <option value="cash">Tiền mặt</option>
-                <option value="momo">MoMo</option>
-                <option value="vnpay">VNPay</option>
+
                 <option value="vietqr">VietQR</option>
               </select>
             </div>

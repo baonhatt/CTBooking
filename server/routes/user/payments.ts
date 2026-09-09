@@ -930,7 +930,7 @@ export async function updatePaymentImpl(
               `;
               const mailer = sendMailFn;
               const effectiveOrderCode = booking.id || bookingCode || booking.pay_txt_code;
-              const confirmSubject = `Xác nhận thanh toán thành công đơn hàng #${effectiveOrderCode}`;
+              const confirmSubject = `[CINESPHERE] Xác nhận đặt vé thành công - Mã vé #${effectiveOrderCode}`;
               if (mailer) {
                 await mailer(booking.email, confirmSubject, html);
                 console.log(`[MailQueue] Đã gửi VR mail xác nhận cho booking ${booking.id}`);

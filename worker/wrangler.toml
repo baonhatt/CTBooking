@@ -73,9 +73,7 @@ migrations_dir = "migrations"
 
 
 
-[ai]
 
-binding = "AI"
 
 
 
@@ -163,9 +161,7 @@ remote = true
 
 
 
-[env.preview.ai]
 
-binding = "AI"
 
 
 

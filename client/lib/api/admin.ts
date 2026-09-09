@@ -68,7 +68,7 @@ export async function getDashboardMetrics(period: string = 'week', year?: number
     totalUsers: number;
     totalTransactions: number;
     revenueTotal: number;
-    revenueByMethod: { cash: number; momo: number; vnpay: number; vietqr: number };
+    revenueByMethod: { cash: number; vietqr: number };
     topTicketsWeek: Array<{ id: number; title: string; revenue: number; count: number }>;
     paymentStats: Array<{ method: string; revenue: number; count: number }>;
     topVipUsers: Array<{ userId: number; email: string; totalSpent: number; bookingCount: number }>;
@@ -93,7 +93,7 @@ export async function getRevenueByDate(
     date: string;
     total: number;
     count: number;
-    revenueByMethod: { cash: number; momo: number; vnpay: number; vietqr: number };
+    revenueByMethod: { cash: number; vietqr: number };
   }>(`/api/admin/dashboard/revenue-date?${params.toString()}`);
 }
 
@@ -122,7 +122,7 @@ export async function getRevenueByMonth(
     return request<{
       total: number;
       count: number;
-      revenueByMethod: { cash: number; momo: number; vnpay: number; vietqr: number };
+      revenueByMethod: { cash: number; vietqr: number };
     }>(`/api/admin/dashboard/revenue-month?${params.toString()}`);
   }
 

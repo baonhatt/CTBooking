@@ -188,13 +188,6 @@ export default function AdminLayout({
     return permissions.some((p) => p.module === module && p.action === action);
   };
 
-  const [hiddenTabs, setHiddenTabs] = useState<string[] | { hidden_tabs: string[] }>(() => {
-    const stored = localStorage.getItem('admin_sidebar_hidden_tabs');
-    if (!stored) return [];
-    const parsed = JSON.parse(stored);
-    return Array.isArray(parsed) ? parsed : parsed?.hidden_tabs || [];
-  });
-
   const [openGroups, setOpenGroups] = useState<Record<string, boolean>>(() => {
     const initial: Record<string, boolean> = {};
     for (const group of menuGroups) {
@@ -207,44 +200,7 @@ export default function AdminLayout({
     setOpenGroups((prev) => ({ ...prev, [groupId]: !prev[groupId] }));
   };
 
-  useEffect(() => {
-    const handleStorageChange = () => {
-      const stored = localStorage.getItem('admin_sidebar_hidden_tabs');
-      if (!stored) {
-        setHiddenTabs([]);
-        return;
-      }
-      const parsed = JSON.parse(stored);
-      setHiddenTabs(Array.isArray(parsed) ? parsed : parsed?.hidden_tabs || []);
-    };
-    window.addEventListener('storage', handleStorageChange);
-    window.addEventListener('admin_sidebar_update', handleStorageChange);
-
-    const isProd = window.location.hostname !== 'localhost';
-    if (isProd && hasPermission('settings', 'view')) {
-      request<AdminSettingsData>('/api/admin/settings')
-        .then((data) => {
-          if (data && data.settings) {
-            const settings = data.settings;
-            const hiddenTabsArray = Array.isArray(settings) ? settings : settings?.hidden_tabs || [];
-            const settingsStr = JSON.stringify(hiddenTabsArray);
-            if (localStorage.getItem('admin_sidebar_hidden_tabs') !== settingsStr) {
-              localStorage.setItem('admin_sidebar_hidden_tabs', settingsStr);
-              setHiddenTabs(hiddenTabsArray);
-            }
-          }
-        })
-        .catch((err) => console.error('Failed to sync settings from server:', err));
-    }
-
-    return () => {
-      window.removeEventListener('storage', handleStorageChange);
-      window.removeEventListener('admin_sidebar_update', handleStorageChange);
-    };
-  }, []);
-
   const filteredGroups = useMemo(() => {
-    const hiddenTabsArray = Array.isArray(hiddenTabs) ? hiddenTabs : hiddenTabs?.hidden_tabs || [];
     const query = searchQuery.trim().toLowerCase();
 
     return menuGroups
@@ -252,10 +208,9 @@ export default function AdminLayout({
         const visibleItems = group.items.filter((item) => {
           const perm = menuPermissions[item.key];
           const hasPerm = perm ? hasPermission(perm.module, perm.action) : true;
-          const isNotHidden = !hiddenTabsArray.includes(item.key);
           const matchesSearch =
             query === '' || item.label.toLowerCase().includes(query) || group.title.toLowerCase().includes(query);
-          return hasPerm && isNotHidden && matchesSearch;
+          return hasPerm && matchesSearch;
         });
 
         return {
@@ -264,7 +219,7 @@ export default function AdminLayout({
         };
       })
       .filter((group) => group.items.length > 0);
-  }, [hiddenTabs, permissions, isSuperAdmin, searchQuery]);
+  }, [permissions, isSuperAdmin, searchQuery]);
 
   function go(tab: Props['active']) {
     setActive(tab);

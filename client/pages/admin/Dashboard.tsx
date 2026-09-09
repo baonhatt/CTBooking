@@ -26,7 +26,7 @@ export default function DashboardPage() {
     totalUsers: 0,
     totalTransactions: 0,
     revenueTotal: 0,
-    revenueByMethod: { cash: 0, momo: 0, vnpay: 0, vietqr: 0 },
+    revenueByMethod: { cash: 0, vietqr: 0 },
     topTicketsWeek: [],
     paymentStats: [],
     topVipUsers: [],
@@ -52,7 +52,7 @@ export default function DashboardPage() {
   const [dateRevenue, setDateRevenue] = useState({
     total: 0,
     count: 0,
-    revenueByMethod: { cash: 0, momo: 0, vnpay: 0, vietqr: 0 }
+    revenueByMethod: { cash: 0, vietqr: 0 }
   });
 
   // 7-day chart state
@@ -167,7 +167,7 @@ export default function DashboardPage() {
           setDateRevenue({
             total: data.total,
             count: data.count,
-            revenueByMethod: (data as any).revenueByMethod || { cash: 0, momo: 0, vnpay: 0, vietqr: 0 }
+            revenueByMethod: (data as any).revenueByMethod || { cash: 0, vietqr: 0 }
           });
         }
       }

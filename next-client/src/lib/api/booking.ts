@@ -8,7 +8,7 @@ export async function createBookingApi(body: {
   name: string;
   movieId?: number;
   ticketCount: number;
-  paymentMethod: 'vietqr' | 'momo' | 'vnpay';
+  paymentMethod: 'vietqr' | 'cash';
   totalPrice?: number;
   ticketPackageId?: number;
   pay_txt_code: string;

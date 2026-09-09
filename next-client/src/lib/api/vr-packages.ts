@@ -23,7 +23,7 @@ export interface VRBookingRequest {
   vr_items: VRPackageItem[];
   voucher_code?: string;
   branch_id?: number;
-  paymentMethod: 'cash' | 'momo' | 'vnpay' | 'vietqr';
+  paymentMethod: 'cash' | 'vietqr';
   pay_txt_code?: string;
 }
 
