@@ -538,6 +538,10 @@ export default function QRPaymentPage() {
                                                             bookingDetails?.voucherDetails?.applicable_ids || bookingDetails?.voucher_details?.applicable_ids || paymentData?.voucherDetails?.applicable_ids || paymentData?.voucher_details?.applicable_ids
                                                         );
 
+                                                        const bType = bookingDetails?.booking_type || paymentData?.bookingType || paymentData?.booking_type || '';
+                                                        const titleRaw = bookingDetails?.movie_title || paymentData?.movieTitle || '';
+                                                        const isVROnly = bType === 'vr' || titleRaw === 'Gói Trải Nghiệm VR' || paymentData?.ticketType === 'VR Booking (1 gói)';
+
                                                         const raw = bookingDetails?.ticket_package_name || paymentData?.ticketType || 'Vé xem phim';
                                                         const moviePkgs = parseMoviePackages(raw, {
                                                             quantity: bookingDetails?.ticket_count || paymentData?.ticketCount || 1,
@@ -548,47 +552,49 @@ export default function QRPaymentPage() {
 
                                                         return (
                                                             <>
-                                                                {/* Danh sách Gói Vé (Phim) */}
-                                                                <div className="space-y-4 rounded-2xl bg-white/[0.03] border border-white/5 p-4">
-                                                                    <div className="flex justify-between items-center pb-2 border-b border-white/5">
-                                                                        <div className="text-[11px] text-gray-400 font-black uppercase tracking-widest">
-                                                                            Chi tiết gói vé
+                                                                {/* Danh sách Gói Vé (Phim) - Chỉ hiện nếu KHÔNG PHẢI chỉ đặt VR */}
+                                                                {!isVROnly && moviePkgs.length > 0 && (
+                                                                    <div className="space-y-4 rounded-2xl bg-white/[0.03] border border-white/5 p-4">
+                                                                        <div className="flex justify-between items-center pb-2 border-b border-white/5">
+                                                                            <div className="text-[11px] text-gray-400 font-black uppercase tracking-widest">
+                                                                                Chi tiết gói vé
+                                                                            </div>
+                                                                            <div className="text-[11px] text-white font-bold bg-white/10 px-2 py-0.5 rounded-full">
+                                                                                {totalQty} VÉ
+                                                                            </div>
                                                                         </div>
-                                                                        <div className="text-[11px] text-white font-bold bg-white/10 px-2 py-0.5 rounded-full">
-                                                                            {totalQty} VÉ
+                                                                        <div className="space-y-3">
+                                                                            {moviePkgs.map((pkg, idx) => {
+                                                                                const isDiscounted = isLineDiscounted({
+                                                                                    discountAmount,
+                                                                                    scope: voucherScope,
+                                                                                    applicableIds,
+                                                                                    kind: 'movie',
+                                                                                    packageId: pkg.package_id
+                                                                                });
+                                                                                return (
+                                                                                    <div key={idx} className="flex justify-between items-center">
+                                                                                        <div className="flex items-start gap-2 max-w-[65%]">
+                                                                                            <span className="text-blue-400 mt-[3px] text-[10px]">●</span>
+                                                                                            <span className="text-sm font-bold text-gray-200 leading-tight">
+                                                                                                {pkg.name}
+                                                                                                {isDiscounted ? <span className="inline-block ml-2 px-1.5 py-[2px] align-middle text-[8px] font-black text-rose-400 bg-rose-400/10 border border-rose-400/20 rounded shadow-sm">ĐƯỢC GIẢM</span> : null}
+                                                                                            </span>
+                                                                                        </div>
+                                                                                        <div className="flex items-center gap-4 text-right">
+                                                                                            <span className="text-xs font-semibold text-gray-500">
+                                                                                                x{pkg.quantity}
+                                                                                            </span>
+                                                                                            <span className="text-sm font-black text-white whitespace-nowrap tabular-nums">
+                                                                                                {moviePackageLineTotal(pkg).toLocaleString('vi-VN')}₫
+                                                                                            </span>
+                                                                                        </div>
+                                                                                    </div>
+                                                                                );
+                                                                            })}
                                                                         </div>
                                                                     </div>
-                                                                    <div className="space-y-3">
-                                                                        {moviePkgs.map((pkg, idx) => {
-                                                                            const isDiscounted = isLineDiscounted({
-                                                                                discountAmount,
-                                                                                scope: voucherScope,
-                                                                                applicableIds,
-                                                                                kind: 'movie',
-                                                                                packageId: pkg.package_id
-                                                                            });
-                                                                            return (
-                                                                                <div key={idx} className="flex justify-between items-center">
-                                                                                    <div className="flex items-start gap-2 max-w-[65%]">
-                                                                                        <span className="text-blue-400 mt-[3px] text-[10px]">●</span>
-                                                                                        <span className="text-sm font-bold text-gray-200 leading-tight">
-                                                                                            {pkg.name}
-                                                                                            {isDiscounted ? <span className="inline-block ml-2 px-1.5 py-[2px] align-middle text-[8px] font-black text-rose-400 bg-rose-400/10 border border-rose-400/20 rounded shadow-sm">ĐƯỢC GIẢM</span> : null}
-                                                                                        </span>
-                                                                                    </div>
-                                                                                    <div className="flex items-center gap-4 text-right">
-                                                                                        <span className="text-xs font-semibold text-gray-500">
-                                                                                            x{pkg.quantity}
-                                                                                        </span>
-                                                                                        <span className="text-sm font-black text-white whitespace-nowrap tabular-nums">
-                                                                                            {moviePackageLineTotal(pkg).toLocaleString('vi-VN')}₫
-                                                                                        </span>
-                                                                                    </div>
-                                                                                </div>
-                                                                            );
-                                                                        })}
-                                                                    </div>
-                                                                </div>
+                                                                )}
 
                                                                 {/* Danh sách gói VR nếu có */}
                                                                 {vrItems.length > 0 && (
@@ -741,38 +747,52 @@ export default function QRPaymentPage() {
                                                         );
                                                     })()}
 
-                                                    {/* Danh sách phim trong gói -> Chuyển thành ghi chú */}
-                                                    <div className="space-y-2 p-3.5 rounded-2xl bg-white/[0.03] border border-white/5 border-dashed mt-2 mx-1">
-                                                        <div className="text-[11px] text-gray-400 font-extrabold uppercase tracking-widest text-center">
-                                                            Phim đang chiếu hôm nay
-                                                        </div>
-                                                        <div className="text-[12px] text-gray-300 font-medium leading-relaxed flex flex-wrap justify-center gap-x-4 gap-y-2">
-                                                            {(() => {
-                                                                try {
-                                                                    const titleRaw = bookingDetails?.movie_title || paymentData?.movieTitle || '';
-                                                                    if (!titleRaw) return null;
+                                                    {/* Danh sách phim trong gói -> Chuyển thành ghi chú (Chỉ hiện khi có đặt phim) */}
+                                                    {(() => {
+                                                        const bType = bookingDetails?.booking_type || paymentData?.bookingType || paymentData?.booking_type || '';
+                                                        const titleRaw = bookingDetails?.movie_title || paymentData?.movieTitle || '';
+                                                        const isVROnly = bType === 'vr' || titleRaw === 'Gói Trải Nghiệm VR' || paymentData?.ticketType === 'VR Booking (1 gói)';
+                                                        
+                                                        if (isVROnly || !titleRaw || titleRaw.toLowerCase().includes('gói trải nghiệm vr')) {
+                                                            return null;
+                                                        }
 
-                                                                    const renderTitle = (title: string, idx: number) => (
-                                                                        <div key={idx} className="flex items-center gap-1.5 text-center">
-                                                                            <span className="text-cyan-500/50">•</span>
-                                                                            <span>{title.trim()}</span>
-                                                                        </div>
-                                                                    );
+                                                        const renderTitle = (title: string, idx: number) => (
+                                                            <div key={idx} className="flex items-center gap-1.5 text-center">
+                                                                <span className="text-cyan-500/50">•</span>
+                                                                <span>{title.trim()}</span>
+                                                            </div>
+                                                        );
 
-                                                                    if (titleRaw.startsWith('[')) {
-                                                                        const parsed = JSON.parse(titleRaw);
-                                                                        if (Array.isArray(parsed)) return parsed.map(renderTitle);
-                                                                    }
-                                                                    if (titleRaw.includes(' & ')) {
-                                                                        return titleRaw.split(' & ').map(renderTitle);
-                                                                    }
-                                                                    return renderTitle(titleRaw, 0);
-                                                                } catch {
-                                                                    return <span>{bookingDetails?.movie_title || paymentData?.movieTitle || ''}</span>;
+                                                        let titlesElement = null;
+                                                        try {
+                                                            if (titleRaw.startsWith('[')) {
+                                                                const parsed = JSON.parse(titleRaw);
+                                                                if (Array.isArray(parsed) && parsed.length > 0) {
+                                                                    titlesElement = parsed.map(renderTitle);
                                                                 }
-                                                            })()}
-                                                        </div>
-                                                    </div>
+                                                            } else if (titleRaw.includes(' & ')) {
+                                                                titlesElement = titleRaw.split(' & ').map(renderTitle);
+                                                            } else {
+                                                                titlesElement = renderTitle(titleRaw, 0);
+                                                            }
+                                                        } catch {
+                                                            titlesElement = <span>{titleRaw}</span>;
+                                                        }
+
+                                                        if (!titlesElement) return null;
+
+                                                        return (
+                                                            <div className="space-y-2 p-3.5 rounded-2xl bg-white/[0.03] border border-white/5 border-dashed mt-2 mx-1">
+                                                                <div className="text-[11px] text-gray-400 font-extrabold uppercase tracking-widest text-center">
+                                                                    Phim đang chiếu hôm nay
+                                                                </div>
+                                                                <div className="text-[12px] text-gray-300 font-medium leading-relaxed flex flex-wrap justify-center gap-x-4 gap-y-2">
+                                                                    {titlesElement}
+                                                                </div>
+                                                            </div>
+                                                        );
+                                                    })()}
 
                                                 </div>
                                             )}

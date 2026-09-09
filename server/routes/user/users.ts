@@ -140,8 +140,15 @@ export async function listUserTransactionsImpl(
 
   if (!account) return { items: [], page, pageSize, total: 0 };
 
-  // 3. Xây dựng điều kiện lọc
-  const conditions: any[] = [eq(tables.bookings.user_id, account.user_id)];
+  // 3. Xây dựng điều kiện lọc (Theo user_id hoặc email của tài khoản)
+  const userFilter = account.user_id
+    ? or(
+        eq(tables.bookings.user_id, account.user_id),
+        sql`lower(${tables.bookings.email}) = ${account.email.toLowerCase()}`
+      )
+    : sql`lower(${tables.bookings.email}) = ${account.email.toLowerCase()}`;
+
+  const conditions: any[] = [userFilter];
 
   // Calculate 10 minutes ago
   const tenMinutesAgo = new Date(Date.now() - 10 * 60 * 1000);

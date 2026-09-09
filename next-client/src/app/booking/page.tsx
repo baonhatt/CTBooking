@@ -1107,20 +1107,6 @@ export default function BookingPage() {
                         </div>
                       )}
                     </div>
-
-                    {/* Phương thức thanh toán – chỉ VietQR */}
-                    <div className="pt-2 border-t border-white/5">
-                      <div className="p-3.5 rounded-xl border bg-red-500/15 border-red-500/60 ring-1 ring-red-500/30 flex items-center gap-3">
-                        <div className="w-9 h-9 rounded-xl bg-red-600 text-white flex items-center justify-center shadow-md shrink-0">
-                          <QrCode className="w-5 h-5" />
-                        </div>
-                        <div>
-                          <p className="font-bold text-sm text-white">Chuyển khoản VietQR</p>
-                          <p className="text-[11px] text-slate-400">Quét mã QR tự động 24/7 – xác nhận tức thì</p>
-                        </div>
-                        <span className="ml-auto w-5 h-5 rounded-full bg-red-500 text-white flex items-center justify-center text-[10px] font-bold shrink-0">✓</span>
-                      </div>
-                    </div>
                   </CardContent>
                 </Card>
 
