@@ -37,6 +37,14 @@ export function formatExportCurrency(val: any): string {
   return `${num.toLocaleString('vi-VN')} ₫`;
 }
 
+function escapeExcelHtml(str: string): string {
+  return str
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+
 /**
  * Xuất file Excel (.xls) với template giao diện HTML:
  * Header màu xanh nhạt (#D9EAFD / #E0F2FE), chữ đậm, viền ô sắc nét, định dạng tiền tệ & ngày giờ đồng bộ.
@@ -89,7 +97,12 @@ export function exportToStyledExcel<T = any>(
           }
 
           const align = col.align || (col.isCurrency ? 'right' : col.isDateTime ? 'center' : 'left');
-          const strVal = String(val);
+          const rawStr = String(val);
+          const hasNewline = rawStr.includes('\n');
+          const escapedStr = escapeExcelHtml(rawStr);
+          const formattedContent = hasNewline
+            ? escapedStr.replace(/\r\n|\n|\r/g, '<br style="mso-data-placement:same-cell;" />')
+            : escapedStr;
 
           return `
                     <td style="
@@ -99,10 +112,11 @@ export function exportToStyledExcel<T = any>(
                         padding: 8px 12px; 
                         border: 1px solid #E2E8F0; 
                         text-align: ${align};
-                        white-space: nowrap;
+                        vertical-align: top;
+                        white-space: ${hasNewline ? 'normal' : 'nowrap'};
                         mso-number-format:'\\@';
                     ">
-                        ${strVal}
+                        ${formattedContent}
                     </td>
                 `;
         })
@@ -215,6 +229,87 @@ export function exportToCSV<T = any>(filename: string, columns: ExportColumn<T>[
 }
 
 /**
+ * Chuyển đổi dữ liệu tên gói vé / VR / Combo sang dạng danh sách (listing) dễ đọc cho Excel / CSV
+ */
+export function formatTicketPackageListing(t: any): string {
+  if (!t) return '';
+
+  const items: string[] = [];
+
+  // 1. Phân tích gói phim từ ticket_package_name
+  const rawName = t.ticket_package_name || t.ticket_package?.name;
+  if (rawName) {
+    if (Array.isArray(rawName)) {
+      for (const item of rawName) {
+        const name = item?.name || item?.package_name || item?.ticket_name || (item?.package_id ? `Gói #${item.package_id}` : 'Gói vé');
+        const qty = Number(item?.quantity) || 1;
+        items.push(`• ${name} (x${qty})`);
+      }
+    } else if (typeof rawName === 'string') {
+      const trimmed = rawName.trim();
+      let parsed = false;
+      if (trimmed.startsWith('[') && trimmed.endsWith(']')) {
+        try {
+          const arr = JSON.parse(trimmed);
+          if (Array.isArray(arr) && arr.length > 0) {
+            for (const item of arr) {
+              const name = item?.name || item?.package_name || item?.ticket_name || (item?.package_id ? `Gói #${item.package_id}` : 'Gói vé');
+              const qty = Number(item?.quantity) || 1;
+              items.push(`• ${name} (x${qty})`);
+            }
+            parsed = true;
+          }
+        } catch {
+          // parse failed, fall back below
+        }
+      } else if (trimmed.startsWith('{') && trimmed.endsWith('}')) {
+        try {
+          const obj = JSON.parse(trimmed);
+          if (obj && typeof obj === 'object') {
+            const name = obj.name || obj.package_name || obj.ticket_name || 'Gói vé';
+            const qty = Number(obj.quantity) || 1;
+            items.push(`• ${name} (x${qty})`);
+            parsed = true;
+          }
+        } catch {}
+      }
+
+      if (!parsed && trimmed) {
+        items.push(trimmed);
+      }
+    }
+  }
+
+  // 2. Phân tích các gói VR từ vr_items
+  if (t.vr_items && Array.isArray(t.vr_items) && t.vr_items.length > 0) {
+    // Nếu trước đó chỉ có chuỗi chung chung "VR Booking (X gói)", thay thế bằng chi tiết vr_items
+    if (items.length === 1 && /^VR Booking \(\d+ gói\)$/i.test(items[0])) {
+      items.length = 0;
+    }
+    for (const vr of t.vr_items) {
+      const vrName = vr?.package_name || vr?.name || 'Trải nghiệm VR';
+      const vrQty = Number(vr?.quantity) || 1;
+      items.push(`• ${vrName} (x${vrQty})`);
+    }
+  } else if (t.booking_type === 'combo_vr' && items.length > 0) {
+    const extraVrQty = Math.max((Number(t.ticketCount) || 1) - items.length, 1);
+    items.push(`• Kèm tùy chọn VR (x${extraVrQty})`);
+  }
+
+  if (items.length > 1) {
+    return items
+      .map((it) => (it.startsWith('•') || it.startsWith('-') ? it : `• ${it}`))
+      .join('\n');
+  }
+
+  if (items.length === 1) {
+    return items[0];
+  }
+
+  return t.ticket_package_name || (t.booking_type === 'vr' ? 'Trải nghiệm VR' : 'Vé xem phim');
+}
+
+/**
  * Định dạng xuất dữ liệu danh sách giao dịch
  */
 export function exportTransactionsData(
@@ -262,12 +357,16 @@ export function exportTransactionsData(
     },
     {
       header: 'Dịch vụ',
-      formatter: (t) => (t.booking_type === 'vr' ? 'Trải nghiệm VR' : 'Vé xem phim'),
+      formatter: (t) => {
+        if (t.booking_type === 'combo_vr') return 'Combo Phim + VR';
+        if (t.booking_type === 'vr') return 'Trải nghiệm VR';
+        return 'Vé xem phim';
+      },
       align: 'center'
     },
     {
       header: 'Tên gói / Vé',
-      formatter: (t) => t.ticket_package_name || '',
+      formatter: (t) => formatTicketPackageListing(t),
       align: 'left'
     },
     {
