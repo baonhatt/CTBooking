@@ -909,35 +909,8 @@ export async function updatePaymentImpl(
                 ? parsedPackages.map((p: any) => `${p.name || p.package_name || rawPkg} x${p.quantity || 1}`).join(', ')
                 : rawPkg || 'Vé đơn';
 
-            if (isVR) {
-              // === Pure VR Email ===
-              const html = `
-                <div style="font-family:Arial,sans-serif;max-width:640px;margin:auto;padding:20px;color:#222;">
-                  <h2 style="color:#7c3aed;text-align:center;">🎮 CINESPHERE - XÁC NHẬN ĐẶT TRẢI NGHIỆM VR</h2>
-                  <p>Xin chào <b>${booking.name || 'Khách hàng'}</b>, cảm ơn bạn đã trải nghiệm VR tại CineSphere!</p>
-                  <div style="background:#f8fafc;padding:15px;border-radius:8px;margin:15px 0;">
-                    <p style="margin:6px 0;"><b>Mã đơn:</b> ${bookingCode || ''}</p>
-                    <p style="margin:6px 0;"><b>Liên hệ:</b> ${booking.phone} / ${booking.email}</p>
-                    <p style="margin:6px 0;"><b>Ngày đặt:</b> ${new Date(booking.created_at).toLocaleString('vi-VN')}</p>
-                    ${result.branch_name ? `<p style="margin:6px 0;"><b>Chi nhánh:</b> ${result.branch_name}${result.branch_address ? ' - ' + result.branch_address : ''}</p>` : ''}
-                    ${updatedBooking?.expiry_date ? `<p style="margin:6px 0;"><b>Vui lòng sử dụng trước:</b> ${new Date(updatedBooking.expiry_date).toLocaleDateString('vi-VN')}</p>` : ''}
-                  </div>
-                  ${vrTableHtml}
-                  ${priceBreakdownHtml}
-                  <hr style="border:none;border-top:1px dashed #cbd5e1;margin:25px 0;">
-                  <p style="font-size:13px;color:#64748b;text-align:center;">Hãy mang theo mã đơn hàng khi đến chi nhánh. Trân trọng!</p>
-                </div>
-              `;
-              const mailer = sendMailFn;
-              const effectiveOrderCode = booking.id || bookingCode || booking.pay_txt_code;
-              const confirmSubject = `[CINESPHERE] Xác nhận đặt vé thành công - Mã vé #${effectiveOrderCode}`;
-              if (mailer) {
-                await mailer(booking.email, confirmSubject, html);
-                console.log(`[MailQueue] Đã gửi VR mail xác nhận cho booking ${booking.id}`);
-              }
-            } else {
-              // === MOVIE & COMBO_VR Email ===
-              const templateData = {
+            // === UNIFIED EMAIL DISPATCH FOR ALL BOOKING TYPES ===
+            const templateData = {
                 bookingCode: bookingCode || '',
                 customerName: booking.name || 'Khách hàng',
                 movieTitle: booking.movie_title || '',
@@ -971,7 +944,6 @@ export async function updatePaymentImpl(
               } else {
                 console.warn('[Payments] No mailer provided, skipping confirmation email');
               }
-            }
           } catch (err) {
             console.error(`[MailQueue] Lỗi gửi mail cho booking ${booking.id}:`, err);
             throw err;

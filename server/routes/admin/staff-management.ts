@@ -3,15 +3,15 @@ import bcrypt from 'bcryptjs';
 import { hashPassword, invalidateStaffPermissionCache } from '../../lib/staff-auth';
 import { getStaffAccountCreatedTemplate, getStaffPasswordResetTemplate } from '../../lib/email-templates';
 import { logAuditAction } from '../../lib/audit-logger';
-import { buildStaffAuditPayload } from './staff-audit-utils';
+import { buildAuditPayload } from '../../lib/audit-utils';
 
 export async function listStaffImpl(
   db: any,
   tables: any,
-  params: { page: number; pageSize: number; q?: string; includeInactive?: boolean }
+  params: { page: number; pageSize: number; q?: string; includeInactive?: boolean; roleId?: number; branchId?: number }
 ) {
   const { staffs, staffRoles, roles, staffBranches, branches } = tables;
-  const { page = 1, pageSize = 20, q = '', includeInactive = false } = params;
+  const { page = 1, pageSize = 20, q = '', includeInactive = false, roleId, branchId } = params;
   const offset = (page - 1) * pageSize;
 
   let query = db
@@ -35,18 +35,31 @@ export async function listStaffImpl(
     .orderBy(desc(staffs.createdAt))
     .limit(pageSize)
     .offset(offset);
+  const conditions = [];
+  
+  if (includeInactive) {
+    conditions.push(isNull(staffs.deletedAt));
+  } else {
+    conditions.push(and(eq(staffs.isActive, true), isNull(staffs.deletedAt)));
+  }
 
   if (q) {
-    query = query.where(
-      and(
-        includeInactive ? isNull(staffs.deletedAt) : and(eq(staffs.isActive, true), isNull(staffs.deletedAt)),
-        sql`${staffs.email} LIKE ${'%' + q + '%'} OR ${staffs.fullname} LIKE ${'%' + q + '%'}`
-      )
+    conditions.push(sql`${staffs.email} LIKE ${'%' + q + '%'} OR ${staffs.fullname} LIKE ${'%' + q + '%'}`);
+  }
+
+  if (roleId) {
+    conditions.push(eq(staffRoles.roleId, roleId));
+  }
+
+  if (branchId) {
+    // Subquery condition for branch filtering without disrupting existing joins
+    conditions.push(
+      sql`${staffs.id} IN (SELECT staff_id FROM staff_branches WHERE branch_id = ${branchId})`
     );
-  } else {
-    query = query.where(
-      includeInactive ? isNull(staffs.deletedAt) : and(eq(staffs.isActive, true), isNull(staffs.deletedAt))
-    );
+  }
+
+  if (conditions.length > 0) {
+    query = query.where(and(...conditions));
   }
 
   const staffList = await query;
@@ -77,14 +90,16 @@ export async function listStaffImpl(
     })
   );
 
-  const [totalResult] = await db
-    .select({ count: count() })
+  let countQuery = db
+    .select({ count: count(sql`DISTINCT ${staffs.id}`) })
     .from(staffs)
-    .where(
-      and(
-        includeInactive ? isNull(staffs.deletedAt) : and(eq(staffs.isActive, true), isNull(staffs.deletedAt))
-      )
-    );
+    .leftJoin(staffRoles, eq(staffs.id, staffRoles.staffId));
+
+  if (conditions.length > 0) {
+    countQuery = countQuery.where(and(...conditions));
+  }
+
+  const [totalResult] = await countQuery;
 
   return {
     items: staffWithDetails,
@@ -175,7 +190,7 @@ export async function createStaffImpl(
   }
 
   // Check if email already exists in accounts (Users)
-  const { accounts } = await import('../../../worker/src/schema');
+  const { accounts } = await import('../../../shared/schema');
   const [existingUser] = await db.select().from(accounts).where(eq(accounts.email, email)).limit(1);
   if (existingUser) {
     return {
@@ -309,7 +324,7 @@ export async function createStaffImpl(
   }
 
   const [finalStaff] = await db.select().from(staffs).where(eq(staffs.id, targetStaffId)).limit(1);
-  const auditNew = buildStaffAuditPayload(finalStaff, { roleIds, branchIds });
+  const auditNew = buildAuditPayload(finalStaff, 'staff', { roleIds, branchIds });
 
   // Log audit action
   await logAuditAction(
@@ -409,7 +424,7 @@ export async function updateStaffImpl(
     }
 
     // Check in accounts table
-    const { accounts } = await import('../../../worker/src/schema');
+    const { accounts } = await import('../../../shared/schema');
     const [userCheck] = await db.select().from(accounts).where(eq(accounts.email, email)).limit(1);
     if (userCheck) {
       return { status: 'error', message: 'Email này đang được sử dụng bởi một tài khoản khách hàng.' };
@@ -422,7 +437,7 @@ export async function updateStaffImpl(
     .from(staffBranches)
     .where(eq(staffBranches.staffId, id));
 
-  const auditOld = buildStaffAuditPayload(existing, {
+  const auditOld = buildAuditPayload(existing, 'staff', {
     roleIds: oldRoles.map((r) => r.roleId),
     branchIds: oldBranches.map((b) => b.branchId)
   });
@@ -467,7 +482,7 @@ export async function updateStaffImpl(
     .from(staffBranches)
     .where(eq(staffBranches.staffId, id));
 
-  const auditNew = buildStaffAuditPayload(updatedStaff, {
+  const auditNew = buildAuditPayload(updatedStaff, 'staff', {
     roleIds: newRoles.map((r) => r.roleId),
     branchIds: newBranches.map((b) => b.branchId)
   });
@@ -520,13 +535,16 @@ export async function deleteStaffImpl(
     .set({ isActive: false, deletedAt: deletionTimestamp, deleted_by_staff_id: staffInfo?.id })
     .where(eq(staffs.id, id));
 
-  const auditOld = buildStaffAuditPayload(existing);
-  const auditNew = buildStaffAuditPayload({
-    ...existing,
-    isActive: false,
-    deletedAt: deletionTimestamp,
-    deleted_by_staff_id: staffInfo?.id
-  });
+  const auditOld = buildAuditPayload(existing, 'staff');
+  const auditNew = buildAuditPayload(
+    {
+      ...existing,
+      isActive: false,
+      deletedAt: deletionTimestamp,
+      deleted_by_staff_id: staffInfo?.id
+    },
+    'staff'
+  );
 
   // Log audit action
   await logAuditAction(
@@ -565,8 +583,8 @@ export async function restoreStaffImpl(
   // Restore by setting isActive to true and deleted_at to null
   await db.update(staffs).set({ isActive: true, deletedAt: null }).where(eq(staffs.id, id));
 
-  const auditOld = buildStaffAuditPayload(existing);
-  const auditNew = buildStaffAuditPayload({ ...existing, isActive: true, deletedAt: null });
+  const auditOld = buildAuditPayload(existing, 'staff');
+  const auditNew = buildAuditPayload({ ...existing, isActive: true, deletedAt: null }, 'staff');
 
   // Log audit action
   await logAuditAction(
@@ -732,12 +750,15 @@ export async function resetStaffPasswordImpl(
     console.warn('[Staff] No mailer provided, skipping password reset email (new password was logged to console)');
   }
 
-  const auditOld = buildStaffAuditPayload(existing);
-  const auditNew = buildStaffAuditPayload({
-    ...existing,
-    forcePasswordChange: true,
-    updatedAt: now
-  });
+  const auditOld = buildAuditPayload(existing, 'staff');
+  const auditNew = buildAuditPayload(
+    {
+      ...existing,
+      forcePasswordChange: true,
+      updatedAt: now
+    },
+    'staff'
+  );
 
   // Log audit action
   await logAuditAction(

@@ -1,4 +1,4 @@
-import { bookings } from '../../worker/src/schema';
+import { bookings } from '../../shared/schema';
 import { eq } from 'drizzle-orm';
 import 'dotenv/config';
 export * from './email-templates';

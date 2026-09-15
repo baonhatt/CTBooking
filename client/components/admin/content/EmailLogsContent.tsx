@@ -11,7 +11,7 @@ import {
   PaginationNext,
   PaginationPrevious
 } from '@/components/ui/pagination';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
 import { getEmailLogsApi } from '@/lib/api';
 import {
@@ -191,6 +191,21 @@ export default function EmailLogsContent() {
       {/* Table */}
       <Card className="border-none shadow-xl shadow-slate-200/50 rounded-3xl overflow-hidden bg-white">
         <CardContent className="p-0">
+          {isLoading ? (
+            <div className="space-y-4 py-4 px-6">
+              <div className="flex items-center justify-center gap-3 py-4 text-slate-600 font-medium">
+                <div className="w-6 h-6 border-2 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
+                <span>Đang tải nhật ký email...</span>
+              </div>
+              <div className="space-y-3">
+                <Skeleton className="h-10 w-full rounded-lg bg-slate-100" />
+                <Skeleton className="h-12 w-full rounded-lg bg-slate-100" />
+                <Skeleton className="h-12 w-full rounded-lg bg-slate-100" />
+                <Skeleton className="h-12 w-full rounded-lg bg-slate-100" />
+                <Skeleton className="h-12 w-full rounded-lg bg-slate-100" />
+              </div>
+            </div>
+          ) : (
           <Table>
             <TableHeader className="bg-slate-50/80">
               <TableRow className="hover:bg-transparent border-none">
@@ -205,33 +220,7 @@ export default function EmailLogsContent() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {isLoading && data.length === 0 ? (
-                Array.from({ length: 5 }).map((_, idx) => (
-                  <TableRow key={`sk-${idx}`}>
-                    <TableCell>
-                      <Skeleton className="h-4 w-10 mx-auto" />
-                    </TableCell>
-                    <TableCell>
-                      <div className="space-y-2">
-                        <Skeleton className="h-4 w-40" />
-                        <Skeleton className="h-3 w-60" />
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <Skeleton className="h-5 w-32" />
-                    </TableCell>
-                    <TableCell>
-                      <Skeleton className="h-6 w-24 mx-auto" />
-                    </TableCell>
-                    <TableCell>
-                      <Skeleton className="h-4 w-32" />
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <Skeleton className="h-8 w-8 ml-auto rounded-full" />
-                    </TableCell>
-                  </TableRow>
-                ))
-              ) : data.length === 0 ? (
+              {data.length === 0 ? (
                 <TableRow>
                   <TableCell colSpan={6} className="h-40 text-center">
                     <div className="flex flex-col items-center justify-center gap-2 text-slate-400">
@@ -301,6 +290,7 @@ export default function EmailLogsContent() {
               )}
             </TableBody>
           </Table>
+          )}
         </CardContent>
       </Card>
 
@@ -471,6 +461,11 @@ export default function EmailLogsContent() {
               </div>
             )}
           </div>
+          <DialogFooter className="bg-slate-50 border-t border-gray-200 p-4">
+            <Button variant="outline" onClick={() => setIsDetailsOpen(false)}>
+              Đóng
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>

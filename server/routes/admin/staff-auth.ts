@@ -8,7 +8,7 @@ import {
   invalidateStaffPermissionCache
 } from '../../lib/staff-auth';
 import { logAuditAction } from '../../lib/audit-logger';
-import { buildStaffAuditPayload } from './staff-audit-utils';
+import { buildAuditPayload } from '../../lib/audit-utils';
 import { sendStaffPasswordChangeOTP, validateStaffOTP, deleteStaffOTP } from '../../lib/otp-utils';
 
 export async function staffLoginImpl(db: any, tables: any, kv: any, body: { email: string; password: string }) {
@@ -203,8 +203,8 @@ export async function staffChangePasswordImpl(
     .set({ revokedAt: now, revokeReason: 'password_change' })
     .where(and(eq(staffTokens.staffId, staffId), isNull(staffTokens.revokedAt)));
 
-  const auditOld = buildStaffAuditPayload(staff);
-  const auditNew = buildStaffAuditPayload({ ...staff, forcePasswordChange: false, updatedAt: now });
+  const auditOld = buildAuditPayload(staff, 'staff');
+  const auditNew = buildAuditPayload({ ...staff, forcePasswordChange: false, updatedAt: now }, 'staff');
 
   // Log audit action
   await logAuditAction(
@@ -284,7 +284,7 @@ export async function staffResetPasswordImpl(
     return { status: 'error', message: 'Staff not found' };
   }
 
-  const auditOld = buildStaffAuditPayload(staff);
+  const auditOld = buildAuditPayload(staff, 'staff');
 
   // Hash new password
   const hashedPassword = await hashPassword(newPassword);
@@ -314,7 +314,7 @@ export async function staffResetPasswordImpl(
   // Invalidate permission cache
   await invalidateStaffPermissionCache(kv, tokenRecord.staffId);
 
-  const auditNew = buildStaffAuditPayload({ ...staff, forcePasswordChange: true, updatedAt: now });
+  const auditNew = buildAuditPayload({ ...staff, forcePasswordChange: true, updatedAt: now }, 'staff');
 
   // Log audit action
   await logAuditAction(
@@ -430,8 +430,8 @@ export async function staffChangePasswordWithOTP(
   // Invalidate permission cache
   await invalidateStaffPermissionCache(kv, staffId);
 
-  const auditOld = buildStaffAuditPayload(staff);
-  const auditNew = buildStaffAuditPayload({ ...staff, forcePasswordChange: false, updatedAt: now });
+  const auditOld = buildAuditPayload(staff, 'staff');
+  const auditNew = buildAuditPayload({ ...staff, forcePasswordChange: false, updatedAt: now }, 'staff');
 
   // Log audit action
   await logAuditAction(
@@ -473,7 +473,7 @@ export async function staffForceChangePasswordImpl(
     return { status: 'error', message: 'Tài khoản không ở trạng thái yêu cầu đổi mật khẩu bắt buộc' };
   }
 
-  const auditOld = buildStaffAuditPayload(staff);
+  const auditOld = buildAuditPayload(staff, 'staff');
 
   // Hash new password
   const hashedPassword = await hashPassword(newPassword);
@@ -491,7 +491,7 @@ export async function staffForceChangePasswordImpl(
   // Invalidate permission cache
   await invalidateStaffPermissionCache(kv, staffId);
 
-  const auditNew = buildStaffAuditPayload({ ...staff, forcePasswordChange: false, updatedAt: now });
+  const auditNew = buildAuditPayload({ ...staff, forcePasswordChange: false, updatedAt: now }, 'staff');
 
   // Log audit action
   await logAuditAction(

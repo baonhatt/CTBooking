@@ -3,7 +3,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -110,7 +110,7 @@ export default function AuditLogsPage() {
   const [isDetailDialogOpen, setIsDetailDialogOpen] = useState(false);
 
   // Fetch audit logs
-  const { data: logsData, isLoading: logsLoading } = useQuery({
+  const { data: logsData, isFetching: logsLoading } = useQuery({
     queryKey: [
       'audit-logs',
       page,
@@ -259,34 +259,7 @@ export default function AuditLogsPage() {
     navigate('/login');
   };
 
-  if (logsLoading) {
-    return (
-      <AdminLayout
-        active={activeTab as any}
-        setActive={setActiveTab as any}
-        adminEmailState={staff?.email || 'admin@email.com'}
-        handleLogout={handleLogout}
-      >
-        <div className="space-y-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <h1 className="text-xl font-bold text-slate-800">Nhật ký hoạt động</h1>
-              <p className="text-sm text-slate-400 mt-0.5">Đang tải...</p>
-            </div>
-          </div>
-          <Card className="border border-gray-200 rounded-xl shadow-sm bg-white">
-            <CardContent className="p-6">
-              <div className="space-y-4">
-                <Skeleton className="h-10 w-full" />
-                <Skeleton className="h-10 w-full" />
-                <Skeleton className="h-10 w-full" />
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-      </AdminLayout>
-    );
-  }
+
 
   return (
     <AdminLayout
@@ -400,6 +373,21 @@ export default function AuditLogsPage() {
         {/* TABLE */}
         <Card className="border border-gray-200 rounded-xl shadow-sm bg-white">
           <CardContent className="p-0 overflow-x-auto">
+            {logsLoading ? (
+              <div className="space-y-4 py-4 px-6">
+                <div className="flex items-center justify-center gap-3 py-4 text-slate-600 font-medium">
+                  <div className="w-6 h-6 border-2 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
+                  <span>Đang tải nhật ký hoạt động từ máy chủ...</span>
+                </div>
+                <div className="space-y-3">
+                  <Skeleton className="h-10 w-full rounded-lg bg-slate-100" />
+                  <Skeleton className="h-12 w-full rounded-lg bg-slate-100" />
+                  <Skeleton className="h-12 w-full rounded-lg bg-slate-100" />
+                  <Skeleton className="h-12 w-full rounded-lg bg-slate-100" />
+                  <Skeleton className="h-12 w-full rounded-lg bg-slate-100" />
+                </div>
+              </div>
+            ) : (
             <Table>
               <TableHeader className="bg-gray-50">
                 <TableRow className="hover:bg-transparent border-none">
@@ -456,6 +444,7 @@ export default function AuditLogsPage() {
                 ))}
               </TableBody>
             </Table>
+            )}
           </CardContent>
         </Card>
 
@@ -503,7 +492,7 @@ export default function AuditLogsPage() {
 
         {/* Detail Dialog */}
         <Dialog open={isDetailDialogOpen} onOpenChange={setIsDetailDialogOpen}>
-          <DialogContent className="[&>button]:hidden bg-white sm:max-w-4xl max-h-[80vh] overflow-y-auto rounded-2xl">
+          <DialogContent className="[&>button]:hidden bg-white sm:max-w-4xl max-h-[80vh] overflow-y-auto rounded-2xl flex flex-col">
             <DialogHeader>
               <DialogTitle>Chi tiết hoạt động</DialogTitle>
             </DialogHeader>
@@ -597,6 +586,11 @@ export default function AuditLogsPage() {
                 )}
               </div>
             )}
+            <DialogFooter className="sticky bottom-0 bg-white border-t p-4 mt-auto">
+              <Button variant="outline" onClick={() => setIsDetailDialogOpen(false)}>
+                Đóng
+              </Button>
+            </DialogFooter>
           </DialogContent>
         </Dialog>
       </div>

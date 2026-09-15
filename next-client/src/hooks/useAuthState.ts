@@ -1,6 +1,6 @@
 'use client';
 import { useState, useEffect } from 'react';
-import { getCookie } from '@/lib/cookies';
+import { getCookie, deleteCookie } from '@/lib/cookies';
 
 export function useAuthState(shouldCheck: boolean = false) {
   const [userName, setUserName] = useState<string | null>(null);
@@ -8,8 +8,15 @@ export function useAuthState(shouldCheck: boolean = false) {
 
   useEffect(() => {
     // Load from cookie first, localStorage as fallback
+    const token = getCookie('userToken') || localStorage.getItem('userToken');
     const userProfile = getCookie('userProfile') || localStorage.getItem('userProfile');
-    if (userProfile) {
+
+    if (userProfile && !token) {
+      // Inconsistent state: token expired but profile remained. Clear it.
+      localStorage.removeItem('userProfile');
+      deleteCookie('userProfile');
+      setUserName(null);
+    } else if (userProfile) {
       try {
         const parsed = JSON.parse(userProfile);
         setUserName(parsed.name || null);
@@ -20,8 +27,13 @@ export function useAuthState(shouldCheck: boolean = false) {
 
     // Listen for auth changes (login/logout)
     const handleAuthChange = () => {
+      const token = getCookie('userToken') || localStorage.getItem('userToken');
       const userProfile = getCookie('userProfile') || localStorage.getItem('userProfile');
-      if (userProfile) {
+      if (userProfile && !token) {
+        localStorage.removeItem('userProfile');
+        deleteCookie('userProfile');
+        setUserName(null);
+      } else if (userProfile) {
         try {
           const parsed = JSON.parse(userProfile);
           setUserName(parsed.name || null);

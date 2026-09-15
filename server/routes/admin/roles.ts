@@ -1,16 +1,30 @@
-import { eq, and, desc, count, isNull, isNotNull, like } from 'drizzle-orm';
+import { eq, and, desc, count, isNull, isNotNull, like, sql } from 'drizzle-orm';
 import { logAuditAction } from '../../lib/audit-logger';
 import { buildAuditPayload } from '../../lib/audit-utils';
 
-export async function listRolesImpl(db: any, tables: any, params?: { page?: number; pageSize?: number }) {
+export async function listRolesImpl(
+  db: any,
+  tables: any,
+  params?: { page?: number; pageSize?: number; q?: string; isSystem?: boolean }
+) {
   const { roles, rolePermissions, permissions } = tables;
-  const { page = 1, pageSize = 100 } = params || {};
+  const { page = 1, pageSize = 100, q = '', isSystem } = params || {};
   const offset = (page - 1) * pageSize;
 
-  const roleList = await db
-    .select()
-    .from(roles)
-    .where(isNull(roles.deleted_at))
+  let query = db.select().from(roles);
+  
+  const conditions = [isNull(roles.deleted_at)];
+  if (q) {
+    conditions.push(sql`${roles.name} LIKE ${'%' + q + '%'}`);
+  }
+  
+  if (isSystem !== undefined) {
+    // Some drizzle tables use isSystem, some is_system, sql handles SQLite natively
+    conditions.push(sql`is_system = ${isSystem ? 1 : 0}`);
+  }
+
+  const roleList = await query
+    .where(and(...conditions))
     .orderBy(desc(roles.level))
     .limit(pageSize)
     .offset(offset);
@@ -41,7 +55,10 @@ export async function listRolesImpl(db: any, tables: any, params?: { page?: numb
   );
 
   // Get total count
-  const [countResult] = await db.select({ count: count() }).from(roles).where(isNull(roles.deleted_at));
+  const [countResult] = await db
+    .select({ count: count() })
+    .from(roles)
+    .where(and(...conditions));
 
   return {
     items: rolesWithPerms,

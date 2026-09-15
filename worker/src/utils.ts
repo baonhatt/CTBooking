@@ -4,9 +4,6 @@ export const RL_MAX = 100;
 export const RL_WINDOW_MS = 60_000;
 // export const attempts = new Map<string, number[]>(); // Removed in-memory map
 
-export async function checkRateLimitKV(env: any, ip: string): Promise<boolean> {
-  return true;
-}
 
 export async function withCache(
   request: Request,

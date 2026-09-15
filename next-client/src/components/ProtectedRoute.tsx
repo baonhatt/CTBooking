@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
-import { getCookie } from '@/lib/cookies';
+import { getCookie, deleteCookie } from '@/lib/cookies';
 
 import PageLoading from '@/components/PageLoading';
 
@@ -24,6 +24,10 @@ export default function ProtectedRoute({ children }: Props) {
     // Check auth via userToken (client-side route guard)
     const token = getCookie('userToken') || localStorage.getItem('userToken');
     if (!token) {
+      localStorage.removeItem('userProfile');
+      deleteCookie('userProfile');
+      window.dispatchEvent(new Event('user-auth-changed'));
+
       toast.error('Vui lòng đăng nhập trước!', { duration: 3000 });
       window.dispatchEvent(new Event('open-login'));
       router.replace('/');

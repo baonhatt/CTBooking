@@ -1,6 +1,6 @@
 import { eq, or, desc, asc, count, inArray, and, sql, isNull, isNotNull, like } from 'drizzle-orm';
 import { formatDateForDb } from '../../lib/date-utils';
-import { deleteCache } from '../../../worker/src/utils';
+
 import { logAuditAction } from '../../lib/audit-logger';
 import { buildAuditPayload } from '../../lib/audit-utils';
 import {

@@ -3,7 +3,7 @@ import { drizzle } from 'drizzle-orm/d1';
 import { validateSessionTokenImpl } from '../../server/routes/user/auth';
 import { loadStaffPermissions } from '../../server/lib/staff-auth';
 import { eq, and, isNull, gt } from 'drizzle-orm';
-import * as schema from './schema';
+import * as schema from '../../shared/schema';
 
 /**
  * Middleware requireAuth - Check session token

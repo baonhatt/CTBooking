@@ -123,7 +123,7 @@ export default function StaffPage() {
 
 
   // Fetch staff list
-  const { data: staffData, isLoading: staffLoading } = useQuery({
+  const { data: staffData, isFetching: staffLoading } = useQuery({
     queryKey: ['staff', page, pageSize, search, filterRole, filterBranch],
     queryFn: async () => {
       const params = new URLSearchParams({
@@ -353,31 +353,7 @@ export default function StaffPage() {
     navigate('/login');
   };
 
-  if (staffLoading) {
-    return (
-      <AdminLayout
-        active={'staff' as any}
-        setActive={() => {}}
-        adminEmailState={staff?.email || 'admin@email.com'}
-        handleLogout={handleLogout}
-      >
-        <div className="space-y-6">
-          <Card>
-            <CardHeader>
-              <CardTitle>Quản lý nhân viên</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                <Skeleton className="h-10 w-full" />
-                <Skeleton className="h-10 w-full" />
-                <Skeleton className="h-10 w-full" />
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-      </AdminLayout>
-    );
-  }
+
 
   return (
     <AdminLayout
@@ -479,124 +455,142 @@ export default function StaffPage() {
             </div>
           </CardHeader>
           <CardContent>
-            {/* Table */}
-            <div className="border rounded-lg overflow-x-auto">
-              <table className="w-full">
-                <thead>
-                  <tr className="border-b bg-gray-50">
-                    <th className="text-left p-3">Email</th>
-                    <th className="text-left p-3">Họ tên</th>
-                    <th className="text-left p-3">Vai trò</th>
-                    <th className="text-left p-3">Chi nhánh</th>
-                    <th className="text-left p-3">Trạng thái</th>
-                    <th className="text-left p-3">Hành động</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {staffList.map((staff: Staff) => (
-                    <tr key={staff.id} className="border-b hover:bg-gray-50">
-                      <td className="p-3">{staff.email}</td>
-                      <td className="p-3">{staff.fullname}</td>
-                      <td className="p-3">
-                        {staff.isSuperAdmin ? (
-                          <span className="font-semibold text-purple-700">Super Admin</span>
-                        ) : (
-                          staff.roles?.join(', ') || '-'
-                        )}
-                      </td>
-                      <td className="p-3">
-                        {staff.isSuperAdmin ? (
-                          <span className="text-slate-500 italic">Tất cả chi nhánh</span>
-                        ) : (
-                          staff.branchNames?.join(', ') || '-'
-                        )}
-                      </td>
-                      <td className="p-3">
-                        {staff.isSuperAdmin && (
-                          <span className="bg-purple-100 text-purple-800 px-2 py-1 rounded text-xs">Super Admin</span>
-                        )}
-                        {staff.forcePasswordChange && (
-                          <span className="bg-yellow-100 text-yellow-800 px-2 py-1 rounded text-xs ml-1">
-                            Đổi mật khẩu
-                          </span>
-                        )}
-                      </td>
-                      <td className="p-3">
-                        <div className="flex gap-1">
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-8 w-8 text-blue-600 hover:text-blue-700 hover:bg-blue-50"
-                            onClick={() => {
-                              setSelectedStaff(staff);
-                              setIsDetailDialogOpen(true);
-                            }}
-                            title="Chi tiết"
-                          >
-                            <Eye className="w-4 h-4" />
-                          </Button>
-                          {hasPermission('staff', 'edit') && (
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="h-8 w-8 text-yellow-600 hover:text-yellow-700 hover:bg-yellow-50"
-                              onClick={() => openEditDialog(staff)}
-                              title="Sửa"
-                            >
-                              <Edit className="w-4 h-4" />
-                            </Button>
-                          )}
-                          {hasPermission('staff', 'reset_password') && (
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="h-8 w-8 text-gray-600 hover:text-gray-700 hover:bg-gray-50"
-                              onClick={() => {
-                                setSelectedStaff(staff);
-                                setIsResetPasswordDialogOpen(true);
-                              }}
-                              title="Đặt lại mật khẩu"
-                            >
-                              <Key className="w-4 h-4" />
-                            </Button>
-                          )}
-                          {!staff.isSuperAdmin && hasPermission('staff', 'delete') && (
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="h-8 w-8 text-red-600 hover:text-red-700 hover:bg-red-50"
-                              onClick={() => {
-                                setSelectedStaff(staff);
-                                setIsDeleteDialogOpen(true);
-                              }}
-                              title="Xóa"
-                            >
-                              <Trash2 className="w-4 h-4" />
-                            </Button>
-                          )}
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-
-            {/* Pagination */}
-            <div className="flex justify-between items-center mt-4">
-              <span className="text-sm text-gray-600">Tổng {total} nhân viên</span>
-              <div className="flex gap-2">
-                <Button variant="outline" disabled={page === 1} onClick={() => setPage(page - 1)}>
-                  Trước
-                </Button>
-                <span className="flex items-center px-3">
-                  Trang {page} / {totalPages || 1}
-                </span>
-                <Button variant="outline" disabled={page >= totalPages} onClick={() => setPage(page + 1)}>
-                  Sau
-                </Button>
+            {staffLoading ? (
+              <div className="space-y-4 py-4">
+                <div className="flex items-center justify-center gap-3 py-4 text-slate-600 font-medium">
+                  <div className="w-6 h-6 border-2 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
+                  <span>Đang tải danh sách nhân viên từ máy chủ...</span>
+                </div>
+                <div className="space-y-3">
+                  <Skeleton className="h-10 w-full rounded-lg bg-slate-100" />
+                  <Skeleton className="h-12 w-full rounded-lg bg-slate-100" />
+                  <Skeleton className="h-12 w-full rounded-lg bg-slate-100" />
+                  <Skeleton className="h-12 w-full rounded-lg bg-slate-100" />
+                  <Skeleton className="h-12 w-full rounded-lg bg-slate-100" />
+                </div>
               </div>
-            </div>
+            ) : (
+              <>
+                {/* Table */}
+                <div className="border rounded-lg overflow-x-auto">
+                  <table className="w-full">
+                    <thead>
+                      <tr className="border-b bg-gray-50">
+                        <th className="text-left p-3">Email</th>
+                        <th className="text-left p-3">Họ tên</th>
+                        <th className="text-left p-3">Vai trò</th>
+                        <th className="text-left p-3">Chi nhánh</th>
+                        <th className="text-left p-3">Trạng thái</th>
+                        <th className="text-left p-3">Hành động</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {staffList.map((staff: Staff) => (
+                        <tr key={staff.id} className="border-b hover:bg-gray-50">
+                          <td className="p-3">{staff.email}</td>
+                          <td className="p-3">{staff.fullname}</td>
+                          <td className="p-3">
+                            {staff.isSuperAdmin ? (
+                              <span className="font-semibold text-purple-700">Super Admin</span>
+                            ) : (
+                              staff.roles?.join(', ') || '-'
+                            )}
+                          </td>
+                          <td className="p-3">
+                            {staff.isSuperAdmin ? (
+                              <span className="text-slate-500 italic">Tất cả chi nhánh</span>
+                            ) : (
+                              staff.branchNames?.join(', ') || '-'
+                            )}
+                          </td>
+                          <td className="p-3">
+                            {staff.isSuperAdmin && (
+                              <span className="bg-purple-100 text-purple-800 px-2 py-1 rounded text-xs">Super Admin</span>
+                            )}
+                            {staff.forcePasswordChange && (
+                              <span className="bg-yellow-100 text-yellow-800 px-2 py-1 rounded text-xs ml-1">
+                                Đổi mật khẩu
+                              </span>
+                            )}
+                          </td>
+                          <td className="p-3">
+                            <div className="flex gap-1">
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-8 w-8 text-blue-600 hover:text-blue-700 hover:bg-blue-50"
+                                onClick={() => {
+                                  setSelectedStaff(staff);
+                                  setIsDetailDialogOpen(true);
+                                }}
+                                title="Chi tiết"
+                              >
+                                <Eye className="w-4 h-4" />
+                              </Button>
+                              {hasPermission('staff', 'edit') && (
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-8 w-8 text-yellow-600 hover:text-yellow-700 hover:bg-yellow-50"
+                                  onClick={() => openEditDialog(staff)}
+                                  title="Sửa"
+                                >
+                                  <Edit className="w-4 h-4" />
+                                </Button>
+                              )}
+                              {hasPermission('staff', 'reset_password') && (
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-8 w-8 text-gray-600 hover:text-gray-700 hover:bg-gray-50"
+                                  onClick={() => {
+                                    setSelectedStaff(staff);
+                                    setIsResetPasswordDialogOpen(true);
+                                  }}
+                                  title="Đặt lại mật khẩu"
+                                >
+                                  <Key className="w-4 h-4" />
+                                </Button>
+                              )}
+                              {!staff.isSuperAdmin && hasPermission('staff', 'delete') && (
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-8 w-8 text-red-600 hover:text-red-700 hover:bg-red-50"
+                                  onClick={() => {
+                                    setSelectedStaff(staff);
+                                    setIsDeleteDialogOpen(true);
+                                  }}
+                                  title="Xóa"
+                                >
+                                  <Trash2 className="w-4 h-4" />
+                                </Button>
+                              )}
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+
+                {/* Pagination */}
+                <div className="flex justify-between items-center mt-4">
+                  <span className="text-sm text-gray-600">Tổng {total} nhân viên</span>
+                  <div className="flex gap-2">
+                    <Button variant="outline" disabled={page === 1} onClick={() => setPage(page - 1)}>
+                      Trước
+                    </Button>
+                    <span className="flex items-center px-3">
+                      Trang {page} / {totalPages || 1}
+                    </span>
+                    <Button variant="outline" disabled={page >= totalPages} onClick={() => setPage(page + 1)}>
+                      Sau
+                    </Button>
+                  </div>
+                </div>
+              </>
+            )}
           </CardContent>
         </Card>
 

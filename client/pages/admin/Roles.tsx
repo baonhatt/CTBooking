@@ -59,7 +59,7 @@ export default function RolesPage() {
   });
 
   // Fetch roles
-  const { data: rolesData, isLoading: rolesLoading } = useQuery({
+  const { data: rolesData, isFetching: rolesLoading } = useQuery({
     queryKey: ['roles', searchQuery, showSystemOnly],
     queryFn: async () => {
       const params = new URLSearchParams();
@@ -158,31 +158,7 @@ export default function RolesPage() {
 
   const roles = (rolesData as any)?.items || [];
 
-  if (rolesLoading) {
-    return (
-      <AdminLayout
-        active={'roles' as any}
-        setActive={() => {}}
-        adminEmailState={staff?.email || 'admin@email.com'}
-        handleLogout={handleLogout}
-      >
-        <div className="space-y-6">
-          <Card>
-            <CardHeader>
-              <CardTitle>Quản lý vai trò</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                <Skeleton className="h-10 w-full" />
-                <Skeleton className="h-10 w-full" />
-                <Skeleton className="h-10 w-full" />
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-      </AdminLayout>
-    );
-  }
+
 
   return (
     <AdminLayout
@@ -270,6 +246,21 @@ export default function RolesPage() {
             </div>
           </CardHeader>
           <CardContent>
+            {rolesLoading ? (
+              <div className="space-y-4 py-4">
+                <div className="flex items-center justify-center gap-3 py-4 text-slate-600 font-medium">
+                  <div className="w-6 h-6 border-2 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
+                  <span>Đang tải danh sách vai trò từ máy chủ...</span>
+                </div>
+                <div className="space-y-3">
+                  <Skeleton className="h-10 w-full rounded-lg bg-slate-100" />
+                  <Skeleton className="h-12 w-full rounded-lg bg-slate-100" />
+                  <Skeleton className="h-12 w-full rounded-lg bg-slate-100" />
+                  <Skeleton className="h-12 w-full rounded-lg bg-slate-100" />
+                  <Skeleton className="h-12 w-full rounded-lg bg-slate-100" />
+                </div>
+              </div>
+            ) : (
             <div className="overflow-x-auto">
               <table className="w-full">
                 <thead>
@@ -340,6 +331,7 @@ export default function RolesPage() {
                 </tbody>
               </table>
             </div>
+            )}
           </CardContent>
         </Card>
 

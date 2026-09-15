@@ -55,7 +55,7 @@ export class MailQueue {
     try {
       if (!table && db) {
         try {
-          const schemaModule = await import('../../worker/src/schema.js');
+          const schemaModule = await import('../../shared/schema.js');
           table = schemaModule.email_logs;
         } catch (e) {
           console.error('[EmailTracking] Could not load email_logs table:', e);

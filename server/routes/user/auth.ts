@@ -5,7 +5,7 @@ import { mailQueue } from '../../lib/mail-queue';
 import { getWelcomeEmailTemplate } from '../../lib/booking-utils';
 import { formatDateForDb } from '../../lib/date-utils';
 import { generateOTP, sendOTPEmail, createOTPRecord, validateOTP, deleteOTP, canResendOTP } from '../../lib/otp-utils';
-import { getAdminSettingsImpl } from '../admin/settings';
+import { getGlobalSettingsImpl } from '../../lib/global-settings';
 
 export async function loginImpl(anyDb: any, tables: { accounts: any; users: any }, payload: Partial<Login>) {
   const email = payload.email || '';
@@ -59,8 +59,8 @@ export async function loginWithSessionImpl(
   });
 
   // Check 2FA settings
-  const settingsResult = await getAdminSettingsImpl();
-  const settings = (settingsResult.settings as any) || {};
+  const settingsResult = await getGlobalSettingsImpl();
+  const settings = (settingsResult as any) || {};
   const enable2FA = settings.otp_settings?.enable_2fa === true;
   const otpExpiryMinutes = settings.otp_settings?.otp_expiry_minutes || 5;
   const otpLength = settings.otp_settings?.otp_length || 6;
@@ -213,8 +213,8 @@ export async function resendOTPImpl(
   });
 
   // Get settings for cooldown
-  const settingsResult = await getAdminSettingsImpl();
-  const settings = (settingsResult.settings as any) || {};
+  const settingsResult = await getGlobalSettingsImpl();
+  const settings = (settingsResult as any) || {};
   console.log('[RESEND OTP] Settings loaded:', JSON.stringify(settings));
   const cooldownSeconds = settings.otp_settings?.otp_resend_cooldown_seconds || 30;
   const otpExpiryMinutes = settings.otp_settings?.otp_expiry_minutes || 5;
@@ -277,7 +277,7 @@ export async function registerImpl(
     }
 
     // Check if email already exists in staffs
-    const { staffs } = await import('../../../worker/src/schema');
+    const { staffs } = await import('../../../shared/schema');
     const staffExist = await anyDb.query.staffs.findFirst({
       where: eq(staffs.email, email)
     });
