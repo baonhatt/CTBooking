@@ -2,8 +2,8 @@
 import { forgetPassApi, loginApi, registerApi, resetPasswordApi, logoutApi } from '@/lib/api';
 
 export function useAuth() {
-  async function login(email: string, password: string) {
-    return loginApi({ email, password });
+  async function login(email: string, password: string, turnstileToken?: string) {
+    return loginApi({ email, password, turnstileToken });
   }
 
   async function logout() {
@@ -14,13 +14,14 @@ export function useAuth() {
     email: string,
     password: string,
     name?: string,
+    turnstileToken?: string,
     options?: { gender?: string; dob?: string; phone?: string }
   ) {
-    return registerApi({ email, password, name, ...(options || {}) });
+    return registerApi({ email, password, name, turnstileToken, ...(options || {}) });
   }
 
-  async function forgetPass(email: string) {
-    return forgetPassApi({ email });
+  async function forgetPass(email: string, turnstileToken?: string) {
+    return forgetPassApi({ email, turnstileToken });
   }
 
   async function resetPass(token: string, newPassword: string) {

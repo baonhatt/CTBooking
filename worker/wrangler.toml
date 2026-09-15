@@ -60,6 +60,7 @@ SUPER_ADMIN_EMAIL = "superadmin@cinesphere.com"
 
 SUPER_ADMIN_FULLNAME = "Super Admin"
 
+TURNSTILE_SECRET = "0x4AAAAAAE1v1BW9DhZPu7hc76CmgkUo2II"
 
 
 [[d1_databases]]
@@ -148,6 +149,7 @@ VITE_CLOUDINARY_UPLOAD_PRESET_IMAGE="ctbooking_images_unsigned"
 
 
 
+TURNSTILE_SECRET = "0x4AAAAAAE1v1BW9DhZPu7hc76CmgkUo2II"
 
 [[env.preview.d1_databases]]
 

@@ -1,6 +1,6 @@
 import { request } from '@/lib/api/http';
 
-export async function loginApi(body: { email: string; password: string }) {
+export async function loginApi(body: { email: string; password: string; turnstileToken?: string }) {
   return request<{ status: string; message: string; user: any; token: string }>('/api/login', {
     method: 'POST',
     body: JSON.stringify(body),
@@ -22,6 +22,7 @@ export async function registerApi(body: {
   gender?: string;
   dob?: string;
   phone?: string;
+  turnstileToken?: string;
 }) {
   return request<{ status: string; message: string; user: any }>('/api/register', {
     method: 'POST',
@@ -29,7 +30,7 @@ export async function registerApi(body: {
   });
 }
 
-export async function forgetPassApi(body: { email: string }) {
+export async function forgetPassApi(body: { email: string; turnstileToken?: string }) {
   return request<{ status: string; message: string }>('/api/forget-password', {
     method: 'POST',
     body: JSON.stringify(body)

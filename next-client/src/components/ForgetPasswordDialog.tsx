@@ -1,5 +1,5 @@
 'use client';
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
@@ -20,6 +20,55 @@ export function ForgetPasswordDialog({ isOpen, onOpenChange, onBackToLogin, auth
   const [email, setEmail] = useState('');
   const [emailError, setEmailError] = useState('');
   const [submitError, setSubmitError] = useState('');
+  const [turnstileToken, setTurnstileToken] = useState<string>('');
+  const turnstileRef = useRef<HTMLDivElement>(null);
+  const turnstileWidgetId = useRef<string | null>(null);
+
+  // Handle Turnstile explicit render
+  useEffect(() => {
+    if (!isOpen) return;
+
+    let timeoutId: any;
+    const renderWidget = () => {
+      // If turnstile script is ready but ref is not yet attached by Radix UI portal, wait.
+      if (!turnstileRef.current) {
+        timeoutId = setTimeout(renderWidget, 100);
+        return;
+      }
+      
+      if ((window as any).turnstile && !turnstileWidgetId.current) {
+        turnstileWidgetId.current = (window as any).turnstile.render(turnstileRef.current, {
+          sitekey: '0x4AAAAAAE1v1PaZCL-bktYH', // Use the same sitekey
+          action: 'forget_password',
+          callback: (token: string) => setTurnstileToken(token),
+          'error-callback': () => setTurnstileToken(''),
+          'expired-callback': () => setTurnstileToken('')
+        });
+      }
+    };
+
+    if (!document.getElementById('turnstile-script')) {
+      const script = document.createElement('script');
+      script.id = 'turnstile-script';
+      script.src = 'https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit';
+      script.async = true;
+      script.defer = true;
+      document.head.appendChild(script);
+      script.onload = () => {
+        timeoutId = setTimeout(renderWidget, 100);
+      };
+    } else {
+      timeoutId = setTimeout(renderWidget, 100);
+    }
+
+    return () => {
+      clearTimeout(timeoutId);
+      if (turnstileWidgetId.current && (window as any).turnstile?.remove) {
+        (window as any).turnstile.remove(turnstileWidgetId.current);
+        turnstileWidgetId.current = null;
+      }
+    };
+  }, [isOpen]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -33,9 +82,14 @@ export function ForgetPasswordDialog({ isOpen, onOpenChange, onBackToLogin, auth
       return;
     }
 
+    if (!turnstileToken) {
+      setSubmitError('Vui lòng hoàn thành bài kiểm tra bảo mật (CAPTCHA).');
+      return;
+    }
+
     try {
       setIsLoading(true);
-      const data = await auth.forgetPass(email);
+      const data = await auth.forgetPass(email, turnstileToken);
 
       if (data?.status === 'success') {
         onOpenChange(false);
@@ -46,11 +100,28 @@ export function ForgetPasswordDialog({ isOpen, onOpenChange, onBackToLogin, auth
       setSubmitError(String(err?.message || 'Yêu cầu thất bại'));
     } finally {
       setIsLoading(false);
+      if ((window as any).turnstile && turnstileWidgetId.current) {
+         (window as any).turnstile.reset(turnstileWidgetId.current);
+         setTurnstileToken('');
+      }
     }
   };
 
+  const handleOpenChange = (open: boolean) => {
+    if (!open) {
+      setEmail('');
+      setEmailError('');
+      setSubmitError('');
+      setTurnstileToken('');
+      if ((window as any).turnstile && turnstileWidgetId.current) {
+         (window as any).turnstile.reset(turnstileWidgetId.current);
+      }
+    }
+    onOpenChange(open);
+  };
+
   return (
-    <Dialog open={isOpen} onOpenChange={onOpenChange}>
+    <Dialog open={isOpen} onOpenChange={handleOpenChange}>
       <DialogContent className="bg-gradient-to-br from-[#0b1226] via-[#0e1b3d] to-[#050915] border border-cyan-500/30 text-white shadow-[0_0_50px_rgba(59,130,246,0.3)]">
         <DialogHeader>
           <div className="flex justify-center mb-4">
@@ -101,10 +172,15 @@ export function ForgetPasswordDialog({ isOpen, onOpenChange, onBackToLogin, auth
             </div>
           )}
 
+          {/* Cloudflare Turnstile */}
+          <div className="flex justify-center mt-2">
+             <div ref={turnstileRef} className="cf-turnstile"></div>
+          </div>
+
           {/* Submit Button */}
           <Button
             type="submit"
-            disabled={isLoading}
+            disabled={isLoading || !turnstileToken}
             className="w-full bg-gradient-to-r from-cyan-400 via-blue-600 to-fuchsia-500 hover:from-fuchsia-500 hover:via-cyan-400 hover:to-blue-600 text-white font-semibold shadow-[0_0_30px_rgba(59,130,246,0.4)] hover:shadow-[0_0_40px_rgba(236,72,153,0.6)]"
           >
             {isLoading ? (

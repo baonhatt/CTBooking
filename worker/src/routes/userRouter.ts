@@ -47,6 +47,28 @@ userRouter.post('/api/login', rateLimiter(5, 60), async (c) => {
 
     const body = await c.req.json().catch(() => ({}));
 
+    // Cloudflare Turnstile Verification
+    const turnstileToken = (body as any)?.turnstileToken;
+    const turnstileSecret = c.env.TURNSTILE_SECRET;
+    if (!isLocal(c.req.url) && turnstileSecret) {
+      if (!turnstileToken) {
+        return c.json({ status: 'error', message: 'Thiếu mã xác thực bảo mật (CAPTCHA). Vui lòng tải lại trang và thử lại.' }, 403);
+      }
+      try {
+        const verifyRes = await fetch('https://challenges.cloudflare.com/turnstile/v0/siteverify', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+          body: `secret=${turnstileSecret}&response=${turnstileToken}`
+        });
+        const verifyData: any = await verifyRes.json();
+        if (!verifyData.success) {
+          return c.json({ status: 'error', message: 'Xác minh CAPTCHA thất bại. Vui lòng tải lại trang.' }, 403);
+        }
+      } catch (e) {
+        return c.json({ status: 'error', message: 'Lỗi xác minh bảo mật nội bộ.' }, 500);
+      }
+    }
+
     const mailer = getMailer(c);
 
     const r = await loginWithSessionImpl(
@@ -186,6 +208,28 @@ userRouter.post('/api/resend-otp', rateLimiter(5, 60), async (c) => {
 
     const body = await c.req.json().catch(() => ({}));
 
+    // Cloudflare Turnstile Verification
+    const turnstileToken = (body as any)?.turnstileToken;
+    const turnstileSecret = c.env.TURNSTILE_SECRET;
+    if (!isLocal(c.req.url) && turnstileSecret) {
+      if (!turnstileToken) {
+        return c.json({ status: 'error', message: 'Thiếu mã xác thực bảo mật (CAPTCHA). Vui lòng tải lại trang và thử lại.' }, 403);
+      }
+      try {
+        const verifyRes = await fetch('https://challenges.cloudflare.com/turnstile/v0/siteverify', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+          body: `secret=${turnstileSecret}&response=${turnstileToken}`
+        });
+        const verifyData: any = await verifyRes.json();
+        if (!verifyData.success) {
+          return c.json({ status: 'error', message: 'Xác minh CAPTCHA thất bại. Vui lòng tải lại trang.' }, 403);
+        }
+      } catch (e) {
+        return c.json({ status: 'error', message: 'Lỗi xác minh bảo mật mạng.' }, 500);
+      }
+    }
+
     const mailer = getMailer(c);
 
     const r = await resendOTPImpl(
@@ -221,6 +265,28 @@ userRouter.post('/api/register', async (c) => {
     const db = drizzle(c.env.cinema_db, { schema });
 
     const body = await c.req.json().catch(() => ({}));
+
+    // Cloudflare Turnstile Verification
+    const turnstileToken = (body as any)?.turnstileToken;
+    const turnstileSecret = c.env.TURNSTILE_SECRET;
+    if (!isLocal(c.req.url) && turnstileSecret) {
+      if (!turnstileToken) {
+        return c.json({ status: 'error', message: 'Thiếu mã xác thực bảo mật (CAPTCHA). Vui lòng thử lại.' }, 403);
+      }
+      try {
+        const verifyRes = await fetch('https://challenges.cloudflare.com/turnstile/v0/siteverify', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+          body: `secret=${turnstileSecret}&response=${turnstileToken}`
+        });
+        const verifyData: any = await verifyRes.json();
+        if (!verifyData.success) {
+          return c.json({ status: 'error', message: 'Xác minh CAPTCHA thất bại. Vui lòng thử lại.' }, 403);
+        }
+      } catch (e) {
+        return c.json({ status: 'error', message: 'Lỗi xác minh bảo mật mạng.' }, 500);
+      }
+    }
 
     const mailer = getMailer(c);
 
@@ -281,6 +347,28 @@ userRouter.post('/api/forget-password', async (c) => {
     const db = drizzle(c.env.cinema_db, { schema });
 
     body = await c.req.json().catch(() => ({}));
+
+    // Cloudflare Turnstile Verification
+    const turnstileToken = (body as any)?.turnstileToken;
+    const turnstileSecret = c.env.TURNSTILE_SECRET;
+    if (!isLocal(c.req.url) && turnstileSecret) {
+      if (!turnstileToken) {
+        return c.json({ status: 'error', message: 'Thiếu mã xác thực bảo mật (CAPTCHA). Vui lòng thử lại.' }, 403);
+      }
+      try {
+        const verifyRes = await fetch('https://challenges.cloudflare.com/turnstile/v0/siteverify', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+          body: `secret=${turnstileSecret}&response=${turnstileToken}`
+        });
+        const verifyData: any = await verifyRes.json();
+        if (!verifyData.success) {
+          return c.json({ status: 'error', message: 'Xác minh CAPTCHA thất bại. Vui lòng thử lại.' }, 403);
+        }
+      } catch (e) {
+        return c.json({ status: 'error', message: 'Lỗi xác minh bảo mật mạng.' }, 500);
+      }
+    }
 
     const email = String((body as any)?.email || '');
 

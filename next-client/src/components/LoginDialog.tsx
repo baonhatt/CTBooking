@@ -1,5 +1,5 @@
 'use client';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
@@ -39,6 +39,9 @@ export function LoginDialog({
   const [showPassword, setShowPassword] = useState(false);
   const [isEmailFocused, setIsEmailFocused] = useState(false);
   const [isPasswordFocused, setIsPasswordFocused] = useState(false);
+  const [turnstileToken, setTurnstileToken] = useState<string>('');
+  const turnstileRef = useRef<HTMLDivElement>(null);
+  const turnstileWidgetId = useRef<string | null>(null);
 
   // OTP states
   const [showOTPDialog, setShowOTPDialog] = useState(false);
@@ -46,6 +49,52 @@ export function LoginDialog({
   const [otpEmail, setOtpEmail] = useState('');
 
   const router = useRouter();
+
+  // Handle Turnstile explicit render
+  useEffect(() => {
+    if (!isOpen) return;
+
+    let timeoutId: any;
+    const renderWidget = () => {
+      // If turnstile script is ready but ref is not yet attached by Radix UI portal, wait.
+      if (!turnstileRef.current) {
+        timeoutId = setTimeout(renderWidget, 100);
+        return;
+      }
+      
+      if ((window as any).turnstile && !turnstileWidgetId.current) {
+        turnstileWidgetId.current = (window as any).turnstile.render(turnstileRef.current, {
+          sitekey: '0x4AAAAAAE1v1PaZCL-bktYH',
+          action: 'user_login',
+          callback: (token: string) => setTurnstileToken(token),
+          'error-callback': () => setTurnstileToken(''),
+          'expired-callback': () => setTurnstileToken('')
+        });
+      }
+    };
+
+    if (!document.getElementById('turnstile-script')) {
+      const script = document.createElement('script');
+      script.id = 'turnstile-script';
+      script.src = 'https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit';
+      script.async = true;
+      script.defer = true;
+      document.head.appendChild(script);
+      script.onload = () => {
+        timeoutId = setTimeout(renderWidget, 100);
+      };
+    } else {
+      timeoutId = setTimeout(renderWidget, 100);
+    }
+
+    return () => {
+      clearTimeout(timeoutId);
+      if (turnstileWidgetId.current && (window as any).turnstile?.remove) {
+        (window as any).turnstile.remove(turnstileWidgetId.current);
+        turnstileWidgetId.current = null;
+      }
+    };
+  }, [isOpen]);
 
   // Ensure all states are clean when the dialog opens or closes
   useEffect(() => {
@@ -61,6 +110,12 @@ export function LoginDialog({
       setShowOTPDialog(false);
       setTempAccountId(null);
       setOtpEmail('');
+      setTurnstileToken('');
+      
+      // Auto-reset turnstile on dialog open to generate fresh token
+      if ((window as any).turnstile && turnstileWidgetId.current) {
+        (window as any).turnstile.reset(turnstileWidgetId.current);
+      }
     }
   }, [isOpen]);
 
@@ -92,9 +147,14 @@ export function LoginDialog({
       return;
     }
 
+    if (!turnstileToken) {
+      setSubmitError('Vui lòng hoàn thành bài kiểm tra bảo mật (CAPTCHA).');
+      return;
+    }
+
     try {
       setIsLoading(true);
-      const data = await auth.login(email, password);
+      const data = await auth.login(email, password, turnstileToken);
 
       if (data?.requires_otp) {
         // Show OTP dialog
@@ -142,10 +202,18 @@ export function LoginDialog({
       const msg = String(err?.message || 'Đăng nhập thất bại');
       if (msg.toLowerCase().includes('email')) {
         setEmailError(msg);
-      } else if (msg.toLowerCase().includes('mật khẩu') || msg.toLowerCase().includes('password')) setSubmitError(msg);
+      } else if (msg.toLowerCase().includes('mật khẩu') || msg.toLowerCase().includes('password')) {
+         setSubmitError(msg);
+      } else {
+         setSubmitError(msg);
+      }
       toast.error(msg);
     } finally {
       setIsLoading(false);
+      if ((window as any).turnstile && turnstileWidgetId.current) {
+         (window as any).turnstile.reset(turnstileWidgetId.current);
+         setTurnstileToken('');
+      }
     }
   };
 
@@ -245,10 +313,21 @@ export function LoginDialog({
               )}
             </div>
 
+            {submitError && (
+              <div className="mt-2 rounded-md bg-rose-500/10 px-3 py-2 text-xs text-rose-300">
+                {submitError}
+              </div>
+            )}
+
+            {/* Cloudflare Turnstile */}
+            <div className="flex justify-center mt-2">
+               <div ref={turnstileRef} className="cf-turnstile"></div>
+            </div>
+
             {/* Submit Button */}
             <Button
               type="submit"
-              disabled={isLoading}
+              disabled={isLoading || !turnstileToken}
               className="w-full bg-gradient-to-r from-cyan-400 via-blue-600 to-fuchsia-500 hover:from-fuchsia-500 hover:via-cyan-400 hover:to-blue-600 text-white font-semibold shadow-[0_0_30px_rgba(59,130,246,0.4)] hover:shadow-[0_0_40px_rgba(236,72,153,0.6)]"
             >
               {isLoading ? (

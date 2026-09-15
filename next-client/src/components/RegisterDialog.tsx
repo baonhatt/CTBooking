@@ -1,5 +1,5 @@
 'use client';
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
@@ -45,7 +45,56 @@ export function RegisterDialog({
 
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [turnstileToken, setTurnstileToken] = useState<string>('');
+  const turnstileRef = useRef<HTMLDivElement>(null);
+  const turnstileWidgetId = useRef<string | null>(null);
+
   const router = useRouter();
+
+  // Handle Turnstile explicit render
+  useEffect(() => {
+    if (!isOpen) return;
+
+    let timeoutId: any;
+    const renderWidget = () => {
+      if (!turnstileRef.current) {
+        timeoutId = setTimeout(renderWidget, 100);
+        return;
+      }
+
+      if ((window as any).turnstile && !turnstileWidgetId.current) {
+        turnstileWidgetId.current = (window as any).turnstile.render(turnstileRef.current, {
+          sitekey: '0x4AAAAAAE1v1PaZCL-bktYH',
+          action: 'user_register',
+          callback: (token: string) => setTurnstileToken(token),
+          'error-callback': () => setTurnstileToken(''),
+          'expired-callback': () => setTurnstileToken('')
+        });
+      }
+    };
+
+    if (!document.getElementById('turnstile-script')) {
+      const script = document.createElement('script');
+      script.id = 'turnstile-script';
+      script.src = 'https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit';
+      script.async = true;
+      script.defer = true;
+      document.head.appendChild(script);
+      script.onload = () => {
+        timeoutId = setTimeout(renderWidget, 100);
+      };
+    } else {
+      timeoutId = setTimeout(renderWidget, 100);
+    }
+
+    return () => {
+      clearTimeout(timeoutId);
+      if (turnstileWidgetId.current && (window as any).turnstile?.remove) {
+        (window as any).turnstile.remove(turnstileWidgetId.current);
+        turnstileWidgetId.current = null;
+      }
+    };
+  }, [isOpen]);
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
@@ -89,9 +138,14 @@ export function RegisterDialog({
       return;
     }
 
+    if (!turnstileToken) {
+      setSubmitError('Vui lòng hoàn thành bài kiểm tra bảo mật (CAPTCHA).');
+      return;
+    }
+
     try {
       setIsLoading(true);
-      const data = await auth.register(email, password, name);
+      const data = await auth.register(email, password, name, turnstileToken);
 
       if (data?.status === 'success') {
         // Token được lưu trong httpOnly cookie bởi backend (nếu có)
@@ -133,7 +187,11 @@ export function RegisterDialog({
       setErrorModal({ open: true, title: 'Đăng ký thất bại', message: msg });
     } finally {
       setIsLoading(false);
-      router.push('/');
+      if ((window as any).turnstile && turnstileWidgetId.current) {
+         (window as any).turnstile.reset(turnstileWidgetId.current);
+         setTurnstileToken('');
+      }
+      // router.push('/'); // Should not push if it fails
     }
   };
 
@@ -149,6 +207,11 @@ export function RegisterDialog({
       setSubmitError('');
       setShowPassword(false);
       setTermsAccepted(false);
+      setTurnstileToken('');
+      // Auto-reset turnstile
+      if ((window as any).turnstile && turnstileWidgetId.current) {
+        (window as any).turnstile.reset(turnstileWidgetId.current);
+      }
     }
     onOpenChange(open);
   };
@@ -328,11 +391,17 @@ export function RegisterDialog({
             <div className="mt-1 rounded-md bg-yellow-500/10 px-3 py-2 text-xs text-yellow-300">{termsError}</div>
           )}
 
+          {/* Cloudflare Turnstile */}
+          <div className="flex justify-center mt-2">
+             <div ref={turnstileRef} className="cf-turnstile"></div>
+          </div>
+
           {/* Submit Button */}
           <Button
             type="submit"
             disabled={
               isLoading ||
+              !turnstileToken ||
               !(email && name && password && confirmPassword && password === confirmPassword && termsAccepted)
             }
             className="w-full bg-gradient-to-r from-cyan-400 via-blue-600 to-fuchsia-500 hover:from-fuchsia-500 hover:via-cyan-400 hover:to-blue-600 text-white font-semibold shadow-[0_0_30px_rgba(59,130,246,0.4)] hover:shadow-[0_0_40px_rgba(236,72,153,0.6)]"

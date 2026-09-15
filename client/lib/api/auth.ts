@@ -1,7 +1,7 @@
 import type { Login, Register } from '@shared/api';
 import { request } from './http';
 
-export async function loginApi(body: { email: string; password: string }) {
+export async function loginApi(body: { email: string; password: string; turnstileToken?: string }) {
   const res = await request<any>('/api/admin/auth/login', {
     method: 'POST',
     body: JSON.stringify(body),

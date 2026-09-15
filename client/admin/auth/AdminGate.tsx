@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { Routes, Route, Navigate, useNavigate, useSearchParams } from 'react-router-dom';
 import { toast } from 'sonner';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
@@ -90,15 +90,57 @@ const AdminLoginView = () => {
   const [error, setError] = useState('');
   const [isEmailFocused, setIsEmailFocused] = useState(false);
   const [isPasswordFocused, setIsPasswordFocused] = useState(false);
+  const [turnstileToken, setTurnstileToken] = useState<string>('');
+  const turnstileRef = useRef<HTMLDivElement>(null);
+  const turnstileWidgetId = useRef<string | null>(null);
+
   const setStaff = useStaffStore((state) => state.setStaff);
+
+  useEffect(() => {
+    const renderWidget = () => {
+      if ((window as any).turnstile && turnstileRef.current && !turnstileWidgetId.current) {
+        turnstileWidgetId.current = (window as any).turnstile.render(turnstileRef.current, {
+          sitekey: '0x4AAAAAAE1v1PaZCL-bktYH',
+          action: 'admin_login',
+          callback: (token: string) => setTurnstileToken(token),
+          'error-callback': () => setTurnstileToken(''),
+          'expired-callback': () => setTurnstileToken('')
+        });
+      }
+    };
+
+    if (!document.getElementById('turnstile-script')) {
+      const script = document.createElement('script');
+      script.id = 'turnstile-script';
+      script.src = 'https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit';
+      script.async = true;
+      script.defer = true;
+      document.head.appendChild(script);
+      script.onload = renderWidget;
+    } else {
+      renderWidget();
+    }
+
+    return () => {
+      if (turnstileWidgetId.current && (window as any).turnstile?.remove) {
+        (window as any).turnstile.remove(turnstileWidgetId.current);
+        turnstileWidgetId.current = null;
+      }
+    };
+  }, []);
 
   async function handleLogin(e?: React.FormEvent) {
     e?.preventDefault();
+    if (!turnstileToken) {
+      setError('Vui lòng hoàn tất kiểm tra bảo mật (CAPTCHA).');
+      return;
+    }
+    
     try {
       setLoading(true);
       setError('');
 
-      const data = await loginApi({ email, password });
+      const data = await loginApi({ email, password, turnstileToken });
 
       if (data.status === 'success') {
         localStorage.setItem('staffToken', data.token);
@@ -111,6 +153,11 @@ const AdminLoginView = () => {
       setError(err?.message || 'Lỗi kết nối server');
     } finally {
       setLoading(false);
+      // Reset turnstile on error to force re-verification
+      if ((window as any).turnstile && turnstileWidgetId.current) {
+        (window as any).turnstile.reset(turnstileWidgetId.current);
+        setTurnstileToken('');
+      }
     }
   }
 
@@ -202,9 +249,14 @@ const AdminLoginView = () => {
               </div>
             )}
 
+            {/* Cloudflare Turnstile CAPTCHA */}
+            <div className="flex justify-center mt-2">
+              <div ref={turnstileRef} className="cf-turnstile"></div>
+            </div>
+
             {/* Submit Button */}
             <Button
-              disabled={loading}
+              disabled={loading || !turnstileToken}
               type="submit"
               className="w-full mt-2 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-bold py-2.5 h-11 rounded-xl shadow-lg shadow-blue-600/25 hover:shadow-blue-600/40 transition-all duration-300 flex items-center justify-center gap-2 group cursor-pointer"
             >

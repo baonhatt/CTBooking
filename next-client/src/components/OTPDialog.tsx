@@ -26,8 +26,57 @@ export function OTPDialog({ isOpen, onOpenChange, tempAccountId, email, onSucces
   const [timeLeft, setTimeLeft] = useState(300); // 5 minutes
   const [canResend, setCanResend] = useState(false);
   const [resendCooldown, setResendCooldown] = useState(30);
+  
+  const [turnstileToken, setTurnstileToken] = useState<string>('');
+  const turnstileRef = useRef<HTMLDivElement>(null);
+  const turnstileWidgetId = useRef<string | null>(null);
 
   const inputRefs = useRef<(HTMLInputElement | null)[]>([]);
+
+  // Handle Turnstile explicit render
+  useEffect(() => {
+    if (!isOpen) return;
+
+    let timeoutId: any;
+    const renderWidget = () => {
+      if (!turnstileRef.current) {
+        timeoutId = setTimeout(renderWidget, 100);
+        return;
+      }
+      
+      if ((window as any).turnstile && !turnstileWidgetId.current) {
+        turnstileWidgetId.current = (window as any).turnstile.render(turnstileRef.current, {
+          sitekey: '0x4AAAAAAE1v1PaZCL-bktYH', // Use the same sitekey
+          action: 'user_otp',
+          callback: (token: string) => setTurnstileToken(token),
+          'error-callback': () => setTurnstileToken(''),
+          'expired-callback': () => setTurnstileToken('')
+        });
+      }
+    };
+
+    if (!document.getElementById('turnstile-script')) {
+      const script = document.createElement('script');
+      script.id = 'turnstile-script';
+      script.src = 'https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit';
+      script.async = true;
+      script.defer = true;
+      document.head.appendChild(script);
+      script.onload = () => {
+        timeoutId = setTimeout(renderWidget, 100);
+      };
+    } else {
+      timeoutId = setTimeout(renderWidget, 100);
+    }
+
+    return () => {
+      clearTimeout(timeoutId);
+      if (turnstileWidgetId.current && (window as any).turnstile?.remove) {
+        (window as any).turnstile.remove(turnstileWidgetId.current);
+        turnstileWidgetId.current = null;
+      }
+    };
+  }, [isOpen]);
 
   // Reset state when dialog opens
   useEffect(() => {
@@ -37,6 +86,10 @@ export function OTPDialog({ isOpen, onOpenChange, tempAccountId, email, onSucces
       setTimeLeft(300);
       setCanResend(false);
       setResendCooldown(30);
+      setTurnstileToken('');
+      if ((window as any).turnstile && turnstileWidgetId.current) {
+         (window as any).turnstile.reset(turnstileWidgetId.current);
+      }
       // Focus first input
       setTimeout(() => {
         inputRefs.current[0]?.focus();
@@ -137,6 +190,11 @@ export function OTPDialog({ isOpen, onOpenChange, tempAccountId, email, onSucces
       return;
     }
 
+    if (!turnstileToken) {
+      setError('Vui lòng hoàn thành bài kiểm tra bảo mật (CAPTCHA).');
+      return;
+    }
+
     try {
       setIsLoading(true);
       setError('');
@@ -171,11 +229,21 @@ export function OTPDialog({ isOpen, onOpenChange, tempAccountId, email, onSucces
       console.error('OTP validation error:', err);
     } finally {
       setIsLoading(false);
+      // Reset turnstile on failure to require a new check
+      if ((window as any).turnstile && turnstileWidgetId.current) {
+         (window as any).turnstile.reset(turnstileWidgetId.current);
+         setTurnstileToken('');
+      }
     }
   };
 
   const handleResend = async () => {
     if (!canResend) return;
+
+    if (!turnstileToken) {
+      setError('Vui lòng hoàn thành bài kiểm tra bảo mật (CAPTCHA).');
+      return;
+    }
 
     try {
       setIsResending(true);
@@ -188,7 +256,8 @@ export function OTPDialog({ isOpen, onOpenChange, tempAccountId, email, onSucces
         },
         body: JSON.stringify({
           temp_account_id: tempAccountId,
-          email: email
+          email: email,
+          turnstileToken: turnstileToken
         })
       });
 
@@ -209,6 +278,10 @@ export function OTPDialog({ isOpen, onOpenChange, tempAccountId, email, onSucces
       console.error('Resend OTP error:', err);
     } finally {
       setIsResending(false);
+      if ((window as any).turnstile && turnstileWidgetId.current) {
+         (window as any).turnstile.reset(turnstileWidgetId.current);
+         setTurnstileToken('');
+      }
     }
   };
 
@@ -273,10 +346,15 @@ export function OTPDialog({ isOpen, onOpenChange, tempAccountId, email, onSucces
             </div>
           )}
 
+          {/* Cloudflare Turnstile */}
+          <div className="flex justify-center mt-2">
+             <div ref={turnstileRef} className="cf-turnstile"></div>
+          </div>
+
           {/* Submit Button */}
           <Button
             type="submit"
-            disabled={isLoading || timeLeft === 0 || otp.join('').length !== 6}
+            disabled={isLoading || timeLeft === 0 || otp.join('').length !== 6 || !turnstileToken}
             className="w-full bg-gradient-to-r from-cyan-400 via-blue-600 to-fuchsia-500 hover:from-fuchsia-500 hover:via-cyan-400 hover:to-blue-600 text-white font-semibold shadow-[0_0_30px_rgba(59,130,246,0.4)] hover:shadow-[0_0_40px_rgba(236,72,153,0.6)]"
           >
             {isLoading ? (
