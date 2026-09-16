@@ -46,14 +46,14 @@ export async function updateUserProfileApi(body: {
   gender?: string;
   dob?: string;
 }) {
-  return request<{ ok: boolean; user: any }>(`/api/users-profile`, {
+  return request<{ ok: boolean; user: any }>(`/api/user/profile`, {
     method: 'POST',
     body: JSON.stringify(body)
   });
 }
 
 export async function changePasswordApi(body: { email: string; oldPassword: string; newPassword: string }) {
-  return request<{ ok: boolean }>(`/api/users-password`, {
+  return request<{ ok: boolean }>(`/api/user/password`, {
     method: 'POST',
     body: JSON.stringify(body)
   });
@@ -63,7 +63,7 @@ export async function getUserTransactionsApi(options: { email: string; status?: 
   const params = new URLSearchParams();
   params.set('email', options.email);
   if (options.status) params.set('status', options.status);
-  const path = `/api/usersprofile/transactions?${params.toString()}`;
+  const path = `/api/user/transactions?${params.toString()}`;
   return request<{ items: any[] }>(path, { signal: options.signal });
 }
 
@@ -82,5 +82,5 @@ export async function getUserProfileByEmailApi(email: string) {
     user_created_at?: string | null;
     user_updated_at?: string | null;
     account_created_at?: string | null;
-  }>(`/api/users-profile?${params.toString()}`);
+  }>(`/api/user/profile?${params.toString()}`);
 }

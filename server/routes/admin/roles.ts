@@ -1,4 +1,4 @@
-import { eq, and, desc, count, isNull, isNotNull, like, sql } from 'drizzle-orm';
+import { eq, and, desc, count, isNull, isNotNull, like, sql, inArray } from 'drizzle-orm';
 import { logAuditAction } from '../../lib/audit-logger';
 import { buildAuditPayload } from '../../lib/audit-utils';
 
@@ -29,30 +29,37 @@ export async function listRolesImpl(
     .limit(pageSize)
     .offset(offset);
 
-  // Get permissions for each role
-  const rolesWithPerms = await Promise.all(
-    roleList.map(async (role: any) => {
-      const permData = await db
-        .select({
-          permissionId: rolePermissions.permissionId,
-          module: permissions.module,
-          action: permissions.action
-        })
-        .from(rolePermissions)
-        .innerJoin(permissions, eq(rolePermissions.permissionId, permissions.id))
-        .where(eq(rolePermissions.roleId, role.id));
+  const roleIds = roleList.map((r: any) => r.id);
+  const rolesWithPerms = roleList.map((r: any) => ({ ...r, permissionIds: [], permissions: [] }));
 
-      return {
-        ...role,
-        permissionIds: permData.map((p: any) => p.permissionId),
-        permissions: permData.map((p: any) => ({
-          id: p.permissionId,
-          module: p.module,
-          action: p.action
-        }))
-      };
-    })
-  );
+  if (roleIds.length > 0) {
+    const allPerms = await db
+      .select({
+        roleId: rolePermissions.roleId,
+        permissionId: rolePermissions.permissionId,
+        module: permissions.module,
+        action: permissions.action
+      })
+      .from(rolePermissions)
+      .innerJoin(permissions, eq(rolePermissions.permissionId, permissions.id))
+      .where(inArray(rolePermissions.roleId, roleIds));
+
+    const permsByRole = allPerms.reduce((acc: any, p: any) => {
+      if (!acc[p.roleId]) acc[p.roleId] = [];
+      acc[p.roleId].push(p);
+      return acc;
+    }, {});
+
+    rolesWithPerms.forEach((r: any) => {
+      const perms = permsByRole[r.id] || [];
+      r.permissionIds = perms.map((p: any) => p.permissionId);
+      r.permissions = perms.map((p: any) => ({
+        id: p.permissionId,
+        module: p.module,
+        action: p.action
+      }));
+    });
+  }
 
   // Get total count
   const [countResult] = await db

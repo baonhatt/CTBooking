@@ -16,7 +16,7 @@ export async function getTickets(options?: {
   if (options?.type && options.type !== 'all') params.set('type', options.type);
   if (options?.includeInactive) params.set('includeInactive', 'true');
   if (options?.branch_id) params.set('branch_id', String(options.branch_id));
-  const path = `/api/tickets${params.toString() ? `?${params.toString()}` : ''}`;
+  const path = `/api/admin/tickets${params.toString() ? `?${params.toString()}` : ''}`;
   return request<{
     items: any[];
     page: number;
@@ -32,7 +32,7 @@ export async function getActiveTickets(options?: { signal?: AbortSignal }) {
 }
 
 export async function getTicketById(id: number) {
-  return request<{ item: any }>(`/api/tickets/${id}`);
+  return request<{ item: any }>(`/api/admin/tickets/${id}`);
 }
 
 export async function createTicketApi(body: {
@@ -56,7 +56,7 @@ export async function createTicketApi(body: {
   min_players?: number;
   max_players?: number;
 }) {
-  return request<{ item: any }>(`/api/tickets`, {
+  return request<{ item: any }>(`/api/admin/tickets`, {
     method: 'POST',
     body: JSON.stringify(body)
   });
@@ -86,14 +86,14 @@ export async function updateTicketApi(
     max_players?: number;
   }
 ) {
-  return request<{ item: any }>(`/api/tickets/${id}`, {
+  return request<{ item: any }>(`/api/admin/tickets/${id}`, {
     method: 'PUT',
     body: JSON.stringify(body)
   });
 }
 
 export async function deleteTicketApi(id: number) {
-  return request<{ ok: boolean }>(`/api/tickets/${id}`, { method: 'DELETE' });
+  return request<{ ok: boolean }>(`/api/admin/tickets/${id}`, { method: 'DELETE' });
 }
 
 export async function toggleTicketStatusApi(id: number) {

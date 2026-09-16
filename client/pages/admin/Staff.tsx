@@ -182,7 +182,7 @@ export default function StaffPage() {
   // Update staff mutation
   const updateMutation = useMutation({
     mutationFn: async ({ id, data }: { id: number; data: any }) => {
-      console.log('Update staff request:', { id, data });
+
       return request(`/api/admin/staff/${id}`, {
         method: 'PUT',
         body: JSON.stringify(data)

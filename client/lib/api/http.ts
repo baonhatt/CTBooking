@@ -30,29 +30,29 @@ export const SERVER_BASE_URL = (() => {
   const base = env?.VITE_SERVER_BASE_URL || '';
   if (typeof window !== 'undefined') {
     const h = window.location.hostname || '';
-    console.log('[DEBUG] hostname:', h, 'base:', base);
+
 
     if (h === 'localhost' || h === '127.0.0.1') return base;
 
     if (h.endsWith('pages.dev') && h !== 'cinema-pages.pages.dev') {
       const url = 'https://cinema-worker-preview.baonhat20.workers.dev';
-      console.log('[DEBUG] Using preview worker:', url);
+
       return url;
     }
 
     if (h === 'cinesphere.com.vn' || h === 'www.cinesphere.com.vn' || h === 'cinema-pages.pages.dev') {
       const url = 'https://cinesphere.com.vn';
-      console.log('[DEBUG] Using cinesphere:', url);
+
       return url;
     }
 
     if (h === 'cinesphere.com.vn' || h === 'www.cinesphere.com.vn' || h === 'admin.cinesphere.com.vn') {
       const url = 'https://api.cinesphere.com.vn';
-      console.log('[DEBUG] Using api.cinesphere:', url);
+
       return url;
     }
 
-    console.log('[DEBUG] Using base fallback:', base);
+
     return base;
   }
   return base;
@@ -80,10 +80,10 @@ export async function request<T>(path: string, init: RequestInit = {}) {
   // Middleware supports both cookie and Authorization header
   const needsStaffAuth =
     path.startsWith('/api/admin') ||
-    path.startsWith('/api/showtimes') ||
-    path.startsWith('/api/bookings-code/') ||
-    path === '/api/bookings-use' ||
-    path === '/api/confirm-booking';
+    path.startsWith('/api/admin/showtimes') ||
+    path.startsWith('/api/admin/bookings-code/') ||
+    path === '/api/admin/bookings-use' ||
+    path === '/api/admin/confirm-booking';
   if (staffToken && needsStaffAuth) {
     headers['Authorization'] = `Bearer ${staffToken}`;
   } else if (token) {

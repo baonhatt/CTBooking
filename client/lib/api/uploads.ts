@@ -248,7 +248,7 @@ export async function getSiteMediaApi(options?: {
   if (options?.type) params.set('type', options.type);
   if (typeof options?.active === 'boolean') params.set('active', String(options.active));
   const baseUrl = SERVER_BASE_URL || '';
-  const path = `${baseUrl}/api/site-media${params.toString() ? `?${params.toString()}` : ''}`;
+  const path = `${baseUrl}/api/admin/site-media${params.toString() ? `?${params.toString()}` : ''}`;
   const res = await fetch(path, { signal: options?.signal });
   if (!res.ok) {
     const data = await res.json().catch(() => ({}));

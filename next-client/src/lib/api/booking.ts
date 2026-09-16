@@ -69,7 +69,7 @@ export async function confirmBookingApi(body: {
   transaction_id?: string;
   paid_at?: string;
 }) {
-  return request<{ message: string; booking: any }>('/api/confirm-booking', {
+  return request<{ message: string; booking: any }>('/api/admin/confirm-booking', {
     method: 'POST',
     body: JSON.stringify(body)
   });
@@ -132,7 +132,7 @@ export async function getBookingByCodeApi(code: string) {
     validity_days: number | null;
     expired: boolean;
     vr_items?: any[];
-  }>(`/api/bookings-code/${code}`);
+  }>(`/api/admin/bookings-code/${code}`);
 }
 
 export async function useTicketApi(code: string) {
@@ -140,7 +140,7 @@ export async function useTicketApi(code: string) {
     status: string;
     message: string;
     booking: { id: number; is_used: boolean };
-  }>(`/api/bookings-use`, {
+  }>(`/api/admin/bookings-use`, {
     method: 'POST',
     body: JSON.stringify({ code })
   });

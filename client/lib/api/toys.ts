@@ -12,7 +12,7 @@ export async function getToys(options?: {
   if (options?.pageSize) params.set('pageSize', String(options.pageSize));
   if (options?.q) params.set('q', options.q);
   if (options?.status) params.set('status', options.status);
-  const path = `/api/toys${params.toString() ? `?${params.toString()}` : ''}`;
+  const path = `/api/admin/toys${params.toString() ? `?${params.toString()}` : ''}`;
   return request<{
     items: any[];
     page: number;
@@ -28,7 +28,7 @@ export async function getActiveToys(options?: { signal?: AbortSignal }) {
 }
 
 export async function getToyById(id: number) {
-  return request<{ toy: any }>(`/api/toys/${id}`);
+  return request<{ toy: any }>(`/api/admin/toys/${id}`);
 }
 
 export async function createToyApi(body: {
@@ -40,7 +40,7 @@ export async function createToyApi(body: {
   image_url?: string;
   image_base64?: string;
 }) {
-  return request<{ toy: any }>('/api/toys', {
+  return request<{ toy: any }>('/api/admin/toys', {
     method: 'POST',
     body: JSON.stringify(body)
   });
@@ -58,12 +58,12 @@ export async function updateToyApi(
     image_base64?: string;
   }
 ) {
-  return request<{ toy: any }>(`/api/toys/${id}`, {
+  return request<{ toy: any }>(`/api/admin/toys/${id}`, {
     method: 'PUT',
     body: JSON.stringify(body)
   });
 }
 
 export async function deleteToyApi(id: number) {
-  return request<{ ok: boolean }>(`/api/toys/${id}`, { method: 'DELETE' });
+  return request<{ ok: boolean }>(`/api/admin/toys/${id}`, { method: 'DELETE' });
 }

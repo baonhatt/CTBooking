@@ -22,7 +22,8 @@ import {
   deleteMovieImpl,
   updateMovieStatusImpl,
   restoreMovieImpl,
-  listDeletedMoviesImpl
+  listDeletedMoviesImpl,
+  getMovieByIdImpl
 } from '../../../server/routes/admin/movies';
 
 import {
@@ -49,7 +50,9 @@ import {
   deleteTicketPackageImpl,
   restoreTicketPackageImpl,
   listDeletedTicketPackagesImpl,
-  toggleTicketStatusImpl
+  toggleTicketStatusImpl,
+  listTicketPackagesImpl,
+  getTicketPackageImpl
 } from '../../../server/routes/admin/tickets';
 
 import {
@@ -65,11 +68,7 @@ import {
   listDeletedBranchesImpl
 } from '../../../server/routes/admin/branches';
 
-import {
-  createSiteMediaImpl,
-  updateSiteMediaImpl,
-  deleteSiteMediaImpl
-} from '../../../server/routes/admin/site-media';
+import { createSiteMediaImpl, updateSiteMediaImpl, deleteSiteMediaImpl, listSiteMediaImpl } from '../../../server/routes/admin/site-media';
 
 import {
   listPostsImpl,
@@ -78,7 +77,6 @@ import {
   updatePostImpl,
   deletePostImpl
 } from '../../../server/routes/admin/posts';
-
 
 import {
   listVouchersImpl,
@@ -100,16 +98,8 @@ import {
   getRevenueByMonthImpl
 } from '../../../server/routes/admin/dashboard';
 
-import {
-  getRevenueImpl,
-  listTransactionsImpl,
-  getTransactionByIdImpl
-} from '../../../server/routes/admin/payments';
-import {
-  getBookingByCodeImpl,
-  confirmUseTicketImpl,
-  updatePaymentImpl
-} from '../../../server/routes/user/payments';
+import { getRevenueImpl, listTransactionsImpl, getTransactionByIdImpl } from '../../../server/routes/admin/payments';
+import { getBookingByCodeImpl, confirmUseTicketImpl, updatePaymentImpl } from '../../../server/routes/user/payments';
 import { getAdminSettingsImpl, updateAdminSettingsImpl } from '../../../server/routes/admin/settings';
 import { getUsersImpl, getUserByIdImpl } from '../../../server/routes/admin/users';
 import { getEmailLogsImpl } from '../../../server/routes/admin/email-logs';
@@ -126,16 +116,31 @@ import {
   staffChangePasswordWithOTP,
   staffForceChangePasswordImpl
 } from '../../../server/routes/admin/staff-auth';
-import { checkSuperAdminExists, setupSuperAdminImpl, seedRolesAndPermissionsImpl } from '../../../server/routes/admin/setup';
 import {
-  listStaffImpl, getStaffByIdImpl, createStaffImpl, updateStaffImpl,
-  deleteStaffImpl, restoreStaffImpl, listDeletedStaffImpl, resetStaffPasswordImpl
+  checkSuperAdminExists,
+  setupSuperAdminImpl,
+  seedRolesAndPermissionsImpl
+} from '../../../server/routes/admin/setup';
+import {
+  listStaffImpl,
+  getStaffByIdImpl,
+  createStaffImpl,
+  updateStaffImpl,
+  deleteStaffImpl,
+  restoreStaffImpl,
+  listDeletedStaffImpl,
+  resetStaffPasswordImpl
 } from '../../../server/routes/admin/staff-management';
 import {
-  listRolesImpl, getRoleByIdImpl, createRoleImpl, updateRoleImpl,
-  deleteRoleImpl, restoreRoleImpl, listDeletedRolesImpl, listPermissionsImpl
+  listRolesImpl,
+  getRoleByIdImpl,
+  createRoleImpl,
+  updateRoleImpl,
+  deleteRoleImpl,
+  restoreRoleImpl,
+  listDeletedRolesImpl,
+  listPermissionsImpl
 } from '../../../server/routes/admin/roles';
-
 
 type Variables = {
   staffId?: number;
@@ -243,13 +248,16 @@ adminRouter.post('/api/admin/auth/login', async (c) => {
         body: new URLSearchParams({
           secret: String(c.env.TURNSTILE_SECRET || ''),
           response: turnstileToken,
-          remoteip: clientIp,
-        }),
+          remoteip: clientIp
+        })
       });
       if (!r.ok) throw new Error(`Turnstile error ${r.status}`);
       const result: any = await r.json();
       if (!result.success || result.action !== 'admin_login') {
-         return c.json({ status: 'error', message: 'Hệ thống bảo vệ từ chối quyền truy cập do hoạt động bất thường' }, 403);
+        return c.json(
+          { status: 'error', message: 'Hệ thống bảo vệ từ chối quyền truy cập do hoạt động bất thường' },
+          403
+        );
       }
     } catch (err) {
       return c.json({ status: 'error', message: 'Máy chủ không thể kiểm tra xác thực bảo vệ' }, 500);
@@ -400,7 +408,6 @@ adminRouter.post('/api/admin/auth/change-password', requireStaffAuth, async (c) 
     return c.json({ status: 'error', message: String(err?.message || 'Internal error') }, 500);
   }
 });
-
 
 adminRouter.post('/api/admin/auth/force-change-password', requireStaffAuth, async (c) => {
   try {
@@ -833,43 +840,48 @@ adminRouter.get('/api/admin/transactions', requireStaffAuth, requirePermission('
   }
 });
 
-adminRouter.get('/api/admin/transactions/:id', requireStaffAuth, requirePermission('transactions', 'view'), async (c) => {
-  try {
-    const id = Number(c.req.param('id'));
+adminRouter.get(
+  '/api/admin/transactions/:id',
+  requireStaffAuth,
+  requirePermission('transactions', 'view'),
+  async (c) => {
+    try {
+      const id = Number(c.req.param('id'));
 
-    const db = drizzle(c.env.cinema_db, { schema });
-    const restrictBranchIds = getRestrictBranchIds(c);
+      const db = drizzle(c.env.cinema_db, { schema });
+      const restrictBranchIds = getRestrictBranchIds(c);
 
-    const r = await getTransactionByIdImpl(
-      db,
+      const r = await getTransactionByIdImpl(
+        db,
 
-      {
-        bookings: schema.bookings,
+        {
+          bookings: schema.bookings,
 
-        users: schema.users,
+          users: schema.users,
 
-        accounts: schema.accounts,
+          accounts: schema.accounts,
 
-        movies: schema.movies,
+          movies: schema.movies,
 
-        ticket_packages: schema.ticket_packages,
+          ticket_packages: schema.ticket_packages,
 
-        branches: schema.branches,
-        auditLogs: schema.auditLogs,
-        booking_vr_items: (schema as any).booking_vr_items,
-        vouchers: (schema as any).vouchers
-      },
-      id,
-      restrictBranchIds
-    );
+          branches: schema.branches,
+          auditLogs: schema.auditLogs,
+          booking_vr_items: (schema as any).booking_vr_items,
+          vouchers: (schema as any).vouchers
+        },
+        id,
+        restrictBranchIds
+      );
 
-    if (!r) return c.json({ message: 'Không tìm thấy' }, 404);
+      if (!r) return c.json({ message: 'Không tìm thấy' }, 404);
 
-    return c.json(r);
-  } catch (err: any) {
-    return c.json({ status: 'error', message: String(err?.message || 'Internal error') }, 500);
+      return c.json(r);
+    } catch (err: any) {
+      return c.json({ status: 'error', message: String(err?.message || 'Internal error') }, 500);
+    }
   }
-});
+);
 
 // ============================================================
 // ===== SETTINGS & EMAIL LOGS ================================
@@ -997,67 +1009,7 @@ adminRouter.get('/api/admin/users/:id', requireStaffAuth, requirePermission('use
   }
 });
 
-adminRouter.get('/api/users', requireStaffAuth, requirePermission('users', 'view'), async (c) => {
-  try {
-    const page = Number(c.req.query('page') || 1);
 
-    const pageSize = Number(c.req.query('pageSize') || 20);
-
-    const q = String(c.req.query('q') || '');
-
-    const db = drizzle(c.env.cinema_db, { schema });
-
-    const r = await getUsersImpl(
-      db,
-
-      {
-        users: schema.users,
-
-        accounts: schema.accounts,
-
-        bookings: schema.bookings
-      },
-
-      { page, pageSize, q }
-    );
-
-    return c.json(r, 200);
-  } catch {
-    return c.json({ status: 'error', message: 'Lỗi máy chủ nội bộ' }, 500);
-  }
-});
-
-adminRouter.get('/api/users/:id', requireStaffAuth, requirePermission('users', 'view_detail'), async (c) => {
-  try {
-    const id = Number(c.req.param('id'));
-
-    const db = drizzle(c.env.cinema_db, { schema });
-
-    const r = await getUserByIdImpl(
-      db,
-
-      {
-        users: schema.users,
-
-        bookings: schema.bookings,
-
-        movies: schema.movies,
-
-        ticket_packages: schema.ticket_packages,
-
-        auditLogs: schema.auditLogs
-      },
-
-      id
-    );
-
-    if (!r) return c.json({ status: 'error', message: 'Không tìm thấy' }, 404);
-
-    return c.json(r, 200);
-  } catch {
-    return c.json({ status: 'error', message: 'Lỗi máy chủ nội bộ' }, 500);
-  }
-});
 
 // ============================================================
 // ===== AUDIT LOGS ===========================================
@@ -1108,7 +1060,7 @@ adminRouter.get('/api/admin/audit-logs', requireStaffAuth, requirePermission('au
 // ===== MOVIES (Batch 2) =====================================
 // ============================================================
 
-adminRouter.post('/api/movies', requireStaffAuth, requirePermission('movies', 'create'), async (c) => {
+adminRouter.post('/api/admin/movies', requireStaffAuth, requirePermission('movies', 'create'), async (c) => {
   try {
     const body = await c.req.json().catch(() => ({}));
 
@@ -1162,7 +1114,7 @@ adminRouter.post('/api/movies', requireStaffAuth, requirePermission('movies', 'c
   }
 });
 
-adminRouter.put('/api/movies/:id', requireStaffAuth, requirePermission('movies', 'edit'), async (c) => {
+adminRouter.put('/api/admin/movies/:id', requireStaffAuth, requirePermission('movies', 'edit'), async (c) => {
   try {
     const id = Number(c.req.param('id'));
 
@@ -1214,7 +1166,7 @@ adminRouter.put('/api/movies/:id', requireStaffAuth, requirePermission('movies',
 
     return c.json(r, 200);
   } catch (err: any) {
-    console.error('[PUT /api/movies/:id] Error:', err?.message || err, err?.stack);
+    console.error('[PUT /api/admin/movies/:id] Error:', err?.message || err, err?.stack);
 
     const msg = err?.message || 'Lỗi máy chủ nội bộ';
 
@@ -1226,51 +1178,56 @@ adminRouter.put('/api/movies/:id', requireStaffAuth, requirePermission('movies',
   }
 });
 
-adminRouter.post('/api/movies-status/:id', requireStaffAuth, requirePermission('movies', 'toggle_status'), async (c) => {
-  try {
-    const id = Number(c.req.param('id'));
+adminRouter.post(
+  '/api/admin/movies-status/:id',
+  requireStaffAuth,
+  requirePermission('movies', 'toggle_status'),
+  async (c) => {
+    try {
+      const id = Number(c.req.param('id'));
 
-    const body: any = await c.req.json().catch(() => ({}));
+      const body: any = await c.req.json().catch(() => ({}));
 
-    const is_active = body.is_active !== undefined ? body.is_active : false;
+      const is_active = body.is_active !== undefined ? body.is_active : false;
 
-    const db = drizzle(c.env.cinema_db, { schema });
+      const db = drizzle(c.env.cinema_db, { schema });
 
-    const staffId = c.get('staffId');
-    const staffEmail = c.get('staffEmail');
-    const staffFullname = c.get('staffFullname');
+      const staffId = c.get('staffId');
+      const staffEmail = c.get('staffEmail');
+      const staffFullname = c.get('staffFullname');
 
-    const r = await updateMovieStatusImpl(
-      db,
-      { movies: schema.movies, ticket_packages: schema.ticket_packages, auditLogs: schema.auditLogs },
-      id,
-      is_active,
-      c.env,
-      getRestrictBranchIds(c),
-      { id: staffId, email: staffEmail, fullname: staffFullname }
-    );
+      const r = await updateMovieStatusImpl(
+        db,
+        { movies: schema.movies, ticket_packages: schema.ticket_packages, auditLogs: schema.auditLogs },
+        id,
+        is_active,
+        c.env,
+        getRestrictBranchIds(c),
+        { id: staffId, email: staffEmail, fullname: staffFullname }
+      );
 
-    const status = typeof (r as any).status === 'number' ? (r as any).status : 200;
+      const status = typeof (r as any).status === 'number' ? (r as any).status : 200;
 
-    const payload = {
-      ...(r as any),
+      const payload = {
+        ...(r as any),
 
-      status: status >= 400 ? 'error' : 'success'
-    };
+        status: status >= 400 ? 'error' : 'success'
+      };
 
-    // Không cần xóa cache: KV cache cho phim đã bị vô hiệu hóa hoàn toàn
+      // Không cần xóa cache: KV cache cho phim đã bị vô hiệu hóa hoàn toàn
 
-    return c.json(payload, status);
-  } catch (err) {
-    return new Response(JSON.stringify({ status: 'error', message: 'Lỗi máy chủ nội bộ' }), {
-      status: 500,
+      return c.json(payload, status);
+    } catch (err) {
+      return new Response(JSON.stringify({ status: 'error', message: 'Lỗi máy chủ nội bộ' }), {
+        status: 500,
 
-      headers: { 'Content-Type': 'application/json' }
-    });
+        headers: { 'Content-Type': 'application/json' }
+      });
+    }
   }
-});
+);
 
-adminRouter.delete('/api/movies/:id', requireStaffAuth, requirePermission('movies', 'delete'), async (c) => {
+adminRouter.delete('/api/admin/movies/:id', requireStaffAuth, requirePermission('movies', 'delete'), async (c) => {
   try {
     const id = Number(c.req.param('id'));
 
@@ -1305,53 +1262,63 @@ adminRouter.delete('/api/movies/:id', requireStaffAuth, requirePermission('movie
   }
 });
 
-adminRouter.post('/api/admin/movies/:id/restore', requireStaffAuth, requirePermission('movies', 'restore'), async (c) => {
-  try {
-    const id = Number(c.req.param('id'));
-    const db = drizzle(c.env.cinema_db, { schema });
-    const staffId = c.get('staffId');
-    const staffEmail = c.get('staffEmail');
-    const staffFullname = c.get('staffFullname');
+adminRouter.post(
+  '/api/admin/movies/:id/restore',
+  requireStaffAuth,
+  requirePermission('movies', 'restore'),
+  async (c) => {
+    try {
+      const id = Number(c.req.param('id'));
+      const db = drizzle(c.env.cinema_db, { schema });
+      const staffId = c.get('staffId');
+      const staffEmail = c.get('staffEmail');
+      const staffFullname = c.get('staffFullname');
 
-    const r = await restoreMovieImpl(db, { movies: schema.movies, auditLogs: schema.auditLogs }, id, {
-      id: staffId,
-      email: staffEmail,
-      fullname: staffFullname
-    });
+      const r = await restoreMovieImpl(db, { movies: schema.movies, auditLogs: schema.auditLogs }, id, {
+        id: staffId,
+        email: staffEmail,
+        fullname: staffFullname
+      });
 
-    return c.json(r, 200);
-  } catch (err: any) {
-    return c.json({ status: 'error', message: err.message || 'Lỗi máy chủ nội bộ' }, err.statusCode || 500);
+      return c.json(r, 200);
+    } catch (err: any) {
+      return c.json({ status: 'error', message: err.message || 'Lỗi máy chủ nội bộ' }, err.statusCode || 500);
+    }
   }
-});
+);
 
-adminRouter.get('/api/admin/deleted/movies', requireStaffAuth, requirePermission('movies', 'view_deleted'), async (c) => {
-  try {
-    const page = Number(c.req.query('page') || 1);
-    const pageSize = Number(c.req.query('pageSize') || 10);
-    const search = String(c.req.query('search') || '');
-    const branch_id = c.req.query('branch_id') ? Number(c.req.query('branch_id')) : null;
-    const restrictBranchIds = getRestrictBranchIds(c);
+adminRouter.get(
+  '/api/admin/deleted/movies',
+  requireStaffAuth,
+  requirePermission('movies', 'view_deleted'),
+  async (c) => {
+    try {
+      const page = Number(c.req.query('page') || 1);
+      const pageSize = Number(c.req.query('pageSize') || 10);
+      const search = String(c.req.query('search') || '');
+      const branch_id = c.req.query('branch_id') ? Number(c.req.query('branch_id')) : null;
+      const restrictBranchIds = getRestrictBranchIds(c);
 
-    const db = drizzle(c.env.cinema_db, { schema });
+      const db = drizzle(c.env.cinema_db, { schema });
 
-    const r = await listDeletedMoviesImpl(
-      db,
-      { movies: schema.movies, staffs: schema.staffs },
-      { page, pageSize, search, branch_id, restrictToBranchIds: restrictBranchIds }
-    );
+      const r = await listDeletedMoviesImpl(
+        db,
+        { movies: schema.movies, staffs: schema.staffs },
+        { page, pageSize, search, branch_id, restrictToBranchIds: restrictBranchIds }
+      );
 
-    return c.json(r, 200);
-  } catch (err) {
-    return c.json({ status: 'error', message: 'Lỗi máy chủ nội bộ' }, 500);
+      return c.json(r, 200);
+    } catch (err) {
+      return c.json({ status: 'error', message: 'Lỗi máy chủ nội bộ' }, 500);
+    }
   }
-});
+);
 
 // ============================================================
 // ===== SHOWTIMES (Batch 3) ==================================
 // ============================================================
 
-adminRouter.get('/api/showtimes', requireStaffAuth, requirePermission('showtimes', 'view'), async (c) => {
+adminRouter.get('/api/admin/showtimes', requireStaffAuth, requirePermission('showtimes', 'view'), async (c) => {
   try {
     const branchId = Number(c.req.query('branch_id') || 0);
     const db = drizzle(c.env.cinema_db, { schema });
@@ -1368,7 +1335,7 @@ adminRouter.get('/api/showtimes', requireStaffAuth, requirePermission('showtimes
   }
 });
 
-adminRouter.post('/api/showtimes', requireStaffAuth, requirePermission('showtimes', 'create'), async (c) => {
+adminRouter.post('/api/admin/showtimes', requireStaffAuth, requirePermission('showtimes', 'create'), async (c) => {
   try {
     const body = await c.req.json().catch(() => ({}));
     const db = drizzle(c.env.cinema_db, { schema });
@@ -1394,7 +1361,7 @@ adminRouter.post('/api/showtimes', requireStaffAuth, requirePermission('showtime
   }
 });
 
-adminRouter.post('/api/showtimes/copy', requireStaffAuth, requirePermission('showtimes', 'create'), async (c) => {
+adminRouter.post('/api/admin/showtimes/copy', requireStaffAuth, requirePermission('showtimes', 'create'), async (c) => {
   try {
     const body = await c.req.json().catch(() => ({}));
     const db = drizzle(c.env.cinema_db, { schema });
@@ -1415,7 +1382,7 @@ adminRouter.post('/api/showtimes/copy', requireStaffAuth, requirePermission('sho
   }
 });
 
-adminRouter.put('/api/showtimes/:id', requireStaffAuth, requirePermission('showtimes', 'edit'), async (c) => {
+adminRouter.put('/api/admin/showtimes/:id', requireStaffAuth, requirePermission('showtimes', 'edit'), async (c) => {
   try {
     const id = Number(c.req.param('id'));
     const body = await c.req.json().catch(() => ({}));
@@ -1438,7 +1405,7 @@ adminRouter.put('/api/showtimes/:id', requireStaffAuth, requirePermission('showt
   }
 });
 
-adminRouter.delete('/api/showtimes/:id', requireStaffAuth, requirePermission('showtimes', 'delete'), async (c) => {
+adminRouter.delete('/api/admin/showtimes/:id', requireStaffAuth, requirePermission('showtimes', 'delete'), async (c) => {
   try {
     const id = Number(c.req.param('id'));
     const db = drizzle(c.env.cinema_db, { schema });
@@ -1463,7 +1430,7 @@ adminRouter.delete('/api/showtimes/:id', requireStaffAuth, requirePermission('sh
 // ===== TOYS & TICKETS (Batch 4) =============================
 // ============================================================
 
-adminRouter.post('/api/toys', requireStaffAuth, requirePermission('toys', 'create'), async (c) => {
+adminRouter.post('/api/admin/toys', requireStaffAuth, requirePermission('toys', 'create'), async (c) => {
   try {
     const db = drizzle(c.env.cinema_db, { schema });
 
@@ -1522,7 +1489,7 @@ adminRouter.post('/api/toys', requireStaffAuth, requirePermission('toys', 'creat
   }
 });
 
-adminRouter.put('/api/toys/:id', requireStaffAuth, requirePermission('toys', 'edit'), async (c) => {
+adminRouter.put('/api/admin/toys/:id', requireStaffAuth, requirePermission('toys', 'edit'), async (c) => {
   try {
     const id = Number(c.req.param('id'));
 
@@ -1587,7 +1554,7 @@ adminRouter.put('/api/toys/:id', requireStaffAuth, requirePermission('toys', 'ed
   }
 });
 
-adminRouter.delete('/api/toys/:id', requireStaffAuth, requirePermission('toys', 'delete'), async (c) => {
+adminRouter.delete('/api/admin/toys/:id', requireStaffAuth, requirePermission('toys', 'delete'), async (c) => {
   try {
     const id = Number(c.req.param('id'));
 
@@ -1681,7 +1648,7 @@ adminRouter.get('/api/admin/deleted/toys', requireStaffAuth, requirePermission('
   }
 });
 
-adminRouter.post('/api/tickets', requireStaffAuth, requirePermission('tickets', 'create'), async (c) => {
+adminRouter.post('/api/admin/tickets', requireStaffAuth, requirePermission('tickets', 'create'), async (c) => {
   try {
     const db = drizzle(c.env.cinema_db, { schema });
 
@@ -1713,7 +1680,7 @@ adminRouter.post('/api/tickets', requireStaffAuth, requirePermission('tickets', 
   }
 });
 
-adminRouter.put('/api/tickets/:id', requireStaffAuth, requirePermission('tickets', 'edit'), async (c) => {
+adminRouter.put('/api/admin/tickets/:id', requireStaffAuth, requirePermission('tickets', 'edit'), async (c) => {
   try {
     const id = Number(c.req.param('id'));
 
@@ -1752,7 +1719,7 @@ adminRouter.put('/api/tickets/:id', requireStaffAuth, requirePermission('tickets
   }
 });
 
-adminRouter.delete('/api/tickets/:id', requireStaffAuth, requirePermission('tickets', 'delete'), async (c) => {
+adminRouter.delete('/api/admin/tickets/:id', requireStaffAuth, requirePermission('tickets', 'delete'), async (c) => {
   try {
     const id = Number(c.req.param('id'));
 
@@ -1786,48 +1753,58 @@ adminRouter.delete('/api/tickets/:id', requireStaffAuth, requirePermission('tick
   }
 });
 
-adminRouter.post('/api/admin/tickets/:id/restore', requireStaffAuth, requirePermission('tickets', 'restore'), async (c) => {
-  try {
-    const id = Number(c.req.param('id'));
-    const db = drizzle(c.env.cinema_db, { schema });
-    const staffId = c.get('staffId');
-    const staffEmail = c.get('staffEmail');
-    const staffFullname = c.get('staffFullname');
+adminRouter.post(
+  '/api/admin/tickets/:id/restore',
+  requireStaffAuth,
+  requirePermission('tickets', 'restore'),
+  async (c) => {
+    try {
+      const id = Number(c.req.param('id'));
+      const db = drizzle(c.env.cinema_db, { schema });
+      const staffId = c.get('staffId');
+      const staffEmail = c.get('staffEmail');
+      const staffFullname = c.get('staffFullname');
 
-    const r = await restoreTicketPackageImpl(
-      db,
-      { ticket_packages: schema.ticket_packages, auditLogs: schema.auditLogs },
-      id,
-      { id: staffId, email: staffEmail, fullname: staffFullname }
-    );
+      const r = await restoreTicketPackageImpl(
+        db,
+        { ticket_packages: schema.ticket_packages, auditLogs: schema.auditLogs },
+        id,
+        { id: staffId, email: staffEmail, fullname: staffFullname }
+      );
 
-    return c.json(r, 200);
-  } catch (err: any) {
-    return c.json({ status: 'error', message: err.message || 'Lỗi máy chủ nội bộ' }, err.statusCode || 500);
+      return c.json(r, 200);
+    } catch (err: any) {
+      return c.json({ status: 'error', message: err.message || 'Lỗi máy chủ nội bộ' }, err.statusCode || 500);
+    }
   }
-});
+);
 
-adminRouter.get('/api/admin/deleted/tickets', requireStaffAuth, requirePermission('tickets', 'view_deleted'), async (c) => {
-  try {
-    const page = Number(c.req.query('page') || 1);
-    const pageSize = Number(c.req.query('pageSize') || 10);
-    const search = String(c.req.query('search') || '');
-    const branch_id = c.req.query('branch_id') ? Number(c.req.query('branch_id')) : null;
-    const restrictBranchIds = getRestrictBranchIds(c);
+adminRouter.get(
+  '/api/admin/deleted/tickets',
+  requireStaffAuth,
+  requirePermission('tickets', 'view_deleted'),
+  async (c) => {
+    try {
+      const page = Number(c.req.query('page') || 1);
+      const pageSize = Number(c.req.query('pageSize') || 10);
+      const search = String(c.req.query('search') || '');
+      const branch_id = c.req.query('branch_id') ? Number(c.req.query('branch_id')) : null;
+      const restrictBranchIds = getRestrictBranchIds(c);
 
-    const db = drizzle(c.env.cinema_db, { schema });
+      const db = drizzle(c.env.cinema_db, { schema });
 
-    const r = await listDeletedTicketPackagesImpl(
-      db,
-      { ticket_packages: schema.ticket_packages, staffs: schema.staffs },
-      { page, pageSize, search, branch_id, restrictToBranchIds: restrictBranchIds }
-    );
+      const r = await listDeletedTicketPackagesImpl(
+        db,
+        { ticket_packages: schema.ticket_packages, staffs: schema.staffs },
+        { page, pageSize, search, branch_id, restrictToBranchIds: restrictBranchIds }
+      );
 
-    return c.json(r, 200);
-  } catch (err) {
-    return c.json({ status: 'error', message: 'Lỗi máy chủ nội bộ' }, 500);
+      return c.json(r, 200);
+    } catch (err) {
+      return c.json({ status: 'error', message: 'Lỗi máy chủ nội bộ' }, 500);
+    }
   }
-});
+);
 
 adminRouter.post(
   '/api/admin/tickets/:id/toggle-status',
@@ -2043,70 +2020,85 @@ adminRouter.post(
   }
 );
 
-adminRouter.post('/api/admin/branches/:id/toggle-open', requireStaffAuth, requirePermission('branches', 'edit'), async (c) => {
-  try {
-    const id = Number(c.req.param('id'));
-    const db = drizzle(c.env.cinema_db, { schema });
-    const staffId = c.get('staffId');
-    const staffEmail = c.get('staffEmail');
-    const staffFullname = c.get('staffFullname');
+adminRouter.post(
+  '/api/admin/branches/:id/toggle-open',
+  requireStaffAuth,
+  requirePermission('branches', 'edit'),
+  async (c) => {
+    try {
+      const id = Number(c.req.param('id'));
+      const db = drizzle(c.env.cinema_db, { schema });
+      const staffId = c.get('staffId');
+      const staffEmail = c.get('staffEmail');
+      const staffFullname = c.get('staffFullname');
 
-    const r = await toggleBranchOpenImpl(
-      db,
-      {
-        branches: schema.branches,
-        auditLogs: schema.auditLogs,
-        bookings: schema.bookings
-      },
-      id,
-      { id: staffId, email: staffEmail, fullname: staffFullname }
-    );
+      const r = await toggleBranchOpenImpl(
+        db,
+        {
+          branches: schema.branches,
+          auditLogs: schema.auditLogs,
+          bookings: schema.bookings
+        },
+        id,
+        { id: staffId, email: staffEmail, fullname: staffFullname }
+      );
 
-    return c.json(r, 200);
-  } catch (err: any) {
-    return c.json({ status: 'error', message: String(err?.message || 'Internal error') }, 500);
+      return c.json(r, 200);
+    } catch (err: any) {
+      return c.json({ status: 'error', message: String(err?.message || 'Internal error') }, 500);
+    }
   }
-});
+);
 
-adminRouter.post('/api/admin/branches/:id/restore', requireStaffAuth, requirePermission('branches', 'restore'), async (c) => {
-  try {
-    const id = Number(c.req.param('id'));
-    const db = drizzle(c.env.cinema_db, { schema });
-    const staffId = c.get('staffId');
-    const staffEmail = c.get('staffEmail');
-    const staffFullname = c.get('staffFullname');
+adminRouter.post(
+  '/api/admin/branches/:id/restore',
+  requireStaffAuth,
+  requirePermission('branches', 'restore'),
+  async (c) => {
+    try {
+      const id = Number(c.req.param('id'));
+      const db = drizzle(c.env.cinema_db, { schema });
+      const staffId = c.get('staffId');
+      const staffEmail = c.get('staffEmail');
+      const staffFullname = c.get('staffFullname');
 
-    const r = await restoreBranchImpl(db, { branches: schema.branches, auditLogs: schema.auditLogs }, id, {
-      id: staffId,
-      email: staffEmail,
-      fullname: staffFullname
-    });
+      const r = await restoreBranchImpl(db, { branches: schema.branches, auditLogs: schema.auditLogs }, id, {
+        id: staffId,
+        email: staffEmail,
+        fullname: staffFullname
+      });
 
-    return c.json(r, 200);
-  } catch (err: any) {
-    return c.json({ status: 'error', message: err.message || 'Lỗi máy chủ nội bộ' }, err.statusCode || 500);
+      return c.json(r, 200);
+    } catch (err: any) {
+      return c.json({ status: 'error', message: err.message || 'Lỗi máy chủ nội bộ' }, err.statusCode || 500);
+    }
   }
-});
+);
 
-adminRouter.get('/api/admin/deleted/branches', requireStaffAuth, requirePermission('branches', 'view_deleted'), async (c) => {
-  try {
-    const page = Number(c.req.query('page') || 1);
-    const pageSize = Number(c.req.query('pageSize') || 10);
-    const search = String(c.req.query('search') || '');
+adminRouter.get(
+  '/api/admin/deleted/branches',
+  requireStaffAuth,
+  requirePermission('branches', 'view_deleted'),
+  async (c) => {
+    try {
+      const page = Number(c.req.query('page') || 1);
+      const pageSize = Number(c.req.query('pageSize') || 10);
+      const search = String(c.req.query('search') || '');
 
-    const db = drizzle(c.env.cinema_db, { schema });
+      const db = drizzle(c.env.cinema_db, { schema });
 
-    const r = await listDeletedBranchesImpl(
-      db,
-      { branches: schema.branches, staffs: schema.staffs },
-      { page, pageSize, search }
-    );
+      const r = await listDeletedBranchesImpl(
+        db,
+        { branches: schema.branches, staffs: schema.staffs },
+        { page, pageSize, search }
+      );
 
-    return c.json(r, 200);
-  } catch (err) {
-    return c.json({ status: 'error', message: 'Lỗi máy chủ nội bộ' }, 500);
+      return c.json(r, 200);
+    } catch (err) {
+      return c.json({ status: 'error', message: 'Lỗi máy chủ nội bộ' }, 500);
+    }
   }
-});
+);
 
 // ============================================================
 // ===== STAFF & ROLES (Batch 6) ==============================
@@ -2749,76 +2741,64 @@ adminRouter.delete('/api/admin/vouchers/:id', requireStaffAuth, requirePermissio
 });
 
 // POST /api/admin/vouchers/:id/restore - Restore deleted voucher
-adminRouter.post('/api/admin/vouchers/:id/restore', requireStaffAuth, requirePermission('vouchers', 'restore'), async (c) => {
-  try {
-    const id = Number(c.req.param('id'));
-    const restrictBranchIds = getRestrictBranchIds(c);
-    const db = drizzle(c.env.cinema_db, { schema });
+adminRouter.post(
+  '/api/admin/vouchers/:id/restore',
+  requireStaffAuth,
+  requirePermission('vouchers', 'restore'),
+  async (c) => {
+    try {
+      const id = Number(c.req.param('id'));
+      const restrictBranchIds = getRestrictBranchIds(c);
+      const db = drizzle(c.env.cinema_db, { schema });
 
-    const staffId = c.get('staffId');
-    const staffEmail = c.get('staffEmail');
-    const staffFullname = c.get('staffFullname');
+      const staffId = c.get('staffId');
+      const staffEmail = c.get('staffEmail');
+      const staffFullname = c.get('staffFullname');
 
-    const r = await restoreVoucherImpl(
-      db,
-      { vouchers: schema.vouchers, auditLogs: schema.auditLogs },
-      id,
-      { id: staffId, email: staffEmail, fullname: staffFullname },
-      restrictBranchIds
-    );
+      const r = await restoreVoucherImpl(
+        db,
+        { vouchers: schema.vouchers, auditLogs: schema.auditLogs },
+        id,
+        { id: staffId, email: staffEmail, fullname: staffFullname },
+        restrictBranchIds
+      );
 
-    return c.json(r, 200 as any);
-  } catch (err: any) {
-    const errStatus = Number(err?.statusCode) || 500;
-    return c.json({ status: 'error', message: String(err?.message || 'Internal error') }, errStatus as any);
+      return c.json(r, 200 as any);
+    } catch (err: any) {
+      const errStatus = Number(err?.statusCode) || 500;
+      return c.json({ status: 'error', message: String(err?.message || 'Internal error') }, errStatus as any);
+    }
   }
-});
+);
 
 // GET /api/admin/deleted/vouchers - List deleted vouchers (trash)
-adminRouter.get('/api/admin/deleted/vouchers', requireStaffAuth, requirePermission('vouchers', 'view_deleted'), async (c) => {
-  try {
-    const page = Number(c.req.query('page') || 1);
-    const pageSize = Number(c.req.query('pageSize') || 10);
-    const search = String(c.req.query('q') || c.req.query('search') || '');
-    const scope = c.req.query('scope') || '';
-    const restrictBranchIds = getRestrictBranchIds(c);
+adminRouter.get(
+  '/api/admin/deleted/vouchers',
+  requireStaffAuth,
+  requirePermission('vouchers', 'view_deleted'),
+  async (c) => {
+    try {
+      const page = Number(c.req.query('page') || 1);
+      const pageSize = Number(c.req.query('pageSize') || 10);
+      const search = String(c.req.query('q') || c.req.query('search') || '');
+      const scope = c.req.query('scope') || '';
+      const restrictBranchIds = getRestrictBranchIds(c);
 
-    const db = drizzle(c.env.cinema_db, { schema });
+      const db = drizzle(c.env.cinema_db, { schema });
 
-    const r = await listDeletedVouchersImpl(
-      db,
-      { vouchers: schema.vouchers },
-      { page, pageSize, search, scope, restrictToBranchIds: restrictBranchIds }
-    );
+      const r = await listDeletedVouchersImpl(
+        db,
+        { vouchers: schema.vouchers },
+        { page, pageSize, search, scope, restrictToBranchIds: restrictBranchIds }
+      );
 
-    return c.json(r, 200 as any);
-  } catch (err: any) {
-    return c.json({ status: 'error', message: String(err?.message || 'Internal error') }, 500 as any);
+      return c.json(r, 200 as any);
+    } catch (err: any) {
+      return c.json({ status: 'error', message: String(err?.message || 'Internal error') }, 500 as any);
+    }
   }
-});
+);
 
-// Alias for deleted vouchers endpoint
-adminRouter.get('/api/admin/vouchers/deleted', requireStaffAuth, requirePermission('vouchers', 'view_deleted'), async (c) => {
-  try {
-    const page = Number(c.req.query('page') || 1);
-    const pageSize = Number(c.req.query('pageSize') || 10);
-    const search = String(c.req.query('q') || c.req.query('search') || '');
-    const scope = c.req.query('scope') || '';
-    const restrictBranchIds = getRestrictBranchIds(c);
-
-    const db = drizzle(c.env.cinema_db, { schema });
-
-    const r = await listDeletedVouchersImpl(
-      db,
-      { vouchers: schema.vouchers },
-      { page, pageSize, search, scope, restrictToBranchIds: restrictBranchIds }
-    );
-
-    return c.json(r, 200 as any);
-  } catch (err: any) {
-    return c.json({ status: 'error', message: String(err?.message || 'Internal error') }, 500 as any);
-  }
-});
 
 adminRouter.all(
   '/api/admin/scheduled/trigger-booking-expiry',
@@ -2844,7 +2824,6 @@ adminRouter.all(
     }
   }
 );
-
 
 // ============================================================
 // ===== UPLOADS & CLOUDINARY (Batch 8) =======================
@@ -3210,36 +3189,6 @@ adminRouter.get('/api/admin/posts', requireStaffAuth, requirePermission('posts',
   }
 });
 
-adminRouter.get('/api/admin/posts', requireStaffAuth, requirePermission('posts', 'view'), async (c) => {
-  try {
-    const page = Number(c.req.query('page') || 1);
-
-    const pageSize = Number(c.req.query('pageSize') || 10);
-
-    const q = String(c.req.query('q') || '');
-
-    const status = String(c.req.query('status') || 'all');
-
-    const db = drizzle(c.env.cinema_db, { schema });
-
-    const r = await listPostsImpl(
-      db,
-      { posts: schema.posts, auditLogs: schema.auditLogs },
-      { page, pageSize, q, status }
-    );
-
-    const parsedItems = (r.items || []).map((p: any) => ({
-      ...p,
-
-      cover_image: parseMediaUrl(p.cover_image, c)
-    }));
-
-    return c.json({ ...r, items: parsedItems });
-  } catch (err: any) {
-    return c.json({ status: 'error', message: String(err?.message || 'Internal error') }, 500);
-  }
-});
-
 adminRouter.get('/api/admin/posts/:id', requireStaffAuth, requirePermission('posts', 'view'), async (c) => {
   try {
     const id = c.req.param('id');
@@ -3262,7 +3211,7 @@ adminRouter.get('/api/admin/posts/:id', requireStaffAuth, requirePermission('pos
   }
 });
 
-adminRouter.post('/api/posts', requireStaffAuth, requirePermission('posts', 'create'), async (c) => {
+adminRouter.post('/api/admin/posts', requireStaffAuth, requirePermission('posts', 'create'), async (c) => {
   try {
     const db = drizzle(c.env.cinema_db, { schema });
 
@@ -3298,7 +3247,7 @@ adminRouter.post('/api/posts', requireStaffAuth, requirePermission('posts', 'cre
 
 // Admin: Update post
 
-adminRouter.put('/api/posts/:id', requireStaffAuth, requirePermission('posts', 'edit'), async (c) => {
+adminRouter.put('/api/admin/posts/:id', requireStaffAuth, requirePermission('posts', 'edit'), async (c) => {
   try {
     const id = Number(c.req.param('id'));
 
@@ -3342,7 +3291,7 @@ adminRouter.put('/api/posts/:id', requireStaffAuth, requirePermission('posts', '
 
 // Admin: Delete post
 
-adminRouter.delete('/api/posts/:id', requireStaffAuth, requirePermission('posts', 'delete'), async (c) => {
+adminRouter.delete('/api/admin/posts/:id', requireStaffAuth, requirePermission('posts', 'delete'), async (c) => {
   try {
     const id = Number(c.req.param('id'));
 
@@ -3383,8 +3332,8 @@ const getD1Tables = (schema: any) => ({
   voucher_redemption_logs: schema.voucher_redemption_logs
 });
 
-// POST /api/confirm-booking
-adminRouter.post('/api/confirm-booking', requireStaffAuth, requirePermission('ticket_check', 'validate'), async (c) => {
+// POST /api/admin/confirm-booking
+adminRouter.post('/api/admin/confirm-booking', requireStaffAuth, requirePermission('ticket_check', 'validate'), async (c) => {
   let body: any = {};
 
   try {
@@ -3431,7 +3380,7 @@ adminRouter.post('/api/confirm-booking', requireStaffAuth, requirePermission('ti
 });
 
 // Ticket checking control system
-adminRouter.get('/api/bookings-code/:code', requireStaffAuth, requirePermission('ticket_check', 'scan'), async (c) => {
+adminRouter.get('/api/admin/bookings-code/:code', requireStaffAuth, requirePermission('ticket_check', 'scan'), async (c) => {
   // Rate Limit Check dùng KV
 
   const ip = c.req.header('CF-Connecting-IP') || 'unknown';
@@ -3465,7 +3414,7 @@ adminRouter.get('/api/bookings-code/:code', requireStaffAuth, requirePermission(
   return c.json(payload, status as any);
 });
 
-adminRouter.post('/api/bookings-use', requireStaffAuth, requirePermission('ticket_check', 'validate'), async (c) => {
+adminRouter.post('/api/admin/bookings-use', requireStaffAuth, requirePermission('ticket_check', 'validate'), async (c) => {
   const db = drizzle(c.env.cinema_db, { schema });
 
   const tables = getD1Tables(schema);
@@ -3493,6 +3442,122 @@ adminRouter.post('/api/bookings-use', requireStaffAuth, requirePermission('ticke
   };
 
   return c.json(payload, status);
+});
+
+// ============================================================
+// ===== PHASE 1: MISSING ADMIN GET ROUTES (Leak Fixed) =======
+// ============================================================
+
+adminRouter.get('/api/admin/toys', requireStaffAuth, requirePermission('toys', 'view'), async (c) => {
+  try {
+    const page = Number(c.req.query('page') || 1);
+    const pageSize = Number(c.req.query('pageSize') || 20);
+    const q = String(c.req.query('q') || '');
+    const status = String(c.req.query('status') || 'all');
+    const db = drizzle(c.env.cinema_db, { schema });
+
+    const r = await listToysImpl(db, { toys: schema.toys }, { page, pageSize, q, status });
+    return c.json(r, 200);
+  } catch (err: any) {
+    return c.json({ status: 'error', message: String(err?.message || 'Internal error') }, 500);
+  }
+});
+
+adminRouter.get('/api/admin/toys/:id', requireStaffAuth, requirePermission('toys', 'view'), async (c) => {
+  try {
+    const id = Number(c.req.param('id'));
+    const db = drizzle(c.env.cinema_db, { schema });
+
+    const toy = await getToyImpl(db, { toys: schema.toys, auditLogs: schema.auditLogs }, id);
+    if (!toy) return c.json({ message: 'Không tìm thấy' }, 404);
+
+    return c.json({ toy }, 200);
+  } catch (err: any) {
+    return c.json({ status: 'error', message: String(err?.message || 'Internal error') }, 500);
+  }
+});
+
+adminRouter.get('/api/admin/tickets', requireStaffAuth, requirePermission('tickets', 'view'), async (c) => {
+  try {
+    const page = Number(c.req.query('page') || 1);
+    const pageSize = Number(c.req.query('pageSize') || 20);
+    const q = String(c.req.query('q') || '');
+    const includeInactive = c.req.query('includeInactive') === 'true';
+    const typeRaw = c.req.query('type') || 'all';
+    const type = typeRaw === 'movie' || typeRaw === 'vr' ? typeRaw : 'all';
+    
+    const db = drizzle(c.env.cinema_db, { schema });
+    const restrictBranchIds = getRestrictBranchIds(c);
+    const branchIdRaw = c.req.query('branch_id');
+    const branchId = branchIdRaw && branchIdRaw !== 'all' ? Number(branchIdRaw) : undefined;
+
+    const r = await listTicketPackagesImpl(
+      db,
+      { ticket_packages: schema.ticket_packages, movies: schema.movies },
+      { page, pageSize, q, includeInactive, branch_id: branchId, restrictToBranchIds: restrictBranchIds, type }
+    );
+    return c.json(r, 200);
+  } catch (err: any) {
+    return c.json({ status: 'error', message: String(err?.message || 'Internal error') }, 500);
+  }
+});
+
+adminRouter.get('/api/admin/tickets/:id', requireStaffAuth, requirePermission('tickets', 'view'), async (c) => {
+  try {
+    const id = Number(c.req.param('id'));
+    const db = drizzle(c.env.cinema_db, { schema });
+    const restrictBranchIds = getRestrictBranchIds(c);
+
+    const r = await getTicketPackageImpl(
+      db,
+      { ticket_packages: schema.ticket_packages, auditLogs: schema.auditLogs },
+      id,
+      restrictBranchIds
+    );
+    if (!r) return c.json({ message: 'Không tìm thấy' }, 404);
+    return c.json(r, 200);
+  } catch (err: any) {
+    return c.json({ status: 'error', message: String(err?.message || 'Internal error') }, 500);
+  }
+});
+
+adminRouter.get('/api/admin/site-media', requireStaffAuth, requirePermission('uploads', 'view'), async (c) => {
+  try {
+    const section = String(c.req.query('section') || '');
+    const type = String(c.req.query('type') || '');
+    const active = String(c.req.query('active') || '');
+    const db = drizzle(c.env.cinema_db, { schema });
+
+    const r = await listSiteMediaImpl(db, { site_media: schema.site_media }, { section, type, active });
+    return c.json(r, 200);
+  } catch (err: any) {
+    return c.json({ status: 'error', message: String(err?.message || 'Internal error') }, 500);
+  }
+});
+
+adminRouter.get('/api/admin/movies/:id', requireStaffAuth, requirePermission('movies', 'view'), async (c) => {
+  try {
+    const id = Number(c.req.param('id'));
+    const db = drizzle(c.env.cinema_db, { schema });
+    const restrictBranchIds = getRestrictBranchIds(c);
+
+    const r = await getMovieByIdImpl(
+      db,
+      {
+        movies: schema.movies,
+        bookings: schema.bookings,
+        ticket_packages: schema.ticket_packages,
+        auditLogs: schema.auditLogs
+      },
+      id,
+      restrictBranchIds
+    );
+
+    if (!r) return c.json({ status: 'error', message: 'Không tìm thấy phim' }, 404);
+    return c.json(r, 200);
+  } catch (err: any) {
+    return c.json({ status: 'error', message: String(err?.message || 'Internal error') }, 500);
+  }
 });
 
 export default adminRouter;

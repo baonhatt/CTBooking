@@ -54,7 +54,7 @@ export async function createPostApi(body: {
   status?: string;
   is_featured?: boolean;
 }) {
-  return request<{ post: any }>('/api/posts', {
+  return request<{ post: any }>('/api/admin/posts', {
     method: 'POST',
     body: JSON.stringify(body)
   });
@@ -72,14 +72,14 @@ export async function updatePostApi(
     is_featured?: boolean;
   }
 ) {
-  return request<{ post: any }>(`/api/posts/${id}`, {
+  return request<{ post: any }>(`/api/admin/posts/${id}`, {
     method: 'PUT',
     body: JSON.stringify(body)
   });
 }
 
 export async function deletePostApi(id: number, hardDelete?: boolean) {
-  return request<any>(`/api/posts/${id}${hardDelete ? '?hardDelete=true' : ''}`, {
+  return request<any>(`/api/admin/posts/${id}${hardDelete ? '?hardDelete=true' : ''}`, {
     method: 'DELETE'
   });
 }

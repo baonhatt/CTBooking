@@ -22,8 +22,8 @@ describe('User Application API Modules', () => {
 
   describe('User Profile & History (Protected Routes)', () => {
     const profileGets = [
-      '/api/users-profile', 
-      '/api/usersprofile/transactions'
+      '/api/user/profile', 
+      '/api/user/transactions'
     ];
 
     describe.each(profileGets)('GET %s', (path) => {
@@ -32,8 +32,8 @@ describe('User Application API Modules', () => {
     });
 
     const profilePosts = [
-      '/api/users-profile', 
-      '/api/users-password'
+      '/api/user/profile', 
+      '/api/user/password'
     ];
 
     describe.each(profilePosts)('POST (Update) %s', (path) => {

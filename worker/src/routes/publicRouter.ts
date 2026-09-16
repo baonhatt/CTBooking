@@ -41,6 +41,31 @@ import {
 
 const publicRouter = new Hono<any>();
 
+function stripAuditLogs(obj: any): any {
+  if (obj === null || typeof obj !== 'object') return obj;
+
+  if (Array.isArray(obj)) {
+    return obj.map(item => stripAuditLogs(item));
+  }
+
+  const clone: any = { ...obj };
+  delete clone.created_at;
+  delete clone.created_by;
+  delete clone.updated_at;
+  delete clone.updated_by;
+  delete clone.created_by_staff_name;
+  delete clone.updated_by_staff_name;
+  delete clone.deleted_by_staff_id;
+
+  for (const key in clone) {
+    if (Object.prototype.hasOwnProperty.call(clone, key)) {
+      clone[key] = stripAuditLogs(clone[key]);
+    }
+  }
+
+  return clone;
+}
+
 // 3. Serve local uploads during development
 publicRouter.get('/uploads/*', async (c) => {
   if (!isLocal(c.req.url)) return c.notFound();
@@ -113,17 +138,7 @@ publicRouter.get('/uploads/*', async (c) => {
 
 publicRouter.get('/', (c) => c.json({ ok: true, service: 'cinema-worker', time: Date.now() }));
 
-publicRouter.get('/api/ping', (c) => {
-  const ping = (typeof process !== 'undefined' && (process as any).env?.PING_MESSAGE) ?? 'ping';
 
-  return c.json({ message: ping });
-});
-
-// Demo endpoint parity
-
-publicRouter.get('/api/demo', (c) => {
-  return c.json({ message: 'Hello from Express server' }, 200);
-});
 
 const getD1Tables = (schema: any) => ({
   bookings: schema.bookings,
@@ -162,31 +177,15 @@ publicRouter.get('/api/getActiveMovies', async (c) => {
       },
       branchId
     );
-    const optimized = activeMovies.map((m) => ({
-      ...m,
-
-      cover_image: parseMediaUrl(m.cover_image ?? '', c),
-
-      detail_images: (() => {
-        const v = m.detail_images;
-
-        if (v === null || v === undefined) return '[]';
-
-        try {
-          const parsed = typeof v === 'string' ? JSON.parse(v) : v;
-
-          if (Array.isArray(parsed)) {
-            const opt = parsed.map((u: string) => parseMediaUrl(u, c));
-
-            return JSON.stringify(opt);
-          }
-
-          return typeof v === 'string' ? parseMediaUrl(v, c) : JSON.stringify(v);
-        } catch {
-          return '[]';
-        }
-      })()
-    }));
+    const optimized = activeMovies.map((m) => {
+      const opt = {
+        ...m,
+        cover_image: parseMediaUrl(m.cover_image ?? '', c)
+      };
+      delete (opt as any).detail_images;
+      delete (opt as any).price;
+      return opt;
+    });
 
     const responseBody = JSON.stringify({ activeMovies: optimized });
 
@@ -385,28 +384,7 @@ publicRouter.get('/api/movies', async (c) => {
   }
 });
 
-publicRouter.get('/api/movies/:id', async (c) => {
-  try {
-    const id = Number(c.req.param('id'));
 
-    const db = drizzle(c.env.cinema_db, { schema });
-    const restrictBranchIds = getRestrictBranchIds(c);
-
-    const movie = await getMovie(db, { movies: schema.movies }, id, restrictBranchIds);
-
-    if (!movie) return c.json({ message: 'Không tìm thấy' }, 404);
-
-    const parsedMovie = {
-      ...movie,
-
-      cover_image: parseMediaUrl(movie.cover_image, c)
-    };
-
-    return c.json({ movie: parsedMovie }, 200);
-  } catch {
-    return c.json({ status: 'error', message: 'Lỗi máy chủ nội bộ' }, 500);
-  }
-});
 
 publicRouter.get('/api/movies-detail/:id', async (c) => {
   const id = Number(c.req.param('id'));
@@ -433,15 +411,14 @@ publicRouter.get('/api/movies-detail/:id', async (c) => {
 
   if (!r) return c.json({ status: 'error', message: 'Không tìm thấy phim' }, 404);
 
-  const parsed = {
+  const parsed = stripAuditLogs({
     ...r,
-
-    cover_image: parseMediaUrl((r as any).cover_image, c),
-
-    detail_images: Array.isArray((r as any).detail_images)
-      ? (r as any).detail_images.map((u: string) => parseMediaUrl(u, c))
-      : (r as any).detail_images
-  };
+    cover_image: parseMediaUrl((r as any).cover_image, c)
+  });
+  
+  delete parsed.detail_images;
+  delete parsed.stats;
+  delete parsed.applicable_packages;
 
   return new Response(JSON.stringify(parsed), {
     status: 200,
@@ -494,15 +471,13 @@ publicRouter.get('/api/toys', async (c) => {
     const r = await listToysImpl(db, { toys: schema.toys }, { page, pageSize, q, status });
 
     return c.json(
-      {
+      stripAuditLogs({
         ...r,
-
         items: (r.items as any[]).map((t: any) => ({
           ...t,
-
           image: parseMediaUrl(t.image, c)
         }))
-      },
+      }),
       200
     );
   } catch {
@@ -538,12 +513,10 @@ publicRouter.get('/api/toys/:id', async (c) => {
 
     if (!r) return c.json({ message: 'Không tìm thấy' }, 404);
 
-    const parsedToy = {
+    const parsedToy = stripAuditLogs({
       ...r,
-
       image: parseMediaUrl((r as any).image, c)
-    };
-
+    });
     return c.json({ toy: parsedToy }, 200);
   } catch {
     return c.json({ status: 'error', message: 'Lỗi máy chủ nội bộ' }, 500);
@@ -576,7 +549,7 @@ publicRouter.get('/api/tickets', async (c) => {
       { page, pageSize, q, includeInactive, branch_id: branchId, restrictToBranchIds: restrictBranchIds, type }
     );
 
-    return c.json(r, 200);
+    return c.json(stripAuditLogs(r), 200);
   } catch (err: any) {
     return c.json({ status: 'error', message: String(err?.message || 'Internal error') }, 500);
   }
@@ -641,7 +614,7 @@ publicRouter.get('/api/tickets/:id', async (c) => {
 
     if (!r) return c.json({ message: 'Không tìm thấy' }, 404);
 
-    return c.json(r, 200);
+    return c.json(stripAuditLogs(r), 200);
   } catch {
     return c.json({ status: 'error', message: 'Lỗi máy chủ nội bộ' }, 500);
   }
@@ -670,15 +643,13 @@ publicRouter.get('/api/site-media', async (c) => {
 
       const r = await listSiteMediaImpl(db, { site_media: schema.site_media }, { section, type, active });
 
-      const parsed = {
+      const parsed = stripAuditLogs({
         ...r,
-
         items: (r.items as any[]).map((m: any) => ({
           ...m,
-
           url: parseMediaUrl(m.url, c)
         }))
-      };
+      });
 
       return new Response(JSON.stringify(parsed), {
         status: 200,
@@ -711,15 +682,6 @@ publicRouter.get('/api/debug/mail', async (_c) => {
   );
 });
 
-publicRouter.get('/api/debug/test-mail', async (c) => {
-  const email = c.req.query('email');
-
-  if (!email) return c.json({ error: 'Missing email param' }, 400);
-
-  const res = await sendMail(email, 'Test Brevo Worker', '<h1>It works!</h1>', c.env);
-
-  return c.json(res);
-});
 
 // ===== SITEMAP XML =====
 
@@ -798,7 +760,7 @@ publicRouter.get('/api/posts', async (c) => {
       cover_image: parseMediaUrl(p.cover_image, c)
     }));
 
-    return c.json({ ...r, items: parsedItems });
+    return c.json(stripAuditLogs({ ...r, items: parsedItems }));
   } catch (err: any) {
     return c.json({ status: 'error', message: String(err?.message || 'Internal error') }, 500);
   }
@@ -820,12 +782,10 @@ publicRouter.get('/api/posts/:identifier', async (c) => {
       return c.json({ message: 'Bài viết không công khai' }, 403);
     }
 
-    const parsed = {
+    const parsed = stripAuditLogs({
       ...post,
-
       cover_image: parseMediaUrl(post.cover_image, c)
-    };
-
+    });
     return c.json({ post: parsed }, 200);
   } catch (err: any) {
     return c.json({ status: 'error', message: String(err?.message || 'Internal error') }, 500);
@@ -878,7 +838,15 @@ publicRouter.post('/api/vr/voucher/validate', async (c) => {
       body
     );
 
-    return c.json(r, 200 as any);
+    const stripped = stripAuditLogs(r);
+    if (stripped.voucher_details) {
+      delete stripped.voucher_details.sale_staff_id;
+      delete stripped.voucher_details.sale_email;
+      delete stripped.voucher_details.usage_limit;
+      delete stripped.voucher_details.per_user_limit;
+      delete stripped.voucher_details.used_count;
+    }
+    return c.json(stripped, 200 as any);
   } catch (err: any) {
     const errStatus = Number(err?.statusCode) || 500;
     return c.json({ valid: false, message: String(err?.message || 'Internal error') }, errStatus as any);
@@ -979,7 +947,7 @@ publicRouter.get('/api/branches/options', async (c) => {
       { includeInactive: false, onlyOpen: true }
     );
 
-    return c.json(r);
+    return c.json(stripAuditLogs(r));
   } catch (err: any) {
     return c.json({ status: 'error', message: String(err?.message || 'Internal error') }, 500);
   }
@@ -996,7 +964,7 @@ publicRouter.get('/api/branches/:id', async (c) => {
       return c.json({ message: 'Không tìm thấy chi nhánh' }, 404);
     }
 
-    return c.json({ branch }, 200);
+    return c.json({ branch: stripAuditLogs(branch) }, 200);
   } catch (err: any) {
     return c.json({ status: 'error', message: String(err?.message || 'Internal error') }, 500);
   }
@@ -1013,7 +981,7 @@ publicRouter.get('/api/branches', async (c) => {
     );
 
     return c.json({
-      items: r.items,
+      items: stripAuditLogs(r.items),
       page: 1,
       pageSize: r.items.length,
       total: r.items.length,

@@ -645,9 +645,9 @@ export default function DashboardContent({
                 <p className="text-[10px] font-bold uppercase italic tracking-widest">Không có dữ liệu</p>
               </div>
             ) : (
-              metrics.topVipUsers?.map((user, idx) => (
+              metrics.topVipUsers?.map((user: any, idx) => (
                 <div
-                  key={user.userId}
+                  key={user.userId || idx}
                   className="p-4 flex items-center justify-between hover:bg-slate-50 transition-colors group"
                 >
                   <div className="flex items-center gap-4">

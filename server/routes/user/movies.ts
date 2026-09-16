@@ -20,6 +20,16 @@ export async function getAllActiveMoviesToday(
 
   const active_movies = await anyDb.query.movies.findMany({
     where: whereCondition,
+    columns: {
+      id: true,
+      title: true,
+      description: true,
+      cover_image: true,
+      genres: true,
+      rating: true,
+      duration_min: true,
+      release_date: true
+    },
     with: {
       branch: true
     },
@@ -31,17 +41,7 @@ export async function getAllActiveMoviesToday(
     title: m.title,
     description: m.description ?? '',
     cover_image: m.cover_image ?? '',
-    detail_images: m.detail_images
-      ? Array.isArray(m.detail_images)
-        ? m.detail_images
-        : (() => {
-            try {
-              return JSON.parse(m.detail_images);
-            } catch {
-              return [];
-            }
-          })()
-      : [],
+    detail_images: [] as any,
     genres: m.genres
       ? Array.isArray(m.genres)
         ? m.genres

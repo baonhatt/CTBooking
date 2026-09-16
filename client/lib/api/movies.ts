@@ -55,7 +55,7 @@ export async function createMovieApi(body: {
   branch_id?: number | null;
   branch_ids?: number[] | null;
 }) {
-  return request<{ movie: any }>('/api/movies', {
+  return request<{ movie: any }>('/api/admin/movies', {
     method: 'POST',
     body: JSON.stringify(body)
   });
@@ -78,14 +78,14 @@ export async function updateMovieApi(
     branch_ids?: number[] | null;
   }
 ) {
-  return request<{ movie: any }>(`/api/movies/${id}`, {
+  return request<{ movie: any }>(`/api/admin/movies/${id}`, {
     method: 'PUT',
     body: JSON.stringify(body)
   });
 }
 
 export async function deleteMovieApi(id: number) {
-  return request<{ ok: boolean }>(`/api/movies/${id}`, { method: 'DELETE' });
+  return request<{ ok: boolean }>(`/api/admin/movies/${id}`, { method: 'DELETE' });
 }
 
 export async function getMovieById(id: number) {
@@ -110,7 +110,7 @@ export async function getMovieById(id: number) {
       totalRevenue: number;
       successfulBookings: number;
     };
-  }>(`/api/movies-detail/${id}`);
+  }>(`/api/admin/movies/${id}`);
 }
 
 // In client/lib/api/movies.ts
@@ -120,7 +120,7 @@ export async function updateMovieStatus(id: number, isActive: boolean) {
     status: string;
     message: string;
     item: any;
-  }>(`/api/movies-status/${id}`, {
+  }>(`/api/admin/movies-status/${id}`, {
     method: 'POST',
     body: JSON.stringify({ is_active: isActive })
   });

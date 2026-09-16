@@ -133,45 +133,53 @@ export async function listVouchersImpl(
     offset: (page - 1) * pageSize
   });
 
-  // Get revenue stats per voucher from voucher_redemption_logs if table available
-  const items = await Promise.all(
-    rawItems.map(async (v: any) => {
-      const meta = parseVoucherMetadata(v.description);
-      let total_revenue = 0;
-      let redemptions_count = v.used_count || 0;
+  const voucherIds = rawItems.map((v: any) => v.id);
+  let aggregatedStats: Record<number, any> = {};
 
-      if (tables.voucher_redemption_logs) {
-        try {
-          const [stats] = await anyDb
-            .select({
-              total_revenue: sum(tables.voucher_redemption_logs.order_total_after_discount),
-              total_count: count()
-            })
-            .from(tables.voucher_redemption_logs)
-            .where(eq(tables.voucher_redemption_logs.voucher_id, v.id));
-          if (stats) {
-            total_revenue = Number(stats.total_revenue || 0);
-            if (Number(stats.total_count || 0) > redemptions_count) {
-              redemptions_count = Number(stats.total_count);
-            }
-          }
-        } catch {}
+  if (voucherIds.length > 0 && tables.voucher_redemption_logs) {
+    try {
+      const statsList = await anyDb
+        .select({
+          voucher_id: tables.voucher_redemption_logs.voucher_id,
+          total_revenue: sum(tables.voucher_redemption_logs.order_total_after_discount),
+          total_count: count()
+        })
+        .from(tables.voucher_redemption_logs)
+        .where(inArray(tables.voucher_redemption_logs.voucher_id, voucherIds))
+        .groupBy(tables.voucher_redemption_logs.voucher_id);
+        
+      statsList.forEach((stat: any) => {
+        aggregatedStats[stat.voucher_id] = stat;
+      });
+    } catch {}
+  }
+
+  const items = rawItems.map((v: any) => {
+    const meta = parseVoucherMetadata(v.description);
+    let total_revenue = 0;
+    let redemptions_count = v.used_count || 0;
+
+    const stats = aggregatedStats[v.id];
+    if (stats) {
+      total_revenue = Number(stats.total_revenue || 0);
+      if (Number(stats.total_count || 0) > redemptions_count) {
+        redemptions_count = Number(stats.total_count);
       }
+    }
 
-      return {
-        ...v,
-        note: meta.note,
-        sale_staff_id: meta.sale_staff_id,
-        sale_name: meta.sale_name,
-        sale_email: meta.sale_email,
-        total_revenue,
-        used_count: redemptions_count,
-        applicable_ticket_package_ids: parseJsonArrayOutput(v.applicable_ticket_package_ids),
-        applicable_user_ids: parseJsonArrayOutput(v.applicable_user_ids),
-        branch_ids: parseJsonArrayOutput(v.branch_ids)
-      };
-    })
-  );
+    return {
+      ...v,
+      note: meta.note,
+      sale_staff_id: meta.sale_staff_id,
+      sale_name: meta.sale_name,
+      sale_email: meta.sale_email,
+      total_revenue,
+      used_count: redemptions_count,
+      applicable_ticket_package_ids: parseJsonArrayOutput(v.applicable_ticket_package_ids),
+      applicable_user_ids: parseJsonArrayOutput(v.applicable_user_ids),
+      branch_ids: parseJsonArrayOutput(v.branch_ids)
+    };
+  });
 
   return { items, page, pageSize, total };
 }

@@ -15,7 +15,7 @@ export type ShowtimeItem = {
 };
 
 export async function getShowtimesAdmin(branchId: number) {
-  return request<{ items: ShowtimeItem[] }>(`/api/showtimes?branch_id=${branchId}`);
+  return request<{ items: ShowtimeItem[] }>(`/api/admin/showtimes?branch_id=${branchId}`);
 }
 
 export async function createShowtimeApi(body: {
@@ -24,7 +24,7 @@ export async function createShowtimeApi(body: {
   start_time: string;
   end_time: string;
 }) {
-  return request<{ status: string; item?: ShowtimeItem; message?: string }>('/api/showtimes', {
+  return request<{ status: string; item?: ShowtimeItem; message?: string }>('/api/admin/showtimes', {
     method: 'POST',
     body: JSON.stringify(body)
   });
@@ -34,20 +34,20 @@ export async function updateShowtimeApi(
   id: number,
   body: { movie_id?: number; start_time?: string; end_time?: string }
 ) {
-  return request<{ status: string; item?: ShowtimeItem; message?: string }>(`/api/showtimes/${id}`, {
+  return request<{ status: string; item?: ShowtimeItem; message?: string }>(`/api/admin/showtimes/${id}`, {
     method: 'PUT',
     body: JSON.stringify(body)
   });
 }
 
 export async function deleteShowtimeApi(id: number) {
-  return request<{ status: string; message?: string }>(`/api/showtimes/${id}`, {
+  return request<{ status: string; message?: string }>(`/api/admin/showtimes/${id}`, {
     method: 'DELETE'
   });
 }
 
 export async function copyShowtimesApi(body: { from_branch_id: number; to_branch_id: number }) {
-  return request<{ status: string; copied?: number; message?: string }>('/api/showtimes/copy', {
+  return request<{ status: string; copied?: number; message?: string }>('/api/admin/showtimes/copy', {
     method: 'POST',
     body: JSON.stringify(body)
   });

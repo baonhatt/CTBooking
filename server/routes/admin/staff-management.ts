@@ -1,4 +1,4 @@
-import { eq, and, or, like, isNull, isNotNull, desc, count, sql, aliasedTable } from 'drizzle-orm';
+import { eq, and, or, like, isNull, isNotNull, desc, count, sql, aliasedTable, inArray } from 'drizzle-orm';
 import bcrypt from 'bcryptjs';
 import { hashPassword, invalidateStaffPermissionCache } from '../../lib/staff-auth';
 import { getStaffAccountCreatedTemplate, getStaffPasswordResetTemplate } from '../../lib/email-templates';
@@ -64,31 +64,43 @@ export async function listStaffImpl(
 
   const staffList = await query;
 
-  // Get roles and branches for each staff
-  const staffWithDetails = await Promise.all(
-    staffList.map(async (staff) => {
-      const roleData = await db
-        .select({ roleId: staffRoles.roleId, roleName: roles.name })
-        .from(staffRoles)
-        .innerJoin(roles, eq(staffRoles.roleId, roles.id))
-        .where(eq(staffRoles.staffId, staff.id));
+  const staffIds = staffList.map((s: any) => s.id);
+  const staffWithDetails = staffList.map((s: any) => ({ ...s, roleIds: [], roles: [], branchIds: [], branchNames: [], branches: [] }));
 
-      const branchData = await db
-        .select({ branchId: staffBranches.branchId, branchName: branches.name })
-        .from(staffBranches)
-        .innerJoin(branches, eq(staffBranches.branchId, branches.id))
-        .where(eq(staffBranches.staffId, staff.id));
+  if (staffIds.length > 0) {
+    const allRoles = await db
+      .select({ staffId: staffRoles.staffId, roleId: staffRoles.roleId, roleName: roles.name })
+      .from(staffRoles)
+      .innerJoin(roles, eq(staffRoles.roleId, roles.id))
+      .where(inArray(staffRoles.staffId, staffIds));
 
-      return {
-        ...staff,
-        roleIds: roleData.map((r) => r.roleId),
-        roles: roleData.map((r) => r.roleName),
-        branchIds: branchData.map((b) => b.branchId),
-        branchNames: branchData.map((b) => b.branchName),
-        branches: branchData.map((b) => ({ id: b.branchId, name: b.branchName }))
-      };
-    })
-  );
+    const allBranches = await db
+      .select({ staffId: staffBranches.staffId, branchId: staffBranches.branchId, branchName: branches.name })
+      .from(staffBranches)
+      .innerJoin(branches, eq(staffBranches.branchId, branches.id))
+      .where(inArray(staffBranches.staffId, staffIds));
+
+    const rolesByStaff = allRoles.reduce((acc: any, r: any) => {
+      if (!acc[r.staffId]) acc[r.staffId] = [];
+      acc[r.staffId].push(r);
+      return acc;
+    }, {});
+    const branchesByStaff = allBranches.reduce((acc: any, b: any) => {
+      if (!acc[b.staffId]) acc[b.staffId] = [];
+      acc[b.staffId].push(b);
+      return acc;
+    }, {});
+
+    staffWithDetails.forEach((s: any) => {
+      const r = rolesByStaff[s.id] || [];
+      const b = branchesByStaff[s.id] || [];
+      s.roleIds = r.map((x: any) => x.roleId);
+      s.roles = r.map((x: any) => x.roleName);
+      s.branchIds = b.map((x: any) => x.branchId);
+      s.branchNames = b.map((x: any) => x.branchName);
+      s.branches = b.map((x: any) => ({ id: x.branchId, name: x.branchName }));
+    });
+  }
 
   let countQuery = db
     .select({ count: count(sql`DISTINCT ${staffs.id}`) })

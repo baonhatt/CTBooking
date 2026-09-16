@@ -141,7 +141,7 @@ export default function MoviesContent({
     return permissions.some((p) => p.module === module && p.action === action);
   };
 
-  console.log(data);
+
   const [movieDetails, setMovieDetails] = useState<any>(null);
   const [isLoadingDetails, setIsLoadingDetails] = useState(false);
 
@@ -161,7 +161,7 @@ export default function MoviesContent({
           setIsLoadingDetails(true);
           const details = await getMovieById(selectedMovieId);
           setMovieDetails(details);
-          console.log(movieDetails);
+
         } catch (err) {
           console.error('Lỗi load chi tiết:', err);
         } finally {

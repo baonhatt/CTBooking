@@ -32,7 +32,7 @@ const getD1Tables = (schema: any) => ({
   voucher_redemption_logs: schema.voucher_redemption_logs
 });
 
-webhookRouter.post('/api/sepay/webhook', async (c) => {
+webhookRouter.post('/api/webhooks/sepay', async (c) => {
   try {
     const db = drizzle(c.env.cinema_db, { schema });
 

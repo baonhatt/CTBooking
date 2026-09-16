@@ -489,7 +489,7 @@ userRouter.post('/api/logout', async (c) => {
   }
 });
 
-userRouter.get('/api/users-profile', requireAuth, async (c) => {
+userRouter.get('/api/user/profile', requireAuth, async (c) => {
   try {
     const accountId = c.get('accountId');
     const db = drizzle(c.env.cinema_db, { schema });
@@ -510,7 +510,7 @@ userRouter.get('/api/users-profile', requireAuth, async (c) => {
   }
 });
 
-userRouter.post('/api/users-profile', requireAuth, async (c) => {
+userRouter.post('/api/user/profile', requireAuth, async (c) => {
   try {
     const db = drizzle(c.env.cinema_db, { schema });
 
@@ -539,7 +539,7 @@ userRouter.post('/api/users-profile', requireAuth, async (c) => {
   }
 });
 
-userRouter.post('/api/users-password', requireAuth, async (c) => {
+userRouter.post('/api/user/password', requireAuth, async (c) => {
   try {
     const db = drizzle(c.env.cinema_db, { schema });
 
@@ -562,7 +562,7 @@ userRouter.post('/api/users-password', requireAuth, async (c) => {
   }
 });
 
-userRouter.get('/api/usersprofile/transactions', requireAuth, async (c) => {
+userRouter.get('/api/user/transactions', requireAuth, async (c) => {
   try {
     const accountId = c.get('accountId');
     const email = String(c.req.query('email') || '');

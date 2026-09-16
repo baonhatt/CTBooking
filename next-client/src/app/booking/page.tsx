@@ -1248,13 +1248,13 @@ export default function BookingPage() {
                 Kiểm tra thông tin nhận vé
               </AlertDialogTitle>
               <AlertDialogDescription className="text-slate-300 text-xs leading-relaxed space-y-3 pt-2">
-                <p>Mã QR vé điện tử và hướng dẫn check-in sẽ được gửi trực tiếp tới email của bạn:</p>
-                <div className="p-3 rounded-xl bg-white/5 border border-white/10 font-bold text-cyan-300 text-sm break-all text-center">
+                <span className="block">Mã QR vé điện tử và hướng dẫn check-in sẽ được gửi trực tiếp tới email của bạn:</span>
+                <span className="block p-3 rounded-xl bg-white/5 border border-white/10 font-bold text-cyan-300 text-sm break-all text-center">
                   {email}
-                </div>
-                <p className="text-[11px] text-slate-400">
+                </span>
+                <span className="block text-[11px] text-slate-400">
                   Vui lòng đảm bảo email trên là chính xác để không bỏ lỡ mã vé.
-                </p>
+                </span>
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter className="flex gap-2 pt-3">
