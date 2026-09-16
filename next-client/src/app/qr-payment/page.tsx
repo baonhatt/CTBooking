@@ -123,7 +123,7 @@ export default function QRPaymentPage() {
 
     const generateQRCode = (data: any, details?: any) => {
         const amount = data?.totalAmount || data?.amount || 0;
-        const orderId = data?.orderId || data?.booking_id || '';
+        const orderId = data?.orderId || data?.bookingId || data?.booking_id || '';
         const description = `${orderId} `;
 
         const branchSettingsRaw = details?.branch?.settings || details?.branch_settings || data?.branch_settings;
@@ -829,8 +829,8 @@ export default function QRPaymentPage() {
                                                 },
                                                 {
                                                     label: 'Nội dung',
-                                                    value: `${paymentData?.orderId || ''}`,
-                                                    copy: `${paymentData?.orderId || ''}`,
+                                                    value: `${paymentData?.orderId || paymentData?.bookingId || paymentData?.booking_id || ''}`,
+                                                    copy: `${paymentData?.orderId || paymentData?.bookingId || paymentData?.booking_id || ''}`,
                                                     mono: true,
                                                     bold: true
                                                 }
