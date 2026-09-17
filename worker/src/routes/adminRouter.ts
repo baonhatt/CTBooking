@@ -121,6 +121,8 @@ import {
   setupSuperAdminImpl,
   seedRolesAndPermissionsImpl
 } from '../../../server/routes/admin/setup';
+import { checkSepayTransactionImpl } from '../../../server/routes/admin/sepay';
+
 import {
   listStaffImpl,
   getStaffByIdImpl,
@@ -764,6 +766,20 @@ adminRouter.get('/api/admin/revenue', requireStaffAuth, requirePermission('dashb
       { from, to, status, restrictToBranchIds: restrictBranchIds }
     );
 
+    return c.json(r);
+  } catch (err: any) {
+    return c.json({ status: 'error', message: String(err?.message || 'Internal error') }, 500);
+  }
+});
+
+adminRouter.get('/api/admin/sepay/check', requireStaffAuth, requirePermission('ticket_check', 'validate'), async (c) => {
+  try {
+    const code = c.req.query('code') || '';
+    const amount = Number(c.req.query('amount') || 0);
+
+    const sepayToken = c.env.SEPAY_API_TOKEN;
+
+    const r = await checkSepayTransactionImpl(code, amount, sepayToken);
     return c.json(r);
   } catch (err: any) {
     return c.json({ status: 'error', message: String(err?.message || 'Internal error') }, 500);

@@ -11,6 +11,9 @@ export default defineConfig(({ mode }) => ({
       allow: ['.', './client', './shared'],
       deny: ['.env', '.env.*', '*.{crt,pem}', '**/.git/**', 'server/**']
     },
+    watch: {
+      ignored: ['**/.wrangler/**', '**/db_backup/**', '**/uploads/**', '**/server/**', '**/worker/**']
+    },
     // Proxy API requests to wrangler dev (npm run dev:worker)
     proxy: {
       '/api': {

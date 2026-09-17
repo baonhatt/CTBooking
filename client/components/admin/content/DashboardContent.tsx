@@ -475,13 +475,13 @@ export default function DashboardContent({
                         ? 'THÁNG NÀY'
                         : `NĂM ${selectedYear}`}
                   </p>
-                  <p className="text-4xl font-black text-slate-900 tracking-tight">
+                  <div className="text-4xl font-black text-slate-900 tracking-tight">
                     {isRevenueLoading ? (
                       <Skeleton className="h-12 w-48 rounded-xl" />
                     ) : (
                       `${dateRevenue.total.toLocaleString()} đ`
                     )}
-                  </p>
+                  </div>
                   <div className="flex gap-2 justify-center md:justify-start">
                     <p className="text-xs font-bold text-blue-600 bg-blue-50 inline-flex px-3 py-1 rounded-full uppercase tracking-widest">
                       {dateRevenue.count} Giao dịch đã xác thực

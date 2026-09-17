@@ -386,6 +386,7 @@ CTBooking/
 │   │   │   ├── payments.ts
 │   │   │   ├── posts.ts
 │   │   │   ├── roles.ts
+│   │   │   ├── sepay.ts
 │   │   │   ├── settings.ts
 │   │   │   ├── setup.ts
 │   │   │   ├── showtimes.ts
@@ -412,8 +413,6 @@ CTBooking/
 │   │   │   ├── users.ts
 │   │   │   ├── vouchers.ts
 │   │   │   └── vr-bookings.ts
-│   │   ├── webhook/
-│   │   │   └── sepay.ts
 │   │   └── mail-service.ts
 │   ├── cloudinary.spec.ts
 │   └── cloudinary.ts
@@ -450,7 +449,7 @@ CTBooking/
   - **Được import bởi:** Không có (được Cloudflare Worker Runtime gọi trực tiếp).
 
 - **`worker/src/middleware.ts`**
-  - **Vai trò:** Chứa các middleware bảo mật và phân quyền dùng chung cho API. Xác thực HTTP Authorization / JWT, kiểm tra quyền hạn của vòng đời Staff/Admin, và logic Rate Limiter cơ bản.
+  - **Vai trò:** Chứa các middleware bảo mật và phân quyền dùng chung cho API. Xác thực HTTP Authorization / JWT, kiểm tra quyền hạn của vòng đời Staff/Admin, xác thực Cloudflare Turnstile bảo vệ bot và logic Rate Limiter `rateLimiter`.
   - **Export chính:** `requireAuth`, `requireStaffAuth`, `requirePermission`, `rateLimiter`.
   - **Import từ đâu:** `server/routes/user/auth.ts`, `server/lib/staff-auth.ts`, `shared/schema.ts`.
   - **Được import bởi:** `worker/src/index.ts`.
@@ -627,6 +626,12 @@ CTBooking/
   - **Import từ đâu:** `lib/rbac-seed.ts`.
   - **Được import bởi:** `worker/src/index.ts`.
 
+- **`server/routes/admin/sepay.ts`**
+  - **Vai trò:** Lắng nghe Webhook và xử lý giao dịch khi cổng thanh toán (SePay/VietQR) ping chuyển khoản thành công. Map logic để đổi trạng thái `status` thành `paid` rồi chốt vé. Dùng `rateLimiter` bảo mật nghiêm ngặt.
+  - **Export chính:** `handleSePayWebhookImpl`.
+  - **Import từ đâu:** `server/routes/user/payments.ts`.
+  - **Được import bởi:** `worker/src/index.ts`.
+
 - **`server/routes/admin/showtimes.ts`**
   - **Vai trò:** CRUD lịch chiếu, suất chiếu phim của từng Rạp (Branch). Logic copy lịch nguyên khối qua ngày khác.
   - **Export chính:** `listShowtimesImpl`, `createShowtimeImpl`, `copyShowtimesImpl`...
@@ -689,7 +694,7 @@ CTBooking/
 
 ### C4. Thư mục `server/routes/user/` (11 files)
 - **`server/routes/user/auth.ts`**
-  - **Vai trò:** Nhánh Đăng nhập/Đăng ký dành riêng cho khách hàng (End-user). Xác thực OTP tạo account và gửi email Welcome.
+  - **Vai trò:** Nhánh Đăng nhập/Đăng ký dành riêng cho khách hàng (End-user). Xác thực mã Cloudflare Turnstile token trực tiếp qua API `siteverify` chống bot spam, xác nhận mã OTP và gửi email Welcome.
   - **Export chính:** `loginImpl`, `loginWithSessionImpl`, `registerImpl`, `validateSessionTokenImpl`, `validateOTPImpl`...
   - **Import từ đâu:** `lib/otp-utils`, `lib/booking-utils`.
   - **Được import bởi:** `worker/src/index.ts`.
@@ -754,14 +759,9 @@ CTBooking/
   - **Import từ đâu:** `./vouchers`, `lib/branch-ids`.
   - **Được import bởi:** `worker/src/index.ts`.
 
-### C7. Thư mục `server/routes/webhook/` (1 file)
-- **`server/routes/webhook/sepay.ts`**
-  - **Vai trò:** Lắng nghe và xử lý giao dịch khi cổng thanh toán (SePay/VNPay) gửi tín hiệu Ping chuyển khoản thành công. Map logic để đổi trạng thái `status` thành `paid` rồi chốt vé.
-  - **Export chính:** `handleSePayWebhookImpl`.
-  - **Import từ đâu:** `server/routes/user/payments.ts`.
-  - **Được import bởi:** `worker/src/index.ts`.
 
-### C8. Các API ở root `server/` (2 files)
+
+### C7. Các API ở root `server/` (2 files)
 - **`server/routes/mail-service.ts`**
   - **Vai trò:** Wrapper API gửi email. Truy cập qua API Resend hoặc nội bộ Worker.
   - **Export chính:** `sendMail`.
@@ -774,7 +774,7 @@ CTBooking/
   - **Import từ đâu:** Thư viện `cloudinary`.
   - **Được import bởi:** (Sử dụng rất hạn chế ở môi trường Worker).
 
-### C9. Root Configs (Môi trường & Build)
+### C8. Root Configs (Môi trường & Build)
 - **`worker/drizzle.config.ts`**
   - **Vai trò:** Khai báo cấu hình D1 DB phục vụ Drizzle Kit Migration.
 - **`worker/wrangler.toml`**

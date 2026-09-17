@@ -16,12 +16,12 @@
 
 **Phạm vi chức năng chính:**
 - Đặt vé phim + VR (đơn lẻ hoặc combo)
-- Thanh toán VietQR (chuyển khoản ngân hàng), MoMo, VNPay (cấu hình sẵn nhưng chưa rõ đã live)
-- Xác thực người dùng: Email/Password + OTP 2FA tùy chọn
+- Thanh toán VietQR (chuyển khoản ngân hàng) tích hợp webhook SePay đối soát tự động, MoMo, VNPay (cấu hình sẵn).
+- Xác thực người dùng (bảo vệ bằng Cloudflare Turnstile chống Bot): Email/Password + OTP 2FA tùy chọn
 - Quản lý đa chi nhánh (multi-branch) với lọc nội dung theo chi nhánh
 - Hệ thống RBAC cho staff (roles, permissions, branch assignment)
 - Blog/bài viết SEO
-- Admin dashboard với revenue analytics
+- Admin dashboard với revenue analytics (fix lỗi hydration/DOM)
 - Email tự động (booking confirm, welcome, reset password, OTP)
 
 ### 1.2 Tech Stack
@@ -235,6 +235,7 @@ Dự án theo **Hybrid Architecture**:
 |---------|-------|
 | `validateBookingImpl` | Kiểm tra email, tính toán giá, validate voucher cho movie booking |
 | `createPaymentImpl` | Tạo booking record + booking_vr_items, gửi email xác nhận qua mailQueue |
+| `handleSePayWebhookImpl` | (Mới) Nhận webhook từ SePay, validate IP & token, đối soát payment_code, set `paid` tự động |
 | `updatePaymentImpl` | Cập nhật payment_status (MoMo/VNPay IPN webhook) |
 | `getBookingByCodeImpl` | Tìm booking theo booking_code (admin check-in) |
 | `confirmUseTicketImpl` | Đánh dấu is_used=true khi staff quét vé |
@@ -480,12 +481,13 @@ flowchart TD
 ### 5.1 User Authentication
 
 **Luồng đăng nhập chuẩn (không có 2FA):**
-1. Client POST `/api/login` {email, password}
-2. Server: So sánh password với `bcrypt.compare()`
-3. Server: Generate `session_token` (32 bytes random hex, `crypto.getRandomValues`)
-4. Server: INSERT vào bảng `tokens` (type='session', expired_at = now+30days)
-5. Server: Set `Set-Cookie: session_token=<token>; HttpOnly; Secure; SameSite=Lax; Max-Age=2592000`
-6. Client: Cookie được browser lưu tự động
+1. Client POST `/api/login` {email, password, turnstile_token}
+2. Server: Validate `turnstile_token` qua hàm `siteverify` chống Bot tự động.
+3. Server: So sánh password với `bcrypt.compare()`
+4. Server: Generate `session_token` (32 bytes random hex, `crypto.getRandomValues`)
+5. Server: INSERT vào bảng `tokens` (type='session', expired_at = now+30days)
+6. Server: Set `Set-Cookie: session_token=<token>; HttpOnly; Secure; SameSite=Lax; Max-Age=2592000`
+7. Client: Cookie được browser lưu tự động
 
 **Luồng đăng nhập với 2FA (khi admin bật):**
 1. Login thành công → kiểm tra setting `otp_settings.enable_2fa`
@@ -922,14 +924,14 @@ Quá nhiều responsibility: validate booking, create booking (movie + VR + comb
 **Mức độ:** 🟡 Warning  
 Bảng `ticket_packages` có cả cột VR-specific (`vr_genre`, `min_players`) và movie-specific — vi phạm Single Table Inheritance không rõ ràng. Nên tách thành 2 bảng hoặc dùng polymorphic pattern rõ ràng.
 
-#### 5. `checkRateLimitKV` luôn return `true`
-**Mức độ:** 🟠 Bug  
-```typescript
-export async function checkRateLimitKV(env: any, ip: string): Promise<boolean> {
-  return true; // ← Hàm này bị stub, không có logic thực
-}
-```
-Hàm này được export nhưng không làm gì. Rate limiting thực sự được xử lý bởi `rateLimiter` middleware mới hơn — nhưng code cũ vẫn để lại gây nhầm lẫn.
+#### 5. Đã xử lý (Fixed) `checkRateLimitKV`
+**Mức độ:** ✅ Đã xử lý
+Hàm stub `checkRateLimitKV` không có logic thực đã được loại bỏ hoàn toàn khỏi dự án. Thay vào đó 100% route nhạy cảm được bao bọc an toàn dưới `rateLimiter` middleware.
+
+#### 5.1 Các tính năng Audit đã làm mới (2026-09-17)
+- Hệ thống thanh toán **SePay** đã live trực tiếp, Webhook đã mount tại `api/admin/sepay.ts` (không còn ở `webhook/sepay` như cũ). Auth Webhook SePay hoạt động với strict match IP SePay.
+- Các API Route thừa thãi (`/api/users/:id`, `/api/admin/vouchers/deleted`, `/api/debug/mail`) đã được delete clean loại bỏ hoàn toàn surface attacks.
+- Login, Register, Forget pass đã hoàn thành gắn **Turnstile Widget** cho bot-protection. Lỗi UI/DOM Nesting đã clean clear hoàn toàn tại Admin Dashboard, admin render Hydration trơn tru.
 
 #### 6. Không có global API error interceptor ở frontend
 **Mức độ:** 🟡 Warning  

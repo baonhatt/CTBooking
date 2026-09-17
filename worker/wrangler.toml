@@ -200,7 +200,7 @@ invocation_logs = true
 
 
 [observability.traces]
-
+send_metrics = false
 enabled = true
 
 head_sampling_rate = 1

@@ -21,7 +21,6 @@
     "build:client": "cross-env VITE_SERVER_BASE_URL=https://api.cinesphere.com.vn vite build",
     "build:client:preview": "cross-env VITE_SERVER_BASE_URL=https://cinema-worker-preview.baonhat20.workers.dev vite build --mode preview",
     "start": "node dist/server/node-build.mjs",
-    "test": "vitest --run",
     "format.fix": "prettier --write .",
     "typecheck": "tsc",
     "deploy:preview": "npx wrangler deploy --env preview --config worker/wrangler.toml",

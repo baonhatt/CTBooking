@@ -68,9 +68,28 @@ export default function MovieScheduleSection() {
   const opensAt = scheduleData?.opens_at;
   const closesAt = scheduleData?.closes_at;
 
-  // Identify next upcoming slot or live slot
-  const liveSlot = useMemo(() => allItems.find((s) => now >= s.start_time && now < s.end_time), [allItems, now]);
-  const nextSlot = useMemo(() => allItems.find((s) => s.start_time > now), [allItems, now]);
+  function timeToMinutes(t: string): number {
+    if (!t) return 0;
+    const [h, m] = t.split(':').map(Number);
+    return h * 60 + m;
+  }
+
+  // Identify the closest slot to the current time
+  const closestSlot = useMemo(() => {
+    if (allItems.length === 0) return null;
+    const nowMin = timeToMinutes(now);
+    return allItems.reduce((prev, curr) => {
+      const prevDiff = Math.abs(timeToMinutes(prev.start_time) - nowMin);
+      const currDiff = Math.abs(timeToMinutes(curr.start_time) - nowMin);
+      return currDiff < prevDiff ? curr : prev;
+    });
+  }, [allItems, now]);
+
+  // nextSlot is used in JSX for label UI styling
+  const nextSlot = useMemo(() => {
+    const sorted = [...allItems].sort((a,b) => a.start_time.localeCompare(b.start_time));
+    return sorted.find((s) => s.start_time > now);
+  }, [allItems, now]);
 
   // Active selected/hovered slot ID
   const [activeSlotId, setActiveSlotId] = useState<number | null>(null);
@@ -78,15 +97,13 @@ export default function MovieScheduleSection() {
   // Initialize active slot
   useEffect(() => {
     if (allItems.length > 0 && activeSlotId === null) {
-      if (liveSlot) {
-        setActiveSlotId(liveSlot.id);
-      } else if (nextSlot) {
-        setActiveSlotId(nextSlot.id);
+      if (closestSlot) {
+        setActiveSlotId(closestSlot.id);
       } else {
         setActiveSlotId(allItems[0].id);
       }
     }
-  }, [allItems, liveSlot, nextSlot, activeSlotId]);
+  }, [allItems, closestSlot, activeSlotId]);
 
   const activeSlot = useMemo(() => {
     return allItems.find((s) => s.id === activeSlotId) || allItems[0] || null;
@@ -469,7 +486,7 @@ export default function MovieScheduleSection() {
                       >
                         <span className="flex items-center justify-center gap-1.5 sm:gap-2">
                           <Ticket className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
-                          Đặt vé ({activeSlot.start_time})
+                          Đặt vé
                           <ChevronRight className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                         </span>
                       </Button>

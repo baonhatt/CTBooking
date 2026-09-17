@@ -16,7 +16,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle
 } from '@/components/ui/alert-dialog';
-import { confirmBookingApi, getBookingByCodeApi, useTicketApi } from '@/lib/api';
+import { confirmBookingApi, getBookingByCodeApi, useTicketApi, checkSepayTransactionApi } from '@/lib/api';
 import { getAdminBranchOptions } from '@/lib/api/branches';
 import {
   parseMoviePackages,
@@ -149,8 +149,9 @@ export default function TicketCheckContent() {
 
   // States cho Alert Dialog
   const [confirmOpen, setConfirmOpen] = useState(false);
-  const [confirmType, setConfirmType] = useState<'checkin' | 'payment'>('checkin');
+  const [confirmType, setConfirmType] = useState<'checkin' | 'payment' | 'force_checkin' | 'force_payment'>('checkin');
   const [allowConfirmCancelled, setAllowConfirmCancelled] = useState(false);
+  const [sepayCheckError, setSepayCheckError] = useState<string | null>(null);
 
   const isSuperAdmin = useIsSuperAdmin();
   const permissions = useStaffPermissions();
@@ -235,7 +236,25 @@ export default function TicketCheckContent() {
           // CHỈ ĐÓNG MODAL KHI THÀNH CÔNG
           setConfirmOpen(false);
         }
-      } else {
+      } else if (confirmType === 'payment' || (confirmType as string) === 'force_payment') {
+        if (confirmType === 'payment') {
+          try {
+            const checkCode = ticketInfo.pay_txt_code || ticketInfo.booking_code || '';
+            const checkRes = await checkSepayTransactionApi(checkCode, Number(ticketInfo.total_price));
+            if (!checkRes.success) {
+              setSepayCheckError(checkRes.message);
+              setConfirmType('force_payment' as any);
+              setUseLoading(false);
+              return;
+            }
+          } catch (e: any) {
+            setSepayCheckError(e.message || 'Lỗi gọi API kiểm tra SePay');
+            setConfirmType('force_payment' as any);
+            setUseLoading(false);
+            return;
+          }
+        }
+
         // 2. Xử lý xác nhận thanh toán
         const payload = {
           user_id: ticketInfo.user_id,
@@ -946,25 +965,31 @@ export default function TicketCheckContent() {
                 ? '⚠️ Xác nhận vào cổng?'
                 : (confirmType as string) === 'force_checkin'
                   ? '⚠️ Duyệt du di vé quá hạn?'
-                  : '💰 Xác nhận thanh toán?'}
+                  : (confirmType as string) === 'force_payment'
+                    ? '⚠️ Cảnh báo duyệt bỏ qua lỗi SePay!'
+                    : '💰 Xác nhận thanh toán?'}
             </AlertDialogTitle>
-            <AlertDialogDescription className="text-slate-500 text-base leading-relaxed space-y-3">
-              <p>
-                {confirmType === 'checkin'
-                  ? `Bạn đang thực hiện cho ${ticketInfo?.ticket_count} khách vào cổng. Hành động này không thể hoàn tác.`
-                  : (confirmType as string) === 'force_checkin'
-                    ? `Vé mã ${ticketInfo?.booking_code} đã hết hạn. Bạn có chắc chắn muốn duyệt du di cho khách vào cổng không? Thao tác này sẽ được lưu lại trong nhật ký hệ thống (Audit Log).`
-                    : `Bạn đã đối soát thành công số tiền ${Number(ticketInfo?.total_price).toLocaleString('vi-VN')}đ cho ID #${ticketInfo?.id}?`}
-              </p>
-              {isBranchMismatch && (
-                <div className="p-3.5 bg-amber-500/10 border border-amber-500/30 rounded-xl text-amber-900 text-xs font-semibold flex items-start gap-2.5 text-left mt-2">
-                  <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
-                  <div>
-                    <span className="font-bold text-amber-950">⚠️ Chú ý lệch chi nhánh:</span> Vé này mua tại{' '}
-                    <span className="font-extrabold underline">{ticketInfo?.branch_name || `Chi nhánh #${ticketInfo?.branch_id}`}</span>, khác với chi nhánh làm việc hiện tại của bạn (<span className="font-extrabold underline">{currentBranchName}</span>).
+            <AlertDialogDescription asChild>
+              <div className="text-slate-500 text-base leading-relaxed space-y-3">
+                <p>
+                  {confirmType === 'checkin'
+                    ? `Bạn đang thực hiện cho ${ticketInfo?.ticket_count} khách vào cổng. Hành động này không thể hoàn tác.`
+                    : (confirmType as string) === 'force_checkin'
+                      ? `Vé mã ${ticketInfo?.booking_code} đã hết hạn. Bạn có chắc chắn muốn duyệt du di cho khách vào cổng không? Thao tác này sẽ được lưu lại trong nhật ký hệ thống (Audit Log).`
+                      : (confirmType as string) === 'force_payment'
+                        ? `Hệ thống gặp vấn đề: ${sepayCheckError}. Bạn có chắc chắn ĐÃ NHẬN ĐỦ TIỀN và ép hệ thống xác nhận bỏ qua tự động?`
+                        : `Bạn đã đối soát thành công số tiền ${Number(ticketInfo?.total_price).toLocaleString('vi-VN')}đ cho ID #${ticketInfo?.id}?`}
+                </p>
+                {isBranchMismatch && (
+                  <div className="p-3.5 bg-amber-500/10 border border-amber-500/30 rounded-xl text-amber-900 text-xs font-semibold flex items-start gap-2.5 text-left mt-2">
+                    <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+                    <div>
+                      <span className="font-bold text-amber-950">⚠️ Chú ý lệch chi nhánh:</span> Vé này mua tại{' '}
+                      <span className="font-extrabold underline">{ticketInfo?.branch_name || `Chi nhánh #${ticketInfo?.branch_id}`}</span>, khác với chi nhánh làm việc hiện tại của bạn (<span className="font-extrabold underline">{currentBranchName}</span>).
+                    </div>
                   </div>
-                </div>
-              )}
+                )}
+              </div>
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter className="gap-3 mt-6">
@@ -983,7 +1008,9 @@ export default function TicketCheckContent() {
                   ? 'bg-green-600 hover:bg-green-700'
                   : (confirmType as string) === 'force_checkin'
                     ? 'bg-amber-600 hover:bg-amber-700'
-                    : 'bg-amber-500 hover:bg-amber-600'
+                    : (confirmType as string) === 'force_payment'
+                      ? 'bg-red-600 hover:bg-red-700 shadow-red-200'
+                      : 'bg-amber-500 hover:bg-amber-600'
               }`}
             >
               {useLoading ? (

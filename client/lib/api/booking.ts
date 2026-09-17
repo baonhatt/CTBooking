@@ -110,3 +110,13 @@ export async function useTicketApi(code: string, allowExpired: boolean = false) 
     body: JSON.stringify({ code, allow_expired: allowExpired })
   });
 }
+
+export async function checkSepayTransactionApi(code: string, amount: number) {
+  return request<{
+    success: boolean;
+    message: string;
+    transaction?: any;
+  }>(`/api/admin/sepay/check?code=${encodeURIComponent(code)}&amount=${amount}`, {
+    method: 'GET'
+  });
+}
