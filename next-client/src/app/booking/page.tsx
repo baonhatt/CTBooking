@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
+import Link from 'next/link';
 import { useQuery } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
@@ -53,7 +54,8 @@ import {
   CheckCircle2,
   ShieldCheck,
   QrCode,
-  Info
+  Info,
+  ChevronDown
 } from 'lucide-react';
 import { useBranch } from '@/hooks/useBranch';
 import { getCookie } from '@/lib/cookies';
@@ -87,6 +89,7 @@ export default function BookingPage() {
   const [showEmailConfirmDialog, setShowEmailConfirmDialog] = useState(false);
   const [showPaymentConfirmDialog, setShowPaymentConfirmDialog] = useState(false);
   const [directBookingItem, setDirectBookingItem] = useState<any | null>(null);
+  const [isMoviesOpen, setIsMoviesOpen] = useState(false);
 
   // Prefetch target routes
   useEffect(() => {
@@ -683,11 +686,11 @@ export default function BookingPage() {
               </div>
             </Card>
           ) : (
-            <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+            <div className="flex flex-col lg:grid lg:grid-cols-12 gap-6 lg:gap-8 lg:items-start">
               {/* ================= LEFT COLUMN: SELECTED ITEMS & MOVIES (7 cols) ================= */}
-              <div className="lg:col-span-7 space-y-6">
+              <div className="contents lg:block lg:col-span-7 lg:space-y-6">
                 {/* 1. ORDER ITEMS LIST CARD */}
-                <Card className="bg-slate-900/60 backdrop-blur-xl border border-white/10 rounded-2xl overflow-hidden shadow-2xl">
+                <Card className="order-1 lg:order-none bg-slate-900/60 backdrop-blur-xl border border-white/10 rounded-2xl overflow-hidden shadow-2xl">
                   <CardHeader className="bg-white/[0.03] border-b border-white/10 py-4 px-5 sm:px-6">
                     <div className="text-base sm:text-lg font-bold text-white flex items-center justify-between">
                       <h2 className="flex items-center gap-2.5 text-base sm:text-lg font-bold text-white">
@@ -782,7 +785,7 @@ export default function BookingPage() {
                                           : 'bg-purple-500/15 border-purple-500/30 text-purple-300'
                                       }`}
                                     >
-                                      {isMovie ? 'Vé Xem Phim 8K' : item.vr_genre || 'Gói VR'}
+                                      {isMovie ? 'Áp dụng cho mọi suất chiếu' : item.vr_genre || 'Gói VR'}
                                     </span>
                                   </div>
                                   <p className="text-xs text-slate-400 flex items-center gap-2">
@@ -873,20 +876,36 @@ export default function BookingPage() {
 
                 {/* 2. PHIM ĐANG CHIẾU (Info-only – rạp 1 phòng xoay vòng) */}
                 {movieItems.length > 0 && availableMovies.length > 0 && (
-                  <Card className="bg-slate-900/60 backdrop-blur-xl border border-white/10 rounded-2xl overflow-hidden shadow-2xl animate-in fade-in duration-300">
-                    <CardHeader className="bg-white/[0.03] border-b border-white/10 py-4 px-5 sm:px-6">
+                  <Card className="order-5 lg:order-none bg-slate-900/60 backdrop-blur-xl border border-white/10 rounded-2xl overflow-hidden shadow-2xl animate-in fade-in duration-300">
+                    <CardHeader 
+                      className="bg-white/[0.03] border-b border-white/10 py-4 px-5 sm:px-6 cursor-pointer lg:cursor-default select-none group"
+                      onClick={() => window.innerWidth < 1024 && setIsMoviesOpen(!isMoviesOpen)}
+                    >
                       <CardTitle className="text-base sm:text-lg font-bold text-white flex items-center justify-between">
                         <div className="flex items-center gap-2.5">
-                          <span className="w-1.5 h-6 bg-gradient-to-b from-blue-400 to-cyan-500 rounded-full" />
+                          <span className="w-1.5 h-6 bg-gradient-to-b from-cyan-400 to-blue-500 rounded-full" />
                           <span>Phim Đang Chiếu</span>
                         </div>
-                        <span className="text-xs text-cyan-400 font-semibold">
-                          {availableMovies.length} phim
-                        </span>
+                        <div className="flex items-center gap-3">
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              window.dispatchEvent(new CustomEvent('open-movie-schedule'));
+                            }}
+                            className="hidden lg:inline text-xs text-slate-400 hover:text-cyan-400 transition-colors font-medium outline-none"
+                          >
+                            Xem lịch chiếu đầy đủ &rarr;
+                          </button>
+                          <div className="flex items-center gap-1.5 px-2 py-1 bg-cyan-500/10 rounded-lg border border-cyan-500/20 group-hover:bg-cyan-500/15 transition-colors">
+                            <span className="text-[11px] sm:text-xs text-cyan-400 font-semibold">{availableMovies.length} phim</span>
+                            <ChevronDown className={`w-3.5 h-3.5 text-cyan-400 lg:hidden transition-transform duration-300 ${isMoviesOpen ? 'rotate-180' : ''}`} />
+                          </div>
+                        </div>
                       </CardTitle>
                     </CardHeader>
 
-                    <CardContent className="p-5 sm:p-6">
+                    <CardContent className={`p-5 sm:p-6 ${isMoviesOpen ? 'block' : 'hidden lg:block'}`}>
                       <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3.5">
                         {availableMovies.map((m: any) => (
                           <div
@@ -898,7 +917,7 @@ export default function BookingPage() {
                                 src={optimizeCloudinaryUrl(m.cover_image, 300)}
                                 alt={m.title}
                                 loading="lazy"
-                                className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                                className="w-full h-full object-cover"
                                 onError={(e) => {
                                   (e.target as HTMLImageElement).src =
                                     'https://images.unsplash.com/photo-1489599849927-2ee91cede3ba?w=400&q=80';
@@ -927,27 +946,26 @@ export default function BookingPage() {
                 )}
 
                 {/* 3. SAFETY / CONVENIENCE NOTES */}
-                <div className="p-4 sm:p-5 rounded-2xl border border-white/10 bg-white/[0.02] backdrop-blur-md space-y-2.5">
+                <div className="order-6 lg:order-none p-4 sm:p-5 rounded-2xl border border-white/10 bg-white/[0.02] backdrop-blur-md space-y-2.5">
                   <h4 className="text-slate-300 font-bold text-xs sm:text-sm flex items-center gap-2">
                     <ShieldCheck className="w-4 h-4 text-cyan-400" />
-                    Lưu ý dành cho khách trải nghiệm:
+                    Lưu ý vận hành:
                   </h4>
-                  <ul className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-1.5 text-xs text-slate-400 list-inside list-disc">
+                  <ul className="grid grid-cols-1 gap-y-1.5 text-xs text-slate-400 list-inside list-disc">
                     <li>Vui lòng có mặt trước giờ chiếu 10-15 phút.</li>
-                    <li>Xuất trình mã QR tại quầy tiếp tân để nhận vé cứng.</li>
+                    <li>Cung cấp mã đặt vé cho nhân viên soát vé để nhận vé cứng.</li>
                     <li>Phòng chiếu trang bị hệ thống âm thanh vòm &amp; Hologram 8K.</li>
-                    <li>Vé điện tử đã thanh toán không hoàn trả hoặc hủy vé.</li>
                   </ul>
                 </div>
               </div>
 
               {/* ================= RIGHT COLUMN: CUSTOMER, PAYMENT & SUMMARY (5 cols) ================= */}
-              <div className="lg:col-span-5 space-y-6">
+              <div className="contents lg:block lg:col-span-5 lg:space-y-6">
                 {/* 1. CUSTOMER INFO CARD */}
-                <Card className="bg-slate-900/60 backdrop-blur-xl border border-white/10 rounded-2xl overflow-hidden shadow-2xl">
+                <Card className="order-2 lg:order-none bg-slate-900/60 backdrop-blur-xl border border-white/10 rounded-2xl overflow-hidden shadow-2xl">
                   <CardHeader className="bg-white/[0.03] border-b border-white/10 py-4 px-5">
                     <CardTitle className="text-base font-bold text-white flex items-center gap-2.5">
-                      <span className="w-1.5 h-5 bg-gradient-to-b from-blue-400 to-purple-500 rounded-full" />
+                      <span className="w-1.5 h-6 bg-gradient-to-b from-cyan-400 to-blue-500 rounded-full" />
                       <span>Thông Tin Nhận Vé</span>
                     </CardTitle>
                   </CardHeader>
@@ -1008,7 +1026,7 @@ export default function BookingPage() {
                     {/* Email */}
                     <div className="space-y-1.5">
                       <Label className="text-xs font-semibold text-slate-300">
-                        Email Nhận Mã QR Vé <span className="text-cyan-400">*</span>
+                        Email Nhận Mã Đặt Vé <span className="text-cyan-400">*</span>
                       </Label>
                       <Input
                         type="email"
@@ -1039,10 +1057,10 @@ export default function BookingPage() {
                 </Card>
 
                 {/* 2. VOUCHER & PAYMENT METHOD */}
-                <Card className="bg-slate-900/60 backdrop-blur-xl border border-white/10 rounded-2xl overflow-hidden shadow-2xl">
+                <Card className="order-3 lg:order-none bg-slate-900/60 backdrop-blur-xl border border-white/10 rounded-2xl overflow-hidden shadow-2xl">
                   <CardHeader className="bg-white/[0.03] border-b border-white/10 py-4 px-5">
                     <CardTitle className="text-base font-bold text-white flex items-center gap-2.5">
-                      <span className="w-1.5 h-5 bg-gradient-to-b from-purple-400 to-pink-500 rounded-full" />
+                      <span className="w-1.5 h-6 bg-gradient-to-b from-cyan-400 to-blue-500 rounded-full" />
                       <span>Ưu Đãi &amp; Thanh Toán</span>
                     </CardTitle>
                   </CardHeader>
@@ -1099,7 +1117,7 @@ export default function BookingPage() {
                             type="button"
                             onClick={applyVoucher}
                             disabled={voucherValidating || !voucherCode.trim()}
-                            className="h-11 px-4 bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-500 hover:to-blue-500 text-white font-bold text-xs rounded-xl shrink-0 transition-all duration-300"
+                            className="h-11 px-4 bg-white/5 border border-white/10 hover:bg-white/10 text-cyan-300 hover:text-cyan-200 font-bold text-xs rounded-xl shrink-0 transition-all duration-300"
                           >
                             {voucherValidating ? <Loader2 className="w-3.5 h-3.5 animate-spin mr-1.5" /> : null}
                             Áp dụng
@@ -1111,10 +1129,10 @@ export default function BookingPage() {
                 </Card>
 
                 {/* 3. ORDER SUMMARY CARD */}
-                <Card className="bg-slate-900/60 backdrop-blur-xl border border-white/10 rounded-2xl overflow-hidden shadow-2xl">
+                <Card className="order-4 lg:order-none bg-slate-900/60 backdrop-blur-xl border border-white/10 rounded-2xl overflow-hidden shadow-2xl">
                   <CardHeader className="bg-white/[0.03] border-b border-white/10 py-4 px-5">
                     <CardTitle className="text-base font-bold text-white flex items-center gap-2.5">
-                      <span className="w-1.5 h-5 bg-gradient-to-b from-cyan-400 to-emerald-400 rounded-full" />
+                      <span className="w-1.5 h-6 bg-gradient-to-b from-cyan-400 to-blue-500 rounded-full" />
                       <span>Tóm Tắt Thanh Toán</span>
                     </CardTitle>
                   </CardHeader>
@@ -1166,8 +1184,18 @@ export default function BookingPage() {
                       </div>
                     </div>
 
+                    {/* Refund Warning */}
+                    <div className="pt-4 mt-2 border-t border-white/10">
+                      <div className="p-3.5 bg-amber-500/10 border border-amber-500/30 rounded-xl flex items-start gap-2.5 shadow-inner">
+                        <Info className="w-4 h-4 text-amber-500 shrink-0 mt-0.5" />
+                        <p className="text-xs text-amber-400/90 leading-snug">
+                          Vé điện tử đã thanh toán <strong className="text-amber-300">không hoàn trả hoặc hủy vé</strong> dưới mọi hình thức.
+                        </p>
+                      </div>
+                    </div>
+
                     {/* Terms Agreement Checkbox */}
-                    <div className="pt-4 border-t border-white/5">
+                    <div className="pt-4">
                       <div className="flex items-start gap-2.5">
                         <Checkbox
                           id="agree-terms"
@@ -1248,7 +1276,7 @@ export default function BookingPage() {
                 Kiểm tra thông tin nhận vé
               </AlertDialogTitle>
               <AlertDialogDescription className="text-slate-300 text-xs leading-relaxed space-y-3 pt-2">
-                <span className="block">Mã QR vé điện tử và hướng dẫn check-in sẽ được gửi trực tiếp tới email của bạn:</span>
+                <span className="block">Mã đặt vé và hướng dẫn check-in sẽ được gửi trực tiếp tới email của bạn:</span>
                 <span className="block p-3 rounded-xl bg-white/5 border border-white/10 font-bold text-cyan-300 text-sm break-all text-center">
                   {email}
                 </span>

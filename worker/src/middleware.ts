@@ -138,35 +138,5 @@ export function requirePermission(module: string, action: string) {
   };
 }
 
-/**
- * Rate Limiter Middleware
- * Uses Cloudflare KV to limit requests by IP
- */
-export function rateLimiter(limit: number, windowSeconds: number) {
-  return async (c: Context, next: Next) => {
-    // Attempt to get client IP
-    const ip = c.req.header('CF-Connecting-IP') || c.req.header('X-Forwarded-For') || 'unknown';
-    
-    // Allow local environments to bypass safely if needed, but here we just rate limit anyway
-    const route = new URL(c.req.url).pathname;
-    const kvKey = `rate_limit:${route}:${ip}`;
-    
-    try {
-      const currentVal = await c.env.CONFIG_KV.get(kvKey);
-      const count = currentVal ? parseInt(currentVal, 10) : 0;
-      
-      if (count >= limit) {
-        return c.json({ status: 'error', message: 'Too many requests, please try again later.' }, 429);
-      }
-      
-      // Increment and set expiration
-      await c.env.CONFIG_KV.put(kvKey, (count + 1).toString(), { expirationTtl: windowSeconds });
-    } catch (e) {
-      console.warn('Rate limiter KV error', e);
-      // Fail open if KV is disconnected
-    }
-    
-    await next();
-  };
-}
+
 

@@ -44,7 +44,6 @@
 | **Package Manager** | pnpm | 10.14.0 |
 | **Language** | TypeScript | 5.9.2 |
 | **Cron** | Cloudflare Workers Cron Trigger | mỗi 5 phút |
-| **Rate Limiting** | Cloudflare KV | - |
 | **3D/VR Preview** | Three.js + @react-three/fiber | 0.176.0 |
 | **Form** | react-hook-form + zod | 7.62.0 / 3.25 |
 | **HTTP Client** | fetch (native) | - |
@@ -92,7 +91,7 @@ CTBooking/                          ← Monorepo root
 │   └── src/
 │       ├── index.ts                ← ⭐ Entry point: toàn bộ API routes (5505 dòng!)
 │       ├── schema.ts               ← Drizzle schema: 18 bảng SQLite
-│       ├── middleware.ts           ← requireAuth, requireStaffAuth, requirePermission, rateLimiter
+│       ├── middleware.ts           ← requireAuth, requireStaffAuth, requirePermission
 │       └── utils.ts               ← Helpers: Cloudinary, cache, token, date utils
 │
 ├── server/                         ← Business logic (imported bởi worker)
@@ -589,10 +588,9 @@ app.onError((err, c) => {
 
 ### 6.3 Rate Limiting
 
-`rateLimiter(limit, windowSeconds)` middleware dùng **Cloudflare KV**:
-- Key format: `rate_limit:<route>:<IP>`
-- Applied: `/api/login` (5 req/60s), `/api/validate-otp` (5/60s), `/api/resend-otp` (5/60s)
-- **Fail open**: nếu KV lỗi, request được phép đi qua
+Hệ thống đã **vô hiệu hóa và gỡ bỏ hoàn toàn** logic Rate Limiting thủ công bằng Cloudflare KV (dùng `CONFIG_KV`) để tránh tình trạng quá tải lượt Ghi (Write Quota) của Cloudflare KV. 
+
+- Khi cần chặn DDoS / Brute Force / Spam API, dự án khuyến nghị sử dụng trực tiếp **Cloudflare WAF Rate Limiting Rules** cấu hình trên Dashboard Cloudflare.
 
 ---
 
@@ -869,14 +867,7 @@ erDiagram
 | `SUPER_ADMIN_FULLNAME` | Tên hiển thị superadmin | ✅ |
 | `IS_PREVIEW` | Flag môi trường preview | - |
 | `INDEXNOW_KEY` | Key cho IndexNow SEO ping | - |
-| `VITE_RATE_LIMIT_BOOKING_CHECK_MAX` | Max requests booking check | - |
-
-**Cloudflare Bindings (wrangler.toml):**
-| Binding | Loại | Mục đích |
-|--------|------|---------|
-| `cinema_db` | D1 Database | Database chính |
 | `r2_cinemastore` | R2 Bucket | Lưu trữ media (chưa active hoàn toàn) |
-| `CONFIG_KV` | KV Namespace | Rate limiting, cache |
 
 **Cron**: `*/5 * * * *` → `expireStaleBookingsImpl` (tự động expire booking `payment_status='pending'` quá `payment_expires_at`)
 
@@ -924,9 +915,9 @@ Quá nhiều responsibility: validate booking, create booking (movie + VR + comb
 **Mức độ:** 🟡 Warning  
 Bảng `ticket_packages` có cả cột VR-specific (`vr_genre`, `min_players`) và movie-specific — vi phạm Single Table Inheritance không rõ ràng. Nên tách thành 2 bảng hoặc dùng polymorphic pattern rõ ràng.
 
-#### 5. Đã xử lý (Fixed) `checkRateLimitKV`
+#### 5. Đã xử lý (Decommissioned) Rate Limiting qua KV
 **Mức độ:** ✅ Đã xử lý
-Hàm stub `checkRateLimitKV` không có logic thực đã được loại bỏ hoàn toàn khỏi dự án. Thay vào đó 100% route nhạy cảm được bao bọc an toàn dưới `rateLimiter` middleware.
+Logic Rate Limiter ghi số dư truy cập theo IP vào Cloudflare KV đã được gỡ bỏ hoàn toàn khỏi toàn bộ router (`middleware.ts`, `userRouter.ts`, `adminRouter.ts`, `publicRouter.ts`) và tệp môi trường `wrangler.toml` để bảo vệ Quota Cloudflare KV và tối ưu hiệu năng worker.
 
 #### 5.1 Các tính năng Audit đã làm mới (2026-09-17)
 - Hệ thống thanh toán **SePay** đã live trực tiếp, Webhook đã mount tại `api/admin/sepay.ts` (không còn ở `webhook/sepay` như cũ). Auth Webhook SePay hoạt động với strict match IP SePay.

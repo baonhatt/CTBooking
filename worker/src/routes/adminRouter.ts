@@ -2,7 +2,7 @@ import { Hono, Context } from 'hono';
 import { drizzle } from 'drizzle-orm/d1';
 import * as schema from '../../../shared/schema';
 
-import { requireStaffAuth, requirePermission, rateLimiter } from '../middleware';
+import { requireStaffAuth, requirePermission } from '../middleware';
 import { sendMail } from '../../../server/routes/mail-service';
 import {
   cloudinarySignedParams,
@@ -281,7 +281,7 @@ adminRouter.post('/api/admin/auth/login', async (c) => {
         rolePermissions: schema.rolePermissions,
         permissions: schema.permissions
       },
-      null,
+      c.env.SETTINGS_KV,
       body
     );
 
@@ -328,7 +328,7 @@ adminRouter.post('/api/admin/auth/verify-login-otp', async (c) => {
         rolePermissions: schema.rolePermissions,
         permissions: schema.permissions
       },
-      null,
+      c.env.SETTINGS_KV,
       body
     );
 
@@ -415,7 +415,7 @@ adminRouter.get('/api/admin/auth/me', requireStaffAuth, async (c) => {
         rolePermissions: schema.rolePermissions,
         permissions: schema.permissions
       },
-      null,
+      c.env.SETTINGS_KV,
       staffId
     );
 
@@ -445,7 +445,7 @@ adminRouter.post('/api/admin/auth/change-password', requireStaffAuth, async (c) 
         rolePermissions: schema.rolePermissions,
         permissions: schema.permissions
       },
-      null,
+      c.env.SETTINGS_KV,
       staffId,
       body
     );
@@ -473,7 +473,7 @@ adminRouter.post('/api/admin/auth/force-change-password', requireStaffAuth, asyn
         staffTokens: schema.staffTokens,
         auditLogs: schema.auditLogs
       },
-      null,
+      c.env.SETTINGS_KV,
       staffId,
       body
     );
@@ -526,7 +526,7 @@ adminRouter.post('/api/admin/auth/change-password-with-otp', requireStaffAuth, a
     const r = await staffChangePasswordWithOTP(
       db,
       { staffs: schema.staffs, staffTokens: schema.staffTokens, auditLogs: schema.auditLogs },
-      null,
+      c.env.SETTINGS_KV,
       staffId,
       body
     );
@@ -568,7 +568,7 @@ adminRouter.post('/api/admin/auth/reset-password', async (c) => {
     const r = await staffResetPasswordImpl(
       db,
       { staffs: schema.staffs, staffTokens: schema.staffTokens, auditLogs: schema.auditLogs },
-      null,
+      c.env.SETTINGS_KV,
       body
     );
 
@@ -3444,19 +3444,7 @@ adminRouter.post('/api/admin/confirm-booking', requireStaffAuth, requirePermissi
 
 // Ticket checking control system
 adminRouter.get('/api/admin/bookings-code/:code', requireStaffAuth, requirePermission('ticket_check', 'scan'), async (c) => {
-  // Rate Limit Check dùng KV
 
-  const ip = c.req.header('CF-Connecting-IP') || 'unknown';
-
-  const max = Number(c.env.VITE_RATE_LIMIT_BOOKING_CHECK_MAX) || 10;
-
-  const windowMs = Number(c.env.VITE_RATE_LIMIT_BOOKING_CHECK_WINDOWMS) || 60000;
-
-  c.header('X-RateLimit-Limit', String(max));
-
-  c.header('X-RateLimit-Remaining', String(max));
-
-  c.header('X-RateLimit-WindowMS', String(windowMs));
 
   const db = drizzle(c.env.cinema_db, { schema });
 

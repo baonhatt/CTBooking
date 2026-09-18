@@ -102,6 +102,13 @@ export default function Header({
         }
     }, []);
 
+    // Listen for global open-movie-schedule event
+    useEffect(() => {
+        const handleOpenSchedule = () => setIsScheduleOpen(true);
+        window.addEventListener('open-movie-schedule', handleOpenSchedule);
+        return () => window.removeEventListener('open-movie-schedule', handleOpenSchedule);
+    }, []);
+
     // Login status
     const [isLoggedIn, setIsLoggedIn] = useState(false);
 

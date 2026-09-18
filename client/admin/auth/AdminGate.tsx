@@ -11,8 +11,8 @@ import { loginApi } from '@/lib/api/auth';
 import { request } from '@/lib/api/http';
 import { checkSuperAdminSetup } from '@/lib/api/admin';
 import iconCine from '@/assets/images/iconCine.svg';
-import { AlertCircle, ShieldAlert, Lock, Mail, Eye, EyeOff, Loader2, ArrowRight } from 'lucide-react';
-import { forceChangePasswordApi } from '@/lib/api/auth';
+import { AlertCircle, ShieldAlert, Lock, Mail, Eye, EyeOff, Loader2, ArrowRight, ShieldCheck } from 'lucide-react';
+import { forceChangePasswordApi, verifyAdminLoginOtpApi } from '@/lib/api/auth';
 import { SessionTimeoutModal } from '@/components/admin/SessionTimeoutModal';
 import AdminIndex from '@/pages/admin/AdminIndex';
 import DashboardPage from '@/pages/admin/Dashboard';
@@ -43,6 +43,7 @@ import DeletedRolesPage from '@/pages/admin/DeletedRoles';
 import DeletedBranchesPage from '@/pages/admin/DeletedBranches';
 import VouchersPage from '@/pages/admin/Vouchers';
 import DeletedVouchersPage from '@/pages/admin/DeletedVouchers';
+import EmailPreviewPage from '@/pages/admin/EmailPreview';
 
 const AccessDenied = () => {
   const navigate = useNavigate();
@@ -91,6 +92,12 @@ const AdminLoginView = () => {
   const [isEmailFocused, setIsEmailFocused] = useState(false);
   const [isPasswordFocused, setIsPasswordFocused] = useState(false);
   const [turnstileToken, setTurnstileToken] = useState<string>('');
+  
+  // 2FA Flow states
+  const [requireOtp, setRequireOtp] = useState(false);
+  const [otpCode, setOtpCode] = useState('');
+  const [pendingStaffId, setPendingStaffId] = useState<number | null>(null);
+
   const turnstileRef = useRef<HTMLDivElement>(null);
   const turnstileWidgetId = useRef<string | null>(null);
 
@@ -146,6 +153,10 @@ const AdminLoginView = () => {
         localStorage.setItem('staffToken', data.token);
         setStaff(data.staff, data.permissions, data.branchIds, data.token, data.expiresAt);
         navigate('/', { replace: true });
+      } else if (data.status === 'require_otp') {
+        setRequireOtp(true);
+        setPendingStaffId(data.staffId);
+        setError('');
       } else {
         setError(data.message || 'Đăng nhập thất bại');
       }
@@ -153,11 +164,34 @@ const AdminLoginView = () => {
       setError(err?.message || 'Lỗi kết nối server');
     } finally {
       setLoading(false);
-      // Reset turnstile on error to force re-verification
-      if ((window as any).turnstile && turnstileWidgetId.current) {
+      if (!requireOtp && (window as any).turnstile && turnstileWidgetId.current) {
         (window as any).turnstile.reset(turnstileWidgetId.current);
         setTurnstileToken('');
       }
+    }
+  }
+
+  async function handleVerifyOtp(e?: React.FormEvent) {
+    e?.preventDefault();
+    if (!otpCode || !pendingStaffId) return;
+
+    try {
+      setLoading(true);
+      setError('');
+      
+      const data = await verifyAdminLoginOtpApi({ staffId: pendingStaffId, otp: otpCode });
+
+      if (data.status === 'success') {
+        localStorage.setItem('staffToken', data.token);
+        setStaff(data.staff, data.permissions, data.branchIds, data.token, data.expiresAt);
+        navigate('/', { replace: true });
+      } else {
+        setError(data.message || 'Mã OTP không hợp lệ hoặc đã hết hạn');
+      }
+    } catch (err: any) {
+      setError(err?.message || 'Lỗi kết nối server xác thực OTP');
+    } finally {
+      setLoading(false);
     }
   }
 
@@ -187,92 +221,155 @@ const AdminLoginView = () => {
         {/* Login Card */}
         <div className="bg-slate-900/80 backdrop-blur-2xl border border-slate-800/90 rounded-3xl p-6 sm:p-8 shadow-[0_25px_50px_-12px_rgba(0,0,0,0.7)]">
           <div className="mb-6">
-            <h2 className="text-lg font-bold text-white">Đăng nhập tài khoản</h2>
-            <p className="text-xs text-slate-400 mt-1">Truy cập bảng điều khiển dành cho Ban Quản trị & Nhân viên</p>
+            <h2 className="text-lg font-bold text-white">{requireOtp ? 'Xác thực bảo vệ 2 lớp' : 'Đăng nhập tài khoản'}</h2>
+            <p className="text-xs text-slate-400 mt-1">{requireOtp ? 'Mã xác thực gồm 6 số đã được gửi tới email của bạn.' : 'Truy cập bảng điều khiển dành cho Ban Quản trị & Nhân viên'}</p>
           </div>
 
-          <form onSubmit={handleLogin} className="space-y-4">
-            {/* Email Input */}
-            <div className="space-y-1.5">
-              <Label className="text-xs font-semibold text-slate-300">Email quản trị</Label>
-              <div className="relative group">
-                <div className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-500 group-focus-within:text-blue-400 transition-colors">
-                  <Mail className="h-4 w-4" />
+          {requireOtp ? (
+            <form onSubmit={handleVerifyOtp} className="space-y-4">
+              <div className="space-y-1.5">
+                <Label className="text-xs font-semibold text-slate-300">Mã Xác Thực (OTP)</Label>
+                <div className="relative group">
+                  <div className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-500 group-focus-within:text-blue-400 transition-colors">
+                    <ShieldCheck className="h-4 w-4" />
+                  </div>
+                  <Input
+                    type="text"
+                    placeholder="Nhập mã 6 số"
+                    className="bg-slate-950/70 border-slate-800/90 rounded-xl pl-10 pr-3 py-3 text-white placeholder:text-slate-600 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition-all text-center tracking-[0.5em] font-mono text-xl font-bold"
+                    value={otpCode}
+                    onChange={(e) => setOtpCode(e.target.value)}
+                    maxLength={8}
+                    autoFocus
+                    required
+                  />
                 </div>
-                <Input
-                  type="email"
-                  placeholder="name@cinesphere.com"
-                  className="bg-slate-950/70 border-slate-800/90 rounded-xl pl-10 pr-3 py-2.5 text-sm text-white placeholder:text-slate-600 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition-all"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  autoComplete={isEmailFocused ? 'email' : 'new-password'}
-                  onFocus={() => setIsEmailFocused(true)}
-                  readOnly={!isEmailFocused}
-                  required
-                />
               </div>
-            </div>
 
-            {/* Password Input */}
-            <div className="space-y-1.5">
-              <Label className="text-xs font-semibold text-slate-300">Mật khẩu</Label>
-              <div className="relative group">
-                <div className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-500 group-focus-within:text-blue-400 transition-colors">
-                  <Lock className="h-4 w-4" />
+              {error && (
+                <div className="flex items-start gap-2.5 bg-rose-500/10 border border-rose-500/25 p-3 rounded-xl text-rose-400 text-xs animate-in fade-in-50 duration-200">
+                  <AlertCircle className="h-4 w-4 shrink-0 mt-0.5" />
+                  <span>{error}</span>
                 </div>
-                <Input
-                  type={showPassword ? 'text' : 'password'}
-                  placeholder="••••••••"
-                  className="bg-slate-950/70 border-slate-800/90 rounded-xl pl-10 pr-10 py-2.5 text-sm text-white placeholder:text-slate-600 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition-all"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  autoComplete={isPasswordFocused ? 'current-password' : 'new-password'}
-                  onFocus={() => setIsPasswordFocused(true)}
-                  readOnly={!isPasswordFocused}
-                  required
-                />
-                <button
+              )}
+
+              <Button
+                disabled={loading || otpCode.length < 4}
+                type="submit"
+                className="w-full mt-2 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-bold py-2.5 h-12 rounded-xl shadow-lg shadow-blue-600/25 hover:shadow-blue-600/40 transition-all duration-300 flex items-center justify-center gap-2 group cursor-pointer"
+              >
+                {loading ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    <span>Đang xác thực...</span>
+                  </>
+                ) : (
+                  <>
+                    <span>Xác thực & Đăng nhập</span>
+                    <ArrowRight className="h-4 w-4 group-hover:translate-x-1 transition-transform" />
+                  </>
+                )}
+              </Button>
+
+              <div className="text-center mt-4">
+                 <button
                   type="button"
-                  onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-300 transition-colors"
+                  onClick={() => {
+                    setRequireOtp(false);
+                    setOtpCode('');
+                    setPendingStaffId(null);
+                    setError('');
+                  }}
+                  className="text-xs text-blue-400 hover:text-blue-300 transition-colors"
                 >
-                  {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                  &larr; Quay lại
                 </button>
               </div>
-            </div>
-
-            {/* Error Message */}
-            {error && (
-              <div className="flex items-start gap-2.5 bg-rose-500/10 border border-rose-500/25 p-3 rounded-xl text-rose-400 text-xs animate-in fade-in-50 duration-200">
-                <AlertCircle className="h-4 w-4 shrink-0 mt-0.5" />
-                <span>{error}</span>
+            </form>
+          ) : (
+            <form onSubmit={handleLogin} className="space-y-4">
+              {/* Email Input */}
+              <div className="space-y-1.5">
+                <Label className="text-xs font-semibold text-slate-300">Email quản trị</Label>
+                <div className="relative group">
+                  <div className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-500 group-focus-within:text-blue-400 transition-colors">
+                    <Mail className="h-4 w-4" />
+                  </div>
+                  <Input
+                    type="email"
+                    placeholder="name@cinesphere.com"
+                    className="bg-slate-950/70 border-slate-800/90 rounded-xl pl-10 pr-3 py-2.5 text-sm text-white placeholder:text-slate-600 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition-all"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    autoComplete={isEmailFocused ? 'email' : 'new-password'}
+                    onFocus={() => setIsEmailFocused(true)}
+                    readOnly={!isEmailFocused}
+                    required
+                  />
+                </div>
               </div>
-            )}
 
-            {/* Cloudflare Turnstile CAPTCHA */}
-            <div className="flex justify-center mt-2">
-              <div ref={turnstileRef} className="cf-turnstile"></div>
-            </div>
+              {/* Password Input */}
+              <div className="space-y-1.5">
+                <Label className="text-xs font-semibold text-slate-300">Mật khẩu</Label>
+                <div className="relative group">
+                  <div className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-500 group-focus-within:text-blue-400 transition-colors">
+                    <Lock className="h-4 w-4" />
+                  </div>
+                  <Input
+                    type={showPassword ? 'text' : 'password'}
+                    placeholder="••••••••"
+                    className="bg-slate-950/70 border-slate-800/90 rounded-xl pl-10 pr-10 py-2.5 text-sm text-white placeholder:text-slate-600 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition-all"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    autoComplete={isPasswordFocused ? 'current-password' : 'new-password'}
+                    onFocus={() => setIsPasswordFocused(true)}
+                    readOnly={!isPasswordFocused}
+                    required
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-300 transition-colors"
+                  >
+                    {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                  </button>
+                </div>
+              </div>
 
-            {/* Submit Button */}
-            <Button
-              disabled={loading || !turnstileToken}
-              type="submit"
-              className="w-full mt-2 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-bold py-2.5 h-11 rounded-xl shadow-lg shadow-blue-600/25 hover:shadow-blue-600/40 transition-all duration-300 flex items-center justify-center gap-2 group cursor-pointer"
-            >
-              {loading ? (
-                <>
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                  <span>Đang xác thực...</span>
-                </>
-              ) : (
-                <>
-                  <span>Đăng nhập hệ thống</span>
-                  <ArrowRight className="h-4 w-4 group-hover:translate-x-1 transition-transform" />
-                </>
+              {/* Error Message */}
+              {error && (
+                <div className="flex items-start gap-2.5 bg-rose-500/10 border border-rose-500/25 p-3 rounded-xl text-rose-400 text-xs animate-in fade-in-50 duration-200">
+                  <AlertCircle className="h-4 w-4 shrink-0 mt-0.5" />
+                  <span>{error}</span>
+                </div>
               )}
-            </Button>
-          </form>
+
+              {/* Cloudflare Turnstile CAPTCHA */}
+              <div className="flex justify-center mt-2">
+                <div ref={turnstileRef} className="cf-turnstile"></div>
+              </div>
+
+              {/* Submit Button */}
+              <Button
+                disabled={loading || !turnstileToken}
+                type="submit"
+                className="w-full mt-2 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-bold py-2.5 h-11 rounded-xl shadow-lg shadow-blue-600/25 hover:shadow-blue-600/40 transition-all duration-300 flex items-center justify-center gap-2 group cursor-pointer"
+              >
+                {loading ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    <span>Đang xác thực...</span>
+                  </>
+                ) : (
+                  <>
+                    <span>Đăng nhập hệ thống</span>
+                    <ArrowRight className="h-4 w-4 group-hover:translate-x-1 transition-transform" />
+                  </>
+                )}
+              </Button>
+            </form>
+          )}
         </div>
 
         {/* Security Footer */}
@@ -501,6 +598,14 @@ export const AdminGate = () => {
           element={
             <ProtectedRoute module="email_logs" action="view">
               <EmailLogsPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/email-templates"
+          element={
+            <ProtectedRoute module="email_logs" action="view">
+              <EmailPreviewPage />
             </ProtectedRoute>
           }
         />

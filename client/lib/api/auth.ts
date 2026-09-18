@@ -19,6 +19,25 @@ export async function loginApi(body: { email: string; password: string; turnstil
   return res;
 }
 
+export async function verifyAdminLoginOtpApi(body: { staffId: number; otp: string }) {
+  const res = await request<any>('/api/admin/auth/verify-login-otp', {
+    method: 'POST',
+    body: JSON.stringify(body),
+    credentials: 'include'
+  });
+
+  // Mapping staff -> user for frontend compatibility
+  if (res.status === 'success' && res.staff && !res.user) {
+    res.user = {
+      ...res.staff,
+      username: res.staff.fullname
+    };
+  }
+
+  return res;
+}
+
+
 export async function logoutApi() {
   return request<{ status: string; message: string }>('/api/logout', {
     method: 'POST',

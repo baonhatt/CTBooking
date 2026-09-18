@@ -14,10 +14,18 @@ import {
 } from 'lucide-react';
 import { buildUrl, request } from '@/lib/api/http';
 import { useStaffPermission } from '@/hooks/useStaffPermission';
+import { toast } from 'sonner';
 
 interface AdminSettingsResponse {
   settings: {
     otp_settings?: {
+      enable_2fa: boolean;
+      otp_expiry_minutes: number;
+      otp_length: number;
+      otp_resend_cooldown_seconds: number;
+      max_otp_attempts: number;
+    };
+    admin_otp_settings?: {
       enable_2fa: boolean;
       otp_expiry_minutes: number;
       otp_length: number;
@@ -32,13 +40,17 @@ export default function SettingsPage() {
   const staff = useStaffStore((state) => state.staff);
   const clearStaff = useStaffStore((state) => state.clearStaff);
   const [adminEmail, setAdminEmail] = useState('');
-  const [otpSettings, setOtpSettings] = useState({
+  const defaultOtpConf = {
     enable_2fa: false,
     otp_expiry_minutes: 5,
     otp_length: 6,
     otp_resend_cooldown_seconds: 30,
     max_otp_attempts: 5
-  });
+  };
+
+  const [otpSettings, setOtpSettings] = useState({ ...defaultOtpConf });
+  const [adminOtpSettings, setAdminOtpSettings] = useState({ ...defaultOtpConf, enable_2fa: true });
+  const [viewMode, setViewMode] = useState<'admin' | 'user'>('admin');
   const [isSyncing, setIsSyncing] = useState(false);
   const canManageSettings = useStaffPermission('settings', 'manage');
 
@@ -47,17 +59,16 @@ export default function SettingsPage() {
   useEffect(() => {
     setAdminEmail(staff?.email || 'admin@email.com');
 
-    // Sync with server if in production
-    if (isProd) {
-      fetchSettings();
-    }
+    // Luôn fetch config từ server
+    fetchSettings();
   }, []);
 
   const fetchSettings = async () => {
     try {
       const data = await request<AdminSettingsResponse>('/api/admin/settings');
-      if (data && data.settings && data.settings.otp_settings) {
-        setOtpSettings(data.settings.otp_settings);
+      if (data && data.settings) {
+        if (data.settings.otp_settings) setOtpSettings(data.settings.otp_settings);
+        if (data.settings.admin_otp_settings) setAdminOtpSettings(data.settings.admin_otp_settings);
       }
     } catch (err) {
       console.error('Failed to fetch admin settings:', err);
@@ -66,25 +77,25 @@ export default function SettingsPage() {
 
   const handleSaveOtpSettings = async () => {
     if (!canManageSettings) return;
-    await saveSettings(otpSettings);
+    await saveSettings();
   };
 
-  const saveSettings = async (newOtpSettings: typeof otpSettings) => {
-    // Sync to server if in production
-    if (isProd) {
-      setIsSyncing(true);
-      try {
-        await request('/api/admin/settings', {
-          method: 'POST',
-          body: JSON.stringify({
-            otp_settings: newOtpSettings
-          })
-        });
-      } catch (err) {
-        console.error('Failed to save admin settings:', err);
-      } finally {
-        setIsSyncing(false);
-      }
+  const saveSettings = async () => {
+    setIsSyncing(true);
+    try {
+      await request('/api/admin/settings', {
+        method: 'POST',
+        body: JSON.stringify({
+          otp_settings: otpSettings,
+          admin_otp_settings: adminOtpSettings
+        })
+      });
+      toast.success('Đã lưu cấu hình cài đặt thành công!');
+    } catch (err) {
+      console.error('Failed to save admin settings:', err);
+      toast.error('Có lỗi xảy ra khi lưu cấu hình');
+    } finally {
+      setIsSyncing(false);
     }
   };
 
@@ -146,18 +157,38 @@ export default function SettingsPage() {
                 </div>
               </div>
               <CardContent className="p-8 space-y-6">
+                
+                {/* Tabs / Segment control */}
+                <div className="flex bg-slate-100 p-1.5 rounded-xl w-fit">
+                  <button
+                    onClick={() => setViewMode('admin')}
+                    className={`px-6 py-2 rounded-lg text-sm font-bold transition-all duration-300 flex-1 min-w-[140px] text-center ${viewMode === 'admin' ? 'bg-white shadow-sm text-blue-600' : 'text-slate-500 hover:text-slate-700'}`}
+                  >
+                    Bảo mật Admin
+                  </button>
+                  <button
+                    onClick={() => setViewMode('user')}
+                    className={`px-6 py-2 rounded-lg text-sm font-bold transition-all duration-300 flex-1 min-w-[140px] text-center ${viewMode === 'user' ? 'bg-white shadow-sm text-blue-600' : 'text-slate-500 hover:text-slate-700'}`}
+                  >
+                    Khách Hàng (User)
+                  </button>
+                </div>
+
                 {/* Enable 2FA */}
                 <div className="flex items-center justify-between p-5 bg-slate-50 rounded-2xl border border-slate-100">
                   <div>
-                    <Label className="text-base font-semibold">Bật 2FA cho đăng nhập</Label>
+                    <Label className="text-base font-semibold">Bật 2FA cho đăng nhập ({viewMode === 'admin' ? 'Admin' : 'Khách hàng'})</Label>
                     <p className="text-sm text-slate-500 mt-1">
-                      Khi bật, người dùng sẽ cần nhập OTP gửi qua email sau khi nhập mật khẩu
+                      Khi bật, tài khoản sẽ cần nhập OTP gửi qua email sau khi nhập mật khẩu
                     </p>
                   </div>
                   <Switch
-                    checked={otpSettings.enable_2fa}
+                    checked={viewMode === 'admin' ? adminOtpSettings.enable_2fa : otpSettings.enable_2fa}
                     disabled={!canManageSettings}
-                    onCheckedChange={(checked) => setOtpSettings({ ...otpSettings, enable_2fa: checked })}
+                    onCheckedChange={(checked) => {
+                      if (viewMode === 'admin') setAdminOtpSettings({ ...adminOtpSettings, enable_2fa: checked });
+                      else setOtpSettings({ ...otpSettings, enable_2fa: checked });
+                    }}
                     className="data-[state=checked]:bg-blue-600"
                   />
                 </div>
@@ -170,10 +201,12 @@ export default function SettingsPage() {
                       type="number"
                       min={1}
                       max={60}
-                      value={otpSettings.otp_expiry_minutes}
-                      onChange={(e) =>
-                        setOtpSettings({ ...otpSettings, otp_expiry_minutes: parseInt(e.target.value) || 5 })
-                      }
+                      value={viewMode === 'admin' ? adminOtpSettings.otp_expiry_minutes : otpSettings.otp_expiry_minutes}
+                      onChange={(e) => {
+                        const val = parseInt(e.target.value) || 5;
+                        if (viewMode === 'admin') setAdminOtpSettings({ ...adminOtpSettings, otp_expiry_minutes: val });
+                        else setOtpSettings({ ...otpSettings, otp_expiry_minutes: val });
+                      }}
                       className="mt-2"
                     />
                     <p className="text-sm text-slate-500 mt-1">OTP sẽ hết hạn sau số phút này</p>
@@ -185,8 +218,12 @@ export default function SettingsPage() {
                       type="number"
                       min={4}
                       max={8}
-                      value={otpSettings.otp_length}
-                      onChange={(e) => setOtpSettings({ ...otpSettings, otp_length: parseInt(e.target.value) || 6 })}
+                      value={viewMode === 'admin' ? adminOtpSettings.otp_length : otpSettings.otp_length}
+                      onChange={(e) => {
+                        const val = parseInt(e.target.value) || 6;
+                        if (viewMode === 'admin') setAdminOtpSettings({ ...adminOtpSettings, otp_length: val });
+                        else setOtpSettings({ ...otpSettings, otp_length: val });
+                      }}
                       className="mt-2"
                     />
                     <p className="text-sm text-slate-500 mt-1">Số ký tự của mã OTP (4-8)</p>
@@ -198,10 +235,12 @@ export default function SettingsPage() {
                       type="number"
                       min={10}
                       max={300}
-                      value={otpSettings.otp_resend_cooldown_seconds}
-                      onChange={(e) =>
-                        setOtpSettings({ ...otpSettings, otp_resend_cooldown_seconds: parseInt(e.target.value) || 30 })
-                      }
+                      value={viewMode === 'admin' ? adminOtpSettings.otp_resend_cooldown_seconds : otpSettings.otp_resend_cooldown_seconds}
+                      onChange={(e) => {
+                        const val = parseInt(e.target.value) || 30;
+                        if (viewMode === 'admin') setAdminOtpSettings({ ...adminOtpSettings, otp_resend_cooldown_seconds: val });
+                        else setOtpSettings({ ...otpSettings, otp_resend_cooldown_seconds: val });
+                      }}
                       className="mt-2"
                     />
                     <p className="text-sm text-slate-500 mt-1">Thời gian chờ giữa các lần gửi lại</p>
@@ -213,10 +252,12 @@ export default function SettingsPage() {
                       type="number"
                       min={3}
                       max={10}
-                      value={otpSettings.max_otp_attempts}
-                      onChange={(e) =>
-                        setOtpSettings({ ...otpSettings, max_otp_attempts: parseInt(e.target.value) || 5 })
-                      }
+                      value={viewMode === 'admin' ? adminOtpSettings.max_otp_attempts : otpSettings.max_otp_attempts}
+                      onChange={(e) => {
+                        const val = parseInt(e.target.value) || 5;
+                        if (viewMode === 'admin') setAdminOtpSettings({ ...adminOtpSettings, max_otp_attempts: val });
+                        else setOtpSettings({ ...otpSettings, max_otp_attempts: val });
+                      }}
                       className="mt-2"
                     />
                     <p className="text-sm text-slate-500 mt-1">Số lần nhập sai tối đa trước khi khóa</p>

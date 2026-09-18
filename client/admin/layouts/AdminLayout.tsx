@@ -36,11 +36,7 @@ import { request } from '@/lib/api/http';
 import { useStaffPermissions, useIsSuperAdmin } from '@/hooks/useStaffPermission';
 import { useStaffStore } from '@/store/staffStore';
 
-interface AdminSettingsData {
-  settings: {
-    hidden_tabs?: string[];
-  };
-}
+
 
 interface Props {
   active:

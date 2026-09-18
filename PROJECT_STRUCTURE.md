@@ -449,8 +449,8 @@ CTBooking/
   - **Được import bởi:** Không có (được Cloudflare Worker Runtime gọi trực tiếp).
 
 - **`worker/src/middleware.ts`**
-  - **Vai trò:** Chứa các middleware bảo mật và phân quyền dùng chung cho API. Xác thực HTTP Authorization / JWT, kiểm tra quyền hạn của vòng đời Staff/Admin, xác thực Cloudflare Turnstile bảo vệ bot và logic Rate Limiter `rateLimiter`.
-  - **Export chính:** `requireAuth`, `requireStaffAuth`, `requirePermission`, `rateLimiter`.
+  - **Vai trò:** Chứa các middleware bảo mật và phân quyền dùng chung cho API. Xác thực HTTP Authorization / JWT, kiểm tra quyền hạn của vòng đời Staff/Admin, và xác thực Cloudflare Turnstile bảo vệ bot.
+  - **Export chính:** `requireAuth`, `requireStaffAuth`, `requirePermission`.
   - **Import từ đâu:** `server/routes/user/auth.ts`, `server/lib/staff-auth.ts`, `shared/schema.ts`.
   - **Được import bởi:** `worker/src/index.ts`.
 
@@ -627,7 +627,7 @@ CTBooking/
   - **Được import bởi:** `worker/src/index.ts`.
 
 - **`server/routes/admin/sepay.ts`**
-  - **Vai trò:** Lắng nghe Webhook và xử lý giao dịch khi cổng thanh toán (SePay/VietQR) ping chuyển khoản thành công. Map logic để đổi trạng thái `status` thành `paid` rồi chốt vé. Dùng `rateLimiter` bảo mật nghiêm ngặt.
+  - **Vai trò:** Lắng nghe Webhook và xử lý giao dịch khi cổng thanh toán (SePay/VietQR) ping chuyển khoản thành công. Map logic để đổi trạng thái `status` thành `paid` rồi chốt vé.
   - **Export chính:** `handleSePayWebhookImpl`.
   - **Import từ đâu:** `server/routes/user/payments.ts`.
   - **Được import bởi:** `worker/src/index.ts`.

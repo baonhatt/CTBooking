@@ -1,5 +1,5 @@
 import type { KVNamespace } from '@cloudflare/workers-types';
-import { getGlobalSettingsImpl } from '../../lib/global-settings';
+import { getGlobalSettingsImpl, updateGlobalSettingsImpl } from '../../lib/global-settings';
 
 const ADMIN_SETTINGS_KEY = 'admin_sidebar_settings';
 
@@ -9,5 +9,8 @@ export async function getAdminSettingsImpl(kv?: any) {
 }
 
 export async function updateAdminSettingsImpl(kv?: any, settings?: any) {
+  if (settings) {
+    await updateGlobalSettingsImpl(kv, settings);
+  }
   return { success: true };
 }

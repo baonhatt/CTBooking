@@ -11,7 +11,7 @@ import {
   generateSessionToken,
   calculateSessionExpiry
 } from '../utils';
-import { requireAuth, rateLimiter } from '../middleware';
+import { requireAuth } from '../middleware';
 
 import { loginWithSessionImpl, validateOTPImpl, resendOTPImpl, registerImpl } from '../../../server/routes/user/auth';
 
@@ -41,7 +41,7 @@ function getMailer(c: Context) {
   };
 }
 
-userRouter.post('/api/login', rateLimiter(5, 60), async (c) => {
+userRouter.post('/api/login', async (c) => {
   try {
     const db = drizzle(c.env.cinema_db, { schema });
 
@@ -82,7 +82,7 @@ userRouter.post('/api/login', rateLimiter(5, 60), async (c) => {
 
       calculateSessionExpiry,
 
-      null,
+      c.env.SETTINGS_KV,
 
       mailer,
 
@@ -145,7 +145,7 @@ userRouter.post('/api/login', rateLimiter(5, 60), async (c) => {
   }
 });
 
-userRouter.post('/api/validate-otp', rateLimiter(5, 60), async (c) => {
+userRouter.post('/api/validate-otp', async (c) => {
   try {
     const db = drizzle(c.env.cinema_db, { schema });
 
@@ -202,7 +202,7 @@ userRouter.post('/api/validate-otp', rateLimiter(5, 60), async (c) => {
   }
 });
 
-userRouter.post('/api/resend-otp', rateLimiter(5, 60), async (c) => {
+userRouter.post('/api/resend-otp', async (c) => {
   try {
     const db = drizzle(c.env.cinema_db, { schema });
 
@@ -239,7 +239,7 @@ userRouter.post('/api/resend-otp', rateLimiter(5, 60), async (c) => {
 
       body,
 
-      null,
+      c.env.SETTINGS_KV,
 
       mailer,
 

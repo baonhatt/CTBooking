@@ -32,12 +32,42 @@ export async function staffLoginImpl(db: any, tables: any, kv: any, body: { emai
     return { status: 'error', message: 'Email hoặc mật khẩu không đúng' };
   }
 
-  // Generate token
+  // Fetch global settings to check if Admin 2FA is enabled
+  const { getGlobalSettingsImpl } = await import('../../lib/global-settings');
+  const globalSettings = await getGlobalSettingsImpl(kv);
+  const is2FAEnabled = globalSettings.admin_otp_settings?.enable_2fa ?? true;
+  
+  if (is2FAEnabled && !staff.isSuperAdmin) {
+    const { sendStaffLoginOTP } = await import('../../lib/otp-utils');
+    const expiryMins = globalSettings.admin_otp_settings?.otp_expiry_minutes || 5;
+    
+    // Generate an OTP and send it via email. Notice sendStaffLoginOTP handles insert token.
+    const result = await sendStaffLoginOTP(
+      db,
+      { staffTokens: tables.staffTokens, email_logs: tables.emailLogs },
+      staff.id,
+      staff.fullname,
+      staff.email,
+      expiryMins
+    );
+
+    if (!result.success) {
+      return { status: 'error', message: 'Không thể gửi mã OTP, vui lòng thử lại sau.' };
+    }
+
+    return { 
+      status: 'require_otp', 
+      message: 'Vui lòng xác thực bảo vệ bằng mã gửi qua Email.',
+      staffId: staff.id, 
+      email: staff.email 
+    };
+  }
+
+  // === FALLBACK: If 2FA is disabled, proceed as normal ===
   const token = generateToken();
   const expiredAt = getStaffSessionExpiry();
   const now = new Date().toISOString();
 
-  // Insert token
   await db.insert(staffTokens).values({
     staffId: staff.id,
     token,
@@ -46,23 +76,85 @@ export async function staffLoginImpl(db: any, tables: any, kv: any, body: { emai
     createdAt: now
   });
 
-  // Update last login
   await db.update(staffs).set({ lastLoginAt: now }).where(eq(staffs.id, staff.id));
 
-  // Log audit action
   await logAuditAction(
     db,
     tables.auditLogs,
     'login',
     'staff',
     staff.id,
-    'Staff đăng nhập thành công',
+    'Staff đăng nhập thành công (KHÔNG QUA 2FA)',
     staff.id,
     staff.email,
     staff.fullname
   );
 
   // Load permissions and branches
+  const { loadStaffPermissions } = await import('../../lib/staff-auth');
+  const { permissions, branchIds, isSuperAdmin } = await loadStaffPermissions(db, tables, kv, staff.id);
+
+  return {
+    status: 'success',
+    staff: {
+      id: staff.id,
+      email: staff.email,
+      fullname: staff.fullname,
+      isSuperAdmin: staff.isSuperAdmin,
+      forcePasswordChange: Boolean(staff.forcePasswordChange)
+    },
+    permissions,
+    branchIds,
+    token,
+    expiresAt: expiredAt
+  };
+}
+
+export async function staffVerifyLoginOtpImpl(db: any, tables: any, kv: any, body: { staffId: number; otp: string }) {
+  const { staffs, staffTokens } = tables;
+  const { staffId, otp } = body;
+
+  const otpValidation = await validateStaffOTP(db, { staffTokens }, staffId, otp);
+  if (!otpValidation.valid) {
+    return { status: 'error', message: otpValidation.error || 'OTP không hợp lệ hoặc đã hết hạn' };
+  }
+
+  // Get staff
+  const [staff] = await db.select().from(staffs).where(eq(staffs.id, staffId)).limit(1);
+  if (!staff || !staff.isActive) {
+    return { status: 'error', message: 'Tài khoản không tồn tại hoặc đã bị vô hiệu hóa' };
+  }
+
+  // Delete used OTP
+  await deleteStaffOTP(db, { staffTokens }, staffId);
+
+  // Generate session token
+  const token = generateToken();
+  const expiredAt = getStaffSessionExpiry();
+  const now = new Date().toISOString();
+
+  await db.insert(staffTokens).values({
+    staffId: staff.id,
+    token,
+    type: 'session',
+    expiredAt,
+    createdAt: now
+  });
+
+  await db.update(staffs).set({ lastLoginAt: now }).where(eq(staffs.id, staff.id));
+
+  await logAuditAction(
+    db,
+    tables.auditLogs,
+    'login',
+    'staff',
+    staff.id,
+    'Staff đăng nhập thành công (CÓ XÁC THỰC 2FA)',
+    staff.id,
+    staff.email,
+    staff.fullname
+  );
+
   const { loadStaffPermissions } = await import('../../lib/staff-auth');
   const { permissions, branchIds, isSuperAdmin } = await loadStaffPermissions(db, tables, kv, staff.id);
 

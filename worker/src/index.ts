@@ -82,9 +82,6 @@ type Bindings = {
 
   IS_PREVIEW?: string;
 
-  VITE_RATE_LIMIT_BOOKING_CHECK_MAX: string;
-
-  VITE_RATE_LIMIT_BOOKING_CHECK_WINDOWMS: string;
   SUPER_ADMIN_EMAIL: string;
   SUPER_ADMIN_PASSWORD: string;
   SUPER_ADMIN_FULLNAME: string;

@@ -163,10 +163,6 @@ publicRouter.get('/api/getActiveMovies', async (c) => {
   try {
     const db = drizzle(c.env.cinema_db, { schema });
 
-    // Rate limit check using KV
-
-    const ip = c.req.header('CF-Connecting-IP') || 'unknown';
-
     // Không dùng KV cache: luôn truy vấn thẳng DB theo branch_id
     const branchId = c.req.query('branch_id') ? Number(c.req.query('branch_id')) : undefined;
 

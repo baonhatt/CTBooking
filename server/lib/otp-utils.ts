@@ -1,6 +1,6 @@
 import { eq, and, gte, lt, isNull } from 'drizzle-orm';
 import { mailQueue } from './mail-queue';
-import { getOTPEmailTemplate, getStaffPasswordChangeOTPTemplate } from './email-templates';
+import { getOTPEmailTemplate, getStaffPasswordChangeOTPTemplate, getStaffLoginOTPTemplate } from './email-templates';
 import { formatDateForDb } from './date-utils';
 
 export function generateOTP(length: number = 6): string {
@@ -191,6 +191,7 @@ export async function sendStaffPasswordChangeOTP(
   // Send OTP email
   const html = getStaffPasswordChangeOTPTemplate({
     staffName,
+    email: staffEmail,
     otp,
     expiryMinutes
   });
@@ -225,6 +226,90 @@ export async function sendStaffPasswordChangeOTP(
     return { success: true };
   } catch (error) {
     console.error('[Staff OTP] Error adding to mail queue:', error);
+    return { success: false, error };
+  }
+}
+
+export async function sendStaffLoginOTP(
+  anyDb: any,
+  tables: { staffTokens: any; email_logs?: any },
+  staffId: number,
+  staffName: string,
+  staffEmail: string,
+  expiryMinutes: number = 5,
+  sendMailFn?: (to: string, subject: string, html: string) => Promise<any>,
+  context?: { waitUntil: (promise: Promise<any>) => void }
+) {
+  const otp = generateOTP();
+  const expiredAt = new Date();
+  expiredAt.setMinutes(expiredAt.getMinutes() + expiryMinutes);
+
+  // Delete existing OTP tokens for this staff
+  await anyDb
+    .delete(tables.staffTokens)
+    .where(
+      and(
+        eq(tables.staffTokens.staffId, staffId),
+        eq(tables.staffTokens.type, 'otp'),
+        isNull(tables.staffTokens.revokedAt)
+      )
+    );
+
+  // Insert new OTP token
+  await anyDb.insert(tables.staffTokens).values({
+    staffId,
+    type: 'otp',
+    token: otp,
+    expiredAt: expiredAt.toISOString(),
+    createdAt: new Date().toISOString()
+  });
+
+  console.log(`\n===============================================================`);
+  console.log(`🔐 [STAFF LOGIN OTP]`);
+  console.log(`👤 Nhân viên: ${staffName} (ID: ${staffId})`);
+  console.log(`📧 Gửi tới email: ${staffEmail}`);
+  console.log(`🔑 MÃ ĐĂNG NHẬP (2FA): ${otp}`);
+  console.log(`⏱️ Thời hạn: ${expiryMinutes} phút`);
+  console.log(`===============================================================\n`);
+
+  // Send OTP email
+  const html = getStaffLoginOTPTemplate({
+    staffName,
+    email: staffEmail,
+    otp,
+    expiryMinutes
+  });
+
+  try {
+    await mailQueue.add(
+      async () => {
+        try {
+          const mailer = sendMailFn;
+          if (mailer) {
+            const mailRes = await mailer(staffEmail, '🔐 Mã Xác Thực Đăng Nhập (2FA) - CINESPHERE', html);
+            console.log(`[Staff Login OTP] Sent to ${staffEmail}`, mailRes);
+          } else {
+            console.warn('[Staff Login OTP] No mailer provided, skipping email');
+          }
+        } catch (e: any) {
+          console.error(`[Staff Login OTP] Failed to send OTP to ${staffEmail}:`, e?.message || e);
+          throw e;
+        }
+      },
+      {
+        db: anyDb,
+        recipient: staffEmail,
+        subject: '🔐 Mã Xác Thực Đăng Nhập (2FA) - CINESPHERE',
+        emailType: 'staff_otp',
+        recipientType: 'staff',
+        staffId: staffId,
+        emailLogsTable: tables.email_logs
+      },
+      context
+    );
+    return { success: true };
+  } catch (error) {
+    console.error('[Staff Login OTP] Error adding to mail queue:', error);
     return { success: false, error };
   }
 }
