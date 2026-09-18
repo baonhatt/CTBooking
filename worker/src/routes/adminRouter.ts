@@ -103,6 +103,7 @@ import { getBookingByCodeImpl, confirmUseTicketImpl, updatePaymentImpl } from '.
 import { getAdminSettingsImpl, updateAdminSettingsImpl } from '../../../server/routes/admin/settings';
 import { getUsersImpl, getUserByIdImpl } from '../../../server/routes/admin/users';
 import { getEmailLogsImpl } from '../../../server/routes/admin/email-logs';
+import { getEmailPreviewImpl } from '../../../server/routes/admin/email-preview';
 import { getAuditLogsImpl } from '../../../server/lib/audit-logger';
 import {
   staffLoginImpl,
@@ -286,10 +287,56 @@ adminRouter.post('/api/admin/auth/login', async (c) => {
 
     if (r.status === 'error') return c.json(r, 400);
 
-    // Set cookie
+    // Bỏ qua tạo session cookie nếu yêu cầu OTP
+    if (r.status === 'require_otp') {
+      return c.json(r);
+    }
 
+    // Set cookie
     c.header('Set-Cookie', `staff_session=${r.token}; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=86400`);
 
+    return c.json(r);
+  } catch (err: any) {
+    return c.json({ status: 'error', message: String(err?.message || 'Internal error') }, 500);
+  }
+});
+
+adminRouter.post('/api/admin/auth/verify-login-otp', async (c) => {
+  try {
+    const body = await c.req.json().catch(() => ({}));
+    if (!body.staffId || !body.otp) {
+      return c.json({ status: 'error', message: 'Thiếu thông tin xác thực' }, 400);
+    }
+
+    // Ensure IP matching if strict security is required?
+    // Here we just verify OTP code against the database.
+    const db = drizzle(c.env.cinema_db, { schema });
+    
+    // Import manually since we don't pollute top level imports if possible (or reuse existing)
+    const { staffVerifyLoginOtpImpl } = await import('../../../server/routes/admin/staff-auth');
+    
+    // Call implementation
+    const r = await staffVerifyLoginOtpImpl(
+      db,
+      {
+        staffs: schema.staffs,
+        staffTokens: schema.staffTokens,
+        auditLogs: schema.auditLogs,
+        staffRoles: schema.staffRoles,
+        staffBranches: schema.staffBranches,
+        roles: schema.roles,
+        rolePermissions: schema.rolePermissions,
+        permissions: schema.permissions
+      },
+      null,
+      body
+    );
+
+    if (r.status === 'error') return c.json(r, 400);
+
+    // Important: set the session cookie finally when 2FA is successful
+    c.header('Set-Cookie', `staff_session=${r.token}; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=86400`);
+    
     return c.json(r);
   } catch (err: any) {
     return c.json({ status: 'error', message: String(err?.message || 'Internal error') }, 500);
@@ -905,7 +952,7 @@ adminRouter.get(
 
 adminRouter.get('/api/admin/settings', requireStaffAuth, requirePermission('settings', 'view'), async (c) => {
   try {
-    const r = await getAdminSettingsImpl();
+    const r = await getAdminSettingsImpl(c.env.SETTINGS_KV);
 
     return c.json(r);
   } catch (err: any) {
@@ -917,7 +964,7 @@ adminRouter.post('/api/admin/settings', requireStaffAuth, requirePermission('set
   try {
     const body = await c.req.json().catch(() => ({}));
 
-    const r = await updateAdminSettingsImpl(null, body);
+    const r = await updateAdminSettingsImpl(c.env.SETTINGS_KV, body);
 
     return c.json(r);
   } catch (err: any) {
@@ -3570,6 +3617,15 @@ adminRouter.get('/api/admin/movies/:id', requireStaffAuth, requirePermission('mo
     );
 
     if (!r) return c.json({ status: 'error', message: 'Không tìm thấy phim' }, 404);
+    return c.json(r, 200);
+  } catch (err: any) {
+    return c.json({ status: 'error', message: String(err?.message || 'Internal error') }, 500);
+  }
+});
+
+adminRouter.get('/api/admin/email-preview', requireStaffAuth, requirePermission('email_logs', 'view'), async (c) => {
+  try {
+    const r = await getEmailPreviewImpl();
     return c.json(r, 200);
   } catch (err: any) {
     return c.json({ status: 'error', message: String(err?.message || 'Internal error') }, 500);

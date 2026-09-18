@@ -1,4 +1,4 @@
-﻿// Main API server setup using Hono framework
+// Main API server setup using Hono framework
 
 import { Hono } from 'hono';
 import publicRouter from './routes/publicRouter';
@@ -41,8 +41,6 @@ type Bindings = {
   cinema_db: D1Database;
 
   r2_cinemastore: R2Bucket;
-
-
 
   CLOUDINARY_CLOUD_NAME: string;
 
@@ -90,14 +88,9 @@ type Bindings = {
   SUPER_ADMIN_EMAIL: string;
   SUPER_ADMIN_PASSWORD: string;
   SUPER_ADMIN_FULLNAME: string;
-
-
 };
 
-
 const app = new Hono<{ Variables: Variables; Bindings: Bindings }>();
-
-
 
 // 1. CORS Middleware - MUST BE THE VERY FIRST MIDDLEWARE
 app.use(
@@ -109,11 +102,7 @@ app.use(
       // 1. Allow localhost & 127.0.0.1 for development
       try {
         const url = new URL(origin);
-        if (
-          url.hostname === 'localhost' ||
-          url.hostname === '127.0.0.1' ||
-          url.hostname.endsWith('.localhost')
-        ) {
+        if (url.hostname === 'localhost' || url.hostname === '127.0.0.1' || url.hostname.endsWith('.localhost')) {
           return origin;
         }
 
@@ -314,7 +303,9 @@ export default {
         bookings: schema.bookings,
         vouchers: schema.vouchers
       });
-      console.log(`[Scheduled Cron] Task completed: expired ${result.expired_count} booking(s), released ${result.voucher_releases} voucher usage(s)`);
+      console.log(
+        `[Scheduled Cron] Task completed: expired ${result.expired_count} booking(s), released ${result.voucher_releases} voucher usage(s)`
+      );
     } catch (err) {
       console.error('[Scheduled Cron] Task failed:', err);
     }

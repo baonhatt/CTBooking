@@ -1,209 +1,198 @@
+# =============================================================================
+# CINEMA WORKER — Cloudflare Workers configuration
+# =============================================================================
+
+# =============================================================================
+# ENVIRONMENT: default / local
+# (Dùng khi KHÔNG truyền --env, ví dụ: `wrangler dev:worker:local`, `wrangler deploy`
+#  không kèm --env, hoặc làm nền tảng var/binding mặc định của toàn bộ config)
+# =============================================================================
 name = "cinema-worker"
-
 main = "src/index.ts"
-
 compatibility_date = "2024-12-01"
-
 compatibility_flags = ["nodejs_compat"]
-
 send_metrics = false
-
 workers_dev = true
-
 preview_urls = true
 
+# -----------------------------------------------------------------------------
+# Cron Triggers
+# -----------------------------------------------------------------------------
 [triggers]
-# Runs every 5 minutes to auto-expire pending bookings and release voucher slots
+# Chạy mỗi 5 phút: tự động hủy booking pending quá hạn & trả lại slot voucher
 crons = ["*/5 * * * *"]
 
+# -----------------------------------------------------------------------------
+# Environment Variables (default / production build-time vars)
+# -----------------------------------------------------------------------------
 [vars]
-
-
-
 VITE_SERVER_BASE_URL = "https://cinesphere.com.vn"
-
 VITE_CLIENT_BASE_URL = "https://cinesphere.com.vn"
 
+# --- Payment gateways ---
 VITE_VNPAY_RETURN_URL = "/checkout"
-
 VITE_VNPAY_GATEWAY = "https://sandbox.vnpayment.vn/paymentv2/vpcpay.html"
-
 VITE_MOMO_ENDPOINT = "https://test-payment.momo.vn/v2/gateway/api/create"
-
 VITE_MOMO_REDIRECT_URL = "/checkout"
-
 VITE_MOMO_IPN_URL = "/api/momo/ipn"
 
+# --- R2 / Storage ---
 R2_PUBLIC_BASE = "https://cinesphere.com.vn"
-
 R2_PUBLIC_ENABLED = "false"
 
+# --- Email senders ---
 GMAIL_SENDER_EMAIL = "no-reply@cinesphere.com.vn"
-
 GMAIL_SENDER_NAME = "CINESPHERE"
-
 BREVO_SENDER_EMAIL = "no-reply@cinesphere.com.vn"
-
 BREVO_SENDER_NAME = "CINESPHERE"
 
+# --- Rate limiting ---
 VITE_RATE_LIMIT_BOOKING_CHECK_MAX = "10"
-
 VITE_RATE_LIMIT_BOOKING_CHECK_WINDOWMS = "60000"
 
+# --- SEO ---
 INDEXNOW_KEY = "a7f3c2e1b5d8f4a9c6e2d1b8f5a3c7e4"
 
+# --- Super Admin bootstrap ---
 SUPER_ADMIN_EMAIL = "superadmin@cinesphere.com"
-
-# SUPER_ADMIN_PASSWORD is a Cloudflare Secret — set via:
-#   wrangler secret put SUPER_ADMIN_PASSWORD --config worker/wrangler.toml
-# Do NOT put the password here.
-
 SUPER_ADMIN_FULLNAME = "Super Admin"
+# SUPER_ADMIN_PASSWORD là Cloudflare Secret — set qua:
+#   wrangler secret put SUPER_ADMIN_PASSWORD --config worker/wrangler.toml
+# KHÔNG đặt password ở đây.
 
+# --- Security ---
 TURNSTILE_SECRET = "0x4AAAAAAE1v1BW9DhZPu7hc76CmgkUo2II"
 
-
+# -----------------------------------------------------------------------------
+# D1 Database (default)
+# -----------------------------------------------------------------------------
 [[d1_databases]]
-
 binding = "cinema_db"
-
 database_name = "cinema-db"
-
 database_id = "9bae4fb3-570a-4ded-9a75-922ce4d6ef81"
-
 migrations_dir = "migrations"
 
+# -----------------------------------------------------------------------------
+# KV Namespace (default)
+# -----------------------------------------------------------------------------
+[[kv_namespaces]]
+binding = "SETTINGS_KV"
+id = "10ffca8eeea440a0bc47527fd05fd93f"
+# ============================= END: default / local ========================
 
 
-
-
-
-
-
+# =============================================================================
+# ENVIRONMENT: preview
+# (Dùng khi chạy `npm run dev:worker` → wrangler dev --env preview, hoặc
+#  `npm run deploy:preview` → wrangler deploy --env preview)
+# =============================================================================
 [env.preview]
 
-
-
 [env.preview.placement]
-
 mode = "smart"
 
-
-
+# -----------------------------------------------------------------------------
+# Environment Variables (preview)
+# -----------------------------------------------------------------------------
 [env.preview.vars]
-
 IS_PREVIEW = "true"
 
+# --- Super Admin bootstrap ---
 SUPER_ADMIN_EMAIL = "superadmin@cinesphere.com"
-
-# SUPER_ADMIN_PASSWORD is a Cloudflare Secret — set via:
-#   wrangler secret put SUPER_ADMIN_PASSWORD --env preview --config worker/wrangler.toml
-# Do NOT put the password here.
-
 SUPER_ADMIN_FULLNAME = "Super Admin"
-
-
+# SUPER_ADMIN_PASSWORD là Cloudflare Secret — set qua:
+#   wrangler secret put SUPER_ADMIN_PASSWORD --env preview --config worker/wrangler.toml
+# KHÔNG đặt password ở đây.
 
 VITE_SERVER_BASE_URL = "https://api.cinesphere.com.vn"
-
 VITE_CLIENT_BASE_URL = "https://preview.cinema-pages.pages.dev"
 
-
-
+# --- Payment gateways ---
+VITE_VNPAY_RETURN_URL = "/checkout"
+VITE_VNPAY_GATEWAY = "https://sandbox.vnpayment.vn/paymentv2/vpcpay.html"
+VITE_MOMO_ENDPOINT = "https://test-payment.momo.vn/v2/gateway/api/create"
 VITE_MOMO_REDIRECT_URL = "/checkout"
-
 VITE_MOMO_IPN_URL = "/api/momo/ipn"
 
-VITE_VNPAY_RETURN_URL = "/checkout"
-
-VITE_VNPAY_GATEWAY = "https://sandbox.vnpayment.vn/paymentv2/vpcpay.html"
-
-
-
-VITE_MOMO_ENDPOINT = "https://test-payment.momo.vn/v2/gateway/api/create"
-
+# --- R2 / Storage ---
 R2_PUBLIC_BASE = "https://preview.cinema-pages.pages.dev"
-
 R2_PUBLIC_ENABLED = "false"
 
+# --- Email senders ---
 GMAIL_SENDER_EMAIL = "no-reply@cinesphere.com.vn"
-
 GMAIL_SENDER_NAME = "CINESPHERE"
-
 BREVO_SENDER_EMAIL = "no-reply@cinesphere.com.vn"
-
 BREVO_SENDER_NAME = "CINESPHERE"
 
+# --- Rate limiting ---
 VITE_RATE_LIMIT_BOOKING_CHECK_MAX = "10"
-
 VITE_RATE_LIMIT_BOOKING_CHECK_WINDOWMS = "60000"
 
+# --- SEO ---
 INDEXNOW_KEY = "a7f3c2e1b5d8f4a9c6e2d1b8f5a3c7e4"
 
+# --- Media upload (Cloudinary) ---
 VITE_CLOUDINARY_CLOUD_NAME = "dzp3rbeix"
+VITE_CLOUDINARY_UPLOAD_PRESET_VIDEO = "ctbooking_videos_unsigned"
+VITE_CLOUDINARY_UPLOAD_PRESET_IMAGE = "ctbooking_images_unsigned"
 
-VITE_CLOUDINARY_UPLOAD_PRESET_VIDEO="ctbooking_videos_unsigned"
-
-VITE_CLOUDINARY_UPLOAD_PRESET_IMAGE="ctbooking_images_unsigned"
-
-
-
-
+# --- Security ---
 TURNSTILE_SECRET = "0x4AAAAAAE1v1BW9DhZPu7hc76CmgkUo2II"
 
+# -----------------------------------------------------------------------------
+# D1 Database (preview)
+# -----------------------------------------------------------------------------
 [[env.preview.d1_databases]]
-
 binding = "cinema_db"
-
 database_name = "cinema-db-preview"
-
 database_id = "fd9274ae-d1a3-42e2-b83d-2fc1bdc71caf"
-
 migrations_dir = "migrations"
-
-# Local dev (wrangler dev --env preview): connect to remote preview D1 instead of local SQLite
+# Local dev (wrangler dev --env preview): kết nối thẳng tới D1 preview thật
+# trên Cloudflare thay vì dùng SQLite local.
 remote = true
 
+# -----------------------------------------------------------------------------
+# KV Namespace (preview)
+# -----------------------------------------------------------------------------
+# LƯU Ý: block KV này phải đặt SAU block D1 ở trên. Đặt trước D1 từng gây lỗi
+# 500 hàng loạt do thứ tự khai báo trong TOML ảnh hưởng tới cách wrangler dev
+# resolve nhiều remote binding trong cùng 1 environment.
+[[env.preview.kv_namespaces]]
+binding = "SETTINGS_KV"
+id = "10ffca8eeea440a0bc47527fd05fd93f"
+# =============================== END: preview ===============================
 
 
-
-
-
-
-
+# =============================================================================
+# ENVIRONMENT: production
+# (Dùng khi chạy `npm run deploy:prod` → wrangler deploy --config worker/wrangler.toml,
+#  không truyền --env → thực chất áp dụng route + observability bên dưới)
+# =============================================================================
 [env.production]
-
 routes = [
-
   { pattern = "cinesphere.com.vn/api/*", zone_name = "cinesphere.com.vn" },
-
   { pattern = "cinesphere.com.vn/uploads/*", zone_name = "cinesphere.com.vn" }
-
 ]
+# ============================== END: production =============================
 
+
+# =============================================================================
+# OBSERVABILITY (top-level — áp dụng chung cho toàn bộ Worker, KHÔNG thuộc
+# riêng env.production dù nằm phía sau trong file này)
+# =============================================================================
 [observability]
-
 enabled = false
-
 head_sampling_rate = 1
 
 [observability.logs]
-
 enabled = true
-
 head_sampling_rate = 1
-
 persist = true
-
 invocation_logs = true
-
-
 
 [observability.traces]
 send_metrics = false
 enabled = true
-
 head_sampling_rate = 1
-
 persist = false
-
+# ============================= END: observability ===========================
