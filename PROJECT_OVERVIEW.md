@@ -998,10 +998,6 @@ erDiagram
 | `SUPER_ADMIN_FULLNAME` | Tên superadmin | ✅ |
 | `VITE_SERVER_BASE_URL` | Base URL backend API | ✅ |
 | `VITE_CLIENT_BASE_URL` | Base URL frontend | ✅ |
-| `R2_PUBLIC_BASE` | Base URL public R2 | — |
-| `R2_PUBLIC_ENABLED` | Enable R2 public URLs (`"false"`) | — |
-| `GMAIL_SENDER_EMAIL` | Gmail sender (có khai báo, backup?) | — |
-| `GMAIL_SENDER_NAME` | Gmail sender name | — |
 | `INDEXNOW_KEY` | IndexNow SEO key | — |
 | `IS_PREVIEW` | Flag preview environment (`"true"`) | — |
 
@@ -1101,7 +1097,7 @@ Logic rate limiter KV đã xóa hoàn toàn. Bảo vệ thực hiện qua Cloudf
 ### 9.3 TODO / Tech Debt còn sót
 
 - `export const attempts = new Map<string, number[]>(); // Removed in-memory map` — comment trong `utils.ts`
-- R2 bucket `r2_cinemastore` được bind nhưng `R2_PUBLIC_ENABLED = "false"`, không có code dùng
+- R2 bucket `r2_cinemastore` được bind nhưng chưa có code dùng public url.
 
 - `client/` thư mục chứa toàn bộ mã nguồn Admin Vite SPA thực thụ. (Lưu ý lịch sử: Trước đây tài liệu ghi nhầm thư mục `app/` ở root là Admin SPA — đã xác minh lại và sửa chính xác vào ngày 22/09/2026. Thư mục `app/` đã bị xóa bỏ vì là rác/mồ côi của Next.js).
 

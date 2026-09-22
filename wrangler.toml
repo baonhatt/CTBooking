@@ -11,8 +11,14 @@ pages_build_output_dir = "dist/spa"
 [env.preview.vars]
 VITE_SERVER_BASE_URL = "https://cinema-worker-preview.baonhat20.workers.dev"
 VITE_CLIENT_BASE_URL = "https://admin-preview.cinema-pages.pages.dev"
+VITE_CLOUDINARY_CLOUD_NAME = "dzp3rbeix"
+VITE_CLOUDINARY_UPLOAD_PRESET_VIDEO = "ctbooking_videos_unsigned"
+VITE_CLOUDINARY_UPLOAD_PRESET_IMAGE = "ctbooking_images_unsigned"
 
 [env.production]
 [env.production.vars]
 VITE_SERVER_BASE_URL = "https://api.cinesphere.com.vn"
 VITE_CLIENT_BASE_URL = "https://admin.cinesphere.com.vn"
+VITE_CLOUDINARY_CLOUD_NAME = "dzp3rbeix"
+VITE_CLOUDINARY_UPLOAD_PRESET_VIDEO = "ctbooking_videos_unsigned"
+VITE_CLOUDINARY_UPLOAD_PRESET_IMAGE = "ctbooking_images_unsigned"
