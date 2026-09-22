@@ -73,8 +73,8 @@ sitemediaRouter.post('/api/admin/cloudinary/sign', requireStaffAuth, requirePerm
       overwrite: 'true',
 
       ...(isVideo
-        ? { allowed_formats: 'mp4,webm,mov', max_bytes: 104857600 } // 100MB for video
-        : { allowed_formats: 'jpg,jpeg,png,webp,gif', max_bytes: 5242880 }) // 5MB for images
+        ? { allowed_formats: 'mp4,webm,mov' } // 100MB for video
+        : { allowed_formats: 'jpg,jpeg,png,webp,gif' }) // 5MB for images
     } as Record<string, string | number>;
 
     const signed = await cloudinarySignedParams(env, params);

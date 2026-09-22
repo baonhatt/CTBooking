@@ -168,6 +168,7 @@ export function uploadDirectToCloudinary(
         form.append('use_filename', 'true');
         form.append('unique_filename', 'false');
         form.append('overwrite', 'true');
+        form.append('allowed_formats', isVideo ? 'mp4,webm,mov' : 'jpg,jpeg,png,webp,gif');
       } else {
         reject(new Error('Lỗi ký gửi signature từ Server, không thể upload file ảnh.'));
         return;
