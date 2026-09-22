@@ -718,7 +718,7 @@ CTBooking/
   - **Được import bởi:** `worker/src/index.ts`.
 
 - **`server/routes/user/payments.ts`**
-  - **Vai trò:** FILE PHỨC TẠP NHẤT HỆ THỐNG. Chịu trách nhiệm chốt giao dịch. Logic tính toán tổng hóa đơn (quantity * unit_price), map ID thanh toán, và xác nhận vé từ Webhook SePay/VNPay trả về.
+  - **Vai trò:** FILE PHỨC TẠP NHẤT HỆ THỐNG. Chịu trách nhiệm chốt giao dịch. Logic tính toán tổng hóa đơn (quantity * unit_price), map ID thanh toán, và xác nhận vé từ Webhook SePay trả về.
   - **Export chính:** `validateBookingImpl`, `createPaymentImpl`, `updatePaymentImpl`, `getBookingByIdImpl`, `confirmUseTicketImpl`.
   - **Import từ đâu:** `lib/booking-utils`, `shared/booking-invoice.ts`, `./vouchers.ts`...
   - **Được import bởi:** `worker/src/index.ts`.

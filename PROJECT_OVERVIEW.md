@@ -53,7 +53,7 @@
 |-----------|-----|---------|
 | **Production Worker** | `cinesphere.com.vn/api/*` | route pattern trong wrangler.toml |
 | **Preview Worker** | `cinema-worker-preview.baonhat20.workers.dev` | env=preview, remote D1 |
-| **Admin SPA (prod)** | Cloudflare Pages: cinema-admin-pages | build từ `app/` qua Vite |
+| **Admin SPA (prod)** | Cloudflare Pages: cinema-admin-pages | build từ `client/` qua Vite |
 | **Admin SPA (preview)** | `preview.cinema-pages.pages.dev` | — |
 | **User Frontend** | Next.js trên CF Pages | `next-client/` |
 
@@ -155,7 +155,7 @@ CTBooking/                              ← Monorepo root (pnpm workspace)
 │       │   ├── page.tsx                ← Homepage (SSR/ISR)
 │       │   ├── booking/page.tsx        ← Trang đặt vé phim (lớn, client component)
 │       │   ├── qr-payment/             ← Trang hiển thị QR VietQR + polling
-│       │   ├── checkout/               ← Return URL MoMo/VNPay
+│       │   ├── checkout/               ← (Legacy/Orphan) Checkout page
 │       │   ├── success-payment/        ← Xác nhận thanh toán thành công
 │       │   ├── account/                ← Profile + lịch sử giao dịch
 │       │   ├── vr/                     ← Giới thiệu VR (3D showcase Three.js)
@@ -184,9 +184,8 @@ CTBooking/                              ← Monorepo root (pnpm workspace)
 │           │   └── payments.ts         ← Payment: validate, create, VR
 │           └── cookies.ts              ← getCookie/setCookie/deleteCookie
 │
-├── app/                                ★ ADMIN SPA: React + Vite (client/)
+├── client/                             ★ ADMIN SPA: React + Vite
 │   └── (pages admin: quản lý phim, vé, staff, voucher, dashboard...)
-├── client/                             ← Source Vite client (có thể là alias của app/)
 ├── public/                             ← Static assets
 ├── drizzle/                            ← Drizzle migration output
 ├── db_backup/                          ← Backup DB SQL files
@@ -216,7 +215,7 @@ CTBooking/                              ← Monorepo root (pnpm workspace)
 |---------|-------|
 | `validateBookingImpl` | Kiểm tra ticket package, tính giá, validate voucher, trả về totalPrice |
 | `createPaymentImpl` | INSERT bookings + booking_vr_items + UPDATE voucher usage; enqueue email xác nhận |
-| `updatePaymentImpl` | Cập nhật payment_status, paid_at, transaction_id (dùng bởi webhook SePay + MoMo/VNPay IPN) |
+| `updatePaymentImpl` | Cập nhật payment_status, paid_at, transaction_id (dùng bởi webhook SePay) |
 | `getBookingByIdImpl` | Lấy booking by ID (public, dùng để poll status) |
 | `getBookingByCodeImpl` | Tìm booking by booking_code (staff check-in) |
 | `confirmUseTicketImpl` | SET is_used=true, checked_in_at=now khi staff quét vé |
@@ -976,7 +975,7 @@ erDiagram
 | **`tokens.type`** | `'session'` \| `'otp'` \| `'reset_password'` |
 | **`staff_tokens.type`** | `'session'` \| `'otp'` |
 | **`bookings.payment_status`** | `'pending'` \| `'paid'` \| `'failed'` \| `'cancelled'` |
-| **`bookings.payment_method`** | `'vietqr'` \| `'momo'` \| `'vnpay'` \| `'cash'` |
+| **`bookings.payment_method`** | `'vietqr'` \| `'cash'` |
 
 ---
 
@@ -999,16 +998,6 @@ erDiagram
 | `SUPER_ADMIN_FULLNAME` | Tên superadmin | ✅ |
 | `VITE_SERVER_BASE_URL` | Base URL backend API | ✅ |
 | `VITE_CLIENT_BASE_URL` | Base URL frontend | ✅ |
-| `VITE_VNPAY_RETURN_URL` | VNPay return URL | ⚠️ sandbox |
-| `VITE_VNPAY_GATEWAY` | VNPay gateway URL | ⚠️ sandbox |
-| `VITE_MOMO_ENDPOINT` | MoMo API endpoint | ⚠️ sandbox |
-| `VITE_MOMO_REDIRECT_URL` | MoMo redirect URL | ⚠️ sandbox |
-| `VITE_MOMO_IPN_URL` | MoMo IPN callback URL | ⚠️ sandbox |
-| `VITE_MOMO_PARTNER_CODE` | MoMo partner code | ⚠️ không có trong wrangler.toml |
-| `VITE_MOMO_ACCESS_KEY` | MoMo access key | ⚠️ không có trong wrangler.toml |
-| `VITE_MOMO_SECRET_KEY` | MoMo secret key | ⚠️ không có trong wrangler.toml |
-| `VITE_VNPAY_TMN_CODE` | VNPay merchant code | ⚠️ không có trong wrangler.toml |
-| `VITE_VNPAY_HASH_SECRET` | VNPay hash secret | ⚠️ không có trong wrangler.toml |
 | `R2_PUBLIC_BASE` | Base URL public R2 | — |
 | `R2_PUBLIC_ENABLED` | Enable R2 public URLs (`"false"`) | — |
 | `GMAIL_SENDER_EMAIL` | Gmail sender (có khai báo, backup?) | — |
@@ -1064,7 +1053,7 @@ npm run db:import-local  # Import SQL dump vào D1 local
 Mặc dù `index.ts` đã được tách thành 4 sub-routers, `adminRouter.ts` vẫn là file cực lớn chứa 80+ route handlers. Nên tách tiếp thành các admin sub-routers theo domain (movies, tickets, payments, staff, roles...).
 
 #### 🔴 Critical: `server/routes/user/payments.ts` (53KB, ~1500 dòng)
-Quá nhiều responsibility: validate booking movie, create booking, validate VR booking, create VR booking, handle MoMo IPN, handle VNPay IPN, confirm use ticket. Nên tách thành: `bookingValidation.ts`, `bookingCreation.ts`, `paymentWebhooks.ts`.
+Quá nhiều responsibility: validate booking movie, create booking, validate VR booking, create VR booking, confirm use ticket. Nên tách thành: `bookingValidation.ts`, `bookingCreation.ts`, `paymentWebhooks.ts`.
 
 #### ✅ Đã xử lý: Datetime timezone không nhất quán
 Tất cả đã theo quy chuẩn đồng bộ: Backend/D1 lưu giờ chuẩn UTC ISO 8601. Frontend (Admin/App) dùng \`Intl.DateTimeFormat\` convert chuẩn xác sang \`Asia/Ho_Chi_Minh\` (không dùng hàm \`getHours()\` thủ công).
@@ -1113,10 +1102,8 @@ Logic rate limiter KV đã xóa hoàn toàn. Bảo vệ thực hiện qua Cloudf
 
 - `export const attempts = new Map<string, number[]>(); // Removed in-memory map` — comment trong `utils.ts`
 - R2 bucket `r2_cinemastore` được bind nhưng `R2_PUBLIC_ENABLED = "false"`, không có code dùng
-- MoMo và VNPay có cấu hình endpoint nhưng trỏ vào sandbox (`test-payment.momo.vn`, `sandbox.vnpayment.vn`) — **chưa live**
-- `app/` directory (Admin Vite SPA) không có `package.json` riêng trong workspace — cần xác nhận thêm cách pnpm build
-- `server/cloudinary.ts` — Express adapter, có thể là legacy từ trước khi chuyển Workers
-- `client/` thư mục — mục đích không rõ, cần xác nhận thêm
+
+- `client/` thư mục chứa toàn bộ mã nguồn Admin Vite SPA thực thụ. (Lưu ý lịch sử: Trước đây tài liệu ghi nhầm thư mục `app/` ở root là Admin SPA — đã xác minh lại và sửa chính xác vào ngày 22/09/2026. Thư mục `app/` đã bị xóa bỏ vì là rác/mồ côi của Next.js).
 
 ### 9.4 Đề xuất cải thiện (theo thứ tự ưu tiên)
 
@@ -1126,5 +1113,5 @@ Logic rate limiter KV đã xóa hoàn toàn. Bảo vệ thực hiện qua Cloudf
 4. **Thêm global 401 interceptor** ở `next-client/src/lib/api/http.ts`
 5. ~~**Thống nhất datetime** về ISO 8601~~ (Đã hoàn tất)
 6. **Tách `ticket_packages`** thành `movie_packages` và `vr_packages` hoặc dùng discriminated union
-7. **Activate MoMo/VNPay** hoặc xóa code để tránh confusion
-8. **Document phân chia** `app/` vs `next-client/` rõ ràng hơn
+
+8. **Document phân chia frontend** rõ ràng hơn

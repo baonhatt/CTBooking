@@ -50,26 +50,6 @@ type Bindings = {
 
   CLOUDINARY_UPLOAD_FOLDER: string;
 
-  VITE_MOMO_PARTNER_CODE: string;
-
-  VITE_MOMO_ACCESS_KEY: string;
-
-  VITE_MOMO_SECRET_KEY: string;
-
-  VITE_MOMO_ENDPOINT: string;
-
-  VITE_MOMO_IPN_URL: string;
-
-  VITE_MOMO_REDIRECT_URL: string;
-
-  VITE_VNPAY_TMN_CODE: string;
-
-  VITE_VNPAY_HASH_SECRET: string;
-
-  VITE_VNPAY_GATEWAY: string;
-
-  VITE_VNPAY_RETURN_URL: string;
-
   VITE_SERVER_BASE_URL: string;
 
   VITE_CLIENT_BASE_URL: string;

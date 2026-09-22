@@ -29,12 +29,7 @@ crons = ["*/5 * * * *"]
 VITE_SERVER_BASE_URL = "https://cinesphere.com.vn"
 VITE_CLIENT_BASE_URL = "https://cinesphere.com.vn"
 
-# --- Payment gateways ---
-VITE_VNPAY_RETURN_URL = "/checkout"
-VITE_VNPAY_GATEWAY = "https://sandbox.vnpayment.vn/paymentv2/vpcpay.html"
-VITE_MOMO_ENDPOINT = "https://test-payment.momo.vn/v2/gateway/api/create"
-VITE_MOMO_REDIRECT_URL = "/checkout"
-VITE_MOMO_IPN_URL = "/api/momo/ipn"
+# --- Payment gateways (VietQR/SePay) ---
 
 # --- R2 / Storage ---
 R2_PUBLIC_BASE = "https://cinesphere.com.vn"
@@ -110,12 +105,7 @@ SUPER_ADMIN_FULLNAME = "Super Admin"
 VITE_SERVER_BASE_URL = "https://api.cinesphere.com.vn"
 VITE_CLIENT_BASE_URL = "https://preview.cinema-pages.pages.dev"
 
-# --- Payment gateways ---
-VITE_VNPAY_RETURN_URL = "/checkout"
-VITE_VNPAY_GATEWAY = "https://sandbox.vnpayment.vn/paymentv2/vpcpay.html"
-VITE_MOMO_ENDPOINT = "https://test-payment.momo.vn/v2/gateway/api/create"
-VITE_MOMO_REDIRECT_URL = "/checkout"
-VITE_MOMO_IPN_URL = "/api/momo/ipn"
+# --- Payment gateways (VietQR/SePay) ---
 
 # --- R2 / Storage ---
 R2_PUBLIC_BASE = "https://preview.cinema-pages.pages.dev"
