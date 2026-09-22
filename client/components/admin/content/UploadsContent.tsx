@@ -31,8 +31,23 @@ import {
   Layout,
   Grid3X3,
   RefreshCw,
-  Info
+  Info,
+  Folder,
+  FolderOpen,
+  FolderTree,
+  Search,
+  Grid,
+  List,
+  Copy,
+  Check,
+  ChevronRight,
+  HardDrive,
+  Filter,
+  ArrowUpDown,
+  Play,
+  Maximize2
 } from 'lucide-react';
+import { ConfirmDeleteDialog } from '@/components/admin/dialogs/ConfirmDeleteDialog';
 
 export default function UploadsContent() {
   const fileRef = useRef<HTMLInputElement | null>(null);
@@ -68,6 +83,35 @@ export default function UploadsContent() {
   const [mediaItems, setMediaItems] = useState<any[]>([]);
   const [mediaLoadingId, setMediaLoadingId] = useState<number | null>(null);
   const [playingVideoId, setPlayingVideoId] = useState<number | null>(null);
+
+  // Windows Explorer Media Library States
+  const [selectedFolder, setSelectedFolder] = useState<string>('all');
+  const [searchQuery, setSearchQuery] = useState<string>('');
+  const [explorerView, setExplorerView] = useState<'grid' | 'list'>('grid');
+  const [selectedMediaItem, setSelectedMediaItem] = useState<any | null>(null);
+  const [copiedId, setCopiedId] = useState<number | null>(null);
+  const [sortBy, setSortBy] = useState<'newest' | 'oldest' | 'section'>('newest');
+  const [itemToDelete, setItemToDelete] = useState<any | null>(null);
+
+  const copyToClipboard = (text: string, id: number) => {
+    navigator.clipboard.writeText(text);
+    setCopiedId(id);
+    toast.success('Đã sao chép URL vào bộ nhớ tạm!');
+    setTimeout(() => setCopiedId(null), 2000);
+  };
+
+  const getSectionLabel = (sec: string) => {
+    switch (sec) {
+      case 'hero_section':
+        return 'Hero Section (Banner Trang Chủ)';
+      case 'technology_section1':
+        return 'Technology Section 1 (Banner Công Nghệ)';
+      case 'technology_section2':
+        return 'Technology Section 2 (Danh Sách Công Nghệ)';
+      default:
+        return sec.replace(/_/g, ' ').toUpperCase();
+    }
+  };
 
   const getThumbnail = (url: string, type: string) => {
     if (type === 'image') return url;
@@ -747,186 +791,774 @@ export default function UploadsContent() {
           open={openMediaModal}
           onOpenChange={(val) => {
             setOpenMediaModal(val);
-            if (!val) setPlayingVideoId(null);
+            if (!val) {
+              setPlayingVideoId(null);
+              setSelectedMediaItem(null);
+            }
           }}
         >
-          <DialogContent className="bg-slate-950 text-white border-white/10 max-w-5xl w-[95vw] h-[85vh] flex flex-col p-0 overflow-hidden shadow-2xl [&>button]:hidden">
-            <DialogHeader className="p-6 border-b border-white/5 bg-white/5 flex flex-row items-center justify-between space-y-0">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-blue-500/10 flex items-center justify-center border border-blue-500/20">
-                  <Grid3X3 className="w-5 h-5 text-blue-400" />
+          <DialogContent className="bg-slate-950 text-white border-white/10 max-w-7xl w-[96vw] h-[90vh] flex flex-col p-0 overflow-hidden shadow-2xl [&>button]:hidden">
+            {/* Explorer Header Bar */}
+            <div className="p-4 border-b border-white/10 bg-slate-900/90 flex flex-col md:flex-row items-center justify-between gap-4 shrink-0">
+              <div className="flex items-center gap-3 w-full md:w-auto">
+                <div className="w-10 h-10 rounded-xl bg-blue-600/20 flex items-center justify-center border border-blue-500/30 text-blue-400">
+                  <HardDrive className="w-5 h-5" />
                 </div>
                 <div>
-                  <DialogTitle className="text-xl font-bold">Thư viện Site Media</DialogTitle>
-                  <p className="text-xs text-gray-500 mt-0.5">
-                    Quản lý và xem trước nội dung đa phương tiện của trang web
+                  <DialogTitle className="text-base font-bold flex items-center gap-2 text-white">
+                    Windows Media Explorer
+                    <span className="text-xs font-normal text-blue-400 bg-blue-500/10 px-2 py-0.5 rounded-full border border-blue-500/20">
+                      v2.0
+                    </span>
+                  </DialogTitle>
+                  <p className="text-xs text-gray-400 flex items-center gap-1.5 mt-0.5 font-mono">
+                    <Folder className="w-3.5 h-3.5 text-yellow-500" />
+                    <span>Thư viện</span>
+                    <ChevronRight className="w-3 h-3 text-gray-500" />
+                    <span className="text-blue-300 font-semibold">{getSectionLabel(selectedFolder)}</span>
                   </p>
                 </div>
               </div>
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={() => setOpenMediaModal(false)}
-                className="hover:bg-white/10 text-gray-400"
-              >
-                <X className="w-5 h-5" />
-              </Button>
-            </DialogHeader>
 
-            <div className="flex-1 overflow-y-auto p-6 custom-scrollbar bg-black/20">
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-                {mediaItems.map((m) => (
-                  <div
-                    key={m.id}
-                    className="group relative rounded-2xl border border-white/10 bg-slate-900 overflow-hidden flex flex-col transition-all hover:border-blue-500/50 hover:shadow-lg hover:shadow-blue-900/10 hover:-translate-y-1"
+              {/* Explorer Search & Controls Toolbar */}
+              <div className="flex items-center gap-3 w-full md:w-auto flex-wrap justify-end">
+                {/* Search Bar */}
+                <div className="relative flex-1 md:w-64">
+                  <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                  <Input
+                    placeholder="Tìm tên file, ID, URL..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="bg-black/40 border-white/10 pl-9 pr-8 h-9 text-xs text-white placeholder:text-gray-500 rounded-lg focus:border-blue-500"
+                  />
+                  {searchQuery && (
+                    <button
+                      onClick={() => setSearchQuery('')}
+                      className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-white"
+                    >
+                      <X className="w-3.5 h-3.5" />
+                    </button>
+                  )}
+                </div>
+
+                {/* Sort dropdown */}
+                <div className="flex items-center gap-1 bg-black/40 border border-white/10 rounded-lg p-1">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setSortBy((s) => (s === 'newest' ? 'oldest' : 'newest'))}
+                    className="h-7 px-2.5 text-xs text-gray-300 hover:text-white hover:bg-white/10 flex items-center gap-1"
+                    title="Sắp xếp ngày"
                   >
-                    {/* Media Preview Area */}
-                    <div className="aspect-video bg-black/40 relative flex items-center justify-center group-hover:bg-black/20 transition-colors">
-                      {m.type === 'image' ? (
-                        <img
-                          src={m.url}
-                          alt={m.section}
-                          loading="lazy"
-                          className="w-full h-full object-cover opacity-80 group-hover:opacity-100 transition-opacity"
-                        />
-                      ) : (
+                    <ArrowUpDown className="w-3.5 h-3.5 text-blue-400" />
+                    <span>{sortBy === 'newest' ? 'Mới nhất' : 'Cũ nhất'}</span>
+                  </Button>
+                </div>
+
+                {/* View Mode Switcher */}
+                <div className="flex items-center bg-black/40 border border-white/10 rounded-lg p-1 gap-1">
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => setExplorerView('grid')}
+                    className={`h-7 w-7 rounded ${explorerView === 'grid' ? 'bg-blue-600 text-white' : 'text-gray-400 hover:text-white'}`}
+                    title="Xem dạng Lưới (Grid)"
+                  >
+                    <Grid className="w-4 h-4" />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => setExplorerView('list')}
+                    className={`h-7 w-7 rounded ${explorerView === 'list' ? 'bg-blue-600 text-white' : 'text-gray-400 hover:text-white'}`}
+                    title="Xem dạng Danh sách chi tiết (List)"
+                  >
+                    <List className="w-4 h-4" />
+                  </Button>
+                </div>
+
+                {/* Refresh */}
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={async () => {
+                    try {
+                      const { items } = await getSiteMediaApi({});
+                      setMediaItems(items);
+                      toast.success('Đã làm mới dữ liệu media');
+                    } catch (err: any) {
+                      toast.error('Không thể làm mới');
+                    }
+                  }}
+                  className="h-9 w-9 border border-white/10 hover:bg-white/10 text-gray-300 rounded-lg"
+                  title="Tải lại thư viện"
+                >
+                  <RefreshCw className="w-4 h-4" />
+                </Button>
+
+                {/* Close Button */}
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => setOpenMediaModal(false)}
+                  className="h-9 w-9 border border-white/10 hover:bg-red-500/20 text-gray-400 hover:text-red-400 rounded-lg"
+                >
+                  <X className="w-5 h-5" />
+                </Button>
+              </div>
+            </div>
+
+            {/* Main Explorer Explorer Container (Sidebar + Content + Inspector) */}
+            <div className="flex-1 flex overflow-hidden bg-slate-950">
+              {/* Left Navigation Tree Sidebar */}
+              <div className="w-64 border-r border-white/10 bg-slate-900/60 p-3 flex flex-col space-y-4 shrink-0 overflow-y-auto custom-scrollbar">
+                <div>
+                  <div className="text-[10px] font-bold uppercase tracking-wider text-gray-400 px-2 mb-2 flex items-center gap-1.5">
+                    <FolderTree className="w-3.5 h-3.5 text-blue-400" />
+                    Thư mục hệ thống
+                  </div>
+                  <div className="space-y-1">
+                    <button
+                      onClick={() => setSelectedFolder('all')}
+                      className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-medium transition-all ${
+                        selectedFolder === 'all'
+                          ? 'bg-blue-600/20 text-blue-300 border border-blue-500/30'
+                          : 'text-gray-300 hover:bg-white/5 hover:text-white'
+                      }`}
+                    >
+                      <div className="flex items-center gap-2.5">
+                        <FolderOpen className="w-4 h-4 text-yellow-500 shrink-0" />
+                        <span className="truncate">Tất cả Media</span>
+                      </div>
+                      <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-white/10 text-gray-300">
+                        {mediaItems.length}
+                      </span>
+                    </button>
+
+                    <button
+                      onClick={() => setSelectedFolder('hero_section')}
+                      className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-medium transition-all ${
+                        selectedFolder === 'hero_section'
+                          ? 'bg-blue-600/20 text-blue-300 border border-blue-500/30'
+                          : 'text-gray-300 hover:bg-white/5 hover:text-white'
+                      }`}
+                    >
+                      <div className="flex items-center gap-2.5">
+                        <Folder className="w-4 h-4 text-blue-400 shrink-0" />
+                        <span className="truncate">Hero Section</span>
+                      </div>
+                      <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-white/10 text-gray-300">
+                        {mediaItems.filter((m) => m.section === 'hero_section').length}
+                      </span>
+                    </button>
+
+                    <button
+                      onClick={() => setSelectedFolder('technology_section1')}
+                      className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-medium transition-all ${
+                        selectedFolder === 'technology_section1'
+                          ? 'bg-blue-600/20 text-blue-300 border border-blue-500/30'
+                          : 'text-gray-300 hover:bg-white/5 hover:text-white'
+                      }`}
+                    >
+                      <div className="flex items-center gap-2.5">
+                        <Folder className="w-4 h-4 text-purple-400 shrink-0" />
+                        <span className="truncate">Tech Section 1</span>
+                      </div>
+                      <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-white/10 text-gray-300">
+                        {mediaItems.filter((m) => m.section === 'technology_section1').length}
+                      </span>
+                    </button>
+
+                    <button
+                      onClick={() => setSelectedFolder('technology_section2')}
+                      className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-medium transition-all ${
+                        selectedFolder === 'technology_section2'
+                          ? 'bg-blue-600/20 text-blue-300 border border-blue-500/30'
+                          : 'text-gray-300 hover:bg-white/5 hover:text-white'
+                      }`}
+                    >
+                      <div className="flex items-center gap-2.5">
+                        <Folder className="w-4 h-4 text-emerald-400 shrink-0" />
+                        <span className="truncate">Tech Section 2</span>
+                      </div>
+                      <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-white/10 text-gray-300">
+                        {mediaItems.filter((m) => m.section === 'technology_section2').length}
+                      </span>
+                    </button>
+                  </div>
+                </div>
+
+                <div className="pt-2 border-t border-white/10">
+                  <div className="text-[10px] font-bold uppercase tracking-wider text-gray-400 px-2 mb-2 flex items-center gap-1.5">
+                    <Filter className="w-3.5 h-3.5 text-blue-400" />
+                    Lọc theo loại tệp
+                  </div>
+                  <div className="space-y-1">
+                    <button
+                      onClick={() => setSelectedFolder('image')}
+                      className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-medium transition-all ${
+                        selectedFolder === 'image'
+                          ? 'bg-emerald-600/20 text-emerald-300 border border-emerald-500/30'
+                          : 'text-gray-300 hover:bg-white/5 hover:text-white'
+                      }`}
+                    >
+                      <div className="flex items-center gap-2.5">
+                        <FileImage className="w-4 h-4 text-emerald-400 shrink-0" />
+                        <span className="truncate">Hình ảnh</span>
+                      </div>
+                      <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/10 text-emerald-400">
+                        {mediaItems.filter((m) => m.type === 'image').length}
+                      </span>
+                    </button>
+
+                    <button
+                      onClick={() => setSelectedFolder('video')}
+                      className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-medium transition-all ${
+                        selectedFolder === 'video'
+                          ? 'bg-blue-600/20 text-blue-300 border border-blue-500/30'
+                          : 'text-gray-300 hover:bg-white/5 hover:text-white'
+                      }`}
+                    >
+                      <div className="flex items-center gap-2.5">
+                        <FileVideo className="w-4 h-4 text-blue-400 shrink-0" />
+                        <span className="truncate">Video Clips</span>
+                      </div>
+                      <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-500/10 text-blue-400">
+                        {mediaItems.filter((m) => m.type === 'video').length}
+                      </span>
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              {/* Main Directory Area */}
+              <div className="flex-1 overflow-y-auto p-5 custom-scrollbar flex flex-col bg-slate-950/60">
+                {/* Folder Shortcuts (shown when in 'all' view with no search) */}
+                {selectedFolder === 'all' && !searchQuery && (
+                  <div className="mb-6 space-y-3">
+                    <div className="text-xs font-bold text-gray-400 uppercase tracking-wider flex items-center gap-2">
+                      <Folder className="w-4 h-4 text-yellow-500" />
+                      Danh mục thư mục chính
+                    </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                      {[
+                        {
+                          id: 'hero_section',
+                          label: 'Hero Section',
+                          desc: 'Banner chính trang chủ',
+                          color: 'from-blue-600/20 to-indigo-600/10 border-blue-500/30 text-blue-400',
+                          icon: <Folder className="w-8 h-8 text-blue-400" />,
+                          count: mediaItems.filter((m) => m.section === 'hero_section').length
+                        },
+                        {
+                          id: 'technology_section1',
+                          label: 'Tech Section 1',
+                          desc: 'Banner giới thiệu công nghệ',
+                          color: 'from-purple-600/20 to-pink-600/10 border-purple-500/30 text-purple-400',
+                          icon: <Folder className="w-8 h-8 text-purple-400" />,
+                          count: mediaItems.filter((m) => m.section === 'technology_section1').length
+                        },
+                        {
+                          id: 'technology_section2',
+                          label: 'Tech Section 2',
+                          desc: 'Danh sách tính năng công nghệ',
+                          color: 'from-emerald-600/20 to-teal-600/10 border-emerald-500/30 text-emerald-400',
+                          icon: <Folder className="w-8 h-8 text-emerald-400" />,
+                          count: mediaItems.filter((m) => m.section === 'technology_section2').length
+                        }
+                      ].map((folder) => (
                         <div
-                          className="relative w-full h-full cursor-pointer group/vid"
-                          onClick={() => setPlayingVideoId(m.id)}
+                          key={folder.id}
+                          onClick={() => setSelectedFolder(folder.id)}
+                          className={`cursor-pointer rounded-2xl p-4 bg-gradient-to-br ${folder.color} border transition-all hover:scale-[1.02] hover:shadow-lg flex items-center gap-4 group`}
                         >
-                          {playingVideoId === m.id ? (
-                            <video src={m.url} autoPlay controls className="w-full h-full object-cover" />
-                          ) : (
-                            <>
-                              {getThumbnail(m.url, m.type) ? (
+                          <div className="p-2.5 rounded-xl bg-black/30 group-hover:scale-110 transition-transform">
+                            {folder.icon}
+                          </div>
+                          <div>
+                            <div className="font-bold text-sm text-white group-hover:text-blue-300 transition-colors">
+                              {folder.label}
+                            </div>
+                            <div className="text-[11px] text-gray-400">{folder.desc}</div>
+                            <div className="text-[10px] text-gray-500 font-semibold mt-1">
+                              {folder.count} tệp media
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Filter & Items Header */}
+                <div className="flex items-center justify-between mb-4 pb-2 border-b border-white/5">
+                  <div className="text-xs text-gray-400 font-medium">
+                    Hiển thị{' '}
+                    <span className="text-white font-bold">
+                      {
+                        mediaItems
+                          .filter((m) => {
+                            if (selectedFolder === 'hero_section') return m.section === 'hero_section';
+                            if (selectedFolder === 'technology_section1') return m.section === 'technology_section1';
+                            if (selectedFolder === 'technology_section2') return m.section === 'technology_section2';
+                            if (selectedFolder === 'image') return m.type === 'image';
+                            if (selectedFolder === 'video') return m.type === 'video';
+                            return true;
+                          })
+                          .filter((m) => {
+                            if (!searchQuery.trim()) return true;
+                            const q = searchQuery.toLowerCase();
+                            return (
+                              String(m.id).includes(q) ||
+                              (m.url || '').toLowerCase().includes(q) ||
+                              (m.section || '').toLowerCase().includes(q)
+                            );
+                          }).length
+                      }
+                    </span>{' '}
+                    tệp media
+                  </div>
+                </div>
+
+                {/* Media Files Display (GRID VIEW) */}
+                {explorerView === 'grid' && (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+                    {mediaItems
+                      .filter((m) => {
+                        if (selectedFolder === 'hero_section') return m.section === 'hero_section';
+                        if (selectedFolder === 'technology_section1') return m.section === 'technology_section1';
+                        if (selectedFolder === 'technology_section2') return m.section === 'technology_section2';
+                        if (selectedFolder === 'image') return m.type === 'image';
+                        if (selectedFolder === 'video') return m.type === 'video';
+                        return true;
+                      })
+                      .filter((m) => {
+                        if (!searchQuery.trim()) return true;
+                        const q = searchQuery.toLowerCase();
+                        return (
+                          String(m.id).includes(q) ||
+                          (m.url || '').toLowerCase().includes(q) ||
+                          (m.section || '').toLowerCase().includes(q)
+                        );
+                      })
+                      .sort((a, b) => {
+                        if (sortBy === 'oldest')
+                          return (
+                            new Date(a.created_at || a.updated_at || 0).getTime() -
+                            new Date(b.created_at || b.updated_at || 0).getTime()
+                          );
+                        return (
+                          new Date(b.created_at || b.updated_at || 0).getTime() -
+                          new Date(a.created_at || a.updated_at || 0).getTime()
+                        );
+                      })
+                      .map((m) => {
+                        const isSelected = selectedMediaItem?.id === m.id;
+                        return (
+                          <div
+                            key={m.id}
+                            onClick={() => setSelectedMediaItem(m)}
+                            className={`group relative rounded-2xl border bg-slate-900 overflow-hidden flex flex-col cursor-pointer transition-all ${
+                              isSelected
+                                ? 'border-blue-500 ring-2 ring-blue-500/40 shadow-xl shadow-blue-900/30'
+                                : 'border-white/10 hover:border-blue-500/40 hover:shadow-lg'
+                            }`}
+                          >
+                            {/* Media Thumbnail */}
+                            <div className="aspect-video bg-black/40 relative flex items-center justify-center overflow-hidden">
+                              {m.type === 'image' ? (
                                 <img
-                                  src={getThumbnail(m.url, m.type)!}
+                                  src={m.url}
                                   alt={m.section}
                                   loading="lazy"
-                                  className="w-full h-full object-cover opacity-60 group-hover:opacity-80 transition-opacity"
-                                />
-                              ) : m.type === 'video' ? (
-                                <video
-                                  src={m.url}
-                                  preload="metadata"
-                                  className="w-full h-full object-cover opacity-60 group-hover:opacity-80 transition-opacity"
+                                  className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                                 />
                               ) : (
-                                <div className="w-full h-full bg-slate-900 flex items-center justify-center">
-                                  <FileVideo className="w-12 h-12 text-blue-500/20" />
+                                <div
+                                  className="relative w-full h-full cursor-pointer"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setPlayingVideoId(m.id);
+                                    setSelectedMediaItem(m);
+                                  }}
+                                >
+                                  {playingVideoId === m.id ? (
+                                    <video src={m.url} autoPlay controls className="w-full h-full object-cover" />
+                                  ) : (
+                                    <>
+                                      {getThumbnail(m.url, m.type) ? (
+                                        <img
+                                          src={getThumbnail(m.url, m.type)!}
+                                          alt={m.section}
+                                          loading="lazy"
+                                          className="w-full h-full object-cover opacity-70 group-hover:opacity-90 transition-opacity"
+                                        />
+                                      ) : (
+                                        <div className="w-full h-full bg-slate-900 flex items-center justify-center">
+                                          <FileVideo className="w-12 h-12 text-blue-500/20" />
+                                        </div>
+                                      )}
+                                      <div className="absolute inset-0 flex items-center justify-center">
+                                        <div className="w-10 h-10 rounded-full bg-blue-600/30 backdrop-blur-md flex items-center justify-center text-white border border-white/20 group-hover:scale-110 transition-transform">
+                                          <Play className="w-5 h-5 ml-0.5" />
+                                        </div>
+                                      </div>
+                                    </>
+                                  )}
                                 </div>
                               )}
 
-                              <div className="absolute inset-0 flex items-center justify-center">
-                                <div className="w-12 h-12 rounded-full bg-blue-600/20 backdrop-blur-md flex items-center justify-center text-white border border-white/20 group-hover/vid:scale-110 group-hover/vid:bg-blue-600/40 transition-all duration-300">
-                                  <FileVideo className="w-6 h-6" />
-                                </div>
+                              {/* Section Badge */}
+                              <div className="absolute top-2 left-2 px-2 py-0.5 rounded-md bg-black/70 backdrop-blur-md border border-white/10 text-[9px] font-bold uppercase tracking-wider text-blue-300">
+                                {m.section.replace('_', ' ')}
                               </div>
 
-                              {/* Click to Play hint */}
-                              <div className="absolute bottom-2 right-2 px-2 py-1 rounded bg-black/60 text-[8px] font-bold text-white uppercase tracking-wider opacity-0 group-hover/vid:opacity-100 transition-opacity">
-                                Click to Play
+                              {/* Type Badge */}
+                              <div className="absolute top-2 right-2 px-2 py-0.5 rounded-md bg-black/70 backdrop-blur-md border border-white/10 text-[9px] font-bold uppercase tracking-wider flex items-center gap-1">
+                                {m.type === 'image' ? (
+                                  <FileImage className="w-3 h-3 text-emerald-400" />
+                                ) : (
+                                  <FileVideo className="w-3 h-3 text-blue-400" />
+                                )}
+                                <span className={m.type === 'image' ? 'text-emerald-300' : 'text-blue-300'}>
+                                  {m.type}
+                                </span>
                               </div>
-                            </>
-                          )}
+                            </div>
+
+                            {/* Info Summary */}
+                            <div className="p-3 flex-1 flex flex-col justify-between space-y-2">
+                              <div>
+                                <div className="flex items-center justify-between text-[10px] text-gray-400 font-mono">
+                                  <span>ID: #{m.id}</span>
+                                  <span>{m.width && m.height ? `${m.width}x${m.height}` : m.format || 'N/A'}</span>
+                                </div>
+                                <div className="text-xs text-white font-medium truncate mt-1">{m.url}</div>
+                              </div>
+
+                              <div className="pt-2 border-t border-white/5 flex items-center justify-between text-[10px] text-gray-500">
+                                <span>
+                                  {m.updated_at
+                                    ? formatDistanceToNow(new Date(m.updated_at), { addSuffix: true, locale: vi })
+                                    : 'N/A'}
+                                </span>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    copyToClipboard(m.url, m.id);
+                                  }}
+                                  className="h-6 px-2 text-[10px] text-blue-400 hover:bg-blue-500/10 rounded"
+                                >
+                                  {copiedId === m.id ? (
+                                    <Check className="w-3 h-3 text-emerald-400" />
+                                  ) : (
+                                    <Copy className="w-3 h-3" />
+                                  )}
+                                </Button>
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
+                  </div>
+                )}
+
+                {/* Media Files Display (LIST VIEW TABLE) */}
+                {explorerView === 'list' && (
+                  <div className="rounded-xl border border-white/10 bg-slate-900 overflow-hidden">
+                    <table className="w-full text-left border-collapse">
+                      <thead>
+                        <tr className="border-b border-white/10 bg-white/5 text-[11px] font-bold text-gray-400 uppercase tracking-wider">
+                          <th className="p-3">Tệp</th>
+                          <th className="p-3">ID</th>
+                          <th className="p-3">Thư mục (Section)</th>
+                          <th className="p-3">Loại</th>
+                          <th className="p-3">Kích thước</th>
+                          <th className="p-3">Ngày cập nhật</th>
+                          <th className="p-3 text-right">Thao tác</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-white/5 text-xs">
+                        {mediaItems
+                          .filter((m) => {
+                            if (selectedFolder === 'hero_section') return m.section === 'hero_section';
+                            if (selectedFolder === 'technology_section1') return m.section === 'technology_section1';
+                            if (selectedFolder === 'technology_section2') return m.section === 'technology_section2';
+                            if (selectedFolder === 'image') return m.type === 'image';
+                            if (selectedFolder === 'video') return m.type === 'video';
+                            return true;
+                          })
+                          .filter((m) => {
+                            if (!searchQuery.trim()) return true;
+                            const q = searchQuery.toLowerCase();
+                            return (
+                              String(m.id).includes(q) ||
+                              (m.url || '').toLowerCase().includes(q) ||
+                              (m.section || '').toLowerCase().includes(q)
+                            );
+                          })
+                          .map((m) => (
+                            <tr
+                              key={m.id}
+                              onClick={() => setSelectedMediaItem(m)}
+                              className={`cursor-pointer hover:bg-white/5 transition-colors ${
+                                selectedMediaItem?.id === m.id ? 'bg-blue-600/20 text-white font-medium' : 'text-gray-300'
+                              }`}
+                            >
+                              <td className="p-3 flex items-center gap-3">
+                                <div className="w-8 h-8 rounded bg-black/40 overflow-hidden shrink-0 flex items-center justify-center border border-white/10">
+                                  {m.type === 'image' ? (
+                                    <img src={m.url} className="w-full h-full object-cover" />
+                                  ) : (
+                                    <FileVideo className="w-4 h-4 text-blue-400" />
+                                  )}
+                                </div>
+                                <span className="truncate max-w-[200px] text-xs font-mono">{m.url}</span>
+                              </td>
+                              <td className="p-3 font-mono text-gray-400">#{m.id}</td>
+                              <td className="p-3">
+                                <span className="px-2 py-0.5 rounded bg-blue-500/10 text-blue-300 text-[10px] font-bold">
+                                  {m.section}
+                                </span>
+                              </td>
+                              <td className="p-3 uppercase text-[10px] font-bold">
+                                <span
+                                  className={m.type === 'image' ? 'text-emerald-400' : 'text-blue-400'}
+                                >
+                                  {m.type}
+                                </span>
+                              </td>
+                              <td className="p-3 text-gray-400 text-[11px]">
+                                {m.width && m.height ? `${m.width}x${m.height}` : 'N/A'}
+                              </td>
+                              <td className="p-3 text-gray-400 text-[11px]">
+                                {m.updated_at
+                                  ? formatDistanceToNow(new Date(m.updated_at), { addSuffix: true, locale: vi })
+                                  : 'N/A'}
+                              </td>
+                              <td className="p-3 text-right">
+                                <div className="flex items-center justify-end gap-2">
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      copyToClipboard(m.url, m.id);
+                                    }}
+                                    className="h-7 w-7 text-gray-400 hover:text-white"
+                                    title="Sao chép URL"
+                                  >
+                                    <Copy className="w-3.5 h-3.5" />
+                                  </Button>
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      window.open(m.url, '_blank');
+                                    }}
+                                    className="h-7 w-7 text-gray-400 hover:text-white"
+                                    title="Xem trực tiếp"
+                                  >
+                                    <ExternalLink className="w-3.5 h-3.5" />
+                                  </Button>
+                                </div>
+                              </td>
+                            </tr>
+                          ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+
+                {/* Empty State */}
+                {mediaItems.filter((m) => {
+                  if (selectedFolder === 'hero_section') return m.section === 'hero_section';
+                  if (selectedFolder === 'technology_section1') return m.section === 'technology_section1';
+                  if (selectedFolder === 'technology_section2') return m.section === 'technology_section2';
+                  if (selectedFolder === 'image') return m.type === 'image';
+                  if (selectedFolder === 'video') return m.type === 'video';
+                  return true;
+                }).length === 0 && (
+                  <div className="flex flex-col items-center justify-center py-20 text-gray-500">
+                    <div className="w-16 h-16 rounded-full bg-white/5 flex items-center justify-center mb-4">
+                      <FolderOpen className="w-8 h-8 opacity-40 text-yellow-500" />
+                    </div>
+                    <h4 className="text-base font-semibold text-gray-300">Thư mục trống</h4>
+                    <p className="text-xs text-gray-500 mt-1">Không có tệp media nào trong thư mục này.</p>
+                  </div>
+                )}
+              </div>
+
+              {/* Right Inspector & Details Pane */}
+              <div className="w-80 border-l border-white/10 bg-slate-900/80 p-4 flex flex-col space-y-4 shrink-0 overflow-y-auto custom-scrollbar">
+                <div className="text-xs font-bold uppercase tracking-wider text-gray-400 flex items-center gap-1.5 pb-2 border-b border-white/10">
+                  <Maximize2 className="w-3.5 h-3.5 text-blue-400" />
+                  Chi tiết tệp Media
+                </div>
+
+                {selectedMediaItem ? (
+                  <div className="space-y-4">
+                    {/* Media Preview Window */}
+                    <div className="aspect-video rounded-xl bg-black border border-white/10 overflow-hidden relative flex items-center justify-center">
+                      {selectedMediaItem.type === 'image' ? (
+                        <img
+                          src={selectedMediaItem.url}
+                          alt="Preview"
+                          className="w-full h-full object-contain"
+                        />
+                      ) : (
+                        <video src={selectedMediaItem.url} controls className="w-full h-full object-contain" />
+                      )}
+                    </div>
+
+                    {/* Meta Properties List */}
+                    <div className="space-y-3 bg-black/40 rounded-xl p-3 border border-white/5 text-xs">
+                      <div>
+                        <div className="text-[10px] text-gray-500 font-bold uppercase">ID Tệp</div>
+                        <div className="font-mono text-white font-bold">#{selectedMediaItem.id}</div>
+                      </div>
+
+                      <div>
+                        <div className="text-[10px] text-gray-500 font-bold uppercase">Thư mục (Section)</div>
+                        <div className="text-blue-300 font-semibold">{getSectionLabel(selectedMediaItem.section)}</div>
+                      </div>
+
+                      <div>
+                        <div className="text-[10px] text-gray-500 font-bold uppercase">Định dạng & Kích thước</div>
+                        <div className="text-gray-300 font-medium">
+                          {selectedMediaItem.type.toUpperCase()} •{' '}
+                          {selectedMediaItem.width && selectedMediaItem.height
+                            ? `${selectedMediaItem.width} x ${selectedMediaItem.height}`
+                            : selectedMediaItem.format || 'N/A'}
+                        </div>
+                      </div>
+
+                      {selectedMediaItem.duration && (
+                        <div>
+                          <div className="text-[10px] text-gray-500 font-bold uppercase">Thời lượng Video</div>
+                          <div className="text-gray-300 font-medium">{Number(selectedMediaItem.duration).toFixed(1)} giây</div>
                         </div>
                       )}
 
-                      {/* Section Badge */}
-                      <div className="absolute top-3 left-3 px-2 py-1 rounded-md bg-black/60 backdrop-blur-md border border-white/10 text-[10px] font-bold uppercase tracking-wider text-blue-300">
-                        {m.section.replace('_', ' ')}
-                      </div>
-
-                      {/* Overlays on Hover */}
-                      <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-3">
-                        <Button
-                          variant="secondary"
-                          size="sm"
-                          className="h-8 w-8 p-0 rounded-full bg-white/10 hover:bg-white/20 text-white backdrop-blur-md"
-                          onClick={() => window.open(m.url, '_blank')}
-                          title="Xem trực tiếp"
-                        >
-                          <ExternalLink className="w-4 h-4" />
-                        </Button>
-                        <Button
-                          variant="destructive"
-                          size="sm"
-                          className="h-8 w-8 p-0 rounded-full bg-red-500/80 hover:bg-red-500 text-white backdrop-blur-md"
-                          disabled={mediaLoadingId === m.id}
-                          onClick={async () => {
-                            if (window.confirm('Bạn có chắc chắn muốn xóa media này?')) {
-                              try {
-                                setMediaLoadingId(m.id);
-                                const r = await deleteSiteMediaApi(Number(m.id));
-                                if (r.ok) {
-                                  toast.success('Đã xóa media thành công');
-                                  const { items } = await getSiteMediaApi({});
-                                  setMediaItems(items);
-                                } else throw new Error();
-                              } catch {
-                                toast.error('Xóa thất bại');
-                              } finally {
-                                setMediaLoadingId(null);
-                              }
-                            }
-                          }}
-                          title="Xóa media"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </Button>
-                      </div>
-                    </div>
-
-                    {/* Info Area */}
-                    <div className="p-4 flex-1 flex flex-col justify-between">
-                      <div className="space-y-2">
-                        <div className="flex items-center justify-between">
-                          <span className="text-[10px] font-mono text-gray-500 uppercase">ID: #{m.id}</span>
-                          <span
-                            className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase ${
-                              m.type === 'image' ? 'bg-emerald-500/10 text-emerald-400' : 'bg-blue-500/10 text-blue-400'
-                            }`}
-                          >
-                            {m.type}
-                          </span>
-                        </div>
-                        <div className="text-xs text-gray-400 break-all line-clamp-2 leading-relaxed opacity-60 group-hover:opacity-100 transition-opacity">
-                          {m.url}
+                      <div>
+                        <div className="text-[10px] text-gray-500 font-bold uppercase">Đường dẫn Direct URL</div>
+                        <div className="font-mono text-[10px] text-gray-400 break-all bg-black/50 p-2 rounded border border-white/5 mt-1 select-all">
+                          {selectedMediaItem.url}
                         </div>
                       </div>
 
-                      <div className="mt-4 pt-4 border-t border-white/5 flex items-center justify-between">
-                        <div
-                          className="flex items-center gap-1.5 text-[10px] text-gray-500 font-medium cursor-help"
-                          title={m.updated_at ? new Date(m.updated_at).toLocaleString('vi-VN') : ''}
-                        >
-                          <RefreshCw className="w-3 h-3" />
-                          {m.updated_at
-                            ? formatDistanceToNow(new Date(m.updated_at), { addSuffix: true, locale: vi })
+                      <div>
+                        <div className="text-[10px] text-gray-500 font-bold uppercase">Cập nhật lần cuối</div>
+                        <div className="text-gray-400 text-[11px]">
+                          {selectedMediaItem.updated_at
+                            ? new Date(selectedMediaItem.updated_at).toLocaleString('vi-VN')
                             : 'N/A'}
                         </div>
                       </div>
                     </div>
-                  </div>
-                ))}
-              </div>
 
-              {mediaItems.length === 0 && (
-                <div className="flex flex-col items-center justify-center py-24 text-gray-500">
-                  <div className="w-20 h-20 rounded-full bg-white/5 flex items-center justify-center mb-6">
-                    <Grid3X3 className="w-10 h-10 opacity-20" />
+                    {/* Action buttons */}
+                    <div className="space-y-2 pt-2">
+                      <Button
+                        onClick={() => copyToClipboard(selectedMediaItem.url, selectedMediaItem.id)}
+                        className="w-full bg-blue-600 hover:bg-blue-700 text-white h-9 rounded-xl font-semibold text-xs flex items-center justify-center gap-2"
+                      >
+                        {copiedId === selectedMediaItem.id ? (
+                          <>
+                            <Check className="w-4 h-4 text-emerald-300" />
+                            Đã sao chép URL!
+                          </>
+                        ) : (
+                          <>
+                            <Copy className="w-4 h-4" />
+                            Sao chép đường dẫn Direct
+                          </>
+                        )}
+                      </Button>
+
+                      <div className="grid grid-cols-2 gap-2">
+                        <Button
+                          variant="outline"
+                          onClick={() => window.open(selectedMediaItem.url, '_blank')}
+                          className="w-full bg-white/5 border-white/10 hover:bg-white/10 text-white h-9 rounded-xl text-xs flex items-center justify-center gap-1.5"
+                        >
+                          <ExternalLink className="w-3.5 h-3.5 text-blue-400" />
+                          Mở tab mới
+                        </Button>
+
+                        <Button
+                          variant="destructive"
+                          disabled={mediaLoadingId === selectedMediaItem.id}
+                          onClick={() => setItemToDelete(selectedMediaItem)}
+                          className="w-full bg-red-500/20 hover:bg-red-500 text-red-300 hover:text-white border border-red-500/30 h-9 rounded-xl text-xs flex items-center justify-center gap-1.5"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                          Xóa media
+                        </Button>
+                      </div>
+                    </div>
                   </div>
-                  <h4 className="text-lg font-medium text-gray-400">Không có dữ liệu media</h4>
-                  <p className="text-sm opacity-50">Tải lên tệp đầu tiên để thấy chúng ở đây.</p>
-                </div>
-              )}
+                ) : (
+                  <div className="flex-1 flex flex-col items-center justify-center text-center py-12 text-gray-500">
+                    <Info className="w-8 h-8 opacity-30 mb-2" />
+                    <p className="text-xs">Chọn 1 tệp media từ danh sách để xem thông tin chi tiết và thao tác.</p>
+                  </div>
+                )}
+              </div>
             </div>
 
-            <div className="p-4 border-t border-white/5 bg-white/5 text-center">
-              <p className="text-[11px] text-gray-500">Hiển thị {mediaItems.length} mục media trong hệ thống</p>
+            {/* Explorer Footer Status Bar */}
+            <div className="px-4 py-2 border-t border-white/10 bg-slate-900/90 text-xs text-gray-400 flex items-center justify-between shrink-0 font-mono">
+              <div className="flex items-center gap-3">
+                <span className="flex items-center gap-1">
+                  <Folder className="w-3.5 h-3.5 text-yellow-500" />
+                  {selectedFolder === 'all' ? 'Root' : selectedFolder}
+                </span>
+                <span>•</span>
+                <span>{mediaItems.length} mục trong thư viện</span>
+              </div>
+              <div className="text-[10px] text-gray-500">Windows Explorer UI v2.0</div>
             </div>
           </DialogContent>
         </Dialog>
+
+        <ConfirmDeleteDialog
+          isOpen={!!itemToDelete}
+          onOpenChange={(open) => !open && setItemToDelete(null)}
+          title="Xác nhận xóa tệp Media"
+          description={
+            <span>
+              Bạn có chắc chắn muốn xóa vĩnh viễn tệp media{' '}
+              <strong className="text-slate-900">ID #{itemToDelete?.id}</strong> không? Hành động này không thể hoàn tác.
+            </span>
+          }
+          confirmText="Xóa vĩnh viễn"
+          cancelText="Hủy bỏ"
+          isDeleting={!!mediaLoadingId}
+          onConfirm={async () => {
+            if (!itemToDelete) return;
+            try {
+              setMediaLoadingId(itemToDelete.id);
+              const r = await deleteSiteMediaApi(Number(itemToDelete.id));
+              if (r.ok) {
+                toast.success('Đã xóa media thành công');
+                if (selectedMediaItem?.id === itemToDelete.id) {
+                  setSelectedMediaItem(null);
+                }
+                const { items } = await getSiteMediaApi({});
+                setMediaItems(items);
+                setItemToDelete(null);
+              } else throw new Error();
+            } catch {
+              toast.error('Xóa thất bại');
+            } finally {
+              setMediaLoadingId(null);
+            }
+          }}
+        />
       </CardContent>
     </Card>
   );

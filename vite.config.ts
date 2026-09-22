@@ -20,9 +20,10 @@ export default defineConfig(({ mode }) => ({
         target: 'http://localhost:8787',
         changeOrigin: true
       },
-      '/uploads': {
+      '/uploads/ctbooking': {
         target: 'http://localhost:8787',
-        changeOrigin: true
+        changeOrigin: true,
+        rewrite: (path) => path
       }
     }
   },
