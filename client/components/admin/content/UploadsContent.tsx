@@ -103,11 +103,11 @@ export default function UploadsContent() {
   const getSectionLabel = (sec: string) => {
     switch (sec) {
       case 'hero_section':
-        return 'Hero Section (Banner Trang Chủ)';
+        return 'Banner trang chủ';
       case 'technology_section1':
-        return 'Technology Section 1 (Banner Công Nghệ)';
+        return 'Banner công nghệ';
       case 'technology_section2':
-        return 'Technology Section 2 (Danh Sách Công Nghệ)';
+        return 'Danh sách công nghệ';
       default:
         return sec.replace(/_/g, ' ').toUpperCase();
     }
@@ -311,13 +311,13 @@ export default function UploadsContent() {
             setUploads((arr) => {
               const cp = [...arr];
               const i = cp.findIndex((x) => x.id === nextItem.id);
-              if (i !== -1) cp[i] = { ...cp[i], status: 'error', error: err?.message || 'Upload lỗi' };
+              if (i !== -1) cp[i] = { ...cp[i], status: 'error', error: err?.message || 'Tải lên lỗi' };
               return cp;
             });
             setStage('error');
             setStatusLines((prev) => [
               ...prev,
-              `Upload thất bại [${nextItem.name}]: ${err?.message || 'Có lỗi xảy ra'}`
+              `Tải lên thất bại [${nextItem.name}]: ${err?.message || 'Có lỗi xảy ra'}`
             ]);
           }
         })();
@@ -404,7 +404,7 @@ export default function UploadsContent() {
   return (
     <Card className="bg-gradient-to-br from-slate-900 to-slate-800 text-white border border-white/10">
       <CardHeader className="pb-4">
-        <CardTitle className="text-2xl font-bold">Uploads</CardTitle>
+        <CardTitle className="text-2xl font-bold">Quản lý tệp media</CardTitle>
       </CardHeader>
       <CardContent className="space-y-6">
         {/* Upload Section */}
@@ -486,9 +486,9 @@ export default function UploadsContent() {
                   value={section}
                   onChange={(e) => setSection(e.target.value as any)}
                 >
-                  <option value="hero_section">Hero Section</option>
-                  <option value="technology_section1">Technology Section 1 (Banner)</option>
-                  <option value="technology_section2">Technology Section 2 (Danh sách)</option>
+                  <option value="hero_section">Banner trang chủ</option>
+                  <option value="technology_section1">Banner công nghệ</option>
+                  <option value="technology_section2">Danh sách công nghệ</option>
                 </select>
                 <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none text-gray-400">
                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -511,7 +511,7 @@ export default function UploadsContent() {
                 <CloudUpload className="w-5 h-5" />
                 {uploads.some((u) => u.status === 'uploading' || u.status === 'pending')
                   ? 'Đang xử lý...'
-                  : 'Bắt đầu Upload'}
+                  : 'Bắt đầu tải lên'}
               </Button>
               <Button
                 variant="outline"
@@ -668,7 +668,7 @@ export default function UploadsContent() {
                             : u.status === 'error'
                               ? 'Lỗi'
                               : u.status === 'uploading'
-                                ? 'Upload'
+                                ? 'Đang tải'
                                 : 'Chờ'}
                         </div>
                       </div>
@@ -697,7 +697,7 @@ export default function UploadsContent() {
                         {u.status === 'done' && (
                           <div className="flex items-center gap-2 text-[11px] text-emerald-400 font-medium py-1 animate-in fade-in">
                             <CheckCircle2 className="w-3.5 h-3.5" />
-                            Upload thành công
+                            Tải lên thành công
                           </div>
                         )}
 
@@ -734,7 +734,7 @@ export default function UploadsContent() {
                 <div>
                   <h4 className="text-sm font-bold text-blue-300">Sẵn sàng tải lên</h4>
                   <p className="text-xs text-blue-400/60 mt-0.5">
-                    Nhấn nút <span className="text-blue-300 font-bold">"Bắt đầu Upload"</span> để xử lý {files.length}{' '}
+                    Nhấn nút <span className="text-blue-300 font-bold">"Bắt đầu tải lên"</span> để xử lý {files.length}{' '}
                     tệp đã chọn.
                   </p>
                 </div>
@@ -754,7 +754,7 @@ export default function UploadsContent() {
                       className="text-[10px] text-gray-500 py-1 flex gap-2 border-b border-white/5 last:border-0"
                     >
                       <span className="text-blue-500/50 shrink-0">
-                        [{new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}]
+                        [{new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })}]
                       </span>
                       <span className="leading-relaxed">{ln}</span>
                     </div>
@@ -806,7 +806,7 @@ export default function UploadsContent() {
                 </div>
                 <div>
                   <DialogTitle className="text-base font-bold flex items-center gap-2 text-white">
-                    Windows Media Explorer
+                    Thư viện media
                     <span className="text-xs font-normal text-blue-400 bg-blue-500/10 px-2 py-0.5 rounded-full border border-blue-500/20">
                       v2.0
                     </span>
@@ -862,7 +862,7 @@ export default function UploadsContent() {
                     size="icon"
                     onClick={() => setExplorerView('grid')}
                     className={`h-7 w-7 rounded ${explorerView === 'grid' ? 'bg-blue-600 text-white' : 'text-gray-400 hover:text-white'}`}
-                    title="Xem dạng Lưới (Grid)"
+                    title="Xem dạng lưới"
                   >
                     <Grid className="w-4 h-4" />
                   </Button>
@@ -871,7 +871,7 @@ export default function UploadsContent() {
                     size="icon"
                     onClick={() => setExplorerView('list')}
                     className={`h-7 w-7 rounded ${explorerView === 'list' ? 'bg-blue-600 text-white' : 'text-gray-400 hover:text-white'}`}
-                    title="Xem dạng Danh sách chi tiết (List)"
+                    title="Xem dạng danh sách"
                   >
                     <List className="w-4 h-4" />
                   </Button>
@@ -945,7 +945,7 @@ export default function UploadsContent() {
                     >
                       <div className="flex items-center gap-2.5">
                         <Folder className="w-4 h-4 text-blue-400 shrink-0" />
-                        <span className="truncate">Hero Section</span>
+                        <span className="truncate">Banner trang chủ</span>
                       </div>
                       <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-white/10 text-gray-300">
                         {mediaItems.filter((m) => m.section === 'hero_section').length}
@@ -962,7 +962,7 @@ export default function UploadsContent() {
                     >
                       <div className="flex items-center gap-2.5">
                         <Folder className="w-4 h-4 text-purple-400 shrink-0" />
-                        <span className="truncate">Tech Section 1</span>
+                        <span className="truncate">Banner công nghệ</span>
                       </div>
                       <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-white/10 text-gray-300">
                         {mediaItems.filter((m) => m.section === 'technology_section1').length}
@@ -979,7 +979,7 @@ export default function UploadsContent() {
                     >
                       <div className="flex items-center gap-2.5">
                         <Folder className="w-4 h-4 text-emerald-400 shrink-0" />
-                        <span className="truncate">Tech Section 2</span>
+                        <span className="truncate">Danh sách công nghệ</span>
                       </div>
                       <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-white/10 text-gray-300">
                         {mediaItems.filter((m) => m.section === 'technology_section2').length}
@@ -1044,7 +1044,7 @@ export default function UploadsContent() {
                       {[
                         {
                           id: 'hero_section',
-                          label: 'Hero Section',
+                          label: 'Banner trang chủ',
                           desc: 'Banner chính trang chủ',
                           color: 'from-blue-600/20 to-indigo-600/10 border-blue-500/30 text-blue-400',
                           icon: <Folder className="w-8 h-8 text-blue-400" />,
@@ -1052,7 +1052,7 @@ export default function UploadsContent() {
                         },
                         {
                           id: 'technology_section1',
-                          label: 'Tech Section 1',
+                          label: 'Banner công nghệ',
                           desc: 'Banner giới thiệu công nghệ',
                           color: 'from-purple-600/20 to-pink-600/10 border-purple-500/30 text-purple-400',
                           icon: <Folder className="w-8 h-8 text-purple-400" />,
@@ -1060,7 +1060,7 @@ export default function UploadsContent() {
                         },
                         {
                           id: 'technology_section2',
-                          label: 'Tech Section 2',
+                          label: 'Danh sách công nghệ',
                           desc: 'Danh sách tính năng công nghệ',
                           color: 'from-emerald-600/20 to-teal-600/10 border-emerald-500/30 text-emerald-400',
                           icon: <Folder className="w-8 h-8 text-emerald-400" />,
@@ -1406,7 +1406,7 @@ export default function UploadsContent() {
                       {selectedMediaItem.type === 'image' ? (
                         <img
                           src={selectedMediaItem.url}
-                          alt="Preview"
+                          alt="Xem trước"
                           className="w-full h-full object-contain"
                         />
                       ) : (
@@ -1427,7 +1427,7 @@ export default function UploadsContent() {
                       </div>
 
                       <div>
-                        <div className="text-[10px] text-gray-500 font-bold uppercase">Định dạng & Kích thước</div>
+                        <div className="text-[10px] text-gray-500 font-bold uppercase">Định dạng & kích thước</div>
                         <div className="text-gray-300 font-medium">
                           {selectedMediaItem.type.toUpperCase()} •{' '}
                           {selectedMediaItem.width && selectedMediaItem.height
@@ -1515,12 +1515,12 @@ export default function UploadsContent() {
               <div className="flex items-center gap-3">
                 <span className="flex items-center gap-1">
                   <Folder className="w-3.5 h-3.5 text-yellow-500" />
-                  {selectedFolder === 'all' ? 'Root' : selectedFolder}
+                  {selectedFolder === 'all' ? 'Thư mục gốc' : getSectionLabel(selectedFolder)}
                 </span>
                 <span>•</span>
                 <span>{mediaItems.length} mục trong thư viện</span>
               </div>
-              <div className="text-[10px] text-gray-500">Windows Explorer UI v2.0</div>
+              <div className="text-[10px] text-gray-500">Giao diện thư viện v2.0</div>
             </div>
           </DialogContent>
         </Dialog>

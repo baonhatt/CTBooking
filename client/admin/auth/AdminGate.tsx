@@ -214,7 +214,7 @@ const AdminLoginView = () => {
           <h1 className="text-xl font-black tracking-widest text-white uppercase">CINESPHERE</h1>
           <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 mt-1.5 rounded-full bg-slate-900/90 border border-slate-800 text-[10px] font-bold tracking-wider text-emerald-400 uppercase">
             <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse shadow-[0_0_8px_rgba(16,185,129,0.8)]" />
-            Management Portal
+            Cổng quản trị
           </div>
         </div>
 
@@ -222,13 +222,13 @@ const AdminLoginView = () => {
         <div className="bg-slate-900/80 backdrop-blur-2xl border border-slate-800/90 rounded-3xl p-6 sm:p-8 shadow-[0_25px_50px_-12px_rgba(0,0,0,0.7)]">
           <div className="mb-6">
             <h2 className="text-lg font-bold text-white">{requireOtp ? 'Xác thực bảo vệ 2 lớp' : 'Đăng nhập tài khoản'}</h2>
-            <p className="text-xs text-slate-400 mt-1">{requireOtp ? 'Mã xác thực gồm 6 số đã được gửi tới email của bạn.' : 'Truy cập bảng điều khiển dành cho Ban Quản trị & Nhân viên'}</p>
+            <p className="text-xs text-slate-400 mt-1">{requireOtp ? 'Mã xác thực gồm 6 số đã được gửi tới email của bạn.' : 'Truy cập bảng điều khiển dành cho ban quản trị & nhân viên'}</p>
           </div>
 
           {requireOtp ? (
             <form onSubmit={handleVerifyOtp} className="space-y-4">
               <div className="space-y-1.5">
-                <Label className="text-xs font-semibold text-slate-300">Mã Xác Thực (OTP)</Label>
+                <Label className="text-xs font-semibold text-slate-300">Mã xác thực (OTP)</Label>
                 <div className="relative group">
                   <div className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-500 group-focus-within:text-blue-400 transition-colors">
                     <ShieldCheck className="h-4 w-4" />
@@ -265,7 +265,7 @@ const AdminLoginView = () => {
                   </>
                 ) : (
                   <>
-                    <span>Xác thực & Đăng nhập</span>
+                    <span>Xác thực & đăng nhập</span>
                     <ArrowRight className="h-4 w-4 group-hover:translate-x-1 transition-transform" />
                   </>
                 )}
@@ -376,7 +376,7 @@ const AdminLoginView = () => {
         <div className="text-center mt-6 text-[11px] text-slate-500 flex items-center justify-center gap-1.5">
           <span>🔒 Bảo mật chuẩn phân quyền RBAC</span>
           <span>•</span>
-          <span>CineSphere System</span>
+          <span>Hệ thống CineSphere</span>
         </div>
       </div>
     </div>
@@ -844,7 +844,7 @@ const ForcePasswordChangeView = ({ staff }: { staff: any }) => {
                 </>
               ) : (
                 <>
-                  <span>Đổi mật khẩu & Bắt đầu</span>
+                  <span>Đổi mật khẩu & bắt đầu</span>
                   <ArrowRight className="h-4 w-4 group-hover:translate-x-1 transition-transform" />
                 </>
               )}

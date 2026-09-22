@@ -587,7 +587,7 @@ export default function VouchersContent(props: Props) {
             <div className="flex items-center justify-between">
                 <div>
                     <h1 className="text-xl font-bold text-slate-800">
-                        {isDeletedView ? 'Quản lý voucher đã xóa' : 'Quản lý vouchers'}
+                        {isDeletedView ? 'Quản lý mã giảm giá đã xóa' : 'Quản lý mã giảm giá'}
                     </h1>
                     <p className="text-sm text-slate-400 mt-0.5">
                         {isDeletedView
@@ -753,7 +753,7 @@ export default function VouchersContent(props: Props) {
                         >
                             <Plus className="w-4 h-4" />
                             {scopeFilter === 'movie'
-                                ? 'Thêm voucher Phim'
+                                ? 'Thêm voucher phim'
                                 : scopeFilter === 'all'
                                     ? 'Thêm voucher'
                                     : 'Thêm voucher VR'}
@@ -844,7 +844,7 @@ export default function VouchersContent(props: Props) {
                                                 <p className="text-xs">
                                                     Bấm "
                                                     {scopeFilter === 'movie'
-                                                        ? 'Thêm voucher Phim'
+                                                        ? 'Thêm voucher phim'
                                                         : scopeFilter === 'all'
                                                             ? 'Thêm voucher'
                                                             : 'Thêm voucher VR'}
@@ -1266,10 +1266,10 @@ export default function VouchersContent(props: Props) {
                                                     ? 'Chỉnh sửa Voucher Tổng hợp'
                                                     : 'Chỉnh sửa Voucher VR'
                                             : editData?.scope === 'movie'
-                                                ? 'Thêm Voucher Phim Mới'
+                                                ? 'Thêm voucher phim mới'
                                                 : editData?.scope === 'all'
-                                                    ? 'Thêm Voucher Mới'
-                                                    : 'Thêm Voucher VR Mới'}
+                                                    ? 'Thêm voucher mới'
+                                                    : 'Thêm voucher VR mới'}
                                     </DialogTitle>
                                     <p className="text-xs text-slate-500 mt-0.5">
                                         {editData?.scope === 'movie'
@@ -1492,11 +1492,11 @@ export default function VouchersContent(props: Props) {
                                             placeholder={editData?.discount_type === 'fixed' ? 'VD: 50000' : 'VD: 20'}
                                             value={
                                                 editData?.discount_value !== undefined && editData?.discount_value !== null
-                                                    ? Number(editData.discount_value).toLocaleString('en-US')
+                                                    ? Number(editData.discount_value).toLocaleString('vi-VN')
                                                     : ''
                                             }
                                             onChange={(e) => {
-                                                const v = Number(e.target.value.replace(/,/g, ''));
+                                                const v = Number(e.target.value.replace(/[^\d]/g, ''));
                                                 setEditData({
                                                     ...editData,
                                                     discount_value: isNaN(v) ? 0 : v
@@ -1514,9 +1514,9 @@ export default function VouchersContent(props: Props) {
                                             <Input
                                                 type="text"
                                                 placeholder="VD: 50000"
-                                                value={editData?.max_discount ? Number(editData.max_discount).toLocaleString('en-US') : ''}
+                                                value={editData?.max_discount ? Number(editData.max_discount).toLocaleString('vi-VN') : ''}
                                                 onChange={(e) => {
-                                                    const v = Number(e.target.value.replace(/,/g, ''));
+                                                    const v = Number(e.target.value.replace(/[^\d]/g, ''));
                                                     setEditData({
                                                         ...editData,
                                                         max_discount: isNaN(v) || v <= 0 ? null : v
@@ -1532,9 +1532,9 @@ export default function VouchersContent(props: Props) {
                                         <Input
                                             type="text"
                                             placeholder="Để trống hoặc 0 = không yêu cầu"
-                                            value={editData?.min_order_value ? Number(editData.min_order_value).toLocaleString('en-US') : ''}
+                                            value={editData?.min_order_value ? Number(editData.min_order_value).toLocaleString('vi-VN') : ''}
                                             onChange={(e) => {
-                                                const v = Number(e.target.value.replace(/,/g, ''));
+                                                const v = Number(e.target.value.replace(/[^\d]/g, ''));
                                                 setEditData({
                                                     ...editData,
                                                     min_order_value: isNaN(v) || v <= 0 ? 0 : v
@@ -1554,7 +1554,7 @@ export default function VouchersContent(props: Props) {
 
                                     <div className="grid grid-cols-2 gap-3">
                                         <div>
-                                            <Label className="text-xs font-semibold text-gray-700 mb-1.5 block">Tổng lượt / Hệ thống</Label>
+                                            <Label className="text-xs font-semibold text-gray-700 mb-1.5 block">Tổng lượt / hệ thống</Label>
                                             <Input
                                                 placeholder="Để trống = không giới hạn"
                                                 value={editData?.usage_limit ?? ''}
@@ -2156,7 +2156,7 @@ export default function VouchersContent(props: Props) {
                                                                 selectedVoucher.scope === 'vr'
                                                                     ? 'Dịch vụ Trải nghiệm VR'
                                                                     : selectedVoucher.scope === 'movie'
-                                                                        ? 'Vé xem phim & Gói phim'
+                                                                        ? 'Vé xem phim & gói phim'
                                                                         : 'Tất cả dịch vụ hệ thống';
 
                                                             const hasSpecificApplied = applied.length > 0;

@@ -258,7 +258,7 @@ export function PostRichTextEditor({ value, onChange, disabled }: PostRichTextEd
                   toast.success('Đã chèn ảnh vào nội dung');
                   return result;
                 } catch (error: any) {
-                  toast.error('Lỗi upload ảnh', {
+                  toast.error('Lỗi tải ảnh lên', {
                     description: error?.message || 'Không thể tải ảnh lên'
                   });
                   throw error;

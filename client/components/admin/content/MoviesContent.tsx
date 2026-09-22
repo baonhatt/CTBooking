@@ -314,7 +314,7 @@ export default function MoviesContent({
               <TableRow className="hover:bg-transparent border-none">
                 <TableHead className="text-xs font-semibold text-gray-600 uppercase py-3">ID</TableHead>
                 <TableHead className="min-w-[300px] text-xs font-semibold text-gray-600 uppercase py-3">
-                  Phim & Thể loại
+                  Phim & thể loại
                 </TableHead>
                 <TableHead className="text-xs font-semibold text-gray-600 uppercase py-3 text-center">
                   Đánh giá
@@ -347,7 +347,7 @@ export default function MoviesContent({
                       <FilterX size={48} className="opacity-20 mb-2" />
                       <p className="text-sm font-medium text-slate-500">Không tìm thấy bộ phim nào phù hợp</p>
                       <Button variant="link" onClick={onRefresh} className="text-blue-500 text-xs">
-                        Xóa bộ lọc & Thử lại
+                        Xóa bộ lọc & thử lại
                       </Button>
                     </div>
                   </TableCell>

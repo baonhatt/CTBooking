@@ -713,7 +713,7 @@ export default function BranchesPage() {
                     <Card className="border-slate-200 shadow-sm bg-white overflow-hidden h-fit">
                       <div className="bg-slate-50 px-4 py-2 border-b border-slate-100 flex items-center gap-2">
                         <MapPin className="w-4 h-4 text-orange-500" />
-                        <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wider">Liên hệ Chi nhánh</h3>
+                        <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wider">Liên hệ chi nhánh</h3>
                       </div>
                       <CardContent className="p-4 space-y-3 text-xs">
                         <div className="flex items-start gap-3">
@@ -779,7 +779,7 @@ export default function BranchesPage() {
                     <div className="bg-cyan-50 px-4 py-2 border-b border-cyan-100 flex items-center gap-2">
                       <Phone className="w-4 h-4 text-cyan-600" />
                       <h3 className="text-xs font-bold text-cyan-800 uppercase tracking-wider">
-                        Cấu hình Footer & Bản đồ
+                        Cấu hình footer & bản đồ
                       </h3>
                     </div>
                     <CardContent className="p-4 space-y-4">
@@ -840,7 +840,7 @@ export default function BranchesPage() {
                     <div className="bg-purple-50 px-4 py-2 border-b border-purple-100 flex items-center gap-2">
                       <Building2 className="w-4 h-4 text-purple-600" />
                       <h3 className="text-xs font-bold text-purple-800 uppercase tracking-wider">
-                        Thông tin Pháp lý & Bổ sung
+                        Thông tin pháp lý & bổ sung
                       </h3>
                     </div>
                     <CardContent className="p-4">
@@ -885,7 +885,7 @@ export default function BranchesPage() {
                       <div className="flex items-center gap-2">
                         <ImageIcon className="w-4 h-4 text-indigo-600" />
                         <h3 className="text-xs font-bold text-indigo-800 uppercase tracking-wider">
-                          Ảnh Banner Hero Landing Page
+                          Ảnh banner trang chủ
                         </h3>
                       </div>
                       {(() => {
@@ -1171,7 +1171,7 @@ function BranchEditModal({ isOpen, onClose, data, onSave, branches }: any) {
                 <div className="p-1.5 bg-blue-50 rounded-lg text-blue-600">
                   <Info className="w-4 h-4" />
                 </div>
-                <h3 className="font-bold text-slate-800">Thông tin Chi nhánh</h3>
+                <h3 className="font-bold text-slate-800">Thông tin chi nhánh</h3>
               </div>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="md:col-span-2">
@@ -1259,7 +1259,7 @@ function BranchEditModal({ isOpen, onClose, data, onSave, branches }: any) {
                     <ImageIcon className="w-4 h-4" />
                   </div>
                   <div>
-                    <h3 className="font-bold text-slate-800 text-sm">Ảnh Banner Chi Nhánh (Hero Carousel Trang Chủ)</h3>
+                    <h3 className="font-bold text-slate-800 text-sm">Ảnh banner chi nhánh (carousel trang chủ)</h3>
                     <p className="text-xs text-slate-500">Tải lên danh sách ảnh banner để tự động hiển thị trên Carousel đầu trang Landing Page</p>
                   </div>
                 </div>
@@ -1401,7 +1401,7 @@ function BranchEditModal({ isOpen, onClose, data, onSave, branches }: any) {
                 <div className="p-1.5 bg-cyan-50 rounded-lg text-cyan-600">
                   <Phone className="w-4 h-4" />
                 </div>
-                <h3 className="font-bold text-slate-800">Cấu hình Footer (Liên hệ & Bản đồ)</h3>
+                <h3 className="font-bold text-slate-800">Cấu hình footer (liên hệ & bản đồ)</h3>
               </div>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4">
                 <div>
@@ -1511,7 +1511,7 @@ function BranchEditModal({ isOpen, onClose, data, onSave, branches }: any) {
                             <path d="m3 21 1.9-5.7a8.5 8.5 11 1 1 3.8 3.8z" />
                           </svg>
                         </div>
-                        Nút Chat Zalo
+                        Nút chat Zalo
                       </span>
                       <Switch
                         checked={settingsData.show_zalo_button}
@@ -1523,7 +1523,7 @@ function BranchEditModal({ isOpen, onClose, data, onSave, branches }: any) {
                         <div className="w-6 h-6 rounded bg-emerald-500 text-white flex items-center justify-center">
                           <Phone className="w-3.5 h-3.5" />
                         </div>
-                        Nút Gọi Điện
+                        Nút gọi điện
                       </span>
                       <Switch
                         checked={settingsData.show_phone_button}
@@ -1556,7 +1556,7 @@ function BranchEditModal({ isOpen, onClose, data, onSave, branches }: any) {
                       <line x1="2" x2="22" y1="10" y2="10" />
                     </svg>
                   </div>
-                  <h3 className="text-sm font-bold text-slate-800">Cấu hình Vé & Thanh toán</h3>
+                  <h3 className="text-sm font-bold text-slate-800">Cấu hình vé & thanh toán</h3>
                 </div>
               </div>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -1578,7 +1578,7 @@ function BranchEditModal({ isOpen, onClose, data, onSave, branches }: any) {
                 <div className="md:col-span-2">
                   <div className="flex items-center justify-between mb-1">
                     <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wider">
-                      Cấu hình QR Code
+                      Cấu hình QR code
                     </label>
                     <button
                       type="button"
@@ -1702,7 +1702,7 @@ function BranchEditModal({ isOpen, onClose, data, onSave, branches }: any) {
                   <div className="p-1.5 bg-purple-50 rounded-lg text-purple-600">
                     <Building2 className="w-4 h-4" />
                   </div>
-                  <h3 className="font-bold text-slate-800">Thông tin Pháp lý (Dynamic)</h3>
+                  <h3 className="font-bold text-slate-800">Thông tin pháp lý</h3>
                 </div>
                 <Button
                   type="button"

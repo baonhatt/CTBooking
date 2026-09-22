@@ -256,7 +256,7 @@ export const PostManagement = () => {
           const result = await uploadDirectToCloudinary(editData.imageFile, 'posts');
           featuredImageUrl = result.url;
         } catch (uploadErr: any) {
-          toast.error('Lỗi upload ảnh', { description: uploadErr?.message || 'Không thể upload ảnh' });
+          toast.error('Lỗi tải ảnh lên', { description: uploadErr?.message || 'Không thể tải ảnh lên' });
           setIsSaving(false);
           return;
         }
@@ -268,7 +268,7 @@ export const PostManagement = () => {
           const result = await uploadDirectToCloudinary(editData.ogImageFile, 'posts');
           ogImageUrl = result.url;
         } catch (uploadErr: any) {
-          toast.error('Lỗi upload OG image', { description: uploadErr?.message || 'Không thể upload OG image' });
+          toast.error('Lỗi tải ảnh OG', { description: uploadErr?.message || 'Không thể tải ảnh OG' });
           setIsSaving(false);
           return;
         }
@@ -825,7 +825,7 @@ export const PostManagement = () => {
                       onClick={() => toggleSection('images')}
                     >
                       <div className="flex items-center justify-between">
-                        <CardTitle className="text-sm font-bold">Hình ảnh & Tóm tắt</CardTitle>
+                        <CardTitle className="text-sm font-bold">Hình ảnh & tóm tắt</CardTitle>
                         {sections.images ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
                       </div>
                     </CardHeader>
@@ -863,10 +863,10 @@ export const PostManagement = () => {
                           {editData.featured_image && (
                             <img
                               src={editData.featured_image}
-                              alt="Preview"
+                              alt="Xem trước"
                               className="mt-2 w-full aspect-video object-cover rounded-lg border cursor-pointer hover:opacity-80 transition-opacity"
                               onClick={() => window.open(editData.featured_image, '_blank')}
-                              title="Click để xem ảnh lớn"
+                              title="Bấm để xem ảnh lớn"
                             />
                           )}
                         </div>
@@ -893,7 +893,7 @@ export const PostManagement = () => {
                       onClick={() => toggleSection('seo')}
                     >
                       <div className="flex items-center justify-between">
-                        <CardTitle className="text-sm font-bold">SEO & Chia sẻ</CardTitle>
+                        <CardTitle className="text-sm font-bold">SEO & chia sẻ</CardTitle>
                         {sections.seo ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
                       </div>
                     </CardHeader>
@@ -1002,10 +1002,10 @@ export const PostManagement = () => {
                             {editData.og_image && (
                               <img
                                 src={editData.og_image}
-                                alt="OG Preview"
+                                alt="Xem trước OG"
                                 className="w-12 h-12 object-cover rounded border cursor-pointer hover:opacity-80 transition-opacity"
                                 onClick={() => window.open(editData.og_image, '_blank')}
-                                title="Click để xem ảnh lớn"
+                                title="Bấm để xem ảnh lớn"
                               />
                             )}
                           </div>
@@ -1054,7 +1054,7 @@ export const PostManagement = () => {
                           >
                             <option value="Article">Bài viết</option>
                             <option value="NewsArticle">Tin tức</option>
-                            <option value="BlogPosting">Blog</option>
+                            <option value="BlogPosting">Bài blog</option>
                           </select>
                         </div>
                       </CardContent>

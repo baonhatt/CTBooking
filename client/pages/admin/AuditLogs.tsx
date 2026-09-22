@@ -282,7 +282,7 @@ export default function AuditLogsPage() {
             <div className="relative flex-1">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 w-4 h-4" />
               <Input
-                placeholder="Tìm kiếm theo tên staff hoặc action..."
+                placeholder="Tìm theo tên nhân viên hoặc hành động..."
                 value={localSearch}
                 onChange={(e) => setLocalSearch(e.target.value)}
                 className="pl-10 bg-slate-50 border-slate-200 focus:bg-white focus:ring-2 focus:ring-blue-500 rounded-xl text-sm"
@@ -395,7 +395,7 @@ export default function AuditLogsPage() {
                   <TableHead className="text-xs font-semibold text-gray-600 uppercase py-3">Nhân viên</TableHead>
                   <TableHead className="text-xs font-semibold text-gray-600 uppercase py-3">Hành động</TableHead>
                   <TableHead className="text-xs font-semibold text-gray-600 uppercase py-3">Đối tượng</TableHead>
-                  <TableHead className="text-xs font-semibold text-gray-600 uppercase py-3">IP Address</TableHead>
+                  <TableHead className="text-xs font-semibold text-gray-600 uppercase py-3">Địa chỉ IP</TableHead>
                   <TableHead className="text-right text-xs font-semibold text-gray-600 uppercase py-3 pr-6">
                     Thao tác
                   </TableHead>
@@ -411,7 +411,7 @@ export default function AuditLogsPage() {
                     <TableCell>
                       <div className="flex flex-col">
                         <span className="font-medium text-slate-900">
-                          {log.staffFullname || `Staff #${log.staffId}`}
+                          {log.staffFullname || `Nhân viên #${log.staffId}`}
                         </span>
                         <span className="text-xs text-slate-500">{log.staffEmail || '-'}</span>
                       </div>
@@ -504,13 +504,13 @@ export default function AuditLogsPage() {
                     <div className="text-sm">{formatDate(selectedLog.createdAt)}</div>
                   </div>
                   <div>
-                    <Label className="text-sm font-medium">IP Address</Label>
+                    <Label className="text-sm font-medium">Địa chỉ IP</Label>
                     <div className="text-sm">{selectedLog.ipAddress || '-'}</div>
                   </div>
                   <div>
                     <Label className="text-sm font-medium">Nhân viên</Label>
                     <div className="text-sm">
-                      {selectedLog.staffFullname || `Staff #${selectedLog.staffId}`} ({selectedLog.staffEmail || '-'})
+                      {selectedLog.staffFullname || `Nhân viên #${selectedLog.staffId}`} ({selectedLog.staffEmail || '-'})
                     </div>
                   </div>
                   <div>

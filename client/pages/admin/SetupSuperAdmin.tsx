@@ -18,7 +18,7 @@ export default function SetupSuperAdminPage() {
   const DEFAULT_CREDENTIALS = {
     email: 'admin@cinesphere.com',
     password: 'admin123',
-    fullname: 'Super Admin'
+    fullname: 'Siêu quản trị'
   };
 
   const useDefaults = () => {
@@ -79,7 +79,7 @@ export default function SetupSuperAdminPage() {
           <h1 className="text-xl font-black tracking-widest text-white uppercase">CINESPHERE</h1>
           <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 mt-1.5 rounded-full bg-slate-900/90 border border-slate-800 text-[10px] font-bold tracking-wider text-purple-400 uppercase">
             <Sparkles className="w-3 h-3" />
-            Khởi tạo Super Admin
+            Khởi tạo siêu quản trị
           </div>
         </div>
 
@@ -87,7 +87,7 @@ export default function SetupSuperAdminPage() {
           <div className="mb-6 flex items-center justify-between">
             <div>
               <h2 className="text-lg font-bold text-white">Khởi tạo quản trị viên</h2>
-              <p className="text-xs text-slate-400 mt-1">Cấu hình tài khoản Super Admin đầu tiên</p>
+              <p className="text-xs text-slate-400 mt-1">Cấu hình tài khoản siêu quản trị đầu tiên</p>
             </div>
             <Button
               type="button"
@@ -126,7 +126,7 @@ export default function SetupSuperAdminPage() {
                 </div>
                 <Input
                   type="text"
-                  placeholder="Super Admin"
+                  placeholder="Siêu quản trị"
                   className="bg-slate-950/70 border-slate-800/90 rounded-xl pl-10 pr-3 py-2.5 text-sm text-white placeholder:text-slate-600 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition-all"
                   value={fullname}
                   onChange={(e) => setFullname(e.target.value)}
@@ -171,7 +171,7 @@ export default function SetupSuperAdminPage() {
                 </>
               ) : (
                 <>
-                  <span>Khởi tạo & Kích hoạt</span>
+                  <span>Khởi tạo & kích hoạt</span>
                   <ArrowRight className="h-4 w-4 group-hover:translate-x-1 transition-transform" />
                 </>
               )}

@@ -130,7 +130,7 @@ const CountdownTimer = ({ targetDate }: { targetDate: string }) => {
 };
 
 const parsePackageName = (name: string, t?: Tx) => {
-  const typeBadgeStr = t?.booking_type === 'vr' ? 'Trải nghiệm VR' : t?.booking_type === 'combo_vr' ? 'Combo Phim + VR' : 'Gói vé phim';
+  const typeBadgeStr = t?.booking_type === 'vr' ? 'Trải nghiệm VR' : t?.booking_type === 'combo_vr' ? 'Combo phim + VR' : 'Gói vé phim';
   
   let vrItemsList: React.ReactNode = null;
   if (t?.booking_type === 'combo_vr' || t?.booking_type === 'vr') {
@@ -422,7 +422,7 @@ export default function TransactionsContent({
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
           <div className="flex flex-col gap-1">
             <h3 className="text-lg font-bold text-slate-900 flex items-center gap-2">
-              Lịch Sử Giao Dịch
+              Lịch sử giao dịch
               <Badge
                 variant="secondary"
                 className="rounded-full bg-slate-100 text-slate-600 px-2 py-0 h-5 text-[10px] font-bold"
@@ -713,11 +713,11 @@ export default function TransactionsContent({
                       // Trường hợp 1: Thanh toán quá hạn (expired - chưa thanh toán)
                       if (t.paymentStatus === 'expired') {
                         return {
-                          text: 'Đã Hết Hạn',
+                          text: 'Đã hết hạn',
                           style: 'border-slate-200 bg-slate-100 text-slate-500 font-medium',
                           icon: <Clock size={10} className="mr-1 mt-[1px] text-slate-400" />,
                           modalIcon: <Clock size={14} className="text-slate-400" />,
-                          ticketText: 'Đã Hết Hạn',
+                          ticketText: 'Đã hết hạn',
                           ticketStyle: 'bg-slate-100 text-slate-500 border-slate-200'
                         };
                       }
@@ -725,11 +725,11 @@ export default function TransactionsContent({
                       // Trường hợp 2: Thanh toán thất bại hoặc Đã Hủy
                       if (t.paymentStatus === 'failed' || t.paymentStatus === 'cancelled') {
                         return {
-                          text: 'Đã Hủy',
+                          text: 'Đã hủy',
                           style: 'border-red-200 bg-red-50 text-red-700',
                           icon: <XCircle size={10} className="mr-1 mt-[1px]" />,
                           modalIcon: <XCircle size={14} />,
-                          ticketText: 'Đã Hủy',
+                          ticketText: 'Đã hủy',
                           ticketStyle: 'bg-red-100 text-red-700 border-red-200 animate-pulse'
                         };
                       }
@@ -737,11 +737,11 @@ export default function TransactionsContent({
                       // Trường hợp 3: Chờ thanh toán
                       if (t.paymentStatus === 'pending') {
                         return {
-                          text: 'Chờ Thanh Toán',
+                          text: 'Chờ thanh toán',
                           style: 'border-yellow-200 bg-yellow-50 text-yellow-700',
                           icon: <Timer size={10} className="mr-1 mt-[1px]" />,
                           modalIcon: <Timer size={14} />,
-                          ticketText: 'Chờ Thanh Toán',
+                          ticketText: 'Chờ thanh toán',
                           ticketStyle: 'bg-yellow-100 text-yellow-700 border-yellow-200'
                         };
                       }
@@ -751,11 +751,11 @@ export default function TransactionsContent({
                         // Ưu tiên check Đã sử dụng
                         if (t.is_used) {
                           return {
-                            text: 'Đã Sử Dụng',
+                            text: 'Đã sử dụng',
                             style: 'border-blue-200 bg-blue-50 text-blue-700',
                             icon: <CheckCircle2 size={10} className="mr-1 mt-[1px]" />,
                             modalIcon: <CheckCircle2 size={14} />,
-                            ticketText: 'Đã Sử Dụng',
+                            ticketText: 'Đã sử dụng',
                             ticketStyle: 'bg-blue-100 text-blue-700 border-blue-200'
                           };
                         }
@@ -763,32 +763,32 @@ export default function TransactionsContent({
                         // Check Hết hạn (Đã thanh toán nhưng quá hạn sử dụng vé)
                         if (t.expired) {
                           return {
-                            text: 'Đã Quá Hạn',
+                            text: 'Đã quá hạn',
                             style: 'border-amber-300 bg-amber-50 text-amber-800 font-bold',
                             icon: <Clock size={10} className="mr-1 mt-[1px] text-amber-600" />,
                             modalIcon: <Clock size={14} className="text-amber-600" />,
-                            ticketText: 'Đã Quá Hạn',
+                            ticketText: 'Đã quá hạn',
                             ticketStyle: 'bg-amber-100 text-amber-800 border-amber-300 font-bold'
                           };
                         }
 
                         // Còn lại là Đang đợi dùng
                         return {
-                          text: 'Đang Đợi Dùng',
+                          text: 'Đang đợi dùng',
                           style: 'border-green-200 bg-green-50 text-green-700',
                           icon: <Timer size={10} className="mr-1 mt-[1px] animate-pulse" />,
                           modalIcon: <Timer size={14} />,
-                          ticketText: 'Đang Đợi Dùng',
+                          ticketText: 'Đang đợi dùng',
                           ticketStyle: 'bg-green-100 text-green-700 border-green-200 font-bold'
                         };
                       }
 
                       return {
-                        text: 'N/A',
+                        text: 'Không rõ',
                         style: 'bg-gray-100 text-gray-400',
                         icon: null,
                         modalIcon: null,
-                        ticketText: 'N/A',
+                        ticketText: 'Không rõ',
                         ticketStyle: 'bg-gray-100 text-gray-400'
                       };
                     };
@@ -814,7 +814,7 @@ export default function TransactionsContent({
                         <TableCell>
                           <div className="flex flex-col">
                             <span className="font-semibold text-sm text-gray-900">
-                              {t.userName || 'Khách Vãng Lai'}
+                              {t.userName || 'Khách vãng lai'}
                             </span>
                             <span className="text-[11px] text-gray-500">{t.email}</span>
                             {t.voucher_code && (
@@ -988,7 +988,7 @@ export default function TransactionsContent({
               <div>
                 <DialogTitle className="text-xl font-bold text-gray-900">Chi tiết giao dịch</DialogTitle>
                 <div className="flex items-center gap-2 text-gray-500 text-[12px] mt-1.5 italic">
-                  ID Hệ thống:
+                  ID hệ thống:
                   <CopyableText text={txDetails?.id?.toString() || ''} label="ID hệ thống" />
                 </div>
               </div>
@@ -1086,12 +1086,12 @@ export default function TransactionsContent({
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
                   {/* Cột 1: Khách Hàng */}
                   <div className="space-y-4">
-                    <SectionHeader color="text-blue-600" title="Khách Hàng" icon={<UserIcon size={16} />} />
+                    <SectionHeader color="text-blue-600" title="Khách hàng" icon={<UserIcon size={16} />} />
                     <div className="bg-slate-50 rounded-xl p-5 border border-slate-100 space-y-4 shadow-sm">
                       <InfoRow label="Họ và Tên" value={txDetails.user?.fullname} bold />
                       <InfoRow label="Email" value={txDetails.user?.email} color="text-blue-600" />
                       <InfoRow
-                        label="Email Tài Khoản"
+                        label="Email tài khoản"
                         value={txDetails.user?.email_auth ? txDetails.user?.email_auth : 'VÃNG LAI'}
                         color="text-red-600"
                       />
@@ -1218,7 +1218,7 @@ export default function TransactionsContent({
                       <>
                         <SectionHeader
                           color="text-amber-600"
-                          title={txDetails.booking_type === 'combo_vr' ? 'Gói Vé & VR Combo' : 'Gói & Phim'}
+                          title={txDetails.booking_type === 'combo_vr' ? 'Gói vé & VR combo' : 'Gói & phim'}
                           icon={<TicketIcon size={16} />}
                         />
                         <div className="bg-blue-50/40 rounded-xl p-5 border border-blue-100 space-y-4 shadow-sm">
@@ -1326,7 +1326,7 @@ export default function TransactionsContent({
                                 <table className="w-full text-xs text-left border-collapse">
                                   <thead className="bg-purple-50/70 text-purple-800">
                                     <tr className="border-none">
-                                      <th className="py-2 px-2.5 font-bold uppercase text-[10px]">Tên Dịch Vụ</th>
+                                      <th className="py-2 px-2.5 font-bold uppercase text-[10px]">Tên dịch vụ</th>
                                       <th className="py-2 px-1 font-bold uppercase text-[10px] text-center w-8">SL</th>
                                       <th className="py-2 px-1.5 font-bold uppercase text-[10px] text-right">Đơn giá</th>
                                       <th className="py-2 px-2.5 font-bold uppercase text-[10px] text-right">Thành tiền</th>
@@ -1436,7 +1436,7 @@ export default function TransactionsContent({
                 <div className="space-y-4">
                   <SectionHeader
                     color="text-emerald-600"
-                    title="Đối Soát & Trạng Thái"
+                    title="Đối soát & trạng thái"
                     icon={<CheckIcon size={16} />}
                   />
                   <div
@@ -1662,7 +1662,7 @@ export default function TransactionsContent({
               <div className="mt-6 p-5 bg-purple-50/40 rounded-xl border border-purple-100">
                 <h4 className="text-sm font-semibold text-purple-900 mb-3 flex items-center gap-2">
                   <TicketIcon size={16} className="text-purple-600" />
-                  Ưu đãi & Nhân viên Sale phụ trách
+                  Ưu đãi & nhân viên sale phụ trách
                 </h4>
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                   <InfoRow

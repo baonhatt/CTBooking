@@ -227,7 +227,7 @@ export default function TicketsContent(props: Props) {
       {/* PAGE HEADER */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-xl font-bold text-slate-800">Quản lý gói vé & Trải nghiệm VR</h1>
+          <h1 className="text-xl font-bold text-slate-800">Quản lý gói vé & trải nghiệm VR</h1>
           <p className="text-sm text-slate-400 mt-0.5">Tổng cộng {data.length} gói dịch vụ trong hệ thống</p>
         </div>
       </div>
@@ -409,7 +409,7 @@ export default function TicketsContent(props: Props) {
                             <div className="flex flex-col gap-0.5">
                               <span className="font-bold text-slate-900">{t.name}</span>
                               <div className="flex items-center gap-2">
-                                <span className="text-[10px] text-slate-400 font-mono">CODE: {t.code || 'N/A'}</span>
+                                <span className="text-[10px] text-slate-400 font-mono">Mã: {t.code || '—'}</span>
                                 {isVR && t.vr_genre && (
                                   <span className="text-[10px] text-purple-600 bg-purple-50 px-1.5 py-0.2 rounded font-medium">
                                     {t.vr_genre}
@@ -623,7 +623,7 @@ export default function TicketsContent(props: Props) {
                     : 'text-slate-600 hover:text-slate-900'
                 }`}
               >
-                <Film className="w-4 h-4" /> 🎬 Vé Xem Phim
+                <Film className="w-4 h-4" /> 🎬 Vé xem phim
               </button>
               <button
                 type="button"
@@ -632,7 +632,7 @@ export default function TicketsContent(props: Props) {
                   editData?.type === 'vr' ? 'bg-purple-600 text-white shadow-sm' : 'text-slate-600 hover:text-slate-900'
                 }`}
               >
-                <Gamepad2 className="w-4 h-4" /> 🎮 Trải Nghiệm VR
+                <Gamepad2 className="w-4 h-4" /> 🎮 Trải nghiệm VR
               </button>
             </div>
           </div>
@@ -690,14 +690,14 @@ export default function TicketsContent(props: Props) {
                     </Label>
                     <Input
                       type="text"
-                      placeholder="150,000"
+                      placeholder="150.000"
                       value={
                         editData?.price !== undefined && editData?.price !== null
-                          ? Number(editData.price).toLocaleString('en-US')
+                          ? Number(editData.price).toLocaleString('vi-VN')
                           : ''
                       }
                       onChange={(e) => {
-                        const v = Number(e.target.value.replace(/,/g, ''));
+                        const v = Number(e.target.value.replace(/[^\d]/g, ''));
                         setEditData({ ...editData, price: isNaN(v) ? 0 : v });
                       }}
                       className="h-9.5 text-sm font-semibold text-slate-800"
@@ -779,7 +779,7 @@ export default function TicketsContent(props: Props) {
                   <div className="bg-white p-4 rounded-2xl border border-purple-100 bg-purple-50/20 shadow-xs space-y-4">
                     <h3 className="text-xs font-bold text-purple-800 border-b border-purple-100 pb-2 flex items-center gap-2">
                       <Gamepad2 size={15} className="text-purple-600" />
-                      Hình ảnh & Người chơi VR
+                      Hình ảnh & người chơi VR
                     </h3>
 
                     {/* Cover Image Upload & URL */}
@@ -838,7 +838,7 @@ export default function TicketsContent(props: Props) {
                         <div className="relative w-full h-32 rounded-xl overflow-hidden border border-purple-200 bg-slate-100 group mt-2">
                           <img
                             src={editData.cover_image}
-                            alt="VR Cover Preview"
+                            alt="Xem trước ảnh bìa VR"
                             className="w-full h-full object-cover"
                           />
                           <button
@@ -932,7 +932,7 @@ export default function TicketsContent(props: Props) {
                 {/* CHI NHÁNH & HIỂN THỊ */}
                 <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-xs space-y-3">
                   <h3 className="text-xs font-bold text-gray-700 border-b pb-2 flex items-center gap-2">
-                    <Info size={14} className="text-blue-500" /> Chi nhánh & Cài đặt hiển thị
+                    <Info size={14} className="text-blue-500" /> Chi nhánh & cài đặt hiển thị
                   </h3>
                   <div>
                     <Label className="text-xs font-semibold text-gray-700 mb-1.5 block">Chi nhánh áp dụng</Label>
@@ -1211,7 +1211,7 @@ export default function TicketsContent(props: Props) {
                   <CardHeader className="pb-2 px-4 pt-4">
                     <CardTitle className="text-xs font-bold text-slate-700 flex items-center gap-2">
                       <span className="text-xs">💰</span>
-                      Giá & Thông số
+                      Giá & thông số
                     </CardTitle>
                   </CardHeader>
                   <CardContent className="px-4 pb-4">
@@ -1286,7 +1286,7 @@ export default function TicketsContent(props: Props) {
                   <CardHeader className="pb-2 px-4 pt-4">
                     <CardTitle className="text-xs font-bold text-slate-700 flex items-center gap-2">
                       <Sparkles className="w-3.5 h-3.5 text-amber-500" />
-                      Tính năng & Thông tin tạo
+                      Tính năng & thông tin tạo
                     </CardTitle>
                   </CardHeader>
                   <CardContent className="px-4 pb-4 space-y-3">

@@ -125,12 +125,12 @@ export default function ProfilePage({ active, setActive, adminEmailState, handle
   return (
     <AdminLayout active={active} setActive={setActive} adminEmailState={adminEmailState} handleLogout={handleLogout}>
       <div className="space-y-6 max-w-2xl mx-auto">
-        <h1 className="text-2xl font-bold mb-6">Hồ Sơ Nhân Viên</h1>
+        <h1 className="text-2xl font-bold mb-6">Hồ sơ nhân viên</h1>
 
         {/* Staff Info Card */}
         <Card className="mb-6">
           <CardHeader>
-            <CardTitle>Thông Tin Cá Nhân</CardTitle>
+            <CardTitle>Thông tin cá nhân</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
             <div>
@@ -149,7 +149,7 @@ export default function ProfilePage({ active, setActive, adminEmailState, handle
             )}
             <div>
               <Label className="text-sm text-gray-600">Vai trò</Label>
-              <p className="font-medium">{staff.isSuperAdmin ? 'Super Admin' : 'Nhân viên'}</p>
+              <p className="font-medium">{staff.isSuperAdmin ? 'Siêu quản trị' : 'Nhân viên'}</p>
             </div>
             {staff.lastLoginAt && (
               <div>
@@ -163,7 +163,7 @@ export default function ProfilePage({ active, setActive, adminEmailState, handle
         {/* Change Password Card */}
         <Card>
           <CardHeader>
-            <CardTitle>Đổi Mật Khẩu</CardTitle>
+            <CardTitle>Đổi mật khẩu</CardTitle>
           </CardHeader>
           <CardContent>
             <form onSubmit={(e) => e.preventDefault()} className="space-y-4" autoComplete="off">
@@ -232,7 +232,7 @@ export default function ProfilePage({ active, setActive, adminEmailState, handle
                       disabled={changePasswordMutation.isPending}
                       className="flex-1"
                     >
-                      {changePasswordMutation.isPending ? 'Đang xử lý...' : 'Đổi Mật Khẩu'}
+                      {changePasswordMutation.isPending ? 'Đang xử lý...' : 'Đổi mật khẩu'}
                     </Button>
                     <Button
                       variant="outline"

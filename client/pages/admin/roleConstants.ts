@@ -50,9 +50,9 @@ export const MODULE_LABELS: Record<string, string> = {
   posts: 'Bài viết',
   ticket_check: 'Kiểm tra vé',
   branches: 'Chi nhánh',
-  uploads: 'Tải lên & Media',
-  email_logs: 'Nhật ký Email',
-  audit_logs: 'Nhật ký Hệ thống',
+  uploads: 'Tải lên & media',
+  email_logs: 'Nhật ký email',
+  audit_logs: 'Nhật ký hệ thống',
   settings: 'Cài đặt',
   transactions: 'Giao dịch'
 };

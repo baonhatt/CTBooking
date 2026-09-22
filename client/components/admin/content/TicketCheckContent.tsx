@@ -862,7 +862,7 @@ export default function TicketCheckContent() {
                           disabled={useLoading || !hasPermission('ticket_check', 'validate')}
                           className="w-full h-14 bg-amber-600 hover:bg-amber-700 text-white font-bold text-base shadow-lg shadow-amber-200 rounded-xl"
                         >
-                          <CheckCircle2 className="w-5 h-5 mr-2" /> Duyệt Vào Cổng Vé Hết Hạn
+                          <CheckCircle2 className="w-5 h-5 mr-2" /> Duyệt vào cổng vé hết hạn
                         </Button>
                       </div>
                     )
@@ -881,7 +881,7 @@ export default function TicketCheckContent() {
                       }`}
                     >
                       {ticketInfo.payment_status === 'failed'
-                        ? 'Khôi phục & Xác nhận thanh toán'
+                        ? 'Khôi phục & xác nhận thanh toán'
                         : 'Xác nhận thanh toán'}
                     </Button>
                   ) : /* Trường hợp 3: Hợp lệ để vào cổng */

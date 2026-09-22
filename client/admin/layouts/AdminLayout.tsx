@@ -123,38 +123,38 @@ export default function AdminLayout({
     },
     {
       id: 'cinema_ops',
-      title: 'Vận hành Rạp',
+      title: 'Vận hành rạp',
       icon: <Clapperboard className="h-4 w-4 text-emerald-400" />,
       items: [
-        { key: 'movies', label: 'Danh sách Phim', icon: <Clapperboard className="h-4 w-4 text-emerald-400" /> },
+        { key: 'movies', label: 'Danh sách phim', icon: <Clapperboard className="h-4 w-4 text-emerald-400" /> },
         { key: 'showtimes', label: 'Lịch chiếu phim', icon: <CalendarClock className="h-4 w-4 text-emerald-400" /> },
-        { key: 'tickets', label: 'Gói vé & Bảng giá', icon: <TicketIcon className="h-4 w-4 text-emerald-400" /> },
+        { key: 'tickets', label: 'Gói vé & bảng giá', icon: <TicketIcon className="h-4 w-4 text-emerald-400" /> },
         { key: 'toys', label: 'Đồ chơi & quà tặng', icon: <Package className="h-4 w-4 text-emerald-400" /> },
-        { key: 'posts', label: 'Bài viết & Bảng tin', icon: <FileText className="h-4 w-4 text-emerald-400" /> }
+        { key: 'posts', label: 'Bài viết & bảng tin', icon: <FileText className="h-4 w-4 text-emerald-400" /> }
       ]
     },
     {
       id: 'sales_customers',
-      title: 'Kinh doanh & Vé',
+      title: 'Kinh doanh & vé',
       icon: <CreditCard className="h-4 w-4 text-amber-400" />,
       items: [
-        { key: 'transactions', label: 'Hóa đơn & Đơn hàng', icon: <CreditCard className="h-4 w-4 text-amber-400" /> },
+        { key: 'transactions', label: 'Hóa đơn & đơn hàng', icon: <CreditCard className="h-4 w-4 text-amber-400" /> },
         { key: 'vouchers', label: 'Mã giảm giá (Voucher)', icon: <Percent className="h-4 w-4 text-amber-400" /> },
         { key: 'ticket-check', label: 'Soát vé xem phim', icon: <ScanLine className="h-4 w-4 text-amber-400" /> },
-        { key: 'users', label: 'Tài khoản Khách hàng', icon: <UsersIcon className="h-4 w-4 text-amber-400" /> }
+        { key: 'users', label: 'Tài khoản khách hàng', icon: <UsersIcon className="h-4 w-4 text-amber-400" /> }
       ]
     },
     {
       id: 'system_management',
-      title: 'Quản trị & Nhân sự',
+      title: 'Quản trị & nhân sự',
       icon: <Building2 className="h-4 w-4 text-purple-400" />,
       items: [
-        { key: 'branches', label: 'Quản lý Chi nhánh', icon: <Building2 className="h-4 w-4 text-purple-400" /> },
-        { key: 'staff', label: 'Tài khoản Nhân viên', icon: <UsersIcon className="h-4 w-4 text-purple-400" /> },
-        { key: 'roles', label: 'Quyền & Vai trò (RBAC)', icon: <ShieldCheck className="h-4 w-4 text-purple-400" /> },
+        { key: 'branches', label: 'Quản lý chi nhánh', icon: <Building2 className="h-4 w-4 text-purple-400" /> },
+        { key: 'staff', label: 'Tài khoản nhân viên', icon: <UsersIcon className="h-4 w-4 text-purple-400" /> },
+        { key: 'roles', label: 'Quyền & vai trò (RBAC)', icon: <ShieldCheck className="h-4 w-4 text-purple-400" /> },
         { key: 'audit-logs', label: 'Nhật ký hoạt động', icon: <History className="h-4 w-4 text-purple-400" /> },
-        { key: 'uploads', label: 'Quản lý Media Uploads', icon: <UploadCloud className="h-4 w-4 text-purple-400" /> },
-        { key: 'email-logs', label: 'Nhật ký Email', icon: <Mail className="h-4 w-4 text-purple-400" /> }
+        { key: 'uploads', label: 'Quản lý tệp media', icon: <UploadCloud className="h-4 w-4 text-purple-400" /> },
+        { key: 'email-logs', label: 'Nhật ký email', icon: <Mail className="h-4 w-4 text-purple-400" /> }
       ]
     }
   ];
@@ -238,13 +238,13 @@ export default function AdminLayout({
     : 'h-screen w-full overflow-hidden flex flex-col bg-slate-50';
 
   const currentTabLabel = useMemo(() => {
-    if (active === 'settings') return 'Cấu hình Hệ thống';
+    if (active === 'settings') return 'Cấu hình hệ thống';
     if (active === 'profile') return 'Hồ sơ cá nhân';
     for (const group of menuGroups) {
       const item = group.items.find((i) => i.key === active);
       if (item) return item.label;
     }
-    return 'Admin Dashboard';
+    return 'Bảng điều khiển';
   }, [active]);
 
   return (
@@ -286,7 +286,7 @@ export default function AdminLayout({
                     <div className="font-black tracking-widest text-sm text-white truncate">CINESPHERE</div>
                     <div className="text-[10px] font-medium text-emerald-400/90 uppercase tracking-wider flex items-center gap-1.5 mt-0.5">
                       <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse shadow-[0_0_8px_rgba(16,185,129,0.8)]"></span>
-                      Workspace
+                      Không gian làm việc
                     </div>
                   </div>
                 )}
@@ -442,7 +442,7 @@ export default function AdminLayout({
                       side="right"
                       className="bg-slate-900 text-slate-100 border-slate-800 font-medium z-50 shadow-xl"
                     >
-                      Cấu hình Hệ thống
+                      Cấu hình hệ thống
                     </TooltipContent>
                   </Tooltip>
                 </TooltipProvider>
@@ -456,7 +456,7 @@ export default function AdminLayout({
                   }`}
                 >
                   <Settings className={`h-4 w-4 ${active === 'settings' ? 'text-blue-400' : 'text-slate-500'}`} />
-                  <span>Cấu hình Hệ thống</span>
+                  <span>Cấu hình hệ thống</span>
                 </button>
               ))}
           </div>
@@ -494,7 +494,7 @@ export default function AdminLayout({
                   {staffName}
                 </span>
                 <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded">
-                  {isSuperAdmin ? 'Super Admin' : 'Staff'}
+                  {isSuperAdmin ? 'Siêu quản trị' : 'Nhân viên'}
                 </span>
               </div>
               <div className="h-9 w-9 rounded-full bg-gradient-to-tr from-blue-600 to-indigo-500 flex items-center justify-center text-sm font-bold text-white uppercase shadow-md border border-white/20">

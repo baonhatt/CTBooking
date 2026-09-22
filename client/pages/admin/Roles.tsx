@@ -115,12 +115,12 @@ export default function RolesPage() {
       });
     },
     onSuccess: () => {
-      toast.success('Seed vai trò mặc định thành công');
+      toast.success('Khởi tạo vai trò mặc định thành công');
       queryClient.invalidateQueries({ queryKey: ['roles'] });
       queryClient.invalidateQueries({ queryKey: ['permissions'] });
     },
     onError: (err: any) => {
-      toast.error(err.message || 'Seed vai trò thất bại');
+      toast.error(err.message || 'Khởi tạo vai trò thất bại');
     }
   });
 
@@ -228,7 +228,7 @@ export default function RolesPage() {
                 )}
                 {isSuperAdmin && (
                   <Button variant="outline" onClick={handleSeed} disabled={seedMutation.isPending}>
-                    {seedMutation.isPending ? 'Đang seed...' : 'Seed vai trò mặc định'}
+                    {seedMutation.isPending ? 'Đang khởi tạo...' : 'Khởi tạo vai trò mặc định'}
                   </Button>
                 )}
                 {hasPermission('roles', 'create') && (
@@ -267,7 +267,7 @@ export default function RolesPage() {
                   <tr className="bg-gray-50">
                     <th className="text-left p-3 border-b">Tên vai trò</th>
                     <th className="text-left p-3 border-b">Loại</th>
-                    <th className="text-left p-3 border-b">Level · Nhân viên</th>
+                    <th className="text-left p-3 border-b">Cấp độ · Nhân viên</th>
                     <th className="text-left p-3 border-b">Mô tả</th>
                     <th className="text-right p-3 border-b w-[140px]">Hành động</th>
                   </tr>
@@ -282,9 +282,9 @@ export default function RolesPage() {
                       <td className="p-3 font-medium capitalize">{role.name}</td>
                       <td className="p-3">
                         {role.isSystem ? (
-                          <span className="bg-gray-100 text-gray-600 px-2 py-1 rounded text-xs">System</span>
+                          <span className="bg-gray-100 text-gray-600 px-2 py-1 rounded text-xs">Hệ thống</span>
                         ) : (
-                          <span className="bg-blue-100 text-blue-600 px-2 py-1 rounded text-xs">Custom</span>
+                          <span className="bg-blue-100 text-blue-600 px-2 py-1 rounded text-xs">Tùy chỉnh</span>
                         )}
                       </td>
                       <td className="p-3">
@@ -364,15 +364,15 @@ export default function RolesPage() {
                 />
               </div>
               <div>
-                <Label>Level</Label>
+                <Label>Cấp độ</Label>
                 <Select value={formData.level} onValueChange={(v) => setFormData({ ...formData, level: v })}>
                   <SelectTrigger>
-                    <SelectValue placeholder="Chọn level" />
+                    <SelectValue placeholder="Chọn cấp độ" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="0">Staff (0)</SelectItem>
-                    <SelectItem value="1">Manager (1)</SelectItem>
-                    <SelectItem value="2">Admin (2)</SelectItem>
+                    <SelectItem value="0">Nhân viên (0)</SelectItem>
+                    <SelectItem value="1">Quản lý (1)</SelectItem>
+                    <SelectItem value="2">Quản trị (2)</SelectItem>
                   </SelectContent>
                 </Select>
               </div>

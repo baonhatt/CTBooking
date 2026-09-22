@@ -62,7 +62,7 @@ export default function EmailPreviewPage() {
           <div className="h-8 w-8 rounded-lg bg-indigo-50 flex items-center justify-center border border-indigo-100 text-indigo-500">
             <Eye className="w-4 h-4" />
           </div>
-          <h2 className="font-bold text-slate-800 text-sm">Danh Sách Layout Email</h2>
+          <h2 className="font-bold text-slate-800 text-sm">Danh sách mẫu email</h2>
         </div>
         <ScrollArea className="flex-1">
           <div className="p-3 space-y-1">
@@ -95,7 +95,7 @@ export default function EmailPreviewPage() {
               className={`h-7 px-3 text-xs font-semibold rounded-md ${viewMode === 'desktop' ? 'bg-white shadow-sm text-blue-600' : 'text-slate-500 hover:text-slate-700'}`}
             >
               <Monitor className="w-3.5 h-3.5 mr-1.5" />
-              Desktop
+              Máy tính
             </Button>
             <Button
               variant="ghost"
@@ -104,7 +104,7 @@ export default function EmailPreviewPage() {
               className={`h-7 px-3 text-xs font-semibold rounded-md ${viewMode === 'mobile' ? 'bg-white shadow-sm text-blue-600' : 'text-slate-500 hover:text-slate-700'}`}
             >
               <Smartphone className="w-3.5 h-3.5 mr-1.5" />
-              Mobile
+              Điện thoại
             </Button>
           </div>
 
@@ -116,7 +116,7 @@ export default function EmailPreviewPage() {
               className={`h-7 px-3 text-xs font-semibold rounded-md ${renderMode === 'render' ? 'bg-white shadow-sm text-amber-600' : 'text-slate-500 hover:text-slate-700'}`}
             >
               <Eye className="w-3.5 h-3.5 mr-1.5" />
-              Render
+              Xem trước
             </Button>
             <Button
               variant="ghost"
@@ -125,7 +125,7 @@ export default function EmailPreviewPage() {
               className={`h-7 px-3 text-xs font-semibold rounded-md ${renderMode === 'source' ? 'bg-white shadow-sm text-amber-600' : 'text-slate-500 hover:text-slate-700'}`}
             >
               <Code className="w-3.5 h-3.5 mr-1.5" />
-              Source
+              Mã nguồn
             </Button>
           </div>
         </div>
@@ -138,7 +138,7 @@ export default function EmailPreviewPage() {
               <iframe 
                 srcDoc={currentTemplate.html}
                 className="w-full flex-1 border-0 h-[800px] min-h-[600px] bg-white transition-all"
-                title="Email Preview"
+                title="Xem trước email"
               />
             </Card>
           ) : (

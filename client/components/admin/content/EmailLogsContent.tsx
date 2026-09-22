@@ -134,7 +134,7 @@ export default function EmailLogsContent() {
               <Mail size={24} />
             </div>
             <div className="flex flex-col gap-1">
-              <h3 className="text-xl font-black text-slate-900 tracking-tight">Lịch sử Email</h3>
+              <h3 className="text-xl font-black text-slate-900 tracking-tight">Lịch sử email</h3>
               <p className="text-xs text-slate-500 font-bold uppercase tracking-widest">
                 Ghi lại tất cả thông báo gửi tới khách hàng
               </p>
@@ -181,7 +181,7 @@ export default function EmailLogsContent() {
             className="h-10 bg-slate-50 border-transparent focus:ring-2 focus:ring-blue-500 rounded-xl px-4 text-sm font-bold text-slate-700 outline-none border"
           >
             <option value="all">TẤT CẢ LOẠI EMAIL</option>
-            <option value="welcome">CHÀO MỪNG (WELCOME)</option>
+            <option value="welcome">Chào mừng</option>
             <option value="reset_password">QUÊN MẬT KHẨU</option>
             <option value="booking_confirmation">XÁC NHẬN ĐẶT VÉ</option>
           </select>
@@ -210,7 +210,7 @@ export default function EmailLogsContent() {
             <TableHeader className="bg-slate-50/80">
               <TableRow className="hover:bg-transparent border-none">
                 <TableHead className="w-16 text-center text-[10px] uppercase font-bold text-slate-400">ID</TableHead>
-                <TableHead className="text-[10px] uppercase font-bold text-slate-500">Người nhận & Tiêu đề</TableHead>
+                <TableHead className="text-[10px] uppercase font-bold text-slate-500">Người nhận & tiêu đề</TableHead>
                 <TableHead className="text-[10px] uppercase font-bold text-slate-500">Loại email</TableHead>
                 <TableHead className="text-center text-[10px] uppercase font-bold text-slate-500">Trạng thái</TableHead>
                 <TableHead className="text-[10px] uppercase font-bold text-slate-500">Thời gian</TableHead>
@@ -350,7 +350,7 @@ export default function EmailLogsContent() {
                 {selectedLog && getStatusBadge(selectedLog.status)}
               </div>
               <div>
-                <DialogTitle className="text-xl font-bold text-gray-900 leading-tight">Chi tiết Email Log</DialogTitle>
+                <DialogTitle className="text-xl font-bold text-gray-900 leading-tight">Chi tiết nhật ký email</DialogTitle>
                 <p className="text-xs text-slate-400 font-bold uppercase tracking-widest mt-1">
                   ID: #{selectedLog?.id}
                 </p>
@@ -370,7 +370,13 @@ export default function EmailLogsContent() {
                   <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100 flex flex-col gap-1">
                     <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Loại email</span>
                     <span className="font-bold text-slate-900 uppercase tracking-tighter">
-                      {selectedLog.email_type}
+                      {selectedLog.email_type === 'welcome'
+                        ? 'Chào mừng'
+                        : selectedLog.email_type === 'reset_password'
+                          ? 'Quên mật khẩu'
+                          : selectedLog.email_type === 'booking_confirmation'
+                            ? 'Xác nhận đặt vé'
+                            : selectedLog.email_type}
                     </span>
                   </div>
                 </div>
@@ -378,13 +384,13 @@ export default function EmailLogsContent() {
                 {/* Connection & IDs */}
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   <div className="p-4 bg-gray-50 rounded-xl border border-gray-200 flex flex-col gap-1">
-                    <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Provider</span>
+                    <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Nhà cung cấp</span>
                     <span className="font-bold text-blue-400 uppercase tracking-tight">
-                      {selectedLog.provider || 'System'}
+                      {selectedLog.provider || 'Hệ thống'}
                     </span>
                   </div>
                   <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100 flex flex-col gap-1">
-                    <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">User ID</span>
+                    <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">ID người dùng</span>
                     <span className="font-bold text-slate-900">
                       {selectedLog.user_id ? (
                         `#${selectedLog.user_id}`
@@ -394,7 +400,7 @@ export default function EmailLogsContent() {
                     </span>
                   </div>
                   <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100 flex flex-col gap-1">
-                    <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Booking ID</span>
+                    <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">ID đặt vé</span>
                     <span className="font-bold text-slate-900">
                       {selectedLog.booking_id ? `#${selectedLog.booking_id}` : '-'}
                     </span>

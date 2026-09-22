@@ -120,7 +120,7 @@ export default function SettingsPage() {
               <SettingsIcon size={28} className="text-blue-600" />
             </div>
             <div>
-              <h1 className="text-3xl font-black text-slate-900 tracking-tight leading-none mb-1">Cấu hình Hệ thống</h1>
+              <h1 className="text-3xl font-black text-slate-900 tracking-tight leading-none mb-1">Cấu hình hệ thống</h1>
               <p className="text-xs text-slate-400 font-bold uppercase tracking-[0.2em]">
                 Tùy chỉnh hệ thống & xác thực
               </p>
@@ -149,7 +149,7 @@ export default function SettingsPage() {
                           variant="outline"
                           className={`ml-2 text-[10px] ${isSyncing ? 'animate-pulse bg-blue-500/10 text-blue-400 border-blue-400/20' : 'bg-green-500/10 text-green-400 border-green-400/20'}`}
                         >
-                          {isSyncing ? 'Đang lưu...' : 'Đã đồng bộ Cloud'}
+                          {isSyncing ? 'Đang lưu...' : 'Đã đồng bộ cloud'}
                         </Badge>
                       )}
                     </div>

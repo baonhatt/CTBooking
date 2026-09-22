@@ -205,7 +205,7 @@ export const MovieEditModal: React.FC<MovieEditModalProps> = ({
                   >
                     {editData?.posterUrl ? (
                       <>
-                        <img src={editData.posterUrl} className="w-full h-full object-cover" alt="Poster preview" />
+                        <img src={editData.posterUrl} className="w-full h-full object-cover" alt="Xem trước poster" />
                         <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
                           <span className="text-white text-xs font-medium bg-black/50 px-3 py-1.5 rounded-full backdrop-blur-sm">
                             Thay đổi ảnh

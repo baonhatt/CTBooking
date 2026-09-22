@@ -216,7 +216,7 @@ export default function DashboardContent({
             })}
           </svg>
           <div className="absolute inset-0 flex flex-col items-center justify-center">
-            <span className="text-[10px] uppercase font-bold text-slate-400">Total</span>
+            <span className="text-[10px] uppercase font-bold text-slate-400">Tổng</span>
             <span className="text-xs font-black text-slate-900">{Math.round(total / 1000)}k</span>
           </div>
         </div>
@@ -536,7 +536,7 @@ export default function DashboardContent({
                       {dateRevenue.count} Giao dịch đã xác thực
                     </p>
                     {metrics.voucherImpact !== undefined && metrics.voucherImpact > 0 && (
-                      <p className="text-xs font-bold text-rose-600 bg-rose-50 inline-flex px-3 py-1 rounded-full uppercase tracking-widest" title="Customer Savings">
+                      <p className="text-xs font-bold text-rose-600 bg-rose-50 inline-flex px-3 py-1 rounded-full uppercase tracking-widest" title="Tiết kiệm của khách hàng">
                         Giảm giá {metrics.voucherImpact.toLocaleString()} đ
                       </p>
                     )}
@@ -778,7 +778,7 @@ export default function DashboardContent({
           <div className="p-6 bg-slate-900 text-white flex justify-between items-center">
             <div>
               <h3 className="text-sm font-black uppercase tracking-widest flex items-center gap-2">
-                Hệ thống & Vận hành
+                Hệ thống & vận hành
                 <TooltipProvider>
                   <Tooltip>
                     <TooltipTrigger asChild>
@@ -921,7 +921,7 @@ export default function DashboardContent({
                   </TooltipProvider>
                 </div>
                 <p className="text-lg font-black text-slate-900">
-                  {metrics.ticketBurnRate !== undefined ? metrics.ticketBurnRate.toFixed(1) : 0} <span className="text-[10px] font-bold text-slate-400">GIỜ (AVG)</span>
+                  {metrics.ticketBurnRate !== undefined ? metrics.ticketBurnRate.toFixed(1) : 0} <span className="text-[10px] font-bold text-slate-400">GIỜ (TB)</span>
                 </p>
                 <p className="text-[9px] text-slate-500 font-bold uppercase">TG khách giữ vé trước khi xem</p>
               </div>

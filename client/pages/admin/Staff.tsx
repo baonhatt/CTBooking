@@ -491,7 +491,7 @@ export default function StaffPage() {
                           <td className="p-3">{staff.fullname}</td>
                           <td className="p-3">
                             {staff.isSuperAdmin ? (
-                              <span className="font-semibold text-purple-700">Super Admin</span>
+                              <span className="font-semibold text-purple-700">Siêu quản trị</span>
                             ) : (
                               staff.roles?.join(', ') || '-'
                             )}
@@ -505,7 +505,7 @@ export default function StaffPage() {
                           </td>
                           <td className="p-3">
                             {staff.isSuperAdmin && (
-                              <span className="bg-purple-100 text-purple-800 px-2 py-1 rounded text-xs">Super Admin</span>
+                              <span className="bg-purple-100 text-purple-800 px-2 py-1 rounded text-xs">Siêu quản trị</span>
                             )}
                             {staff.forcePasswordChange && (
                               <span className="bg-yellow-100 text-yellow-800 px-2 py-1 rounded text-xs ml-1">
@@ -920,7 +920,7 @@ export default function StaffPage() {
                         <div className="flex items-center gap-2 pt-1">
                           {selectedStaff.isSuperAdmin && (
                             <Badge className="bg-purple-100 text-purple-700 hover:bg-purple-100 border-none rounded-full px-2 py-0 text-[10px] h-5">
-                              Super Admin
+                              Siêu quản trị
                             </Badge>
                           )}
                           {selectedStaff.forcePasswordChange && (
@@ -943,7 +943,7 @@ export default function StaffPage() {
                     <CardContent className="p-4 space-y-4">
                       <div className="flex items-center gap-2 pb-2 border-b border-slate-200">
                         <Shield className="w-4 h-4 text-purple-500" />
-                        <h3 className="text-sm font-semibold text-slate-800">Phân quyền & Chi nhánh</h3>
+                        <h3 className="text-sm font-semibold text-slate-800">Phân quyền & chi nhánh</h3>
                       </div>
                       <div className="space-y-4">
                         <div className="space-y-2">
