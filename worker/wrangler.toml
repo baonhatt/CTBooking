@@ -42,7 +42,7 @@ INDEXNOW_KEY = "a7f3c2e1b5d8f4a9c6e2d1b8f5a3c7e4"
 
 # --- Media upload (Cloudinary) ---
 CLOUDINARY_CLOUD_NAME = "dzp3rbeix"
-CLOUDINARY_API_KEY = "614634766925132"
+CLOUDINARY_API_KEY = "818788716941232"
 # CLOUDINARY_API_SECRET là Cloudflare Secret (đã cấu hình trên Dashboard)
 
 # --- Super Admin bootstrap ---
@@ -117,7 +117,7 @@ INDEXNOW_KEY = "a7f3c2e1b5d8f4a9c6e2d1b8f5a3c7e4"
 
 # --- Media upload (Cloudinary) ---
 CLOUDINARY_CLOUD_NAME = "dzp3rbeix"
-CLOUDINARY_API_KEY = "614634766925132"
+CLOUDINARY_API_KEY = "818788716941232"
 # CLOUDINARY_API_SECRET set qua wrangler secret
 
 # --- Security ---
