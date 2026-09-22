@@ -1,4 +1,4 @@
-import { SERVER_BASE_URL } from './http';
+import { SERVER_BASE_URL, request } from './http';
 
 export interface UploadResult {
   url: string;
@@ -19,6 +19,9 @@ export function uploadAdminImage(
     const baseUrl = SERVER_BASE_URL || '';
     const xhr = new XMLHttpRequest();
     xhr.open('POST', `${baseUrl}/api/admin/uploads/image`);
+    const staffToken = typeof window !== 'undefined' ? localStorage.getItem('staffToken') : null;
+    if (staffToken) xhr.setRequestHeader('Authorization', `Bearer ${staffToken}`);
+    xhr.withCredentials = true;
     xhr.responseType = 'json';
     xhr.upload.onprogress = (e) => {
       if (e.lengthComputable && onProgress) {
@@ -52,6 +55,9 @@ export function uploadAdminVideo(
     const baseUrl = SERVER_BASE_URL || '';
     const xhr = new XMLHttpRequest();
     xhr.open('POST', `${baseUrl}/api/admin/uploads/video`);
+    const staffToken = typeof window !== 'undefined' ? localStorage.getItem('staffToken') : null;
+    if (staffToken) xhr.setRequestHeader('Authorization', `Bearer ${staffToken}`);
+    xhr.withCredentials = true;
     xhr.responseType = 'json';
     xhr.upload.onprogress = (e) => {
       if (e.lengthComputable && onProgress) {
@@ -110,14 +116,10 @@ export function uploadDirectToCloudinary(
 
     const trySigned = async () => {
       try {
-        const baseUrl = SERVER_BASE_URL || '';
-        const resp = await fetch(`${baseUrl}/api/admin/cloudinary/sign`, {
+        const data = await request<any>('/api/admin/cloudinary/sign', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ folder, resource_type: resourceType })
         });
-        if (!resp.ok) return null;
-        const data = await resp.json().catch(() => null);
         if (!data?.signature || !data?.timestamp || !data?.api_key) return null;
         return {
           signature: String(data.signature),
@@ -157,25 +159,18 @@ export function uploadDirectToCloudinary(
       }
     };
     (async () => {
-      // Prioritize unsigned preset if provided (for caching)
-      if (uploadPreset) {
-        form.append('upload_preset', uploadPreset);
+      const signed = await trySigned();
+      if (signed) {
+        // Signed upload: append required payload
+        form.append('api_key', signed.api_key);
+        form.append('timestamp', String(signed.timestamp));
+        form.append('signature', signed.signature);
+        form.append('use_filename', 'true');
+        form.append('unique_filename', 'false');
+        form.append('overwrite', 'true');
       } else {
-        const signed = await trySigned();
-        if (signed) {
-          // Signed upload: do NOT include upload_preset
-          form.delete('upload_preset');
-          form.append('api_key', signed.api_key);
-          form.append('timestamp', String(signed.timestamp));
-          form.append('signature', signed.signature);
-          form.append('use_filename', 'true');
-          form.append('unique_filename', 'false');
-          form.append('overwrite', 'true');
-        } else {
-          // Neither signature nor preset available
-          reject(new Error('Thiếu cấu hình upload: cần VITE_CLOUDINARY_UPLOAD_PRESET_* hoặc bật ký server'));
-          return;
-        }
+        reject(new Error('Lỗi ký gửi signature từ Server, không thể upload file ảnh.'));
+        return;
       }
       xhr.send(form);
     })();
@@ -196,17 +191,10 @@ export async function createSiteMediaApi(body: {
   display_order?: number;
   is_active?: boolean;
 }) {
-  const baseUrl = SERVER_BASE_URL || '';
-  const res = await fetch(`${baseUrl}/api/admin/site-media`, {
+  return request<{ item: any }>('/api/admin/site-media', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body)
   });
-  if (!res.ok) {
-    const data = await res.json().catch(() => ({}));
-    throw new Error(data?.message || `HTTP ${res.status}`);
-  }
-  return (await res.json()) as { item: any };
 }
 
 export async function updateSiteMediaApi(body: {
@@ -224,17 +212,10 @@ export async function updateSiteMediaApi(body: {
   display_order?: number;
   is_active?: boolean;
 }) {
-  const baseUrl = SERVER_BASE_URL || '';
-  const res = await fetch(`${baseUrl}/api/admin/site-media`, {
+  return request<{ item: any; success: boolean }>('/api/admin/site-media', {
     method: 'PUT',
-    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body)
   });
-  if (!res.ok) {
-    const data = await res.json().catch(() => ({}));
-    throw new Error(data?.message || `HTTP ${res.status}`);
-  }
-  return (await res.json()) as { item: any; success: boolean };
 }
 
 export async function getSiteMediaApi(options?: {
@@ -247,22 +228,10 @@ export async function getSiteMediaApi(options?: {
   if (options?.section) params.set('section', options.section);
   if (options?.type) params.set('type', options.type);
   if (typeof options?.active === 'boolean') params.set('active', String(options.active));
-  const baseUrl = SERVER_BASE_URL || '';
-  const path = `${baseUrl}/api/admin/site-media${params.toString() ? `?${params.toString()}` : ''}`;
-  const res = await fetch(path, { signal: options?.signal });
-  if (!res.ok) {
-    const data = await res.json().catch(() => ({}));
-    throw new Error(data?.message || `HTTP ${res.status}`);
-  }
-  return (await res.json()) as { items: any[] };
+  const path = `/api/admin/site-media${params.toString() ? `?${params.toString()}` : ''}`;
+  return request<{ items: any[] }>(path, { signal: options?.signal });
 }
 
 export async function deleteSiteMediaApi(id: number) {
-  const baseUrl = SERVER_BASE_URL || '';
-  const res = await fetch(`${baseUrl}/api/admin/site-media/${id}`, { method: 'DELETE' });
-  const data = await res.json().catch(() => ({}));
-  if (!res.ok) {
-    throw new Error(data?.message || `HTTP ${res.status}`);
-  }
-  return data as { ok: boolean; item?: any };
+  return request<{ ok: boolean; item?: any }>(`/api/admin/site-media/${id}`, { method: 'DELETE' });
 }

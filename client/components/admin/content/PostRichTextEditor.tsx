@@ -67,10 +67,7 @@ class CloudinaryUploadAdapter {
 
   async upload() {
     const file = await this.loader.file;
-    const isLocal = typeof window !== 'undefined' && window.location.hostname === 'localhost';
-    const result = isLocal
-      ? await uploadAdminImage(file, 'posts_editor')
-      : await uploadDirectToCloudinary(file, 'posts');
+    const result = await uploadDirectToCloudinary(file, 'posts');
 
     return {
       default: result.url

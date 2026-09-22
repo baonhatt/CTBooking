@@ -17,8 +17,10 @@ import {
   Activity,
   CheckCircle2,
   Clock,
-  Building2
+  Building2,
+  Info
 } from 'lucide-react';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { format, formatDistanceToNow } from 'date-fns';
 import { vi } from 'date-fns/locale';
 
@@ -237,12 +239,26 @@ export default function DashboardContent({
 
   const monthNames = ['T1', 'T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'T8', 'T9', 'T10', 'T11', 'T12'];
 
-  const StatCard = ({ title, value, icon: Icon, color, trend }: any) => (
+  const StatCard = ({ title, value, icon: Icon, color, trend, tooltip }: any) => (
     <Card className="bg-white border-none shadow-slate-200/50 shadow-lg hover:shadow-xl transition-all duration-300 rounded-2xl overflow-hidden group">
       <CardContent className="p-6 relative">
         <div className="flex items-start justify-between relative z-10">
           <div className="space-y-1">
-            <p className="text-[11px] font-bold text-slate-400 uppercase tracking-widest">{title}</p>
+            <div className="flex items-center gap-1">
+              <p className="text-[11px] font-bold text-slate-400 uppercase tracking-widest">{title}</p>
+              {tooltip && (
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Info className="w-3.5 h-3.5 text-slate-300 hover:text-blue-500 cursor-help transition-colors" />
+                    </TooltipTrigger>
+                    <TooltipContent side="top" className="max-w-[200px] text-center font-normal normal-case tracking-normal">
+                      <p className="text-xs text-slate-700">{tooltip}</p>
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+              )}
+            </div>
             {isPageLoading ? (
               <Skeleton className="h-8 w-24 rounded-lg" />
             ) : (
@@ -344,24 +360,33 @@ export default function DashboardContent({
 
       {/* Primary Metrics Grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-        <StatCard title={`Phim mới (${selectedYear})`} value={metrics.totalMovies} icon={Film} color={colors.primary} />
+        <StatCard
+          title={`Phim mới (${selectedYear})`}
+          value={metrics.totalMovies}
+          icon={Film}
+          color={colors.primary}
+          tooltip="Tổng phim mới ra mắt, giúp đánh giá độ phong phú của nội dung."
+        />
         <StatCard
           title={`Quà / Đồ chơi mới (${selectedYear})`}
           value={metrics.totalToys}
           icon={Package}
           color={colors.secondary}
+          tooltip="Số lượng đồ chơi/quà tặng mới được cập nhật, đánh giá độ đa dạng sản phẩm phụ."
         />
         <StatCard
           title={`Khách hàng mới (${selectedYear})`}
           value={metrics.totalUsers}
           icon={Users}
           color={colors.accent}
+          tooltip="Lượng người dùng mới đăng ký, cho biết tốc độ tăng trưởng khách tiềm năng."
         />
         <StatCard
           title={`Giao dịch (${selectedYear})`}
           value={metrics.totalTransactions}
           icon={CreditCard}
           color={colors.teal}
+          tooltip="Tổng đơn hàng hoặc giao dịch thanh toán thành công trong hệ thống."
         />
       </div>
 
@@ -375,7 +400,19 @@ export default function DashboardContent({
                 <div className="p-2 bg-blue-50 text-blue-600 rounded-lg">
                   <TrendingUp size={18} />
                 </div>
-                <h2 className="text-lg font-bold text-slate-900 tracking-tight uppercase">Phân tích thu chi</h2>
+                <h2 className="text-lg font-bold text-slate-900 tracking-tight uppercase flex items-center gap-2">
+                  Phân tích thu chi
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Info className="w-4 h-4 text-slate-400 hover:text-blue-500 cursor-help transition-colors" />
+                      </TooltipTrigger>
+                      <TooltipContent side="top" className="max-w-[250px] text-center font-normal normal-case tracking-normal">
+                        <p className="text-xs text-slate-700">Theo dõi chi tiết luồng tiền, doanh thu theo cổng thanh toán và xem sự biến động qua các thời điểm để quản lý dòng tiền hiệu quả.</p>
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
+                </h2>
               </div>
               <div className="flex bg-slate-100/80 p-1 rounded-xl items-center">
                 {[
@@ -431,7 +468,10 @@ export default function DashboardContent({
                     <TrendingUp size={18} />
                   </div>
                   <div>
-                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-tight">Cổng số 1</p>
+                    <div className="flex items-center gap-1">
+                      <p className="text-[10px] font-black text-slate-400 uppercase tracking-tight">Cổng số 1</p>
+                      <TooltipProvider><Tooltip><TooltipTrigger asChild><Info className="w-3 h-3 text-slate-300 hover:text-blue-500 cursor-help transition-colors" /></TooltipTrigger><TooltipContent side="top" className="max-w-[200px] text-center font-normal normal-case tracking-normal"><p className="text-[10px] text-slate-700">Tên cổng thanh toán đem lại doanh thu cao nhất.</p></TooltipContent></Tooltip></TooltipProvider>
+                    </div>
                     <p className="text-sm font-black text-slate-900 uppercase">
                       {metrics.paymentStats?.[0]?.method || '...'}
                     </p>
@@ -443,7 +483,10 @@ export default function DashboardContent({
                     <CreditCard size={18} />
                   </div>
                   <div>
-                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-tight">Tổng thu cổng 1</p>
+                    <div className="flex items-center gap-1">
+                      <p className="text-[10px] font-black text-slate-400 uppercase tracking-tight">Tổng thu cổng 1</p>
+                      <TooltipProvider><Tooltip><TooltipTrigger asChild><Info className="w-3 h-3 text-slate-300 hover:text-blue-500 cursor-help transition-colors" /></TooltipTrigger><TooltipContent side="top" className="max-w-[200px] text-center font-normal normal-case tracking-normal"><p className="text-[10px] text-slate-700">Doanh thu đạt được qua cổng phổ biến nhất này.</p></TooltipContent></Tooltip></TooltipProvider>
+                    </div>
                     <p className="text-sm font-black text-slate-900">
                       {metrics.paymentStats?.[0]?.revenue?.toLocaleString() || 0} đ
                     </p>
@@ -455,7 +498,10 @@ export default function DashboardContent({
                     <Users size={18} />
                   </div>
                   <div>
-                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-tight">Giao dịch cổng 1</p>
+                    <div className="flex items-center gap-1">
+                      <p className="text-[10px] font-black text-slate-400 uppercase tracking-tight">Giao dịch cổng 1</p>
+                      <TooltipProvider><Tooltip><TooltipTrigger asChild><Info className="w-3 h-3 text-slate-300 hover:text-blue-500 cursor-help transition-colors" /></TooltipTrigger><TooltipContent side="top" className="max-w-[200px] text-center font-normal normal-case tracking-normal"><p className="text-[10px] text-slate-700">Số lượng đơn thanh toán qua cổng số 1.</p></TooltipContent></Tooltip></TooltipProvider>
+                    </div>
                     <p className="text-sm font-black text-slate-900">
                       {metrics.paymentStats?.[0]?.count || 0} <span className="text-[10px] text-slate-400">ĐƠN</span>
                     </p>
@@ -467,14 +513,17 @@ export default function DashboardContent({
             <div className="flex flex-col md:flex-row items-center justify-between gap-12 py-4">
               <div className="space-y-4 text-center md:text-left flex-1">
                 <div className="space-y-2">
-                  <p className="text-[11px] font-bold text-slate-400 uppercase tracking-[0.3em]">
-                    Của{' '}
-                    {dateFilterType === 'day'
-                      ? 'HÔM NAY'
-                      : dateFilterType === 'month'
-                        ? 'THÁNG NÀY'
-                        : `NĂM ${selectedYear}`}
-                  </p>
+                  <div className="flex items-center justify-center md:justify-start gap-1">
+                    <p className="text-[11px] font-bold text-slate-400 uppercase tracking-[0.3em]">
+                      Của{' '}
+                      {dateFilterType === 'day'
+                        ? 'HÔM NAY'
+                        : dateFilterType === 'month'
+                          ? 'THÁNG NÀY'
+                          : `NĂM ${selectedYear}`}
+                    </p>
+                    <TooltipProvider><Tooltip><TooltipTrigger asChild><Info className="w-3.5 h-3.5 text-slate-300 hover:text-blue-500 cursor-help transition-colors" /></TooltipTrigger><TooltipContent side="top" className="max-w-[200px] text-center font-normal normal-case tracking-normal"><p className="text-[10px] text-slate-700">Tổng doanh thu hệ thống ghi nhận trong khoảng thời gian phân tích đã chọn ở trên.</p></TooltipContent></Tooltip></TooltipProvider>
+                  </div>
                   <div className="text-4xl font-black text-slate-900 tracking-tight">
                     {isRevenueLoading ? (
                       <Skeleton className="h-12 w-48 rounded-xl" />
@@ -495,24 +544,36 @@ export default function DashboardContent({
                 </div>
 
                 {metrics.revenueBreakdown && (
-                  <div className="pt-4 border-t border-slate-100 flex gap-6 text-left">
+                  <div className="pt-4 border-t border-slate-100 flex gap-6 text-left shrink-0 max-w-full flex-wrap">
                     <div>
-                      <p className="text-[10px] font-black text-slate-400 uppercase">Vé Phim</p>
+                      <div className="flex items-center gap-1">
+                        <p className="text-[10px] font-black text-slate-400 uppercase">Vé Phim</p>
+                        <TooltipProvider><Tooltip><TooltipTrigger asChild><Info className="w-3 h-3 text-slate-300 hover:text-blue-500 cursor-help transition-colors" /></TooltipTrigger><TooltipContent side="top" className="max-w-[200px] text-center font-normal normal-case tracking-normal"><p className="text-[10px] text-slate-700">Doanh thu từ vé phim 2D/3D thông thường.</p></TooltipContent></Tooltip></TooltipProvider>
+                      </div>
                       <p className="text-sm font-black text-slate-800">{metrics.revenueBreakdown.movie.toLocaleString()} đ</p>
                     </div>
                     <div>
-                      <p className="text-[10px] font-black text-slate-400 uppercase">Vé VR</p>
+                      <div className="flex items-center gap-1">
+                        <p className="text-[10px] font-black text-slate-400 uppercase">Vé VR</p>
+                        <TooltipProvider><Tooltip><TooltipTrigger asChild><Info className="w-3 h-3 text-slate-300 hover:text-blue-500 cursor-help transition-colors" /></TooltipTrigger><TooltipContent side="top" className="max-w-[200px] text-center font-normal normal-case tracking-normal"><p className="text-[10px] text-slate-700">Doanh thu vé trải nghiệm thực tế ảo VR.</p></TooltipContent></Tooltip></TooltipProvider>
+                      </div>
                       <p className="text-sm font-black text-slate-800">{metrics.revenueBreakdown.vr.toLocaleString()} đ</p>
                     </div>
                     <div>
-                      <p className="text-[10px] font-black text-slate-400 uppercase">Combo / Khác</p>
+                      <div className="flex items-center gap-1">
+                        <p className="text-[10px] font-black text-slate-400 uppercase">Combo / Khác</p>
+                        <TooltipProvider><Tooltip><TooltipTrigger asChild><Info className="w-3 h-3 text-slate-300 hover:text-blue-500 cursor-help transition-colors" /></TooltipTrigger><TooltipContent side="top" className="max-w-[200px] text-center font-normal normal-case tracking-normal"><p className="text-[10px] text-slate-700">Doanh thu bắp nước, đồ chơi, combo khác.</p></TooltipContent></Tooltip></TooltipProvider>
+                      </div>
                       <p className="text-sm font-black text-slate-800">{metrics.revenueBreakdown.combo.toLocaleString()} đ</p>
                     </div>
                   </div>
                 )}
               </div>
               <div className="flex flex-col items-center">
-                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3">TỶ TRỌNG CỔNG THANH TOÁN</p>
+                <div className="flex items-center gap-1 mb-3">
+                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">TỶ TRỌNG CỔNG THANH TOÁN</p>
+                  <TooltipProvider><Tooltip><TooltipTrigger asChild><Info className="w-3.5 h-3.5 text-slate-300 hover:text-blue-500 cursor-help transition-colors" /></TooltipTrigger><TooltipContent side="top" className="max-w-[200px] text-center font-normal normal-case tracking-normal"><p className="text-[10px] text-slate-700">Phân bố doanh thu theo phương thức thanh toán, nhận biết cổng đang được khách hàng tin dùng nhất.</p></TooltipContent></Tooltip></TooltipProvider>
+                </div>
                 <div className="scale-110">
                   <DonutChart data={dateRevenue.revenueByMethod} />
                 </div>
@@ -528,6 +589,16 @@ export default function DashboardContent({
             <div className="flex items-center justify-between">
               <CardTitle className="text-lg font-bold text-slate-900 flex items-center gap-2">
                 <Package className="w-5 h-5 text-amber-500" /> TOP 5 GÓI VÉ
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Info className="w-4 h-4 text-slate-400 hover:text-amber-500 cursor-help transition-colors" />
+                    </TooltipTrigger>
+                    <TooltipContent side="top" className="max-w-[250px] text-center font-normal capitalize-none normal-case tracking-normal">
+                      <p className="text-xs text-slate-700">Hiển thị 5 sản phẩm/chuỗi dịch vụ được mua nhiều nhất, giúp nhận biết xu hướng tiêu dùng và tối ưu chiến lược bán hàng.</p>
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
               </CardTitle>
               <span className="text-[10px] font-black bg-amber-100 text-amber-700 px-2 py-1 rounded-md uppercase tracking-tighter">
                 THEO {topPeriod === 'week' ? 'TUẦN' : topPeriod === 'month' ? 'THÁNG' : 'NĂM'}
@@ -629,7 +700,19 @@ export default function DashboardContent({
           {isPageLoading && <LoadingOverlay />}
           <div className="p-6 bg-blue-600 text-white flex justify-between items-center">
             <div>
-              <h3 className="text-sm font-black uppercase tracking-widest">Top VIP Users {selectedYear}</h3>
+              <h3 className="text-sm font-black uppercase tracking-widest flex items-center gap-2">
+                Top VIP Users {selectedYear}
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Info className="w-4 h-4 text-blue-200 hover:text-white cursor-help transition-colors" />
+                    </TooltipTrigger>
+                    <TooltipContent side="top" className="max-w-[250px] text-center font-normal normal-case tracking-normal">
+                      <p className="text-xs text-slate-700">Danh sách các khách hàng có tổng chi tiêu cao nhất, hỗ trợ định hướng các chính sách ưu đãi và chăm sóc khách hàng thân thiết.</p>
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+              </h3>
               <p className="text-[10px] text-blue-100 font-bold uppercase tracking-widest">
                 Dựa trên doanh thực thực tế
               </p>
@@ -694,7 +777,19 @@ export default function DashboardContent({
           {isPageLoading && <LoadingOverlay />}
           <div className="p-6 bg-slate-900 text-white flex justify-between items-center">
             <div>
-              <h3 className="text-sm font-black uppercase tracking-widest">Hệ thống & Vận hành</h3>
+              <h3 className="text-sm font-black uppercase tracking-widest flex items-center gap-2">
+                Hệ thống & Vận hành
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Info className="w-4 h-4 text-slate-500 hover:text-emerald-400 cursor-help transition-colors" />
+                    </TooltipTrigger>
+                    <TooltipContent side="top" className="max-w-[250px] text-center font-normal normal-case tracking-normal">
+                      <p className="text-xs text-slate-700">Theo dõi thời gian thực các chỉ số quan trọng của hệ thống: tỷ lệ quét vé, thanh toán lỗi/thành công, và mức độ giữ chân khách hàng.</p>
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+              </h3>
               <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">
                 Chỉ số hiệu suất thời gian thực
               </p>
@@ -709,9 +804,21 @@ export default function DashboardContent({
             <div className="space-y-4">
               <div className="flex justify-between items-end">
                 <div>
-                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">
-                    Tỷ lệ sử dụng vé
-                  </p>
+                  <div className="flex items-center gap-1">
+                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">
+                      Tỷ lệ sử dụng vé
+                    </p>
+                    <TooltipProvider>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Info className="w-3.5 h-3.5 text-slate-300 hover:text-emerald-500 cursor-help transition-colors mb-1" />
+                        </TooltipTrigger>
+                        <TooltipContent side="top" className="max-w-[200px] text-center font-normal normal-case tracking-normal">
+                          <p className="text-[10px] text-slate-700">Tỷ lệ vé đã được quét sử dụng so với tổng số vé đã bán. Giúp đánh giá tỷ lệ khách hàng thực tế đến rạp.</p>
+                        </TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
+                  </div>
                   <h4 className="text-lg font-black text-slate-900">
                     {metrics.ticketUsage.used} / {metrics.ticketUsage.total}{' '}
                     <span className="text-[10px] text-slate-400 font-bold uppercase">Vé đã quét</span>
@@ -736,7 +843,19 @@ export default function DashboardContent({
 
             {/* 2. Payment Success Rate */}
             <div className="space-y-4">
-              <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Sức khỏe thanh toán</p>
+              <div className="flex items-center gap-1">
+                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Sức khỏe thanh toán</p>
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Info className="w-3.5 h-3.5 text-slate-300 hover:text-emerald-500 cursor-help transition-colors" />
+                    </TooltipTrigger>
+                    <TooltipContent side="top" className="max-w-[200px] text-center font-normal normal-case tracking-normal">
+                      <p className="text-[10px] text-slate-700">Tình trạng các giao dịch thanh toán: Thành công (Paid), Đang xử lý (Pend), Thất bại (Fail). Giúp phát hiện trạng thái cổng thanh toán.</p>
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+              </div>
               <div className="flex gap-1 h-3 rounded-full overflow-hidden">
                 {(() => {
                   const total =
@@ -788,14 +907,38 @@ export default function DashboardContent({
             {/* 3. Ticket Burn Rate & Retention */}
             <div className="grid grid-cols-2 gap-4 pb-2 border-b border-white/5">
               <div className="space-y-2">
-                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Tốc độ tiêu thụ vé</p>
+                <div className="flex items-center gap-1">
+                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Tốc độ tiêu thụ vé</p>
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Info className="w-3.5 h-3.5 text-slate-300 hover:text-emerald-500 cursor-help transition-colors" />
+                      </TooltipTrigger>
+                      <TooltipContent side="top" className="max-w-[200px] text-center font-normal normal-case tracking-normal">
+                        <p className="text-[10px] text-slate-700">Thời gian trung bình (bằng giờ) từ lúc khách mua hoặc nhận vé đến khi vé được quét mã sử dụng thực tế.</p>
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
+                </div>
                 <p className="text-lg font-black text-slate-900">
                   {metrics.ticketBurnRate !== undefined ? metrics.ticketBurnRate.toFixed(1) : 0} <span className="text-[10px] font-bold text-slate-400">GIỜ (AVG)</span>
                 </p>
                 <p className="text-[9px] text-slate-500 font-bold uppercase">TG khách giữ vé trước khi xem</p>
               </div>
               <div className="space-y-2">
-                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Giữ chân khách hàng</p>
+                <div className="flex items-center gap-1">
+                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Giữ chân khách hàng</p>
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Info className="w-3.5 h-3.5 text-slate-300 hover:text-emerald-500 cursor-help transition-colors" />
+                      </TooltipTrigger>
+                      <TooltipContent side="top" className="max-w-[200px] text-center font-normal normal-case tracking-normal">
+                        <p className="text-[10px] text-slate-700">Tỷ lệ khách hàng cũ quay lại giao dịch trên hệ thống so với lượng khách hàng mới, giúp đánh giá mức độ trung thành.</p>
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
+                </div>
                 <div className="flex gap-2 items-end">
                   {metrics.customerRetention && (() => {
                      const total = metrics.customerRetention.newUsers + metrics.customerRetention.returningUsers;
@@ -819,9 +962,21 @@ export default function DashboardContent({
             {/* 4. Peak Hour Distribution */}
             <div className="space-y-4 pt-2">
               <div className="flex items-center justify-between">
-                <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest">
-                  Khung giờ đặt vé (Heatmap 24h)
-                </p>
+                <div className="flex items-center gap-1">
+                  <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest">
+                    Khung giờ đặt vé (Heatmap 24h)
+                  </p>
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Info className="w-3.5 h-3.5 text-slate-300 hover:text-emerald-500 cursor-help transition-colors" />
+                      </TooltipTrigger>
+                      <TooltipContent side="top" className="max-w-[200px] text-center font-normal normal-case tracking-normal">
+                        <p className="text-[10px] text-slate-700">Biểu đồ thể hiện lượng giao dịch đặt vé được thực hiện tại mỗi khung giờ trong ngày, giúp xác định giờ cao điểm.</p>
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
+                </div>
                 <Clock size={12} className="text-slate-400" />
               </div>
               <div className="flex items-end justify-between h-16 gap-0.5">
@@ -851,9 +1006,21 @@ export default function DashboardContent({
               
               {metrics.checkinTraffic && (
                 <div className="pt-2 mt-4 border-t border-slate-50">
-                  <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-3">
-                    Lưu lượng khách check-in (Theo Thứ)
-                  </p>
+                  <div className="flex items-center gap-1 mb-3">
+                    <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest">
+                      Lưu lượng khách check-in (Theo Thứ)
+                    </p>
+                    <TooltipProvider>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Info className="w-3.5 h-3.5 text-slate-300 hover:text-emerald-500 cursor-help transition-colors" />
+                        </TooltipTrigger>
+                        <TooltipContent side="top" className="max-w-[200px] text-center font-normal normal-case tracking-normal">
+                          <p className="text-[10px] text-slate-700">Mức độ tập trung của khách hàng check-in thực tế tại rạp chia theo từng thứ trong tuần (Chủ Nhật đến Thứ 7).</p>
+                        </TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
+                  </div>
                   <div className="flex items-end justify-between h-10 gap-2">
                     {metrics.checkinTraffic.map((count, i) => {
                       const max = Math.max(...metrics.checkinTraffic!, 1);
@@ -885,8 +1052,9 @@ export default function DashboardContent({
         <Card className="bg-white border-none shadow-slate-200/50 shadow-xl rounded-2xl p-8 space-y-8 flex flex-col justify-between">
           <div className="flex justify-between items-center">
             <div>
-              <h3 className="text-xl font-black text-slate-900 tracking-tight uppercase">
+              <h3 className="text-xl font-black text-slate-900 tracking-tight uppercase flex items-center gap-2">
                 Performance 7 Ngày ({selectedYear})
+                <TooltipProvider><Tooltip><TooltipTrigger asChild><Info className="w-4 h-4 text-slate-400 hover:text-blue-500 cursor-help transition-colors" /></TooltipTrigger><TooltipContent side="top" className="max-w-[250px] text-center font-normal normal-case tracking-normal"><p className="text-[10px] text-slate-700">Biểu đồ thể hiện biến động và đà tăng trưởng của doanh thu trong 7 ngày gần nhất, giúp bắt mạch kịp thời sức bật của rạp chiếu.</p></TooltipContent></Tooltip></TooltipProvider>
               </h3>
               <p className="text-xs text-slate-400 font-bold uppercase tracking-widest pl-1">
                 Phân tích hiệu suất doanh thu ngắn hạn
@@ -903,8 +1071,9 @@ export default function DashboardContent({
         <Card className="bg-white border-none shadow-slate-200/50 shadow-xl rounded-2xl p-8 space-y-8 flex flex-col justify-between">
           <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
             <div className="space-y-1">
-              <h3 className="text-xl font-black text-slate-900 tracking-tight uppercase">
+              <h3 className="text-xl font-black text-slate-900 tracking-tight uppercase flex items-center gap-2">
                 Thống kê tăng trưởng năm {selectedYear}
+                <TooltipProvider><Tooltip><TooltipTrigger asChild><Info className="w-4 h-4 text-slate-400 hover:text-blue-500 cursor-help transition-colors" /></TooltipTrigger><TooltipContent side="top" className="max-w-[250px] text-center font-normal normal-case tracking-normal"><p className="text-[10px] text-slate-700">Biểu đồ so sánh doanh thu từng tháng trong năm kinh doanh, theo dõi quy luật cao điểm/thấp điểm để điều chỉnh kế hoạch bán cho đợt tiếp.</p></TooltipContent></Tooltip></TooltipProvider>
               </h3>
               <p className="text-xs text-slate-400 font-bold uppercase tracking-widest pl-1">
                 Phân tích dòng tiền theo tháng
