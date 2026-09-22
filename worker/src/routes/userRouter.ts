@@ -1,4 +1,5 @@
 import { Hono, Context } from 'hono';
+import { z } from 'zod';
 import { drizzle } from 'drizzle-orm/d1';
 import * as schema from '../../../shared/schema';
 import { eq } from 'drizzle-orm';
@@ -41,14 +42,25 @@ function getMailer(c: Context) {
   };
 }
 
+const loginSchema = z.object({
+  email: z.string().email('Email không hợp lệ'),
+  password: z.string().min(1, 'Mật khẩu không được để trống'),
+  turnstileToken: z.string().min(1, 'Mã xác thực không hợp lệ'),
+}).passthrough();
+
 userRouter.post('/api/login', async (c) => {
   try {
     const db = drizzle(c.env.cinema_db, { schema });
 
     const body = await c.req.json().catch(() => ({}));
+    
+    const parsed = loginSchema.safeParse(body);
+    if (!parsed.success) {
+      return c.json({ status: 'error', message: parsed.error.issues[0].message }, 400);
+    }
 
     // Cloudflare Turnstile Verification
-    const turnstileToken = (body as any)?.turnstileToken;
+    const turnstileToken = parsed.data.turnstileToken;
     const turnstileSecret = c.env.TURNSTILE_SECRET;
     if (!isLocal(c.req.url) && turnstileSecret) {
       if (!turnstileToken) {
@@ -76,7 +88,7 @@ userRouter.post('/api/login', async (c) => {
 
       { accounts: schema.accounts, users: schema.users, tokens: schema.tokens, email_logs: schema.email_logs },
 
-      { ...body, days: 30 },
+      { ...parsed.data, days: 30 },
 
       generateSessionToken,
 
@@ -95,13 +107,9 @@ userRouter.post('/api/login', async (c) => {
       return c.json(
         {
           status: 'success',
-
           requires_otp: true,
-
           message: (r as any).message,
-
           temp_account_id: (r as any).temp_account_id,
-
           email: (r as any).email
         },
         200
@@ -122,11 +130,8 @@ userRouter.post('/api/login', async (c) => {
       return c.json(
         {
           status: 'success',
-
           message: (r as any).message,
-
           user: (r as any).user,
-
           token: (r as any).token
         },
         200
@@ -135,7 +140,6 @@ userRouter.post('/api/login', async (c) => {
 
     const payload = {
       ...(r as any),
-
       status: status >= 400 ? 'error' : 'success'
     };
 
@@ -260,14 +264,29 @@ userRouter.post('/api/resend-otp', async (c) => {
   }
 });
 
+const registerSchema = z.object({
+  email: z.string().email('Email không hợp lệ'),
+  password: z.string().min(1, 'Mật khẩu không được để trống'),
+  name: z.string().min(1, 'Tên không được để trống'),
+  phone: z.string().optional(),
+  gender: z.string().optional(),
+  dob: z.string().optional(),
+  turnstileToken: z.string().min(1, 'Mã xác thực không hợp lệ'),
+}).passthrough();
+
 userRouter.post('/api/register', async (c) => {
   try {
     const db = drizzle(c.env.cinema_db, { schema });
 
     const body = await c.req.json().catch(() => ({}));
+    
+    const parsed = registerSchema.safeParse(body);
+    if (!parsed.success) {
+      return c.json({ status: 'error', message: parsed.error.issues[0].message }, 400);
+    }
 
     // Cloudflare Turnstile Verification
-    const turnstileToken = (body as any)?.turnstileToken;
+    const turnstileToken = parsed.data.turnstileToken;
     const turnstileSecret = c.env.TURNSTILE_SECRET;
     if (!isLocal(c.req.url) && turnstileSecret) {
       if (!turnstileToken) {
@@ -299,7 +318,7 @@ userRouter.post('/api/register', async (c) => {
 
       { accounts: schema.accounts, users: schema.users, email_logs: schema.email_logs },
 
-      body as any,
+      parsed.data as any,
 
       mailer,
 
@@ -327,14 +346,10 @@ userRouter.post('/api/register', async (c) => {
     return c.json(
       {
         message: err?.message || 'Lỗi máy chủ nội bộ',
-
         error: String(err),
-
         cause: err?.cause ? String(err.cause) : undefined,
-
         stack: err?.stack || null
       },
-
       status
     );
   }

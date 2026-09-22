@@ -1,5 +1,7 @@
 'use client';
 
+import { formatDateTimeVN, formatDOB } from '@/lib/utils';
+
 import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
@@ -201,20 +203,7 @@ export default function Account() {
 
     const formatDateTime = (dateStr: any) => {
         if (!dateStr) return '--';
-        try {
-            const d = new Date(dateStr);
-            if (isNaN(d.getTime())) return String(dateStr);
-
-            const day = String(d.getDate()).padStart(2, '0');
-            const month = String(d.getMonth() + 1).padStart(2, '0');
-            const year = d.getFullYear();
-            const hour = String(d.getHours()).padStart(2, '0');
-            const min = String(d.getMinutes()).padStart(2, '0');
-
-            return `${day}/${month}/${year} ${hour}:${min}`;
-        } catch {
-            return String(dateStr);
-        }
+        return formatDateTimeVN(dateStr);
     };
 
     useEffect(() => {
@@ -235,16 +224,7 @@ export default function Account() {
             if (!isMounted) return;
 
             if (data) {
-                const dobStr = (() => {
-                    try {
-                        if (!data?.dob) return '';
-                        const d = new Date(data.dob as any);
-                        if (isNaN(d.getTime())) return String(data.dob);
-                        return d.toISOString().slice(0, 10);
-                    } catch {
-                        return '';
-                    }
-                })();
+                const dobStr = formatDOB(data?.dob);
                 setProfile((p) => ({
                     ...p,
                     name: data?.fullname || p.name || '',
@@ -272,13 +252,7 @@ export default function Account() {
                         try {
                             const dsrc = t?.paid_at || t?.created_at;
                             if (!dsrc) return '';
-                            const d = new Date(dsrc);
-                            const dd = String(d.getDate()).padStart(2, '0');
-                            const mm = String(d.getMonth() + 1).padStart(2, '0');
-                            const yyyy = d.getFullYear();
-                            const hh = String(d.getHours()).padStart(2, '0');
-                            const min = String(d.getMinutes()).padStart(2, '0');
-                            return `${dd}/${mm}/${yyyy} ${hh}:${min}`;
+                            return formatDateTimeVN(dsrc);
                         } catch {
                             return '';
                         }
@@ -412,9 +386,14 @@ export default function Account() {
                 const src = t?.paid_at || t?.created_at;
                 if (!src) return 'Khác';
                 const d = new Date(src);
-                const mm = String(d.getMonth() + 1).padStart(2, '0');
-                const yyyy = d.getFullYear();
-                return `Tháng ${mm}/${yyyy}`;
+                const formatter = new Intl.DateTimeFormat('vi-VN', {
+                    timeZone: 'Asia/Ho_Chi_Minh',
+                    month: '2-digit',
+                    year: 'numeric'
+                });
+                const parts = formatter.formatToParts(d);
+                const getPart = (type: string) => parts.find(p => p.type === type)?.value || '';
+                return `Tháng ${getPart('month')}/${getPart('year')}`;
             } catch {
                 return 'Khác';
             }

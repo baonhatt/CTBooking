@@ -12,12 +12,10 @@ import { listSiteMediaImpl } from '../../../server/routes/admin/site-media';
 import { listActiveTicketPackages } from '../../../server/routes/user/tickets';
 import { listTicketPackagesImpl, getTicketPackageImpl } from '../../../server/routes/admin/tickets';
 import { listPostsImpl, getPostImpl } from '../../../server/routes/admin/posts';
-import {
-  validateBookingImpl,
-  createPaymentImpl,
-  updatePaymentImpl,
-  getBookingByIdImpl
-} from '../../../server/routes/user/payments';
+import { validateBookingImpl } from '../../../server/routes/user/booking/validate';
+import { createPaymentImpl } from '../../../server/routes/user/booking/create';
+import { updatePaymentImpl } from '../../../server/routes/user/booking/update';
+import { getBookingByIdImpl } from '../../../server/routes/user/booking/query';
 
 import {
   listActiveVRPackagesImpl,

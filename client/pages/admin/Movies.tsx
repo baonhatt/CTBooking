@@ -137,32 +137,7 @@ export default function MoviesPage() {
     [showActiveOnly, filteredMovies, totalMovies]
   );
 
-  function toLocalDateTimeString(date: Date) {
-    const pad = (n: number) => n.toString().padStart(2, '0');
-    const yyyy = date.getFullYear();
-    const mm = pad(date.getMonth() + 1);
-    const dd = pad(date.getDate());
-    const hh = pad(date.getHours());
-    const min = pad(date.getMinutes());
-    return `${yyyy}-${mm}-${dd}T${hh}:${min}`;
-  }
-  function formatLocalDateTime(date: Date) {
-    const pad = (n: number) => n.toString().padStart(2, '0');
-    const year = date.getFullYear();
-    const month = pad(date.getMonth() + 1);
-    const day = pad(date.getDate());
-    const hours = pad(date.getHours());
-    const minutes = pad(date.getMinutes());
-    return (
-      <>
-        {year}-{month}-{day}{' '}
-        <strong style={{ color: 'red' }}>
-          {' '}
-          / {hours}:{minutes}
-        </strong>
-      </>
-    );
-  }
+
 
   const handleOpenEdit = (_type: 'movie', data: any) => {
     setEditType('movie');

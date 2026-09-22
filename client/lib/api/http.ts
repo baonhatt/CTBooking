@@ -96,11 +96,20 @@ export async function request<T>(path: string, init: RequestInit = {}) {
     headers
   });
   if (!res.ok) {
-    // Auto logout khi 401 Unauthorized (token hết hạn hoặc invalid)
-    // Loại trừ các API setup công khai để tránh loop
-    const isPublicSetup = path.includes('/api/admin/setup/super-admin');
-    if (res.status === 401 && typeof window !== 'undefined' && !isPublicSetup) {
-      handleAutoLogout();
+    // Xử lý chung chặn 401 (Hết phiên, token invalid)
+    if (res.status === 401 && typeof window !== 'undefined') {
+      // Loại trừ các API setup công khai và API login để tránh redirect loop
+      const isPublicSetup = path.includes('/api/admin/setup/super-admin');
+      const isAuthApi = path.includes('/api/admin/auth/login');
+      
+      if (!isPublicSetup && !isAuthApi) {
+        handleAutoLogout();
+      }
+    } else if (res.status === 403 && typeof window !== 'undefined') {
+      // Xử lý chặn lỗi 403 (Không đủ quyền)
+      import('sonner').then(({ toast }) => {
+        toast.error('Bạn không có quyền thực hiện thao tác này.', { id: 'admin-access-denied' });
+      });
     }
 
     let errorMessage = `HTTP ${res.status}`;

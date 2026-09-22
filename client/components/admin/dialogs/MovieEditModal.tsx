@@ -9,6 +9,7 @@ import { format } from 'date-fns';
 import { BranchMultiSelect } from '@/components/admin/BranchMultiSelect';
 import { normalizeBranchIdsInput, parseBranchIdsFromApi } from '@/lib/branch-ids';
 import { createMovieApi, updateMovieApi, getMovieById, getAdminBranchOptions } from '@/lib/api';
+import { formatToVNDatetimeLocal, vnDatetimeLocalToUTC } from '@/lib/utils';
 
 export interface MovieEditModalProps {
   isEditOpen: boolean;
@@ -407,13 +408,13 @@ export const MovieEditModal: React.FC<MovieEditModalProps> = ({
                           type="datetime-local"
                           value={
                             editData?.release_date
-                              ? format(new Date(editData.release_date), "yyyy-MM-dd'T'HH:mm")
+                              ? formatToVNDatetimeLocal(editData.release_date)
                               : ''
                           }
                           onChange={(e) => {
                             setEditData({
                               ...editData,
-                              release_date: e.target.value ? new Date(e.target.value).toISOString() : undefined
+                              release_date: e.target.value ? vnDatetimeLocalToUTC(e.target.value) : undefined
                             });
                             setIsDirty(true);
                           }}

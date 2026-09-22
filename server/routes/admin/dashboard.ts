@@ -396,6 +396,9 @@ export async function getDashboardMetricsImpl(
       return { paid, pending, failed };
     })(),
     bookingHours: await (async () => {
+      // TODO: đang nhóm theo ngày UTC, có thể lệch ranh giới ngày so với giờ VN
+      // trong khung 17h-24h UTC (tương ứng 00h-07h sáng hôm sau giờ VN).
+      // Cần audit lại nếu yêu cầu báo cáo doanh thu chính xác theo ngày lịch VN.
       // For cross-platform safety (Postgres vs SQLite/D1), we fetch hours of paid bookings and aggregate in JS
       // This is efficient enough for dashboard use cases
       const results = await anyDb
@@ -619,6 +622,9 @@ export async function getRevenue7DaysImpl(anyDb: any, tables: { bookings: any },
   let currentDay = new Date(startDay);
 
   while (currentDay <= today && currentDay <= yearEnd) {
+    // TODO: đang nhóm theo ngày UTC, có thể lệch ranh giới ngày so với giờ VN
+    // trong khung 17h-24h UTC (tương ứng 00h-07h sáng hôm sau giờ VN).
+    // Cần audit lại nếu yêu cầu báo cáo doanh thu chính xác theo ngày lịch VN.
     const dayStart = new Date(currentDay);
     dayStart.setHours(0, 0, 0, 0);
     const dayEnd = new Date(currentDay);

@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import type { Movie } from '@shared/api';
 import { getAllActiveMoviesToday } from '@/lib/api';
+import { getVNYear } from '@/lib/utils';
 
 export function useMovies2025() {
   return useQuery<Movie[]>({
@@ -17,7 +18,7 @@ export function useMovies2025() {
           .toLowerCase()
           .replace(/[^a-z0-9]+/g, '-')
           .replace(/^-+|-+$/g, '');
-        const year = new Date(m.release_date as any).getFullYear();
+        const year = getVNYear(m.release_date);
         return {
           id,
           title: m.title,

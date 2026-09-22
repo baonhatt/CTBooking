@@ -18,14 +18,23 @@ export function formatExportDateTime(val: any): string {
   if (!val) return '---';
   const d = new Date(val);
   if (isNaN(d.getTime())) return '---';
-  const pad = (n: number) => (n < 10 ? '0' + n : String(n));
-  const hours = pad(d.getHours());
-  const minutes = pad(d.getMinutes());
-  const seconds = pad(d.getSeconds());
-  const day = pad(d.getDate());
-  const month = pad(d.getMonth() + 1);
-  const year = d.getFullYear();
-  return `${day}/${month}/${year} ${hours}:${minutes}:${seconds}`;
+  
+  const formatter = new Intl.DateTimeFormat('vi-VN', {
+    timeZone: 'Asia/Ho_Chi_Minh',
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hour12: false
+  });
+  
+  const parts = formatter.formatToParts(d);
+  const getPart = (type: string) => parts.find(p => p.type === type)?.value || '';
+  
+  const hour = getPart('hour') === '24' ? '00' : getPart('hour');
+  return `${getPart('day')}/${getPart('month')}/${getPart('year')} ${hour}:${getPart('minute')}:${getPart('second')}`;
 }
 
 /**

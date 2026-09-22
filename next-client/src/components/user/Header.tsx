@@ -109,6 +109,38 @@ export default function Header({
         return () => window.removeEventListener('open-movie-schedule', handleOpenSchedule);
     }, []);
 
+    // Listen for global 401 interceptor event
+    useEffect(() => {
+        const handleOpenLogin = (e: any) => {
+            setIsRegisterOpen(false);
+            setIsForgetPassOpen(false);
+            setTimeout(() => {
+                setIsLoginOpen(true);
+            }, 50);
+            
+            if (e.detail?.message) {
+                import('sonner').then(({ toast }) => {
+                    toast.error(e.detail.message, { id: 'session-expired-toast' });
+                });
+            }
+        };
+        window.addEventListener('open-login-dialog', handleOpenLogin as EventListener);
+        return () => window.removeEventListener('open-login-dialog', handleOpenLogin as EventListener);
+    }, []);
+
+    // Listen for global 403 access denied event
+    useEffect(() => {
+        const handleShowErrorToast = (e: any) => {
+            if (e.detail?.message) {
+                import('sonner').then(({ toast }) => {
+                    toast.error(e.detail.message, { id: 'access-denied-toast' });
+                });
+            }
+        };
+        window.addEventListener('show-error-toast', handleShowErrorToast as EventListener);
+        return () => window.removeEventListener('show-error-toast', handleShowErrorToast as EventListener);
+    }, []);
+
     // Login status
     const [isLoggedIn, setIsLoggedIn] = useState(false);
 

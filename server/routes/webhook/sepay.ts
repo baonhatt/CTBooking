@@ -1,5 +1,21 @@
 import { eq, sql } from 'drizzle-orm';
-import { updatePaymentImpl } from '../user/payments';
+import { updatePaymentImpl } from '../user/booking/update';
+
+export function timingSafeEqualStr(a: string, b: string): boolean {
+  if (typeof a !== 'string' || typeof b !== 'string') return false;
+  
+  let mismatch = a.length === b.length ? 0 : 1;
+  const maxLen = Math.max(a.length, b.length);
+  
+  let result = 0;
+  for (let i = 0; i < maxLen; i++) {
+    const charA = i < a.length ? a.charCodeAt(i) : 0;
+    const charB = i < b.length ? b.charCodeAt(i) : 0;
+    result |= (charA ^ charB);
+  }
+  
+  return result === 0 && mismatch === 0;
+}
 
 export async function handleSePayWebhookImpl(
   db: any,
@@ -7,9 +23,13 @@ export async function handleSePayWebhookImpl(
   body: any,
   sendMailFn?: (to: string, subject: string, html: string) => Promise<any>,
   getBookingEmailHtml?: (data: any) => string,
-  context?: { waitUntil: (promise: Promise<any>) => void }
+  context?: { waitUntil: (promise: Promise<any>) => void },
+  authHeader?: string,
+  expectedKey?: string,
+  logSystemError?: (context: string, error: any, payload?: any) => void
 ) {
   try {
+    // Auth is already verified in webhookRouter.ts before calling this implementation (fail-fast)
     const {
       gateway,
       transactionDate,

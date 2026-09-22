@@ -52,7 +52,7 @@ BREVO_SENDER_NAME = "CINESPHERE"
 INDEXNOW_KEY = "a7f3c2e1b5d8f4a9c6e2d1b8f5a3c7e4"
 
 # --- Super Admin bootstrap ---
-SUPER_ADMIN_EMAIL = "superadmin@cinesphere.com"
+SUPER_ADMIN_EMAIL = "admin@cinesphere.com"
 SUPER_ADMIN_FULLNAME = "Super Admin"
 # SUPER_ADMIN_PASSWORD là Cloudflare Secret — set qua:
 #   wrangler secret put SUPER_ADMIN_PASSWORD --config worker/wrangler.toml
@@ -60,6 +60,11 @@ SUPER_ADMIN_FULLNAME = "Super Admin"
 
 # --- Security ---
 TURNSTILE_SECRET = "0x4AAAAAAE1v1BW9DhZPu7hc76CmgkUo2II"
+
+# --- SePay Webhook ---
+# SEPAY_API_KEY là Cloudflare Secret — set qua:
+#   wrangler secret put SEPAY_API_KEY --config worker/wrangler.toml
+# Không cấu hình plain text ở mục variables.
 
 # -----------------------------------------------------------------------------
 # D1 Database (default)
@@ -96,7 +101,7 @@ mode = "smart"
 IS_PREVIEW = "true"
 
 # --- Super Admin bootstrap ---
-SUPER_ADMIN_EMAIL = "superadmin@cinesphere.com"
+SUPER_ADMIN_EMAIL = "admin@cinesphere.com"
 SUPER_ADMIN_FULLNAME = "Super Admin"
 # SUPER_ADMIN_PASSWORD là Cloudflare Secret — set qua:
 #   wrangler secret put SUPER_ADMIN_PASSWORD --env preview --config worker/wrangler.toml

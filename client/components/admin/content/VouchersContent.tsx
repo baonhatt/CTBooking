@@ -26,6 +26,7 @@ import {
     User,
     History
 } from 'lucide-react';
+import { formatToVNDatetimeLocal, vnDatetimeLocalToUTC } from '@/lib/utils';
 import { format, formatDistanceToNow, isAfter, isBefore } from 'date-fns';
 import { vi } from 'date-fns/locale';
 import { Switch } from '@/components/ui/switch';
@@ -156,34 +157,40 @@ const generateRandomCode = () => {
 
 const toLocalDatetimeString = (dateStr: string | Date | null | undefined): string => {
     if (!dateStr) return '';
-    const d = new Date(dateStr);
-    if (isNaN(d.getTime())) return '';
-    const pad = (n: number) => n.toString().padStart(2, '0');
-    const year = d.getFullYear();
-    const month = pad(d.getMonth() + 1);
-    const day = pad(d.getDate());
-    const hours = pad(d.getHours());
-    const minutes = pad(d.getMinutes());
-    return `${year}-${month}-${day}T${hours}:${minutes}`;
+    return formatToVNDatetimeLocal(dateStr);
 };
 
 const fromLocalDatetimeString = (val: string): string | null => {
     if (!val) return null;
-    const d = new Date(val);
-    if (isNaN(d.getTime())) return null;
-    return d.toISOString();
+    return vnDatetimeLocalToUTC(val);
 };
 
 const getTodayStartIso = () => {
     const d = new Date();
-    d.setHours(0, 0, 0, 0);
-    return d.toISOString();
+    const formatter = new Intl.DateTimeFormat('en-US', {
+        timeZone: 'Asia/Ho_Chi_Minh',
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit'
+    });
+    const parts = formatter.formatToParts(d);
+    const getPart = (type: string) => parts.find(p => p.type === type)?.value || '';
+    const dateStr = `${getPart('year')}-${getPart('month')}-${getPart('day')}`;
+    return new Date(`${dateStr}T00:00:00+07:00`).toISOString();
 };
 
 const getTodayEndIso = () => {
     const d = new Date();
-    d.setHours(23, 59, 59, 999);
-    return d.toISOString();
+    const formatter = new Intl.DateTimeFormat('en-US', {
+        timeZone: 'Asia/Ho_Chi_Minh',
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit'
+    });
+    const parts = formatter.formatToParts(d);
+    const getPart = (type: string) => parts.find(p => p.type === type)?.value || '';
+    const dateStr = `${getPart('year')}-${getPart('month')}-${getPart('day')}`;
+    return new Date(`${dateStr}T23:59:59+07:00`).toISOString();
 };
 
 export default function VouchersContent(props: Props) {

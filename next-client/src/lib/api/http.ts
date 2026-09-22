@@ -1,5 +1,4 @@
 import { siteConfig } from '@/config/site';
-import { handleAutoLogout } from '../auth-utils';
 import { getCookie } from '@/lib/cookies';
 
 // Sử dụng biến môi trường Next.js thay vì Vite syntax
@@ -49,9 +48,48 @@ export async function request<T>(path: string, init: RequestInit = {}) {
     }
   });
   if (!res.ok) {
-    // Auto logout khi 401 Unauthorized (token hết hạn hoặc invalid)
-    if (res.status === 401 && typeof window !== 'undefined') {
-      handleAutoLogout();
+    // Xử lý interceptor 401 và 403 tập trung
+    if (typeof window !== 'undefined') {
+      if (res.status === 401) {
+        // Loại trừ các API liên quan đến auth để tránh vòng lặp hoặc lỗi redirect
+        const authPaths = [
+          '/api/login',
+          '/api/register',
+          '/api/validate-otp',
+          '/api/resend-otp',
+          '/api/forget-password',
+          '/api/reset-password'
+        ];
+        
+        const isAuthApi = authPaths.some((p) => path.includes(p));
+
+        if (!isAuthApi) {
+          // Xóa token và profile ở client (cookie + localStorage)
+          // Không gọi /api/logout vì 401 tức là token đã hết hạn trên server rồi
+          // Gọi rườm rà thêm request là không cần thiết
+          localStorage.removeItem('userToken');
+          localStorage.removeItem('userProfile');
+          
+          // Import dynamic deleteCookie để đảm bảo an toàn nếu run-time khác
+          // Tuy nhiên hàm getCookie được import tĩnh ở trên rồi.
+          import('@/lib/cookies').then(({ deleteCookie }) => {
+            deleteCookie('userToken');
+            deleteCookie('userProfile');
+          });
+
+          // Dispatch event để UI cập nhật (ví dụ useAuthState)
+          window.dispatchEvent(new Event('user-auth-changed'));
+          
+          // Mở Login dialog qua global event
+          window.dispatchEvent(new CustomEvent('open-login-dialog', { 
+            detail: { message: 'Phiên đăng nhập đã hết hạn, vui lòng đăng nhập lại.' } 
+          }));
+        }
+      } else if (res.status === 403) {
+        window.dispatchEvent(new CustomEvent('show-error-toast', { 
+          detail: { message: 'Bạn không có quyền thực hiện thao tác này.' } 
+        }));
+      }
     }
 
     let errorMessage = `HTTP ${res.status}`;

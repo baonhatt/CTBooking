@@ -5,9 +5,91 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
-export function formatDate(dateString?: string) {
-  const d = new Date(dateString ?? Date.now());
-  return `${d.getDate()} Tháng ${d.getMonth() + 1}, ${d.getFullYear()}`;
+export function formatToVNDatetimeLocal(dateStr?: string | Date | null): string {
+  if (!dateStr) return '';
+  const d = new Date(dateStr);
+  if (isNaN(d.getTime())) return '';
+  
+  const formatter = new Intl.DateTimeFormat('en-US', {
+    timeZone: 'Asia/Ho_Chi_Minh',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false
+  });
+  
+  const parts = formatter.formatToParts(d);
+  const getPart = (type: string) => parts.find(p => p.type === type)?.value || '';
+  
+  const hour = getPart('hour') === '24' ? '00' : getPart('hour');
+  return `${getPart('year')}-${getPart('month')}-${getPart('day')}T${hour}:${getPart('minute')}`;
+}
+
+export function vnDatetimeLocalToUTC(localStr: string): string | null {
+  if (!localStr) return null;
+  try {
+    const timeStr = localStr.length === 16 ? `${localStr}:00` : localStr;
+    const d = new Date(`${timeStr}+07:00`);
+    if (isNaN(d.getTime())) return null;
+    return d.toISOString();
+  } catch {
+    return null;
+  }
+}
+
+export function formatDateTimeVN(dateString?: string | Date | null): string {
+  if (!dateString) return '';
+  const d = new Date(dateString);
+  if (isNaN(d.getTime())) return '';
+  return new Intl.DateTimeFormat('vi-VN', {
+    timeZone: 'Asia/Ho_Chi_Minh',
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  }).format(d);
+}
+
+export function formatDate(dateString?: string | Date | null): string {
+  if (!dateString) {
+    dateString = new Date();
+  }
+  const d = new Date(dateString);
+  if (isNaN(d.getTime())) return '';
+  const formatter = new Intl.DateTimeFormat('vi-VN', {
+    timeZone: 'Asia/Ho_Chi_Minh',
+    day: 'numeric',
+    month: 'numeric',
+    year: 'numeric',
+  });
+  const parts = formatter.formatToParts(d);
+  const getPart = (type: string) => parts.find(p => p.type === type)?.value || '';
+  return `${getPart('day')} Tháng ${getPart('month')}, ${getPart('year')}`;
+}
+
+export function getVNYear(dateString?: string | Date | null): number {
+  if (!dateString) return new Date().getFullYear();
+  const d = new Date(dateString);
+  if (isNaN(d.getTime())) return new Date().getFullYear();
+  const formatter = new Intl.DateTimeFormat('en-US', {
+    timeZone: 'Asia/Ho_Chi_Minh',
+    year: 'numeric'
+  });
+  return Number(formatter.format(d));
+}
+
+export function formatDOB(dob?: string | Date | null): string {
+  try {
+      if (!dob) return '';
+      const d = new Date(dob as any);
+      if (isNaN(d.getTime())) return String(dob);
+      return d.toISOString().slice(0, 10);
+  } catch {
+      return '';
+  }
 }
 
 export function buildPostHref(post: { slug?: string; id: number }) {
