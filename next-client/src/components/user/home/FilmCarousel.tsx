@@ -308,7 +308,7 @@ export default function FilmCarousel({ initialFilms = [], onSelectFilm }: FilmCa
               Lướt qua các suất chiếu đa chiều. Chọn phim để mở chi tiết và chuyển tới bước đặt vé ngay.
             </p>
           </div>
-          <div className="flex items-center gap-3 self-end md:self-auto">
+          <div className="hidden md:flex items-center gap-3 self-end md:self-auto">
             <Button
               variant="ghost"
               className="w-10 h-10 rounded-xl bg-white/[0.07] hover:bg-white/[0.15] border border-white/15 text-white hover:border-cyan-400/50 hover:shadow-[0_0_15px_rgba(6,182,212,0.3)] disabled:opacity-30 transition-all flex items-center justify-center p-0"

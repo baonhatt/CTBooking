@@ -539,24 +539,6 @@ export default function TechnologyBanner({
                 )}
               </div>
             </div>
-            {videoPreviewsMerged.length > 1 && (
-              <div className="flex justify-center gap-4 mt-6 md:hidden">
-                <button
-                  onClick={scrollPrev}
-                  disabled={!canScrollPrev}
-                  className="rounded-full w-10 h-10 bg-black/60 backdrop-blur-md border border-white/20 flex items-center justify-center"
-                >
-                  <ChevronLeft className="h-5 w-5 text-white" />
-                </button>
-                <button
-                  onClick={scrollNext}
-                  disabled={!canScrollNext}
-                  className="rounded-full w-10 h-10 bg-black/60 backdrop-blur-md border border-white/20 flex items-center justify-center"
-                >
-                  <ChevronRight className="h-5 w-5 text-white" />
-                </button>
-              </div>
-            )}
           </div>
         </motion.div>
       </div>

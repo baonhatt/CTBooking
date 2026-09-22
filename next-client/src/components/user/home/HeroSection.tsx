@@ -385,42 +385,42 @@ export default function HeroSection({
                 initial={{ opacity: 0, y: 15 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.4 }}
-                className="flex flex-wrap items-center gap-4 pt-1"
+                className="grid grid-cols-2 sm:flex sm:flex-wrap items-center gap-3 sm:gap-4 pt-1"
               >
                 <Button
-                  className="group rounded-xl px-8 py-6 text-sm sm:text-base font-bold bg-gradient-to-r from-cyan-500 via-blue-600 to-fuchsia-500 hover:from-fuchsia-500 hover:via-cyan-400 hover:to-blue-600 text-white shadow-[0_0_30px_rgba(6,182,212,0.4)] transition-all duration-300 hover:shadow-[0_0_40px_rgba(236,72,153,0.6)] hover:scale-[1.02] active:scale-95 cursor-pointer"
+                  className="w-full sm:w-auto group rounded-xl px-2 sm:px-8 py-4 sm:py-6 text-[13px] sm:text-base font-bold bg-gradient-to-r from-cyan-500 via-blue-600 to-fuchsia-500 hover:from-fuchsia-500 hover:via-cyan-400 hover:to-blue-600 text-white shadow-[0_0_20px_rgba(6,182,212,0.3)] sm:shadow-[0_0_30px_rgba(6,182,212,0.4)] transition-all duration-300 hover:shadow-[0_0_40px_rgba(236,72,153,0.6)] hover:scale-[1.02] active:scale-95 cursor-pointer flex justify-center items-center"
                   onClick={() => {
                     const bookingSection = document.getElementById('promotions');
                     bookingSection?.scrollIntoView({ behavior: 'smooth' });
                   }}
                 >
-                  <span className="flex items-center gap-2">
+                  <span className="flex items-center gap-1.5 sm:gap-2 whitespace-nowrap">
                     Đặt vé ngay
-                    <Play className="h-4 w-4 group-hover:translate-x-1 transition-transform" />
+                    <Play className="h-3.5 w-3.5 sm:h-4 sm:w-4 group-hover:translate-x-1 transition-transform" />
                   </span>
                 </Button>
 
                 <Button
                   variant="outline"
-                  className="rounded-xl px-6 py-6 text-sm sm:text-base font-bold border-cyan-400/40 bg-cyan-500/10 hover:bg-cyan-500/20 hover:border-cyan-400 text-cyan-300 transition-all flex items-center gap-2 cursor-pointer shadow-md"
+                  className="w-full sm:w-auto rounded-xl px-2 sm:px-6 py-4 sm:py-6 text-[13px] sm:text-base font-bold border-cyan-400/40 bg-cyan-500/10 hover:bg-cyan-500/20 hover:border-cyan-400 text-cyan-300 transition-all flex items-center justify-center gap-1.5 sm:gap-2 cursor-pointer shadow-md"
                   onClick={() => {
                     const scheduleSection = document.getElementById('schedule');
                     scheduleSection?.scrollIntoView({ behavior: 'smooth' });
                   }}
                 >
-                  <Calendar className="h-5 w-5 text-cyan-400" />
-                  Lịch chiếu hôm nay
+                  <Calendar className="h-4 w-4 sm:h-5 sm:w-5 text-cyan-400 shrink-0" />
+                  <span className="truncate">Lịch chiếu hôm nay</span>
                 </Button>
 
                 <Button
-                  className="group rounded-xl px-8 py-6 text-sm sm:text-base font-bold bg-gradient-to-r from-purple-600 via-fuchsia-600 to-pink-600 hover:from-pink-600 hover:via-purple-600 hover:to-fuchsia-600 text-white shadow-[0_0_30px_rgba(168,85,247,0.4)] transition-all duration-300 hover:scale-[1.02] active:scale-95 cursor-pointer"
+                  className="w-full sm:w-auto group rounded-xl px-2 sm:px-8 py-4 sm:py-6 text-[13px] sm:text-base font-bold bg-gradient-to-r from-purple-600 via-fuchsia-600 to-pink-600 hover:from-pink-600 hover:via-purple-600 hover:to-fuchsia-600 text-white shadow-[0_0_20px_rgba(168,85,247,0.3)] sm:shadow-[0_0_30px_rgba(168,85,247,0.4)] transition-all duration-300 hover:scale-[1.02] active:scale-95 cursor-pointer flex justify-center items-center"
                   onClick={() => {
                     const vrSection = document.getElementById('vr');
                     vrSection?.scrollIntoView({ behavior: 'smooth' });
                   }}
                 >
-                  <span className="flex items-center gap-2">
-                    <Gamepad2 className="h-5 w-5" />
+                  <span className="flex items-center gap-1.5 sm:gap-2 whitespace-nowrap">
+                    <Gamepad2 className="h-4 w-4 sm:h-5 sm:w-5" />
                     Trải nghiệm VR
                   </span>
                 </Button>
@@ -428,11 +428,11 @@ export default function HeroSection({
                 {heroMedia?.url && (
                   <Button
                     variant="outline"
-                    className="rounded-xl px-5 py-6 text-sm font-semibold border-white/20 bg-white/5 hover:bg-white/10 hover:border-cyan-400 text-slate-100 transition-all flex items-center gap-2 cursor-pointer shadow-md"
+                    className="w-full sm:w-auto rounded-xl px-2 sm:px-5 py-4 sm:py-6 text-[13px] sm:text-sm font-semibold border-white/20 bg-white/5 hover:bg-white/10 hover:border-cyan-400 text-slate-100 transition-all flex items-center justify-center gap-1.5 sm:gap-2 cursor-pointer shadow-md"
                     onClick={() => setIsVideoModalOpen(true)}
                   >
-                    <Play className="h-4 w-4 text-cyan-400" />
-                    Xem Video 8K
+                    <Play className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-cyan-400 shrink-0" />
+                    <span className="truncate">Xem Video 8K</span>
                   </Button>
                 )}
               </m.div>
