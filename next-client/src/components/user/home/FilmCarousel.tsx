@@ -172,115 +172,7 @@ export default function FilmCarousel({ initialFilms = [], onSelectFilm }: FilmCa
     router.push('/booking');
   };
 
-  const MovieContent = () => (
-    <div className={cn('overflow-y-auto scrollbar-neon flex-1', isMobile ? 'px-4 pt-2 pb-6' : 'px-6 pt-6 pb-4')}>
-      <div className={cn('grid gap-6', !isMobile && 'md:grid-cols-2')}>
-        {isLoadingDetails || !movieDetails ? (
-          <div className="col-span-full flex items-center justify-center py-12">
-            <div className="text-center">
-              <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-cyan-400 mx-auto mb-4"></div>
-              <p className="text-gray-400">Đang tải thông tin phim...</p>
-            </div>
-          </div>
-        ) : (
-          <>
-            <div
-              className={cn(
-                'relative rounded-xl overflow-hidden border border-cyan-500/30 shadow-[0_0_30px_rgba(59,130,246,0.2)]',
-                isMobile ? 'aspect-video mx-auto w-full max-w-sm' : 'aspect-[2/3]'
-              )}
-            >
-              <img
-                src={
-                  optimizeCloudinaryUrl(movieDetails.cover_image, 800) ||
-                  'https://images.unsplash.com/photo-1464375117522-1311d6a5b81f?auto=format&fit=crop&w=900&q=80'
-                }
-                alt={movieDetails.title}
-                width={400}
-                height={600}
-                className="w-full h-full object-cover"
-              />
-              <div className="absolute inset-0 bg-gradient-to-t from-black/40 to-transparent pointer-events-none" />
-            </div>
 
-            <div className="space-y-4">
-              {isMobile && (
-                <div className="space-y-1">
-                  <h2 className="text-2xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-cyan-300 via-blue-400 to-fuchsia-400">
-                    {movieDetails.title}
-                  </h2>
-                  <p className="text-gray-400 text-sm">
-                    {(() => {
-                      try {
-                        const genres = Array.isArray(movieDetails.genres)
-                          ? movieDetails.genres
-                          : typeof movieDetails.genres === 'string'
-                            ? JSON.parse(movieDetails.genres as string)
-                            : [];
-                        return Array.isArray(genres) && genres.length > 0 ? genres.join(' • ') : 'Chưa phân loại';
-                      } catch {
-                        return 'Chưa phân loại';
-                      }
-                    })()}
-                  </p>
-                </div>
-              )}
-
-              <div>
-                <h3 className="text-base font-semibold text-cyan-300 mb-2 flex items-center gap-2">
-                  <span className="w-1 h-4 bg-gradient-to-b from-cyan-400 to-blue-500 rounded-full"></span>
-                  Mô tả
-                </h3>
-                <p className="text-gray-300 leading-relaxed text-sm">
-                  {movieDetails.description || 'Chưa có mô tả cho bộ phim này.'}
-                </p>
-              </div>
-
-              <div className="grid grid-cols-2 gap-4 pt-4 border-t border-white/10">
-                {movieDetails.rating !== null && movieDetails.rating !== undefined && (
-                  <div className="flex items-center gap-2 p-2 rounded-lg bg-white/5 border border-white/10">
-                    <Star className="h-4 w-4 text-yellow-400 fill-yellow-400" />
-                    <span className="text-white font-medium text-sm">{movieDetails.rating.toFixed(1)} / 10</span>
-                  </div>
-                )}
-                {movieDetails.duration_min && (
-                  <div className="flex items-center gap-2 p-2 rounded-lg bg-white/5 border border-white/10">
-                    <Clock className="h-4 w-4 text-cyan-400" />
-                    <span className="text-white font-medium text-sm">{movieDetails.duration_min} phút</span>
-                  </div>
-                )}
-              </div>
-            </div>
-          </>
-        )}
-      </div>
-    </div>
-  );
-
-  const MovieFooter = () =>
-    movieDetails && (
-      <div
-        className={cn(
-          'flex gap-3 border-t border-white/10 bg-gradient-to-br from-[#0b1226] via-[#0e1b3d] to-[#050915] shrink-0',
-          isMobile ? 'p-4 justify-between sticky bottom-0' : 'px-6 py-4 justify-end'
-        )}
-      >
-        <Button
-          variant="outline"
-          onClick={() => setIsModalOpen(false)}
-          className="border-white/20 text-white hover:bg-white/10 hover:text-white hover:border-cyan-400/50 transition-all flex-1 md:flex-none"
-        >
-          Đóng
-        </Button>
-        <Button
-          onClick={handleBookTicket}
-          className="bg-gradient-to-r from-cyan-400 via-blue-600 to-fuchsia-500 hover:from-fuchsia-500 hover:via-cyan-400 hover:to-blue-600 text-white font-semibold shadow-[0_0_30px_rgba(59,130,246,0.4)] hover:shadow-[0_0_40px_rgba(236,72,153,0.6)] transition-all duration-300 hover:scale-105 flex-1 md:flex-none"
-        >
-          <Ticket className="h-4 w-4 mr-2" />
-          Đặt vé ngay
-        </Button>
-      </div>
-    );
 
   return (
     <section
@@ -402,55 +294,145 @@ export default function FilmCarousel({ initialFilms = [], onSelectFilm }: FilmCa
         )}
       </div>
 
-      {isMobile ? (
-        <Drawer open={isModalOpen} onOpenChange={setIsModalOpen}>
-          <DrawerContent className="bg-gradient-to-br from-[#0b1226] via-[#0e1b3d] to-[#050915] border-t border-cyan-500/30 text-white p-0 max-h-[96vh]">
-            <DrawerHeader className="text-left sr-only">
-              <DrawerTitle>{movieDetails?.title || 'Chi tiết phim'}</DrawerTitle>
-              <DrawerDescription>Thông tin chi tiết về phim</DrawerDescription>
-            </DrawerHeader>
-            <MovieContent />
-            <MovieFooter />
-          </DrawerContent>
-        </Drawer>
-      ) : (
-        <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
-          <DialogContent className="max-w-3xl max-h-[90vh] flex z-[9999] flex-col bg-gradient-to-br from-[#0b1226] via-[#0e1b3d] to-[#050915] border border-cyan-500/30 text-white p-0 shadow-[0_0_50px_rgba(59,130,246,0.3)]">
-            <div className="overflow-y-auto scrollbar-neon flex-1 px-6 pt-6 pb-4">
-              <DialogHeader className="mb-4">
-                <DialogTitle
-                  className={cn(
-                    'text-3xl font-bold mb-2',
-                    !movieDetails && 'sr-only',
-                    movieDetails &&
-                      'text-transparent bg-clip-text bg-gradient-to-r from-cyan-300 via-blue-400 to-fuchsia-400'
-                  )}
-                >
-                  {movieDetails?.title || 'Chi tiết phim'}
-                </DialogTitle>
-                <DialogDescription className={cn('text-gray-300 text-sm', !movieDetails && 'sr-only')}>
-                  {movieDetails
-                    ? (() => {
-                        try {
-                          const genres = Array.isArray(movieDetails.genres)
-                            ? movieDetails.genres
-                            : typeof movieDetails.genres === 'string'
-                              ? JSON.parse(movieDetails.genres as string)
-                              : [];
-                          return Array.isArray(genres) && genres.length > 0 ? genres.join(' • ') : 'Chưa phân loại';
-                        } catch {
-                          return 'Chưa phân loại';
+      <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
+        <DialogContent className={cn("max-w-3xl flex z-[9999] flex-col bg-gradient-to-br from-[#0b1226] via-[#0e1b3d] to-[#050915] border border-cyan-500/30 text-white p-0 shadow-[0_0_50px_rgba(59,130,246,0.3)] overflow-hidden", isMobile ? "max-h-[96vh] w-[95vw] rounded-xl" : "max-h-[90vh]")}>
+          <div className="overflow-y-auto scrollbar-neon flex-1 px-6 pt-6 pb-4">
+            <DialogHeader className="mb-4">
+              <DialogTitle
+                className={cn(
+                  'text-3xl font-bold mb-2',
+                  !movieDetails && 'sr-only',
+                  movieDetails &&
+                    'text-transparent bg-clip-text bg-gradient-to-r from-cyan-300 via-blue-400 to-fuchsia-400'
+                )}
+              >
+                {movieDetails?.title || 'Chi tiết phim'}
+              </DialogTitle>
+              <DialogDescription className={cn('text-gray-300 text-sm', !movieDetails && 'sr-only')}>
+                {movieDetails
+                  ? (() => {
+                      try {
+                        const genres = Array.isArray(movieDetails.genres)
+                          ? movieDetails.genres
+                          : typeof movieDetails.genres === 'string'
+                            ? JSON.parse(movieDetails.genres as string)
+                            : [];
+                        return Array.isArray(genres) && genres.length > 0 ? genres.join(' • ') : 'Chưa phân loại';
+                      } catch {
+                        return 'Chưa phân loại';
+                      }
+                    })()
+                  : 'Thông tin chi tiết về bộ phim'}
+              </DialogDescription>
+            </DialogHeader>
+            <div className={cn(isMobile ? 'px-0 pt-2 pb-6' : 'px-0 pt-6 pb-4')}>
+              <div className={cn('grid gap-6', !isMobile && 'md:grid-cols-2')}>
+                {isLoadingDetails || !movieDetails ? (
+                  <div className="col-span-full flex items-center justify-center py-12">
+                    <div className="text-center">
+                      <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-cyan-400 mx-auto mb-4"></div>
+                      <p className="text-gray-400">Đang tải thông tin phim...</p>
+                    </div>
+                  </div>
+                ) : (
+                  <>
+                    <div
+                      className={cn(
+                        'relative rounded-xl overflow-hidden border border-cyan-500/30 shadow-[0_0_30px_rgba(59,130,246,0.2)]',
+                        isMobile ? 'aspect-video mx-auto w-full max-w-sm' : 'aspect-[2/3]'
+                      )}
+                    >
+                      <img
+                        src={
+                          optimizeCloudinaryUrl(movieDetails.cover_image, 800) ||
+                          'https://images.unsplash.com/photo-1464375117522-1311d6a5b81f?auto=format&fit=crop&w=900&q=80'
                         }
-                      })()
-                    : 'Thông tin chi tiết về bộ phim'}
-                </DialogDescription>
-              </DialogHeader>
-              <MovieContent />
+                        alt={movieDetails.title}
+                        width={400}
+                        height={600}
+                        className="w-full h-full object-cover"
+                      />
+                      <div className="absolute inset-0 bg-gradient-to-t from-black/40 to-transparent pointer-events-none" />
+                    </div>
+
+                    <div className="space-y-4">
+                      {isMobile && (
+                        <div className="space-y-1">
+                          <h2 className="text-2xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-cyan-300 via-blue-400 to-fuchsia-400">
+                            {movieDetails.title}
+                          </h2>
+                          <p className="text-gray-400 text-sm">
+                            {(() => {
+                              try {
+                                const genres = Array.isArray(movieDetails.genres)
+                                  ? movieDetails.genres
+                                  : typeof movieDetails.genres === 'string'
+                                    ? JSON.parse(movieDetails.genres as string)
+                                    : [];
+                                return Array.isArray(genres) && genres.length > 0 ? genres.join(' • ') : 'Chưa phân loại';
+                              } catch {
+                                return 'Chưa phân loại';
+                              }
+                            })()}
+                          </p>
+                        </div>
+                      )}
+
+                      <div>
+                        <h3 className="text-base font-semibold text-cyan-300 mb-2 flex items-center gap-2">
+                          <span className="w-1 h-4 bg-gradient-to-b from-cyan-400 to-blue-500 rounded-full"></span>
+                          Mô tả
+                        </h3>
+                        <p className="text-gray-300 leading-relaxed text-sm">
+                          {movieDetails.description || 'Chưa có mô tả cho bộ phim này.'}
+                        </p>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-4 pt-4 border-t border-white/10">
+                        {movieDetails.rating !== null && movieDetails.rating !== undefined && (
+                          <div className="flex items-center gap-2 p-2 rounded-lg bg-white/5 border border-white/10">
+                            <Star className="h-4 w-4 text-yellow-400 fill-yellow-400" />
+                            <span className="text-white font-medium text-sm">{movieDetails.rating.toFixed(1)} / 10</span>
+                          </div>
+                        )}
+                        {movieDetails.duration_min && (
+                          <div className="flex items-center gap-2 p-2 rounded-lg bg-white/5 border border-white/10">
+                            <Clock className="h-4 w-4 text-cyan-400" />
+                            <span className="text-white font-medium text-sm">{movieDetails.duration_min} phút</span>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </>
+                )}
+              </div>
             </div>
-            <MovieFooter />
-          </DialogContent>
-        </Dialog>
-      )}
+          </div>
+          {movieDetails && (
+            <div
+              className={cn(
+                'flex gap-3 border-t border-white/10 bg-gradient-to-br from-[#0b1226] via-[#0e1b3d] to-[#050915] shrink-0 z-10',
+                isMobile ? 'p-4 justify-between' : 'px-6 py-4 justify-end'
+              )}
+            >
+              <Button
+                variant="outline"
+                onClick={() => setIsModalOpen(false)}
+                className="border-white/20 text-white hover:bg-white/10 hover:text-white hover:border-cyan-400/50 transition-all flex-1 md:flex-none"
+              >
+                Đóng
+              </Button>
+              <Button
+                onClick={handleBookTicket}
+                className="bg-gradient-to-r from-cyan-400 via-blue-600 to-fuchsia-500 hover:from-fuchsia-500 hover:via-cyan-400 hover:to-blue-600 text-white font-semibold shadow-[0_0_30px_rgba(59,130,246,0.4)] hover:shadow-[0_0_40px_rgba(236,72,153,0.6)] transition-all duration-300 hover:scale-105 flex-1 md:flex-none"
+              >
+                <Ticket className="h-4 w-4 mr-2" />
+                Đặt vé ngay
+              </Button>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </section>
   );
 }
