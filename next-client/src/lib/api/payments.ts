@@ -1,4 +1,4 @@
-import { API_BASE_URL, request } from '@/lib/api/http';
+import { buildUrl, request } from '@/lib/api/http';
 
 // Thêm vào file api.ts hoặc tạo file riêng vietqr.ts
 
@@ -45,7 +45,7 @@ export const checkVietQRPaymentStatus = async (
   params: CheckPaymentStatusParams
 ): Promise<CheckPaymentStatusResponse> => {
   try {
-    const response = await fetch(`${API_BASE_URL}/api/payments/check-vietqr-status`, {
+    const response = await fetch(buildUrl('/api/payments/check-vietqr-status'), {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -77,7 +77,7 @@ export interface ConfirmPaymentParams {
 
 export const confirmVietQRPayment = async (params: ConfirmPaymentParams): Promise<CheckPaymentStatusResponse> => {
   try {
-    const response = await fetch(`${API_BASE_URL}/api/payments/confirm-vietqr`, {
+    const response = await fetch(buildUrl('/api/payments/confirm-vietqr'), {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -102,7 +102,7 @@ export const confirmVietQRPayment = async (params: ConfirmPaymentParams): Promis
  */
 export const cancelVietQRPayment = async (bookingId: string): Promise<void> => {
   try {
-    const response = await fetch(`${API_BASE_URL}/api/payments/cancel-vietqr/${bookingId}`, {
+    const response = await fetch(buildUrl(`/api/payments/cancel-vietqr/${bookingId}`), {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',

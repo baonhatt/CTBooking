@@ -87,7 +87,7 @@ export default function MovieScheduleSection() {
 
   // nextSlot is used in JSX for label UI styling
   const nextSlot = useMemo(() => {
-    const sorted = [...allItems].sort((a,b) => a.start_time.localeCompare(b.start_time));
+    const sorted = [...allItems].sort((a, b) => a.start_time.localeCompare(b.start_time));
     return sorted.find((s) => s.start_time > now);
   }, [allItems, now]);
 
@@ -231,6 +231,17 @@ export default function MovieScheduleSection() {
 
     const branchId = selectedBranch?.id;
 
+    const branchPkgMovies = (matchedPackage?.movies || []).filter((m: any) => {
+      if (!branchId) return true;
+      if (m.branch_id && m.branch_id !== branchId) return false;
+      return true;
+    });
+
+    const finalSlotMovies =
+      branchPkgMovies.length > 0
+        ? branchPkgMovies
+        : [{ id: slot.movie_id, title: slot.movie_title, duration_min: slot.movie_duration_min, cover_image: slot.movie_cover_image }];
+
     // Save direct booking item into sessionStorage
     try {
       sessionStorage.setItem(
@@ -240,9 +251,7 @@ export default function MovieScheduleSection() {
           type: 'movie',
           name: matchedPackage?.name || 'Vé Phim Cinesphere',
           price: Number(matchedPackage?.price || 0),
-          movies: matchedPackage?.movies || [
-            { id: slot.movie_id, title: slot.movie_title, duration_min: slot.movie_duration_min }
-          ],
+          movies: finalSlotMovies,
           quantity: 1,
           branchId,
           preferredMovieId: slot.movie_id,
@@ -334,7 +343,10 @@ export default function MovieScheduleSection() {
                 <div className="absolute inset-0 rounded-full bg-gradient-to-tr from-cyan-500/20 via-blue-600/20 to-purple-600/25 blur-2xl sm:blur-3xl pointer-events-none" />
 
                 {/* SVG Analog Clock Face (ViewBox 0 0 280 280, Center: 140, 140) */}
-                <svg className="w-full h-full relative z-10 drop-shadow-[0_10px_35px_rgba(0,0,0,0.9)]" viewBox="0 0 280 280">
+                <svg
+                  className="w-full h-full relative z-10 drop-shadow-[0_10px_35px_rgba(0,0,0,0.9)]"
+                  viewBox="0 0 280 280"
+                >
                   <defs>
                     <linearGradient id="analog-bezel-grad" x1="0%" y1="0%" x2="100%" y2="100%">
                       <stop offset="0%" stopColor="#38bdf8" stopOpacity="0.4" />
@@ -358,12 +370,44 @@ export default function MovieScheduleSection() {
                       <stop offset="100%" stopColor="#0284c7" />
                     </linearGradient>
                   </defs>
-                  <circle cx="140" cy="140" r="138" fill="url(#analog-bezel-grad)" stroke="#0284c7" strokeWidth="1" strokeOpacity="0.3" />
-                  <circle cx="140" cy="140" r="135" fill="none" stroke="#ffffff" strokeWidth="0.5" strokeOpacity="0.15" />
+                  <circle
+                    cx="140"
+                    cy="140"
+                    r="138"
+                    fill="url(#analog-bezel-grad)"
+                    stroke="#0284c7"
+                    strokeWidth="1"
+                    strokeOpacity="0.3"
+                  />
+                  <circle
+                    cx="140"
+                    cy="140"
+                    r="135"
+                    fill="none"
+                    stroke="#ffffff"
+                    strokeWidth="0.5"
+                    strokeOpacity="0.15"
+                  />
                   <circle cx="140" cy="140" r="132" fill="url(#analog-dial-grad)" />
-                  <circle cx="140" cy="140" r="114" fill="none" stroke="rgba(56,189,248,0.12)" strokeWidth="1" strokeDasharray="2 4" />
+                  <circle
+                    cx="140"
+                    cy="140"
+                    r="114"
+                    fill="none"
+                    stroke="rgba(56,189,248,0.12)"
+                    strokeWidth="1"
+                    strokeDasharray="2 4"
+                  />
                   <circle cx="140" cy="140" r="90" fill="none" stroke="rgba(255,255,255,0.06)" strokeWidth="1" />
-                  <circle cx="140" cy="140" r="62" fill="none" stroke="rgba(56,189,248,0.15)" strokeWidth="0.75" strokeDasharray="1 3" />
+                  <circle
+                    cx="140"
+                    cy="140"
+                    r="62"
+                    fill="none"
+                    stroke="rgba(56,189,248,0.15)"
+                    strokeWidth="0.75"
+                    strokeDasharray="1 3"
+                  />
                   {clockTicks.map((t) => (
                     <line
                       key={t.key}
@@ -393,28 +437,97 @@ export default function MovieScheduleSection() {
                     </text>
                   ))}
                   <g transform="translate(140, 195)">
-                    <rect x="-32" y="-12" width="64" height="22" rx="6" fill="#030712" stroke="#0ea5e9" strokeWidth="1" strokeOpacity="0.4" />
-                    <text x="0" y="3" textAnchor="middle" fill="#22d3ee" fontSize="9.5" fontWeight="900" fontFamily="monospace">
+                    <rect
+                      x="-32"
+                      y="-12"
+                      width="64"
+                      height="22"
+                      rx="6"
+                      fill="#030712"
+                      stroke="#0ea5e9"
+                      strokeWidth="1"
+                      strokeOpacity="0.4"
+                    />
+                    <text
+                      x="0"
+                      y="3"
+                      textAnchor="middle"
+                      fill="#22d3ee"
+                      fontSize="9.5"
+                      fontWeight="900"
+                      fontFamily="monospace"
+                    >
                       {activeSlot?.start_time || '--:--'}
                     </text>
                   </g>
                   {slotMarkers.map((slot) => {
                     const isSelected = activeSlot?.id === slot.id;
                     return (
-                      <g key={slot.id} onClick={() => handleSlotClick(slot.id)} onMouseEnter={() => handleSlotHover(slot.id)} className="cursor-pointer group/marker">
+                      <g
+                        key={slot.id}
+                        onClick={() => handleSlotClick(slot.id)}
+                        onMouseEnter={() => handleSlotHover(slot.id)}
+                        className="cursor-pointer group/marker"
+                      >
                         <circle cx={slot.x} cy={slot.y} r="12" fill="transparent" />
-                        {isSelected && (<circle cx={slot.x} cy={slot.y} r="7.5" fill="none" stroke="#38bdf8" strokeWidth="1.5" strokeOpacity="0.85" />)}
-                        <circle cx={slot.x} cy={slot.y} r={isSelected ? '5' : '3.5'} fill={isSelected ? '#38bdf8' : '#cbd5e1'} stroke={isSelected ? '#ffffff' : '#030712'} strokeWidth={isSelected ? '2' : '1.5'} className="transition-all duration-300" />
+                        {isSelected && (
+                          <circle
+                            cx={slot.x}
+                            cy={slot.y}
+                            r="7.5"
+                            fill="none"
+                            stroke="#38bdf8"
+                            strokeWidth="1.5"
+                            strokeOpacity="0.85"
+                          />
+                        )}
+                        <circle
+                          cx={slot.x}
+                          cy={slot.y}
+                          r={isSelected ? '5' : '3.5'}
+                          fill={isSelected ? '#38bdf8' : '#cbd5e1'}
+                          stroke={isSelected ? '#ffffff' : '#030712'}
+                          strokeWidth={isSelected ? '2' : '1.5'}
+                          className="transition-all duration-300"
+                        />
                       </g>
                     );
                   })}
-                  <g style={{ transform: `rotate(${hourHandAngle}deg)`, transformOrigin: '140px 140px', transition: 'transform 0.75s cubic-bezier(0.25, 1, 0.5, 1)' }}>
-                    <path d="M 137.5 140 L 138.5 86 L 140 76 L 141.5 86 L 142.5 140 L 141 150 L 139 150 Z" fill="url(#analog-hour-grad)" filter="drop-shadow(0px 2px 4px rgba(0,0,0,0.8))" />
+                  <g
+                    style={{
+                      transform: `rotate(${hourHandAngle}deg)`,
+                      transformOrigin: '140px 140px',
+                      transition: 'transform 0.75s cubic-bezier(0.25, 1, 0.5, 1)'
+                    }}
+                  >
+                    <path
+                      d="M 137.5 140 L 138.5 86 L 140 76 L 141.5 86 L 142.5 140 L 141 150 L 139 150 Z"
+                      fill="url(#analog-hour-grad)"
+                      filter="drop-shadow(0px 2px 4px rgba(0,0,0,0.8))"
+                    />
                   </g>
-                  <g style={{ transform: `rotate(${minuteHandAngle}deg)`, transformOrigin: '140px 140px', transition: 'transform 0.8s cubic-bezier(0.25, 1, 0.5, 1)' }}>
-                    <path d="M 138 140 L 139 52 L 140 42 L 141 52 L 142 140 L 141 155 L 139 155 Z" fill="url(#analog-minute-grad)" filter="drop-shadow(0px 2px 5px rgba(6,182,212,0.6))" />
+                  <g
+                    style={{
+                      transform: `rotate(${minuteHandAngle}deg)`,
+                      transformOrigin: '140px 140px',
+                      transition: 'transform 0.8s cubic-bezier(0.25, 1, 0.5, 1)'
+                    }}
+                  >
+                    <path
+                      d="M 138 140 L 139 52 L 140 42 L 141 52 L 142 140 L 141 155 L 139 155 Z"
+                      fill="url(#analog-minute-grad)"
+                      filter="drop-shadow(0px 2px 5px rgba(6,182,212,0.6))"
+                    />
                   </g>
-                  <circle cx="140" cy="140" r="8.5" fill="#0f172a" stroke="#38bdf8" strokeWidth="2" filter="drop-shadow(0 2px 4px rgba(0,0,0,0.9))" />
+                  <circle
+                    cx="140"
+                    cy="140"
+                    r="8.5"
+                    fill="#0f172a"
+                    stroke="#38bdf8"
+                    strokeWidth="2"
+                    filter="drop-shadow(0 2px 4px rgba(0,0,0,0.9))"
+                  />
                   <circle cx="140" cy="140" r="5" fill="#0284c7" />
                   <circle cx="140" cy="140" r="2.5" fill="#ffffff" />
                 </svg>
@@ -432,7 +545,10 @@ export default function MovieScheduleSection() {
                     {activeSlot.movie_cover_image ? (
                       <img
                         key={activeSlot.movie_id}
-                        src={optimizeCloudinaryUrl(activeSlot.movie_cover_image, 300, 'auto:good') || activeSlot.movie_cover_image}
+                        src={
+                          optimizeCloudinaryUrl(activeSlot.movie_cover_image, 300, 'auto:good') ||
+                          activeSlot.movie_cover_image
+                        }
                         alt={activeSlot.movie_title}
                         className="w-full h-full object-cover group-hover:scale-105 transition-all duration-300"
                       />
@@ -479,7 +595,7 @@ export default function MovieScheduleSection() {
                       <span>8K / Âm vòm</span>
                     </div>
 
-                    <div className="pt-1 sm:pt-2">
+                    {/* <div className="pt-1 sm:pt-2">
                       <Button
                         onClick={() => handleBookSlot(activeSlot)}
                         className="w-full sm:w-auto px-4 py-2 sm:px-7 sm:py-5 rounded-lg sm:rounded-xl bg-gradient-to-r from-cyan-500 via-blue-600 to-fuchsia-600 hover:from-fuchsia-600 hover:to-cyan-500 text-white font-bold shadow-[0_0_20px_rgba(6,182,212,0.45)] transition-all duration-300 hover:scale-[1.02] active:scale-95 cursor-pointer text-xs sm:text-sm"
@@ -490,7 +606,7 @@ export default function MovieScheduleSection() {
                           <ChevronRight className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                         </span>
                       </Button>
-                    </div>
+                    </div> */}
                   </div>
                 </div>
               ) : null}
@@ -499,7 +615,9 @@ export default function MovieScheduleSection() {
               <div className="space-y-1.5 sm:space-y-2.5">
                 <div className="flex items-center justify-between text-[11px] sm:text-xs text-slate-400">
                   <span className="font-bold text-slate-300">Tất cả các suất chiếu:</span>
-                  <span className="text-[10px] sm:text-[11px] text-cyan-400 font-semibold">{allItems.length} suất chiếu</span>
+                  <span className="text-[10px] sm:text-[11px] text-cyan-400 font-semibold">
+                    {allItems.length} suất chiếu
+                  </span>
                 </div>
 
                 <div className="flex items-center gap-1.5 sm:gap-2 overflow-x-auto pb-1.5 scrollbar-none touch-pan-x sm:flex-wrap sm:max-h-36 sm:overflow-y-auto sm:pr-1 custom-scrollbar">

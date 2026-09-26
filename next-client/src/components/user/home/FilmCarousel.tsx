@@ -11,15 +11,6 @@ import { optimizeCloudinaryUrl, generateCloudinarySrcSet, cn } from '@/lib/utils
 import { Button } from '@/components/ui/button';
 
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import {
-  Drawer,
-  DrawerClose,
-  DrawerContent,
-  DrawerDescription,
-  DrawerFooter,
-  DrawerHeader,
-  DrawerTitle
-} from '@/components/ui/drawer';
 import { movieStore } from '@/store/movieStore';
 import useEmblaCarousel from 'embla-carousel-react';
 import type { EmblaCarouselType } from 'embla-carousel';
@@ -162,16 +153,32 @@ export default function FilmCarousel({ initialFilms = [], initialBranchId, onSel
   const handleBookTicket = () => {
     setIsModalOpen(false);
     if (movieDetails) {
-      localStorage.setItem(
-        'selectedFilm',
-        JSON.stringify({
-          id: movieDetails.id,
-          title: movieDetails.title,
-          cover_image: movieDetails.cover_image
-        })
-      );
+      try {
+        localStorage.setItem(
+          'selectedFilm',
+          JSON.stringify({
+            id: movieDetails.id,
+            title: movieDetails.title,
+            cover_image: movieDetails.cover_image
+          })
+        );
+      } catch (error) {
+        console.error('Failed to save selected film:', error);
+      }
     }
-    router.push('/booking');
+
+    setTimeout(() => {
+      const packageSection = document.getElementById('promotions');
+      if (packageSection) {
+        const headerEl = document.querySelector('header') as HTMLElement | null;
+        const headerOffset = headerEl?.offsetHeight || 72;
+        const rect = packageSection.getBoundingClientRect();
+        const absoluteTop = window.scrollY + rect.top;
+        window.scrollTo({ top: Math.max(0, absoluteTop - headerOffset), behavior: 'smooth' });
+      } else {
+        router.push('/#promotions');
+      }
+    }, 100);
   };
 
 
@@ -297,7 +304,12 @@ export default function FilmCarousel({ initialFilms = [], initialBranchId, onSel
       </div>
 
       <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
-        <DialogContent className={cn("max-w-3xl flex z-[9999] flex-col bg-gradient-to-br from-[#0b1226] via-[#0e1b3d] to-[#050915] border border-cyan-500/30 text-white p-0 shadow-[0_0_50px_rgba(59,130,246,0.3)] overflow-hidden", isMobile ? "max-h-[96vh] w-[95vw] rounded-xl" : "max-h-[90vh]")}>
+        <DialogContent
+          onCloseAutoFocus={(e) => {
+            e.preventDefault();
+          }}
+          className={cn("max-w-3xl flex z-[9999] flex-col bg-gradient-to-br from-[#0b1226] via-[#0e1b3d] to-[#050915] border border-cyan-500/30 text-white p-0 shadow-[0_0_50px_rgba(59,130,246,0.3)] overflow-hidden", isMobile ? "max-h-[96vh] w-[95vw] rounded-xl" : "max-h-[90vh]")}
+        >
           <div className="overflow-y-auto scrollbar-neon flex-1 px-6 pt-6 pb-4">
             <DialogHeader className="mb-4">
               <DialogTitle

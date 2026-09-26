@@ -24,7 +24,7 @@ import {
         Gamepad2
 } from 'lucide-react';
 import UserLayout from '@/layouts/UserLayout';
-import { API_BASE_URL, confirmBookingApi, getBookingByIdApi, getVRBookingById } from '@/lib/api';
+import { buildUrl, confirmBookingApi, getBookingByIdApi, getVRBookingById } from '@/lib/api';
 import { useAuthState } from '@/hooks/useAuthState';
 import {
         parseMoviePackages,
@@ -189,8 +189,7 @@ export default function Checkout() {
         const resolveImageUrl = (u: string | undefined | null) => {
                 if (!u) return '';
                 if (u.startsWith('http')) return u;
-                const path = u.startsWith('/') ? u : `/${u}`;
-                return `${API_BASE_URL}${path}`;
+                return buildUrl(u);
         };
         const getGenresText = (g: any) => {
                 try {

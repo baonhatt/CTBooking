@@ -22,11 +22,11 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { toast } from 'sonner';
 import {
   getActiveTickets,
+  getActiveMoviesToday,
   getVRPackages,
   VRPackageItem,
   createBookingApi,
-  API_BASE_URL,
-  SERVER_BASE_URL,
+  buildUrl,
   validateBookingApi,
   validateVrVoucher,
   validateVRBooking,
@@ -106,12 +106,20 @@ export default function BookingPage() {
 
   const activeBranchId = urlBranchId ?? selectedBranch?.id;
 
-  // Fetch Tickets & VR packages
   const { data: ticketsData, isLoading: isLoadingTickets } = useQuery({
     queryKey: ['activeTickets', activeBranchId],
     queryFn: ({ signal }) => getActiveTickets(activeBranchId ?? undefined, { signal }),
     staleTime: 60000
   });
+
+  // Fetch active movies today for this branch
+  const { data: branchMoviesData } = useQuery({
+    queryKey: ['activeMoviesToday', activeBranchId],
+    queryFn: () => getActiveMoviesToday(activeBranchId ?? undefined),
+    staleTime: 60000
+  });
+
+  const branchMovies = useMemo(() => branchMoviesData || [], [branchMoviesData]);
 
   const { data: vrPackagesData, isLoading: isLoadingVrPackages } = useQuery({
     queryKey: ['vrPackages', activeBranchId],
@@ -162,6 +170,11 @@ export default function BookingPage() {
       if (rawDirect) {
         const parsed = JSON.parse(rawDirect);
         if (parsed?.packageId) {
+          // Đồng bộ chi nhánh nếu item lưu từ chi nhánh khác
+          if (activeBranchId && parsed.branchId && Number(parsed.branchId) !== Number(activeBranchId)) {
+            parsed.branchId = activeBranchId;
+            parsed.movies = [];
+          }
           setDirectBookingItem(parsed);
           return;
         }
@@ -248,20 +261,56 @@ export default function BookingPage() {
   const movieSubtotal = useMemo(() => movieItems.reduce((s, i) => s + i.price * i.quantity, 0), [movieItems, selectedItems]);
   const vrSubtotal = useMemo(() => vrItems.reduce((s, i) => s + i.price * i.quantity, 0), [vrItems, selectedItems]);
 
-  // Available movies for selected movie packages
+  // Available movies for selected movie packages (filtered strictly by active branch)
   const availableMovies = useMemo(() => {
+    const branchMovieMap = new Map<number, any>();
+    branchMovies.forEach((m: any) => {
+      if (m?.id) branchMovieMap.set(Number(m.id), m);
+    });
+
     const moviesMap = new Map<number, any>();
     movieItems.forEach((item) => {
       const pkg = ticketPackages.find((p: any) => p.id === item.packageId);
       const list = pkg?.movies && pkg.movies.length > 0 ? pkg.movies : item.movies || [];
       list.forEach((m: any) => {
-        if (m?.id && !moviesMap.has(m.id)) {
-          moviesMap.set(m.id, m);
+        if (!m?.id) return;
+        const mid = Number(m.id);
+
+        // 1. Phim BẮT BUỘC phải nằm trong danh sách phim đang chiếu của chi nhánh
+        if (branchMovieMap.size > 0 && !branchMovieMap.has(mid)) {
+          return;
         }
+
+        // 2. Kiểm tra branch_ids / branch_id trên object movie (nếu có)
+        if (activeBranchId && m.branch_ids) {
+          try {
+            const bIds = Array.isArray(m.branch_ids)
+              ? m.branch_ids
+              : typeof m.branch_ids === 'string'
+                ? JSON.parse(m.branch_ids)
+                : null;
+            if (Array.isArray(bIds) && bIds.length > 0 && !bIds.includes(activeBranchId)) {
+              return;
+            }
+          } catch {}
+        }
+        if (activeBranchId && m.branch_id && m.branch_id !== activeBranchId) {
+          return;
+        }
+
+        const fullMovie = branchMovieMap.get(mid) || m;
+        moviesMap.set(mid, fullMovie);
       });
     });
+
+    // Nếu người dùng chọn gói xem phim nhưng moviesMap trống (do combo cũ trỏ sai rạp khác),
+    // tự động fallback hiển thị toàn bộ phim đang chiếu tại chi nhánh hiện tại!
+    if (movieItems.length > 0 && moviesMap.size === 0 && branchMovies.length > 0) {
+      return branchMovies;
+    }
+
     return Array.from(moviesMap.values());
-  }, [movieItems, ticketPackages]);
+  }, [movieItems, ticketPackages, activeBranchId, branchMovies]);
 
   // No movie selection needed – single-room rotating model, just show info
 
@@ -300,8 +349,7 @@ export default function BookingPage() {
   const resolveImageUrl = (u: string | undefined | null) => {
     if (!u) return '';
     if (u.startsWith('http')) return u;
-    const path = u.startsWith('/') ? u : `/${u}`;
-    return `${API_BASE_URL}${path}`;
+    return buildUrl(u);
   };
 
   // Pricing Calculations
@@ -539,9 +587,19 @@ export default function BookingPage() {
         booking = res.booking;
       }
 
+      const preferredMovie =
+        directBookingItem?.preferredMovieId && movieItems.length > 0
+          ? movieItems[0]?.movies?.find(
+              (m: any) => Number(m.id) === Number(directBookingItem.preferredMovieId)
+            ) || availableMovies.find((m: any) => Number(m.id) === Number(directBookingItem.preferredMovieId))
+          : availableMovies?.[0] || null;
+
       const summary = {
         orderId,
-        movie: movieItems.length > 0 ? (movieItems[0]?.movies?.[0]?.title || movieItems[0]?.name || '') : 'Gói Trải Nghiệm VR',
+        movie:
+          movieItems.length > 0
+            ? (preferredMovie?.title || movieItems[0]?.movies?.[0]?.title || movieItems[0]?.name || '')
+            : 'Gói Trải Nghiệm VR',
         name,
         phone,
         email,
@@ -553,7 +611,7 @@ export default function BookingPage() {
         vr_items: selectedVrList,
         booking_type: movieItems.length === 0 ? 'vr' : vr_items.length > 0 ? 'combo_vr' : 'movie',
         method: paymentMethod,
-        poster: movieItems[0]?.cover_image || selectedVrList[0]?.cover_image || '',
+        poster: preferredMovie?.cover_image || availableMovies?.[0]?.cover_image || movieItems[0]?.cover_image || movieItems[0]?.movies?.[0]?.cover_image || selectedVrList[0]?.cover_image || '',
         duration: '',
         genres: '',
         ticketPackageId: movieItems[0]?.packageId,
@@ -933,7 +991,11 @@ export default function BookingPage() {
                                     {m.duration_min ? `${m.duration_min} Phút` : '8K'}
                                   </span>
                                   {m.genres && (
-                                    <span className="text-[9px] text-slate-400 truncate">{m.genres}</span>
+                                    <span className="text-[9px] text-slate-400 truncate">
+                                      {Array.isArray(m.genres)
+                                        ? m.genres.map((g: any) => (typeof g === 'object' && g ? g.name : String(g))).join(', ')
+                                        : String(m.genres)}
+                                    </span>
                                   )}
                                 </div>
                               </div>
