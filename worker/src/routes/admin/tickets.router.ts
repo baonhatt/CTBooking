@@ -31,6 +31,7 @@ ticketsRouter.post('/api/admin/tickets', requireStaffAuth, requirePermission('ti
     const staffEmail = c.get('staffEmail');
 
     const staffFullname = c.get('staffFullname');
+    const restrictBranchIds = getRestrictBranchIds(c);
 
     const r = await createTicketPackageImpl(
       db,
@@ -41,7 +42,8 @@ ticketsRouter.post('/api/admin/tickets', requireStaffAuth, requirePermission('ti
 
       c.env,
 
-      { id: staffId, email: staffEmail, fullname: staffFullname }
+      { id: staffId, email: staffEmail, fullname: staffFullname },
+      restrictBranchIds
     );
 
     // Không cần xóa cache: KV cache cho vé đã bị vô hiệu hóa hoàn toàn
@@ -65,6 +67,7 @@ ticketsRouter.put('/api/admin/tickets/:id', requireStaffAuth, requirePermission(
     const staffEmail = c.get('staffEmail');
 
     const staffFullname = c.get('staffFullname');
+    const restrictBranchIds = getRestrictBranchIds(c);
 
     const r = await updateTicketPackageImpl(
       db,
@@ -77,7 +80,8 @@ ticketsRouter.put('/api/admin/tickets/:id', requireStaffAuth, requirePermission(
 
       c.env,
 
-      { id: staffId, email: staffEmail, fullname: staffFullname }
+      { id: staffId, email: staffEmail, fullname: staffFullname },
+      restrictBranchIds
     );
 
     if (!r) return c.json({ status: 'error', message: 'Không tìm thấy' }, 404);
@@ -102,6 +106,7 @@ ticketsRouter.delete('/api/admin/tickets/:id', requireStaffAuth, requirePermissi
     const staffEmail = c.get('staffEmail');
 
     const staffFullname = c.get('staffFullname');
+    const restrictBranchIds = getRestrictBranchIds(c);
 
     const r = await deleteTicketPackageImpl(
       db,
@@ -112,7 +117,8 @@ ticketsRouter.delete('/api/admin/tickets/:id', requireStaffAuth, requirePermissi
 
       c.env,
 
-      { id: staffId, email: staffEmail, fullname: staffFullname }
+      { id: staffId, email: staffEmail, fullname: staffFullname },
+      restrictBranchIds
     );
 
     if (!r) return c.json({ status: 'error', message: 'Không tìm thấy' }, 404);
@@ -136,12 +142,14 @@ ticketsRouter.post(
       const staffId = c.get('staffId');
       const staffEmail = c.get('staffEmail');
       const staffFullname = c.get('staffFullname');
+      const restrictBranchIds = getRestrictBranchIds(c);
 
       const r = await restoreTicketPackageImpl(
         db,
         { ticket_packages: schema.ticket_packages, auditLogs: schema.auditLogs },
         id,
-        { id: staffId, email: staffEmail, fullname: staffFullname }
+        { id: staffId, email: staffEmail, fullname: staffFullname },
+        restrictBranchIds
       );
 
       return c.json(r, 200);
@@ -189,13 +197,15 @@ ticketsRouter.post(
       const staffId = c.get('staffId');
       const staffEmail = c.get('staffEmail');
       const staffFullname = c.get('staffFullname');
+      const restrictBranchIds = getRestrictBranchIds(c);
 
       const r = await toggleTicketStatusImpl(
         db,
         { ticket_packages: schema.ticket_packages, auditLogs: schema.auditLogs },
         id,
         c.env,
-        { id: staffId, email: staffEmail, fullname: staffFullname }
+        { id: staffId, email: staffEmail, fullname: staffFullname },
+        restrictBranchIds
       );
 
       return c.json(r, 200);

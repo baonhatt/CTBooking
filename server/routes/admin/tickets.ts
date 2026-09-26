@@ -8,6 +8,7 @@ import {
   enrichItemsWithParsedBranchIds,
   resolveBranchIdsInput,
   staffCanAccessBranchIds,
+  staffCanModifyBranchRecord,
   sqlBranchIdsMatchFilter,
   sqlBranchIdsStaffAccessFilter
 } from '../../lib/branch-ids';
@@ -293,7 +294,8 @@ export async function createTicketPackageImpl(
     max_players?: number;
   },
   RUN_ENV: any,
-  staffInfo?: { id: number; email: string; fullname: string }
+  staffInfo?: { id: number; email: string; fullname: string },
+  restrictToBranchIds: number[] | null = null
 ) {
   const {
     name,
@@ -318,6 +320,34 @@ export async function createTicketPackageImpl(
   } = args;
 
   const branchFields = resolveBranchIdsInput(branch_ids, branch_id);
+
+  if (restrictToBranchIds && restrictToBranchIds.length > 0) {
+    if (branchFields.branch_ids === null || (branchFields.branch_ids === undefined && branchFields.branch_id === null)) {
+      const err: any = new Error('Chỉ Super Admin mới có quyền tạo gói vé cho tất cả chi nhánh');
+      err.statusCode = 403;
+      throw err;
+    }
+    if (branch_ids !== undefined && branch_ids !== null) {
+      if (!Array.isArray(branch_ids) || branch_ids.length === 0) {
+        const err: any = new Error('Vui lòng chọn ít nhất một chi nhánh thuộc quyền quản lý');
+        err.statusCode = 400;
+        throw err;
+      }
+      const hasInvalid = branch_ids.some((id) => !restrictToBranchIds.includes(Number(id)));
+      if (hasInvalid) {
+        const err: any = new Error('Bạn không có quyền tạo gói vé cho chi nhánh ngoài phạm vi quản lý');
+        err.statusCode = 403;
+        throw err;
+      }
+    }
+    if (branch_id !== undefined && branch_id !== null) {
+      if (!restrictToBranchIds.includes(Number(branch_id))) {
+        const err: any = new Error('Bạn không có quyền tạo gói vé cho chi nhánh ngoài phạm vi quản lý');
+        err.statusCode = 403;
+        throw err;
+      }
+    }
+  }
 
   // 1. Chuẩn bị thời gian tạo và cập nhật
   const now = new Date();
@@ -485,11 +515,22 @@ export async function updateTicketPackageImpl(
     max_players?: number;
   },
   RUN_ENV: any,
-  staffInfo?: { id: number; email: string; fullname: string }
+  staffInfo?: { id: number; email: string; fullname: string },
+  restrictToBranchIds: number[] | null = null
 ) {
   const existing = await anyDb.query.ticket_packages.findFirst({ where: eq(tables.ticket_packages.id, id) });
   if (!existing) {
     throw new Error('Không tìm thấy gói vé');
+  }
+
+  if (
+    restrictToBranchIds &&
+    restrictToBranchIds.length > 0 &&
+    !staffCanModifyBranchRecord(existing.branch_ids, restrictToBranchIds, false)
+  ) {
+    const err: any = new Error('Bạn không có quyền sửa gói vé này (thuộc chi nhánh khác hoặc tất cả chi nhánh)');
+    err.statusCode = 403;
+    throw err;
   }
 
   const {
@@ -530,6 +571,33 @@ export async function updateTicketPackageImpl(
   if (is_active !== undefined) data.is_active = Boolean(is_active);
   if (display_order !== undefined) data.display_order = Number(display_order);
   if (branch_ids !== undefined || branch_id !== undefined) {
+    if (restrictToBranchIds && restrictToBranchIds.length > 0) {
+      if (branch_ids === null || (branch_ids === undefined && branch_id === null)) {
+        const err: any = new Error('Chỉ Super Admin mới có quyền gán gói vé cho tất cả chi nhánh');
+        err.statusCode = 403;
+        throw err;
+      }
+      if (branch_ids !== undefined && branch_ids !== null) {
+        if (!Array.isArray(branch_ids) || branch_ids.length === 0) {
+          const err: any = new Error('Vui lòng chọn ít nhất một chi nhánh thuộc quyền quản lý');
+          err.statusCode = 400;
+          throw err;
+        }
+        const hasInvalid = branch_ids.some((id) => !restrictToBranchIds.includes(Number(id)));
+        if (hasInvalid) {
+          const err: any = new Error('Bạn không có quyền gán gói vé cho chi nhánh ngoài phạm vi quản lý');
+          err.statusCode = 403;
+          throw err;
+        }
+      }
+      if (branch_id !== undefined && branch_id !== null) {
+        if (!restrictToBranchIds.includes(Number(branch_id))) {
+          const err: any = new Error('Bạn không có quyền gán gói vé cho chi nhánh ngoài phạm vi quản lý');
+          err.statusCode = 403;
+          throw err;
+        }
+      }
+    }
     const branchFields = resolveBranchIdsInput(branch_ids, branch_id);
     if (branchFields.branch_ids !== undefined) data.branch_ids = branchFields.branch_ids;
     if (branchFields.branch_id !== undefined) data.branch_id = branchFields.branch_id;
@@ -635,7 +703,8 @@ export async function deleteTicketPackageImpl(
   tables: { ticket_packages: any; bookings: any; auditLogs: any },
   id: number,
   RUN_ENV: any,
-  staffInfo?: { id: number; email: string; fullname: string }
+  staffInfo?: { id: number; email: string; fullname: string },
+  restrictToBranchIds: number[] | null = null
 ) {
   try {
     // 1. Kiểm tra gói vé có tồn tại không
@@ -645,6 +714,16 @@ export async function deleteTicketPackageImpl(
 
     // Nếu không tìm thấy gói vé, trả về null
     if (!existing) return null;
+
+    if (
+      restrictToBranchIds &&
+      restrictToBranchIds.length > 0 &&
+      !staffCanModifyBranchRecord(existing.branch_ids, restrictToBranchIds, false)
+    ) {
+      const err: any = new Error('Bạn không có quyền xóa gói vé này (thuộc chi nhánh khác hoặc tất cả chi nhánh)');
+      err.statusCode = 403;
+      throw err;
+    }
 
     // 2. Check if ticket package is being used in bookings
     const [bookingCount] = await anyDb
@@ -700,7 +779,8 @@ export async function restoreTicketPackageImpl(
   anyDb: any,
   tables: { ticket_packages: any; auditLogs: any },
   id: number,
-  staffInfo?: { id: number; email: string; fullname: string }
+  staffInfo?: { id: number; email: string; fullname: string },
+  restrictToBranchIds: number[] | null = null
 ) {
   try {
     const existing = await anyDb.query.ticket_packages.findFirst({
@@ -710,6 +790,16 @@ export async function restoreTicketPackageImpl(
     if (!existing) {
       const err: any = new Error('Ticket package not found');
       err.statusCode = 404;
+      throw err;
+    }
+
+    if (
+      restrictToBranchIds &&
+      restrictToBranchIds.length > 0 &&
+      !staffCanModifyBranchRecord(existing.branch_ids, restrictToBranchIds, false)
+    ) {
+      const err: any = new Error('Bạn không có quyền khôi phục gói vé này');
+      err.statusCode = 403;
       throw err;
     }
 
@@ -823,7 +913,8 @@ export async function toggleTicketStatusImpl(
   tables: { ticket_packages: any; auditLogs: any },
   id: number,
   RUN_ENV: any,
-  staffInfo?: { id: number; email: string; fullname: string }
+  staffInfo?: { id: number; email: string; fullname: string },
+  restrictToBranchIds: number[] | null = null
 ) {
   const existing = await anyDb.query.ticket_packages.findFirst({
     where: eq(tables.ticket_packages.id, id)
@@ -832,6 +923,16 @@ export async function toggleTicketStatusImpl(
   if (!existing) {
     const err: any = new Error('Gói vé không tồn tại');
     err.statusCode = 404;
+    throw err;
+  }
+
+  if (
+    restrictToBranchIds &&
+    restrictToBranchIds.length > 0 &&
+    !staffCanModifyBranchRecord(existing.branch_ids, restrictToBranchIds, false)
+  ) {
+    const err: any = new Error('Bạn không có quyền thay đổi trạng thái gói vé này');
+    err.statusCode = 403;
     throw err;
   }
 
