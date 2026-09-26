@@ -26,10 +26,12 @@ import { setCookie } from '@/lib/cookies';
 
 export default function HeroSection({
   initialMovies = [],
-  heroMedia = null
+  heroMedia = null,
+  initialBranchId
 }: {
   initialMovies?: any[];
   heroMedia?: any;
+  initialBranchId?: number;
 }) {
   const pointerX = useMotionValue(0);
   const pointerY = useMotionValue(0);
@@ -100,11 +102,12 @@ export default function HeroSection({
     [heroMedia, isDesktopHero]
   );
 
-  const { data: movies = initialMovies } = useQuery({
+  const isInitialBranch = !selectedBranch?.id || selectedBranch?.id === initialBranchId;
+  const { data: movies = (isInitialBranch ? initialMovies : []) } = useQuery({
     queryKey: ['activeMovies', selectedBranch?.id],
     queryFn: () => getActiveMoviesToday(selectedBranch?.id),
-    initialData: initialMovies,
-    staleTime: 5 * 60 * 1000 // 5 minutes cache to prevent duplicate client refetch on mount
+    initialData: isInitialBranch ? initialMovies : undefined,
+    staleTime: 60 * 1000
   });
 
   // Extract and memoize branch banners

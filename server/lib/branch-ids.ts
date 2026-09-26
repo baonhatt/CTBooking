@@ -88,6 +88,25 @@ export function staffCanAccessBranchIds(
   return parsed.some((id) => staffBranchIds.includes(id));
 }
 
+/**
+ * Mutation guard: edit, delete, toggle status
+ * - Super admin can modify anything.
+ * - Non-superadmin CANNOT modify a record targeting "All branches" (null).
+ * - Non-superadmin can only modify records where all targeted branches are within staff's assigned branches.
+ */
+export function staffCanModifyBranchRecord(
+  recordBranchIds: string | null | undefined,
+  staffBranchIds: number[] | undefined,
+  isSuperAdmin: boolean | undefined
+): boolean {
+  if (isSuperAdmin) return true;
+  if (!staffBranchIds || staffBranchIds.length === 0) return false;
+  const parsed = parseBranchIds(recordBranchIds ?? null);
+  if (parsed === null) return false; // Global records cannot be modified by branch-specific staff
+  if (parsed.length === 0) return false;
+  return parsed.every((id) => staffBranchIds.includes(id));
+}
+
 /** SQL: record visible when filtering public/admin list by a single branch */
 export function sqlBranchIdsMatchFilter(
   branchIdsColumn: unknown,

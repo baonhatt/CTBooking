@@ -45,10 +45,17 @@ const safetyGuidelines = [
   'Luôn tuân thủ giới hạn khu vực chơi để tránh va chạm vật lý ngoài đời thực.'
 ];
 
-export default function VRShowcase({ initialPackages = [] }: { initialPackages?: any[] }) {
+export default function VRShowcase({
+  initialPackages = [],
+  initialBranchId
+}: {
+  initialPackages?: any[];
+  initialBranchId?: number;
+}) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { selectedBranch } = useBranch();
+  const isInitialBranch = !selectedBranch?.id || selectedBranch?.id === initialBranchId;
   const [selectedGenre, setSelectedGenre] = useState<string>('all');
   const [selectedDetailPkg, setSelectedDetailPkg] = useState<any | null>(null);
   const [modalQty, setModalQty] = useState<number>(1);
@@ -61,11 +68,11 @@ export default function VRShowcase({ initialPackages = [] }: { initialPackages?:
   const { data: vrRes } = useQuery({
     queryKey: ['vrPackages', selectedBranch?.id],
     queryFn: () => getVRPackages(selectedBranch?.id),
-    initialData: { items: initialPackages },
-    staleTime: 5 * 60 * 1000 // 5 minutes cache to prevent duplicate client refetch on mount
+    initialData: isInitialBranch ? { items: initialPackages } : undefined,
+    staleTime: 60 * 1000
   });
 
-  const packagesData: any[] = vrRes?.items ?? initialPackages;
+  const packagesData: any[] = vrRes?.items ?? (isInitialBranch ? initialPackages : []);
 
   const resolveImageUrl = (u: string | undefined | null) => {
     if (!u) return '';

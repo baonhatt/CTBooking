@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { getMoviesAdmin, updateMovieStatus, getAdminBranchOptions, deleteMovieApi } from '@/lib/api';
 import AdminLayout from '@/admin/layouts/AdminLayout';
 import MoviesContent from '@/components/admin/content/MoviesContent';
-import { useStaffPermission } from '@/hooks/useStaffPermission';
+import { useStaffPermission, useStaffBranchIds } from '@/hooks/useStaffPermission';
 import { MovieEditModal } from '@/components/admin/dialogs/MovieEditModal';
 import { toast } from 'sonner';
 import { useStaffStore } from '@/store/staffStore';
@@ -21,6 +21,7 @@ import {
 export default function MoviesPage() {
   const navigate = useNavigate();
   const staff = useStaffStore((state) => state.staff);
+  const staffBranchIds = useStaffBranchIds();
   const clearStaff = useStaffStore((state) => state.clearStaff);
   const [activeTab, setActiveTab] = useState('movies');
 
@@ -147,6 +148,15 @@ export default function MoviesPage() {
   };
   const handleOpenCreate = () => {
     setEditType('movie');
+    const defaultBranchIds =
+      selectedBranchId && selectedBranchId !== 'all'
+        ? [selectedBranchId]
+        : staffBranchIds && staffBranchIds.length > 0
+          ? staffBranchIds
+          : staff?.isSuperAdmin
+            ? null
+            : [];
+
     setEditData({
       id: '',
       title: '',
@@ -154,7 +164,9 @@ export default function MoviesPage() {
       duration: '',
       posterUrl: '',
       status: 'active',
-      price: 0
+      price: 0,
+      branch_ids: defaultBranchIds,
+      branch_id: defaultBranchIds && defaultBranchIds.length === 1 ? defaultBranchIds[0] : null
     });
     setIsEditOpen(true);
   };

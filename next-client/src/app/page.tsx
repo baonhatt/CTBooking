@@ -101,14 +101,14 @@ export default async function Home({ searchParams }: { searchParams: { branch_id
     <UserLayout>
       <main>
         <ClearStorageOnMount />
-        <HeroSection initialMovies={activeMovies} heroMedia={heroMedia} />
+        <HeroSection initialMovies={activeMovies} heroMedia={heroMedia} initialBranchId={effectiveBranchId} />
 
         <Suspense fallback={<div className="min-h-[200px]" />}>
           {/* Pass initial data to the interactive Client Components */}
-          <FilmCarousel initialFilms={activeMovies} />
+          <FilmCarousel initialFilms={activeMovies} initialBranchId={effectiveBranchId} />
           <MovieScheduleSection />
-          <VRShowcase initialPackages={vrRes.items || []} />
-          <PromotionShowcase initialCombos={ticketsRes.items || []} />
+          <VRShowcase initialPackages={vrRes.items || []} initialBranchId={effectiveBranchId} />
+          <PromotionShowcase initialCombos={ticketsRes.items || []} initialBranchId={effectiveBranchId} />
           <TechnologyBanner initialMainItem={techMainItem} initialListItems={techListItems} />
           <ProductSection initialProducts={toysRes.items || []} />
         </Suspense>

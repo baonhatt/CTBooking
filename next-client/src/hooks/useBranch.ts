@@ -81,30 +81,37 @@ export function useBranch() {
       setCookie(SELECTED_BRANCH_KEY, String(branch.id), 60 * 60 * 24 * 30);
       localStorage.setItem(SELECTED_BRANCH_KEY, String(branch.id));
 
-      // Force update the current query data regardless of the key
-      queryClient.setQueryData(['branches', urlBranchId], (old: any) =>
-        old ? { ...old, selectedBranch: branch } : old
+      const branchPayload = {
+        branches: data?.branches?.length ? data.branches : [branch],
+        selectedBranch: branch
+      };
+
+      // Force update all queries starting with 'branches'
+      queryClient.setQueriesData({ queryKey: ['branches'] }, (old: any) =>
+        old ? { ...old, selectedBranch: branch } : branchPayload
       );
 
-      // Also update for the target branch ID to be safe
-      queryClient.setQueryData(['branches', branch.id], (old: any) => (old ? { ...old, selectedBranch: branch } : old));
+      // Explicitly set for current, target branch ID, and null
+      queryClient.setQueryData(['branches', urlBranchId], branchPayload);
+      queryClient.setQueryData(['branches', branch.id], branchPayload);
+      queryClient.setQueryData(['branches', null], branchPayload);
 
       const params = new URLSearchParams(searchParams.toString());
       params.set('branch_id', branch.id.toString());
 
       if (isPostsRoute) {
-        // For posts, we update storage but don't necessarily need branch_id in URL
-        // However, we must ensure the UI re-renders.
-        // router.refresh() or just pushing the pathname works if the state is updated.
         router.push(pathname);
       } else {
         router.push(`${pathname}?${params.toString()}`);
       }
 
+      // Invalidate all queries that depend on the active branch
       queryClient.invalidateQueries({ queryKey: ['activeMovies'] });
       queryClient.invalidateQueries({ queryKey: ['activeTickets'] });
+      queryClient.invalidateQueries({ queryKey: ['vrPackages'] });
+      queryClient.invalidateQueries({ queryKey: ['publicSchedule'] });
     },
-    [isPostsRoute, pathname, queryClient, router, searchParams, urlBranchId]
+    [data?.branches, isPostsRoute, pathname, queryClient, router, searchParams, urlBranchId]
   );
 
   const toggleDontShowConfirm = useCallback((value: boolean) => {

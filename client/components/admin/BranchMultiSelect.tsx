@@ -12,6 +12,7 @@ type BranchMultiSelectProps = {
   disabled?: boolean;
   isLoading?: boolean;
   className?: string;
+  allowAll?: boolean;
 };
 
 export function BranchMultiSelect({
@@ -20,10 +21,11 @@ export function BranchMultiSelect({
   onChange,
   disabled,
   isLoading,
-  className
+  className,
+  allowAll = true
 }: BranchMultiSelectProps) {
-  const isAll = value === null;
-  const selectedIds = value ?? [];
+  const isAll = allowAll && value === null;
+  const selectedIds = value ?? (allowAll ? [] : branches.map((b) => b.id));
   const allSelected = isAll || (branches.length > 0 && selectedIds.length === branches.length);
 
   const toggleAll = (checked: boolean) => {
@@ -45,7 +47,7 @@ export function BranchMultiSelect({
     const current = selectedIds;
     if (checked) {
       const next = [...current, branchId];
-      if (next.length === branches.length) {
+      if (allowAll && next.length === branches.length) {
         onChange(null);
         return;
       }
@@ -71,18 +73,20 @@ export function BranchMultiSelect({
 
   return (
     <div className={`rounded-xl border border-gray-200 bg-white p-3 shadow-sm ${className || ''}`}>
-      {/* "Tất cả chi nhánh" Checkbox */}
-      <div className="flex items-center gap-2.5 pb-2.5 border-b border-gray-100">
-        <Checkbox
-          id="branch-select-all"
-          checked={allSelected}
-          disabled={disabled || branches.length === 0}
-          onCheckedChange={(checked) => toggleAll(Boolean(checked))}
-        />
-        <Label htmlFor="branch-select-all" className="text-sm font-semibold text-gray-900 cursor-pointer select-none">
-          Tất cả chi nhánh
-        </Label>
-      </div>
+      {/* "Tất cả chi nhánh" Checkbox - only shown when allowAll is true */}
+      {allowAll && (
+        <div className="flex items-center gap-2.5 pb-2.5 border-b border-gray-100">
+          <Checkbox
+            id="branch-select-all"
+            checked={allSelected}
+            disabled={disabled || branches.length === 0}
+            onCheckedChange={(checked) => toggleAll(Boolean(checked))}
+          />
+          <Label htmlFor="branch-select-all" className="text-sm font-semibold text-gray-900 cursor-pointer select-none">
+            Tất cả chi nhánh
+          </Label>
+        </div>
+      )}
 
       {/* List of Branches */}
       <div className="pt-2 max-h-44 overflow-y-auto space-y-0.5">

@@ -8,6 +8,7 @@ import {
   parseBranchIds,
   resolveBranchIdsInput,
   staffCanAccessBranchIds,
+  staffCanModifyBranchRecord,
   sqlBranchIdsMatchFilter,
   sqlBranchIdsStaffAccessFilter
 } from '../../lib/branch-ids';
@@ -32,7 +33,8 @@ export async function createMovieImpl(
   config?: any,
   RUN_ENV?: any,
   uploader?: (base64: string, folder: string) => Promise<{ url: string }>,
-  staffInfo?: { id: number; email: string; fullname: string }
+  staffInfo?: { id: number; email: string; fullname: string },
+  restrictToBranchIds: number[] | null = null
 ) {
   if (config) {
     process.env = config;
@@ -48,7 +50,41 @@ export async function createMovieImpl(
       throw error; // Throw lỗi khi upload ảnh
     }
   }
-  const branchFields = resolveBranchIdsInput(data.branch_ids, data.branch_id);
+
+  let targetBranchIds = data.branch_ids;
+  let targetBranchId = data.branch_id;
+
+  if (restrictToBranchIds && restrictToBranchIds.length > 0) {
+    if (targetBranchIds === undefined && targetBranchId === undefined) {
+      targetBranchIds = restrictToBranchIds;
+      targetBranchId = restrictToBranchIds[0];
+    } else if (targetBranchIds === null || (targetBranchIds === undefined && targetBranchId === null)) {
+      const err: any = new Error('Chỉ Super Admin mới có quyền tạo phim cho tất cả chi nhánh');
+      err.statusCode = 403;
+      throw err;
+    } else if (targetBranchIds !== undefined && targetBranchIds !== null) {
+      if (!Array.isArray(targetBranchIds) || targetBranchIds.length === 0) {
+        const err: any = new Error('Vui lòng chọn ít nhất một chi nhánh thuộc quyền quản lý của bạn');
+        err.statusCode = 400;
+        throw err;
+      }
+      const hasInvalid = targetBranchIds.some((id) => !restrictToBranchIds.includes(Number(id)));
+      if (hasInvalid) {
+        const err: any = new Error('Bạn không có quyền tạo phim cho chi nhánh ngoài phạm vi quản lý');
+        err.statusCode = 403;
+        throw err;
+      }
+    } else if (targetBranchId !== undefined && targetBranchId !== null) {
+      if (!restrictToBranchIds.includes(Number(targetBranchId))) {
+        const err: any = new Error('Bạn không có quyền tạo phim cho chi nhánh ngoài phạm vi quản lý');
+        err.statusCode = 403;
+        throw err;
+      }
+      targetBranchIds = [Number(targetBranchId)];
+    }
+  }
+
+  const branchFields = resolveBranchIdsInput(targetBranchIds, targetBranchId);
   const baseData: any = {
     title: data.title,
     description: data.description,
@@ -132,9 +168,9 @@ export async function updateMovieImpl(
     oldMovie &&
     restrictToBranchIds &&
     restrictToBranchIds.length > 0 &&
-    !staffCanAccessBranchIds(oldMovie.branch_ids, restrictToBranchIds, false)
+    !staffCanModifyBranchRecord(oldMovie.branch_ids, restrictToBranchIds, false)
   ) {
-    const err: any = new Error('Bạn không có quyền sửa phim thuộc chi nhánh khác');
+    const err: any = new Error('Bạn không có quyền sửa phim này (phim thuộc chi nhánh khác hoặc áp dụng cho tất cả chi nhánh)');
     err.statusCode = 403;
     throw err;
   }
@@ -161,6 +197,33 @@ export async function updateMovieImpl(
   if (data.rating !== undefined) payload.rating = data.rating ?? null;
   if (data.duration_min !== undefined) payload.duration_min = data.duration_min;
   if (data.branch_ids !== undefined || data.branch_id !== undefined) {
+    if (restrictToBranchIds && restrictToBranchIds.length > 0) {
+      if (data.branch_ids === null || (data.branch_ids === undefined && data.branch_id === null)) {
+        const err: any = new Error('Chỉ Super Admin mới có quyền gán phim cho tất cả chi nhánh');
+        err.statusCode = 403;
+        throw err;
+      }
+      if (data.branch_ids !== undefined && data.branch_ids !== null) {
+        if (!Array.isArray(data.branch_ids) || data.branch_ids.length === 0) {
+          const err: any = new Error('Vui lòng chọn ít nhất một chi nhánh thuộc quyền quản lý');
+          err.statusCode = 400;
+          throw err;
+        }
+        const hasInvalid = data.branch_ids.some((id) => !restrictToBranchIds.includes(Number(id)));
+        if (hasInvalid) {
+          const err: any = new Error('Bạn không có quyền gán phim cho chi nhánh ngoài phạm vi quản lý');
+          err.statusCode = 403;
+          throw err;
+        }
+      }
+      if (data.branch_id !== undefined && data.branch_id !== null) {
+        if (!restrictToBranchIds.includes(Number(data.branch_id))) {
+          const err: any = new Error('Bạn không có quyền gán phim cho chi nhánh ngoài phạm vi quản lý');
+          err.statusCode = 403;
+          throw err;
+        }
+      }
+    }
     const branchFields = resolveBranchIdsInput(data.branch_ids, data.branch_id);
     if (branchFields.branch_ids !== undefined) payload.branch_ids = branchFields.branch_ids;
     if (branchFields.branch_id !== undefined) payload.branch_id = branchFields.branch_id;
@@ -270,9 +333,9 @@ export async function deleteMovieImpl(
   if (
     restrictToBranchIds &&
     restrictToBranchIds.length > 0 &&
-    !staffCanAccessBranchIds(existing.branch_ids, restrictToBranchIds, false)
+    !staffCanModifyBranchRecord(existing.branch_ids, restrictToBranchIds, false)
   ) {
-    const err: any = new Error('Bạn không có quyền xóa phim thuộc chi nhánh khác');
+    const err: any = new Error('Bạn không có quyền xóa phim này (phim thuộc chi nhánh khác hoặc áp dụng cho tất cả chi nhánh)');
     err.statusCode = 403;
     throw err;
   }
@@ -347,7 +410,8 @@ export async function restoreMovieImpl(
   anyDb: any,
   tables: { movies: any; auditLogs: any },
   id: number,
-  staffInfo?: { id: number; email: string; fullname: string }
+  staffInfo?: { id: number; email: string; fullname: string },
+  restrictToBranchIds: number[] | null = null
 ) {
   const existing = await anyDb.query.movies.findFirst({
     where: eq(tables.movies.id, id)
@@ -356,6 +420,16 @@ export async function restoreMovieImpl(
   if (!existing) {
     const err: any = new Error('Movie not found');
     err.statusCode = 404;
+    throw err;
+  }
+
+  if (
+    restrictToBranchIds &&
+    restrictToBranchIds.length > 0 &&
+    !staffCanModifyBranchRecord(existing.branch_ids, restrictToBranchIds, false)
+  ) {
+    const err: any = new Error('Bạn không có quyền khôi phục phim này (phim thuộc chi nhánh khác hoặc áp dụng cho tất cả chi nhánh)');
+    err.statusCode = 403;
     throw err;
   }
 
@@ -472,9 +546,9 @@ export async function updateMovieStatusImpl(
     if (
       restrictToBranchIds &&
       restrictToBranchIds.length > 0 &&
-      !staffCanAccessBranchIds(existingMovie.branch_ids, restrictToBranchIds, false)
+      !staffCanModifyBranchRecord(existingMovie.branch_ids, restrictToBranchIds, false)
     ) {
-      const err: any = new Error('Bạn không có quyền thay đổi trạng thái phim thuộc chi nhánh khác');
+      const err: any = new Error('Bạn không có quyền thay đổi trạng thái phim này (phim thuộc chi nhánh khác hoặc áp dụng cho tất cả chi nhánh)');
       err.statusCode = 403;
       throw err;
     }

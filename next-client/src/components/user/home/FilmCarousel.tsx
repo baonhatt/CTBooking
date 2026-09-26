@@ -26,10 +26,11 @@ import type { EmblaCarouselType } from 'embla-carousel';
 
 interface FilmCarouselProps {
   initialFilms?: any[];
+  initialBranchId?: number;
   onSelectFilm?: () => void;
 }
 
-export default function FilmCarousel({ initialFilms = [], onSelectFilm }: FilmCarouselProps) {
+export default function FilmCarousel({ initialFilms = [], initialBranchId, onSelectFilm }: FilmCarouselProps) {
   const router = useRouter();
   const [mounted, setMounted] = useState(false);
   const [selectedMovieId, setSelectedMovieId] = useState<number | null>(null);
@@ -65,12 +66,13 @@ export default function FilmCarousel({ initialFilms = [], onSelectFilm }: FilmCa
   );
 
   const { selectedBranch } = useBranch();
-  const { data: activeFilms = initialFilms } = useQuery({
+  const isInitialBranch = !selectedBranch?.id || selectedBranch?.id === initialBranchId;
+  const { data: activeFilms = (isInitialBranch ? initialFilms : []) } = useQuery({
     queryKey: ['activeMovies', selectedBranch?.id],
     queryFn: () => getActiveMoviesToday(selectedBranch?.id),
-    initialData: initialFilms,
+    initialData: isInitialBranch ? initialFilms : undefined,
     enabled: mounted,
-    staleTime: 5 * 60 * 1000 // 5 minutes cache to prevent duplicate client refetch on mount
+    staleTime: 60 * 1000
   });
 
   const films = useMemo(() => {

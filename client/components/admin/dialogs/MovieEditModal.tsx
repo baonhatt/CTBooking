@@ -10,6 +10,7 @@ import { BranchMultiSelect } from '@/components/admin/BranchMultiSelect';
 import { normalizeBranchIdsInput, parseBranchIdsFromApi } from '@/lib/branch-ids';
 import { createMovieApi, updateMovieApi, getMovieById, getAdminBranchOptions } from '@/lib/api';
 import { formatToVNDatetimeLocal, vnDatetimeLocalToUTC } from '@/lib/utils';
+import { useIsSuperAdmin, useStaffBranchIds } from '@/hooks/useStaffPermission';
 
 export interface MovieEditModalProps {
   isEditOpen: boolean;
@@ -28,11 +29,20 @@ export const MovieEditModal: React.FC<MovieEditModalProps> = ({
   branchesProp,
   onRefresh
 }) => {
+  const isSuperAdmin = useIsSuperAdmin();
+  const staffBranchIds = useStaffBranchIds();
+
   const [isSaving, setIsSaving] = useState(false);
   const [isDirty, setIsDirty] = useState(false);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [isDragging, setIsDragging] = useState(false);
   const [branches, setBranches] = useState<any[]>([]);
+
+  const availableBranches = React.useMemo(() => {
+    if (isSuperAdmin) return branches;
+    if (!staffBranchIds || staffBranchIds.length === 0) return branches;
+    return branches.filter((b) => staffBranchIds.includes(b.id));
+  }, [branches, isSuperAdmin, staffBranchIds]);
 
   useEffect(() => {
     if (!isEditOpen) {
@@ -340,9 +350,10 @@ export const MovieEditModal: React.FC<MovieEditModalProps> = ({
                     <div className="grid grid-cols-12 gap-4">
                       <div className="col-span-12 lg:col-span-6">
                         <Label className="text-sm font-medium text-gray-900 mb-2 block">Chi nhánh</Label>
-                        {branches && branches.length > 0 ? (
+                        {availableBranches && availableBranches.length > 0 ? (
                           <BranchMultiSelect
-                            branches={branches}
+                            branches={availableBranches}
+                            allowAll={isSuperAdmin}
                             value={normalizeBranchIdsInput(editData?.branch_ids, editData?.branch_id)}
                             onChange={(branch_ids) => {
                               setEditData({
@@ -464,10 +475,22 @@ export const MovieEditModal: React.FC<MovieEditModalProps> = ({
                     });
                   }
 
-                  const branch_ids = normalizeBranchIdsInput(editData.branch_ids, editData.branch_id);
-                  if (Array.isArray(branch_ids) && branch_ids.length === 0) {
-                    toast.error('Lỗi', { description: 'Vui lòng chọn ít nhất một chi nhánh hoặc "Tất cả chi nhánh"' });
-                    return;
+                  let branch_ids = normalizeBranchIdsInput(editData.branch_ids, editData.branch_id);
+                  if (!isSuperAdmin) {
+                    if (branch_ids === null) {
+                      branch_ids = staffBranchIds && staffBranchIds.length > 0
+                        ? staffBranchIds
+                        : (availableBranches.length > 0 ? [availableBranches[0].id] : []);
+                    }
+                    if (!Array.isArray(branch_ids) || branch_ids.length === 0) {
+                      toast.error('Lỗi', { description: 'Vui lòng chọn ít nhất một chi nhánh thuộc quyền quản lý' });
+                      return;
+                    }
+                  } else {
+                    if (Array.isArray(branch_ids) && branch_ids.length === 0) {
+                      toast.error('Lỗi', { description: 'Vui lòng chọn ít nhất một chi nhánh hoặc "Tất cả chi nhánh"' });
+                      return;
+                    }
                   }
 
                   const payload = {

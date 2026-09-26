@@ -1,7 +1,7 @@
-import { eq, and, inArray } from 'drizzle-orm';
-import { parseBranchIds, staffCanAccessBranchIds } from './branch-ids';
+import { eq, inArray } from 'drizzle-orm';
+import { parseBranchIds, staffCanAccessBranchIds, staffCanModifyBranchRecord } from './branch-ids';
 
-export { staffCanAccessBranchIds, parseBranchIds, matchesBranchFilter } from './branch-ids';
+export { staffCanAccessBranchIds, staffCanModifyBranchRecord, parseBranchIds, matchesBranchFilter } from './branch-ids';
 
 /**
  * Apply branch isolation filter to a query

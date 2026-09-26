@@ -45,5 +45,6 @@ uploads/
 *.sqlite-wal
 *.sql
 !worker/migrations/*.sql
-
+!docs/create_local_manager_accounts.sql
+tmp/
 

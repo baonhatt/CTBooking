@@ -24,21 +24,28 @@ import { Button } from '@/components/ui/button';
 import { ShoppingCart, Sparkles } from 'lucide-react';
 import { toast } from 'sonner';
 
-export default function PromotionShowcase({ initialCombos = [] }: { initialCombos?: any[] }) {
+export default function PromotionShowcase({
+  initialCombos = [],
+  initialBranchId
+}: {
+  initialCombos?: any[];
+  initialBranchId?: number;
+}) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [showBranchConfirmDialog, setShowBranchConfirmDialog] = useState(false);
   const { selectedBranch, dontShowConfirm, toggleDontShowConfirm } = useBranch();
+  const isInitialBranch = !selectedBranch?.id || selectedBranch?.id === initialBranchId;
 
   // Thêm useQuery để tự động refetch khi branch thay đổi
   const { data: ticketsRes } = useQuery({
     queryKey: ['activeTickets', selectedBranch?.id],
     queryFn: () => getActiveTickets(selectedBranch?.id),
-    initialData: { items: initialCombos, total: initialCombos.length },
-    staleTime: 5 * 60 * 1000 // 5 minutes cache to prevent duplicate client refetch on mount
+    initialData: isInitialBranch ? { items: initialCombos, total: initialCombos.length } : undefined,
+    staleTime: 60 * 1000
   });
 
-  const combosData = ticketsRes?.items ?? initialCombos;
+  const combosData = ticketsRes?.items ?? (isInitialBranch ? initialCombos : []);
 
   useEffect(() => {
     router.prefetch('/booking');

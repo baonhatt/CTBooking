@@ -40,6 +40,7 @@ moviesRouter.post('/api/admin/movies', requireStaffAuth, requirePermission('movi
     const staffEmail = c.get('staffEmail');
 
     const staffFullname = c.get('staffFullname');
+    const restrictBranchIds = getRestrictBranchIds(c);
 
     const r = await createMovieImpl(
       db,
@@ -54,7 +55,8 @@ moviesRouter.post('/api/admin/movies', requireStaffAuth, requirePermission('movi
 
       cloud.uploader,
 
-      { id: staffId, email: staffEmail, fullname: staffFullname }
+      { id: staffId, email: staffEmail, fullname: staffFullname },
+      restrictBranchIds
     );
 
     // Không cần xóa cache: KV cache cho phim đã bị vô hiệu hóa hoàn toàn
@@ -68,8 +70,8 @@ moviesRouter.post('/api/admin/movies', requireStaffAuth, requirePermission('movi
     };
 
     return c.json(payload, status);
-  } catch {
-    return c.json({ status: 'error', message: 'Lỗi máy chủ nội bộ' }, 500);
+  } catch (err: any) {
+    return c.json({ status: 'error', message: err?.message || 'Lỗi máy chủ nội bộ' }, err?.statusCode || 500);
   }
 });
 
@@ -232,12 +234,19 @@ moviesRouter.post(
       const staffId = c.get('staffId');
       const staffEmail = c.get('staffEmail');
       const staffFullname = c.get('staffFullname');
+      const restrictBranchIds = getRestrictBranchIds(c);
 
-      const r = await restoreMovieImpl(db, { movies: schema.movies, auditLogs: schema.auditLogs }, id, {
-        id: staffId,
-        email: staffEmail,
-        fullname: staffFullname
-      });
+      const r = await restoreMovieImpl(
+        db,
+        { movies: schema.movies, auditLogs: schema.auditLogs },
+        id,
+        {
+          id: staffId,
+          email: staffEmail,
+          fullname: staffFullname
+        },
+        restrictBranchIds
+      );
 
       return c.json(r, 200);
     } catch (err: any) {

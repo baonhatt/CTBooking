@@ -55,7 +55,8 @@ import {
 import { optimizeCloudinaryUrl } from '@/lib/utils';
 
 import { useNavigate } from 'react-router-dom';
-import { useStaffPermissions, useIsSuperAdmin } from '@/hooks/useStaffPermission';
+import { useStaffPermissions, useIsSuperAdmin, useStaffBranchIds } from '@/hooks/useStaffPermission';
+import { parseBranchIdsFromApi } from '@/lib/branch-ids';
 
 interface MovieData {
   id: string | number;
@@ -135,6 +136,16 @@ export default function MoviesContent({
   const navigate = useNavigate();
   const permissions = useStaffPermissions();
   const isSuperAdmin = useIsSuperAdmin();
+  const staffBranchIds = useStaffBranchIds();
+
+  const canModifyMovie = (movie: any) => {
+    if (isSuperAdmin) return true;
+    if (!staffBranchIds.length) return false;
+    const parsed = parseBranchIdsFromApi(movie.branch_ids ?? movie.branch_id);
+    if (parsed === null) return false; // Global records cannot be modified by branch staff
+    if (parsed.length === 0) return false;
+    return parsed.every((id: number) => staffBranchIds.includes(id));
+  };
 
   const hasPermission = (module: string, action: string) => {
     if (isSuperAdmin) return true;
@@ -355,6 +366,7 @@ export default function MoviesContent({
               ) : (
                 data.map((movie) => {
                   const isActive = movieStatus[movie.id] === 'active';
+                  const canEditThisMovie = canModifyMovie(movie);
                   return (
                     <TableRow
                       key={movie.id}
@@ -417,7 +429,7 @@ export default function MoviesContent({
                       <TableCell>
                         <div className="flex items-center justify-center gap-4 py-2">
                           <div className="flex shrink-0 w-12 justify-center">
-                            {hasPermission('movies', 'toggle_status') ? (
+                            {hasPermission('movies', 'toggle_status') && canEditThisMovie ? (
                               <AlertDialog>
                                 <AlertDialogTrigger asChild>
                                   <Switch
@@ -513,14 +525,15 @@ export default function MoviesContent({
                             <Button
                               variant="outline"
                               size="sm"
-                              className="h-8 rounded-lg hover:bg-yellow-50 text-yellow-600"
-                              onClick={() => onEdit('movie', movie)}
-                              title="Chỉnh sửa"
+                              disabled={!canEditThisMovie}
+                              className={`h-8 rounded-lg ${canEditThisMovie ? 'hover:bg-yellow-50 text-yellow-600' : 'opacity-40 cursor-not-allowed text-gray-400'}`}
+                              onClick={() => canEditThisMovie && onEdit('movie', movie)}
+                              title={canEditThisMovie ? 'Chỉnh sửa' : 'Chỉ Super Admin mới có quyền sửa phim này'}
                             >
                               <Pencil className="h-3.5 w-3.5" />
                             </Button>
                           )}
-                          {onDelete && hasPermission('movies', 'delete') && (
+                          {onDelete && hasPermission('movies', 'delete') && canEditThisMovie && (
                             <Button
                               variant="outline"
                               size="sm"
