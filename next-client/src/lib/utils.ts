@@ -111,6 +111,9 @@ export function optimizeCloudinaryUrl(
   if (!url) return undefined;
   if (!url.includes('cloudinary.com')) return url;
 
+  // Force HTTPS for production mixed-content prevention
+  url = url.replace(/^http:\/\//i, 'https://');
+
   // Convert .heic or .heif to .jpg so all web browsers can display it
   const formattedUrl = url.replace(/\.(heic|heif)$/i, '.jpg');
 
@@ -150,6 +153,10 @@ export function optimizeCloudinaryVideoUrl(
 ): string | undefined {
   if (!url) return undefined;
   if (!url.includes('cloudinary.com')) return url;
+  
+  // Force HTTPS for production mixed-content prevention
+  url = url.replace(/^http:\/\//i, 'https://');
+  
   const parts = url.split('/upload/');
   if (parts.length !== 2) return url;
 
@@ -176,6 +183,9 @@ export function getCloudinaryThumbnail(
 ): string | undefined {
   if (!url) return undefined;
   if (!url.includes('cloudinary.com')) return url;
+
+  // Force HTTPS for production mixed-content prevention
+  url = url.replace(/^http:\/\//i, 'https://');
 
   const transformations = ['f_auto', `q_${getAutoQuality(quality)}`, 'so_2'];
   if (width) transformations.push(`w_${width}`, 'c_limit');
