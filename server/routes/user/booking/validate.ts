@@ -207,6 +207,12 @@ export async function validateBookingInput(
     for (const it of vr_items) {
       const pkg: any = vrPkgMap.get(it.vr_package_id);
       if (!pkg) continue;
+
+      const targetBranchIdForVR = pkg.branch_id || branch_id || targetBranchId;
+      if (!matchesBranch(pkg.branch_ids, targetBranchIdForVR)) {
+        throw new HttpError(400, `Gói VR "${pkg.name}" không áp dụng tại chi nhánh bạn chọn.`);
+      }
+
       const qty = Math.max(1, Number(it.quantity || 1));
       const price = Number(pkg.price || 0);
       const lineTotal = price * qty;
