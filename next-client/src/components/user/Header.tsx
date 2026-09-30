@@ -38,6 +38,8 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { Calendar, Check, ChevronDown, Gamepad2, MapPin, ShoppingCart } from 'lucide-react';
 import { useCart } from '@/store/cartStore';
+import { useQuery } from '@tanstack/react-query';
+import { getVRPackages } from '@/lib/api/vr-packages';
 const LoginDialog = dynamic(() => import('@/components/LoginDialog'), { ssr: false });
 const RegisterDialog = dynamic(() => import('@/components/RegisterDialog'), { ssr: false });
 const ForgetPasswordDialog = dynamic(() => import('@/components/ForgetPasswordDialog'), { ssr: false });
@@ -69,6 +71,13 @@ export default function Header({
 
     const { branches, selectedBranch, selectBranch } = useBranch();
     const { totalItemsCount, openCart } = useCart();
+
+    const { data: vrRes } = useQuery({
+        queryKey: ['vrPackages', selectedBranch?.id],
+        queryFn: () => getVRPackages(selectedBranch?.id),
+        staleTime: 60 * 1000
+    });
+    const hasVRPackages = vrRes?.items && vrRes.items.length > 0;
 
     const [isScheduleOpen, setIsScheduleOpen] = useState(false);
     const [mounted, setMounted] = useState(false);
@@ -263,7 +272,7 @@ export default function Header({
         setShowBranchConfirm(false);
     };
 
-    const navItems = NAV_ITEMS;
+    const navItems = hasVRPackages ? NAV_ITEMS : NAV_ITEMS.filter((item: any) => item.target !== 'vr');
 
     return (
         <header

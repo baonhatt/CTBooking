@@ -19,6 +19,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { useQuery } from '@tanstack/react-query';
 import { movieStore } from '@/store/movieStore';
 import { getMovieById, getActiveMoviesToday } from '@/lib/api/movies';
+import { getVRPackages } from '@/lib/api/vr-packages';
 import { optimizeCloudinaryUrl, optimizeCloudinaryVideoUrl, getCloudinaryThumbnail } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { useBranch } from '@/hooks/useBranch';
@@ -109,6 +110,13 @@ export default function HeroSection({
     initialData: isInitialBranch ? initialMovies : undefined,
     staleTime: 60 * 1000
   });
+
+  const { data: vrRes } = useQuery({
+    queryKey: ['vrPackages', selectedBranch?.id],
+    queryFn: () => getVRPackages(selectedBranch?.id),
+    staleTime: 60 * 1000
+  });
+  const hasVRPackages = vrRes?.items && vrRes.items.length > 0;
 
   // Extract and memoize branch banners
   const branchBanners = useMemo<string[]>(() => {
@@ -415,18 +423,20 @@ export default function HeroSection({
                   <span className="truncate">Lịch chiếu hôm nay</span>
                 </Button>
 
-                <Button
-                  className="w-full sm:w-auto group rounded-xl px-2 sm:px-8 py-4 sm:py-6 text-[13px] sm:text-base font-bold bg-gradient-to-r from-purple-600 via-fuchsia-600 to-pink-600 hover:from-pink-600 hover:via-purple-600 hover:to-fuchsia-600 text-white shadow-[0_0_20px_rgba(168,85,247,0.3)] sm:shadow-[0_0_30px_rgba(168,85,247,0.4)] transition-all duration-300 hover:scale-[1.02] active:scale-95 cursor-pointer flex justify-center items-center"
-                  onClick={() => {
-                    const vrSection = document.getElementById('vr');
-                    vrSection?.scrollIntoView({ behavior: 'smooth' });
-                  }}
-                >
-                  <span className="flex items-center gap-1.5 sm:gap-2 whitespace-nowrap">
-                    <Gamepad2 className="h-4 w-4 sm:h-5 sm:w-5" />
-                    Trải nghiệm VR
-                  </span>
-                </Button>
+                {hasVRPackages && (
+                  <Button
+                    className="w-full sm:w-auto group rounded-xl px-2 sm:px-8 py-4 sm:py-6 text-[13px] sm:text-base font-bold bg-gradient-to-r from-purple-600 via-fuchsia-600 to-pink-600 hover:from-pink-600 hover:via-purple-600 hover:to-fuchsia-600 text-white shadow-[0_0_20px_rgba(168,85,247,0.3)] sm:shadow-[0_0_30px_rgba(168,85,247,0.4)] transition-all duration-300 hover:scale-[1.02] active:scale-95 cursor-pointer flex justify-center items-center"
+                    onClick={() => {
+                      const vrSection = document.getElementById('vr');
+                      vrSection?.scrollIntoView({ behavior: 'smooth' });
+                    }}
+                  >
+                    <span className="flex items-center gap-1.5 sm:gap-2 whitespace-nowrap">
+                      <Gamepad2 className="h-4 w-4 sm:h-5 sm:w-5" />
+                      Trải nghiệm VR
+                    </span>
+                  </Button>
+                )}
 
                 {heroMedia?.url && (
                   <Button

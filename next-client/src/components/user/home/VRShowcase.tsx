@@ -160,6 +160,10 @@ export default function VRShowcase({
     setModalQty(1);
   };
 
+  if (packagesData.length === 0) {
+    return null;
+  }
+
   return (
     <section
       id="vr"
@@ -226,17 +230,8 @@ export default function VRShowcase({
           </div>
         )}
 
-        {/* Empty State */}
-        {filteredPackages.length === 0 ? (
-          <div className="text-center py-12 sm:py-16 px-4 bg-slate-900/40 rounded-3xl border border-white/10 backdrop-blur-md max-w-xl mx-auto space-y-3">
-            <Gamepad2 className="w-10 h-10 sm:w-12 sm:h-12 text-slate-500 mx-auto" />
-            <h3 className="text-base sm:text-lg font-bold text-white">Chưa có gói VR nào khả dụng</h3>
-            <p className="text-xs text-slate-400">
-              Chi nhánh hiện tại đang cập nhật thêm các tựa game VR mới. Vui lòng chọn chi nhánh khác hoặc quay lại sau!
-            </p>
-          </div>
-        ) : (
-          /* VR Package Grid (2 columns on mobile, 3 on desktop) */
+        {/* VR Package Grid (2 columns on mobile, 3 on desktop) */
+        filteredPackages.length > 0 && (
           <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3 gap-2.5 sm:gap-6 max-w-7xl mx-auto">
             {filteredPackages.map((pkg: any) => {
               const imageUrl = resolveImageUrl(pkg.cover_image);
