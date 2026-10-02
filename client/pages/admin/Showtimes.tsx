@@ -1,8 +1,7 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import AdminLayout from '@/admin/layouts/AdminLayout';
 import ShowtimesContent from '@/components/admin/content/ShowtimesContent';
-import { getShowtimesAdmin, getAdminBranchOptions, getPublicBranches } from '@/lib/api';
-import { useStaffPermission } from '@/hooks/useStaffPermission';
+import { getShowtimesAdmin, getAdminBranchOptions } from '@/lib/api';
 import { useStaffStore } from '@/store/staffStore';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
@@ -12,7 +11,6 @@ export default function ShowtimesPage() {
   const navigate = useNavigate();
   const staff = useStaffStore((state) => state.staff);
   const clearStaff = useStaffStore((state) => state.clearStaff);
-  const canViewBranches = useStaffPermission('branches', 'view');
 
   const [activeTab, setActiveTab] = useState('showtimes');
   const [branches, setBranches] = useState<any[]>([]);
@@ -54,9 +52,8 @@ export default function ShowtimesPage() {
   useEffect(() => {
     (async () => {
       try {
-        const { items: branchItems } = canViewBranches
-          ? await getAdminBranchOptions({ includeInactive: true })
-          : await getPublicBranches();
+        // ALWAYS use getAdminBranchOptions to respect backend branch scoping 
+        const { items: branchItems } = await getAdminBranchOptions({ includeInactive: true });
         const activeBranches = (branchItems || []).filter((b: any) => !b.deleted_at);
         setBranches(activeBranches);
         await loadSchedules(activeBranches);
@@ -65,7 +62,7 @@ export default function ShowtimesPage() {
         toast.error('Không tải được danh sách chi nhánh');
       }
     })();
-  }, [canViewBranches, loadSchedules]);
+  }, [loadSchedules]);
 
   const handleLogout = () => {
     localStorage.removeItem('staffToken');

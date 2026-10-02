@@ -8,10 +8,10 @@ import { buildAuditPayload } from '../../lib/audit-utils';
 export async function listStaffImpl(
   db: any,
   tables: any,
-  params: { page: number; pageSize: number; q?: string; includeInactive?: boolean; roleId?: number; branchId?: number }
+  params: { page: number; pageSize: number; q?: string; includeInactive?: boolean; roleId?: number; branchId?: number; restrictToBranchIds?: number[] }
 ) {
   const { staffs, staffRoles, roles, staffBranches, branches } = tables;
-  const { page = 1, pageSize = 20, q = '', includeInactive = false, roleId, branchId } = params;
+  const { page = 1, pageSize = 20, q = '', includeInactive = false, roleId, branchId, restrictToBranchIds } = params;
   const offset = (page - 1) * pageSize;
 
   let query = db
@@ -55,6 +55,18 @@ export async function listStaffImpl(
     // Subquery condition for branch filtering without disrupting existing joins
     conditions.push(
       sql`${staffs.id} IN (SELECT staff_id FROM staff_branches WHERE branch_id = ${branchId})`
+    );
+  }
+
+  if (restrictToBranchIds && restrictToBranchIds.length > 0) {
+    // 1) Không cho phép xem Super Admin
+    conditions.push(eq(staffs.isSuperAdmin, false));
+    // 2) Chỉ được thấy những nhân viên thuộc các chi nhánh mà caller quản lý
+    conditions.push(
+      inArray(
+        staffs.id,
+        db.select({ staffId: staffBranches.staffId }).from(staffBranches).where(inArray(staffBranches.branchId, restrictToBranchIds))
+      )
     );
   }
 

@@ -49,8 +49,10 @@ ticketsRouter.post('/api/admin/tickets', requireStaffAuth, requirePermission('ti
     // Không cần xóa cache: KV cache cho vé đã bị vô hiệu hóa hoàn toàn
 
     return c.json(r, 201);
-  } catch {
-    return c.json({ status: 'error', message: 'Lỗi máy chủ nội bộ' }, 500);
+  } catch (err: any) {
+    const msg = err?.message || 'Lỗi máy chủ nội bộ';
+    const statusCode = err?.statusCode || (msg.includes('Không thể') || msg.includes('Không có quyền') ? 403 : 500);
+    return c.json({ status: 'error', message: msg }, statusCode as any);
   }
 });
 
@@ -90,8 +92,10 @@ ticketsRouter.put('/api/admin/tickets/:id', requireStaffAuth, requirePermission(
 
     return c.json(r, 200);
   } catch (err: any) {
-    console.error('Error updating ticket package:', err);
-    return c.json({ status: 'error', message: 'Lỗi máy chủ nội bộ' }, 500);
+    console.error('Error updating ticket package:', err?.message || err);
+    const msg = err?.message || 'Lỗi máy chủ nội bộ';
+    const statusCode = err?.statusCode || (msg.includes('Không thể') || msg.includes('Không có quyền') ? 403 : 500);
+    return c.json({ status: 'error', message: msg }, statusCode as any);
   }
 });
 
@@ -126,8 +130,10 @@ ticketsRouter.delete('/api/admin/tickets/:id', requireStaffAuth, requirePermissi
     // Không cần xóa cache: KV cache cho vé đã bị vô hiệu hóa hoàn toàn
 
     return c.json(r, 200);
-  } catch {
-    return c.json({ status: 'error', message: 'Lỗi máy chủ nội bộ' }, 500);
+  } catch (err: any) {
+    const msg = err?.message || 'Lỗi máy chủ nội bộ';
+    const statusCode = err?.statusCode || (msg.includes('Không thể') || msg.includes('Không có quyền') ? 403 : 500);
+    return c.json({ status: 'error', message: msg }, statusCode as any);
   }
 });
 

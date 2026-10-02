@@ -2,7 +2,7 @@ import { Hono, Context } from 'hono';
 import { drizzle } from 'drizzle-orm/d1';
 import * as schema from '../../../../shared/schema';
 import { requireStaffAuth, requirePermission } from '../../middleware';
-import { getMailer } from './admin-helpers';
+import { getMailer, getRestrictBranchIds } from './admin-helpers';
 
 import {
   listStaffImpl,
@@ -28,6 +28,7 @@ staffRouter.get('/api/admin/staff', requireStaffAuth, requirePermission('staff',
     const includeInactive = c.req.query('includeInactive') === 'true';
     const roleId = c.req.query('roleId') ? Number(c.req.query('roleId')) : undefined;
     const branchId = c.req.query('branchId') ? Number(c.req.query('branchId')) : undefined;
+    const restrictToBranchIds = getRestrictBranchIds(c);
 
     const db = drizzle(c.env.cinema_db, { schema });
 
@@ -44,7 +45,7 @@ staffRouter.get('/api/admin/staff', requireStaffAuth, requirePermission('staff',
 
         branches: schema.branches
       },
-      { page, pageSize, q, includeInactive, roleId, branchId }
+      { page, pageSize, q, includeInactive, roleId, branchId, restrictToBranchIds }
     );
 
     return c.json(r);

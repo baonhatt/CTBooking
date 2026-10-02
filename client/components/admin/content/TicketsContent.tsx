@@ -17,7 +17,8 @@ import {
   Image,
   Users,
   Sparkles,
-  ShieldAlert
+  ShieldAlert,
+  Copy
 } from 'lucide-react';
 import { format, formatDistanceToNow } from 'date-fns';
 import { vi } from 'date-fns/locale';
@@ -59,6 +60,7 @@ import { uploadDirectToCloudinary } from '@/lib/api/uploads';
 import { getMoviesAdmin } from '@/lib/api/movies';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useStaffPermissions, useIsSuperAdmin } from '@/hooks/useStaffPermission';
+import { useStaffStore } from '@/store/staffStore';
 import { useConfirmUnsaved } from '@/hooks/useConfirmUnsaved';
 
 interface TicketPackage {
@@ -96,6 +98,7 @@ interface Props {
   setPage: React.Dispatch<React.SetStateAction<number>>;
   onCreate: () => void;
   onEdit: (data: TicketPackage) => void;
+  onClone?: (data: TicketPackage) => void;
   setTickets: React.Dispatch<React.SetStateAction<TicketPackage[]>>;
   isEditOpen: boolean;
   setIsEditOpen: (open: boolean) => void;
@@ -121,10 +124,18 @@ export default function TicketsContent(props: Props) {
   const navigate = useNavigate();
   const permissions = useStaffPermissions();
   const isSuperAdmin = useIsSuperAdmin();
+  const staffBranchIds = useStaffStore((state) => state.branchIds);
 
   const hasPermission = (module: string, action: string) => {
     if (isSuperAdmin) return true;
     return permissions.some((p) => p.module === module && p.action === action);
+  };
+
+  const canModifyTicket = (t: TicketPackage) => {
+    if (isSuperAdmin) return true;
+    if (t.branch_ids === null || t.branch_ids === undefined) return false;
+    if (t.branch_ids.length === 0) return true;
+    return t.branch_ids.every((id) => staffBranchIds.includes(id));
   };
 
   const {
@@ -134,6 +145,7 @@ export default function TicketsContent(props: Props) {
     setPage,
     onCreate,
     onEdit,
+    onClone,
     setTickets,
     isEditOpen,
     setIsEditOpen,
@@ -461,7 +473,7 @@ export default function TicketsContent(props: Props) {
                           <BranchIdsBadge branch_ids={t.branch_ids} branch_id={t.branch_id} branches={branches || []} />
                         </TableCell>
                         <TableCell className="text-center">
-                          {hasPermission('tickets', 'toggle_status') ? (
+                          {hasPermission('tickets', 'toggle_status') && canModifyTicket(t) ? (
                             <AlertDialog>
                               <AlertDialogTrigger asChild>
                                 <Switch
@@ -486,6 +498,7 @@ export default function TicketsContent(props: Props) {
                               disabled
                               className="scale-100 opacity-40 cursor-not-allowed"
                               style={{ backgroundColor: t.is_active ? '#10b981' : '#d1d5db' }}
+                              title={!canModifyTicket(t) ? "Không có quyền sửa (Khác chi nhánh / Dùng chung)" : ""}
                             />
                           )}
                         </TableCell>
@@ -498,15 +511,32 @@ export default function TicketsContent(props: Props) {
                               setSelectedTicket(t);
                               setIsDetailDialogOpen(true);
                             }}
+                            title="Xem chi tiết"
                           >
                             <Eye className="h-4.5 w-4.5" />
                           </Button>
+                          {onClone && hasPermission('tickets', 'create') && (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="h-8 rounded-lg hover:bg-emerald-50 text-emerald-600 border-emerald-200"
+                              onClick={() => {
+                                const packageToClone = {...t};
+                                // Generate a clone without ID
+                                onClone(packageToClone);
+                              }}
+                              title="Nhân bản"
+                            >
+                              <Copy className="h-4.5 w-4.5" />
+                            </Button>
+                          )}
                           {hasPermission('tickets', 'edit') && (
                             <Button
                               variant="outline"
                               size="sm"
-                              className="h-8 rounded-lg hover:bg-yellow-50 text-yellow-600 border-yellow-200"
-                              onClick={() => onEdit(t)}
+                              className={`h-8 rounded-lg border-yellow-200 ${canModifyTicket(t) ? 'hover:bg-yellow-50 text-yellow-600' : 'opacity-40 cursor-not-allowed'}`}
+                              onClick={() => canModifyTicket(t) && onEdit(t)}
+                              title={!canModifyTicket(t) ? "Không có quyền sửa (Khác chi nhánh / Dùng chung)" : "Chỉnh sửa"}
                             >
                               <Pencil className="h-4.5 w-4.5" />
                             </Button>
@@ -515,9 +545,9 @@ export default function TicketsContent(props: Props) {
                             <Button
                               variant="outline"
                               size="sm"
-                              className="h-8 rounded-lg hover:bg-red-50 text-red-600 border-red-200"
-                              onClick={() => onDelete(t)}
-                              title="Xóa"
+                              className={`h-8 rounded-lg border-red-200 ${canModifyTicket(t) ? 'hover:bg-red-50 text-red-600' : 'opacity-40 cursor-not-allowed'}`}
+                              onClick={() => canModifyTicket(t) && onDelete(t)}
+                              title={!canModifyTicket(t) ? "Không có quyền xóa (Khác chi nhánh / Dùng chung)" : "Xóa"}
                             >
                               <Trash2 className="h-4.5 w-4.5" />
                             </Button>

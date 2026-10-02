@@ -283,10 +283,12 @@ export default function StaffPage() {
       setErrors(newErrors);
       return;
     }
-    const dataToSend = {
-      ...formData,
-      roleIds: formData.roleId ? [parseInt(formData.roleId)] : []
+    const dataToSend: any = {
+      ...formData
     };
+    if (isSuperAdmin) {
+      dataToSend.roleIds = formData.roleId ? [parseInt(formData.roleId)] : [];
+    }
     createMutation.mutate(dataToSend);
   };
 
@@ -300,10 +302,12 @@ export default function StaffPage() {
       setErrors(newErrors);
       return;
     }
-    const dataToSend = {
-      ...formData,
-      roleIds: formData.roleId ? [parseInt(formData.roleId)] : []
+    const dataToSend: any = {
+      ...formData
     };
+    if (isSuperAdmin) {
+      dataToSend.roleIds = formData.roleId ? [parseInt(formData.roleId)] : [];
+    }
     updateMutation.mutate({
       id: selectedStaff.id,
       data: dataToSend

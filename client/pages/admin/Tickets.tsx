@@ -164,6 +164,12 @@ export default function TicketsPage() {
     setIsEditOpen(true);
   };
 
+  const handleClone = (data: any) => {
+    setEditData({ ...data, id: 0, code: generateCode(), name: `${data.name} (Copy)` });
+    setIsCodeEditable(false);
+    setIsEditOpen(true);
+  };
+
   const handleDelete = (ticket: any) => {
     setTicketToDelete(ticket);
     setIsDeleteDialogOpen(true);
@@ -208,6 +214,7 @@ export default function TicketsPage() {
         setPage={setPage}
         onCreate={openCreate}
         onEdit={(data) => openEdit(data)}
+        onClone={(data) => handleClone(data)}
         setTickets={setTickets}
         isEditOpen={isEditOpen}
         setIsEditOpen={setIsEditOpen}
