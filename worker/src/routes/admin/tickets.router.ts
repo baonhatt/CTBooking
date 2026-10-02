@@ -231,6 +231,8 @@ ticketsRouter.get('/api/admin/tickets', requireStaffAuth, requirePermission('tic
     const includeInactive = c.req.query('includeInactive') === 'true';
     const typeRaw = c.req.query('type') || 'all';
     const type = typeRaw === 'movie' || typeRaw === 'vr' ? typeRaw : 'all';
+    const sort = c.req.query('sort');
+    const dir = c.req.query('dir');
     
     const db = drizzle(c.env.cinema_db, { schema });
     const restrictBranchIds = getRestrictBranchIds(c);
@@ -240,7 +242,7 @@ ticketsRouter.get('/api/admin/tickets', requireStaffAuth, requirePermission('tic
     const r = await listTicketPackagesImpl(
       db,
       { ticket_packages: schema.ticket_packages, movies: schema.movies },
-      { page, pageSize, q, includeInactive, branch_id: branchId, restrictToBranchIds: restrictBranchIds, type }
+      { page, pageSize, q, includeInactive, branch_id: branchId, restrictToBranchIds: restrictBranchIds, type, sort, dir }
     );
     return c.json(r, 200);
   } catch (err: any) {

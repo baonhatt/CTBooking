@@ -277,23 +277,97 @@ export default function AuditLogsPage() {
           </div>
         </div>
 
+        {/* TOOLBAR */}
         <div className="flex flex-col xl:flex-row justify-between items-start xl:items-center gap-4 bg-white p-4 rounded-2xl border border-gray-200 shadow-sm">
-          <form onSubmit={handleSearchAudit} className="flex flex-1 w-full gap-2 max-w-xl">
-            <div className="relative flex-1">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 w-4 h-4" />
-              <Input
-                placeholder="Tìm theo tên nhân viên hoặc hành động..."
-                value={localSearch}
-                onChange={(e) => setLocalSearch(e.target.value)}
-                className="pl-10 bg-slate-50 border-slate-200 focus:bg-white focus:ring-2 focus:ring-blue-500 rounded-xl text-sm"
-              />
-            </div>
-            <Button
-              type="submit"
-              className="bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-semibold px-4 flex items-center gap-1.5 shrink-0"
+          {/* L E F T - G R O U P */}
+          <div className="flex flex-wrap items-center gap-3 w-full xl:w-auto">
+            <form onSubmit={handleSearchAudit} className="flex gap-2">
+              <div className="relative w-[320px]">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 w-4 h-4" />
+                <input
+                  type="text"
+                  placeholder="Tìm theo tên nhân viên hoặc hành động..."
+                  value={localSearch}
+                  onChange={(e) => setLocalSearch(e.target.value)}
+                  className="w-full pl-10 pr-4 h-10 bg-slate-50 border border-slate-200 focus:bg-white focus:ring-2 focus:ring-blue-500 rounded-xl transition-all outline-none text-sm"
+                />
+              </div>
+              <Button
+                type="submit"
+                className="h-10 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-semibold px-4 flex items-center gap-1.5 shrink-0"
+              >
+                <Search className="w-3.5 h-3.5" /> Tìm kiếm
+              </Button>
+            </form>
+          </div>
+
+          {/* R I G H T - G R O U P */}
+          <div className="flex flex-wrap items-center gap-2.5 w-full xl:w-auto font-sans justify-start xl:justify-end">
+            <select
+              value={filterStaff}
+              onChange={(e) => setFilterStaff(e.target.value)}
+              className="h-10 px-3 bg-white border border-slate-200 rounded-xl text-xs focus:ring-2 focus:ring-blue-500 outline-none shadow-sm cursor-pointer min-w-[140px]"
             >
-              <Search className="w-3.5 h-3.5" /> Tìm kiếm
-            </Button>
+              <option value="all">Tất cả nhân viên</option>
+              {staffList.map((staff: Staff) => (
+                <option key={staff.id} value={String(staff.id)}>
+                  {staff.fullname}
+                </option>
+              ))}
+            </select>
+
+            <select
+              value={filterAction}
+              onChange={(e) => setFilterAction(e.target.value)}
+              className="h-10 px-3 bg-white border border-slate-200 rounded-xl text-xs focus:ring-2 focus:ring-blue-500 outline-none shadow-sm cursor-pointer min-w-[140px]"
+            >
+              <option value="all">Tất cả hành động</option>
+              {Object.entries(ACTION_LABELS).map(([value, label]) => (
+                <option key={value} value={value}>
+                  {label}
+                </option>
+              ))}
+            </select>
+
+            <select
+              value={filterEntityType}
+              onChange={(e) => setFilterEntityType(e.target.value)}
+              className="h-10 px-3 bg-white border border-slate-200 rounded-xl text-xs focus:ring-2 focus:ring-blue-500 outline-none shadow-sm cursor-pointer min-w-[140px]"
+            >
+              <option value="all">Tất cả đối tượng</option>
+              {Object.entries(ENTITY_LABELS).map(([value, label]) => (
+                <option key={value} value={value}>
+                  {label}
+                </option>
+              ))}
+            </select>
+
+            <input
+              type="date"
+              value={filterFromDate}
+              onChange={(e) => setFilterFromDate(e.target.value)}
+              className="h-10 px-3 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:ring-2 focus:ring-blue-500 outline-none shadow-sm cursor-pointer w-[130px]"
+              title="Từ ngày"
+            />
+            
+            <input
+              type="date"
+              value={filterToDate}
+              onChange={(e) => setFilterToDate(e.target.value)}
+              className="h-10 px-3 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:ring-2 focus:ring-blue-500 outline-none shadow-sm cursor-pointer w-[130px]"
+              title="Đến ngày"
+            />
+
+            {(filterStaff || filterAction || filterEntityType || filterFromDate || filterToDate) && (
+              <Button 
+                variant="outline" 
+                onClick={clearFilters} 
+                className="h-10 rounded-xl border-dashed border-slate-300 text-slate-500 hover:text-slate-700 px-3 flex items-center gap-2"
+              >
+                <FilterX className="w-3.5 h-3.5" /> Bỏ lọc
+              </Button>
+            )}
+
             <Button
               type="button"
               variant="outline"
@@ -302,70 +376,13 @@ export default function AuditLogsPage() {
                 setLocalSearch('');
                 setSearch('');
                 setPage(1);
+                clearFilters();
                 queryClient.invalidateQueries(['audit-logs'] as any);
               }}
-              className="rounded-xl shadow-sm hover:rotate-180 transition-transform duration-500 shrink-0 h-10 w-10"
+              className="rounded-xl shadow-sm hover:rotate-180 transition-transform duration-500 shrink-0 h-10 w-10 ml-1"
+              title="Làm mới"
             >
               <RefreshCw className="w-4 h-4" />
-            </Button>
-          </form>
-
-          <div className="flex flex-wrap items-center gap-3 w-full xl:w-auto">
-            <Select value={filterStaff} onValueChange={setFilterStaff}>
-              <SelectTrigger className="w-[180px] h-10">
-                <SelectValue placeholder="Nhân viên" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Tất cả nhân viên</SelectItem>
-                {staffList.map((staff: Staff) => (
-                  <SelectItem key={staff.id} value={String(staff.id)}>
-                    {staff.fullname}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <Select value={filterAction} onValueChange={setFilterAction}>
-              <SelectTrigger className="w-[150px] h-10">
-                <SelectValue placeholder="Hành động" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Tất cả</SelectItem>
-                {Object.entries(ACTION_LABELS).map(([value, label]) => (
-                  <SelectItem key={value} value={value}>
-                    {label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <Select value={filterEntityType} onValueChange={setFilterEntityType}>
-              <SelectTrigger className="w-[150px] h-10">
-                <SelectValue placeholder="Đối tượng" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Tất cả</SelectItem>
-                {Object.entries(ENTITY_LABELS).map(([value, label]) => (
-                  <SelectItem key={value} value={value}>
-                    {label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <Input
-              type="date"
-              value={filterFromDate}
-              onChange={(e) => setFilterFromDate(e.target.value)}
-              className="w-[140px] h-10 bg-slate-50 border-slate-200 rounded-xl text-sm"
-              placeholder="Từ ngày"
-            />
-            <Input
-              type="date"
-              value={filterToDate}
-              onChange={(e) => setFilterToDate(e.target.value)}
-              className="w-[140px] h-10 bg-slate-50 border-slate-200 rounded-xl text-sm"
-              placeholder="Đến ngày"
-            />
-            <Button variant="outline" onClick={clearFilters} className="h-10">
-              <FilterX className="w-4 h-4 mr-2" /> Xóa filter
             </Button>
           </div>
         </div>

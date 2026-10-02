@@ -71,9 +71,11 @@ export async function listTicketPackagesImpl(
     branch_id?: number;
     restrictToBranchIds?: number[] | null;
     type?: 'all' | 'movie' | 'vr';
+    sort?: string;
+    dir?: string;
   }
 ) {
-  const { page, pageSize, q, includeInactive = false, branch_id, restrictToBranchIds = null, type = 'all' } = args;
+  const { page, pageSize, q, includeInactive = false, branch_id, restrictToBranchIds = null, type = 'all', sort, dir } = args;
 
   // 1. Xây dựng điều kiện where
   let whereCondition = includeInactive
@@ -111,6 +113,29 @@ export async function listTicketPackagesImpl(
     const staffFilter = sqlBranchIdsStaffAccessFilter(tables.ticket_packages.branch_ids, restrictToBranchIds);
     whereCondition = whereCondition ? and(whereCondition, staffFilter) : staffFilter;
   }
+  // Determine order by
+  let orderByClause = [asc(tables.ticket_packages.display_order), desc(tables.ticket_packages.id)];
+  if (sort) {
+    const directionFn = dir === 'asc' ? asc : desc;
+    switch (sort) {
+      case 'updated_at':
+        orderByClause = [directionFn(tables.ticket_packages.updated_at), desc(tables.ticket_packages.id)];
+        break;
+      case 'price':
+        orderByClause = [directionFn(sql`CAST(${tables.ticket_packages.price} AS DECIMAL)`), desc(tables.ticket_packages.id)];
+        break;
+      case 'name':
+        orderByClause = [directionFn(tables.ticket_packages.name), desc(tables.ticket_packages.id)];
+        break;
+      case 'type':
+        orderByClause = [
+          directionFn(sql`CASE WHEN ${tables.ticket_packages.type} = 'vr' THEN 1 ELSE 0 END`),
+          desc(tables.ticket_packages.id)
+        ];
+        break;
+    }
+  }
+
   // 2. Lấy dữ liệu phân trang - tạm thời bỏ join branches
   const [totalResArray, pkgList] = await Promise.all([
     anyDb.select({ count: count() }).from(tables.ticket_packages).where(whereCondition),
@@ -118,7 +143,7 @@ export async function listTicketPackagesImpl(
       .select()
       .from(tables.ticket_packages)
       .where(whereCondition)
-      .orderBy(asc(tables.ticket_packages.display_order), desc(tables.ticket_packages.id))
+      .orderBy(...orderByClause)
       .limit(pageSize)
       .offset((page - 1) * pageSize)
   ]);

@@ -207,64 +207,69 @@ export default function MoviesContent({
 
       {/* TOOLBAR */}
       <div className="flex flex-col xl:flex-row justify-between items-start xl:items-center gap-4 bg-white p-4 rounded-2xl border border-gray-200 shadow-sm">
-        <form onSubmit={handleSearchSubmit} className="flex flex-1 w-full gap-2 max-w-lg">
-          <div className="relative flex-1">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 w-4 h-4" />
-            <input
-              type="text"
-              placeholder="Tìm tên phim..."
-              value={localSearch}
-              onChange={(e) => setLocalSearch(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 bg-slate-50 border-slate-200 border focus:bg-white focus:ring-2 focus:ring-blue-500 rounded-xl transition-all outline-none text-sm"
-            />
-          </div>
-          <Button
-            type="submit"
-            className="bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-semibold px-4 flex items-center gap-1.5 shrink-0"
-          >
-            <Search className="w-3.5 h-3.5" /> Tìm kiếm
-          </Button>
-          <Button
-            type="button"
-            variant="outline"
-            size="icon"
-            onClick={() => {
-              setLocalSearch('');
-              onSearchChange('');
-              onRefresh();
-            }}
-            className="rounded-xl shadow-sm hover:rotate-180 transition-transform duration-500 shrink-0"
-            title="Làm mới"
-          >
-            <RefreshCw className={`w-4 h-4 ${isLoading ? 'animate-spin' : ''}`} />
-          </Button>
-        </form>
+        {/* L E F T - G R O U P */}
+        <div className="flex flex-wrap items-center gap-3 w-full xl:w-auto">
+          <form onSubmit={handleSearchSubmit} className="flex gap-2">
+            <div className="relative w-[280px]">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 w-4 h-4" />
+              <input
+                type="text"
+                placeholder="Tìm tên phim..."
+                value={localSearch}
+                onChange={(e) => setLocalSearch(e.target.value)}
+                className="w-full pl-10 pr-4 h-10 bg-slate-50 border-slate-200 border focus:bg-white focus:ring-2 focus:ring-blue-500 rounded-xl transition-all outline-none text-sm"
+              />
+            </div>
+            <Button
+              type="submit"
+              className="h-10 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-semibold px-4 flex items-center gap-1.5 shrink-0"
+            >
+              <Search className="w-3.5 h-3.5" /> Tìm kiếm
+            </Button>
+          </form>
 
-        <div className="flex flex-wrap items-center gap-3 w-full xl:w-auto font-sans">
-          <div className="flex items-center gap-2 px-3 py-1.5 bg-slate-50 rounded-xl border border-slate-200">
-            <span className="text-[10px] font-bold text-slate-500 uppercase">Chỉ hiện đang chiếu</span>
+          <div className="flex items-center gap-2.5 px-3 py-1.5 bg-slate-50 rounded-xl border border-slate-200 h-10">
+            <span className="text-xs font-medium text-slate-500 whitespace-nowrap">Chỉ hiện đang chiếu</span>
             <Switch
               checked={showActiveOnly}
               onCheckedChange={setShowActiveOnly}
               className="data-[state=checked]:bg-green-500 data-[state=unchecked]:bg-gray-300 cursor-pointer"
             />
           </div>
+        </div>
 
-          <select
-            value={sortKey}
-            onChange={(e) => setSortKey(e.target.value as any)}
-            className="bg-white border rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none shadow-sm cursor-pointer"
-          >
-            <option value="updated_at">Mới cập nhật</option>
-            <option value="rating">Đánh giá cao</option>
-            <option value="release_date">Ngày phát hành</option>
-          </select>
+        {/* R I G H T - G R O U P */}
+        <div className="flex flex-wrap items-center gap-2.5 w-full xl:w-auto font-sans justify-start xl:justify-end">
+          <div className="flex items-center gap-1.5 bg-slate-50 p-1 rounded-xl border border-slate-100">
+            <select
+              value={sortKey}
+              onChange={(e) => setSortKey(e.target.value as any)}
+              className="h-9 px-3 bg-white border border-slate-200 rounded-lg text-xs focus:ring-2 focus:ring-blue-500 outline-none shadow-sm cursor-pointer"
+            >
+              <option value="updated_at">Mới cập nhật</option>
+              <option value="rating">Đánh giá cao</option>
+              <option value="release_date">Ngày phát hành</option>
+            </select>
+            <Button
+              variant="outline"
+              size="icon"
+              onClick={() => setSortDir?.(sortDir === 'asc' ? 'desc' : 'asc')}
+              className="rounded-lg border-slate-200 hover:bg-slate-50 active:scale-95 transition-all shadow-sm h-9 w-9 shrink-0"
+              title={sortDir === 'asc' ? 'Tăng dần' : 'Giảm dần'}
+            >
+              {sortDir === 'desc' ? (
+                <SortDesc className="w-4 h-4 text-slate-600" />
+              ) : (
+                <SortAsc className="w-4 h-4 text-slate-600" />
+              )}
+            </Button>
+          </div>
 
           {branches.length > 0 ? (
             <select
               value={selectedBranchId || 'all'}
               onChange={(e) => setSelectedBranchId(e.target.value === 'all' ? 'all' : Number(e.target.value))}
-              className="bg-white border rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none shadow-sm cursor-pointer"
+              className="h-10 px-3 bg-white border border-slate-200 rounded-xl text-xs focus:ring-2 focus:ring-blue-500 outline-none shadow-sm cursor-pointer"
             >
               {isSuperAdmin && <option value="all">Tất cả chi nhánh</option>}
               {branches.map((branch) => (
@@ -280,21 +285,6 @@ export default function MoviesContent({
             </div>
           )}
 
-          {/* BỔ SUNG NÚT ĐẢO CHIỀU TẠI ĐÂY */}
-          <Button
-            variant="outline"
-            size="icon"
-            onClick={() => setSortDir?.(sortDir === 'asc' ? 'desc' : 'asc')}
-            className="rounded-xl border-slate-200 hover:bg-slate-50 active:scale-95 transition-all shadow-sm h-10 w-10 shrink-0"
-            title={sortDir === 'asc' ? 'Tăng dần' : 'Giảm dần'}
-          >
-            {sortDir === 'desc' ? (
-              <SortDesc className="w-4 h-4 text-slate-600" />
-            ) : (
-              <SortAsc className="w-4 h-4 text-slate-600" />
-            )}
-          </Button>
-
           {hasPermission('movies', 'view_deleted') && (
             <Button
               variant="outline"
@@ -302,18 +292,33 @@ export default function MoviesContent({
               className="rounded-xl flex items-center gap-2 h-10 px-4 shadow-sm"
             >
               <Trash2 className="w-4 h-4" />
-              <span className="hidden sm:inline text-sm text-slate-600 font-medium">Xem đã xóa</span>
+              <span className="hidden sm:inline text-xs font-semibold text-slate-600">Xem đã xóa</span>
             </Button>
           )}
 
           {hasPermission('movies', 'create') && (
             <Button
               onClick={onCreate}
-              className="bg-blue-600 hover:bg-blue-700 rounded-lg shadow-sm gap-2 text-white h-10 px-5 font-medium ml-auto"
+              className="bg-blue-600 hover:bg-blue-700 rounded-xl shadow-sm gap-2 text-white h-10 px-5 font-semibold text-xs"
             >
               <Plus className="w-4 h-4" /> Thêm mới
             </Button>
           )}
+
+          <Button
+            type="button"
+            variant="outline"
+            size="icon"
+            onClick={() => {
+              setLocalSearch('');
+              onSearchChange('');
+              onRefresh();
+            }}
+            className="rounded-xl shadow-sm hover:rotate-180 transition-transform duration-500 shrink-0 h-10 w-10 ml-2"
+            title="Làm mới"
+          >
+            <RefreshCw className={`w-4 h-4 ${isLoading ? 'animate-spin' : ''}`} />
+          </Button>
         </div>
       </div>
 

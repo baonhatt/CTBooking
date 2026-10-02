@@ -488,190 +488,157 @@ export default function TransactionsContent({
 
         <div className="h-px bg-slate-100 my-2" />
 
-        {/* Toolbar Grid */}
-        <div className="space-y-4">
-          <div className="flex flex-wrap items-center gap-3">
-            <form
-              onSubmit={(e) => {
-                e.preventDefault();
-                setTxQuery(localTxQuery);
-                setPage(1);
-              }}
-              className="flex flex-1 min-w-[300px] max-w-lg gap-2"
-            >
-              <div className="relative flex-1">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 w-4 h-4" />
-                <Input
-                  placeholder="Tìm email hoặc mã giao dịch..."
-                  value={localTxQuery}
-                  onChange={(e) => setLocalTxQuery(e.target.value)}
-                  className="pl-10 h-11 bg-slate-50 border-transparent focus:bg-white focus:ring-2 focus:ring-blue-500 rounded-xl transition-all"
-                />
-              </div>
-              <Button
-                type="submit"
-                className="h-11 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-semibold px-4 flex items-center gap-1.5 shrink-0"
-              >
-                <Search className="w-4 h-4" /> Tìm kiếm
-              </Button>
-            </form>
-
-            <div className="flex flex-wrap items-center gap-2">
-              {/* Pills filter loại booking */}
-              <div className="flex items-center gap-1 p-1 bg-slate-50 rounded-xl border border-slate-200 h-11">
-                <button
-                  onClick={() => {
-                    setBookingTypeFilter?.('all');
-                    setPage(1);
-                  }}
-                  className={`px-3 h-8 rounded-lg text-xs font-bold transition-all ${
-                    bookingTypeFilter === 'all'
-                      ? 'bg-slate-800 text-white shadow-sm'
-                      : 'text-slate-500 hover:text-slate-700 hover:bg-white'
-                  }`}
-                >
-                  Tất cả
-                </button>
-                <button
-                  onClick={() => {
-                    setBookingTypeFilter?.('movie');
-                    setPage(1);
-                  }}
-                  className={`px-3 h-8 rounded-lg text-xs font-bold transition-all flex items-center gap-1 ${
-                    bookingTypeFilter === 'movie'
-                      ? 'bg-blue-600 text-white shadow-sm shadow-blue-200'
-                      : 'text-slate-500 hover:text-blue-600 hover:bg-white'
-                  }`}
-                >
-                  <Film size={12} /> Vé Phim
-                </button>
-                <button
-                  onClick={() => {
-                    setBookingTypeFilter?.('vr');
-                    setPage(1);
-                  }}
-                  className={`px-3 h-8 rounded-lg text-xs font-bold transition-all flex items-center gap-1 ${
-                    bookingTypeFilter === 'vr'
-                      ? 'bg-purple-600 text-white shadow-sm shadow-purple-200'
-                      : 'text-slate-500 hover:text-purple-600 hover:bg-white'
-                  }`}
-                >
-                  <Gamepad2 size={12} /> Trải nghiệm VR
-                </button>
-              </div>
-
-              <div className="flex items-center gap-3 px-4 py-2 bg-slate-50 rounded-xl border border-slate-200 h-11">
-                <span className="text-xs font-medium text-slate-500 whitespace-nowrap">Chỉ hiện đã thanh toán</span>
-                <Switch
-                  checked={txStatus === 'paid'}
-                  onCheckedChange={(val) => setTxStatus?.(val ? 'paid' : 'all')}
-                  className="data-[state=checked]:bg-green-500 data-[state=unchecked]:bg-gray-300 cursor-pointer"
-                />
-              </div>
-
-              <select
-                value={paymentMethod}
-                onChange={(e) => setPaymentMethod?.(e.target.value)}
-                className="h-11 px-3 bg-white border rounded-xl text-sm w-44 cursor-pointer shadow-sm"
-              >
-                <option value="">Tất cả phương thức</option>
-                <option value="cash">Tiền mặt</option>
-
-                <option value="vietqr">VietQR</option>
-              </select>
+        {/* ROW 1: Primary — tìm kiếm + phân loại + trạng thái */}
+        <div className="flex flex-wrap items-center gap-3">
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              setTxQuery(localTxQuery);
+              setPage(1);
+            }}
+            className="flex flex-1 min-w-[260px] max-w-md gap-2"
+          >
+            <div className="relative flex-1">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 w-4 h-4" />
+              <Input
+                placeholder="Tìm email hoặc mã giao dịch..."
+                value={localTxQuery}
+                onChange={(e) => setLocalTxQuery(e.target.value)}
+                className="pl-10 h-10 bg-slate-50 border-transparent focus:bg-white focus:ring-2 focus:ring-blue-500 rounded-xl transition-all"
+              />
             </div>
+            <Button
+              type="submit"
+              className="h-10 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-semibold px-4 flex items-center gap-1.5 shrink-0"
+            >
+              <Search className="w-3.5 h-3.5" /> Tìm
+            </Button>
+          </form>
+
+          {/* Pills loại booking */}
+          <div className="flex items-center gap-1 p-1 bg-slate-100 rounded-xl border border-slate-200 h-10">
+            <button
+              onClick={() => { setBookingTypeFilter?.('all'); setPage(1); }}
+              className={`px-3 h-7 rounded-lg text-xs font-bold transition-all ${bookingTypeFilter === 'all' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+            >Tất cả</button>
+            <button
+              onClick={() => { setBookingTypeFilter?.('movie'); setPage(1); }}
+              className={`px-3 h-7 rounded-lg text-xs font-bold transition-all flex items-center gap-1 ${bookingTypeFilter === 'movie' ? 'bg-blue-600 text-white shadow-sm' : 'text-slate-500 hover:text-blue-600'}`}
+            ><Film size={11} /> Vé Phim</button>
+            <button
+              onClick={() => { setBookingTypeFilter?.('vr'); setPage(1); }}
+              className={`px-3 h-7 rounded-lg text-xs font-bold transition-all flex items-center gap-1 ${bookingTypeFilter === 'vr' ? 'bg-purple-600 text-white shadow-sm' : 'text-slate-500 hover:text-purple-600'}`}
+            ><Gamepad2 size={11} /> Trải nghiệm VR</button>
           </div>
 
-          <div className="flex flex-wrap items-center justify-between gap-4">
-            <div className="flex flex-wrap items-center gap-3">
-              <div className="flex items-center gap-3 p-1.5 bg-slate-50 rounded-xl border border-slate-100">
-                <div className="flex items-center gap-2 px-3">
-                  <span className="text-xs font-medium text-slate-400">Từ</span>
-                  <Input
-                    type="date"
-                    value={fromDate}
-                    onChange={(e) => setFromDate?.(e.target.value)}
-                    className="w-36 h-8 bg-white border-0 shadow-sm text-xs rounded-lg"
-                  />
-                </div>
-                <div className="w-px h-4 bg-slate-200" />
-                <div className="flex items-center gap-2 px-3">
-                  <span className="text-xs font-medium text-slate-400">Đến</span>
-                  <Input
-                    type="date"
-                    value={toDate}
-                    onChange={(e) => setToDate?.(e.target.value)}
-                    className="w-36 h-8 bg-white border-0 shadow-sm text-xs rounded-lg"
-                  />
-                </div>
-              </div>
+          {/* Toggle đã thanh toán */}
+          <div className="flex items-center gap-2.5 px-3 py-2 bg-slate-50 rounded-xl border border-slate-200 h-10">
+            <span className="text-xs font-medium text-slate-500 whitespace-nowrap">Đã thanh toán</span>
+            <Switch
+              checked={txStatus === 'paid'}
+              onCheckedChange={(val) => setTxStatus?.(val ? 'paid' : 'all')}
+              className="data-[state=checked]:bg-green-500 data-[state=unchecked]:bg-gray-300 cursor-pointer"
+            />
+          </div>
+        </div>
 
+        {/* DIVIDER */}
+        <div className="h-px bg-slate-100" />
+
+        {/* ROW 2: Secondary — lọc theo điều kiện */}
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="flex flex-wrap items-center gap-3">
+            {/* Date range */}
+            <div className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-50 rounded-xl border border-slate-200 h-10">
+              <span className="text-[11px] font-medium text-slate-400">Từ</span>
+              <Input
+                type="date"
+                value={fromDate}
+                onChange={(e) => setFromDate?.(e.target.value)}
+                className="w-36 h-7 bg-white border-0 shadow-sm text-xs rounded-lg px-2"
+              />
+              <span className="text-slate-300">—</span>
+              <span className="text-[11px] font-medium text-slate-400">Đến</span>
+              <Input
+                type="date"
+                value={toDate}
+                onChange={(e) => setToDate?.(e.target.value)}
+                className="w-36 h-7 bg-white border-0 shadow-sm text-xs rounded-lg px-2"
+              />
+            </div>
+
+            {/* Sắp xếp theo */}
+            <select
+              value={sortKey}
+              onChange={(e) => setSortKey(e.target.value as any)}
+              className="h-10 px-3 bg-white border rounded-xl text-xs w-44 cursor-pointer shadow-sm focus:ring-2 focus:ring-blue-500 outline-none"
+            >
+              <option value="created_at">Thời gian tạo</option>
+              <option value="paid_at">Thời gian thanh toán</option>
+            </select>
+
+            {/* Phương thức thanh toán */}
+            <select
+              value={paymentMethod}
+              onChange={(e) => setPaymentMethod?.(e.target.value)}
+              className="h-10 px-3 bg-white border rounded-xl text-xs w-40 cursor-pointer shadow-sm focus:ring-2 focus:ring-blue-500 outline-none"
+            >
+              <option value="">Tất cả phương thức</option>
+              <option value="cash">Tiền mặt</option>
+              <option value="vietqr">VietQR</option>
+            </select>
+
+            {/* Chi nhánh */}
+            {branches.length > 0 ? (
               <select
-                value={sortKey}
-                onChange={(e) => setSortKey(e.target.value as any)}
-                className="h-11 px-3 bg-white border rounded-xl text-xs w-40 cursor-pointer shadow-sm focus:ring-2 focus:ring-blue-500 outline-none"
+                value={selectedBranchId || 'all'}
+                onChange={(e) => setSelectedBranchId(e.target.value === 'all' ? 'all' : Number(e.target.value))}
+                className="h-10 px-3 bg-white border rounded-xl text-xs w-40 cursor-pointer shadow-sm focus:ring-2 focus:ring-blue-500 outline-none"
               >
-                <option value="created_at">Thời gian tạo</option>
-                <option value="paid_at">Thời gian thanh toán</option>
+                {isSuperAdmin && <option value="all">Tất cả chi nhánh</option>}
+                {branches.map((branch) => (
+                  <option key={branch.id} value={branch.id}>{branch.name}</option>
+                ))}
               </select>
+            ) : (
+              <div className="flex items-center gap-2 h-10 px-3 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium text-slate-500">
+                <Loader2 className="w-3.5 h-3.5 animate-spin text-blue-600" />
+                <span>Đang tải chi nhánh...</span>
+              </div>
+            )}
+          </div>
 
-              {branches.length > 0 ? (
-                <select
-                  value={selectedBranchId || 'all'}
-                  onChange={(e) => setSelectedBranchId(e.target.value === 'all' ? 'all' : Number(e.target.value))}
-                  className="h-11 px-3 bg-white border rounded-xl text-xs w-40 cursor-pointer shadow-sm focus:ring-2 focus:ring-blue-500 outline-none"
-                >
-                  {isSuperAdmin && <option value="all">Tất cả chi nhánh</option>}
-                  {branches.map((branch) => (
-                    <option key={branch.id} value={branch.id}>
-                      {branch.name}
-                    </option>
-                  ))}
-                </select>
-              ) : (
-                <div className="flex items-center gap-2 h-11 px-3 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium text-slate-500">
-                  <Loader2 className="w-3.5 h-3.5 animate-spin text-blue-600" />
-                  <span>Đang tải chi nhánh...</span>
-                </div>
-              )}
-            </div>
-
-            <div className="flex items-center gap-2">
-              <Button
-                variant="outline"
-                size="icon"
-                onClick={() => setSortDir?.(sortDir === 'asc' ? 'desc' : 'asc')}
-                className="rounded-xl border-slate-200 hover:bg-slate-50 active:scale-95 transition-all shadow-sm w-10 h-10 shrink-0"
-                title={sortDir === 'asc' ? 'Tăng dần' : 'Giảm dần'}
-              >
-                {sortDir === 'desc' ? (
-                  <SortDesc className="w-4 h-4 text-slate-600" />
-                ) : (
-                  <SortAsc className="w-4 h-4 text-slate-600" />
-                )}
-              </Button>
-
-              <Button
-                variant="outline"
-                size="icon"
-                className="text-slate-400 hover:text-rose-600 hover:bg-rose-50 hover:border-rose-100 w-10 h-10 rounded-xl transition-all shadow-sm shrink-0"
-                title="Xóa bộ lọc"
-                onClick={() => {
-                  setTxQuery('');
-                  setTxStatus?.('paid');
-                  setSortKey?.('created_at');
-                  setSortDir?.('desc');
-                  setPaymentMethod?.('');
-                  setFromDate?.('');
-                  setToDate?.('');
-                  setBookingTypeFilter?.('all');
-                  setPage(1);
-                  toast.info('Đã đặt lại bộ lọc');
-                }}
-              >
-                <FilterX size={16} />
-              </Button>
-            </div>
+          {/* Sort dir + Clear */}
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="icon"
+              onClick={() => setSortDir?.(sortDir === 'asc' ? 'desc' : 'asc')}
+              className="rounded-xl border-slate-200 hover:bg-slate-50 active:scale-95 transition-all shadow-sm w-10 h-10 shrink-0"
+              title={sortDir === 'asc' ? 'Tăng dần' : 'Giảm dần'}
+            >
+              {sortDir === 'desc' ? <SortDesc className="w-4 h-4 text-slate-600" /> : <SortAsc className="w-4 h-4 text-slate-600" />}
+            </Button>
+            <Button
+              variant="outline"
+              size="icon"
+              className="text-slate-400 hover:text-rose-600 hover:bg-rose-50 hover:border-rose-100 w-10 h-10 rounded-xl transition-all shadow-sm shrink-0"
+              title="Xóa bộ lọc"
+              onClick={() => {
+                setTxQuery('');
+                setTxStatus?.('paid');
+                setSortKey?.('created_at');
+                setSortDir?.('desc');
+                setPaymentMethod?.('');
+                setFromDate?.('');
+                setToDate?.('');
+                setBookingTypeFilter?.('all');
+                setPage(1);
+                toast.info('Đã đặt lại bộ lọc');
+              }}
+            >
+              <FilterX size={16} />
+            </Button>
           </div>
         </div>
       </div>

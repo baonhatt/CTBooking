@@ -7,6 +7,8 @@ export async function getTickets(options?: {
   type?: 'all' | 'movie' | 'vr';
   includeInactive?: boolean;
   branch_id?: number | 'all';
+  sort?: string;
+  dir?: string;
   signal?: AbortSignal;
 }) {
   const params = new URLSearchParams();
@@ -16,6 +18,8 @@ export async function getTickets(options?: {
   if (options?.type && options.type !== 'all') params.set('type', options.type);
   if (options?.includeInactive) params.set('includeInactive', 'true');
   if (options?.branch_id) params.set('branch_id', String(options.branch_id));
+  if (options?.sort) params.set('sort', options.sort);
+  if (options?.dir) params.set('dir', options.dir);
   const path = `/api/admin/tickets${params.toString() ? `?${params.toString()}` : ''}`;
   return request<{
     items: any[];

@@ -107,23 +107,46 @@ export default function ToysContent({
 
       {/* TOOLBAR */}
       <div className="flex flex-col xl:flex-row justify-between items-start xl:items-center gap-4 bg-white p-4 rounded-2xl border border-gray-200 shadow-sm">
-        <form onSubmit={handleSearchSubmit} className="flex flex-1 gap-2 max-w-xl">
-          <div className="relative flex-1">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 w-4 h-4" />
-            <input
-              type="text"
-              placeholder="Tìm tên đồ chơi, sản phẩm..."
-              value={localSearch}
-              onChange={(e) => setLocalSearch(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 bg-slate-50 border-slate-200 focus:bg-white focus:ring-2 focus:ring-blue-500 rounded-xl transition-all outline-none text-sm border"
+        {/* L E F T - G R O U P */}
+        <div className="flex flex-wrap items-center gap-3 w-full xl:w-auto">
+          <form onSubmit={handleSearchSubmit} className="flex gap-2">
+            <div className="relative w-[280px]">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 w-4 h-4" />
+              <input
+                type="text"
+                placeholder="Tìm tên đồ chơi, sản phẩm..."
+                value={localSearch}
+                onChange={(e) => setLocalSearch(e.target.value)}
+                className="w-full pl-10 pr-4 h-10 bg-slate-50 border border-slate-200 focus:bg-white focus:ring-2 focus:ring-blue-500 rounded-xl transition-all outline-none text-sm"
+              />
+            </div>
+            <Button
+              type="submit"
+              className="h-10 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-semibold px-4 flex items-center gap-1.5 shrink-0"
+            >
+              <Search className="w-3.5 h-3.5" /> Tìm kiếm
+            </Button>
+          </form>
+          <div className="flex items-center gap-2.5 px-3 py-1.5 bg-slate-50 rounded-xl border border-slate-200 h-10">
+            <span className="text-xs font-medium text-slate-500 whitespace-nowrap">Chỉ hiện khả dụng</span>
+            <Switch
+              checked={showActiveOnly}
+              onCheckedChange={setShowActiveOnly}
+              className="data-[state=checked]:bg-green-500 data-[state=unchecked]:bg-gray-300 cursor-pointer"
             />
           </div>
-          <Button
-            type="submit"
-            className="bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-semibold px-4 flex items-center gap-1.5 shrink-0"
-          >
-            <Search className="w-3.5 h-3.5" /> Tìm kiếm
-          </Button>
+        </div>
+
+        {/* R I G H T - G R O U P */}
+        <div className="flex flex-wrap items-center gap-2.5 w-full xl:w-auto font-sans justify-start xl:justify-end">
+          {hasPermission('toys', 'create') && (
+            <Button
+              onClick={onCreate}
+              className="bg-blue-600 hover:bg-blue-700 rounded-xl shadow-sm gap-2 text-white h-10 px-5 font-semibold text-xs"
+            >
+              <Plus className="w-4 h-4" /> Thêm mới
+            </Button>
+          )}
           <Button
             type="button"
             variant="outline"
@@ -133,30 +156,11 @@ export default function ToysContent({
               onSearchChange('');
               onRefresh();
             }}
-            className="rounded-xl shadow-sm hover:rotate-180 transition-transform duration-500 shrink-0 h-10 w-10"
+            className="rounded-xl shadow-sm hover:rotate-180 transition-transform duration-500 shrink-0 h-10 w-10 ml-2"
             title="Làm mới"
           >
             <RefreshCw className={`w-4 h-4 ${isLoading ? 'animate-spin' : ''}`} />
           </Button>
-        </form>
-
-        <div className="flex flex-wrap items-center gap-3">
-          <div className="flex items-center gap-2 px-3 py-1.5 bg-slate-50 rounded-xl border border-slate-200">
-            <span className="text-[10px] font-bold text-slate-500 uppercase whitespace-nowrap">Chỉ hiện khả dụng</span>
-            <Switch
-              checked={showActiveOnly}
-              onCheckedChange={setShowActiveOnly}
-              className="data-[state=checked]:bg-green-500 data-[state=unchecked]:bg-gray-300 cursor-pointer"
-            />
-          </div>
-          {hasPermission('toys', 'create') && (
-            <Button
-              onClick={onCreate}
-              className="bg-blue-600 hover:bg-blue-700 rounded-lg shadow-sm gap-2 text-white h-10 px-5 font-medium"
-            >
-              <Plus className="w-4 h-4" /> Thêm mới
-            </Button>
-          )}
         </div>
       </div>
       <Card className="border border-gray-200 rounded-xl shadow-sm bg-white">

@@ -18,7 +18,9 @@ import {
   Users,
   Sparkles,
   ShieldAlert,
-  Copy
+  Copy,
+  SortDesc,
+  SortAsc
 } from 'lucide-react';
 import { format, formatDistanceToNow } from 'date-fns';
 import { vi } from 'date-fns/locale';
@@ -118,6 +120,10 @@ interface Props {
   onViewDetail?: (ticket: TicketPackage) => void;
   isCodeEditable?: boolean;
   setIsCodeEditable?: (editable: boolean) => void;
+  sortKey?: string;
+  sortDir?: 'asc' | 'desc';
+  setSortKey?: (k: string) => void;
+  setSortDir?: (d: 'asc' | 'desc') => void;
 }
 
 export default function TicketsContent(props: Props) {
@@ -163,7 +169,11 @@ export default function TicketsContent(props: Props) {
     onDelete,
     onViewDetail,
     isCodeEditable = false,
-    setIsCodeEditable = () => {}
+    setIsCodeEditable = () => {},
+    sortKey = 'updated_at',
+    setSortKey = () => {},
+    sortDir = 'desc',
+    setSortDir = () => {}
   } = props;
   const { isLoading = false } = props as any;
 
@@ -320,16 +330,42 @@ export default function TicketsContent(props: Props) {
             </button>
           </div>
 
-          <div className="flex items-center gap-2 px-3 py-1.5 bg-slate-50 rounded-xl border border-slate-200">
-            <span className="text-[10px] font-bold text-slate-500 uppercase">Chỉ hiện khả dụng</span>
+          <div className="flex items-center gap-2.5 px-3 py-1.5 bg-slate-50 rounded-xl border border-slate-200 h-10">
+            <span className="text-xs font-medium text-slate-500 whitespace-nowrap">Chỉ hiện khả dụng</span>
             <Switch
               checked={showActiveOnly}
               onCheckedChange={setShowActiveOnly}
               className="data-[state=checked]:bg-green-500 data-[state=unchecked]:bg-gray-300 cursor-pointer"
             />
           </div>
+
         </div>
         <div className="flex flex-wrap items-center gap-3">
+          <select
+            value={sortKey}
+            onChange={(e) => setSortKey?.(e.target.value)}
+            className="bg-white border rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none shadow-sm cursor-pointer h-10"
+          >
+            <option value="updated_at">Mới cập nhật</option>
+            <option value="name">Tên gói</option>
+            <option value="price">Giá</option>
+            <option value="type">Phân loại</option>
+          </select>
+
+          <Button
+            variant="outline"
+            size="icon"
+            onClick={() => setSortDir?.(sortDir === 'asc' ? 'desc' : 'asc')}
+            className="rounded-xl border-slate-200 hover:bg-slate-50 active:scale-95 transition-all shadow-sm h-10 w-10 shrink-0"
+            title={sortDir === 'asc' ? 'Tăng dần' : 'Giảm dần'}
+          >
+            {sortDir === 'desc' ? (
+              <SortDesc className="w-4 h-4 text-slate-600" />
+            ) : (
+              <SortAsc className="w-4 h-4 text-slate-600" />
+            )}
+          </Button>
+
           {branches.length > 0 ? (
             <select
               value={selectedBranchId || 'all'}

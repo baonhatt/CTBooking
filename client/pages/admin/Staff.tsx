@@ -23,6 +23,7 @@ import {
   X,
   Search,
   RefreshCw,
+  Plus,
   Eye,
   FileText,
   Edit,
@@ -367,97 +368,109 @@ export default function StaffPage() {
       handleLogout={handleLogout}
     >
       <div className="space-y-6">
-        <Card>
-          <CardHeader>
-            <div className="flex flex-col xl:flex-row justify-between items-start xl:items-center gap-4">
-              <div className="flex flex-col gap-1">
-                <CardTitle>Quản lý nhân viên</CardTitle>
-                <p className="text-xs text-slate-500">Tổng cộng {staffData?.total || 0} nhân viên trong hệ thống</p>
+        {/* PAGE HEADER */}
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-xl font-bold text-slate-800">Quản lý nhân viên</h1>
+            <p className="text-sm text-slate-400 mt-0.5">Tổng cộng {staffData?.total || 0} nhân viên trong hệ thống</p>
+          </div>
+        </div>
+
+        {/* TOOLBAR */}
+        <div className="flex flex-col xl:flex-row justify-between items-start xl:items-center gap-4 bg-white p-4 rounded-2xl border border-gray-200 shadow-sm">
+          {/* L E F T - G R O U P */}
+          <div className="flex flex-wrap items-center gap-3 w-full xl:w-auto">
+            <form onSubmit={handleSearchStaff} className="flex gap-2">
+              <div className="relative w-[320px]">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 w-4 h-4" />
+                <input
+                  type="text"
+                  placeholder="Tìm theo email hoặc tên..."
+                  value={localSearch}
+                  onChange={(e) => setLocalSearch(e.target.value)}
+                  className="w-full pl-10 pr-4 h-10 bg-slate-50 border border-slate-200 focus:bg-white focus:ring-2 focus:ring-blue-500 rounded-xl transition-all outline-none text-sm"
+                />
               </div>
-              <form onSubmit={handleSearchStaff} className="flex flex-1 w-full xl:max-w-md gap-2">
-                <div className="relative flex-1">
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 w-4 h-4" />
-                  <Input
-                    placeholder="Tìm theo email hoặc tên..."
-                    value={localSearch}
-                    onChange={(e) => setLocalSearch(e.target.value)}
-                    className="pl-10 pr-4 bg-slate-50 border-slate-200 focus:bg-white focus:ring-2 focus:ring-blue-500 rounded-xl transition-all outline-none text-sm border"
-                  />
-                </div>
-                <Button
-                  type="submit"
-                  className="bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-semibold px-4 flex items-center gap-1.5 shrink-0"
-                >
-                  <Search className="w-3.5 h-3.5" /> Tìm kiếm
-                </Button>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="icon"
-                  onClick={() => {
-                    setLocalSearch('');
-                    setSearch('');
-                    setFilterRole('');
-                    setFilterBranch(staff?.isSuperAdmin ? 'all' : '');
-                    queryClient.invalidateQueries({ queryKey: ['staff'] });
-                  }}
-                  className="h-10 w-10 hover:rotate-180 transition-transform duration-500 shrink-0"
-                  title="Làm mới"
-                >
-                  <RefreshCw className="h-4 w-4" />
-                </Button>
-              </form>
-              <div className="flex flex-wrap items-center gap-2 w-full xl:w-auto">
-                {hasPermission('staff', 'view_deleted') && (
-                  <Button
-                    variant="outline"
-                    onClick={() => navigate('/deleted/staff')}
-                    className="flex items-center gap-2"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                    Xem đã xóa
-                  </Button>
-                )}
-                <Select value={filterRole} onValueChange={setFilterRole}>
-                  <SelectTrigger className="w-[180px] h-10">
-                    <SelectValue placeholder="Vai trò" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">Tất cả vai trò</SelectItem>
-                    {roles.map((role: Role) => (
-                      <SelectItem key={role.id} value={String(role.id)}>
-                        {role.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <Select value={filterBranch} onValueChange={setFilterBranch}>
-                  <SelectTrigger className="w-[180px] h-10">
-                    <SelectValue placeholder="Chi nhánh" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">Tất cả chi nhánh</SelectItem>
-                    {branches.map((branch: Branch) => (
-                      <SelectItem key={branch.id} value={String(branch.id)}>
-                        {branch.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                {hasPermission('staff', 'create') && (
-                  <Button
-                    onClick={() => {
-                      resetForm();
-                      setIsCreateDialogOpen(true);
-                    }}
-                    className="bg-blue-600 hover:bg-blue-700"
-                  >
-                    Tạo nhân viên mới
-                  </Button>
-                )}
-              </div>
-            </div>
-          </CardHeader>
+              <Button
+                type="submit"
+                className="h-10 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-semibold px-4 flex items-center gap-1.5 shrink-0"
+              >
+                <Search className="w-3.5 h-3.5" /> Tìm kiếm
+              </Button>
+            </form>
+          </div>
+
+          {/* R I G H T - G R O U P */}
+          <div className="flex flex-wrap items-center gap-2.5 w-full xl:w-auto font-sans justify-start xl:justify-end">
+            <select 
+              value={filterRole} 
+              onChange={(e) => setFilterRole(e.target.value)}
+              className="h-10 px-3 bg-white border border-slate-200 rounded-xl text-xs focus:ring-2 focus:ring-blue-500 outline-none shadow-sm cursor-pointer min-w-[140px]"
+            >
+              <option value="all">Tất cả vai trò</option>
+              {roles.map((role: Role) => (
+                <option key={role.id} value={String(role.id)}>
+                  {role.name}
+                </option>
+              ))}
+            </select>
+            
+            <select 
+              value={filterBranch} 
+              onChange={(e) => setFilterBranch(e.target.value)}
+              className="h-10 px-3 bg-white border border-slate-200 rounded-xl text-xs focus:ring-2 focus:ring-blue-500 outline-none shadow-sm cursor-pointer min-w-[140px]"
+            >
+              <option value="all">Tất cả chi nhánh</option>
+              {branches.map((branch: Branch) => (
+                <option key={branch.id} value={String(branch.id)}>
+                  {branch.name}
+                </option>
+              ))}
+            </select>
+
+            {hasPermission('staff', 'view_deleted') && (
+              <Button
+                variant="outline"
+                onClick={() => navigate('/deleted/staff')}
+                className="rounded-xl flex items-center gap-2 h-10 px-4 shadow-sm"
+              >
+                <Trash2 className="w-4 h-4" />
+                <span className="hidden sm:inline text-xs font-semibold text-slate-600">Xem đã xóa</span>
+              </Button>
+            )}
+            
+            {hasPermission('staff', 'create') && (
+              <Button
+                onClick={() => {
+                  resetForm();
+                  setIsCreateDialogOpen(true);
+                }}
+                className="bg-blue-600 hover:bg-blue-700 rounded-xl shadow-sm gap-2 text-white h-10 px-5 font-semibold text-xs"
+              >
+                <Plus className="w-4 h-4" /> Tạo nhân viên
+              </Button>
+            )}
+
+            <Button
+              type="button"
+              variant="outline"
+              size="icon"
+              onClick={() => {
+                setLocalSearch('');
+                setSearch('');
+                setFilterRole('');
+                setFilterBranch(staff?.isSuperAdmin ? 'all' : '');
+                queryClient.invalidateQueries({ queryKey: ['staff'] });
+              }}
+              className="rounded-xl shadow-sm hover:rotate-180 transition-transform duration-500 shrink-0 h-10 w-10 ml-2"
+              title="Làm mới"
+            >
+              <RefreshCw className="h-4 w-4" />
+            </Button>
+          </div>
+        </div>
+
+        <Card className="border border-gray-200 rounded-xl shadow-sm bg-white mt-4">
           <CardContent>
             {staffLoading ? (
               <div className="space-y-4 py-4">

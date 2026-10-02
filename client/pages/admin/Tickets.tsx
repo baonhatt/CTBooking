@@ -60,6 +60,9 @@ export default function TicketsPage() {
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
 
   const [typeFilter, setTypeFilter] = useState<'all' | 'movie' | 'vr'>(initialFilters.typeFilter || 'all');
+  const [sortKey, setSortKey] = useState<string>(initialFilters.sortKey || 'updated_at');
+  const [sortDir, setSortDir] = useState<'asc' | 'desc'>(initialFilters.sortDir || 'desc');
+
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [editData, setEditData] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -115,7 +118,9 @@ export default function TicketsPage() {
       pageSize,
       type: typeFilter,
       includeInactive: !showActiveOnly,
-      branch_id: selectedBranchId
+      branch_id: selectedBranchId,
+      sort: sortKey,
+      dir: sortDir
     });
     setTickets(
       items.map((t: any) => ({
@@ -149,14 +154,14 @@ export default function TicketsPage() {
 
   useEffect(() => {
     handleRefresh();
-  }, [page, showActiveOnly, selectedBranchId, typeFilter]);
+  }, [page, showActiveOnly, selectedBranchId, typeFilter, sortKey, sortDir]);
 
   useEffect(() => {
     try {
-      const state = { page, showActiveOnly, branchId: selectedBranchId, typeFilter };
+      const state = { page, showActiveOnly, branchId: selectedBranchId, typeFilter, sortKey, sortDir };
       localStorage.setItem('admin_tickets_filters', JSON.stringify(state));
     } catch {}
-  }, [page, showActiveOnly, selectedBranchId, typeFilter]);
+  }, [page, showActiveOnly, selectedBranchId, typeFilter, sortKey, sortDir]);
 
   const openCreate = () => {
     const defaultType = typeFilter === 'vr' ? 'vr' : 'movie';
@@ -234,6 +239,10 @@ export default function TicketsPage() {
         setTypeFilter={setTypeFilter}
         isCodeEditable={isCodeEditable}
         setIsCodeEditable={setIsCodeEditable}
+        sortKey={sortKey}
+        sortDir={sortDir}
+        setSortKey={setSortKey}
+        setSortDir={setSortDir}
       />
       <ConfirmDeleteDialog
         isOpen={isDeleteDialogOpen}
