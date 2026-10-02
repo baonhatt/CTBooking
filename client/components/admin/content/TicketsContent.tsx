@@ -52,7 +52,7 @@ import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
 import { BranchMultiSelect } from '@/components/admin/BranchMultiSelect';
 import { BranchIdsBadge } from '@/components/admin/BranchIdsBadge';
-import { normalizeBranchIdsInput } from '@/lib/branch-ids';
+import { normalizeBranchIdsInput, parseBranchIdsFromApi } from '@/lib/branch-ids';
 import { toast } from 'sonner';
 import { useNavigate } from 'react-router-dom';
 import { createTicketApi, updateTicketApi, getAdminBranchOptions, toggleTicketStatusApi } from '@/lib/api';
@@ -217,6 +217,39 @@ export default function TicketsContent(props: Props) {
       });
     }
   }, [isEditOpen]);
+
+  const filteredMovies = React.useMemo(() => {
+    if (!movies) return [];
+    
+    // Determine the raw branch list for the ticket package
+    const pBranchesRaw = editData?.branch_ids !== undefined 
+      ? editData.branch_ids 
+      : (editData?.branch_id ? [editData.branch_id] : []);
+    
+    // If it's explicitly null, the package is Global (All Branches)
+    const isPackageGlobal = pBranchesRaw === null;
+    const pBranches = Array.isArray(pBranchesRaw) ? pBranchesRaw : [];
+
+    return movies.filter((movie) => {
+      // Must securely parse the movie branch ids as it can be a stringified JSON from API
+      const mBranchesRaw = parseBranchIdsFromApi(movie.branch_ids ?? movie.branch_id);
+      const isMovieGlobal = mBranchesRaw === null;
+      const mBranches = Array.isArray(mBranchesRaw) ? mBranchesRaw : [];
+      
+      // If Ticket is global, it can include ANY movie
+      if (isPackageGlobal) {
+        return true;
+      }
+      
+      // If movie is global, it's playable everywhere and thus available for any specific ticket package
+      if (isMovieGlobal) {
+        return true;
+      }
+      
+      // Both are specific: ensure they share at least one branch
+      return pBranches.some((b: number) => mBranches.includes(b));
+    });
+  }, [movies, editData?.branch_ids, editData?.branch_id]);
 
   // ✅ FIX: Chỉ đóng popup AFTER API call thành công
   const handleToggleStatus = async (id: number, currentStatus: boolean) => {
@@ -915,15 +948,41 @@ export default function TicketsContent(props: Props) {
                 ) : (
                   /* MOVIE COMBO SELECT */
                   <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-xs space-y-4">
-                    <h3 className="text-xs font-bold text-gray-700 border-b pb-2 flex items-center gap-2">
-                      <Film size={14} className="text-blue-500" />
-                      Combo Phim áp dụng ({editData?.combo?.length || 0})
-                    </h3>
+                    <div className="border-b pb-2 flex items-center justify-between">
+                      <h3 className="text-xs font-bold text-gray-700 flex items-center gap-2">
+                        <Film size={14} className="text-blue-500" />
+                        Combo Phim ({(editData?.combo || []).filter((id: number) => filteredMovies.some(m => m.id === id)).length}/{filteredMovies.length})
+                      </h3>
+                      {filteredMovies.length > 0 && (
+                        <div className="flex items-center gap-1.5 hover:bg-slate-50 px-2 py-1 rounded cursor-pointer transition-colors">
+                          <Checkbox
+                            id="check-all-movies"
+                            checked={filteredMovies.length > 0 && filteredMovies.every(m => (editData.combo || []).includes(m.id))}
+                            onCheckedChange={(checked) => {
+                              const existingCombo = editData.combo || [];
+                              const visibleMovieIds = filteredMovies.map(m => m.id);
+                              if (checked) {
+                                const toAdd = visibleMovieIds.filter(id => !existingCombo.includes(id));
+                                setEditData({ ...editData, combo: [...existingCombo, ...toAdd] });
+                              } else {
+                                setEditData({ ...editData, combo: existingCombo.filter((id: number) => !visibleMovieIds.includes(id)) });
+                              }
+                            }}
+                          />
+                          <label
+                            htmlFor="check-all-movies"
+                            className="text-[10px] font-bold uppercase text-slate-500 cursor-pointer"
+                          >
+                            Chọn tất cả
+                          </label>
+                        </div>
+                      )}
+                    </div>
                     <div className="border border-gray-200 rounded-xl p-2.5 h-44 overflow-y-auto space-y-1.5 bg-gray-50/50">
-                      {movies.length === 0 ? (
-                        <p className="text-xs text-gray-400 text-center py-6">Không có phim nào</p>
+                      {filteredMovies.length === 0 ? (
+                        <p className="text-xs text-gray-400 text-center py-6">Không có phim nào khả dụng cho chi nhánh này</p>
                       ) : (
-                        movies.map((movie) => (
+                        filteredMovies.map((movie) => (
                           <div
                             key={movie.id}
                             className="flex items-center space-x-2.5 hover:bg-white p-1.5 rounded-lg border border-transparent hover:border-slate-200 transition-colors"
@@ -1050,6 +1109,9 @@ export default function TicketsContent(props: Props) {
                           .filter(Boolean)
                       : editData.features || [];
 
+                  const rawCombo = editData.type === 'vr' ? [] : editData.combo || [];
+                  const validCombo = rawCombo.filter((id: number) => filteredMovies.some(m => m.id === id));
+
                   const payload = {
                     name: editData.name.trim(),
                     code: editData.code?.trim() || undefined,
@@ -1057,7 +1119,7 @@ export default function TicketsContent(props: Props) {
                     price: Number(editData.price || 0),
                     features,
                     type: editData.type || 'movie',
-                    combo: editData.type === 'vr' ? [] : editData.combo || [],
+                    combo: validCombo,
                     min_group_size: editData.min_group_size ? Number(editData.min_group_size) : undefined,
                     max_group_size: editData.max_group_size ? Number(editData.max_group_size) : undefined,
                     is_member_only: !!editData.is_member_only,

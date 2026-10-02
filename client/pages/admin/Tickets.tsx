@@ -165,7 +165,7 @@ export default function TicketsPage() {
   };
 
   const handleClone = (data: any) => {
-    setEditData({ ...data, id: 0, code: generateCode(), name: `${data.name} (Copy)` });
+    setEditData({ ...data, id: 0, code: generateCode(), name: data.name });
     setIsCodeEditable(false);
     setIsEditOpen(true);
   };
