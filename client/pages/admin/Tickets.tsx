@@ -159,7 +159,8 @@ export default function TicketsPage() {
   }, [page, showActiveOnly, selectedBranchId, typeFilter]);
 
   const openCreate = () => {
-    setEditData({ id: 0, name: '', code: generateCode(), price: 0, is_active: true, features: [] });
+    const defaultType = typeFilter === 'vr' ? 'vr' : 'movie';
+    setEditData({ id: 0, name: '', code: generateCode(), price: 0, is_active: true, features: [], type: defaultType });
     setIsCodeEditable(false);
     setIsEditOpen(true);
   };

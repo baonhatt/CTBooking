@@ -292,7 +292,7 @@ export default function VRShowcase({
                   {/* Body Content */}
                   <div className="p-3 sm:p-5 flex-1 flex flex-col justify-between space-y-2.5 sm:space-y-4">
                     <div className="space-y-1.5 sm:space-y-3">
-                      <h3 className="font-extrabold text-white text-xs sm:text-lg tracking-wide line-clamp-1 group-hover:text-purple-300 transition-colors">
+                      <h3 className="font-extrabold text-white text-xs sm:text-base tracking-tight line-clamp-1 group-hover:text-purple-300 transition-colors">
                         {pkg.name}
                       </h3>
 
