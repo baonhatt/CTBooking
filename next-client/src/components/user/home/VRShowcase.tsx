@@ -245,16 +245,22 @@ export default function VRShowcase({
                   {/* Package Cover Image Header */}
                   <div className="relative aspect-[16/10] w-full overflow-hidden bg-slate-950 flex items-center justify-center">
                     {hasImage ? (
-                      <img
-                        src={optimizeCloudinaryUrl(imageUrl, 600)}
-                        alt={pkg.name}
-                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-                        loading="lazy"
-                        onError={(e) => {
-                          (e.target as HTMLImageElement).src =
-                            'https://images.unsplash.com/photo-1593508512255-86ab42a8e620?auto=format&fit=crop&w=800&q=80';
-                        }}
-                      />
+                      <>
+                        <div
+                          className="absolute inset-0 bg-cover bg-center opacity-40 blur-xl scale-110 pointer-events-none transition-transform duration-500 group-hover:scale-125"
+                          style={{ backgroundImage: `url(${optimizeCloudinaryUrl(imageUrl, 600)})` }}
+                        />
+                        <img
+                          src={optimizeCloudinaryUrl(imageUrl, 600)}
+                          alt={pkg.name}
+                          className="relative w-full h-full object-contain group-hover:scale-105 transition-transform duration-500 drop-shadow-2xl"
+                          loading="lazy"
+                          onError={(e) => {
+                            (e.target as HTMLImageElement).src =
+                              'https://images.unsplash.com/photo-1593508512255-86ab42a8e620?auto=format&fit=crop&w=800&q=80';
+                          }}
+                        />
+                      </>
                     ) : (
                       <div className="w-full h-full bg-gradient-to-br from-purple-950/70 via-slate-900 to-fuchsia-950/70 flex flex-col items-center justify-center gap-1 sm:gap-2 p-2 sm:p-4 text-center">
                         <div className="p-2 sm:p-3 rounded-xl sm:rounded-2xl bg-purple-500/20 border border-purple-500/30 text-purple-300">
@@ -388,11 +394,17 @@ export default function VRShowcase({
               {/* Modal Image Header */}
               <div className="relative aspect-video w-full bg-slate-900 overflow-hidden shrink-0">
                 {selectedDetailPkg.cover_image ? (
-                  <img
-                    src={resolveImageUrl(selectedDetailPkg.cover_image)}
-                    alt={selectedDetailPkg.name}
-                    className="w-full h-full object-cover"
-                  />
+                  <>
+                    <div
+                      className="absolute inset-0 bg-cover bg-center opacity-40 blur-2xl scale-110 pointer-events-none"
+                      style={{ backgroundImage: `url(${resolveImageUrl(selectedDetailPkg.cover_image)})` }}
+                    />
+                    <img
+                      src={resolveImageUrl(selectedDetailPkg.cover_image)}
+                      alt={selectedDetailPkg.name}
+                      className="relative w-full h-full object-contain drop-shadow-2xl"
+                    />
+                  </>
                 ) : (
                   <div className="w-full h-full bg-gradient-to-br from-purple-950 via-slate-900 to-fuchsia-950 flex flex-col items-center justify-center gap-2">
                     <Gamepad2 className="w-12 h-12 text-purple-400" />
