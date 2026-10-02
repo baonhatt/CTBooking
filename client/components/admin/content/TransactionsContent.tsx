@@ -647,20 +647,18 @@ export default function TransactionsContent({
       <Card className="border border-gray-200 rounded-xl shadow-sm bg-white">
         <CardContent className="p-0">
           <Table>
-            <TableHeader className="bg-sky-50/80 border-b border-sky-100">
+            <TableHeader className="bg-gray-50 border-b">
               <TableRow className="hover:bg-transparent border-none">
-                <TableHead className="text-xs font-bold text-sky-900 uppercase py-3.5 pr-0">ID</TableHead>
-                <TableHead className="text-xs font-bold text-sky-900 uppercase py-3.5">Chi nhánh</TableHead>
-                <TableHead className="text-xs font-bold text-sky-900 uppercase py-3.5">Người dùng</TableHead>
-                <TableHead className="text-center text-xs font-bold text-sky-900 uppercase py-3.5">Loại</TableHead>
-                <TableHead className="text-xs font-bold text-sky-900 uppercase py-3.5">Sản phẩm</TableHead>
-                <TableHead className="text-center text-xs font-bold text-sky-900 uppercase py-3.5">Số lượng</TableHead>
-                <TableHead className="text-xs font-bold text-sky-900 uppercase py-3.5">Doanh thu</TableHead>
-                <TableHead className="text-xs font-bold text-sky-900 uppercase py-3.5">Thời gian</TableHead>
-                <TableHead className="text-center text-xs font-bold text-sky-900 uppercase py-3.5">
-                  Phương thức
-                </TableHead>
-                <TableHead className="text-right text-xs font-bold text-sky-900 uppercase py-3.5 pr-6">
+                <TableHead className="w-[70px]">ID</TableHead>
+                <TableHead className="min-w-[160px]">Chi nhánh</TableHead>
+                <TableHead>Người dùng</TableHead>
+                <TableHead className="text-center w-[80px]">Loại</TableHead>
+                <TableHead>Sản phẩm</TableHead>
+                <TableHead className="text-center w-[80px]">Số lượng</TableHead>
+                <TableHead className="w-[120px]">Doanh thu</TableHead>
+                <TableHead className="w-[120px]">Thời gian</TableHead>
+                <TableHead className="text-center w-[110px]">Phương thức</TableHead>
+                <TableHead className="text-right w-[140px] pr-6">
                   Thao tác
                 </TableHead>
               </TableRow>
@@ -770,7 +768,7 @@ export default function TransactionsContent({
                         <TableCell className="font-mono text-xs text-gray-500">#{t.id}</TableCell>
                         <TableCell>
                           <div
-                            className="text-[12px] font-medium text-slate-600 whitespace-nowrap min-w-[150px]"
+                            className="text-[12px] font-medium text-slate-600 truncate max-w-[200px]"
                             title={branches.find((b) => b.id === t.branch_id)?.name || 'Tất cả chi nhánh'}
                           >
                             {branches.find((b) => b.id === t.branch_id)?.name || (
@@ -816,7 +814,7 @@ export default function TransactionsContent({
                         <TableCell className="min-w-[150px] font-medium text-[11px] text-slate-700 leading-tight">
                           {parsePackageName(t.ticket_package_name, t)}
                         </TableCell>
-                        <TableCell className="text-center font-bold text-slate-800 text-sm">
+                        <TableCell className="text-center font-semibold text-slate-800 text-[13px]">
                           {t.ticketCount}
                         </TableCell>
                         <TableCell className="font-bold text-blue-700">
@@ -866,7 +864,7 @@ export default function TransactionsContent({
                         </TableCell>
 
                         <TableCell className="text-center">
-                          <span className="text-sm font-bold uppercase text-slate-700">{t.paymentMethod}</span>
+                          <span className="text-[11px] font-semibold tracking-wider uppercase text-slate-600">{t.paymentMethod}</span>
                         </TableCell>
 
                         <TableCell className="text-right">

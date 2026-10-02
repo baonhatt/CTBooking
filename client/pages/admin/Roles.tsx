@@ -282,12 +282,12 @@ export default function RolesPage() {
             <div className="overflow-x-auto">
               <table className="w-full">
                 <thead>
-                  <tr className="bg-gray-50">
-                    <th className="text-left p-3 border-b">Tên vai trò</th>
-                    <th className="text-left p-3 border-b">Loại</th>
-                    <th className="text-left p-3 border-b">Cấp độ · Nhân viên</th>
-                    <th className="text-left p-3 border-b">Mô tả</th>
-                    <th className="text-right p-3 border-b w-[140px]">Hành động</th>
+                  <tr className="bg-gray-50 border-b">
+                    <th className="h-10 px-4 text-left align-middle font-semibold text-xs text-slate-500 uppercase tracking-wider">Tên vai trò</th>
+                    <th className="h-10 px-4 text-left align-middle font-semibold text-xs text-slate-500 uppercase tracking-wider">Loại</th>
+                    <th className="h-10 px-4 text-left align-middle font-semibold text-xs text-slate-500 uppercase tracking-wider">Cấp độ · Nhân viên</th>
+                    <th className="h-10 px-4 text-left align-middle font-semibold text-xs text-slate-500 uppercase tracking-wider">Mô tả</th>
+                    <th className="h-10 px-4 text-right align-middle font-semibold text-xs text-slate-500 uppercase tracking-wider w-[140px]">Hành động</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -297,19 +297,19 @@ export default function RolesPage() {
                       className="border-b hover:bg-gray-50 cursor-pointer"
                       onClick={() => navigate(`/roles/${role.id}`)}
                     >
-                      <td className="p-3 font-medium capitalize">{role.name}</td>
-                      <td className="p-3">
+                      <td className="px-4 py-2.5 align-middle text-[13px] font-medium capitalize">{role.name}</td>
+                      <td className="px-4 py-2.5 align-middle text-[13px]">
                         {role.isSystem ? (
                           <span className="bg-gray-100 text-gray-600 px-2 py-1 rounded text-xs">Hệ thống</span>
                         ) : (
                           <span className="bg-blue-100 text-blue-600 px-2 py-1 rounded text-xs">Tùy chỉnh</span>
                         )}
                       </td>
-                      <td className="p-3">
+                      <td className="px-4 py-2.5 align-middle text-[13px]">
                         Lv{role.level} · {role.staffCount || 0} nhân viên
                       </td>
-                      <td className="p-3 text-sm text-gray-600">{role.description || '-'}</td>
-                      <td className="p-3" onClick={(e) => e.stopPropagation()}>
+                      <td className="px-4 py-2.5 align-middle text-[13px] text-gray-600">{role.description || '-'}</td>
+                      <td className="px-4 py-2.5 align-middle text-[13px]" onClick={(e) => e.stopPropagation()}>
                         <div className="flex justify-end items-center gap-1 w-[100px] ml-auto">
                           <Button
                             variant="ghost"

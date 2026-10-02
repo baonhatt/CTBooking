@@ -493,34 +493,34 @@ export default function StaffPage() {
                   <table className="w-full">
                     <thead>
                       <tr className="border-b bg-gray-50">
-                        <th className="text-left p-3">Email</th>
-                        <th className="text-left p-3">Họ tên</th>
-                        <th className="text-left p-3">Vai trò</th>
-                        <th className="text-left p-3">Chi nhánh</th>
-                        <th className="text-left p-3">Trạng thái</th>
-                        <th className="text-left p-3">Hành động</th>
+                        <th className="h-10 px-4 text-left align-middle font-semibold text-xs text-slate-500 uppercase tracking-wider">Email</th>
+                        <th className="h-10 px-4 text-left align-middle font-semibold text-xs text-slate-500 uppercase tracking-wider">Họ tên</th>
+                        <th className="h-10 px-4 text-left align-middle font-semibold text-xs text-slate-500 uppercase tracking-wider">Vai trò</th>
+                        <th className="h-10 px-4 text-left align-middle font-semibold text-xs text-slate-500 uppercase tracking-wider">Chi nhánh</th>
+                        <th className="h-10 px-4 text-left align-middle font-semibold text-xs text-slate-500 uppercase tracking-wider">Trạng thái</th>
+                        <th className="h-10 px-4 text-left align-middle font-semibold text-xs text-slate-500 uppercase tracking-wider">Hành động</th>
                       </tr>
                     </thead>
                     <tbody>
                       {staffList.map((staff: Staff) => (
                         <tr key={staff.id} className="border-b hover:bg-gray-50">
-                          <td className="p-3">{staff.email}</td>
-                          <td className="p-3">{staff.fullname}</td>
-                          <td className="p-3">
+                          <td className="px-4 py-2.5 align-middle text-[13px]">{staff.email}</td>
+                          <td className="px-4 py-2.5 align-middle text-[13px]">{staff.fullname}</td>
+                          <td className="px-4 py-2.5 align-middle text-[13px]">
                             {staff.isSuperAdmin ? (
                               <span className="font-semibold text-purple-700">Siêu quản trị</span>
                             ) : (
                               staff.roles?.join(', ') || '-'
                             )}
                           </td>
-                          <td className="p-3">
+                          <td className="px-4 py-2.5 align-middle text-[13px]">
                             {staff.isSuperAdmin ? (
                               <span className="text-slate-500 italic">Tất cả chi nhánh</span>
                             ) : (
                               staff.branchNames?.join(', ') || '-'
                             )}
                           </td>
-                          <td className="p-3">
+                          <td className="px-4 py-2.5 align-middle text-[13px]">
                             {staff.isSuperAdmin && (
                               <span className="bg-purple-100 text-purple-800 px-2 py-1 rounded text-xs">Siêu quản trị</span>
                             )}
@@ -530,7 +530,7 @@ export default function StaffPage() {
                               </span>
                             )}
                           </td>
-                          <td className="p-3">
+                          <td className="px-4 py-2.5 align-middle text-[13px]">
                             <div className="flex gap-1">
                               <Button
                                 variant="ghost"
