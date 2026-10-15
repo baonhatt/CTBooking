@@ -405,15 +405,15 @@ export default function HeroSection({
                     bookingSection?.scrollIntoView({ behavior: 'smooth' });
                   }}
                 >
-                  <span className="flex items-center gap-1.5 sm:gap-2 whitespace-nowrap">
+                  <span className="flex items-center gap-2 whitespace-nowrap">
+                    <Ticket className="h-4 w-4 sm:h-5 sm:w-5 shrink-0" />
                     Đặt vé ngay
-                    <Play className="h-3.5 w-3.5 sm:h-4 sm:w-4 group-hover:translate-x-1 transition-transform" />
                   </span>
                 </Button>
 
                 <Button
                   variant="outline"
-                  className="w-full sm:w-auto rounded-xl px-2 sm:px-6 py-4 sm:py-6 text-[13px] sm:text-base font-bold border-cyan-400/40 bg-cyan-500/10 hover:bg-cyan-500/20 hover:border-cyan-400 text-cyan-300 transition-all flex items-center justify-center gap-1.5 sm:gap-2 cursor-pointer shadow-md"
+                  className="w-full sm:w-auto rounded-xl px-2 sm:px-6 py-4 sm:py-6 text-[13px] sm:text-base font-bold border-cyan-400/40 bg-cyan-500/10 hover:bg-cyan-500/20 hover:border-cyan-400 text-cyan-300 transition-all flex items-center justify-center gap-2 cursor-pointer shadow-md"
                   onClick={() => {
                     const scheduleSection = document.getElementById('schedule');
                     scheduleSection?.scrollIntoView({ behavior: 'smooth' });
@@ -431,8 +431,8 @@ export default function HeroSection({
                       vrSection?.scrollIntoView({ behavior: 'smooth' });
                     }}
                   >
-                    <span className="flex items-center gap-1.5 sm:gap-2 whitespace-nowrap">
-                      <Gamepad2 className="h-4 w-4 sm:h-5 sm:w-5" />
+                    <span className="flex items-center gap-2 whitespace-nowrap">
+                      <Gamepad2 className="h-4 w-4 sm:h-5 sm:w-5 shrink-0" />
                       Trải nghiệm VR
                     </span>
                   </Button>
@@ -441,10 +441,10 @@ export default function HeroSection({
                 {heroMedia?.url && (
                   <Button
                     variant="outline"
-                    className="w-full sm:w-auto rounded-xl px-2 sm:px-5 py-4 sm:py-6 text-[13px] sm:text-sm font-semibold border-white/20 bg-white/5 hover:bg-white/10 hover:border-cyan-400 text-slate-100 transition-all flex items-center justify-center gap-1.5 sm:gap-2 cursor-pointer shadow-md"
+                    className="w-full sm:w-auto rounded-xl px-2 sm:px-5 py-4 sm:py-6 text-[13px] sm:text-base font-semibold border-white/20 bg-white/5 hover:bg-white/10 hover:border-cyan-400 text-slate-100 transition-all flex items-center justify-center gap-2 cursor-pointer shadow-md"
                     onClick={() => setIsVideoModalOpen(true)}
                   >
-                    <Play className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-cyan-400 shrink-0" />
+                    <Play className="h-4 w-4 sm:h-5 sm:w-5 text-cyan-400 shrink-0" />
                     <span className="truncate">Xem Video 8K</span>
                   </Button>
                 )}

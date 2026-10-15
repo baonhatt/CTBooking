@@ -74,40 +74,54 @@ export default function MovieScheduleSection() {
     return h * 60 + m;
   }
 
-  // Identify the closest slot to the current time
-  const closestSlot = useMemo(() => {
+  // Priority slot: đang chiếu → sắp chiếu gần nhất → suất cuối ngày (fallback)
+  const prioritySlot = useMemo(() => {
     if (allItems.length === 0) return null;
-    const nowMin = timeToMinutes(now);
-    return allItems.reduce((prev, curr) => {
-      const prevDiff = Math.abs(timeToMinutes(prev.start_time) - nowMin);
-      const currDiff = Math.abs(timeToMinutes(curr.start_time) - nowMin);
-      return currDiff < prevDiff ? curr : prev;
-    });
+    const sorted = [...allItems].sort((a, b) => a.start_time.localeCompare(b.start_time));
+    const live = sorted.find((s) => now >= s.start_time && now < s.end_time);
+    if (live) return live;
+    const upcoming = sorted.find((s) => s.start_time > now);
+    if (upcoming) return upcoming;
+    return sorted[sorted.length - 1];
   }, [allItems, now]);
 
-  // nextSlot is used in JSX for label UI styling
   const nextSlot = useMemo(() => {
     const sorted = [...allItems].sort((a, b) => a.start_time.localeCompare(b.start_time));
     return sorted.find((s) => s.start_time > now);
   }, [allItems, now]);
 
-  // Active selected/hovered slot ID
-  const [activeSlotId, setActiveSlotId] = useState<number | null>(null);
+  // ── 3-MODE STATE ───────────────────────────────────────────────────────────
+  // AUTO     : focusMode='auto'     → activeSlot = prioritySlot (đang/sắp chiếu)
+  // PREVIEW  : hoveredSlotId set   → activeSlot = hovered slot (revert on leave)
+  // SELECTED : focusMode='selected' → activeSlot = selectedSlotId (không auto-revert)
+  // ---------------------------------------------------------------------------
+  type FocusMode = 'auto' | 'selected';
+  const [focusMode, setFocusMode] = useState<FocusMode>('auto');
+  const [selectedSlotId, setSelectedSlotId] = useState<number | null>(null);
+  const [hoveredSlotId, setHoveredSlotId] = useState<number | null>(null);
 
-  // Initialize active slot
-  useEffect(() => {
-    if (allItems.length > 0 && activeSlotId === null) {
-      if (closestSlot) {
-        setActiveSlotId(closestSlot.id);
-      } else {
-        setActiveSlotId(allItems[0].id);
-      }
-    }
-  }, [allItems, closestSlot, activeSlotId]);
-
+  // Derived: slot hiện tại đang được focus
   const activeSlot = useMemo(() => {
-    return allItems.find((s) => s.id === activeSlotId) || allItems[0] || null;
-  }, [allItems, activeSlotId]);
+    // PREVIEW luôn được ưu tiên cao nhất (hover tạm)
+    if (hoveredSlotId !== null) {
+      const found = allItems.find((s) => s.id === hoveredSlotId);
+      if (found) return found;
+    }
+    // SELECTED: user đã click chọn
+    if (focusMode === 'selected' && selectedSlotId !== null) {
+      const found = allItems.find((s) => s.id === selectedSlotId);
+      if (found) return found;
+    }
+    // AUTO: luôn dùng priority slot
+    return prioritySlot || allItems[0] || null;
+  }, [allItems, hoveredSlotId, focusMode, selectedSlotId, prioritySlot]);
+
+  // AUTO mode: khi prioritySlot thay đổi (now tick) → tự update nếu đang ở AUTO
+  useEffect(() => {
+    if (focusMode === 'auto' && prioritySlot) {
+      setSelectedSlotId(null);
+    }
+  }, [prioritySlot, focusMode]);
 
   // Preload all movie covers into memory cache to eliminate any image loading flash/flicker
   useEffect(() => {
@@ -128,25 +142,44 @@ export default function MovieScheduleSection() {
   const prevMinuteRef = useRef(0);
   const isInitializedRef = useRef(false);
 
-  // Debounced Hover Handler to eliminate rapid flickering when mouse sweeps across slots
   const hoverTimerRef = useRef<NodeJS.Timeout | null>(null);
 
+  // PREVIEW: hover → set hoveredSlotId tạm thời (debounce nhẹ chống flicker)
   const handleSlotHover = (slotId: number) => {
     if (hoverTimerRef.current) clearTimeout(hoverTimerRef.current);
-    hoverTimerRef.current = setTimeout(() => {
-      setActiveSlotId(slotId);
-    }, 70);
+    hoverTimerRef.current = setTimeout(() => setHoveredSlotId(slotId), 60);
   };
 
+  // PREVIEW end: mouse leave → clear hover → revert về AUTO hoặc SELECTED
+  const handleSlotLeave = () => {
+    if (hoverTimerRef.current) clearTimeout(hoverTimerRef.current);
+    setHoveredSlotId(null);
+  };
+
+  // SELECTED: click slot
+  // - Nếu click lại slot đang selected → deselect, về AUTO
+  // - Nếu click slot khác → chuyển SELECTED sang slot đó
   const handleSlotClick = (slotId: number) => {
     if (hoverTimerRef.current) clearTimeout(hoverTimerRef.current);
-    setActiveSlotId(slotId);
+    setHoveredSlotId(null);
+    if (focusMode === 'selected' && selectedSlotId === slotId) {
+      // Deselect → về AUTO
+      setFocusMode('auto');
+      setSelectedSlotId(null);
+    } else {
+      setFocusMode('selected');
+      setSelectedSlotId(slotId);
+    }
+  };
+
+  // Deselect về AUTO khi click bên ngoài section (reset)
+  const handleSectionLeave = () => {
+    if (focusMode === 'selected') return; // giữ nguyên khi đang SELECTED
+    setHoveredSlotId(null);
   };
 
   useEffect(() => {
-    return () => {
-      if (hoverTimerRef.current) clearTimeout(hoverTimerRef.current);
-    };
+    return () => { if (hoverTimerRef.current) clearTimeout(hoverTimerRef.current); };
   }, []);
 
   useEffect(() => {
@@ -206,20 +239,14 @@ export default function MovieScheduleSection() {
     });
   }, []);
 
-  // Showtime Markers along the clock bezel
-  const slotMarkers = useMemo(() => {
-    return allItems.map((slot) => {
-      const { hourAngle } = timeToClockAngles(slot.start_time);
-      const rad = (hourAngle - 90) * (Math.PI / 180);
-      const r = 126;
-      return {
-        ...slot,
-        angle: hourAngle,
-        x: 140 + r * Math.cos(rad),
-        y: 140 + r * Math.sin(rad)
-      };
-    });
-  }, [allItems]);
+  // [CHANGED] Chỉ tính vị trí dot của activeSlot (bỏ nhiều dots rối trên bezel)
+  const activeSlotMarker = useMemo(() => {
+    if (!activeSlot) return null;
+    const { hourAngle } = timeToClockAngles(activeSlot.start_time);
+    const rad = (hourAngle - 90) * (Math.PI / 180);
+    const r = 126;
+    return { x: 140 + r * Math.cos(rad), y: 140 + r * Math.sin(rad) };
+  }, [activeSlot]);
 
   // Handle Book Ticket: Append movie item to booking flow
   const handleBookSlot = (slot: PublicShowtime) => {
@@ -304,9 +331,7 @@ export default function MovieScheduleSection() {
               hàng ngày
             </span>
           </h2>
-          <p className="text-[11px] sm:text-sm text-slate-300 mt-1.5 sm:mt-2 px-2">
-            Rê chuột hoặc chạm vào các múi giờ trên đồng hồ để xoay kim chỉ và hiển thị phim tương ứng.
-          </p>
+
           <div className="flex flex-wrap items-center justify-center gap-2 sm:gap-3 text-slate-300 text-[11px] sm:text-xs mt-2.5 sm:mt-3">
             <span className="flex items-center gap-1.5 px-2.5 py-0.5 sm:px-3 sm:py-1 rounded-full bg-white/5 border border-white/10 font-medium">
               <MapPin className="w-3 h-3 text-cyan-400" />
@@ -460,39 +485,49 @@ export default function MovieScheduleSection() {
                       {activeSlot?.start_time || '--:--'}
                     </text>
                   </g>
-                  {slotMarkers.map((slot) => {
-                    const isSelected = activeSlot?.id === slot.id;
+                  {/* Dot duy nhất trên bezel: pulse khi live+AUTO, fuchsia khi SELECTED, cyan khi PREVIEW */}
+                  {activeSlotMarker && (() => {
+                    const isLiveSlot = activeSlot ? now >= activeSlot.start_time && now < activeSlot.end_time : false;
+                    const showPulse = isLiveSlot && focusMode === 'auto';
+                    const dotColor = focusMode === 'selected' ? '#d946ef' : '#38bdf8';
+                    const ringColor = focusMode === 'selected' ? '#d946ef' : (showPulse ? '#34d399' : '#38bdf8');
                     return (
-                      <g
-                        key={slot.id}
-                        onClick={() => handleSlotClick(slot.id)}
-                        onMouseEnter={() => handleSlotHover(slot.id)}
-                        className="cursor-pointer group/marker"
-                      >
-                        <circle cx={slot.x} cy={slot.y} r="12" fill="transparent" />
-                        {isSelected && (
+                      <g className="pointer-events-none">
+                        {/* Pulse ring chỉ khi đang chiếu + AUTO mode */}
+                        {showPulse && (
                           <circle
-                            cx={slot.x}
-                            cy={slot.y}
-                            r="7.5"
+                            cx={activeSlotMarker.x}
+                            cy={activeSlotMarker.y}
+                            r="11"
                             fill="none"
-                            stroke="#38bdf8"
-                            strokeWidth="1.5"
-                            strokeOpacity="0.85"
+                            stroke="#34d399"
+                            strokeWidth="1"
+                            strokeOpacity="0.4"
+                            className="animate-ping"
                           />
                         )}
                         <circle
-                          cx={slot.x}
-                          cy={slot.y}
-                          r={isSelected ? '5' : '3.5'}
-                          fill={isSelected ? '#38bdf8' : '#cbd5e1'}
-                          stroke={isSelected ? '#ffffff' : '#030712'}
-                          strokeWidth={isSelected ? '2' : '1.5'}
-                          className="transition-all duration-300"
+                          cx={activeSlotMarker.x}
+                          cy={activeSlotMarker.y}
+                          r="8"
+                          fill="none"
+                          stroke={ringColor}
+                          strokeWidth="1.5"
+                          strokeOpacity="0.5"
+                          className="transition-all duration-500"
+                        />
+                        <circle
+                          cx={activeSlotMarker.x}
+                          cy={activeSlotMarker.y}
+                          r="4.5"
+                          fill={dotColor}
+                          stroke="#ffffff"
+                          strokeWidth="1.5"
+                          className="transition-all duration-500"
                         />
                       </g>
                     );
-                  })}
+                  })()}
                   <g
                     style={{
                       transform: `rotate(${hourHandAngle}deg)`,
@@ -532,15 +567,17 @@ export default function MovieScheduleSection() {
                   <circle cx="140" cy="140" r="2.5" fill="#ffffff" />
                 </svg>
               </div>
-              <p className="text-[10px] sm:text-[11px] text-slate-400 mt-2 sm:mt-4 text-center flex items-center gap-1">
-                <span>Chạm vào các mốc trên đồng hồ hoặc danh sách bên dưới</span>
-              </p>
+
             </div>
 
             {/* 2. RIGHT COLUMN: HORIZONTAL MOVIE SHOWCASE & DIRECT BOOKING ACTION */}
             <div className="lg:col-span-6 flex flex-col justify-between h-full space-y-3.5 sm:space-y-6">
               {activeSlot ? (
-                <div className="bg-gradient-to-br from-slate-900/95 via-[#081333]/90 to-slate-950/95 rounded-xl sm:rounded-2xl p-3.5 sm:p-6 border border-cyan-500/30 shadow-[0_0_35px_rgba(6,182,212,0.15)] flex flex-row gap-3.5 sm:gap-5 items-center sm:items-start transition-all duration-300">
+                <div className={`bg-gradient-to-br from-slate-900/95 via-[#081333]/90 to-slate-950/95 rounded-xl sm:rounded-2xl p-3.5 sm:p-6 border transition-all duration-300 flex flex-row gap-3.5 sm:gap-5 items-center sm:items-start ${
+                  focusMode === 'selected'
+                    ? 'border-fuchsia-500/50 shadow-[0_0_35px_rgba(168,85,247,0.2)]'
+                    : 'border-cyan-500/30 shadow-[0_0_35px_rgba(6,182,212,0.15)]'
+                }`}>
                   <div className="w-20 h-28 sm:w-36 sm:h-48 rounded-lg sm:rounded-xl overflow-hidden bg-slate-950 shrink-0 border border-white/20 shadow-xl relative group">
                     {activeSlot.movie_cover_image ? (
                       <img
@@ -595,18 +632,27 @@ export default function MovieScheduleSection() {
                       <span>8K / Âm vòm</span>
                     </div>
 
-                    {/* <div className="pt-1 sm:pt-2">
-                      <Button
-                        onClick={() => handleBookSlot(activeSlot)}
-                        className="w-full sm:w-auto px-4 py-2 sm:px-7 sm:py-5 rounded-lg sm:rounded-xl bg-gradient-to-r from-cyan-500 via-blue-600 to-fuchsia-600 hover:from-fuchsia-600 hover:to-cyan-500 text-white font-bold shadow-[0_0_20px_rgba(6,182,212,0.45)] transition-all duration-300 hover:scale-[1.02] active:scale-95 cursor-pointer text-xs sm:text-sm"
-                      >
-                        <span className="flex items-center justify-center gap-1.5 sm:gap-2">
-                          <Ticket className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
-                          Đặt vé
-                          <ChevronRight className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
-                        </span>
-                      </Button>
-                    </div> */}
+                    {/* Nút Đặt vé: chỉ hiện ở SELECTED mode */}
+                    {focusMode === 'selected' && (
+                      <div className="pt-1 sm:pt-2 flex items-center gap-2">
+                        <Button
+                          onClick={() => handleBookSlot(activeSlot)}
+                          className="px-4 py-2 sm:px-6 sm:py-4 rounded-lg sm:rounded-xl bg-gradient-to-r from-fuchsia-500 via-purple-600 to-blue-600 hover:from-blue-600 hover:to-fuchsia-500 text-white font-bold shadow-[0_0_20px_rgba(168,85,247,0.4)] transition-all duration-300 hover:scale-[1.02] active:scale-95 cursor-pointer text-xs sm:text-sm"
+                        >
+                          <span className="flex items-center gap-1.5 sm:gap-2">
+                            <Ticket className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                            Đặt vé suất này
+                            <ChevronRight className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
+                          </span>
+                        </Button>
+                        <button
+                          onClick={() => { setFocusMode('auto'); setSelectedSlotId(null); }}
+                          className="text-[10px] sm:text-xs text-slate-400 hover:text-slate-200 transition-colors cursor-pointer underline underline-offset-2"
+                        >
+                          Bỏ chọn
+                        </button>
+                      </div>
+                    )}
                   </div>
                 </div>
               ) : null}
@@ -622,20 +668,29 @@ export default function MovieScheduleSection() {
 
                 <div className="flex items-center gap-1.5 sm:gap-2 overflow-x-auto pb-1.5 scrollbar-none touch-pan-x sm:flex-wrap sm:max-h-36 sm:overflow-y-auto sm:pr-1 custom-scrollbar">
                   {allItems.map((slot) => {
-                    const isSelected = activeSlot?.id === slot.id;
+                    const isActiveDisplay = activeSlot?.id === slot.id;
+                    const isPinned = focusMode === 'selected' && selectedSlotId === slot.id;
                     const isLive = now >= slot.start_time && now < slot.end_time;
+                    const isPast = slot.end_time < now;
 
                     return (
                       <button
                         key={slot.id}
-                        onClick={() => handleSlotClick(slot.id)}
-                        onMouseEnter={() => handleSlotHover(slot.id)}
-                        className={`px-3 py-1.5 rounded-lg sm:rounded-xl text-xs font-bold transition-all duration-200 cursor-pointer border shrink-0 sm:shrink ${
-                          isSelected
-                            ? 'bg-gradient-to-r from-cyan-500 to-blue-600 text-white font-black border-cyan-300 shadow-[0_0_15px_rgba(6,182,212,0.6)] scale-105'
-                            : isLive
-                              ? 'bg-cyan-950/60 border-cyan-500/50 text-cyan-300'
-                              : 'bg-white/5 hover:bg-white/10 border-white/10 text-slate-300 hover:text-white'
+                        onClick={() => !isPast && handleSlotClick(slot.id)}
+                        onMouseEnter={() => !isPast && handleSlotHover(slot.id)}
+                        onMouseLeave={handleSlotLeave}
+                        disabled={isPast}
+                        title={isPast ? 'Suất đã kết thúc' : undefined}
+                        className={`px-3 py-1.5 rounded-lg sm:rounded-xl text-xs font-bold transition-all duration-200 border shrink-0 sm:shrink ${
+                          isPast
+                            ? 'opacity-35 cursor-not-allowed bg-white/3 border-white/5 text-slate-500'
+                            : isPinned
+                              ? 'bg-gradient-to-r from-fuchsia-500 to-purple-600 text-white font-black border-fuchsia-300 shadow-[0_0_15px_rgba(168,85,247,0.5)] scale-105 cursor-pointer'
+                              : isActiveDisplay
+                                ? 'bg-gradient-to-r from-cyan-500 to-blue-600 text-white font-black border-cyan-300 shadow-[0_0_15px_rgba(6,182,212,0.6)] scale-105 cursor-pointer'
+                                : isLive
+                                  ? 'bg-emerald-950/60 border-emerald-500/50 text-emerald-300 cursor-pointer hover:bg-emerald-900/60'
+                                  : 'bg-white/5 hover:bg-white/10 border-white/10 text-slate-300 hover:text-white cursor-pointer'
                         }`}
                       >
                         {slot.start_time}
