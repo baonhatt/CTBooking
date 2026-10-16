@@ -132,9 +132,148 @@ export function isLineDiscounted(args: {
   const { discountAmount, scope, applicableIds, kind, packageId } = args;
   if (!(Number(discountAmount) > 0)) return false;
   if (packageId == null || !Number.isFinite(Number(packageId))) return false;
-  if (scope !== kind) return false;
+  const effectiveScope = scope || 'all';
+  if (effectiveScope !== 'all' && effectiveScope !== kind) return false;
   const id = Number(packageId);
   return applicableIds.length === 0 || applicableIds.includes(id);
+}
+
+export type VrItemForAllocation = {
+  vr_package_id: number;
+  quantity: number;
+  unit_price: number;
+  package_name?: string;
+  line_total?: number;
+  branch_id?: number | null;
+};
+
+export type AllocatedVrItem = {
+  vr_ticket_package_id: number;
+  quantity: number;
+  unit_price: number;
+  package_name?: string;
+  branch_id?: number | null;
+  discounted_unit_price: number;
+  line_total: number;
+  voucher_discount_amount: number;
+};
+
+export type MovieItemForAllocation = {
+  package_id?: number;
+  quantity?: number;
+  price?: number;
+};
+
+export function allocateVoucherDiscountToVrItems(args: {
+  vrItems: VrItemForAllocation[];
+  movieItems?: MovieItemForAllocation[];
+  voucherScope?: VoucherScope | null;
+  applicablePackageIds?: number[];
+  voucherDiscountAmount: number;
+}): AllocatedVrItem[] {
+  const { vrItems, movieItems = [], voucherScope, applicablePackageIds = [], voucherDiscountAmount } = args;
+  const scope = (voucherScope || 'all') as VoucherScope;
+  const applicableIds = applicablePackageIds || [];
+  const discountTotal = Math.max(0, Number(voucherDiscountAmount || 0));
+
+  const fallback: AllocatedVrItem[] = vrItems.map((item) => {
+    const rawTotal = Math.round(Number(item.unit_price || 0) * Number(item.quantity || 1));
+    return {
+      vr_ticket_package_id: item.vr_package_id,
+      quantity: item.quantity,
+      unit_price: item.unit_price,
+      package_name: item.package_name,
+      branch_id: item.branch_id ?? null,
+      discounted_unit_price: item.unit_price,
+      line_total: rawTotal,
+      voucher_discount_amount: 0
+    };
+  });
+
+  if (discountTotal <= 0 || vrItems.length === 0 || scope === 'movie') {
+    return fallback;
+  }
+
+  const isVrEligible = (pkgId: number) => applicableIds.length === 0 || applicableIds.includes(Number(pkgId));
+  const isMovieEligible = (pkgId?: number) => pkgId != null && (applicableIds.length === 0 || applicableIds.includes(Number(pkgId)));
+
+  let vrEligibleSubtotal = 0;
+  for (const it of vrItems) {
+    if (isVrEligible(it.vr_package_id)) {
+      vrEligibleSubtotal += Math.round(Number(it.unit_price || 0) * Number(it.quantity || 1));
+    }
+  }
+
+  if (vrEligibleSubtotal <= 0) {
+    return fallback;
+  }
+
+  let movieEligibleSubtotal = 0;
+  if (scope === 'all') {
+    for (const m of movieItems) {
+      if (isMovieEligible(m.package_id)) {
+        movieEligibleSubtotal += Math.round(Number(m.price || 0) * Number(m.quantity || 1));
+      }
+    }
+  }
+
+  const combinedEligibleSubtotal = vrEligibleSubtotal + movieEligibleSubtotal;
+  if (combinedEligibleSubtotal <= 0) {
+    return fallback;
+  }
+
+  let vrPortionDiscount = discountTotal;
+  if (scope === 'all') {
+    vrPortionDiscount = Math.min(
+      vrEligibleSubtotal,
+      Math.round((vrEligibleSubtotal / combinedEligibleSubtotal) * discountTotal)
+    );
+  } else {
+    vrPortionDiscount = Math.min(vrEligibleSubtotal, discountTotal);
+  }
+
+  const eligibleIndices: number[] = [];
+  vrItems.forEach((it, idx) => {
+    if (isVrEligible(it.vr_package_id)) eligibleIndices.push(idx);
+  });
+
+  let allocatedVrDiscount = 0;
+  const itemDiscounts: number[] = new Array(vrItems.length).fill(0);
+
+  eligibleIndices.forEach((itemIdx, pos) => {
+    const it = vrItems[itemIdx];
+    const rawLineTotal = Math.round(Number(it.unit_price || 0) * Number(it.quantity || 1));
+    const isLast = pos === eligibleIndices.length - 1;
+
+    let itemDisc = 0;
+    if (isLast) {
+      itemDisc = Math.max(0, vrPortionDiscount - allocatedVrDiscount);
+    } else {
+      itemDisc = Math.round((rawLineTotal / vrEligibleSubtotal) * vrPortionDiscount);
+    }
+    itemDisc = Math.min(itemDisc, rawLineTotal);
+    itemDiscounts[itemIdx] = itemDisc;
+    allocatedVrDiscount += itemDisc;
+  });
+
+  return vrItems.map((item, idx) => {
+    const rawTotal = Math.round(Number(item.unit_price || 0) * Number(item.quantity || 1));
+    const disc = itemDiscounts[idx] || 0;
+    const finalLineTotal = Math.max(0, rawTotal - disc);
+    const qty = Math.max(1, Number(item.quantity || 1));
+    const discUnitPrice = Math.round((finalLineTotal / qty) * 100) / 100;
+
+    return {
+      vr_ticket_package_id: item.vr_package_id,
+      quantity: item.quantity,
+      unit_price: item.unit_price,
+      package_name: item.package_name,
+      branch_id: item.branch_id ?? null,
+      discounted_unit_price: discUnitPrice,
+      line_total: finalLineTotal,
+      voucher_discount_amount: disc
+    };
+  });
 }
 
 export function voucherScopeLabel(scope?: VoucherScope | null): string {

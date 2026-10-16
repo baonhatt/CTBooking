@@ -540,7 +540,7 @@ export default function QRPaymentPage() {
 
                                                         const bType = bookingDetails?.booking_type || paymentData?.bookingType || paymentData?.booking_type || '';
                                                         const titleRaw = bookingDetails?.movie_title || paymentData?.movieTitle || '';
-                                                        const isVROnly = bType === 'vr' || titleRaw === 'Gói Trải Nghiệm VR' || paymentData?.ticketType === 'VR Booking (1 gói)';
+                                                        const isVROnly = bType === 'vr' || titleRaw === 'Gói Trải Nghiệm VR' || String(paymentData?.ticketType || '').startsWith('VR Booking');
 
                                                         const raw = bookingDetails?.ticket_package_name || paymentData?.ticketType || 'Vé xem phim';
                                                         const moviePkgs = parseMoviePackages(raw, {

@@ -3,6 +3,7 @@ import type { VRBookingRequest, VRBookingResponse, VRPackageLineItem } from '../
 import { formatDateForDb } from '../../lib/date-utils';
 import { validateVoucherForVRImpl, matchesBranch } from './vouchers';
 import { sqlBranchIdsMatchFilter } from '../../lib/branch-ids';
+import { allocateVoucherDiscountToVrItems, parseApplicableIds } from '../../../shared/booking-invoice';
 
 // =============== 1. List VR Packages for user booking page ===============
 export async function listActiveVRPackagesImpl(anyDb: any, tables: { ticket_packages: any }, branch_id?: number) {
@@ -250,32 +251,33 @@ export async function createVRBookingImpl(
       return { success: false, error: 'Không thể tạo đặt VR', status: 500 };
     }
 
-    // Insert booking_vr_items
-    const itemsToSave: VRPackageLineItem[] = validated.vr_items_resolved.map((it) => {
-      const disc_unit = voucher_applied
-        ? it.unit_price -
-          (validated.voucher_discount_amount > 0
-            ? +(
-                (it.unit_price * it.quantity * validated.voucher_discount_amount) /
-                validated.original_total_price /
-                it.quantity
-              ).toFixed(2)
-            : 0)
-        : it.unit_price;
-      const line_disc = it.unit_price * it.quantity - disc_unit * it.quantity;
-      return {
-        booking_id: bookingRow.id,
-        vr_ticket_package_id: it.vr_package_id,
+    // Insert booking_vr_items using standard pro-rata discount allocation
+    const applicableIds = parseApplicableIds(voucher_applied?.voucher_details?.applicable_ticket_package_ids);
+    const allocatedItems = allocateVoucherDiscountToVrItems({
+      vrItems: validated.vr_items_resolved.map((it) => ({
+        vr_package_id: it.vr_package_id,
         quantity: it.quantity,
         unit_price: it.unit_price,
         package_name: it.package_name,
-        voucher_id: voucher_applied?.voucher_details?.id || null,
-        discounted_unit_price: +disc_unit.toFixed(2),
-        line_total: +(disc_unit * it.quantity).toFixed(2),
-        voucher_discount_amount: +line_disc.toFixed(2),
         branch_id: branch_id || null
-      };
+      })),
+      voucherScope: voucher_applied?.voucher_details?.scope || 'vr',
+      applicablePackageIds: applicableIds,
+      voucherDiscountAmount: Number(validated.voucher_discount_amount || 0)
     });
+
+    const itemsToSave: VRPackageLineItem[] = allocatedItems.map((it) => ({
+      booking_id: bookingRow.id,
+      vr_ticket_package_id: it.vr_ticket_package_id,
+      quantity: it.quantity,
+      unit_price: it.unit_price,
+      package_name: it.package_name || '',
+      voucher_id: voucher_applied?.voucher_details?.id || null,
+      discounted_unit_price: it.discounted_unit_price,
+      line_total: it.line_total,
+      voucher_discount_amount: it.voucher_discount_amount,
+      branch_id: branch_id || null
+    }));
     const insertedItemsArr: any[] = [];
     for (const row of itemsToSave) {
       try {

@@ -183,7 +183,9 @@ export default function Account() {
                 quantity: t.quantity,
                 movieTitle: t.movie,
                 ticketType: t.ticket_package,
-                branch_name: t.branch_name || ''
+                branch_name: t.branch_name || '',
+                vr_items: t.vr_items || [],
+                booking_type: t.booking_type || 'movie'
             }));
 
             router.push('/qr-payment');

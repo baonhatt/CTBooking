@@ -2,6 +2,7 @@ import { PaymentRequest } from '@shared/api';
 import { eq, and, isNull, or, sql } from 'drizzle-orm';
 import { validateBookingInput } from './validate';
 import { formatDateForDb } from '../../../lib/date-utils';
+import { allocateVoucherDiscountToVrItems, parseApplicableIds } from '@shared/booking-invoice';
 
 export async function createPaymentImpl(
   anyDb: any,
@@ -124,32 +125,39 @@ export async function createPaymentImpl(
       return { status: 500, message: 'Không thể tạo đặt vé' };
     }
 
-    // Insert line items into booking_vr_items
+    // Insert line items into booking_vr_items with pro-rata discount allocation
     const insertedItemsArr: any[] = [];
-    if (tables.booking_vr_items) {
-      if (hasVR) {
-        for (const item of vrItemsDetails!) {
-          try {
-            const r = await anyDb
-              .insert(tables.booking_vr_items)
-              .values({
-                booking_id: bookingRow.id,
-                vr_ticket_package_id: item.vr_package_id,
-                quantity: item.quantity,
-                unit_price: item.unit_price,
-                package_name: item.package_name,
-                voucher_id: voucherDetails?.id || null,
-                discounted_unit_price: item.unit_price,
-                line_total: item.line_total,
-                voucher_discount_amount: 0,
-                branch_id: item.branch_id || branchIdToSave,
-                created_at: formatDateForDb(nowIso)
-              })
-              .returning();
-            if (r) insertedItemsArr.push(Array.isArray(r) ? r[0] : r);
-          } catch (err: any) {
-            console.error('Error inserting VR item to booking_vr_items:', err);
-          }
+    if (tables.booking_vr_items && hasVR && vrItemsDetails && vrItemsDetails.length > 0) {
+      const applicableIds = parseApplicableIds(voucherDetails?.applicable_ticket_package_ids);
+      const allocatedVrItems = allocateVoucherDiscountToVrItems({
+        vrItems: vrItemsDetails,
+        movieItems: validation.movieItemsDetails || [],
+        voucherScope: voucherDetails?.scope,
+        applicablePackageIds: applicableIds,
+        voucherDiscountAmount: Number(voucherDiscountAmount || 0)
+      });
+
+      for (const item of allocatedVrItems) {
+        try {
+          const r = await anyDb
+            .insert(tables.booking_vr_items)
+            .values({
+              booking_id: bookingRow.id,
+              vr_ticket_package_id: item.vr_ticket_package_id,
+              quantity: item.quantity,
+              unit_price: item.unit_price,
+              package_name: item.package_name,
+              voucher_id: voucherDetails?.id || null,
+              discounted_unit_price: item.discounted_unit_price,
+              line_total: item.line_total,
+              voucher_discount_amount: item.voucher_discount_amount,
+              branch_id: item.branch_id || branchIdToSave,
+              created_at: formatDateForDb(nowIso)
+            })
+            .returning();
+          if (r) insertedItemsArr.push(Array.isArray(r) ? r[0] : r);
+        } catch (err: any) {
+          console.error('Error inserting VR item to booking_vr_items:', err);
         }
       }
     }
