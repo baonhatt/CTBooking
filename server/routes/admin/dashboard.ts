@@ -275,6 +275,7 @@ export async function getDashboardMetricsImpl(
             package_name: tables.booking_vr_items.package_name,
             quantity: tables.booking_vr_items.quantity,
             unit_price: tables.booking_vr_items.unit_price,
+            line_total: tables.booking_vr_items.line_total,
           })
           .from(tables.booking_vr_items)
           .where(inArray(tables.booking_vr_items.booking_id, chunk));
@@ -284,10 +285,11 @@ export async function getDashboardMetricsImpl(
           const title = it.package_name || 'Gói VR';
           const price = Number(it.unit_price || 0);
           const tCount = Number(it.quantity || 1);
+          const lineRev = it.line_total != null ? Number(it.line_total) : price * tCount;
           
           if (pkgId) {
             const prev = map.get(pkgId) || { title, revenue: 0, count: 0 };
-            prev.revenue += price * tCount;
+            prev.revenue += lineRev;
             prev.count += tCount;
             prev.title = title || prev.title;
             map.set(pkgId, prev);

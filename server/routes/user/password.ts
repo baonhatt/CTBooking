@@ -119,14 +119,22 @@ export async function resetPasswordImpl(
     .update(tables.accounts)
     .set({ password: hashedPassword, updated_at: formatDateForDb(now) })
     .where(eq(tables.accounts.id, tokenRecord.account_id));
+
+  // Xóa token reset hiện tại và toàn bộ session token cũ của tài khoản
   await anyDb.delete(tables.tokens).where(eq(tables.tokens.id, tokenRecord.id));
+  await anyDb.delete(tables.tokens).where(
+    and(
+      eq(tables.tokens.account_id, tokenRecord.account_id),
+      eq(tables.tokens.type, 'session')
+    )
+  );
 
   return { status: 200, message: 'Mật khẩu đã được đặt lại thành công!' };
 }
 
 export async function changePasswordImpl(
   anyDb: any,
-  tables: { accounts: any },
+  tables: { accounts: any; tokens?: any },
   payload: { accountId?: number; email?: string; oldPassword?: string; newPassword?: string }
 ) {
   const { accountId, oldPassword, newPassword } = payload;
@@ -152,5 +160,20 @@ export async function changePasswordImpl(
     .update(tables.accounts)
     .set({ password: hashed, updated_at: formatDateForDb(now) })
     .where(eq(tables.accounts.id, account.id));
+
+  // Thu hồi toàn bộ session token cũ của tài khoản để bảo mật
+  if (tables.tokens) {
+    try {
+      await anyDb.delete(tables.tokens).where(
+        and(
+          eq(tables.tokens.account_id, account.id),
+          eq(tables.tokens.type, 'session')
+        )
+      );
+    } catch (e) {
+      console.warn('[ChangePassword] Could not invalidate old sessions:', e);
+    }
+  }
+
   return { status: 200, message: 'Đổi mật khẩu thành công' };
 }

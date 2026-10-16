@@ -314,12 +314,18 @@ export async function confirmUseTicketImpl(
         updated_at: formatDateForDb(new Date()),
         checked_in_at: formatDateForDb(new Date())
       })
-      .where(eq(bookingsTable.id, booking.id))
+      .where(and(eq(bookingsTable.id, booking.id), eq(bookingsTable.is_used, false)))
       .returning();
 
     const updated = Array.isArray(updatedRes) ? updatedRes[0] : updatedRes;
 
-    if (!updated) return { status: 500, message: 'Không thể cập nhật trạng thái vé' };
+    if (!updated) {
+      const recheck = await anyDb.query.bookings.findFirst({ where: eq(bookingsTable.id, booking.id) });
+      if (recheck?.is_used) {
+        return { status: 400, message: 'Vé này vừa được quét sử dụng cách đây ít giây!' };
+      }
+      return { status: 500, message: 'Không thể cập nhật trạng thái vé' };
+    }
 
     // Log audit log if this check-in was forced for an expired ticket
     if (expired && allowExpired && staffInfo && tables.auditLogs) {

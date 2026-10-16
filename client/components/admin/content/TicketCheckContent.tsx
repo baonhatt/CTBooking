@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -122,6 +122,7 @@ export default function TicketCheckContent() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [useLoading, setUseLoading] = useState(false);
+  const isActionSubmittingRef = useRef(false);
 
   // Parse URL if being redirected from Transactions page
   const [searchParams] = useSearchParams();
@@ -205,7 +206,8 @@ export default function TicketCheckContent() {
   };
 
   const executeAction = async () => {
-    if (!ticketInfo) return;
+    if (!ticketInfo || useLoading || isActionSubmittingRef.current) return;
+    isActionSubmittingRef.current = true;
     setUseLoading(true); // Bật hiệu ứng loading trên button
 
     try {
@@ -279,6 +281,7 @@ export default function TicketCheckContent() {
       // Không đóng modal khi lỗi để nhân viên có thể xem thông báo lỗi
     } finally {
       setUseLoading(false); // Tắt hiệu ứng loading
+      isActionSubmittingRef.current = false;
     }
   };
 

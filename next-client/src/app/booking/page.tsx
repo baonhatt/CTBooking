@@ -81,6 +81,7 @@ export default function BookingPage() {
   const [emailError, setEmailError] = useState<string>('');
   const paymentMethod = 'vietqr' as const;
   const [isProcessing, setIsProcessing] = useState(false);
+  const isBookingSubmittingRef = useRef(false);
   const [formErrors, setFormErrors] = useState<{ [key: string]: string }>({});
   const [voucherCode, setVoucherCode] = useState<string>('');
   const [voucherValidating, setVoucherValidating] = useState(false);
@@ -486,8 +487,10 @@ export default function BookingPage() {
   };
 
   const performBooking = async () => {
+    if (isProcessing || isBookingSubmittingRef.current) return;
+    isBookingSubmittingRef.current = true;
+    setIsProcessing(true);
     try {
-      setIsProcessing(true);
       const timestampSeconds = Math.floor(Date.now() / 1000);
       const randomSuffix = Math.floor(Math.random() * 100)
         .toString()
@@ -669,6 +672,7 @@ export default function BookingPage() {
       });
     } finally {
       setIsProcessing(false);
+      isBookingSubmittingRef.current = false;
     }
   };
 
@@ -1349,19 +1353,30 @@ export default function BookingPage() {
             </AlertDialogHeader>
             <AlertDialogFooter className="flex gap-2 pt-3">
               <AlertDialogCancel
+                disabled={isProcessing}
                 onClick={() => setShowEmailConfirmDialog(false)}
-                className="border-white/10 bg-white/5 hover:bg-white/10 text-slate-300 text-xs rounded-xl font-bold h-10 px-4"
+                className="border-white/10 bg-white/5 hover:bg-white/10 text-slate-300 text-xs rounded-xl font-bold h-10 px-4 disabled:opacity-50"
               >
                 Đổi email khác
               </AlertDialogCancel>
               <AlertDialogAction
-                onClick={() => {
+                disabled={isProcessing}
+                onClick={(e) => {
+                  e.preventDefault();
+                  if (isProcessing || isBookingSubmittingRef.current) return;
                   setShowEmailConfirmDialog(false);
                   performBooking();
                 }}
-                className="bg-gradient-to-r from-cyan-400 to-blue-500 hover:from-cyan-300 hover:to-blue-400 text-black font-extrabold text-xs rounded-xl h-10 px-5"
+                className="bg-gradient-to-r from-cyan-400 to-blue-500 hover:from-cyan-300 hover:to-blue-400 text-black font-extrabold text-xs rounded-xl h-10 px-5 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
               >
-                Đúng, tiến hành thanh toán
+                {isProcessing ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    <span>Đang xử lý...</span>
+                  </>
+                ) : (
+                  <span>Đúng, tiến hành thanh toán</span>
+                )}
               </AlertDialogAction>
             </AlertDialogFooter>
           </AlertDialogContent>

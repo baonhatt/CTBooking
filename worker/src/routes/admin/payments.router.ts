@@ -6,7 +6,20 @@ import { getRestrictBranchIds, getMailer } from './admin-helpers';
 
 
 
-const getD1Tables = (schema: any) => ({ bookings: schema.bookings, users: schema.users, accounts: schema.accounts, movies: schema.movies, ticket_packages: schema.ticket_packages, email_logs: schema.email_logs, branches: schema.branches, showtimes: schema.showtimes });
+const getD1Tables = (schema: any) => ({
+  bookings: schema.bookings,
+  users: schema.users,
+  accounts: schema.accounts,
+  movies: schema.movies,
+  ticket_packages: schema.ticket_packages,
+  email_logs: schema.email_logs,
+  branches: schema.branches,
+  showtimes: schema.showtimes,
+  booking_vr_items: (schema as any).booking_vr_items,
+  vouchers: (schema as any).vouchers,
+  voucher_redemption_logs: (schema as any).voucher_redemption_logs,
+  auditLogs: (schema as any).auditLogs
+});
 
 import { getBookingEmailTemplate } from '../../../../server/lib/email-templates';
 import { logSystemError } from '../../utils';

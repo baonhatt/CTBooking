@@ -561,7 +561,7 @@ userRouter.post('/api/user/password', requireAuth, async (c) => {
     const body = await c.req.json().catch(() => ({}));
     body.accountId = c.get('accountId');
 
-    const r = await changePasswordImpl(db, { accounts: schema.accounts }, body as any);
+    const r = await changePasswordImpl(db, { accounts: schema.accounts, tokens: schema.tokens }, body as any);
 
     const status = typeof (r as any).status === 'number' ? (r as any).status : 200;
 
