@@ -136,14 +136,14 @@ const parsePackageName = (name: string, t?: Tx) => {
   if (t?.booking_type === 'combo_vr' || t?.booking_type === 'vr') {
     if (t.vr_items && t.vr_items.length > 0) {
       vrItemsList = t.vr_items.map((it, idx) => (
-        <span key={`vr-${idx}`} className="truncate text-slate-500 mt-0.5 text-[11px]">
+        <span key={`vr-${idx}`} className="truncate text-slate-500 mt-0.5 text-[10px] block max-w-[160px]" title={`${it.package_name} (x${it.quantity})`}>
           • {it.package_name} (x{it.quantity})
         </span>
       ));
     }
     if (!vrItemsList && t?.booking_type === 'combo_vr') {
       vrItemsList = (
-        <span className="truncate text-slate-500 mt-0.5 text-[11px]">
+        <span className="truncate text-slate-500 mt-0.5 text-[10px] block max-w-[160px]">
           • Kèm tùy chọn VR (x{Math.max((t?.ticketCount || 1) - 1, 1)})
         </span>
       );
@@ -158,7 +158,7 @@ const parsePackageName = (name: string, t?: Tx) => {
         const parsed = JSON.parse(trimmed);
         if (Array.isArray(parsed)) {
           movieItemsList = parsed.map((item, idx) => (
-            <span key={idx} className="truncate text-slate-500 mt-0.5 text-[11px]">
+            <span key={idx} className="truncate text-slate-500 mt-0.5 text-[10px] block max-w-[160px]" title={`${item.name || 'Gói vé'} (x${item.quantity || 1})`}>
               • {item.name || 'Gói vé'} (x{item.quantity || 1})
             </span>
           ));
@@ -167,13 +167,19 @@ const parsePackageName = (name: string, t?: Tx) => {
     } catch (e) {}
     
     if (!movieItemsList) {
-      movieItemsList = <span className="truncate text-slate-500 mt-0.5 text-[11px]">• {name || '---'}</span>;
+      movieItemsList = (
+        <span className="truncate text-slate-500 mt-0.5 text-[10px] block max-w-[160px]" title={name || '---'}>
+          • {name || '---'}
+        </span>
+      );
     }
   }
   
   return (
-    <div className="flex flex-col gap-0.5">
-      <span className="font-bold text-slate-800 text-xs uppercase">{typeBadgeStr}</span>
+    <div className="flex flex-col gap-0.5 max-w-[160px]">
+      <span className="font-bold text-slate-800 text-[11px] uppercase truncate" title={typeBadgeStr}>
+        {typeBadgeStr}
+      </span>
       {movieItemsList}
       {vrItemsList}
     </div>
@@ -644,21 +650,21 @@ export default function TransactionsContent({
       </div>
 
       {/* Bảng dữ liệu đã tối ưu cột */}
-      <Card className="border border-gray-200 rounded-xl shadow-sm bg-white">
+      <Card className="border border-gray-200 rounded-xl shadow-sm bg-white overflow-hidden">
         <CardContent className="p-0">
-          <Table>
+          <Table className="w-full">
             <TableHeader className="bg-gray-50 border-b">
               <TableRow className="hover:bg-transparent border-none">
-                <TableHead className="w-[70px]">ID</TableHead>
-                <TableHead className="min-w-[160px]">Chi nhánh</TableHead>
-                <TableHead>Người dùng</TableHead>
-                <TableHead className="text-center w-[80px]">Loại</TableHead>
-                <TableHead>Sản phẩm</TableHead>
-                <TableHead className="text-center w-[80px]">Số lượng</TableHead>
-                <TableHead className="w-[120px]">Doanh thu</TableHead>
-                <TableHead className="w-[120px]">Thời gian</TableHead>
-                <TableHead className="text-center w-[110px]">Phương thức</TableHead>
-                <TableHead className="text-right w-[140px] pr-6">
+                <TableHead className="w-[50px] px-2 text-center text-xs">ID</TableHead>
+                <TableHead className="w-[110px] px-2.5 text-xs">Chi nhánh</TableHead>
+                <TableHead className="w-[175px] px-2.5 text-xs">Người dùng</TableHead>
+                <TableHead className="text-center w-[72px] px-1.5 text-xs">Loại</TableHead>
+                <TableHead className="w-[162px] px-2.5 text-xs">Sản phẩm</TableHead>
+                <TableHead className="text-center w-[58px] px-1 text-xs whitespace-nowrap">SL</TableHead>
+                <TableHead className="w-[95px] px-2 text-xs">Doanh thu</TableHead>
+                <TableHead className="w-[108px] px-2 text-xs">Thời gian</TableHead>
+                <TableHead className="text-center w-[76px] px-1 text-xs whitespace-nowrap">Phương thức</TableHead>
+                <TableHead className="text-right w-[115px] pr-3 pl-1 text-xs">
                   Thao tác
                 </TableHead>
               </TableRow>
@@ -667,7 +673,7 @@ export default function TransactionsContent({
               {isLoading
                 ? Array.from({ length: 5 }).map((_, idx) => (
                     <TableRow key={`sk-${idx}`}>
-                      <TableCell colSpan={10}>
+                      <TableCell colSpan={10} className="px-3">
                         <Skeleton className="h-10 w-full" />
                       </TableCell>
                     </TableRow>
@@ -765,10 +771,10 @@ export default function TransactionsContent({
                         key={t.id}
                         className="hover:bg-gray-50 transition-colors border-b border-gray-200 h-[52px]"
                       >
-                        <TableCell className="font-mono text-xs text-gray-500">#{t.id}</TableCell>
-                        <TableCell>
+                        <TableCell className="font-mono text-xs text-gray-500 text-center px-2">#{t.id}</TableCell>
+                        <TableCell className="px-2.5">
                           <div
-                            className="text-[12px] font-medium text-slate-600 truncate max-w-[200px]"
+                            className="text-[12px] font-medium text-slate-600 truncate max-w-[105px]"
                             title={branches.find((b) => b.id === t.branch_id)?.name || 'Tất cả chi nhánh'}
                           >
                             {branches.find((b) => b.id === t.branch_id)?.name || (
@@ -776,19 +782,19 @@ export default function TransactionsContent({
                             )}
                           </div>
                         </TableCell>
-                        <TableCell>
-                          <div className="flex flex-col">
-                            <span className="font-semibold text-sm text-gray-900">
+                        <TableCell className="px-2.5">
+                          <div className="flex flex-col max-w-[170px]">
+                            <span className="font-semibold text-xs text-gray-900 truncate" title={t.userName || 'Khách vãng lai'}>
                               {t.userName || 'Khách vãng lai'}
                             </span>
-                            <span className="text-[11px] text-gray-500">{t.email}</span>
+                            <span className="text-[11px] text-gray-500 truncate" title={t.email}>{t.email}</span>
                             {t.voucher_code && (
-                              <div className="flex items-center gap-1 mt-1 flex-wrap">
-                                <span className="inline-flex items-center px-1.5 py-0.5 rounded bg-purple-100 text-purple-700 font-mono text-[10px] font-bold">
+                              <div className="flex items-center gap-1 mt-0.5 flex-wrap">
+                                <span className="inline-flex items-center px-1.5 py-0.5 rounded bg-purple-100 text-purple-700 font-mono text-[9px] font-bold truncate max-w-[110px]" title={t.voucher_code}>
                                   🏷️ {t.voucher_code}
                                 </span>
                                 {t.sale_name && (
-                                  <span className="text-[10px] text-blue-600 font-semibold truncate">
+                                  <span className="text-[9px] text-blue-600 font-semibold truncate max-w-[55px]" title={t.sale_name}>
                                     👤 {t.sale_name}
                                   </span>
                                 )}
@@ -796,36 +802,36 @@ export default function TransactionsContent({
                             )}
                           </div>
                         </TableCell>
-                        <TableCell className="text-center">
+                        <TableCell className="text-center px-1.5">
                           {t.booking_type === 'combo_vr' ? (
-                            <Badge className="bg-amber-100 text-amber-700 border-amber-200 py-0.5 font-bold flex items-center justify-center gap-1 mx-auto w-fit text-nowrap">
-                              <Film size={10} /> Phim, VR
+                            <Badge className="bg-amber-100 text-amber-700 border-amber-200 py-0.5 px-1.5 font-bold flex items-center justify-center gap-1 mx-auto w-fit text-nowrap text-[10px]">
+                              <Film size={9} /> Phim, VR
                             </Badge>
                           ) : t.booking_type === 'vr' ? (
-                            <Badge className="bg-purple-100 text-purple-700 border-purple-200 py-0.5 font-bold flex items-center justify-center gap-1 mx-auto w-fit">
-                              <Gamepad2 size={10} /> VR
+                            <Badge className="bg-purple-100 text-purple-700 border-purple-200 py-0.5 px-1.5 font-bold flex items-center justify-center gap-1 mx-auto w-fit text-[10px]">
+                              <Gamepad2 size={9} /> VR
                             </Badge>
                           ) : (
-                            <Badge className="bg-blue-100 text-blue-700 border-blue-200 py-0.5 font-bold flex items-center justify-center gap-1 mx-auto w-fit">
-                              <Film size={10} /> Phim
+                            <Badge className="bg-blue-100 text-blue-700 border-blue-200 py-0.5 px-1.5 font-bold flex items-center justify-center gap-1 mx-auto w-fit text-[10px]">
+                              <Film size={9} /> Phim
                             </Badge>
                           )}
                         </TableCell>
-                        <TableCell className="min-w-[150px] font-medium text-[11px] text-slate-700 leading-tight">
+                        <TableCell className="px-2.5 font-medium text-[11px] text-slate-700 leading-tight">
                           {parsePackageName(t.ticket_package_name, t)}
                         </TableCell>
-                        <TableCell className="text-center font-semibold text-slate-800 text-[13px]">
+                        <TableCell className="text-center font-semibold text-slate-800 text-xs px-1">
                           {t.ticketCount}
                         </TableCell>
-                        <TableCell className="font-bold text-blue-700">
+                        <TableCell className="font-bold text-blue-700 text-xs px-2 whitespace-nowrap">
                           <div>{t.totalPrice.toLocaleString('vi-VN')}đ</div>
                           {t.voucher_discount_amount && t.voucher_discount_amount > 0 ? (
-                            <div className="text-[10px] text-emerald-600 font-medium">
+                            <div className="text-[9px] text-emerald-600 font-medium">
                               -{t.voucher_discount_amount.toLocaleString('vi-VN')}đ
                             </div>
                           ) : null}
                         </TableCell>
-                        <TableCell className="text-[11px] text-slate-500 font-medium">
+                        <TableCell className="text-[11px] text-slate-500 font-medium px-2">
                           {(() => {
                             const config = getStatusConfig();
                             const dateToUse =
@@ -853,7 +859,7 @@ export default function TransactionsContent({
                                 </span>
                                 <Badge
                                   variant="outline"
-                                  className={`${config.style} px-2 py-0.5 text-[10px] font-bold whitespace-nowrap w-fit uppercase flex items-center`}
+                                  className={`${config.style} px-1.5 py-0.5 text-[9px] font-bold whitespace-nowrap w-fit uppercase flex items-center`}
                                 >
                                   {config.icon}
                                   {config.text}
@@ -863,12 +869,12 @@ export default function TransactionsContent({
                           })()}
                         </TableCell>
 
-                        <TableCell className="text-center">
-                          <span className="text-[11px] font-semibold tracking-wider uppercase text-slate-600">{t.paymentMethod}</span>
+                        <TableCell className="text-center px-1">
+                          <span className="text-[10px] font-semibold tracking-wider uppercase text-slate-600 leading-tight block">{t.paymentMethod}</span>
                         </TableCell>
 
-                        <TableCell className="text-right">
-                          <div className="flex justify-end items-center gap-2">
+                        <TableCell className="text-right pr-3 pl-1">
+                          <div className="flex justify-end items-center gap-1.5">
                             {(t.paymentStatus === 'paid' || t.paymentStatus === 'pending') && !t.is_used && !t.expired && (
                               <Button
                                 variant="outline"
@@ -877,17 +883,17 @@ export default function TransactionsContent({
                                   e.stopPropagation();
                                   navigate('/ticket-check?code=' + t.booking_code);
                                 }}
-                                className="h-8 text-blue-600 bg-blue-50 border-blue-200 hover:bg-blue-600 hover:text-white transition-all shadow-sm px-2.5"
+                                className="h-7 w-7 p-0 text-blue-600 bg-blue-50 border-blue-200 hover:bg-blue-600 hover:text-white transition-all shadow-sm shrink-0"
                                 title="Soát vé nhanh"
                               >
-                                <TicketIcon size={14} />
+                                <TicketIcon size={13} />
                               </Button>
                             )}
                             <Button
                               variant="outline"
                               size="sm"
                               onClick={() => handleViewDetails(t)}
-                              className="h-8 hover:bg-blue-600 hover:text-white transition-all shadow-sm text-xs"
+                              className="h-7 px-2.5 hover:bg-blue-600 hover:text-white transition-all shadow-sm text-xs font-medium whitespace-nowrap"
                             >
                               Xem chi tiết
                             </Button>
