@@ -666,7 +666,7 @@ export default function MovieScheduleSection() {
                   </span>
                 </div>
 
-                <div className="flex items-center gap-1.5 sm:gap-2 overflow-x-auto pb-1.5 scrollbar-none touch-pan-x sm:flex-wrap sm:max-h-36 sm:overflow-y-auto sm:pr-1 custom-scrollbar">
+                <div className="grid grid-cols-4 gap-1.5 sm:flex sm:flex-wrap sm:gap-2 sm:max-h-36 sm:overflow-y-auto sm:pr-1 custom-scrollbar">
                   {allItems.map((slot) => {
                     const isActiveDisplay = activeSlot?.id === slot.id;
                     const isPinned = focusMode === 'selected' && selectedSlotId === slot.id;
@@ -681,7 +681,7 @@ export default function MovieScheduleSection() {
                         onMouseLeave={handleSlotLeave}
                         disabled={isPast}
                         title={isPast ? 'Suất đã kết thúc' : undefined}
-                        className={`px-3 py-1.5 rounded-lg sm:rounded-xl text-xs font-bold transition-all duration-200 border shrink-0 sm:shrink ${
+                        className={`w-full py-2 rounded-lg text-xs font-bold transition-all duration-200 border text-center sm:w-auto sm:px-3 sm:py-1.5 sm:shrink ${
                           isPast
                             ? 'opacity-35 cursor-not-allowed bg-white/3 border-white/5 text-slate-500'
                             : isPinned

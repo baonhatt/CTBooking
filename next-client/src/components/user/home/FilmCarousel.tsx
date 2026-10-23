@@ -311,34 +311,41 @@ export default function FilmCarousel({ initialFilms = [], initialBranchId, onSel
           className={cn("max-w-3xl flex z-[9999] flex-col bg-gradient-to-br from-[#0b1226] via-[#0e1b3d] to-[#050915] border border-cyan-500/30 text-white p-0 shadow-[0_0_50px_rgba(59,130,246,0.3)] overflow-hidden", isMobile ? "max-h-[96vh] w-[95vw] rounded-xl" : "max-h-[90vh]")}
         >
           <div className="overflow-y-auto scrollbar-neon flex-1 px-6 pt-6 pb-4">
-            <DialogHeader className="mb-4">
-              <DialogTitle
-                className={cn(
-                  'text-3xl font-bold mb-2',
-                  !movieDetails && 'sr-only',
-                  movieDetails &&
-                    'text-transparent bg-clip-text bg-gradient-to-r from-cyan-300 via-blue-400 to-fuchsia-400'
-                )}
-              >
-                {movieDetails?.title || 'Chi tiết phim'}
-              </DialogTitle>
-              <DialogDescription className={cn('text-gray-300 text-sm', !movieDetails && 'sr-only')}>
-                {movieDetails
-                  ? (() => {
-                      try {
-                        const genres = Array.isArray(movieDetails.genres)
-                          ? movieDetails.genres
-                          : typeof movieDetails.genres === 'string'
-                            ? JSON.parse(movieDetails.genres as string)
-                            : [];
-                        return Array.isArray(genres) && genres.length > 0 ? genres.join(' • ') : 'Chưa phân loại';
-                      } catch {
-                        return 'Chưa phân loại';
-                      }
-                    })()
-                  : 'Thông tin chi tiết về bộ phim'}
-              </DialogDescription>
-            </DialogHeader>
+            {/* Chỉ hiện header title trên desktop */}
+            {!isMobile && (
+              <DialogHeader className="mb-4">
+                <DialogTitle
+                  className={cn(
+                    'text-3xl font-bold mb-2',
+                    !movieDetails && 'sr-only',
+                    movieDetails &&
+                      'text-transparent bg-clip-text bg-gradient-to-r from-cyan-300 via-blue-400 to-fuchsia-400'
+                  )}
+                >
+                  {movieDetails?.title || 'Chi tiết phim'}
+                </DialogTitle>
+                <DialogDescription className={cn('text-gray-300 text-sm', !movieDetails && 'sr-only')}>
+                  {movieDetails
+                    ? (() => {
+                        try {
+                          const genres = Array.isArray(movieDetails.genres)
+                            ? movieDetails.genres
+                            : typeof movieDetails.genres === 'string'
+                              ? JSON.parse(movieDetails.genres as string)
+                              : [];
+                          return Array.isArray(genres) && genres.length > 0 ? genres.join(' • ') : 'Chưa phân loại';
+                        } catch {
+                          return 'Chưa phân loại';
+                        }
+                      })()
+                    : 'Thông tin chi tiết về bộ phim'}
+                </DialogDescription>
+              </DialogHeader>
+            )}
+            {/* sr-only DialogTitle cho accessibility khi ở mobile */}
+            {isMobile && (
+              <DialogTitle className="sr-only">{movieDetails?.title || 'Chi tiết phim'}</DialogTitle>
+            )}
             <div className={cn(isMobile ? 'px-0 pt-2 pb-6' : 'px-0 pt-6 pb-4')}>
               <div className={cn('grid gap-6', !isMobile && 'md:grid-cols-2')}>
                 {isLoadingDetails || !movieDetails ? (
@@ -353,7 +360,7 @@ export default function FilmCarousel({ initialFilms = [], initialBranchId, onSel
                     <div
                       className={cn(
                         'relative rounded-xl overflow-hidden border border-cyan-500/30 shadow-[0_0_30px_rgba(59,130,246,0.2)]',
-                        isMobile ? 'aspect-video mx-auto w-full max-w-sm' : 'aspect-[2/3]'
+                        isMobile ? 'aspect-[2/3] mx-auto w-[65%]' : 'aspect-[2/3]'
                       )}
                     >
                       <img
@@ -370,25 +377,43 @@ export default function FilmCarousel({ initialFilms = [], initialBranchId, onSel
                     </div>
 
                     <div className="space-y-4">
+                      {/* Mobile: title + genre + rating/duration ở trên, mô tả bên dưới */}
                       {isMobile && (
-                        <div className="space-y-1">
-                          <h2 className="text-2xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-cyan-300 via-blue-400 to-fuchsia-400">
-                            {movieDetails.title}
-                          </h2>
-                          <p className="text-gray-400 text-sm">
-                            {(() => {
-                              try {
-                                const genres = Array.isArray(movieDetails.genres)
-                                  ? movieDetails.genres
-                                  : typeof movieDetails.genres === 'string'
-                                    ? JSON.parse(movieDetails.genres as string)
-                                    : [];
-                                return Array.isArray(genres) && genres.length > 0 ? genres.join(' • ') : 'Chưa phân loại';
-                              } catch {
-                                return 'Chưa phân loại';
-                              }
-                            })()}
-                          </p>
+                        <div className="space-y-2">
+                          <div>
+                            <h2 className="text-xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-cyan-300 via-blue-400 to-fuchsia-400">
+                              {movieDetails.title}
+                            </h2>
+                            <p className="text-gray-400 text-sm mt-0.5">
+                              {(() => {
+                                try {
+                                  const genres = Array.isArray(movieDetails.genres)
+                                    ? movieDetails.genres
+                                    : typeof movieDetails.genres === 'string'
+                                      ? JSON.parse(movieDetails.genres as string)
+                                      : [];
+                                  return Array.isArray(genres) && genres.length > 0 ? genres.join(' • ') : 'Chưa phân loại';
+                                } catch {
+                                  return 'Chưa phân loại';
+                                }
+                              })()}
+                            </p>
+                          </div>
+                          {/* Rating + duration ngay dưới tên phim */}
+                          <div className="flex gap-3">
+                            {movieDetails.rating !== null && movieDetails.rating !== undefined && (
+                              <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-white/5 border border-white/10">
+                                <Star className="h-3.5 w-3.5 text-yellow-400 fill-yellow-400" />
+                                <span className="text-white font-medium text-xs">{movieDetails.rating.toFixed(1)}</span>
+                              </div>
+                            )}
+                            {movieDetails.duration_min && (
+                              <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-white/5 border border-white/10">
+                                <Clock className="h-3.5 w-3.5 text-cyan-400" />
+                                <span className="text-white font-medium text-xs">{movieDetails.duration_min} phút</span>
+                              </div>
+                            )}
+                          </div>
                         </div>
                       )}
 
@@ -402,20 +427,23 @@ export default function FilmCarousel({ initialFilms = [], initialBranchId, onSel
                         </p>
                       </div>
 
-                      <div className="grid grid-cols-2 gap-4 pt-4 border-t border-white/10">
-                        {movieDetails.rating !== null && movieDetails.rating !== undefined && (
-                          <div className="flex items-center gap-2 p-2 rounded-lg bg-white/5 border border-white/10">
-                            <Star className="h-4 w-4 text-yellow-400 fill-yellow-400" />
-                            <span className="text-white font-medium text-sm">{movieDetails.rating.toFixed(1)} / 10</span>
-                          </div>
-                        )}
-                        {movieDetails.duration_min && (
-                          <div className="flex items-center gap-2 p-2 rounded-lg bg-white/5 border border-white/10">
-                            <Clock className="h-4 w-4 text-cyan-400" />
-                            <span className="text-white font-medium text-sm">{movieDetails.duration_min} phút</span>
-                          </div>
-                        )}
-                      </div>
+                      {/* Desktop: rating/duration ở cuối */}
+                      {!isMobile && (
+                        <div className="grid grid-cols-2 gap-4 pt-4 border-t border-white/10">
+                          {movieDetails.rating !== null && movieDetails.rating !== undefined && (
+                            <div className="flex items-center gap-2 p-2 rounded-lg bg-white/5 border border-white/10">
+                              <Star className="h-4 w-4 text-yellow-400 fill-yellow-400" />
+                              <span className="text-white font-medium text-sm">{movieDetails.rating.toFixed(1)} / 10</span>
+                            </div>
+                          )}
+                          {movieDetails.duration_min && (
+                            <div className="flex items-center gap-2 p-2 rounded-lg bg-white/5 border border-white/10">
+                              <Clock className="h-4 w-4 text-cyan-400" />
+                              <span className="text-white font-medium text-sm">{movieDetails.duration_min} phút</span>
+                            </div>
+                          )}
+                        </div>
+                      )}
                     </div>
                   </>
                 )}
