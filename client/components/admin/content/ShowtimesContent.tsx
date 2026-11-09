@@ -66,6 +66,7 @@ export default function ShowtimesContent({ branches, schedules, isLoading, onRef
   const [editing, setEditing] = useState<ShowtimeItem | null>(null);
   const [form, setForm] = useState({ movie_id: 0, start_time: '', end_time: '' });
   const [copyFromBranchId, setCopyFromBranchId] = useState<number | ''>('');
+  const [isCopyConfirmOpen, setIsCopyConfirmOpen] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<ShowtimeItem | null>(null);
 
   const items = editorBranch ? schedules[editorBranch.id] || [] : [];
@@ -197,18 +198,25 @@ export default function ShowtimesContent({ branches, schedules, isLoading, onRef
     }
   };
 
-  const handleCopy = async () => {
+  // The button opens a confirmation first: copying replaces the schedule of this branch
+  const askCopyConfirmation = () => {
     if (!editorBranch || !copyFromBranchId) {
       toast.error('Chọn chi nhánh nguồn');
       return;
     }
+    setIsCopyConfirmOpen(true);
+  };
+
+  const handleCopy = async () => {
+    if (!editorBranch || !copyFromBranchId || isSaving) return;
+    setIsCopyConfirmOpen(false);
     setIsSaving(true);
     try {
       const r = await copyShowtimesApi({
         from_branch_id: Number(copyFromBranchId),
         to_branch_id: editorBranch.id
       });
-      toast.success(`Đã sao chép ${r.copied ?? 0} suất chiếu`);
+      toast.success(`Đã sao chép ${r.copied ?? 0} suất chiếu` + (r.skipped ? `, bỏ qua ${r.skipped} suất vì phim không chiếu ở chi nhánh này` : ''));
       setCopyFromBranchId('');
       await onRefreshBranch(editorBranch.id);
     } catch (err: any) {
@@ -410,7 +418,7 @@ export default function ShowtimesContent({ branches, schedules, isLoading, onRef
               </div>
             )}
 
-            {hasPermission('showtimes', 'create') && branches.length > 1 && (
+            {hasPermission('showtimes', 'create') && hasPermission('showtimes', 'delete') && branches.length > 1 && (
               <div className="flex flex-wrap items-end gap-2 rounded-xl border border-slate-200 p-3">
                 <div className="flex-1 min-w-[200px] space-y-1.5">
                   <Label>Sao chép lịch từ chi nhánh khác</Label>
@@ -432,7 +440,7 @@ export default function ShowtimesContent({ branches, schedules, isLoading, onRef
                 </div>
                 <Button
                   variant="outline"
-                  onClick={handleCopy}
+                  onClick={askCopyConfirmation}
                   disabled={isSaving || !copyFromBranchId}
                   className="h-10 rounded-lg"
                 >
@@ -516,6 +524,21 @@ export default function ShowtimesContent({ branches, schedules, isLoading, onRef
           </div>
         </DialogContent>
       </Dialog>
+
+      <ConfirmDeleteDialog
+        isOpen={isCopyConfirmOpen}
+        onOpenChange={setIsCopyConfirmOpen}
+        title="Sao chép lịch chiếu"
+        description={
+          <>
+            Lịch hiện tại của {editorBranch?.name} ({(editorBranch ? schedules[editorBranch.id] || [] : []).length} suất) sẽ bị XÓA
+            và thay bằng lịch của chi nhánh nguồn. Không thể hoàn tác. Tiếp tục?
+          </>
+        }
+        onConfirm={handleCopy}
+        isDeleting={isSaving}
+        confirmText="Xóa và sao chép"
+      />
 
       <ConfirmDeleteDialog
         isOpen={!!deleteTarget}

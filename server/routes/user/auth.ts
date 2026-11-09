@@ -6,6 +6,13 @@ import { getWelcomeEmailTemplate } from '../../lib/booking-utils';
 import { formatDateForDb } from '../../lib/date-utils';
 import { generateOTP, sendOTPEmail, createOTPRecord, validateOTP, deleteOTP, canResendOTP } from '../../lib/otp-utils';
 import { getGlobalSettingsImpl } from '../../lib/global-settings';
+import {
+  isCustomerOtpLocked,
+  recordCustomerOtpFailure,
+  clearCustomerOtpFailures,
+  OTP_DEFAULT_MAX_FAILS,
+  LOCKED_MESSAGE
+} from '../../lib/login-throttle';
 
 export async function loginImpl(anyDb: any, tables: { accounts: any; users: any }, payload: Partial<Login>) {
   const email = payload.email || '';
@@ -159,10 +166,19 @@ export async function validateOTPImpl(
     return { status: 404, message: 'Tài khoản không tồn tại!' };
   }
 
+  // Wrong codes are limited per account (max_otp_attempts from the settings), so a 6-digit code cannot be guessed
+  const settingsForOtp = await getGlobalSettingsImpl(kv);
+  const maxFails = Number(settingsForOtp.otp_settings?.max_otp_attempts) || OTP_DEFAULT_MAX_FAILS;
+  if (await isCustomerOtpLocked(kv, temp_account_id, maxFails)) {
+    return { status: 429, message: LOCKED_MESSAGE };
+  }
+
   const validation = await validateOTP(anyDb, { tokens: tables.tokens }, temp_account_id, otp);
   if (!validation.valid) {
+    await recordCustomerOtpFailure(kv, temp_account_id);
     return { status: 400, message: validation.error || 'OTP không hợp lệ' };
   }
+  await clearCustomerOtpFailures(kv, temp_account_id);
 
   const user = await anyDb.query.users.findFirst({
     where: eq(tables.users.id, useracc.user_id)

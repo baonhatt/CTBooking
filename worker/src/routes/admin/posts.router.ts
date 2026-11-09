@@ -153,6 +153,8 @@ postsRouter.delete('/api/admin/posts/:id', requireStaffAuth, requirePermission('
     const staffEmail = c.get('staffEmail');
     const staffFullname = c.get('staffFullname');
     const isSuperAdmin = c.get('isSuperAdmin');
+    // Permanent delete only when asked for on purpose (and only the Super Admin gets it); otherwise the post is archived
+    const hardDelete = c.req.query('hardDelete') === 'true';
 
     const r = await deletePostImpl(
       db,
@@ -160,12 +162,14 @@ postsRouter.delete('/api/admin/posts/:id', requireStaffAuth, requirePermission('
       id,
       getCloudHelpers(c, c.env).deleter,
       { id: staffId, email: staffEmail, fullname: staffFullname },
-      isSuperAdmin
+      isSuperAdmin,
+      hardDelete
     );
 
     if (!r) return c.json({ message: 'Không tìm thấy' }, 404);
 
-    return c.json({ status: 'success', message: isSuperAdmin ? 'Đã xóa vĩnh viễn' : 'Đã lưu trữ bài viết' });
+    const permanent = isSuperAdmin === true && hardDelete;
+    return c.json({ status: 'success', message: permanent ? 'Đã xóa vĩnh viễn' : 'Đã lưu trữ bài viết' });
   } catch (err: any) {
     return c.json({ status: 'error', message: String(err?.message || 'Internal error') }, 500);
   }

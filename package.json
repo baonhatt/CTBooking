@@ -53,6 +53,7 @@
     "react-helmet-async": "^3.0.0",
     "sharp": "^0.34.5",
     "wrangler": "^4.124.0",
+    "xss": "^1.0.15",
     "zod": "^3.25.76"
   },
   "devDependencies": {

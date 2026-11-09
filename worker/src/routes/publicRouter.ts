@@ -19,6 +19,7 @@ import { findBookingForOwner, bookingStatusPayload } from '../../../server/route
 import { resolveOrderTokenSecret, makeOrderToken, ORDER_TOKEN_HEADER } from '../../../server/lib/order-token';
 import { validateSessionTokenImpl } from '../../../server/routes/user/auth';
 import { formatDateForDb } from '../../../server/lib/date-utils';
+import { sanitizePostHtml } from '../../../server/lib/sanitize-html';
 
 import {
   listActiveVRPackagesImpl,
@@ -825,8 +826,10 @@ publicRouter.get('/api/posts/:identifier', async (c) => {
       return c.json({ message: 'Bài viết không công khai' }, 403);
     }
 
+    // Posts saved before the save-time cleaning existed are cleaned here too, without touching the database
     const parsed = stripAuditLogs({
       ...post,
+      content: sanitizePostHtml(post.content),
       cover_image: parseMediaUrl(post.cover_image, c)
     });
     return c.json({ post: parsed }, 200);

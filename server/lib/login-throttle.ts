@@ -78,6 +78,30 @@ export async function clearStaffLoginFailures(kv: ThrottleKv | undefined, email:
   await kv.delete(pairKey(email, ip));
 }
 
+function customerOtpKey(accountId: number): string {
+  return `otp_fail:customer:${accountId}`;
+}
+
+/** True when this customer account has used up its wrong-OTP allowance. */
+export async function isCustomerOtpLocked(
+  kv: ThrottleKv | undefined,
+  accountId: number,
+  maxFails: number = OTP_DEFAULT_MAX_FAILS
+): Promise<boolean> {
+  if (!kv) return false;
+  return readCount(await kv.get(customerOtpKey(accountId))) >= maxFails;
+}
+
+export async function recordCustomerOtpFailure(kv: ThrottleKv | undefined, accountId: number): Promise<void> {
+  if (!kv) return;
+  await increment(kv, customerOtpKey(accountId));
+}
+
+export async function clearCustomerOtpFailures(kv: ThrottleKv | undefined, accountId: number): Promise<void> {
+  if (!kv) return;
+  await kv.delete(customerOtpKey(accountId));
+}
+
 export async function isStaffOtpLocked(
   kv: ThrottleKv | undefined,
   staffId: number,

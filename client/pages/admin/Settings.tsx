@@ -52,6 +52,10 @@ export default function SettingsPage() {
   const [adminOtpSettings, setAdminOtpSettings] = useState({ ...defaultOtpConf, enable_2fa: true });
   const [viewMode, setViewMode] = useState<'admin' | 'user'>('admin');
   const [isSyncing, setIsSyncing] = useState(false);
+  // The settings as they were loaded from the server. Saving is blocked until they have been loaded, so the screen's
+  // default values can never overwrite the real ones.
+  const [loadedSettings, setLoadedSettings] = useState<{ otp: boolean; admin: boolean } | null>(null);
+  const [loadFailed, setLoadFailed] = useState(false);
   const canManageSettings = useStaffPermission('settings', 'manage');
 
   const isProd = window.location.hostname !== 'localhost';
@@ -69,14 +73,36 @@ export default function SettingsPage() {
       if (data && data.settings) {
         if (data.settings.otp_settings) setOtpSettings(data.settings.otp_settings);
         if (data.settings.admin_otp_settings) setAdminOtpSettings(data.settings.admin_otp_settings);
+        setLoadedSettings({
+          otp: data.settings.otp_settings?.enable_2fa === true,
+          admin: data.settings.admin_otp_settings?.enable_2fa === true
+        });
+        setLoadFailed(false);
+      } else {
+        setLoadFailed(true);
       }
     } catch (err) {
       console.error('Failed to fetch admin settings:', err);
+      setLoadFailed(true);
     }
   };
 
   const handleSaveOtpSettings = async () => {
-    if (!canManageSettings) return;
+    if (!canManageSettings || !loadedSettings) return;
+
+    // Turning two-factor login on or off for staff or customers is confirmed first
+    if (adminOtpSettings.enable_2fa !== loadedSettings.admin) {
+      const message = adminOtpSettings.enable_2fa
+        ? 'Bật xác thực 2 lớp cho nhân viên? Chỉ bật khi TẤT CẢ nhân viên (trừ Super Admin) có email thật, vì họ sẽ nhận mã OTP qua email để đăng nhập.'
+        : 'Tắt xác thực 2 lớp cho nhân viên? Đăng nhập admin sẽ chỉ cần mật khẩu.';
+      if (!window.confirm(message)) return;
+    }
+    if (otpSettings.enable_2fa !== loadedSettings.otp) {
+      const message = otpSettings.enable_2fa
+        ? 'Bật xác thực OTP cho khách hàng? Khách sẽ nhận mã OTP qua email khi đăng nhập.'
+        : 'Tắt xác thực OTP cho khách hàng?';
+      if (!window.confirm(message)) return;
+    }
     await saveSettings();
   };
 
@@ -91,9 +117,11 @@ export default function SettingsPage() {
         })
       });
       toast.success('Đã lưu cấu hình cài đặt thành công!');
-    } catch (err) {
+      setLoadedSettings({ otp: otpSettings.enable_2fa === true, admin: adminOtpSettings.enable_2fa === true });
+    } catch (err: any) {
       console.error('Failed to save admin settings:', err);
-      toast.error('Có lỗi xảy ra khi lưu cấu hình');
+      // The server says why a value was refused (for example a number outside its range)
+      toast.error(err?.message || 'Có lỗi xảy ra khi lưu cấu hình');
     } finally {
       setIsSyncing(false);
     }
@@ -264,9 +292,15 @@ export default function SettingsPage() {
                   </div>
                 </div>
 
+                {loadFailed && (
+                  <div className="rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700 flex items-center justify-between gap-3">
+                    <span>Không tải được cấu hình hiện tại nên chưa thể lưu, để tránh ghi đè giá trị thật.</span>
+                    <button onClick={fetchSettings} className="font-semibold underline">Tải lại</button>
+                  </div>
+                )}
                 <button
                   onClick={handleSaveOtpSettings}
-                  disabled={isSyncing || !canManageSettings}
+                  disabled={isSyncing || !canManageSettings || !loadedSettings}
                   className="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-xl transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {isSyncing ? 'Đang lưu...' : 'Lưu cài đặt OTP'}

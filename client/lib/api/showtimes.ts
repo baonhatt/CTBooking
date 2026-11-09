@@ -47,7 +47,7 @@ export async function deleteShowtimeApi(id: number) {
 }
 
 export async function copyShowtimesApi(body: { from_branch_id: number; to_branch_id: number }) {
-  return request<{ status: string; copied?: number; message?: string }>('/api/admin/showtimes/copy', {
+  return request<{ status: string; copied?: number; skipped?: number; replaced?: number; message?: string }>('/api/admin/showtimes/copy', {
     method: 'POST',
     body: JSON.stringify(body)
   });

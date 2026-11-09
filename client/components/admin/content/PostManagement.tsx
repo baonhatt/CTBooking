@@ -25,7 +25,8 @@ import {
   Calendar,
   Share2,
   Globe,
-  Trash2
+  Trash2,
+  RotateCcw
 } from 'lucide-react';
 import {
   Pagination,
@@ -217,6 +218,18 @@ export const PostManagement = () => {
     }
     setPostToDelete(post);
     setIsDeleteDialogOpen(true);
+  };
+
+  // Take a post out of the archive: it goes back to draft
+  const handleRestore = async (post: PostData) => {
+    if (!post.id) return;
+    try {
+      await updatePostApi(post.id, { status: 'draft' });
+      toast.success('Đã khôi phục bài viết về bản nháp');
+      fetchPosts();
+    } catch (error: any) {
+      toast.error('Lỗi', { description: error?.message || 'Không thể khôi phục bài viết' });
+    }
   };
 
   const confirmDelete = async (hardDelete = false) => {
@@ -583,6 +596,17 @@ export const PostManagement = () => {
                             title="Chỉnh sửa"
                           >
                             <Edit3 size={15} />
+                          </Button>
+                        )}
+                        {post.status === 'archived' && hasPermission('posts', 'edit') && (
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => handleRestore(post)}
+                            className="h-7 w-7 text-green-600 hover:text-green-700 hover:bg-green-50 rounded-lg transition-colors"
+                            title="Khôi phục về bản nháp"
+                          >
+                            <RotateCcw size={15} />
                           </Button>
                         )}
                         {hasPermission('posts', 'delete') && (
@@ -1136,7 +1160,7 @@ export const PostManagement = () => {
           <AlertDialogHeader>
             <AlertDialogTitle className="text-slate-900 text-lg font-bold">Xác nhận xóa bài viết</AlertDialogTitle>
             <AlertDialogDescription className="text-slate-600 text-sm mt-2">
-              Bạn có chắc chắn muốn xóa bài viết "{postToDelete?.title}"? Bài viết sẽ được chuyển sang trạng thái lưu trữ.
+              Bạn có chắc chắn muốn lưu trữ bài viết "{postToDelete?.title}"? Bài viết vẫn còn trong hệ thống (mục Lưu trữ) và có thể khôi phục.{isSuperAdmin ? ' Chỉ nút "Xóa vĩnh viễn" mới xóa hẳn khỏi cơ sở dữ liệu.' : ''}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter className="mt-4 flex flex-col sm:flex-row gap-2">

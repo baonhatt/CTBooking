@@ -58,7 +58,13 @@ showtimesRouter.post('/api/admin/showtimes', requireStaffAuth, requirePermission
   }
 });
 
-showtimesRouter.post('/api/admin/showtimes/copy', requireStaffAuth, requirePermission('showtimes', 'create'), async (c) => {
+// Copying replaces the schedule of the target branch, so it needs the right to create AND to delete showtimes
+showtimesRouter.post(
+  '/api/admin/showtimes/copy',
+  requireStaffAuth,
+  requirePermission('showtimes', 'create'),
+  requirePermission('showtimes', 'delete'),
+  async (c) => {
   try {
     const body = await c.req.json().catch(() => ({}));
     const db = drizzle(c.env.cinema_db, { schema });
@@ -67,7 +73,7 @@ showtimesRouter.post('/api/admin/showtimes/copy', requireStaffAuth, requirePermi
     const staffFullname = c.get('staffFullname');
     const r = await copyShowtimesImpl(
       db,
-      { showtimes: schema.showtimes, auditLogs: schema.auditLogs },
+      { showtimes: schema.showtimes, auditLogs: schema.auditLogs, movies: schema.movies },
       body,
       getRestrictBranchIds(c),
       { id: staffId, email: staffEmail, fullname: staffFullname }

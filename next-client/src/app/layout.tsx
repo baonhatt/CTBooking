@@ -1,3 +1,4 @@
+import { jsonLdString } from '@/lib/safe-html';
 import type { Metadata } from 'next';
 import { Inter } from 'next/font/google';
 import './globals.css';
@@ -103,8 +104,8 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="vi">
       <body className={`${inter.className} bg-[#050915] text-white`}>
         <NextTopLoader color="#22d3ee" height={3} showSpinner={false} />
-        <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(organizationSchema) }} />
-        <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(websiteSchema) }} />
+        <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: jsonLdString(organizationSchema) }} />
+        <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: jsonLdString(websiteSchema) }} />
         <Providers>{children}</Providers>
       </body>
     </html>

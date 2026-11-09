@@ -46,9 +46,13 @@ export async function getGlobalSettingsImpl(kv?: any) {
 
 export async function updateGlobalSettingsImpl(kv: any, newSettings: any) {
   if (!kv) return null;
-  const current = await getGlobalSettingsImpl(kv);
-  const updated = { ...current, ...newSettings };
-  
+  const current: any = await getGlobalSettingsImpl(kv);
+  // Each group is merged key by key, so changing one value keeps the others
+  const updated: any = { ...current };
+  for (const group of Object.keys(newSettings || {})) {
+    updated[group] = { ...(current[group] || {}), ...(newSettings[group] || {}) };
+  }
+
   await kv.put('global_settings', JSON.stringify(updated));
   return updated;
 }

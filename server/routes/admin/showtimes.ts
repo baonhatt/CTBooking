@@ -1,7 +1,8 @@
-import { eq, and, ne, asc, sql } from 'drizzle-orm';
+import { eq, and, ne, asc, sql, isNull } from 'drizzle-orm';
 import { logAuditAction } from '../../lib/audit-logger';
 import { formatDateForDb } from '../../lib/date-utils';
 import { isValidTime, normalizeTime } from '../../lib/showtime-utils';
+import { matchesBranchFilter } from '../../lib/branch-ids';
 
 type StaffInfo = { id: number; email: string; fullname: string };
 
@@ -266,9 +267,18 @@ export async function deleteShowtimeImpl(
   return { status: 'success' };
 }
 
+/**
+ * Copies the whole schedule of one branch over the schedule of another.
+ *  - Only movies that can be shown at the target branch are copied (active, not deleted, for that branch). The number
+ *    of skipped slots is returned.
+ *  - The old schedule of the target is removed and the new slots are added in ONE batch, so a failure half way never
+ *    leaves a cut schedule.
+ *  - Nothing is removed when no slot can be copied.
+ *  - The audit line keeps the schedule that was replaced.
+ */
 export async function copyShowtimesImpl(
   db: any,
-  tables: { showtimes: any; auditLogs: any },
+  tables: { showtimes: any; auditLogs: any; movies?: any },
   data: { from_branch_id: number; to_branch_id: number },
   restrictToBranchIds: number[] | null,
   staffInfo?: StaffInfo
@@ -296,19 +306,56 @@ export async function copyShowtimesImpl(
     return { status: 'error', message: 'Chi nhánh nguồn chưa có lịch chiếu', statusCode: 400 };
   }
 
-  const now = formatDateForDb(new Date()) as string;
-  await db.delete(tables.showtimes).where(eq(tables.showtimes.branch_id, toBranchId));
-
-  for (const slot of source) {
-    await db.insert(tables.showtimes).values({
-      branch_id: toBranchId,
-      movie_id: slot.movie_id,
-      start_time: slot.start_time,
-      end_time: slot.end_time,
-      created_at: now,
-      updated_at: now
-    });
+  // Movies that can be shown at the target branch
+  let eligibleMovieIds: Set<number> | null = null;
+  if (tables.movies) {
+    const movieRows = await db
+      .select({ id: tables.movies.id, branch_ids: tables.movies.branch_ids, branch_id: tables.movies.branch_id })
+      .from(tables.movies)
+      .where(and(eq(tables.movies.is_active, true), isNull(tables.movies.deleted_at)));
+    eligibleMovieIds = new Set(
+      movieRows
+        .filter((movie: any) => matchesBranchFilter(movie.branch_ids, movie.branch_id, toBranchId))
+        .map((movie: any) => Number(movie.id))
+    );
   }
+  const copyable = eligibleMovieIds ? source.filter((slot: any) => eligibleMovieIds!.has(Number(slot.movie_id))) : source;
+  const skipped = source.length - copyable.length;
+
+  if (!copyable.length) {
+    return {
+      status: 'error',
+      message: 'Không có suất nào có thể sao chép: các phim của lịch nguồn không chiếu ở chi nhánh đích hoặc đã bị ẩn',
+      statusCode: 400
+    };
+  }
+
+  // The schedule that will be replaced, kept for the audit line
+  const replaced = await db
+    .select()
+    .from(tables.showtimes)
+    .where(eq(tables.showtimes.branch_id, toBranchId))
+    .orderBy(asc(tables.showtimes.start_time));
+
+  // One batch: remove the old schedule and add the new one together
+  const now = formatDateForDb(new Date()) as string;
+  const statements = [
+    db.delete(tables.showtimes).where(eq(tables.showtimes.branch_id, toBranchId)),
+    ...copyable.map((slot: any) =>
+      db.insert(tables.showtimes).values({
+        branch_id: toBranchId,
+        movie_id: slot.movie_id,
+        start_time: slot.start_time,
+        end_time: slot.end_time,
+        created_at: now,
+        updated_at: now
+      })
+    )
+  ];
+  if (typeof db.batch !== 'function') {
+    return { status: 'error', message: 'Cơ sở dữ liệu không hỗ trợ ghi gộp, chưa thể sao chép an toàn', statusCode: 500 };
+  }
+  await db.batch(statements);
 
   if (staffInfo) {
     await logAuditAction(
@@ -317,12 +364,15 @@ export async function copyShowtimesImpl(
       'copy',
       'showtimes',
       toBranchId,
-      `Sao chép ${source.length} suất từ chi nhánh #${fromBranchId} sang #${toBranchId}`,
+      `Sao chép ${copyable.length} suất từ chi nhánh #${fromBranchId} sang #${toBranchId}` +
+        (skipped ? ` (bỏ qua ${skipped} suất vì phim không chiếu ở chi nhánh đích)` : '') +
+        `; thay ${replaced.length} suất cũ`,
       staffInfo.id,
       staffInfo.email,
-      staffInfo.fullname
+      staffInfo.fullname,
+      JSON.stringify(replaced)
     );
   }
 
-  return { status: 'success', copied: source.length };
+  return { status: 'success', copied: copyable.length, skipped, replaced: replaced.length };
 }

@@ -152,7 +152,9 @@ userRouter.post('/api/validate-otp', async (c) => {
 
       generateSessionToken,
 
-      calculateSessionExpiry
+      calculateSessionExpiry,
+
+      c.env.SETTINGS_KV
     );
 
     const status = typeof (r as any).status === 'number' ? (r as any).status : 200;

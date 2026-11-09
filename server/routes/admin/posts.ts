@@ -1,6 +1,7 @@
 import { eq, desc, and, or, like, sql } from 'drizzle-orm';
 import { formatDateForDb } from '../../lib/date-utils';
 import { logAuditAction } from '../../lib/audit-logger';
+import { sanitizePostHtml } from '../../lib/sanitize-html';
 import { buildAuditPayload } from '../../lib/audit-utils';
 
 export async function listPostsImpl(
@@ -196,7 +197,8 @@ export async function createPostImpl(
   const insertData: any = {
     title,
     slug,
-    content,
+    // The HTML is cleaned before it is saved (scripts, event handlers and the like are removed)
+    content: sanitizePostHtml(content),
     excerpt: excerpt || null,
     featured_image: savedImage || null,
     status: status || 'draft',
@@ -304,7 +306,7 @@ export async function updatePostImpl(
   if (args.slug !== undefined) {
     data.slug = args.slug;
   }
-  if (content !== undefined) data.content = content;
+  if (content !== undefined) data.content = sanitizePostHtml(content);
   if (excerpt !== undefined) data.excerpt = excerpt;
   if (featured_image !== undefined) data.featured_image = featured_image;
   if (status !== undefined) {
@@ -384,20 +386,24 @@ export async function deletePostImpl(
   id: number,
   deleter?: (url: string) => Promise<void>,
   staffInfo?: { id: number; email: string; fullname: string },
-  isSuperAdmin?: boolean
+  isSuperAdmin?: boolean,
+  hardDelete?: boolean
 ) {
   const existing = await anyDb.query.posts.findFirst({
     where: eq(tables.posts.id, id)
   });
   if (!existing) return null;
 
-  // Check if post is published
-  if (existing.status === 'published' && !isSuperAdmin) {
-    throw new Error('Bài viết đã xuất bản. Vui lòng gỡ xuất bản trước khi xóa.');
+  // Everyone archives by default (a soft delete: the post stays in the database with status "archived").
+  // A permanent delete needs BOTH the Super Admin and an explicit hardDelete = true.
+  const permanent = isSuperAdmin === true && hardDelete === true;
+
+  // A published post is taken down first by staff. The Super Admin can archive it, but not delete it for good.
+  if (existing.status === 'published' && (!isSuperAdmin || permanent)) {
+    throw new Error('Bài viết đã xuất bản. Vui lòng gỡ xuất bản hoặc lưu trữ trước khi xóa.');
   }
 
-  // Soft delete for regular staff (archive), hard delete for superadmin
-  if (isSuperAdmin) {
+  if (permanent) {
     // Hard delete: remove from database
     if (existing.featured_image && deleter) {
       deleter(existing.featured_image).catch((e) => console.error('Failed to delete post image:', e));
@@ -423,10 +429,10 @@ export async function deletePostImpl(
     await logAuditAction(
       anyDb,
       tables.auditLogs,
-      isSuperAdmin ? 'delete' : 'archive',
+      permanent ? 'delete' : 'archive',
       'post',
       id,
-      isSuperAdmin ? `Xóa vĩnh viễn bài viết: ${existing.title}` : `Lưu trữ bài viết: ${existing.title}`,
+      permanent ? `Xóa vĩnh viễn bài viết: ${existing.title}` : `Lưu trữ bài viết: ${existing.title}`,
       staffInfo.id,
       staffInfo.email,
       staffInfo.fullname,

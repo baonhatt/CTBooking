@@ -24,11 +24,17 @@ settingsRouter.post('/api/admin/settings', requireStaffAuth, requirePermission('
   try {
     const body = await c.req.json().catch(() => ({}));
 
-    const r = await updateAdminSettingsImpl(c.env.SETTINGS_KV, body);
+    const db = drizzle(c.env.cinema_db, { schema });
+    const r = await updateAdminSettingsImpl(c.env.SETTINGS_KV, body, {
+      db,
+      auditLogs: schema.auditLogs,
+      staff: { id: c.get('staffId'), email: c.get('staffEmail'), fullname: c.get('staffFullname') }
+    });
 
     return c.json(r);
   } catch (err: any) {
-    return c.json({ message: String(err?.message || 'Internal error') }, 500);
+    const status = Number(err?.statusCode) || 500;
+    return c.json({ message: String(err?.message || 'Internal error') }, status as any);
   }
 });
 
