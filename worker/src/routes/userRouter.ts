@@ -27,6 +27,7 @@ import {
 
 import { sendMail } from '../../../server/routes/mail-service';
 import { resolveOrderTokenSecret, makeOrderToken } from '../../../server/lib/order-token';
+import { clampPage } from '../../../server/lib/paging';
 
 type Variables = {
   accountId?: number;
@@ -530,9 +531,8 @@ userRouter.get('/api/user/transactions', requireAuth, async (c) => {
     const email = String(c.req.query('email') || '');
     const status = String(c.req.query('status') || 'all');
 
-    const page = Number(c.req.query('page') || 1);
-
-    const pageSize = Number(c.req.query('pageSize') || 10);
+    // The page size is capped at 100 and a bad page number becomes 1
+    const { page, pageSize } = clampPage(c.req.query('page'), c.req.query('pageSize'), { defaultPageSize: 10 });
 
     const sort = String(c.req.query('sort') || 'created_at');
 

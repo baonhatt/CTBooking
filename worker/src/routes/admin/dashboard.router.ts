@@ -26,6 +26,13 @@ dashboardRouter.get('/api/admin/dashboard/metrics', requireStaffAuth, requirePer
     const branchIdParam = c.req.query('branch_id');
     const branchId = branchIdParam && branchIdParam !== 'all' ? Number(branchIdParam) : undefined;
     const restrictBranchIds = getRestrictBranchIds(c);
+    // Money fields are only returned to staff who have the view_revenue right
+    const staffPermissions = (c.get('staffPermissions') as Array<{ module: string; action: string }> | undefined) || [];
+    const canViewRevenue =
+      c.get('isSuperAdmin') === true ||
+      staffPermissions.some(
+        (p) => (p.module === 'dashboard' || p.module === '*') && (p.action === 'view_revenue' || p.action === '*')
+      );
     const branchIds =
       branchId !== undefined && !Number.isNaN(branchId)
         ? restrictBranchIds
@@ -57,7 +64,8 @@ dashboardRouter.get('/api/admin/dashboard/metrics', requireStaffAuth, requirePer
       period,
 
       year,
-      branchIds
+      branchIds,
+      { canViewRevenue }
     );
 
     return c.json(r);

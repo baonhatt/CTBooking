@@ -1,16 +1,15 @@
 import { eq, and, or, gte, lte, inArray, desc, asc, sum, count, sql } from 'drizzle-orm';
 import { formatDateForDb } from '../../../server/lib/date-utils';
+import { vnRangeFromInputs, sqlPaidInRange, sqlListedInRange, sqlCreatedInRange } from '../../../server/lib/vn-time';
+import { chunk } from '../../../server/lib/paging';
 
 export async function getRevenueImpl(
   anyDb: any,
   tables: { bookings: any },
   args: { from?: string; to?: string; status?: string; restrictToBranchIds?: number[] | null }
 ) {
-  const from = args.from ? new Date(args.from) : undefined;
-  const to = args.to ? new Date(args.to) : undefined;
   const status = String(args.status || 'paid').toLowerCase();
   const whereParts: any[] = [];
-  if (status !== 'all') whereParts.push(inArray(tables.bookings.payment_status, ['paid']));
   if (args.restrictToBranchIds !== null && args.restrictToBranchIds !== undefined) {
     if (args.restrictToBranchIds.length === 0) {
       whereParts.push(sql`1 = 0`);
@@ -18,23 +17,10 @@ export async function getRevenueImpl(
       whereParts.push(inArray(tables.bookings.branch_id, args.restrictToBranchIds));
     }
   }
-  let dateCondition = undefined as any;
-  if (from && to) {
-    dateCondition = or(
-      and(gte(tables.bookings.paid_at, formatDateForDb(from)), lte(tables.bookings.paid_at, formatDateForDb(to))),
-      and(gte(tables.bookings.created_at, formatDateForDb(from)), lte(tables.bookings.created_at, formatDateForDb(to)))
-    );
-  } else if (from) {
-    dateCondition = or(
-      gte(tables.bookings.paid_at, formatDateForDb(from)),
-      gte(tables.bookings.created_at, formatDateForDb(from))
-    );
-  } else if (to) {
-    dateCondition = or(
-      lte(tables.bookings.paid_at, formatDateForDb(to)),
-      lte(tables.bookings.created_at, formatDateForDb(to))
-    );
-  }
+  // Paid orders count on the day they were paid (Vietnam time). Status "all" lists every status: paid ones by the day
+  // paid, the others by the day created.
+  const range = vnRangeFromInputs(args.from, args.to);
+  const dateCondition = status === 'all' ? sqlListedInRange(tables.bookings, range) : sqlPaidInRange(tables.bookings, range);
   const finalWhere = and(...whereParts, dateCondition);
   const [agg] = await anyDb
     .select({ total: sum(tables.bookings.total_price), count: count() })
@@ -112,24 +98,16 @@ export async function listTransactionsImpl(
     }
   }
 
-  // Filter theo khoảng thời gian
+  // Filter theo khoảng thời gian (giờ Việt Nam): a date alone is the whole day, both ends included.
+  // Paid orders are found by the day they were paid, the others by the day they were created.
   if (from || to) {
-    const f = from ? new Date(from) : undefined;
-    const t = to ? new Date(to) : undefined;
-    const createdField = tables.bookings.created_at;
-    const paidField = tables.bookings.paid_at;
-
-    if (f && t) {
-      whereCondition.push(
-        or(
-          and(gte(createdField, formatDateForDb(f)), lte(createdField, formatDateForDb(t))),
-          and(gte(paidField, formatDateForDb(f)), lte(paidField, formatDateForDb(t)))
-        )
-      );
-    } else if (f) {
-      whereCondition.push(or(gte(createdField, formatDateForDb(f)), gte(paidField, formatDateForDb(f))));
-    } else if (t) {
-      whereCondition.push(or(lte(createdField, formatDateForDb(t)), lte(paidField, formatDateForDb(t))));
+    const range = vnRangeFromInputs(from, to);
+    if (status === 'paid') {
+      whereCondition.push(sqlPaidInRange(tables.bookings, range));
+    } else if (status && status !== 'all') {
+      whereCondition.push(sqlCreatedInRange(tables.bookings, range));
+    } else {
+      whereCondition.push(sqlListedInRange(tables.bookings, range));
     }
   }
 
@@ -201,14 +179,18 @@ export async function listTransactionsImpl(
   const vrBookingIds = Array.from(new Set(itemsRaw.map((r: any) => r.booking.id)));
   let vrItemsByBooking: Record<number, Array<{ package_name: string; quantity: number }>> = {};
   if (tables.booking_vr_items && vrBookingIds.length > 0) {
-    const vrRows = await anyDb
-      .select({
-        booking_id: tables.booking_vr_items.booking_id,
-        package_name: tables.booking_vr_items.package_name,
-        quantity: tables.booking_vr_items.quantity
-      })
-      .from(tables.booking_vr_items)
-      .where(inArray(tables.booking_vr_items.booking_id, vrBookingIds));
+    const vrRows: any[] = [];
+    for (const idChunk of chunk(vrBookingIds as number[], 100)) {
+      const rowsOfChunk = await anyDb
+        .select({
+          booking_id: tables.booking_vr_items.booking_id,
+          package_name: tables.booking_vr_items.package_name,
+          quantity: tables.booking_vr_items.quantity
+        })
+        .from(tables.booking_vr_items)
+        .where(inArray(tables.booking_vr_items.booking_id, idChunk));
+      vrRows.push(...rowsOfChunk);
+    }
 
     vrItemsByBooking = vrRows.reduce((acc: any, row: any) => {
       const bid = row.booking_id;
@@ -244,24 +226,9 @@ export async function listTransactionsImpl(
       } catch {}
     }
 
-    let parsedMovieQty = 0;
-    let hasParsed = false;
-    if (tx.ticket_package_name) {
-      try {
-        const raw = tx.ticket_package_name.trim();
-        if (raw.startsWith('[') && raw.endsWith(']')) {
-          const arr = JSON.parse(raw);
-          if (Array.isArray(arr)) {
-            parsedMovieQty = arr.reduce((acc: number, it: any) => acc + Number(it.quantity || 1), 0);
-            hasParsed = true;
-          }
-        }
-      } catch (e) {}
-    }
+    // The number of tickets is what the order itself says. Adding the VR lines on top counted them twice.
     const vrItems = vrItemsByBooking[tx.id] || [];
-    const vrQty = vrItems.reduce((s: number, it: any) => s + Number(it.quantity || 0), 0);
-    const baseMovieQty = hasParsed ? parsedMovieQty : tx.ticket_count;
-    const finalTicketCount = (tx.booking_type === 'combo_vr' || tx.booking_type === 'vr') ? baseMovieQty + vrQty : baseMovieQty;
+    const finalTicketCount = Number(tx.ticket_count || 0);
 
     return {
       id: tx.id,

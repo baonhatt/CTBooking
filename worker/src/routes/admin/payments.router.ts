@@ -26,6 +26,7 @@ import { logSystemError } from '../../utils';
 import { getRevenueImpl, listTransactionsImpl, getTransactionByIdImpl } from '../../../../server/routes/admin/payments';
 import { checkSepayTransactionImpl } from '../../../../server/routes/admin/sepay';
 import { confirmBookingImpl } from '../../../../server/routes/admin/confirm-booking';
+import { clampPage, EXPORT_MAX_ROWS, MAX_PAGE_SIZE } from '../../../../server/lib/paging';
 import { resendBookingEmailImpl } from '../../../../server/routes/admin/resend-booking-email';
 import { confirmUseTicketImpl, getBookingByCodeImpl } from '../../../../server/routes/user/booking/query';
 type Variables = { staffId?: number; staffEmail?: string; staffFullname?: string; isSuperAdmin?: boolean; staffPermissions?: Array<{ module: string; action: string }>; staffBranchIds?: number[]; };
@@ -68,32 +69,37 @@ paymentsRouter.get('/api/admin/sepay/check', requireStaffAuth, requirePermission
   }
 });
 
+// The filters of the transaction list, read from the query string. Used by the list and by the export.
+function readTransactionFilters(c: any) {
+  const searchText = String(c.req.query('searchText') || '');
+  const status = String(c.req.query('status') || 'all');
+  const sort = String(c.req.query('sort') || 'created_at');
+  const dir = String(c.req.query('dir') || 'desc').toLowerCase() === 'asc' ? 'asc' : 'desc';
+  const payment_method = String(c.req.query('payment_method') || '');
+  const from = String(c.req.query('from') || '');
+  const to = String(c.req.query('to') || '');
+  const booking_type_raw = String(c.req.query('booking_type') || 'all');
+  const booking_type = (['all', 'movie', 'vr'].includes(booking_type_raw) ? booking_type_raw : 'all') as 'all' | 'movie' | 'vr';
+  const branch_id_raw = c.req.query('branch_id');
+  const branch_id = branch_id_raw && branch_id_raw !== 'all' ? Number(branch_id_raw) : undefined;
+  return { searchText, status, sort, dir, payment_method, from, to, booking_type, branch_id } as const;
+}
+
+const TRANSACTION_TABLES = {
+  bookings: schema.bookings,
+  users: schema.users,
+  accounts: schema.accounts,
+  movies: schema.movies,
+  ticket_packages: schema.ticket_packages,
+  vouchers: (schema as any).vouchers,
+  booking_vr_items: (schema as any).booking_vr_items
+};
+
 paymentsRouter.get('/api/admin/transactions', requireStaffAuth, requirePermission('transactions', 'view'), async (c) => {
   try {
-    const page = Number(c.req.query('page') || 1);
-
-    const pageSize = Number(c.req.query('pageSize') || 20);
-
-    const searchText = String(c.req.query('searchText') || '');
-
-    const status = String(c.req.query('status') || 'all');
-
-    const sort = String(c.req.query('sort') || 'created_at');
-
-    const dir = String(c.req.query('dir') || 'desc').toLowerCase() === 'asc' ? 'asc' : 'desc';
-
-    const payment_method = String(c.req.query('payment_method') || '');
-
-    const from = String(c.req.query('from') || '');
-
-    const to = String(c.req.query('to') || '');
-    const booking_type_raw = String(c.req.query('booking_type') || 'all');
-    const booking_type = (['all', 'movie', 'vr'].includes(booking_type_raw) ? booking_type_raw : 'all') as
-      | 'all'
-      | 'movie'
-      | 'vr';
-    const branch_id_raw = c.req.query('branch_id');
-    const branch_id = branch_id_raw && branch_id_raw !== 'all' ? Number(branch_id_raw) : undefined;
+    // The page size is capped at 100 and a bad page number becomes 1
+    const { page, pageSize } = clampPage(c.req.query('page'), c.req.query('pageSize'));
+    const { searchText, status, sort, dir, payment_method, from, to, booking_type, branch_id } = readTransactionFilters(c);
 
     const db = drizzle(c.env.cinema_db, { schema });
     const restrictBranchIds = getRestrictBranchIds(c);
@@ -133,6 +139,35 @@ paymentsRouter.get('/api/admin/transactions', requireStaffAuth, requirePermissio
     );
 
     return c.json(r);
+  } catch (err: any) {
+    return c.json({ status: 'error', message: String(err?.message || 'Internal error') }, 500);
+  }
+});
+
+// Registered BEFORE /api/admin/transactions/:id, otherwise ":id" would match the word "export".
+// Export of the transaction list: at most 5000 rows, read in pages of 100. It tells the screen when it cut the list.
+paymentsRouter.get('/api/admin/transactions/export', requireStaffAuth, requirePermission('transactions', 'view'), async (c) => {
+  try {
+    const filters = readTransactionFilters(c);
+    const db = drizzle(c.env.cinema_db, { schema });
+    const restrictBranchIds = getRestrictBranchIds(c);
+
+    const items: any[] = [];
+    let total = 0;
+    for (let page = 1; items.length < EXPORT_MAX_ROWS; page++) {
+      const r: any = await listTransactionsImpl(db, TRANSACTION_TABLES, {
+        page,
+        pageSize: MAX_PAGE_SIZE,
+        ...filters,
+        branch_id: filters.branch_id,
+        restrictToBranchIds: restrictBranchIds
+      });
+      total = r.total;
+      items.push(...r.items);
+      if (r.items.length < MAX_PAGE_SIZE) break;
+    }
+    const rows = items.slice(0, EXPORT_MAX_ROWS);
+    return c.json({ items: rows, total, truncated: total > rows.length, limit: EXPORT_MAX_ROWS });
   } catch (err: any) {
     return c.json({ status: 'error', message: String(err?.message || 'Internal error') }, 500);
   }

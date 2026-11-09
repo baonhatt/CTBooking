@@ -1,5 +1,6 @@
 import { eq, and, inArray, sql, gte, lte, or, desc, asc, count, SQL } from 'drizzle-orm';
 import { formatDateForDb } from '../../lib/date-utils';
+import { vnRangeFromInputs, sqlListedInRange } from '../../lib/vn-time';
 
 export async function updateUserProfileImpl(
   anyDb: any,
@@ -171,19 +172,8 @@ export async function listUserTransactionsImpl(
   }
   // Xử lý ngày tháng (Đảm bảo formatDateForDb trả về string ISO hoặc format SQLite hiểu)
   if (fromStr || toStr) {
-    const from = fromStr ? formatDateForDb(new Date(fromStr)) : null;
-    const to = toStr ? formatDateForDb(new Date(toStr)) : null;
-
-    const dateConditions: any[] = [];
-    if (from && to) {
-      dateConditions.push(and(gte(tables.bookings.created_at, from), lte(tables.bookings.created_at, to)));
-      dateConditions.push(and(gte(tables.bookings.paid_at, from), lte(tables.bookings.paid_at, to)));
-    } else if (from) {
-      dateConditions.push(gte(tables.bookings.created_at, from), gte(tables.bookings.paid_at, from));
-    } else if (to) {
-      dateConditions.push(lte(tables.bookings.created_at, to), lte(tables.bookings.paid_at, to));
-    }
-    if (dateConditions.length > 0) conditions.push(or(...dateConditions));
+    // Vietnam time: a date alone is the whole day. Paid orders by the day paid, the others by the day created.
+    conditions.push(sqlListedInRange(tables.bookings, vnRangeFromInputs(fromStr, toStr)));
   }
   const whereClause = and(...conditions);
 

@@ -1,5 +1,35 @@
 import { count, sum, eq, inArray, and, or, gte, lte, gt, sql, isNull, isNotNull } from 'drizzle-orm';
 import { formatDateForDb, getVnParts } from '../../../server/lib/date-utils';
+import {
+  currentVnYear,
+  vnDayStart,
+  vnYmd,
+  vnYearRange,
+  vnMonthRange,
+  vnDateStringRange,
+  vnDayRange,
+  sqlRevenueTimeInRange,
+  sqlPaidInRange,
+  sqlListedInRange,
+  sqlCreatedInRange,
+  revenueInstant
+} from '../../../server/lib/vn-time';
+
+/**
+ * The window for the "top tickets" list inside the selected year, from 00:00 Vietnam time.
+ * week = the last 7 days, month = the last 30 days, anything else = the whole year.
+ * For a year that is not the current one the window ends at the end of that year.
+ */
+export function topTicketsRange(period: string, selectedYear: number, now: Date = new Date()) {
+  const yearRange = vnYearRange(selectedYear);
+  const days = period === 'week' ? 7 : period === 'month' ? 30 : 0;
+  if (days === 0) return yearRange;
+
+  const anchor = selectedYear === currentVnYear(now) ? now : new Date(Date.parse(yearRange.end) - 1);
+  const anchorDay = vnYmd(anchor);
+  const start = vnDayStart(anchorDay.year, anchorDay.month, anchorDay.day - (days - 1)).toISOString();
+  return { start: start < yearRange.start ? yearRange.start : start, end: yearRange.end };
+}
 import { sqlBranchIdsStaffAccessFilter } from '../../../server/lib/branch-ids';
 
 function buildBranchBookingCondition(bookingsTable: any, restrictToBranchIds: number[] | null | undefined) {
@@ -19,25 +49,25 @@ export async function getDashboardMetricsImpl(
   tables: { movies: any; toys?: any; users: any; bookings: any; ticket_packages: any; branches?: any; booking_vr_items?: any; voucher_redemption_logs?: any },
   topPeriod: string = 'week',
   year?: number,
-  restrictToBranchIds: number[] | null = null
+  restrictToBranchIds: number[] | null = null,
+  options: { canViewRevenue?: boolean } = {}
 ) {
-  // Use current year if not provided
-  const selectedYear = year || new Date().getFullYear();
+  // The money fields are only returned to staff who have the view_revenue right
+  const canViewRevenue = options.canViewRevenue === true;
 
-  // Year boundaries
-  const yearStart = new Date(selectedYear, 0, 1, 0, 0, 0, 0);
-  const yearEnd = new Date(selectedYear, 11, 31, 23, 59, 59, 999);
+  // Use the current year (Vietnam time) if not provided
+  const selectedYear = year || currentVnYear();
 
-  const yearCondition = or(
-    and(
-      gte(tables.bookings.created_at, formatDateForDb(yearStart)),
-      lte(tables.bookings.created_at, formatDateForDb(yearEnd))
-    ),
-    and(
-      gte(tables.bookings.paid_at, formatDateForDb(yearStart)),
-      lte(tables.bookings.paid_at, formatDateForDb(yearEnd))
-    )
-  );
+  // Year boundaries in Vietnam time. yearEnd is the last millisecond of the year.
+  const yearRange = vnYearRange(selectedYear);
+  const yearStart = new Date(yearRange.start);
+  const yearEnd = new Date(Date.parse(yearRange.end) - 1);
+
+  // Revenue: paid orders count on the day they were PAID (created_at only for old orders without paid_at).
+  // Always used next to the "paid" status condition.
+  const yearCondition = sqlRevenueTimeInRange(tables.bookings, yearRange);
+  // Numbers that belong to the moment of ordering (payment health, busiest booking hours) use the creation time.
+  const createdYearCondition = sqlCreatedInRange(tables.bookings, yearRange);
   const branchConditionBookings = buildBranchBookingCondition(tables.bookings, restrictToBranchIds);
   const branchConditionMovies = buildBranchMovieCondition(tables.movies, restrictToBranchIds);
 
@@ -159,27 +189,8 @@ export async function getDashboardMetricsImpl(
     { method: 'VIETQR', revenue: Number(vietqrYearAgg?.sum || 0), count: Number(vietqrYearAgg?.count || 0) }
   ].sort((a, b) => b.revenue - a.revenue);
 
-  // Top Tickets Filter (within selected year)
-  let topStartDate = new Date(yearStart);
-  const topEndDate = new Date(yearEnd);
-
-  if (topPeriod === 'week') {
-    // Last 7 days within the year
-    const now = new Date();
-    topStartDate = new Date(now);
-    topStartDate.setDate(topStartDate.getDate() - 6);
-    // Ensure within year bounds
-    if (topStartDate < yearStart) topStartDate = new Date(yearStart);
-  } else if (topPeriod === 'month') {
-    // Last 30 days within the year
-    const now = new Date();
-    topStartDate = new Date(now);
-    topStartDate.setDate(topStartDate.getDate() - 29);
-    if (topStartDate < yearStart) topStartDate = new Date(yearStart);
-  } else if (topPeriod === 'year') {
-    // Entire selected year
-    topStartDate = new Date(yearStart);
-  }
+  // Top Tickets window, inside the selected year, from 00:00 Vietnam time
+  const topRange = topTicketsRange(topPeriod, selectedYear);
 
   const topBookings = await anyDb
     .select({
@@ -195,16 +206,7 @@ export async function getDashboardMetricsImpl(
       and(
         inArray(tables.bookings.payment_status, ['paid']),
         branchConditionBookings,
-        or(
-          and(
-            gte(tables.bookings.created_at, formatDateForDb(topStartDate)),
-            lte(tables.bookings.created_at, formatDateForDb(topEndDate))
-          ),
-          and(
-            gte(tables.bookings.paid_at, formatDateForDb(topStartDate)),
-            lte(tables.bookings.paid_at, formatDateForDb(topEndDate))
-          )
-        )
+        sqlRevenueTimeInRange(tables.bookings, topRange)
       )
     );
 
@@ -337,7 +339,7 @@ export async function getDashboardMetricsImpl(
     } catch {}
   }
 
-  return {
+  const metrics = {
     branch_id: branchInfo
       ? branchInfo.id
       : restrictToBranchIds && restrictToBranchIds.length === 1
@@ -383,7 +385,7 @@ export async function getDashboardMetricsImpl(
         .where(
           and(
             inArray(tables.bookings.payment_status, ['paid', 'pending', 'failed', 'expired']),
-            yearCondition,
+            createdYearCondition,
             branchConditionBookings
           )
         )
@@ -403,7 +405,7 @@ export async function getDashboardMetricsImpl(
       const results = await anyDb
         .select({ createdAt: tables.bookings.created_at })
         .from(tables.bookings)
-        .where(and(inArray(tables.bookings.payment_status, ['paid']), yearCondition, branchConditionBookings));
+        .where(and(inArray(tables.bookings.payment_status, ['paid']), createdYearCondition, branchConditionBookings));
       const hours = Array(24).fill(0);
       results.forEach((r: any) => {
         const parts = getVnParts(r.createdAt);
@@ -412,61 +414,57 @@ export async function getDashboardMetricsImpl(
       return hours;
     })(),
     revenueBreakdown: await (async () => {
-      let movie = 0, vr = 0, combo = 0;
-      const allBookings = await anyDb
+      const paidBookings = await anyDb
         .select({
-           id: tables.bookings.id,
-           total_price: tables.bookings.total_price,
-           booking_type: tables.bookings.booking_type,
-           ticket_unit_price: tables.bookings.ticket_unit_price,
-           ticket_count: tables.bookings.ticket_count,
-           ticket_package_name: tables.bookings.ticket_package_name
+          id: tables.bookings.id,
+          total_price: tables.bookings.total_price,
+          booking_type: tables.bookings.booking_type
         })
         .from(tables.bookings)
         .where(and(inArray(tables.bookings.payment_status, ['paid']), yearCondition, branchConditionBookings));
 
-      // Fetch all VR items for these
-      let vrItemsData: any[] = [];
-      const vrBookingIds = allBookings.filter((b: any) => b.booking_type === 'vr' || b.booking_type === 'combo_vr').map((b: any) => b.id);
-      
-      if (tables.booking_vr_items && vrBookingIds.length > 0) {
-        const chunk = 100;
-        for (let i = 0; i < vrBookingIds.length; i += chunk) {
-          const slice = vrBookingIds.slice(i, i + chunk);
-          const chunkItems = await anyDb.select({
-             booking_id: tables.booking_vr_items.booking_id,
-             unit_price: tables.booking_vr_items.unit_price,
-             quantity: tables.booking_vr_items.quantity
-          }).from(tables.booking_vr_items).where(inArray(tables.booking_vr_items.booking_id, slice));
-          vrItemsData.push(...chunkItems);
+      // VR lines of these orders, in chunks of 100 ids (the limit of bound values in one query)
+      const vrRevenueByBooking = new Map<number, number>();
+      const bookingsWithVrLines = new Set<number>();
+      const vrBookingIds = paidBookings
+        .filter((b: any) => b.booking_type === 'vr' || b.booking_type === 'combo_vr')
+        .map((b: any) => b.id);
+      if (tables.booking_vr_items) {
+        for (let from = 0; from < vrBookingIds.length; from += 100) {
+          const lines = await anyDb
+            .select({
+              booking_id: tables.booking_vr_items.booking_id,
+              unit_price: tables.booking_vr_items.unit_price,
+              quantity: tables.booking_vr_items.quantity,
+              line_total: tables.booking_vr_items.line_total
+            })
+            .from(tables.booking_vr_items)
+            .where(inArray(tables.booking_vr_items.booking_id, vrBookingIds.slice(from, from + 100)));
+          for (const line of lines) {
+            // line_total is what was charged for the line, after the voucher
+            const charged =
+              line.line_total !== null && line.line_total !== undefined
+                ? Number(line.line_total)
+                : Number(line.unit_price || 0) * Number(line.quantity || 1);
+            vrRevenueByBooking.set(line.booking_id, (vrRevenueByBooking.get(line.booking_id) || 0) + charged);
+            bookingsWithVrLines.add(line.booking_id);
+          }
         }
       }
 
-      for (const b of allBookings) {
-         let currentTicketRev = 0;
-         if (b.booking_type !== 'vr' && b.booking_type !== 'combo_vr') {
-            const nameStr = typeof b.ticket_package_name === 'string' ? b.ticket_package_name.trim() : '';
-            if (nameStr.startsWith('[') || nameStr.startsWith('{')) {
-              try {
-                const parsed = JSON.parse(nameStr);
-                const items = Array.isArray(parsed) ? parsed : [parsed];
-                for (const it of items) currentTicketRev += Number(it.price || 0) * Number(it.quantity || 1);
-              } catch {}
-            } else {
-               currentTicketRev += Number(b.ticket_unit_price || 0) * Number(b.ticket_count || 0);
-            }
-            movie += currentTicketRev;
-         }
-         
-         const bVrItems = vrItemsData.filter(v => v.booking_id === b.id);
-         let curVrRev = 0;
-         for (const v of bVrItems) curVrRev += Number(v.unit_price || 0) * Number(v.quantity || 1);
-         vr += curVrRev;
-
-         const currentComboRev = Number(b.total_price || 0) - (currentTicketRev + curVrRev);
-         if (currentComboRev > 0) combo += currentComboRev;
+      let movie = 0;
+      let vr = 0;
+      for (const b of paidBookings) {
+        const total = Number(b.total_price || 0);
+        let vrPart = vrRevenueByBooking.get(b.id) || 0;
+        // A VR order with no saved lines is all VR
+        if (b.booking_type === 'vr' && !bookingsWithVrLines.has(b.id)) vrPart = total;
+        vrPart = Math.min(Math.max(vrPart, 0), total);
+        vr += vrPart;
+        movie += total - vrPart;
       }
-      return { movie, vr, combo };
+      // The two parts add up to the revenue total
+      return { movie, vr };
     })(),
     checkinTraffic: await (async () => {
       const arr = Array(7).fill(0); // Sun(0) to Sat(6)
@@ -478,20 +476,17 @@ export async function getDashboardMetricsImpl(
       return arr;
     })(),
     voucherImpact: await (async () => {
-       if (!tables.voucher_redemption_logs) return 0;
-       
-       let yearConditionRedeemed = undefined as any;
-       if (year !== undefined) {
-         const yearStart = new Date(year, 0, 1, 0, 0, 0, 0);
-         const yearEnd = new Date(year, 11, 31, 23, 59, 59, 999);
-         yearConditionRedeemed = and(
-           gte(tables.voucher_redemption_logs.redeemed_at, formatDateForDb(yearStart)),
-           lte(tables.voucher_redemption_logs.redeemed_at, formatDateForDb(yearEnd))
-         );
-       }
-       
-       const [res] = await anyDb.select({ total: sum(tables.voucher_redemption_logs.discount_amount_applied) }).from(tables.voucher_redemption_logs).where(yearConditionRedeemed);
-       return Number(res?.total || 0);
+      if (!tables.voucher_redemption_logs) return 0;
+
+      // Join the logs to their orders so the year and the branch of the ORDER decide what is counted
+      const conditions = [inArray(tables.bookings.payment_status, ['paid']), branchConditionBookings];
+      if (year !== undefined) conditions.push(yearCondition);
+      const [res] = await anyDb
+        .select({ total: sum(tables.voucher_redemption_logs.discount_amount_applied) })
+        .from(tables.voucher_redemption_logs)
+        .innerJoin(tables.bookings, eq(tables.voucher_redemption_logs.booking_id, tables.bookings.id))
+        .where(and(...conditions));
+      return Number(res?.total || 0);
     })(),
     ticketBurnRate: await (async () => {
       let totalHoldMs = 0;
@@ -528,8 +523,31 @@ export async function getDashboardMetricsImpl(
        return { newUsers, returningUsers };
     })()
   };
+
+  if (!canViewRevenue) {
+    const { revenueTotal, revenueByMethod, revenueBreakdown, voucherImpact, topVipUsers, ...withoutMoney } = metrics as any;
+    return {
+      ...withoutMoney,
+      revenue_hidden: true,
+      topTicketsWeek: (metrics.topTicketsWeek || []).map((item: any) => ({ id: item.id, title: item.title, count: item.count })),
+      paymentStats: (metrics.paymentStats || []).map((item: any) => ({ method: item.method, count: item.count }))
+    };
+  }
+  return metrics;
 }
 
+/** Adds a paid order to the cash / VietQR totals. */
+function addToMethodTotals(totals: { cash: number; vietqr: number }, paymentMethod: unknown, price: number) {
+  const method = String(paymentMethod || '').toLowerCase();
+  if (method === 'cash') totals.cash += price;
+  else if (method === 'vietqr') totals.vietqr += price;
+}
+
+/**
+ * Revenue of one Vietnam day ("YYYY-MM-DD"), or of a whole year when no date is given.
+ * status "paid" (default) counts paid orders on the day they were paid. status "all" lists orders of every status:
+ * paid ones by the day paid, the others by the day created.
+ */
 export async function getRevenueByDateImpl(
   anyDb: any,
   tables: { bookings: any },
@@ -537,129 +555,78 @@ export async function getRevenueByDateImpl(
 ) {
   const dateStr = String(args.date || '');
   const status = String(args.status || 'paid').toLowerCase();
-  const selectedYear = args.year || new Date().getFullYear();
+  const selectedYear = args.year || currentVnYear();
+  const emptyResult = { date: dateStr || 'all', total: 0, count: 0, revenueByMethod: { cash: 0, vietqr: 0 } };
 
-  const statusCondition = status !== 'all' ? inArray(tables.bookings.payment_status, ['paid']) : undefined;
+  const wantsOneDay = Boolean(dateStr) && dateStr !== 'all';
+  const dayRange = wantsOneDay ? vnDateStringRange(dateStr) : null;
+  if (wantsOneDay && !dayRange) return emptyResult;
+  const range = dayRange || vnYearRange(selectedYear);
+
+  const timeCondition = status === 'all' ? sqlListedInRange(tables.bookings, range) : sqlPaidInRange(tables.bookings, range);
   const branchCondition = buildBranchBookingCondition(tables.bookings, args.branchIds);
 
-  // Default wide fetch bounds 
-  let fetchStart = new Date(Date.UTC(selectedYear, 0, 1) - 24 * 3600 * 1000); 
-  let fetchEnd = new Date(Date.UTC(selectedYear, 11, 31, 23, 59, 59, 999) + 24 * 3600 * 1000);
-
-  if (dateStr && dateStr !== 'all') {
-    const d = new Date(dateStr); 
-    fetchStart = new Date(d.getTime() - 48 * 3600 * 1000);
-    fetchEnd = new Date(d.getTime() + 48 * 3600 * 1000);
-  }
-  
-  const wideCondition = or(
-    and(
-      gte(tables.bookings.created_at, formatDateForDb(fetchStart)),
-      lte(tables.bookings.created_at, formatDateForDb(fetchEnd))
-    ),
-    and(
-      gte(tables.bookings.paid_at, formatDateForDb(fetchStart)),
-      lte(tables.bookings.paid_at, formatDateForDb(fetchEnd))
-    )
-  );
-
   const bookings = await anyDb
-    .select({
-      total_price: tables.bookings.total_price,
-      created_at: tables.bookings.created_at,
-      payment_method: tables.bookings.payment_method
-    })
+    .select({ total_price: tables.bookings.total_price, payment_method: tables.bookings.payment_method })
     .from(tables.bookings)
-    .where(and(wideCondition, statusCondition, branchCondition));
+    .where(and(timeCondition, branchCondition));
 
+  const methods = { cash: 0, vietqr: 0 };
   let total = 0;
-  let count = 0;
-  let cash = 0;
-  let vietqr = 0;
-
   for (const b of bookings) {
-    const vnParts = getVnParts(b.created_at);
-    if (!vnParts) continue;
-
-    let isMatch = false;
-    if (dateStr && dateStr !== 'all') {
-      isMatch = vnParts.dateString === dateStr;
-    } else {
-      isMatch = vnParts.year === selectedYear;
-    }
-
-    if (isMatch) {
-      const price = Number(b.total_price || 0);
-      total += price;
-      count++;
-      const method = String(b.payment_method || '').toLowerCase();
-      if (method === 'cash') cash += price;
-      else if (method === 'vietqr') vietqr += price;
-    }
+    const price = Number(b.total_price || 0);
+    total += price;
+    addToMethodTotals(methods, b.payment_method, price);
   }
 
-  return {
-    date: dateStr || 'all',
-    total,
-    count,
-    revenueByMethod: { cash, vietqr }
-  };
+  return { date: dateStr || 'all', total, count: bookings.length, revenueByMethod: methods };
 }
 
+/** Revenue of the last 7 Vietnam days, today last. */
 export async function getRevenue7DaysImpl(anyDb: any, tables: { bookings: any }, year?: number, branchIds?: number[]) {
   const branchCondition = buildBranchBookingCondition(tables.bookings, branchIds);
-  const now = new Date(); // local node time
+  const today = vnYmd(new Date());
 
-  // Generate the last 7 days VN date strings
+  // The 7 days, oldest first, as "YYYY-MM-DD" keys
   const daysMap = new Map<string, number>();
-  const vnNowParts = getVnParts(now);
-  
-  if (vnNowParts) {
-    // Generate previous 6 days backwards to maintain standard order
-    for (let i = 6; i >= 0; i--) {
-      // Subtract days in milliseconds from current time
-      const d = new Date(now.getTime() - i * 24 * 3600 * 1000);
-      const p = getVnParts(d);
-      if (p) daysMap.set(p.dateString, 0);
-    }
+  for (let back = 6; back >= 0; back--) {
+    const day = vnYmd(vnDayStart(today.year, today.month, today.day - back));
+    daysMap.set(vnKey(day), 0);
   }
+  const range = {
+    start: vnDayStart(today.year, today.month, today.day - 6).toISOString(),
+    end: vnDayStart(today.year, today.month, today.day + 1).toISOString()
+  };
 
-  // fetch from 8 days ago to safely overlap any timezone bounds
-  const fetchBoundary = new Date(now.getTime() - 8 * 24 * 3600 * 1000);
   const bookings = await anyDb
     .select({
       total_price: tables.bookings.total_price,
+      paid_at: tables.bookings.paid_at,
       created_at: tables.bookings.created_at
     })
     .from(tables.bookings)
-    .where(
-      and(
-        inArray(tables.bookings.payment_status, ['paid']),
-        branchCondition,
-        gte(tables.bookings.created_at, formatDateForDb(fetchBoundary))
-      )
-    );
+    .where(and(sqlPaidInRange(tables.bookings, range), branchCondition));
 
   for (const b of bookings) {
-    const vnParts = getVnParts(b.created_at);
-    if (!vnParts) continue;
-    
-    if (daysMap.has(vnParts.dateString)) {
-      daysMap.set(vnParts.dateString, daysMap.get(vnParts.dateString)! + Number(b.total_price || 0));
-    }
+    const instant = revenueInstant(b);
+    if (!instant) continue; // one row with a broken date does not stop the report
+    const key = vnKey(vnYmd(instant));
+    if (daysMap.has(key)) daysMap.set(key, daysMap.get(key)! + Number(b.total_price || 0));
   }
 
   const days: { day: string; revenue: number }[] = [];
-  for (const [dateStr, rev] of daysMap.entries()) {
-    // dateStr format: YYYY-MM-DD
-    const m = dateStr.substring(5, 7);
-    const d = dateStr.substring(8, 10);
-    days.push({ day: `${m}-${d}`, revenue: rev });
+  for (const [key, revenue] of daysMap.entries()) {
+    // key is YYYY-MM-DD; the screen shows MM-DD
+    days.push({ day: key.substring(5, 7) + '-' + key.substring(8, 10), revenue });
   }
-
   return { data: days };
 }
 
+function vnKey(day: { year: number; month: number; day: number }) {
+  return day.year + '-' + String(day.month).padStart(2, '0') + '-' + String(day.day).padStart(2, '0');
+}
+
+/** Revenue of one Vietnam month, or of every month of a year. Same counting rule as the other revenue numbers. */
 export async function getRevenueByMonthImpl(
   anyDb: any,
   tables: { bookings: any },
@@ -669,66 +636,53 @@ export async function getRevenueByMonthImpl(
   const monthStr = String(args.month || '');
   const status = String(args.status || 'paid').toLowerCase();
   const branchCondition = buildBranchBookingCondition(tables.bookings, args.branchIds);
-  const statusCondition = status !== 'all' ? inArray(tables.bookings.payment_status, ['paid']) : undefined;
 
-  let targetYear = new Date().getFullYear();
+  let targetYear = currentVnYear();
   if (yearStr) {
     targetYear = Number(yearStr) > 0 ? Number(yearStr) : targetYear;
   }
 
-  // Fetch wide boundaries for the whole year +- 2 days to be extremely safe about timezones
-  const fetchStart = new Date(Date.UTC(targetYear, 0, 1) - 48 * 3600 * 1000);
-  const fetchEnd = new Date(Date.UTC(targetYear, 11, 31, 23, 59, 59, 999) + 48 * 3600 * 1000);
+  const oneMonth = Boolean(monthStr && yearStr);
+  const targetMonth = Number(monthStr);
+  if (oneMonth && !(Number.isInteger(targetMonth) && targetMonth >= 1 && targetMonth <= 12)) {
+    return { total: 0, count: 0, revenueByMethod: { cash: 0, vietqr: 0 } };
+  }
+
+  const range = oneMonth ? vnMonthRange(targetYear, targetMonth) : vnYearRange(targetYear);
+  const timeCondition = status === 'all' ? sqlListedInRange(tables.bookings, range) : sqlPaidInRange(tables.bookings, range);
 
   const bookings = await anyDb
     .select({
       total_price: tables.bookings.total_price,
+      paid_at: tables.bookings.paid_at,
       created_at: tables.bookings.created_at,
-      payment_method: tables.bookings.payment_method
+      payment_method: tables.bookings.payment_method,
+      payment_status: tables.bookings.payment_status
     })
     .from(tables.bookings)
-    .where(
-      and(
-        statusCondition,
-        branchCondition,
-        gte(tables.bookings.created_at, formatDateForDb(fetchStart)),
-        lte(tables.bookings.created_at, formatDateForDb(fetchEnd))
-      )
-    );
+    .where(and(timeCondition, branchCondition));
 
-  if (monthStr && yearStr) {
-    const targetMonth = Number(monthStr);
+  if (oneMonth) {
+    const methods = { cash: 0, vietqr: 0 };
     let total = 0;
-    let count = 0;
-    let cash = 0;
-    let vietqr = 0;
-
     for (const b of bookings) {
-      const parts = getVnParts(b.created_at);
-      if (parts && parts.year === targetYear && parts.month === targetMonth) {
-        const price = Number(b.total_price || 0);
-        total += price;
-        count++;
-        const method = String(b.payment_method || '').toLowerCase();
-        if (method === 'cash') cash += price;
-        else if (method === 'vietqr') vietqr += price;
-      }
+      const price = Number(b.total_price || 0);
+      total += price;
+      addToMethodTotals(methods, b.payment_method, price);
     }
-
-    return {
-      total,
-      count,
-      revenueByMethod: { cash, vietqr }
-    };
+    return { total, count: bookings.length, revenueByMethod: methods };
   }
 
-  // Array length 12
-  const months = Array(12).fill(0).map((_, i) => ({ month: i + 1, revenue: 0 }));
+  // Array length 12. A paid order counts in the month it was paid, any other order in the month it was created.
+  const months = Array(12)
+    .fill(0)
+    .map((_, i) => ({ month: i + 1, revenue: 0 }));
   for (const b of bookings) {
-    const parts = getVnParts(b.created_at);
-    if (parts && parts.year === targetYear) {
-      months[parts.month - 1].revenue += Number(b.total_price || 0);
-    }
+    const isPaid = String(b.payment_status || '').toLowerCase() === 'paid';
+    const instant = revenueInstant(isPaid ? b : { created_at: b.created_at });
+    if (!instant) continue; // one row with a broken date does not stop the report
+    const parts = vnYmd(instant);
+    if (parts.year === targetYear) months[parts.month - 1].revenue += Number(b.total_price || 0);
   }
 
   return { year: targetYear, data: months };

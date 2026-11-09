@@ -22,7 +22,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger
 } from '@/components/ui/dropdown-menu';
-import { getTransactionById, getTransactions, getTickets } from '@/lib/api';
+import { getTransactionById, getTransactions, exportTransactions, getTickets } from '@/lib/api';
 import { exportTransactionsData } from '@/lib/exportUtils';
 import {
   CheckCircle2,
@@ -386,9 +386,7 @@ export default function TransactionsContent({
     try {
       setIsExporting(true);
       toast.info('Đang chuẩn bị dữ liệu xuất...');
-      const res = await getTransactions({
-        page: 1,
-        pageSize: 5000,
+      const res = await exportTransactions({
         searchText: txQuery,
         status: txStatus,
         sort: sortKey,
@@ -405,7 +403,13 @@ export default function TransactionsContent({
         return;
       }
       exportTransactionsData(items, branches, 'danh_sach_giao_dich_tat_ca');
-      toast.success(`Đã xuất thành công ${items.length} giao dịch ra file Excel/CSV!`);
+      if (res?.truncated) {
+        toast.warning('Chỉ xuất ' + items.length + ' trong ' + res.total + ' dòng', {
+          description: 'Hãy thu hẹp bộ lọc (khoảng ngày, chi nhánh) rồi xuất lại phần còn lại.'
+        });
+      } else {
+        toast.success(`Đã xuất thành công ${items.length} giao dịch ra file Excel/CSV!`);
+      }
     } catch (err: any) {
       toast.error(err.message || 'Lỗi xuất dữ liệu');
     } finally {

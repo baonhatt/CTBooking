@@ -29,19 +29,33 @@ interface Metrics {
   totalToys: number;
   totalUsers: number;
   totalTransactions: number;
-  revenueTotal: number;
-  revenueByMethod: { cash: number; vietqr: number };
-  topTicketsWeek: Array<{ id: number; title: string; revenue: number; count: number }>;
-  paymentStats: Array<{ method: string; revenue: number; count: number }>;
-  topVipUsers: Array<{ userId: number; email: string; totalSpent: number; bookingCount: number }>;
+  // The money fields are missing when the staff member has no view_revenue right (revenue_hidden is then true)
+  revenue_hidden?: boolean;
+  revenueTotal?: number;
+  revenueByMethod?: { cash: number; vietqr: number };
+  topTicketsWeek: Array<{ id: number; title: string; revenue?: number; count: number }>;
+  paymentStats: Array<{ method: string; revenue?: number; count: number }>;
+  topVipUsers?: Array<{ userId: number; email: string; totalSpent: number; bookingCount: number }>;
   ticketUsage: { used: number; total: number };
   paymentHealth: { paid: number; pending: number; failed: number };
   bookingHours: number[];
-  revenueBreakdown?: { movie: number; vr: number; combo: number };
+  revenueBreakdown?: { movie: number; vr: number };
   checkinTraffic?: number[];
   voucherImpact?: number;
   ticketBurnRate?: number;
   customerRetention?: { newUsers: number; returningUsers: number };
+}
+
+// "2026-11-09" -> "09/11/2026"
+function formatDayLabel(value: string) {
+  const match = /^(\d{4})-(\d{2})-(\d{2})/.exec(value || '');
+  return match ? match[3] + '/' + match[2] + '/' + match[1] : value;
+}
+
+// "2026-11" -> "11/2026"
+function formatMonthLabel(value: string) {
+  const match = /^(\d{4})-(\d{2})/.exec(value || '');
+  return match ? match[2] + '/' + match[1] : value;
 }
 
 interface Props {
@@ -488,7 +502,7 @@ export default function DashboardContent({
                       <TooltipProvider><Tooltip><TooltipTrigger asChild><Info className="w-3 h-3 text-slate-300 hover:text-blue-500 cursor-help transition-colors" /></TooltipTrigger><TooltipContent side="top" className="max-w-[200px] text-center font-normal normal-case tracking-normal"><p className="text-[10px] text-slate-700">Doanh thu đạt được qua cổng phổ biến nhất này.</p></TooltipContent></Tooltip></TooltipProvider>
                     </div>
                     <p className="text-sm font-black text-slate-900">
-                      {metrics.paymentStats?.[0]?.revenue?.toLocaleString() || 0} đ
+                      {metrics.revenue_hidden ? '—' : (metrics.paymentStats?.[0]?.revenue ?? 0).toLocaleString() + ' đ'}
                     </p>
                   </div>
                 </div>
@@ -517,10 +531,10 @@ export default function DashboardContent({
                     <p className="text-[11px] font-bold text-slate-400 uppercase tracking-[0.3em]">
                       Của{' '}
                       {dateFilterType === 'day'
-                        ? 'HÔM NAY'
+                        ? 'NGÀY ' + formatDayLabel(selectedDate)
                         : dateFilterType === 'month'
-                          ? 'THÁNG NÀY'
-                          : `NĂM ${selectedYear}`}
+                          ? 'THÁNG ' + formatMonthLabel(selectedDate)
+                          : 'NĂM ' + selectedYear}
                     </p>
                     <TooltipProvider><Tooltip><TooltipTrigger asChild><Info className="w-3.5 h-3.5 text-slate-300 hover:text-blue-500 cursor-help transition-colors" /></TooltipTrigger><TooltipContent side="top" className="max-w-[200px] text-center font-normal normal-case tracking-normal"><p className="text-[10px] text-slate-700">Tổng doanh thu hệ thống ghi nhận trong khoảng thời gian phân tích đã chọn ở trên.</p></TooltipContent></Tooltip></TooltipProvider>
                   </div>
@@ -558,13 +572,6 @@ export default function DashboardContent({
                         <TooltipProvider><Tooltip><TooltipTrigger asChild><Info className="w-3 h-3 text-slate-300 hover:text-blue-500 cursor-help transition-colors" /></TooltipTrigger><TooltipContent side="top" className="max-w-[200px] text-center font-normal normal-case tracking-normal"><p className="text-[10px] text-slate-700">Doanh thu vé trải nghiệm thực tế ảo VR.</p></TooltipContent></Tooltip></TooltipProvider>
                       </div>
                       <p className="text-sm font-black text-slate-800">{metrics.revenueBreakdown.vr.toLocaleString()} đ</p>
-                    </div>
-                    <div>
-                      <div className="flex items-center gap-1">
-                        <p className="text-[10px] font-black text-slate-400 uppercase">Combo / Khác</p>
-                        <TooltipProvider><Tooltip><TooltipTrigger asChild><Info className="w-3 h-3 text-slate-300 hover:text-blue-500 cursor-help transition-colors" /></TooltipTrigger><TooltipContent side="top" className="max-w-[200px] text-center font-normal normal-case tracking-normal"><p className="text-[10px] text-slate-700">Doanh thu bắp nước, đồ chơi, combo khác.</p></TooltipContent></Tooltip></TooltipProvider>
-                      </div>
-                      <p className="text-sm font-black text-slate-800">{metrics.revenueBreakdown.combo.toLocaleString()} đ</p>
                     </div>
                   </div>
                 )}
@@ -668,7 +675,7 @@ export default function DashboardContent({
                         {pkg.title}
                       </p>
                       <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">
-                        Doanh thu: {pkg.revenue.toLocaleString()} đ
+                        {pkg.revenue !== undefined ? 'Doanh thu: ' + pkg.revenue.toLocaleString() + ' đ' : ''}
                       </p>
                     </div>
                     <div className="text-right">
@@ -722,7 +729,12 @@ export default function DashboardContent({
             </div>
           </div>
           <div className="divide-y divide-slate-50 flex-1 flex flex-col min-h-[350px]">
-            {metrics.topVipUsers?.length === 0 ? (
+            {metrics.revenue_hidden ? (
+              <div className="flex-1 flex flex-col items-center justify-center p-8 text-slate-400 bg-slate-50/50">
+                <Users size={32} className="mb-2 opacity-20" />
+                <p className="text-[10px] font-bold uppercase italic tracking-widest">Không có quyền xem doanh thu</p>
+              </div>
+            ) : metrics.topVipUsers?.length === 0 ? (
               <div className="flex-1 flex flex-col items-center justify-center p-8 text-slate-300 bg-slate-50/50">
                 <Users size={32} className="mb-2 opacity-20" />
                 <p className="text-[10px] font-bold uppercase italic tracking-widest">Không có dữ liệu</p>
@@ -1053,7 +1065,7 @@ export default function DashboardContent({
           <div className="flex justify-between items-center">
             <div>
               <h3 className="text-xl font-black text-slate-900 tracking-tight uppercase flex items-center gap-2">
-                Performance 7 Ngày ({selectedYear})
+                Doanh thu 7 ngày gần nhất
                 <TooltipProvider><Tooltip><TooltipTrigger asChild><Info className="w-4 h-4 text-slate-400 hover:text-blue-500 cursor-help transition-colors" /></TooltipTrigger><TooltipContent side="top" className="max-w-[250px] text-center font-normal normal-case tracking-normal"><p className="text-[10px] text-slate-700">Biểu đồ thể hiện biến động và đà tăng trưởng của doanh thu trong 7 ngày gần nhất, giúp bắt mạch kịp thời sức bật của rạp chiếu.</p></TooltipContent></Tooltip></TooltipProvider>
               </h3>
               <p className="text-xs text-slate-400 font-bold uppercase tracking-widest pl-1">

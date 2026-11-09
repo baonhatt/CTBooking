@@ -53,6 +53,32 @@ export async function getTransactions(options?: {
   }>(path, { signal: options?.signal });
 }
 
+// Export of the transaction list with the same filters. The server returns at most 5000 rows and says when it cut the list.
+export async function exportTransactions(options?: {
+  searchText?: string;
+  status?: string;
+  payment_method?: string;
+  from?: string;
+  to?: string;
+  sort?: 'created_at' | 'paid_at';
+  dir?: 'asc' | 'desc';
+  branch_id?: number | 'all';
+  booking_type?: 'all' | 'movie' | 'vr';
+}) {
+  const params = new URLSearchParams();
+  if (options?.searchText) params.set('searchText', options.searchText);
+  if (options?.status) params.set('status', options.status);
+  if (options?.payment_method) params.set('payment_method', options.payment_method);
+  if (options?.from) params.set('from', options.from);
+  if (options?.to) params.set('to', options.to);
+  if (options?.sort) params.set('sort', options.sort);
+  if (options?.branch_id) params.set('branch_id', String(options.branch_id));
+  if (options?.dir) params.set('dir', options.dir);
+  if (options?.booking_type) params.set('booking_type', options.booking_type);
+  const path = '/api/admin/transactions/export' + (params.toString() ? '?' + params.toString() : '');
+  return request<{ items: any[]; total: number; truncated: boolean; limit: number }>(path);
+}
+
 export async function getDashboardMetrics(period: string = 'week', year?: number, branch_id?: number | 'all') {
   const params = new URLSearchParams();
   params.append('period', period);
@@ -67,11 +93,12 @@ export async function getDashboardMetrics(period: string = 'week', year?: number
     totalToys: number;
     totalUsers: number;
     totalTransactions: number;
-    revenueTotal: number;
-    revenueByMethod: { cash: number; vietqr: number };
-    topTicketsWeek: Array<{ id: number; title: string; revenue: number; count: number }>;
-    paymentStats: Array<{ method: string; revenue: number; count: number }>;
-    topVipUsers: Array<{ userId: number; email: string; totalSpent: number; bookingCount: number }>;
+    revenue_hidden?: boolean;
+    revenueTotal?: number;
+    revenueByMethod?: { cash: number; vietqr: number };
+    topTicketsWeek: Array<{ id: number; title: string; revenue?: number; count: number }>;
+    paymentStats: Array<{ method: string; revenue?: number; count: number }>;
+    topVipUsers?: Array<{ userId: number; email: string; totalSpent: number; bookingCount: number }>;
     ticketUsage: { used: number; total: number };
     paymentHealth: { paid: number; pending: number; failed: number };
     bookingHours: number[];

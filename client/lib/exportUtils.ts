@@ -46,6 +46,14 @@ export function formatExportCurrency(val: any): string {
   return `${num.toLocaleString('vi-VN')} ₫`;
 }
 
+/**
+ * A cell that starts with = + - @ (or a tab or line break) can run as a formula when the file is opened in Excel.
+ * A leading ' makes it plain text. Numbers are never changed.
+ */
+export function neutralizeFormula(value: string): string {
+  return /^[=+\-@\t\r]/.test(value) ? "'" + value : value;
+}
+
 function escapeExcelHtml(str: string): string {
   return str
     .replace(/&/g, '&amp;')
@@ -106,7 +114,8 @@ export function exportToStyledExcel<T = any>(
           }
 
           const align = col.align || (col.isCurrency ? 'right' : col.isDateTime ? 'center' : 'left');
-          const rawStr = String(val);
+          const isNumber = typeof val === 'number' && Number.isFinite(val);
+          const rawStr = isNumber ? String(val) : neutralizeFormula(String(val));
           const hasNewline = rawStr.includes('\n');
           const escapedStr = escapeExcelHtml(rawStr);
           const formattedContent = hasNewline
@@ -123,7 +132,7 @@ export function exportToStyledExcel<T = any>(
                         text-align: ${align};
                         vertical-align: top;
                         white-space: ${hasNewline ? 'normal' : 'nowrap'};
-                        mso-number-format:'\\@';
+                        mso-number-format:${isNumber ? "'#\\,##0'" : "'\\@'"};
                     ">
                         ${formattedContent}
                     </td>
@@ -218,7 +227,8 @@ export function exportToCSV<T = any>(filename: string, columns: ExportColumn<T>[
           val = '';
         }
 
-        const strVal = String(val).replace(/"/g, '""');
+        if (typeof val === 'number' && Number.isFinite(val)) return String(val);
+        const strVal = neutralizeFormula(String(val)).replace(/"/g, '""');
         return `"${strVal}"`;
       })
       .join(',');
@@ -385,7 +395,7 @@ export function exportTransactionsData(
     },
     {
       header: 'Giá gốc (VNĐ)',
-      formatter: (t) => formatExportCurrency(t.originalTotalPrice ?? t.original_price ?? t.totalPrice ?? 0),
+      formatter: (t) => Number(t.originalTotalPrice ?? t.original_price ?? t.totalPrice ?? 0),
       align: 'right',
       isCurrency: true
     },
@@ -396,13 +406,13 @@ export function exportTransactionsData(
     },
     {
       header: 'Tiền giảm voucher (VNĐ)',
-      formatter: (t) => formatExportCurrency(t.voucher_discount_amount || 0),
+      formatter: (t) => Number(t.voucher_discount_amount || 0),
       align: 'right',
       isCurrency: true
     },
     {
       header: 'Tổng thực thu (VNĐ)',
-      formatter: (t) => formatExportCurrency(t.totalPrice || 0),
+      formatter: (t) => (t.paymentStatus === 'paid' ? Number(t.totalPrice || 0) : 0),
       align: 'right',
       isCurrency: true
     },
@@ -417,6 +427,8 @@ export function exportTransactionsData(
         if (t.paymentStatus === 'paid') return 'Đã thanh toán';
         if (t.paymentStatus === 'pending') return 'Chờ thanh toán';
         if (t.paymentStatus === 'failed') return 'Đã hủy';
+        if (t.paymentStatus === 'cancelled') return 'Đã hủy';
+        if (t.paymentStatus === 'expired') return 'Hết hạn thanh toán';
         return t.paymentStatus || '';
       },
       align: 'center'
@@ -424,7 +436,8 @@ export function exportTransactionsData(
     {
       header: 'Trạng thái vé/dịch vụ',
       formatter: (t) => {
-        if (t.paymentStatus === 'failed') return 'Đã hủy';
+        if (t.paymentStatus === 'failed' || t.paymentStatus === 'cancelled') return 'Đã hủy';
+        if (t.paymentStatus === 'expired') return 'Hết hạn thanh toán';
         if (t.paymentStatus === 'pending') return 'Chờ thanh toán';
         if (t.is_used) return 'Đã sử dụng';
         if (t.expired) return 'Đã quá hạn';

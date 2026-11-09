@@ -20,7 +20,7 @@ export default function DashboardPage() {
   const canViewRevenue = useStaffPermission('dashboard', 'view_revenue');
   const canViewBranches = useStaffPermission('branches', 'view');
   const [activeTab, setActiveTab] = useState('dashboard');
-  const [metrics, setMetrics] = useState({
+  const [metrics, setMetrics] = useState<any>({
     totalMovies: 0,
     totalToys: 0,
     totalUsers: 0,
