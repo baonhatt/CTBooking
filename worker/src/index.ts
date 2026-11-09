@@ -117,7 +117,8 @@ app.use(
       'Access-Control-Request-Method',
       'x-branch-id',
       'x-staff-token',
-      'x-client-version'
+      'x-client-version',
+      'x-order-token'
     ],
     exposeHeaders: ['Content-Type', 'Authorization', 'X-KV-Cache', 'ETag'],
     maxAge: 86400,

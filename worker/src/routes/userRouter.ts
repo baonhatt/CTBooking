@@ -26,6 +26,7 @@ import {
 } from '../../../server/routes/user/users';
 
 import { sendMail } from '../../../server/routes/mail-service';
+import { resolveOrderTokenSecret, makeOrderToken } from '../../../server/lib/order-token';
 
 type Variables = {
   accountId?: number;
@@ -540,6 +541,14 @@ userRouter.get('/api/user/transactions', requireAuth, async (c) => {
 
     const db = drizzle(c.env.cinema_db, { schema });
 
+    // Tokens for unpaid orders. If the secret is missing the history still works, just without them.
+    let orderTokenSecret: string | null = null;
+    try {
+      orderTokenSecret = resolveOrderTokenSecret(c.env, c.req.url);
+    } catch (err) {
+      logSystemError('order-token-secret', err);
+    }
+
     const r = await listUserTransactionsImpl(
       db,
 
@@ -557,7 +566,21 @@ userRouter.get('/api/user/transactions', requireAuth, async (c) => {
         vouchers: schema.vouchers
       },
 
-      { accountId, email, status, page, pageSize, sort, dir, payment_method, from, to }
+      {
+        accountId,
+        email,
+        status,
+        page,
+        pageSize,
+        sort,
+        dir,
+        payment_method,
+        from,
+        to,
+        getOrderToken: orderTokenSecret
+          ? (booking) => makeOrderToken(orderTokenSecret as string, booking.id, booking.pay_txt_code)
+          : undefined
+      }
     );
 
     return c.json(r, 200);

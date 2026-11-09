@@ -2,7 +2,12 @@ import { PaymentRequest } from '@shared/api';
 import { eq, and, isNull, or, sql } from 'drizzle-orm';
 import { validateBookingInput } from './validate';
 import { formatDateForDb } from '../../../lib/date-utils';
+import { generatePayTxtCode, isPayCodeCollision } from '../../../lib/pay-code';
+import { releaseVoucherForCancelledBooking } from '../../scheduled/booking-expiry';
 import { allocateVoucherDiscountToVrItems, parseApplicableIds } from '@shared/booking-invoice';
+
+/** How many fresh random pay_txt_code values are tried if one happens to collide with an existing order. */
+const PAY_CODE_MAX_ATTEMPTS = 5;
 
 export async function createPaymentImpl(
   anyDb: any,
@@ -19,12 +24,32 @@ export async function createPaymentImpl(
     voucher_redemption_logs?: any;
   }
 ) {
+  // Set once the voucher slot is taken. If anything later fails, the slot is given back.
+  let lockedVoucherId: number | null = null;
+
+  async function giveBackVoucherSlot() {
+    // Clear first, so a second call cannot give the slot back twice
+    const voucherId = lockedVoucherId;
+    lockedVoucherId = null;
+    if (voucherId && tables.vouchers) {
+      try {
+        await releaseVoucherForCancelledBooking(
+          anyDb,
+          { vouchers: tables.vouchers },
+          { voucher_id: voucherId, previous_payment_status: 'pending' }
+        );
+      } catch (releaseError) {
+        console.error('[createPayment] Could not give back the voucher slot:', releaseError);
+      }
+    }
+  }
+
   try {
     const validation = await validateBookingInput(anyDb, payload, tables);
     const { user, movies, totalPrice, vrItemsDetails, originalTotalPrice, voucherDiscountAmount, voucherDetails } =
       validation;
-    const { emailBook, phone, name, ticketCount, paymentMethod, pay_txt_code, combo, voucher_code, branch_id } =
-      payload;
+    // The payment reference is generated here. Any pay_txt_code sent by the browser is ignored.
+    const { emailBook, phone, name, ticketCount, paymentMethod, combo, voucher_code } = payload;
     const userId = user?.id ? Number(user.id) : null;
 
     const bookingsTable = tables.bookings;
@@ -39,10 +64,6 @@ export async function createPaymentImpl(
 
     // Use explicit UTC ISO timestamps for created_at/updated_at để đồng bộ giữa Postgres & D1
     const nowIso = new Date();
-    let pay_txt_code_dt: string | null = null;
-    if (pay_txt_code && String(pay_txt_code).trim()) {
-      pay_txt_code_dt = String(pay_txt_code).trim();
-    }
 
     const hasVR = vrItemsDetails && vrItemsDetails.length > 0;
     let trueTicketCount = 0;
@@ -57,7 +78,8 @@ export async function createPaymentImpl(
     }
 
     const bookingType = hasVR ? 'combo_vr' : 'movie';
-    const branchIdToSave = validation.ticketPackage?.branch_id || branch_id || null;
+    // Every order belongs to a branch: the one asked for, or the default branch (never empty)
+    const branchIdToSave = validation.branchId;
 
     // Payment expires in 10 minutes from now
     const paymentExpiresAt = formatDateForDb(new Date(nowIso.getTime() + 10 * 60 * 1000));
@@ -65,7 +87,7 @@ export async function createPaymentImpl(
     // If a voucher is used, lock the usage slot NOW (atomically) before creating the booking.
     // This prevents race conditions where two users both see 'available' and both get the discount.
     // The slot will be released by the cronjob if payment is not completed within 10 minutes,
-    // or by the cancel endpoint if the user manually cancels.
+    // by the cancel endpoint if the user manually cancels, or right below if saving the order fails.
     if (voucherDetails?.id && tables.vouchers) {
       const lockResult = await anyDb
         .update(tables.vouchers)
@@ -82,46 +104,57 @@ export async function createPaymentImpl(
       if (!lockResult || (Array.isArray(lockResult) && lockResult.length === 0)) {
         return { status: 409, message: 'Mã giảm giá vừa hết lượt sử dụng, vui lòng đặt lại không dùng mã.' };
       }
+      lockedVoucherId = Number(voucherDetails.id);
     }
 
-    // Try to use .returning() to get the inserted row when supported (Postgres).
-    // Fallback to the existing query approach for DBs that don't support returning (D1/SQLite).
-    const insertedBooking = await anyDb
-      .insert(bookingsTable)
-      .values({
-        user_id: userId,
-        movie_id: null, // No single movie ID for combo
-        ticket_package_id: validation.ticketPackage?.id ? Number(validation.ticketPackage.id) : null,
-        ticket_count: trueTicketCount,
-        total_price: Number(totalPrice),
-        original_total_price: Number(originalTotalPrice || totalPrice),
-        voucher_id: voucherDetails?.id || null,
-        voucher_code_snapshot: voucher_code || null,
-        voucher_discount_amount: Number(voucherDiscountAmount || 0),
-        booking_type: bookingType,
-        payment_method: (paymentMethod || 'cash').toLowerCase(),
-        phone,
-        name,
-        email: emailBook,
-        combo: JSON.stringify(combo || []),
-        movie_title: movieTitles,
-        movie_duration: movieDurations,
-        movie_poster: moviePosters,
-        ticket_package_name:
-          validation.movieItemsDetails && validation.movieItemsDetails.length > 0
-            ? JSON.stringify(validation.movieItemsDetails)
-            : validation.ticketPackage?.name || null,
-        ticket_unit_price: validation.ticketPackage?.price ? Number(validation.ticketPackage.price) : null,
-        branch_id: branchIdToSave,
-        pay_txt_code: pay_txt_code_dt,
-        payment_expires_at: paymentExpiresAt,
-        created_at: formatDateForDb(nowIso),
-        updated_at: formatDateForDb(nowIso)
-      })
-      .returning();
+    // Insert the booking. The random pay_txt_code is the only value that can collide, so only that is retried.
+    let bookingRow: any = null;
+    for (let attempt = 1; attempt <= PAY_CODE_MAX_ATTEMPTS && !bookingRow; attempt++) {
+      try {
+        const insertedBooking = await anyDb
+          .insert(bookingsTable)
+          .values({
+            user_id: userId,
+            movie_id: null, // No single movie ID for combo
+            ticket_package_id: validation.ticketPackage?.id ? Number(validation.ticketPackage.id) : null,
+            ticket_count: trueTicketCount,
+            total_price: Number(totalPrice),
+            original_total_price: Number(originalTotalPrice || totalPrice),
+            voucher_id: voucherDetails?.id || null,
+            voucher_code_snapshot: voucher_code || null,
+            voucher_discount_amount: Number(voucherDiscountAmount || 0),
+            booking_type: bookingType,
+            payment_method: (paymentMethod || 'cash').toLowerCase(),
+            phone,
+            name,
+            email: emailBook,
+            combo: JSON.stringify(combo || []),
+            movie_title: movieTitles,
+            movie_duration: movieDurations,
+            movie_poster: moviePosters,
+            ticket_package_name:
+              validation.movieItemsDetails && validation.movieItemsDetails.length > 0
+                ? JSON.stringify(validation.movieItemsDetails)
+                : validation.ticketPackage?.name || null,
+            ticket_unit_price: validation.ticketPackage?.price ? Number(validation.ticketPackage.price) : null,
+            branch_id: branchIdToSave,
+            pay_txt_code: generatePayTxtCode(),
+            payment_expires_at: paymentExpiresAt,
+            created_at: formatDateForDb(nowIso),
+            updated_at: formatDateForDb(nowIso)
+          })
+          .returning();
+        bookingRow = Array.isArray(insertedBooking) ? insertedBooking[0] : insertedBooking;
+      } catch (insertError) {
+        if (!isPayCodeCollision(insertError) || attempt === PAY_CODE_MAX_ATTEMPTS) {
+          await giveBackVoucherSlot();
+          throw insertError;
+        }
+      }
+    }
 
-    let bookingRow = Array.isArray(insertedBooking) ? insertedBooking[0] : insertedBooking;
     if (!bookingRow) {
+      await giveBackVoucherSlot();
       return { status: 500, message: 'Không thể tạo đặt vé' };
     }
 
@@ -137,8 +170,8 @@ export async function createPaymentImpl(
         voucherDiscountAmount: Number(voucherDiscountAmount || 0)
       });
 
-      for (const item of allocatedVrItems) {
-        try {
+      try {
+        for (const item of allocatedVrItems) {
           const r = await anyDb
             .insert(tables.booking_vr_items)
             .values({
@@ -156,9 +189,20 @@ export async function createPaymentImpl(
             })
             .returning();
           if (r) insertedItemsArr.push(Array.isArray(r) ? r[0] : r);
-        } catch (err: any) {
-          console.error('Error inserting VR item to booking_vr_items:', err);
         }
+      } catch (itemError) {
+        // An order that pays for VR packages but has no VR lines is wrong. Cancel it instead of returning "created".
+        console.error('Error inserting VR item to booking_vr_items:', itemError);
+        try {
+          await anyDb
+            .update(bookingsTable)
+            .set({ payment_status: 'failed', updated_at: formatDateForDb(new Date()) })
+            .where(eq(bookingsTable.id, bookingRow.id));
+        } catch (cancelError) {
+          console.error('[createPayment] Could not cancel the half-created booking:', cancelError);
+        }
+        await giveBackVoucherSlot();
+        return { status: 500, message: 'Không thể lưu chi tiết đặt vé. Vui lòng thử lại.' };
       }
     }
 
@@ -181,12 +225,19 @@ export async function createPaymentImpl(
         email: bookingRow.email,
         payment_status: bookingRow.payment_status,
         created_at: bookingRow.created_at,
+        // The reference the customer types into the bank transfer, and the payment deadline (both set by the server)
+        pay_txt_code: bookingRow.pay_txt_code,
+        payment_expires_at: bookingRow.payment_expires_at,
         vr_items: insertedItemsArr.length > 0 ? insertedItemsArr : vrItemsDetails || []
       }
     };
   } catch (err: any) {
-    const status = err?.status || 500;
-    const message = err?.message || 'Lỗi máy chủ nội bộ';
-    return { status, message };
+    // A deliberate error (validation, voucher, branch) carries a status and a message meant for the customer.
+    // Anything else is an internal failure whose text (for example a database error) must not reach the customer.
+    if (typeof err?.status === 'number') {
+      return { status: err.status, message: err.message || 'Lỗi máy chủ nội bộ' };
+    }
+    console.error('[createPayment] Unexpected error:', err);
+    return { status: 500, message: 'Lỗi máy chủ nội bộ' };
   }
 }

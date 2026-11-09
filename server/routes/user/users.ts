@@ -127,9 +127,14 @@ export async function listUserTransactionsImpl(
     payment_method: string;
     from?: string;
     to?: string;
+    /**
+     * Makes the per-order token for one of the customer's own unpaid orders, so "continue payment" works from the
+     * history. Left out when the signing secret is not configured: the history still loads, just without the token.
+     */
+    getOrderToken?: (booking: { id: number; pay_txt_code: string }) => Promise<string>;
   }
 ) {
-  const { accountId, status, page, pageSize, sort, dir, payment_method, from: fromStr, to: toStr } = args;
+  const { accountId, status, page, pageSize, sort, dir, payment_method, from: fromStr, to: toStr, getOrderToken } = args;
   const skip = (page - 1) * pageSize;
 
   if (!accountId) return { items: [], page, pageSize, total: 0 };
@@ -258,6 +263,21 @@ export async function listUserTransactionsImpl(
     }
   }
 
+  // 5d. Order tokens for the customer's own unpaid orders (the list only holds the account's own orders)
+  const orderTokens = new Map<number, string>();
+  if (getOrderToken) {
+    for (const row of rows) {
+      const b = row.booking;
+      if (String(b.payment_status || '').toLowerCase() === 'pending' && b.pay_txt_code) {
+        try {
+          orderTokens.set(Number(b.id), await getOrderToken({ id: Number(b.id), pay_txt_code: b.pay_txt_code }));
+        } catch (tokenError) {
+          console.error('[listUserTransactions] Could not make an order token:', tokenError);
+        }
+      }
+    }
+  }
+
   // 6. Map lại dữ liệu về cấu trúc chuẩn
   const now = new Date();
   const mapped = rows.map((row: any) => {
@@ -275,6 +295,9 @@ export async function listUserTransactionsImpl(
       booking_id: b.id,
       booking_code: b.booking_code,
       pay_txt_code: b.pay_txt_code,
+      order_token: orderTokens.get(Number(b.id)) ?? null,
+      payment_expires_at: b.payment_expires_at ?? null,
+      branch_id: b.branch_id ?? null,
       booking_type: b.booking_type || 'movie',
       user_id: b.user_id,
       movie: b.movie_title || '',
@@ -305,5 +328,6 @@ export async function listUserTransactionsImpl(
     };
   });
 
-  return { items: mapped, page, pageSize, total };
+  // server_now lets the browser count the payment deadline against the server's clock
+  return { items: mapped, page, pageSize, total, server_now: formatDateForDb(new Date()) };
 }

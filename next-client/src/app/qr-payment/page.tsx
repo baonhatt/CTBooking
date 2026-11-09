@@ -20,6 +20,15 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import UserLayout from '@/layouts/UserLayout';
+import { buildUrl } from '@/lib/api/http';
+import { fetchBookingStatus, cancelBookingByToken } from '@/lib/api/booking';
+import {
+    isValidPayCode,
+    localDeadlineMs,
+    secondsLeft,
+    classifyPaymentStatus,
+    nextPollDelayMs
+} from '@/lib/payment-flow';
 import {
     AlertDialog,
     AlertDialogAction,
@@ -42,10 +51,91 @@ import {
     buildPriceBreakdown
 } from '@shared/booking-invoice';
 
+/** The bank account a payment goes to, taken from the branch's own configuration. */
+interface BankInfo {
+    bankName: string;
+    accountNumber: string;
+    accountName: string;
+    bankCode: string;
+    qrCodeUrl: string;
+}
+
+const EMPTY_BANK_INFO: BankInfo = { bankName: '', accountNumber: '', accountName: '', bankCode: '', qrCodeUrl: '' };
+
+const BANK_NAME_TO_CODE: { [key: string]: string } = {
+    'MB Bank': 'MB',
+    MB: 'MB',
+    Vietcombank: 'VCB',
+    VCB: 'VCB',
+    BIDV: 'BIDV',
+    Vietinbank: 'CTG',
+    VietinBank: 'CTG',
+    Techcombank: 'TCB',
+    TCB: 'TCB',
+    ACB: 'ACB',
+    Sacombank: 'STB',
+    OCB: 'OCB',
+    VPBank: 'VPB',
+    TPBank: 'TPB',
+    HDBank: 'HDB'
+};
+
+/**
+ * Reads the bank account out of a branch's settings. Returns null unless the account is complete (bank, number and
+ * holder), or the branch supplies its own QR image. There is deliberately no built-in fallback account: a QR that
+ * sends money to the wrong account is worse than no QR.
+ */
+function extractBankInfoFromSettings(settingsStrOrObj: any): BankInfo | null {
+    if (!settingsStrOrObj) return null;
+    try {
+        const settings = typeof settingsStrOrObj === 'string' ? JSON.parse(settingsStrOrObj) : settingsStrOrObj;
+        const pc = settings?.payment_config;
+        if (!pc) return null;
+
+        const bankName = (pc.bank_name || '').trim();
+        const bankCode = (pc.bank_code || BANK_NAME_TO_CODE[bankName] || '').toUpperCase().trim();
+        const accountNumber = (pc.account_number || '').trim();
+        const accountName = (pc.account_name || '').trim();
+        const qrCodeUrl = (pc.qr_code_url || '').trim();
+
+        if (qrCodeUrl || (bankCode && accountNumber && accountName)) {
+            return { bankName: bankName || bankCode, bankCode, accountNumber, accountName, qrCodeUrl };
+        }
+    } catch (e) {
+        console.error('Error parsing branch payment config:', e);
+    }
+    return null;
+}
+
+function buildQrUrl(data: any, bank: BankInfo): string {
+    if (bank.qrCodeUrl) return bank.qrCodeUrl;
+    const amount = data?.totalAmount || data?.amount || 0;
+    // The transfer content is the payment reference the server gave this order. The SePay webhook matches on it.
+    const description = `${data?.pay_txt_code} `;
+    return `https://img.vietqr.io/image/${bank.bankCode}-${bank.accountNumber}-compact2.png?amount=${amount}&addInfo=${encodeURIComponent(description)}&accountName=${encodeURIComponent(bank.accountName)}`;
+}
+
+/** The branch's bank account: from the order data saved in this browser, or else from the branch's public page. */
+async function resolveBankInfo(data: any): Promise<BankInfo | null> {
+    const fromOrder = extractBankInfoFromSettings(data?.branch_settings);
+    if (fromOrder) return fromOrder;
+    if (!data?.branch_id) return null;
+    try {
+        const res = await fetch(buildUrl(`/api/branches/${data.branch_id}`), { cache: 'no-store' });
+        if (!res.ok) return null;
+        const json = await res.json();
+        return extractBankInfoFromSettings(json?.branch?.settings);
+    } catch {
+        return null;
+    }
+}
+
 export default function QRPaymentPage() {
     const router = useRouter();
     const [paymentData, setPaymentData] = useState<any>(null);
-    const [bookingDetails, setBookingDetails] = useState<any>(null);
+    // The page no longer downloads the order from the server. What it shows was saved in this browser when the order
+    // was placed. The server only hands out the payment status, to whoever holds the order token.
+    const bookingDetails: any = null;
     const [qrCodeUrl, setQrCodeUrl] = useState<string>('');
     const [copiedText, setCopiedText] = useState<string | null>(null);
     const [timeLeft, setTimeLeft] = useState<number>(0);
@@ -54,17 +144,15 @@ export default function QRPaymentPage() {
     const [showUnpaidDialog, setShowUnpaidDialog] = useState(false);
     const [showExpiredDialog, setShowExpiredDialog] = useState(false);
     const [showCancelDialog, setShowCancelDialog] = useState(false);
+    // 'expired' = the 10 minutes ran out. 'closed' = the server says the order was cancelled or expired.
+    const [closedReason, setClosedReason] = useState<'expired' | 'closed'>('expired');
+    const [bankConfigMissing, setBankConfigMissing] = useState(false);
+    const [bankInfo, setBankInfo] = useState<BankInfo>(EMPTY_BANK_INFO);
 
-    const DEFAULT_BANK_INFO = {
-        bankName: 'Ngân Hàng OCB',
-        accountNumber: '596310',
-        accountName: 'CONG TY TNHH CONG NGHE VR VIET NAM',
-        bankCode: 'OCB',
-        qrCodeUrl: ''
-    };
-
-    const [bankInfo, setBankInfo] = useState(DEFAULT_BANK_INFO);
     const paymentDataRef = useRef<any>(null);
+    // Set when the payment is over (paid, cancelled, expired): the countdown and the status checks stop.
+    const finishedRef = useRef(false);
+    const expiredHandledRef = useRef(false);
 
     // Prefetch trang đích để tránh lag sau khi thanh toán xong
     useEffect(() => {
@@ -73,229 +161,210 @@ export default function QRPaymentPage() {
         router.prefetch('/');
     }, [router]);
 
-    const extractBankInfoFromSettings = (settingsStrOrObj: any) => {
-        if (!settingsStrOrObj) return null;
-        try {
-            const settings = typeof settingsStrOrObj === 'string' ? JSON.parse(settingsStrOrObj) : settingsStrOrObj;
-            const pc = settings?.payment_config;
-            if (!pc) return null;
-
-            const bankNameToCode: { [key: string]: string } = {
-                'MB Bank': 'MB',
-                MB: 'MB',
-                Vietcombank: 'VCB',
-                VCB: 'VCB',
-                BIDV: 'BIDV',
-                Vietinbank: 'CTG',
-                VietinBank: 'CTG',
-                Techcombank: 'TCB',
-                TCB: 'TCB',
-                ACB: 'ACB',
-                Sacombank: 'STB',
-                OCB: 'OCB',
-                VPBank: 'VPB',
-                TPBank: 'TPB',
-                HDBank: 'HDB'
-            };
-
-            const bankName = (pc.bank_name || '').trim();
-            const rawBankCode = (pc.bank_code || bankNameToCode[bankName] || bankName || DEFAULT_BANK_INFO.bankCode)
-                .toUpperCase()
-                .trim();
-            const accountNumber = (pc.account_number || '').trim();
-            const accountName = (pc.account_name || '').trim();
-            const qrCodeUrl = (pc.qr_code_url || '').trim();
-
-            if (bankName || accountNumber || accountName || qrCodeUrl) {
-                return {
-                    bankName: bankName || DEFAULT_BANK_INFO.bankName,
-                    bankCode: rawBankCode || DEFAULT_BANK_INFO.bankCode,
-                    accountNumber: accountNumber || DEFAULT_BANK_INFO.accountNumber,
-                    accountName: accountName || DEFAULT_BANK_INFO.accountName,
-                    qrCodeUrl: qrCodeUrl || ''
-                };
-            }
-        } catch (e) {
-            console.error('Error parsing branch payment config:', e);
-        }
-        return null;
+    const clearPaymentStorage = () => {
+        localStorage.removeItem('qrPaymentData');
+        localStorage.removeItem('qrPaymentEndTime');
     };
 
-    const generateQRCode = (data: any, details?: any) => {
-        const amount = data?.totalAmount || data?.amount || 0;
-        const orderId = data?.orderId || data?.bookingId || data?.booking_id || '';
-        const description = `${orderId} `;
+    const orderIdentity = () => {
+        const data = paymentDataRef.current;
+        return {
+            data,
+            bookingId: Number(data?.bookingId || data?.booking_id) || 0,
+            orderToken: String(data?.order_token || '')
+        };
+    };
 
-        const branchSettingsRaw = details?.branch?.settings || details?.branch_settings || data?.branch_settings;
+    /** Takes the customer to the success page. Callers make sure it runs only once. */
+    const goToSuccess = () => {
+        const data = paymentDataRef.current;
+        if (data) {
+            localStorage.setItem(
+                'lastCheckoutOrder',
+                JSON.stringify({
+                    ...data,
+                    payment_status: 'paid',
+                    paidAt: new Date().toISOString()
+                })
+            );
+        }
+        localStorage.removeItem('pendingOrder');
+        clearPaymentStorage();
+        toast.success('Thanh toán thành công!');
+        router.replace('/success-payment');
+    };
 
-        const branchBank = extractBankInfoFromSettings(branchSettingsRaw);
-        const activeBank = branchBank || DEFAULT_BANK_INFO;
+    const handleSuccess = () => {
+        if (finishedRef.current) return;
+        finishedRef.current = true;
+        goToSuccess();
+    };
 
-        setBankInfo(activeBank);
+    /** The server says the order can no longer be paid (cancelled, failed or expired). */
+    const handleClosed = () => {
+        if (finishedRef.current) return;
+        finishedRef.current = true;
+        clearPaymentStorage();
+        setClosedReason('closed');
+        setShowExpiredDialog(true);
+    };
 
-        if (activeBank.qrCodeUrl) {
-            setQrCodeUrl(activeBank.qrCodeUrl);
-            return;
+    /** The countdown reached zero. Runs once: it cancels the unpaid order, or finds out that it was paid after all. */
+    const handleExpired = async () => {
+        if (expiredHandledRef.current || finishedRef.current) return;
+        expiredHandledRef.current = true;
+        finishedRef.current = true;
+
+        const { bookingId, orderToken } = orderIdentity();
+        if (bookingId && orderToken) {
+            const { httpStatus } = await cancelBookingByToken(bookingId, orderToken);
+            // 409: the order was paid just before the deadline
+            if (httpStatus === 409) {
+                goToSuccess();
+                return;
+            }
         }
 
-        const qrContent = `https://img.vietqr.io/image/${activeBank.bankCode}-${activeBank.accountNumber}-compact2.png?amount=${amount}&addInfo=${encodeURIComponent(description)}&accountName=${encodeURIComponent(activeBank.accountName)}`;
-        setQrCodeUrl(qrContent);
+        clearPaymentStorage();
+        setClosedReason('expired');
+        setShowExpiredDialog(true);
     };
 
     useEffect(() => {
-        const savedData = localStorage.getItem('qrPaymentData');
+        let isCancelled = false;
+        let timerId: ReturnType<typeof setInterval> | undefined;
 
-        if (!savedData) {
+        let data: any = null;
+        try {
+            const saved = localStorage.getItem('qrPaymentData');
+            data = saved ? JSON.parse(saved) : null;
+        } catch {
+            data = null;
+        }
+
+        if (!data) {
             router.replace('/booking');
             return;
         }
 
-        const data = JSON.parse(savedData);
-        setPaymentData(data);
-        paymentDataRef.current = data;
-        generateQRCode(data);
+        // An order needs its payment reference and its order token. Without them the page cannot build a correct
+        // transfer or read the payment status, so it asks the customer to start again.
+        const payCode = data.pay_txt_code || data.orderId;
+        const bookingId = data.bookingId || data.booking_id;
+        const storedEnd = Number(localStorage.getItem('qrPaymentEndTime'));
+        const deadlineMs =
+            Number.isFinite(storedEnd) && storedEnd > 0
+                ? storedEnd
+                : localDeadlineMs(data.payment_expires_at, Number(data.server_clock_offset_ms) || 0);
 
-        // Fetch full booking details (Ticket Info & Branch settings)
-        const fetchBookingDetails = async () => {
-            const bId = data?.bookingId || data?.booking_id;
-            if (bId) {
-                try {
-                    const baseUrl = process.env.NEXT_PUBLIC_SERVER_BASE_URL || '';
-                    const controller = new AbortController();
-                    const timeoutId = setTimeout(() => controller.abort(), 10000);
-                    const res = await fetch(`${baseUrl}/api/bookings/${bId}`, { signal: controller.signal });
-                    clearTimeout(timeoutId);
-                    if (res.ok) {
-                        const json = await res.json();
-                        setBookingDetails(json);
-                        // Regenerate QR code and bank info with branch settings
-                        generateQRCode(data, json);
-                    } else {
-                        toast.error('Lỗi tải dữ liệu chi tiết hóa đơn. Vui lòng làm mới trang.');
-                    }
-                } catch (error) {
-                    console.error('Error fetching booking details:', error);
-                    toast.error('Lỗi kết nối mạng khi tải chi tiết hóa đơn.');
-                } finally {
-                    setIsLoadingDetails(false);
-                }
-            } else {
-                setIsLoadingDetails(false);
-            }
-        };
-        fetchBookingDetails();
-
-        // --- Timer Logic ---
-        const savedEndTime = localStorage.getItem('qrPaymentEndTime');
-        let endTime = savedEndTime ? parseInt(savedEndTime, 10) : 0;
-
-        if (!endTime || isNaN(endTime)) {
-            // 10 minutes from now if not set
-            endTime = Date.now() + 10 * 60 * 1000;
-            localStorage.setItem('qrPaymentEndTime', endTime.toString());
+        if (!bookingId || !data.order_token || !isValidPayCode(payCode) || !deadlineMs) {
+            clearPaymentStorage();
+            toast.error('Phiên thanh toán không còn hợp lệ. Vui lòng đặt vé lại.');
+            router.replace('/booking');
+            return;
         }
+        localStorage.setItem('qrPaymentEndTime', String(deadlineMs));
+
+        const order = { ...data, pay_txt_code: payCode, orderId: payCode };
+        setPaymentData(order);
+        paymentDataRef.current = order;
+
+        resolveBankInfo(order).then((bank) => {
+            if (isCancelled) return;
+            if (bank) {
+                setBankInfo(bank);
+                setQrCodeUrl(buildQrUrl(order, bank));
+            } else {
+                setBankConfigMissing(true);
+            }
+            setIsLoadingDetails(false);
+        });
 
         const updateTimer = () => {
-            const remaining = Math.max(0, Math.ceil((endTime - Date.now()) / 1000));
+            const remaining = secondsLeft(deadlineMs);
             setTimeLeft(remaining);
-
             if (remaining <= 0) {
+                if (timerId) clearInterval(timerId);
                 handleExpired();
             }
         };
 
         updateTimer(); // Initial call
-        const timerId = setInterval(updateTimer, 1000);
+        timerId = setInterval(updateTimer, 1000);
 
         return () => {
-            clearInterval(timerId);
+            isCancelled = true;
+            if (timerId) clearInterval(timerId);
         };
     }, [router]);
 
-    const handleSuccess = () => {
-        if (paymentData) {
-            localStorage.setItem('lastCheckoutOrder', JSON.stringify({
-                ...paymentData,
-                payment_status: 'paid',
-                paidAt: new Date().toISOString()
-            }));
-        }
-        localStorage.removeItem('pendingOrder');
-        localStorage.removeItem('qrPaymentData');
-        localStorage.removeItem('qrPaymentEndTime');
-        toast.success('Thanh toán thành công!');
-        router.replace('/success-payment');
-    };
-
-    // --- Auto Polling Logic (every 5s) ---
+    // --- Auto polling: ask the server for the payment status until the payment is over ---
     useEffect(() => {
-        const bId = paymentData?.bookingId || paymentData?.booking_id;
-        if (!bId) return;
+        const bookingId = Number(paymentData?.bookingId || paymentData?.booking_id) || 0;
+        const orderToken = String(paymentData?.order_token || '');
+        if (!bookingId || !orderToken) return;
 
-        const checkPaymentStatus = async () => {
-            try {
-                const savedEndTime = localStorage.getItem('qrPaymentEndTime');
-                const endTime = savedEndTime ? parseInt(savedEndTime, 10) : 0;
-                if (endTime && Date.now() >= endTime) return;
+        let isCancelled = false;
+        let timeoutId: ReturnType<typeof setTimeout> | undefined;
+        let consecutiveFailures = 0;
 
-                const baseUrl = process.env.NEXT_PUBLIC_SERVER_BASE_URL || '';
-                const res = await fetch(`${baseUrl}/api/bookings/${bId}`, { cache: 'no-store' });
-                if (res.ok) {
-                    const booking = await res.json();
-                    if (booking.payment_status === 'paid') {
-                        handleSuccess();
-                    }
-                }
-            } catch (error) {
-                console.error('Auto polling error:', error);
-            }
+        const schedule = (delayMs: number) => {
+            if (!isCancelled && !finishedRef.current) timeoutId = setTimeout(checkStatus, delayMs);
         };
 
-        // Run immediate check on load / paymentData ready
-        checkPaymentStatus();
+        async function checkStatus() {
+            if (isCancelled || finishedRef.current) return;
 
-        // Poll every 5s for fast response when customer transfers money
-        const intervalId = setInterval(checkPaymentStatus, 5000);
+            // No checks while the tab is hidden. The visibility handler below checks again as soon as it is shown.
+            if (typeof document !== 'undefined' && document.hidden) {
+                schedule(nextPollDelayMs(0));
+                return;
+            }
 
-        return () => clearInterval(intervalId);
-    }, [paymentData]);
+            const result = await fetchBookingStatus(bookingId, orderToken);
+            if (isCancelled || finishedRef.current) return;
 
-    const handleExpired = async () => {
-        const data = paymentDataRef.current;
-        const bId = data?.bookingId || data?.booking_id;
-
-        if (bId) {
-            try {
-                const baseUrl = process.env.NEXT_PUBLIC_SERVER_BASE_URL || '';
-                const res = await fetch(`${baseUrl}/api/cancel-booking`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        payment_id: bId,
-                        payment_status: 'failed'
-                    })
-                });
-
-                // Check safeguard (409 Conflict)
-                if (res.status === 409) {
-                    localStorage.removeItem('qrPaymentData');
-                    localStorage.removeItem('qrPaymentEndTime');
-                    toast.success('Giao dịch đã được thanh toán thành công!');
-                    router.replace('/success-payment');
+            if (result.ok) {
+                consecutiveFailures = 0;
+                const outcome = classifyPaymentStatus(result.data.payment_status);
+                if (outcome === 'paid') {
+                    handleSuccess();
                     return;
                 }
-            } catch (error) {
-                console.error('Failed to update booking status:', error);
+                if (outcome === 'closed') {
+                    handleClosed();
+                    return;
+                }
+            } else if (result.httpStatus === 404) {
+                // The token no longer matches an order: there is nothing left to wait for
+                handleClosed();
+                return;
+            } else {
+                consecutiveFailures += 1;
+                if (consecutiveFailures === 3) {
+                    toast.warning('Mất kết nối tới máy chủ. Đang thử lại...', { id: 'qr-offline' });
+                }
             }
+
+            schedule(nextPollDelayMs(consecutiveFailures));
         }
 
-        // Clear localStorage
-        localStorage.removeItem('qrPaymentData');
-        localStorage.removeItem('qrPaymentEndTime');
+        const onVisibilityChange = () => {
+            if (!document.hidden && !finishedRef.current) {
+                if (timeoutId) clearTimeout(timeoutId);
+                checkStatus();
+            }
+        };
+        document.addEventListener('visibilitychange', onVisibilityChange);
 
-        // Show expired dialog
-        setShowExpiredDialog(true);
-    };
+        checkStatus();
+
+        return () => {
+            isCancelled = true;
+            if (timeoutId) clearTimeout(timeoutId);
+            document.removeEventListener('visibilitychange', onVisibilityChange);
+        };
+    }, [paymentData]);
 
     const formatTime = (seconds: number) => {
         const m = Math.floor(seconds / 60);
@@ -321,30 +390,30 @@ export default function QRPaymentPage() {
     };
 
     const handleCheckPayment = async () => {
-        const bId = paymentData?.bookingId || paymentData?.booking_id;
-        if (!bId) {
+        const { bookingId, orderToken } = orderIdentity();
+        if (!bookingId || !orderToken) {
             toast.error('Không tìm thấy thông tin đơn hàng');
             return;
         }
 
         setIsChecking(true);
-        try {
-            const baseUrl = process.env.NEXT_PUBLIC_SERVER_BASE_URL || '';
-            const res = await fetch(`${baseUrl}/api/bookings/${bId}`, { cache: 'no-store' });
-            if (res.ok) {
-                const booking = await res.json();
-                if (booking.payment_status === 'paid') {
-                    handleSuccess();
-                } else {
-                    setShowUnpaidDialog(true);
-                }
-            } else {
-                toast.error('Không thể kiểm tra trạng thái thanh toán');
-            }
-        } catch (error) {
-            toast.error('Lỗi kết nối, vui lòng thử lại');
-        } finally {
-            setIsChecking(false);
+        const result = await fetchBookingStatus(bookingId, orderToken);
+        setIsChecking(false);
+
+        if (!result.ok) {
+            toast.error(
+                result.httpStatus === 404 ? 'Không tìm thấy đơn hàng' : 'Lỗi kết nối, vui lòng thử lại'
+            );
+            return;
+        }
+
+        const outcome = classifyPaymentStatus(result.data.payment_status);
+        if (outcome === 'paid') {
+            handleSuccess();
+        } else if (outcome === 'closed') {
+            handleClosed();
+        } else {
+            setShowUnpaidDialog(true);
         }
     };
 
@@ -353,55 +422,51 @@ export default function QRPaymentPage() {
     };
 
     const performCancelPayment = async () => {
-        const bId = paymentData?.bookingId || paymentData?.booking_id;
-        let isPaidSafeguard = false;
+        const { bookingId, orderToken } = orderIdentity();
+        // Stop counting and checking: the customer chose to leave
+        finishedRef.current = true;
 
-        if (bId) {
-            try {
-                const baseUrl = process.env.NEXT_PUBLIC_SERVER_BASE_URL || '';
-                const res = await fetch(`${baseUrl}/api/cancel-booking`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        payment_id: bId,
-                        payment_status: 'failed'
-                    })
-                });
-
-                if (res.status === 409) {
-                    isPaidSafeguard = true;
-                    toast.success('Giao dịch đã được thanh toán thành công!');
-
-                    try {
-                        const currentOrder = localStorage.getItem('lastCheckoutOrder');
-                        let newOrder = currentOrder ? JSON.parse(currentOrder) : {};
-                        newOrder = {
-                            ...newOrder,
-                            ...paymentData,
-                            payment_status: 'paid',
-                            booking_id: bId
-                        };
-                        localStorage.setItem('lastCheckoutOrder', JSON.stringify(newOrder));
-                    } catch (e) { }
-
-                    localStorage.removeItem('qrPaymentData');
-                    localStorage.removeItem('qrPaymentEndTime');
-
-                    router.replace('/success-payment');
-                    return;
-                }
-            } catch (error) {
-                console.error('Failed to update booking status:', error);
-            }
+        let httpStatus: number | null = 200;
+        if (bookingId && orderToken) {
+            ({ httpStatus } = await cancelBookingByToken(bookingId, orderToken));
         }
 
-        if (!isPaidSafeguard) {
-            localStorage.removeItem('qrPaymentData');
-            localStorage.removeItem('qrPaymentEndTime');
+        // 409: it was paid after all
+        if (httpStatus === 409) {
+            toast.success('Giao dịch đã được thanh toán thành công!');
+            goToSuccess();
+            return;
+        }
+
+        clearPaymentStorage();
+        if (httpStatus === null) {
+            toast.info('Chưa kết nối được máy chủ để hủy đơn. Đơn sẽ tự hết hạn sau ít phút.');
+        } else {
             toast.info('Đã hủy giao dịch thành công');
-            router.replace('/booking');
         }
+        router.replace('/booking');
     };
+
+    // The branch has no complete bank account: do not show a QR that could send money to the wrong place
+    if (bankConfigMissing) {
+        return (
+            <UserLayout className="bg-[#0f172a]" hideFooter>
+                <div className="relative min-h-screen">
+                    <div className="relative z-10 max-w-md mx-auto px-4 pt-40 text-center text-white space-y-5">
+                        <AlertTriangle className="w-12 h-12 text-amber-400 mx-auto" />
+                        <h1 className="text-xl font-bold">Chưa thể thanh toán chuyển khoản</h1>
+                        <p className="text-gray-300 leading-relaxed">
+                            Chi nhánh này chưa cấu hình tài khoản nhận tiền nên hệ thống không tạo mã QR để tránh chuyển nhầm.
+                            Vui lòng liên hệ hotline <span className="font-bold text-blue-400">036 643 1179</span>.
+                        </p>
+                        <Button onClick={performCancelPayment} className="bg-red-600 hover:bg-red-500 text-white">
+                            Hủy đơn và quay lại
+                        </Button>
+                    </div>
+                </div>
+            </UserLayout>
+        );
+    }
 
     return (
         <UserLayout className="bg-[#0f172a]" hideFooter>
@@ -813,24 +878,24 @@ export default function QRPaymentPage() {
                                             {[
                                                 {
                                                     label: 'Ngân hàng',
-                                                    value: bankInfo.bankName,
+                                                    value: bankInfo.bankName || '—',
                                                     copy: bankInfo.bankName
                                                 },
                                                 {
                                                     label: 'Số tài khoản',
-                                                    value: bankInfo.accountNumber,
+                                                    value: bankInfo.accountNumber || '—',
                                                     copy: bankInfo.accountNumber,
                                                     mono: true
                                                 },
                                                 {
                                                     label: 'Chủ tài khoản',
-                                                    value: bankInfo.accountName,
+                                                    value: bankInfo.accountName || '—',
                                                     copy: bankInfo.accountName
                                                 },
                                                 {
                                                     label: 'Nội dung',
-                                                    value: `${paymentData?.orderId || paymentData?.bookingId || paymentData?.booking_id || ''}`,
-                                                    copy: `${paymentData?.orderId || paymentData?.bookingId || paymentData?.booking_id || ''}`,
+                                                    value: `${paymentData?.pay_txt_code || ''}`,
+                                                    copy: `${paymentData?.pay_txt_code || ''}`,
                                                     mono: true,
                                                     bold: true
                                                 }
@@ -967,20 +1032,38 @@ export default function QRPaymentPage() {
                 </AlertDialogContent>
             </AlertDialog>
 
-            {/* Expired Dialog */}
+            {/* Expired / closed dialog */}
             <AlertDialog open={showExpiredDialog} onOpenChange={() => { }}>
                 <AlertDialogContent className="bg-[#0f172a] border-white/10 text-white max-w-[400px]">
                     <AlertDialogHeader>
                         <AlertDialogTitle className="text-xl font-bold text-red-400 text-center">
-                            Hết thời gian thanh toán
+                            {closedReason === 'expired' ? 'Hết thời gian thanh toán' : 'Đơn hàng không còn hiệu lực'}
                         </AlertDialogTitle>
-                        <AlertDialogDescription className="text-gray-300 text-base leading-relaxed text-center">
-                            Đơn hàng của bạn đã hết hạn thanh toán (10 phút).
-                            <br />
-                            Vui lòng đặt vé lại nếu bạn muốn tiếp tục.
-                            <br />
-                            <br />
-                            Gặp sự cố? Liên hệ hotline <span className="font-bold text-blue-400">036 643 1179</span>.
+                        <AlertDialogDescription asChild>
+                            <div className="text-gray-300 text-base leading-relaxed text-center space-y-3">
+                                <p>
+                                    {closedReason === 'expired'
+                                        ? 'Đơn hàng của bạn đã hết hạn thanh toán (10 phút).'
+                                        : 'Đơn hàng đã bị hủy hoặc đã hết hạn thanh toán.'}{' '}
+                                    Vui lòng đặt vé lại nếu bạn muốn tiếp tục.
+                                </p>
+                                <div className="rounded-xl bg-white/5 border border-white/10 p-3 text-sm text-left space-y-1">
+                                    <p className="text-amber-300 font-bold">Nếu bạn đã chuyển khoản</p>
+                                    <p>
+                                        Liên hệ hotline <span className="font-bold text-blue-400">036 643 1179</span> và cung cấp:
+                                    </p>
+                                    <p>
+                                        Nội dung chuyển khoản:{' '}
+                                        <span className="font-mono font-bold text-white">{paymentData?.pay_txt_code}</span>
+                                    </p>
+                                    <p>
+                                        Số tiền:{' '}
+                                        <span className="font-bold text-white">
+                                            {new Intl.NumberFormat('vi-VN').format(Number(paymentData?.totalAmount || paymentData?.amount || 0))}₫
+                                        </span>
+                                    </p>
+                                </div>
+                            </div>
                         </AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter>

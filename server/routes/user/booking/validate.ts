@@ -1,7 +1,8 @@
 import { PaymentRequest } from '@shared/api';
 import { eq, and, asc, isNull, inArray, sql } from 'drizzle-orm';
 import { validateVoucherForVRImpl, matchesBranch } from '../vouchers';
-import { HttpError, MAX_TICKET_PER_ORDER, BookingValidationResult } from './shared';
+import { HttpError, MAX_TICKET_PER_ORDER, BookingValidationResult, normalizeQuantity } from './shared';
+import { resolveOrderBranchId } from '../../../lib/booking-branch';
 
 export async function validateBookingInput(
   anyDb: any,
@@ -73,7 +74,7 @@ export async function validateBookingInput(
         throw new HttpError(400, `Gói vé "${pkg.name}" không áp dụng tại chi nhánh bạn chọn.`);
       }
       const price = Number(pkg.price || 0);
-      const qty = Math.max(1, Number(item.quantity || 1));
+      const qty = normalizeQuantity(item.quantity);
 
       movieTotalPrice += price * qty;
       calculatedTicketCount += qty;
@@ -91,6 +92,10 @@ export async function validateBookingInput(
     unitPrice = Number(pkgs[0].price || 0);
     // Override ticketCount with calculated value from payload items
     ticketCount = calculatedTicketCount;
+    // The limit is checked again here: the count sent by the browser was replaced by the real total from the items
+    if (ticketCount > MAX_TICKET_PER_ORDER) {
+      throw new HttpError(400, `Mỗi lượt chỉ đặt tối đa ${MAX_TICKET_PER_ORDER} vé.`);
+    }
   } else if (ticketPackageId) {
     ticketPackage = await anyDb.query.ticket_packages.findFirst({
       where: eq(ticketPackagesTable.id, ticketPackageId)
@@ -138,7 +143,7 @@ export async function validateBookingInput(
 
   // Branch check: Ensure the branch is open
   let branchSettings: any = {};
-  const targetBranchId = ticketPackage.branch_id || branch_id;
+  const targetBranchId = await resolveOrderBranchId(anyDb, branchesTable, ticketPackage.branch_id || branch_id);
   if (ticketPackage && !matchesBranch(ticketPackage.branch_ids, targetBranchId)) {
     throw new HttpError(400, `Gói vé "${ticketPackage.name}" không áp dụng tại chi nhánh bạn chọn.`);
   }
@@ -213,7 +218,7 @@ export async function validateBookingInput(
         throw new HttpError(400, `Gói VR "${pkg.name}" không áp dụng tại chi nhánh bạn chọn.`);
       }
 
-      const qty = Math.max(1, Number(it.quantity || 1));
+      const qty = normalizeQuantity(it.quantity);
       const price = Number(pkg.price || 0);
       const lineTotal = price * qty;
       vrTotalPrice += lineTotal;
@@ -263,6 +268,7 @@ export async function validateBookingInput(
   const totalPrice = Math.max(0, originalTotalPrice - voucherDiscountAmount);
 
   return {
+    branchId: targetBranchId,
     user: {
       id: user?.id ?? null,
       email: userEmail,

@@ -15,13 +15,15 @@ import { listPostsImpl, getPostImpl } from '../../../server/routes/admin/posts';
 import { validateBookingImpl } from '../../../server/routes/user/booking/validate';
 import { createPaymentImpl } from '../../../server/routes/user/booking/create';
 import { updatePaymentImpl } from '../../../server/routes/user/booking/update';
-import { getBookingByIdImpl } from '../../../server/routes/user/booking/query';
+import { findBookingForOwner, bookingStatusPayload } from '../../../server/routes/user/booking/access';
+import { resolveOrderTokenSecret, makeOrderToken, ORDER_TOKEN_HEADER } from '../../../server/lib/order-token';
+import { validateSessionTokenImpl } from '../../../server/routes/user/auth';
+import { formatDateForDb } from '../../../server/lib/date-utils';
 
 import {
   listActiveVRPackagesImpl,
   validateVRBookingImpl,
-  createVRBookingImpl,
-  getVRBookingByIdImpl
+  createVRBookingImpl
 } from '../../../server/routes/user/vr-bookings';
 
 import { validateVoucherForVRImpl } from '../../../server/routes/user/vouchers';
@@ -157,6 +159,34 @@ function getRestrictBranchIds(c: any): number[] | null {
   return isSuperAdmin ? null : staffBranchIds;
 }
 
+/**
+ * The secret that signs per-order tokens. Null when it is not configured (outside localhost).
+ * Routes call this BEFORE touching the database, so a configuration mistake never leaves a half-created order.
+ */
+function readOrderTokenSecret(c: any): string | null {
+  try {
+    return resolveOrderTokenSecret(c.env, c.req.url);
+  } catch (err) {
+    logSystemError('order-token-secret', err);
+    return null;
+  }
+}
+
+const ORDER_SYSTEM_NOT_READY = 'Hệ thống chưa sẵn sàng nhận đặt vé. Vui lòng thử lại sau.';
+
+/** The signed-in customer's account id, when the request carries a valid customer session. Never throws. */
+async function getOptionalAccountId(c: any, db: any): Promise<number | null> {
+  try {
+    const token =
+      c.req.header('cookie')?.match(/session_token=([^;]+)/)?.[1] || c.req.header('Authorization')?.replace('Bearer ', '');
+    if (!token) return null;
+    const validation = await validateSessionTokenImpl(db, { tokens: schema.tokens }, token);
+    return validation.valid ? (validation.accountId ?? null) : null;
+  } catch {
+    return null;
+  }
+}
+
 publicRouter.get('/api/getActiveMovies', async (c) => {
   try {
     const db = drizzle(c.env.cinema_db, { schema });
@@ -238,6 +268,9 @@ publicRouter.post('/api/create-booking', async (c) => {
   let body: any = {};
 
   try {
+    const secret = readOrderTokenSecret(c);
+    if (!secret) return c.json({ status: 'error', message: ORDER_SYSTEM_NOT_READY }, 500);
+
     const db = drizzle(c.env.cinema_db, { schema });
 
     const tables = getD1Tables(schema);
@@ -250,48 +283,60 @@ publicRouter.post('/api/create-booking', async (c) => {
 
     const status = typeof (r as any).status === 'number' ? (r as any).status : 200;
 
-    const payload = {
+    const payload: any = {
       ...(r as any),
 
       status: status >= 400 ? 'error' : 'success'
     };
 
+    // The token proves "this is my order" to the status and cancel routes. The server clock lets the payment page
+    // count down against the server's time.
+    if (status === 201 && payload.booking?.pay_txt_code) {
+      payload.booking.order_token = await makeOrderToken(secret, payload.booking.id, payload.booking.pay_txt_code);
+      payload.booking.server_now = formatDateForDb(new Date());
+    }
+
     return c.json(payload, status as any);
   } catch (err: any) {
     logSystemError('create-booking', err, body);
 
-    const status = err?.status || 500;
-
-    return c.json(
-      {
-        message: err?.message || 'Lỗi máy chủ nội bộ',
-
-        error: String(err),
-
-        cause: err?.cause ? String(err.cause) : undefined,
-
-        stack: err?.stack || null
-      },
-
-      status
-    );
+    // The reason stays in the server log. The customer gets no stack trace and no database text.
+    return c.json({ status: 'error', message: 'Lỗi máy chủ nội bộ' }, 500);
   }
 });
 
 publicRouter.post('/api/cancel-booking', async (c) => {
   let body: any = {};
   try {
+    const secret = readOrderTokenSecret(c);
+    if (!secret) return c.json({ status: 'error', message: ORDER_SYSTEM_NOT_READY }, 500);
+
     const db = drizzle(c.env.cinema_db, { schema });
     const tables = getD1Tables(schema);
     body = await c.req.json().catch(() => ({}));
 
-    // Force payment_status to 'failed' for safety so public users cannot confirm bookings
-    const safeBody = {
-      ...body,
-      payment_status: 'failed'
-    };
+    // Only the person who placed the order can cancel it: the order token, or a signed-in owner account.
+    // Anything else gets the same answer as an order that does not exist.
+    const booking = await findBookingForOwner(db, tables, {
+      bookingId: Number(body?.payment_id),
+      orderToken: c.req.header(ORDER_TOKEN_HEADER),
+      secret,
+      accountId: await getOptionalAccountId(c, db)
+    });
+    if (!booking) {
+      return c.json({ status: 'error', message: 'Không tìm thấy đặt vé' }, 404);
+    }
 
-    const r = await updatePaymentImpl(db, safeBody as any, undefined, undefined, tables, c.executionCtx);
+    // The status is fixed to 'failed': a customer can cancel but can never confirm a payment.
+    // Nothing from the body except the booking id is used.
+    const r = await updatePaymentImpl(
+      db,
+      { payment_id: booking.id, payment_status: 'failed' },
+      undefined,
+      undefined,
+      tables,
+      c.executionCtx
+    );
 
     const status = typeof (r as any).status === 'number' ? (r as any).status : 200;
     const payload = {
@@ -301,33 +346,37 @@ publicRouter.post('/api/cancel-booking', async (c) => {
     return c.json(payload, status as any);
   } catch (err: any) {
     logSystemError('cancel-booking', err, body);
-    return c.json({ message: err?.message || 'Lỗi máy chủ nội bộ' }, 500);
+    return c.json({ status: 'error', message: 'Lỗi máy chủ nội bộ' }, 500);
   }
 });
 
-publicRouter.get('/api/bookings/:id', async (c) => {
+// The payment status of one order, for the payment page. It needs the order token (or a signed-in owner) and returns
+// only the payment state, the deadline and the server clock: no name, phone, email or ticket code.
+async function handleBookingStatus(c: any) {
   try {
+    const secret = readOrderTokenSecret(c);
+    if (!secret) return c.json({ status: 'error', message: ORDER_SYSTEM_NOT_READY }, 500);
+
     const db = drizzle(c.env.cinema_db, { schema });
 
-    const tables = getD1Tables(schema);
+    const booking = await findBookingForOwner(db, getD1Tables(schema), {
+      bookingId: Number(c.req.param('id')),
+      orderToken: c.req.header(ORDER_TOKEN_HEADER),
+      secret,
+      accountId: await getOptionalAccountId(c, db)
+    });
+    if (!booking) {
+      return c.json({ status: 'error', message: 'Không tìm thấy đặt vé' }, 404);
+    }
 
-    const id = Number(c.req.param('id'));
-
-    const r = await getBookingByIdImpl(db, id, tables);
-
-    const status = typeof (r as any).status === 'number' ? (r as any).status : 200;
-
-    const payload = {
-      ...(r as any),
-
-      status: status >= 400 ? 'error' : 'success'
-    };
-
-    return c.json(payload, status as any);
+    return c.json(bookingStatusPayload(booking), 200);
   } catch (err: any) {
-    return c.json({ message: err?.message || 'Lỗi máy chủ nội bộ' }, 500);
+    logSystemError('booking-status', err);
+    return c.json({ status: 'error', message: 'Lỗi máy chủ nội bộ' }, 500);
   }
-});
+}
+
+publicRouter.get('/api/bookings/:id', handleBookingStatus);
 
 publicRouter.get('/api/movies', async (c) => {
   try {
@@ -870,6 +919,9 @@ publicRouter.post('/api/vr/validate-booking', async (c) => {
 
 publicRouter.post('/api/vr/create-booking', async (c) => {
   try {
+    const secret = readOrderTokenSecret(c);
+    if (!secret) return c.json({ success: false, error: ORDER_SYSTEM_NOT_READY }, 500 as any);
+
     const body = await c.req.json().catch(() => ({}));
     const db = drizzle(c.env.cinema_db, { schema });
 
@@ -879,39 +931,27 @@ publicRouter.post('/api/vr/create-booking', async (c) => {
       voucher_redemption_logs: schema.voucher_redemption_logs,
       users: schema.users,
       bookings: schema.bookings,
-      booking_vr_items: schema.booking_vr_items
+      booking_vr_items: schema.booking_vr_items,
+      branches: schema.branches
     });
 
     const status = Number(r.status) || 200;
     const clone: any = { ...r };
     delete clone.status;
+
+    if (status === 201 && clone.booking?.pay_txt_code) {
+      clone.booking.order_token = await makeOrderToken(secret, clone.booking.id, clone.booking.pay_txt_code);
+      clone.booking.server_now = formatDateForDb(new Date());
+    }
     return c.json(clone, status as any);
   } catch (err: any) {
-    return c.json({ success: false, error: String(err?.message || 'Internal error') }, 500 as any);
+    logSystemError('vr-create-booking', err);
+    return c.json({ success: false, error: 'Lỗi máy chủ nội bộ' }, 500 as any);
   }
 });
 
-publicRouter.get('/api/vr/bookings/:id', async (c) => {
-  try {
-    const id = Number(c.req.param('id'));
-    const db = drizzle(c.env.cinema_db, { schema });
-
-    const r = await getVRBookingByIdImpl(
-      db,
-      {
-        bookings: schema.bookings,
-        booking_vr_items: schema.booking_vr_items,
-        voucher_redemption_logs: schema.voucher_redemption_logs
-      },
-      id
-    );
-
-    if (!r) return c.json({ message: 'Không tìm thấy booking VR' }, 404 as any);
-    return c.json(r, 200 as any);
-  } catch (err: any) {
-    return c.json({ status: 'error', message: String(err?.message || 'Internal error') }, 500 as any);
-  }
-});
+// Same minimal status as /api/bookings/:id (VR orders live in the same table)
+publicRouter.get('/api/vr/bookings/:id', handleBookingStatus);
 
 // ============================================================
 // ===== BRANCHES (Public) ====================================

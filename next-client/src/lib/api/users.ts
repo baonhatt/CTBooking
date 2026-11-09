@@ -64,7 +64,8 @@ export async function getUserTransactionsApi(options: { email: string; status?: 
   params.set('email', options.email);
   if (options.status) params.set('status', options.status);
   const path = `/api/user/transactions?${params.toString()}`;
-  return request<{ items: any[] }>(path, { signal: options.signal });
+  // server_now is the server's clock, used to count a payment deadline against the server's time
+  return request<{ items: any[]; server_now?: string }>(path, { signal: options.signal });
 }
 
 export async function getUserProfileByEmailApi(email: string) {

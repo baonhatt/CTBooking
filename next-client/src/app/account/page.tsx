@@ -1,6 +1,7 @@
 'use client';
 
 import { formatDateTimeVN, formatDOB } from '@/lib/utils';
+import { isValidPayCode, localDeadlineMs, serverClockOffsetMs } from '@/lib/payment-flow';
 
 import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
@@ -55,6 +56,10 @@ export interface UserTransactionItem {
     booking_id: number;
     booking_code: string;
     pay_txt_code: string;
+    /** Proves the order is yours, so the payment page can read its status and cancel it. Only on unpaid orders. */
+    order_token?: string | null;
+    payment_expires_at?: string | null;
+    branch_id?: number | null;
     movie: string;
     ticket_package: string;
     quantity: number;
@@ -119,6 +124,8 @@ export default function Account() {
 
     const [transactions, setTransactions] = useState<UserTransactionItem[]>([]);
     const [isLoadingTx, setIsLoadingTx] = useState(true);
+    // Server clock minus this browser's clock. A payment deadline is counted on the server's time.
+    const [serverClockOffset, setServerClockOffset] = useState(0);
     const [isDetailOpen, setIsDetailOpen] = useState(false);
     const [selectedTx, setSelectedTx] = useState<UserTransactionItem | null>(null);
     const [currentPage, setCurrentPage] = useState(1);
@@ -160,29 +167,37 @@ export default function Account() {
 
     const handleContinuePayment = (t: any) => {
         try {
-            if (!t.created_at) {
-                toast.error('Giao dịch thiếu thông tin thời gian khởi tạo.');
+            // The payment reference (the transfer content) and the order token both come from the server.
+            // Without them no correct transfer can be made, so the customer is asked to order again.
+            if (!isValidPayCode(t.pay_txt_code) || !t.order_token) {
+                toast.error('Không thể tiếp tục thanh toán đơn này. Vui lòng đặt vé lại.');
                 return;
             }
 
-            const createdTime = new Date(t.created_at).getTime();
-            const endTime = createdTime + 10 * 60 * 1000;
-
-            if (Date.now() >= endTime) {
-                toast.error('Đơn hàng này đã quá giới hạn 10 phút và không thể thanh toán.');
+            const deadlineMs = localDeadlineMs(t.payment_expires_at, serverClockOffset);
+            if (deadlineMs === null) {
+                toast.error('Giao dịch thiếu thông tin hạn thanh toán.');
+                return;
+            }
+            if (Date.now() >= deadlineMs) {
+                toast.error('Đơn hàng này đã quá hạn thanh toán (10 phút) và không thể thanh toán.');
                 return;
             }
 
-            localStorage.setItem('qrPaymentEndTime', endTime.toString());
+            localStorage.setItem('qrPaymentEndTime', String(deadlineMs));
             localStorage.setItem('qrPaymentData', JSON.stringify({
                 bookingId: t.booking_id || t.id,
-                orderId: t.booking_code,
-                booking_code: t.booking_code,
+                orderId: t.pay_txt_code,
+                pay_txt_code: t.pay_txt_code,
+                order_token: t.order_token,
+                payment_expires_at: t.payment_expires_at,
+                server_clock_offset_ms: serverClockOffset,
                 amount: t.amount,
                 totalAmount: t.amount,
                 quantity: t.quantity,
                 movieTitle: t.movie,
                 ticketType: t.ticket_package,
+                branch_id: t.branch_id,
                 branch_name: t.branch_name || '',
                 vr_items: t.vr_items || [],
                 booking_type: t.booking_type || 'movie'
@@ -236,6 +251,8 @@ export default function Account() {
                     dob: dobStr || p.dob || ''
                 }));
             }
+
+            setServerClockOffset(serverClockOffsetMs((txRes as any)?.server_now));
 
             const items = txRes?.items || [];
             const mapped =

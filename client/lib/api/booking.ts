@@ -61,20 +61,6 @@ export async function confirmBookingApi(body: {
   });
 }
 
-export async function getBookingByIdApi(bookingId: number) {
-  return request<{
-    id: number;
-    payment_status: string;
-    user_id: number;
-    name: string;
-    phone: string;
-    email: string;
-    ticket_count: number;
-    total_price: number;
-    payment_method?: string;
-  }>(`/api/bookings/${bookingId}`);
-}
-
 export async function getBookingByCodeApi(code: string) {
   return request<{
     id: number;

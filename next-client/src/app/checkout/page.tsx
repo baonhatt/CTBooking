@@ -24,7 +24,8 @@ import {
         Gamepad2
 } from 'lucide-react';
 import UserLayout from '@/layouts/UserLayout';
-import { buildUrl, confirmBookingApi, getBookingByIdApi, getVRBookingById } from '@/lib/api';
+import { buildUrl, fetchBookingStatus } from '@/lib/api';
+import { classifyPaymentStatus } from '@/lib/payment-flow';
 import { useAuthState } from '@/hooks/useAuthState';
 import {
         parseMoviePackages,
@@ -59,62 +60,48 @@ export default function Checkout() {
                 // Assuming SePay might not send specific params on redirect, or customization allowed.
                 // If SePay redirects to /checkout without params, the polling logic will handle it using 'pendingOrder'.
                 // If SePay sends params:
-                const sepayGateway = searchParams.get('gateway');
-                const sepayTransactionDate = searchParams.get('transactionDate');
-                const sepayAmount = searchParams.get('transferAmount');
-                const sepayContent = searchParams.get('transferContent');
-
+                // The query string of a payment redirect is not trusted. The status always comes from the server (below).
                 let pending: any = null;
 
-                if (!pending) {
-                        const s = localStorage.getItem('pendingOrder');
-                        pending = s ? JSON.parse(s) : null;
+                const pendingJson = localStorage.getItem('pendingOrder');
+                if (pendingJson) {
+                        try {
+                                pending = JSON.parse(pendingJson);
+                        } catch {
+                                pending = null;
+                        }
                 }
                 // Fallback: nếu không có pending, thử lấy snapshot cuối cùng
                 if (!pending) {
-                        const last = localStorage.getItem('lastCheckoutOrder');
-                        pending = last ? JSON.parse(last) : null;
+                        const lastJson = localStorage.getItem('lastCheckoutOrder');
+                        if (lastJson) {
+                                try {
+                                        pending = JSON.parse(lastJson);
+                                } catch {
+                                        pending = null;
+                                }
+                        }
                 }
 
-                // Nếu không có pending data, thử lấy từ localStorage trước khi về trang chủ
                 if (!pending) {
-                        const savedOrder = localStorage.getItem('lastCheckoutOrder');
-                        if (savedOrder) {
-                                try {
-                                        const o = JSON.parse(savedOrder);
-                                        setOrder(o);
-                                        const vr = o.booking_type === 'vr' || (Array.isArray(o.vr_items) && o.vr_items.length > 0);
-                                        setIsVR(vr);
-                                        if (vr && Array.isArray(o.vr_items)) setVrItems(o.vr_items);
-                                        setStatus(o.payment_status === 'paid' ? 'success' : o.payment_status === 'failed' ? 'failed' : 'success');
-                                } catch { }
-                        } else {
-                                router.push('/');
-                        }
+                        router.push('/');
                         return;
                 }
 
-                // Nếu có pending data, set order
-                if (pending) {
-                        const merged = { ...pending };
-                        setOrder(merged);
-                        const vr = merged.booking_type === 'vr' || (Array.isArray(merged.vr_items) && merged.vr_items.length > 0);
-                        setIsVR(vr);
-                        if (vr && Array.isArray(merged.vr_items)) setVrItems(merged.vr_items);
-                        // VietQR/SePay - default to success if payment_status is paid or not set (webhook already confirmed)
-                        setStatus(merged.payment_status === 'failed' ? 'failed' : 'success');
-                        localStorage.removeItem('pendingOrder');
-                }
+                const merged = { ...pending };
+                setOrder(merged);
+                const vr = merged.booking_type === 'vr' || (Array.isArray(merged.vr_items) && merged.vr_items.length > 0);
+                setIsVR(vr);
+                if (vr && Array.isArray(merged.vr_items)) setVrItems(merged.vr_items);
 
-                // SePay handling
-                if (sepayGateway && pending && pending.booking_id) {
-                        // SePay usually confirms via webhook, but we can optimistically set loading or success if we trust the redirect
-                        // However, we should just let the polling (below) check the status from DB.
-                        // Or we can force a check.
-                        setStatus('processing'); // Show processing while polling checks status
-
-                        // Optional: Notify backend we are here, though webhook handles the core logic.
-                        // Just wait for poll to update status to "success"
+                // "Thành công" is shown only for an order already confirmed as paid: the payment page saves that after the
+                // server said so. An order that was just placed starts as "processing" until the server confirms it (below).
+                if (merged.payment_status === 'paid') {
+                        setStatus('success');
+                } else if (merged.payment_status === 'failed') {
+                        setStatus('failed');
+                } else {
+                        setStatus('processing');
                 }
 
                 const onAuthChanged = () => setIsLoggedIn(!!userName);
@@ -126,64 +113,43 @@ export default function Checkout() {
                 };
         }, [searchParams, userName]);
 
+        // Confirm the payment with the server. Only the payment state is read; the details shown on this page come from
+        // what this browser saved when the order was placed. The ticket code is in the email (and the account history).
         useEffect(() => {
-                if (!order?.booking_id) return;
-                (async () => {
-                        try {
-                                const bookingData = await getBookingByIdApi(Number(order.booking_id));
-                                if (bookingData) {
-                                        const newStatus =
-                                                bookingData.payment_status === 'paid' ? 'success' : bookingData.payment_status === 'failed' ? 'failed' : '';
-                                        if (newStatus) setStatus(newStatus);
-                                        if ((bookingData as any).booking_code) {
-                                                setBookingCode((bookingData as any).booking_code);
-                                        }
-                                        const bookingType = (bookingData as any).booking_type || 'movie';
-                                        let vrList: any[] = Array.isArray((bookingData as any).vr_items)
-                                                ? (bookingData as any).vr_items
-                                                : [];
-                                        if (vrList.length === 0 && (bookingType === 'vr' || bookingType === 'combo_vr')) {
-                                                try {
-                                                        const vrDetail = await getVRBookingById(Number(order.booking_id));
-                                                        vrList = vrDetail?.vr_items || [];
-                                                } catch { }
-                                        }
-                                        const vr = hasVrContent(bookingType, vrList);
-                                        setIsVR(vr);
-                                        setVrItems(vrList);
+                if (!order?.booking_id || !order?.order_token) return;
+                if (order.payment_status === 'paid') return;
 
-                                        const merged = {
-                                                ...order,
-                                                amount: bookingData.total_price ?? order.amount,
-                                                original_total_price: (bookingData as any).original_total_price ?? order.original_total_price,
-                                                voucher_discount_amount: (bookingData as any).voucher_discount_amount ?? order.voucher_discount_amount,
-                                                voucher_code_snapshot: (bookingData as any).voucher_code_snapshot ?? order.voucher_code_snapshot ?? order.voucher_code,
-                                                voucher_details:
-                                                        (bookingData as any).voucher_details ||
-                                                        (bookingData as any).voucherDetails ||
-                                                        order.voucher_details ||
-                                                        null,
-                                                payment_status: bookingData.payment_status ?? order.payment_status,
-                                                name: bookingData.name ?? order.name,
-                                                phone: bookingData.phone ?? order.phone,
-                                                email: bookingData.email ?? order.email,
-                                                method: bookingData.payment_method ?? order.method,
-                                                movie: (bookingData as any).movie_title || order.movie,
-                                                poster: (bookingData as any).movie_image || order.poster,
-                                                duration: (bookingData as any).duration_min || order.duration,
-                                                ticketPackageName: (bookingData as any).ticket_package_name || order.ticketPackageName,
-                                                expiryDate: (bookingData as any).expiry_date || order.expiryDate,
-                                                paidAt: (bookingData as any).paid_at || order.paidAt,
-                                                booking_type: bookingType,
-                                                vr_items: vrList
-                                        } as any;
-                                        setOrder(merged);
-                                        try {
-                                                localStorage.setItem('lastCheckoutOrder', JSON.stringify(merged));
-                                        } catch { }
-                                }
-                        } catch { }
+                let isCancelled = false;
+                (async () => {
+                        const result = await fetchBookingStatus(Number(order.booking_id), String(order.order_token));
+                        if (isCancelled) return;
+
+                        if (!result.ok) {
+                                // The order is gone for this token. Any other error leaves the page on "processing".
+                                if (result.httpStatus === 404) setStatus('failed');
+                                return;
+                        }
+
+                        const outcome = classifyPaymentStatus(result.data.payment_status);
+                        if (outcome === 'paid') {
+                                const paidOrder = { ...order, payment_status: 'paid', paidAt: order.paidAt || new Date().toISOString() };
+                                setStatus('success');
+                                setOrder(paidOrder);
+                                try {
+                                        localStorage.setItem('lastCheckoutOrder', JSON.stringify(paidOrder));
+                                        localStorage.removeItem('pendingOrder');
+                                } catch { }
+                        } else if (outcome === 'closed') {
+                                setStatus('failed');
+                        } else if (localStorage.getItem('qrPaymentData')) {
+                                // Not paid yet and the QR page can still be used: go back to it
+                                router.replace('/qr-payment');
+                        }
                 })();
+
+                return () => {
+                        isCancelled = true;
+                };
         }, [order?.booking_id]);
 
         const resolveImageUrl = (u: string | undefined | null) => {

@@ -1,5 +1,6 @@
 'use client';
 
+import { isValidPayCode, serverClockOffsetMs, localDeadlineMs, SAFETY_MARGIN_MS } from '@/lib/payment-flow';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
@@ -491,12 +492,6 @@ export default function BookingPage() {
     isBookingSubmittingRef.current = true;
     setIsProcessing(true);
     try {
-      const timestampSeconds = Math.floor(Date.now() / 1000);
-      const randomSuffix = Math.floor(Math.random() * 100)
-        .toString()
-        .padStart(2, '0');
-      const orderId = `CS${String(timestampSeconds).padStart(10, '0')}${randomSuffix}`;
-
       const vr_items: VRPackageItem[] = vrItems.map((i) => ({
         vr_package_id: i.packageId,
         quantity: i.quantity
@@ -543,8 +538,7 @@ export default function BookingPage() {
           vr_items,
           voucher_code: appliedVoucher ? voucherCode.trim() : undefined,
           branch_id: selectedBranch?.id,
-          paymentMethod,
-          pay_txt_code: orderId
+          paymentMethod
         });
         if (res?.error || !res?.booking) {
           throw new Error(res?.error || 'Không thể tạo đặt vé VR');
@@ -581,7 +575,6 @@ export default function BookingPage() {
           paymentMethod,
           totalPrice: canonicalTotal,
           ticketPackageId: mainMoviePkg.packageId,
-          pay_txt_code: orderId,
           movie_items,
           vr_items,
           voucher_code: appliedVoucher ? voucherCode.trim() : undefined,
@@ -589,6 +582,15 @@ export default function BookingPage() {
         });
         booking = res.booking;
       }
+
+      // The payment reference, the order token and the deadline all come from the server
+      if (!booking || !isValidPayCode(booking.pay_txt_code) || !booking.order_token) {
+        throw new Error('Không nhận được mã thanh toán từ máy chủ. Vui lòng thử lại.');
+      }
+      const orderId: string = booking.pay_txt_code;
+      const serverOffsetMs = serverClockOffsetMs(booking.server_now);
+      const paymentDeadlineMs =
+        localDeadlineMs(booking.payment_expires_at, serverOffsetMs) ?? Date.now() + 10 * 60 * 1000 - SAFETY_MARGIN_MS;
 
       const preferredMovie =
         directBookingItem?.preferredMovieId && movieItems.length > 0
@@ -599,6 +601,10 @@ export default function BookingPage() {
 
       const summary = {
         orderId,
+        pay_txt_code: orderId,
+        order_token: booking.order_token,
+        payment_expires_at: booking.payment_expires_at,
+        server_clock_offset_ms: serverOffsetMs,
         movie:
           movieItems.length > 0
             ? (preferredMovie?.title || movieItems[0]?.movies?.[0]?.title || movieItems[0]?.name || '')
@@ -662,7 +668,8 @@ export default function BookingPage() {
           branch_settings: selectedBranch?.settings
         })
       );
-      localStorage.removeItem('qrPaymentEndTime');
+      // The countdown ends on the server's deadline (moved onto this browser's clock), not on the browser's own idea of 10 minutes
+      localStorage.setItem('qrPaymentEndTime', String(paymentDeadlineMs));
       router.push('/qr-payment');
       return;
     } catch (err: any) {

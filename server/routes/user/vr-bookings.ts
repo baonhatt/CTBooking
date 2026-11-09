@@ -4,6 +4,9 @@ import { formatDateForDb } from '../../lib/date-utils';
 import { validateVoucherForVRImpl, matchesBranch } from './vouchers';
 import { sqlBranchIdsMatchFilter } from '../../lib/branch-ids';
 import { allocateVoucherDiscountToVrItems, parseApplicableIds } from '../../../shared/booking-invoice';
+import { generatePayTxtCode, isPayCodeCollision } from '../../lib/pay-code';
+import { resolveOrderBranchId } from '../../lib/booking-branch';
+import { releaseVoucherForCancelledBooking } from '../scheduled/booking-expiry';
 
 // =============== 1. List VR Packages for user booking page ===============
 export async function listActiveVRPackagesImpl(anyDb: any, tables: { ticket_packages: any }, branch_id?: number) {
@@ -155,6 +158,9 @@ export async function validateVRBookingImpl(anyDb: any, payload: VRBookingReques
 }
 
 // =============== 3. Create VR Booking (actually insert) ===============
+/** How many fresh random pay_txt_code values are tried if one happens to collide with an existing order. */
+const PAY_CODE_MAX_ATTEMPTS = 5;
+
 export async function createVRBookingImpl(
   anyDb: any,
   payload: VRBookingRequest,
@@ -165,11 +171,37 @@ export async function createVRBookingImpl(
     users: any;
     bookings: any;
     booking_vr_items: any;
+    branches: any;
   }
 ): Promise<VRBookingResponse & { status?: number }> {
+  // Set once the voucher slot is taken. If anything later fails, the slot is given back.
+  let lockedVoucherId: number | null = null;
+
+  async function giveBackVoucherSlot() {
+    // Clear first, so a second call (for example from the outer catch) cannot give the slot back twice
+    const voucherId = lockedVoucherId;
+    lockedVoucherId = null;
+    if (voucherId) {
+      try {
+        await releaseVoucherForCancelledBooking(
+          anyDb,
+          { vouchers: tables.vouchers },
+          { voucher_id: voucherId, previous_payment_status: 'pending' }
+        );
+      } catch (releaseError) {
+        console.error('[createVRBooking] Could not give back the voucher slot:', releaseError);
+      }
+    }
+  }
+
   try {
-    const validated = await validateVRBookingInput(anyDb, payload, tables);
-    const { name, phone, emailBook, paymentMethod, pay_txt_code, branch_id } = payload;
+    // Every order belongs to a branch: the one asked for, or the default branch (never empty)
+    const branch_id = await resolveOrderBranchId(anyDb, tables.branches, payload.branch_id);
+    const orderPayload = { ...payload, branch_id };
+
+    const validated = await validateVRBookingInput(anyDb, orderPayload, tables);
+    // The payment reference is generated here. Any pay_txt_code sent by the browser is ignored.
+    const { name, phone, emailBook, paymentMethod } = orderPayload;
     const booking_type = 'vr';
 
     const nowIso = new Date();
@@ -206,48 +238,54 @@ export async function createVRBookingImpl(
       if (!lockResult || (Array.isArray(lockResult) && lockResult.length === 0)) {
         return { success: false, error: 'Mã giảm giá vừa hết lượt sử dụng, vui lòng đặt lại không dùng mã.', status: 409 };
       }
+      lockedVoucherId = Number(voucher_applied.voucher_details.id);
     }
 
-    const inserted = await anyDb
-      .insert(tables.bookings)
-      .values({
-        user_id,
-        booking_type,
-        movie_id: null,
-        ticket_package_id: null, // multi VR items → bảng phụ
-        ticket_count: validated.total_quantity,
-        original_total_price: String(validated.original_total_price),
-        voucher_id: voucher_applied?.voucher_details?.id || null,
-        voucher_code_snapshot: voucher_applied?.voucher_details?.code || null,
-        voucher_discount_amount: String(validated.voucher_discount_amount),
-        total_price: String(validated.total_price),
-        payment_method: (paymentMethod || 'cash').toLowerCase(),
-        phone: phone.trim(),
-        name: name.trim(),
-        email: emailBook.trim(),
-        combo: null,
-        movie_title: null,
-        movie_duration: null,
-        movie_poster: null,
-        ticket_package_name: `VR Booking (${validated.total_quantity} gói)`,
-        ticket_unit_price: null,
-        branch_id: branch_id || null,
-        pay_txt_code: pay_txt_code || null,
-        payment_expires_at: paymentExpiresAt,
-        created_at: formatDateForDb(nowIso),
-        updated_at: formatDateForDb(nowIso)
-      })
-      .returning();
-
-    let bookingRow: any = Array.isArray(inserted) ? inserted[0] : inserted;
-    if (!bookingRow) {
-      // Fallback find last
-      bookingRow = await anyDb.query.bookings.findFirst({
-        where: sql`${tables.bookings.booking_type} = 'vr'`,
-        orderBy: sql`${tables.bookings.id} DESC`
-      });
+    // Insert the booking. The random pay_txt_code is the only value that can collide, so only that is retried.
+    let bookingRow: any = null;
+    for (let attempt = 1; attempt <= PAY_CODE_MAX_ATTEMPTS && !bookingRow; attempt++) {
+      try {
+        const inserted = await anyDb
+          .insert(tables.bookings)
+          .values({
+            user_id,
+            booking_type,
+            movie_id: null,
+            ticket_package_id: null, // multi VR items → bảng phụ
+            ticket_count: validated.total_quantity,
+            original_total_price: String(validated.original_total_price),
+            voucher_id: voucher_applied?.voucher_details?.id || null,
+            voucher_code_snapshot: voucher_applied?.voucher_details?.code || null,
+            voucher_discount_amount: String(validated.voucher_discount_amount),
+            total_price: String(validated.total_price),
+            payment_method: (paymentMethod || 'cash').toLowerCase(),
+            phone: phone.trim(),
+            name: name.trim(),
+            email: emailBook.trim(),
+            combo: null,
+            movie_title: null,
+            movie_duration: null,
+            movie_poster: null,
+            ticket_package_name: `VR Booking (${validated.total_quantity} gói)`,
+            ticket_unit_price: null,
+            branch_id,
+            pay_txt_code: generatePayTxtCode(),
+            payment_expires_at: paymentExpiresAt,
+            created_at: formatDateForDb(nowIso),
+            updated_at: formatDateForDb(nowIso)
+          })
+          .returning();
+        bookingRow = Array.isArray(inserted) ? inserted[0] : inserted;
+      } catch (insertError) {
+        if (!isPayCodeCollision(insertError) || attempt === PAY_CODE_MAX_ATTEMPTS) {
+          await giveBackVoucherSlot();
+          throw insertError;
+        }
+      }
     }
+
     if (!bookingRow) {
+      await giveBackVoucherSlot();
       return { success: false, error: 'Không thể tạo đặt VR', status: 500 };
     }
 
@@ -259,7 +297,7 @@ export async function createVRBookingImpl(
         quantity: it.quantity,
         unit_price: it.unit_price,
         package_name: it.package_name,
-        branch_id: branch_id || null
+        branch_id
       })),
       voucherScope: voucher_applied?.voucher_details?.scope || 'vr',
       applicablePackageIds: applicableIds,
@@ -276,16 +314,27 @@ export async function createVRBookingImpl(
       discounted_unit_price: it.discounted_unit_price,
       line_total: it.line_total,
       voucher_discount_amount: it.voucher_discount_amount,
-      branch_id: branch_id || null
+      branch_id
     }));
     const insertedItemsArr: any[] = [];
-    for (const row of itemsToSave) {
-      try {
+    try {
+      for (const row of itemsToSave) {
         const r = await anyDb.insert(tables.booking_vr_items).values(row).returning();
         if (r) insertedItemsArr.push(Array.isArray(r) ? r[0] : r);
-      } catch (err: any) {
-        console.error('Insert vr item lỗi', err);
       }
+    } catch (itemError) {
+      // An order that pays for VR packages but has no VR lines is wrong. Cancel it instead of returning "created".
+      console.error('Insert vr item lỗi', itemError);
+      try {
+        await anyDb
+          .update(tables.bookings)
+          .set({ payment_status: 'failed', updated_at: formatDateForDb(new Date()) })
+          .where(eq(tables.bookings.id, bookingRow.id));
+      } catch (cancelError) {
+        console.error('[createVRBooking] Could not cancel the half-created booking:', cancelError);
+      }
+      await giveBackVoucherSlot();
+      return { success: false, error: 'Không thể lưu chi tiết đặt vé. Vui lòng thử lại.', status: 500 };
     }
 
     const finalItems = insertedItemsArr.length > 0 ? insertedItemsArr : itemsToSave;
@@ -303,33 +352,17 @@ export async function createVRBookingImpl(
         voucher_id: voucher_applied?.voucher_details?.id || null,
         payment_status: bookingRow.payment_status || 'pending',
         payment_method: bookingRow.payment_method || paymentMethod,
+        // The reference the customer types into the bank transfer, and the payment deadline (both set by the server)
+        pay_txt_code: bookingRow.pay_txt_code,
+        payment_expires_at: bookingRow.payment_expires_at,
         vr_items: finalItems as any
-      }
+      } as any
     };
   } catch (err: any) {
-    return { success: false, error: err.message || 'Lỗi tạo VR booking', status: err.statusCode || 400 };
+    await giveBackVoucherSlot();
+    return { success: false, error: err.message || 'Lỗi tạo VR booking', status: err.statusCode || err.status || 400 };
   }
 }
 
-// =============== 4. Get VR Booking by ID (join vr_items) ===============
-export async function getVRBookingByIdImpl(
-  anyDb: any,
-  tables: { bookings: any; booking_vr_items: any; voucher_redemption_logs: any },
-  id: number
-) {
-  const booking = await anyDb.query.bookings.findFirst({
-    where: eq(tables.bookings.id, id)
-  });
-  if (!booking) return null;
-
-  const vr_items = await anyDb.query.booking_vr_items.findMany({
-    where: eq(tables.booking_vr_items.booking_id, id),
-    orderBy: sql`${tables.booking_vr_items.id} ASC`
-  });
-
-  return {
-    ...booking,
-    booking_type: booking.booking_type || 'movie',
-    vr_items
-  };
-}
+// The public lookup of a VR booking by id was removed: it returned every column of the booking to anyone.
+// The payment page now reads a minimal status through bookingStatusPayload (see booking/access.ts).

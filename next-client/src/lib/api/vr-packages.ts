@@ -1,4 +1,5 @@
 import { request } from '@/lib/api/http';
+import type { CreatedBooking } from './booking';
 
 export interface VRPackageItem {
   vr_package_id: number;
@@ -24,7 +25,6 @@ export interface VRBookingRequest {
   voucher_code?: string;
   branch_id?: number;
   paymentMethod: 'cash' | 'vietqr';
-  pay_txt_code?: string;
 }
 
 export function getVRPackages(branch_id?: number, opts?: { signal?: AbortSignal }) {
@@ -50,12 +50,10 @@ export function validateVRBooking(payload: VRBookingRequest) {
 }
 
 export function createVRBooking(payload: VRBookingRequest) {
-  return request<{ success: boolean; booking: any; error?: string }>('/api/vr/create-booking', {
+  return request<{ success: boolean; booking: CreatedBooking; error?: string }>('/api/vr/create-booking', {
     method: 'POST',
     body: JSON.stringify(payload)
   });
 }
 
-export function getVRBookingById(id: number) {
-  return request<any>(`/api/vr/bookings/${id}`);
-}
+// The VR booking lookup by id was removed: the payment page reads its status with fetchBookingStatus (booking.ts).

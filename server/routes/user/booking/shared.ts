@@ -10,7 +10,21 @@ export class HttpError extends Error {
 
 export const MAX_TICKET_PER_ORDER = 10;
 
+/**
+ * A quantity sent by the browser. Missing means 1. Anything that is not a whole number of at least 1
+ * (text, NaN, decimals, zero, negatives) is refused instead of being quietly turned into a price of NaN.
+ */
+export function normalizeQuantity(value: unknown): number {
+  const quantity = value === undefined || value === null || value === '' ? 1 : Number(value);
+  if (!Number.isInteger(quantity) || quantity < 1) {
+    throw new HttpError(400, 'Số lượng không hợp lệ.');
+  }
+  return quantity;
+}
+
 export type BookingValidationResult = {
+  /** The branch the order belongs to: the one asked for, or the default branch. Never empty. */
+  branchId: number;
   user: {
     id: number | null;
     email: string;
