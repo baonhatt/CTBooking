@@ -100,6 +100,8 @@ interface TicketInfo {
   valid: boolean;
   can_use: boolean;
   pay_txt_code?: string;
+  /** The bank's reference for the transfer, when the bank reported one for this order */
+  transaction_id?: string | null;
   validity_days: number | null;
   expired: boolean;
   movie_title?: string;
@@ -816,6 +818,19 @@ export default function TicketCheckContent() {
                     </span>
                   </div>
                 </div>
+
+                {/* Đơn đã huỷ hoặc hết hạn nhưng ngân hàng đã ghi nhận tiền: nhân viên cần đối chiếu */}
+                {['failed', 'expired'].includes(String(ticketInfo.payment_status || '').toLowerCase()) &&
+                  ticketInfo.transaction_id && (
+                    <div className="mt-4 py-3 px-4 rounded-2xl bg-amber-50 text-amber-800 border border-amber-200 flex items-start gap-2 text-left">
+                      <AlertTriangle size={18} className="mt-0.5 shrink-0" />
+                      <p className="text-sm">
+                        Đã có giao dịch ngân hàng ghi nhận cho đơn này, mã{' '}
+                        <span className="font-bold break-all">{ticketInfo.transaction_id}</span>. Hãy đối chiếu với sao kê
+                        rồi xác nhận thanh toán.
+                      </p>
+                    </div>
+                  )}
 
                 <div className="pt-4">
                   {/* Trường hợp 0: Giao dịch đã hủy */}

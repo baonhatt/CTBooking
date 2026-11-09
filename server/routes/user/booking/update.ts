@@ -6,6 +6,17 @@ import { redeemVoucherAfterPaymentImpl } from '../vouchers';
 import { releaseVoucherForCancelledBooking } from '../../scheduled/booking-expiry';
 import { isLineDiscounted, voucherScopeLabel, parseApplicableIds, vrPackageId } from '@shared/booking-invoice';
 
+/** The answer for a status change that someone else already made. It is a success: nothing is left to do. */
+function alreadyProcessedResult(booking: any) {
+  return {
+    status: 200,
+    message: 'Giao dịch đã được xử lý trước đó',
+    booking,
+    already_processed: true,
+    voucher_slot_unavailable: false
+  };
+}
+
 export async function updatePaymentImpl(
   anyDb: any,
   payload: {
@@ -85,11 +96,6 @@ export async function updatePaymentImpl(
     const isPaid = String(payment_status).toLowerCase() === 'paid';
     const isAlreadyPaid = String(booking.payment_status).toLowerCase() === 'paid';
 
-    // 2. Logic tạo mã vé
-    if (isPaid && !bookingCode) {
-      bookingCode = await generateBookingCode(anyDb);
-    }
-
     // Bảo vệ: Nếu đơn đã thanh toán (isAlreadyPaid) mà request gửi lên là failed
     // => Chặn update, trả về thông báo để Client xử lý (Alert "Đã thanh toán" thay vì "Đã hủy")
     if (isAlreadyPaid && payment_status === 'failed') {
@@ -98,6 +104,14 @@ export async function updatePaymentImpl(
         message: 'Giao dịch đã được thanh toán thành công',
         booking: booking
       };
+    }
+
+    // An order that is already paid is not paid again: no second ticket code, voucher log or email.
+    if (isPaid && isAlreadyPaid) return alreadyProcessedResult(booking);
+
+    // 2. Logic tạo mã vé. The code is made first but only saved by the request that wins the status change below.
+    if (isPaid && !bookingCode) {
+      bookingCode = await generateBookingCode(anyDb);
     }
 
     // 3. Chuẩn bị payload update
@@ -137,14 +151,30 @@ export async function updatePaymentImpl(
       if (confirmed_by_staff_id) updatePayload.confirmed_by_staff_id = Number(confirmed_by_staff_id);
     }
 
-    // 4. Update và lấy kết quả mới nhất
+    // 4. Update và lấy kết quả mới nhất.
+    // The status change is one conditional UPDATE, so two requests at the same moment cannot both win:
+    //  - to 'paid': only while the order is not paid yet;
+    //  - to failed / cancelled / expired: only while the order is still pending or expired.
+    const currentStatusSql = sql`coalesce(lower(${bookingsTable.payment_status}), '')`;
+    const transitionGuard = isPaid ? sql`${currentStatusSql} <> 'paid'` : sql`${currentStatusSql} in ('pending', 'expired')`;
+
     const updatedRes = await anyDb
       .update(bookingsTable)
       .set(updatePayload)
-      .where(eq(bookingsTable.id, booking.id))
+      .where(and(eq(bookingsTable.id, booking.id), transitionGuard))
       .returning();
 
     const updatedBooking = Array.isArray(updatedRes) ? updatedRes[0] : updatedRes;
+
+    // Nothing changed: another request got there first. Say so and do none of the follow-up work below.
+    if (!updatedBooking) {
+      const latest = await anyDb.query.bookings.findFirst({ where: eq(bookingsTable.id, booking.id) });
+      const latestStatus = String(latest?.payment_status || '').toLowerCase();
+      if (!isPaid && latestStatus === 'paid') {
+        return { status: 409, message: 'Giao dịch đã được thanh toán thành công', booking: latest };
+      }
+      return alreadyProcessedResult(latest || booking);
+    }
 
     // 5b. Redeem Voucher + VR booking logic (only if paid)
     let voucherSlotUnavailable = false;

@@ -1,5 +1,59 @@
-import { eq, sql } from 'drizzle-orm';
+import { eq, and, or, isNull } from 'drizzle-orm';
 import { updatePaymentImpl } from '../user/booking/update';
+import { logAuditAction } from '../../lib/audit-logger';
+
+// The customer has this long to pay, counted from the moment the order was created.
+const PAYMENT_WINDOW_MS = 10 * 60 * 1000;
+
+// The audit entries are made by the system, not by a staff member.
+const AUDIT_ACTOR_EMAIL = 'system';
+const AUDIT_ACTOR_NAME = 'SePay webhook';
+
+type WebhookTables = {
+  bookings: any;
+  users: any;
+  accounts: any;
+  movies: any;
+  ticket_packages: any;
+  branches: any;
+  auditLogs?: any;
+};
+
+/** One audit line for a bank transfer that did not make an order paid. Never stops the webhook. */
+async function recordTransferAudit(db: any, tables: WebhookTables, action: string, booking: any, details: string, extra: any) {
+  if (!tables.auditLogs) return;
+  try {
+    await logAuditAction(
+      db,
+      tables.auditLogs,
+      action,
+      'booking',
+      booking.id,
+      details,
+      null,
+      AUDIT_ACTOR_EMAIL,
+      AUDIT_ACTOR_NAME,
+      undefined,
+      JSON.stringify({ pay_txt_code: booking.pay_txt_code, ...extra })
+    );
+  } catch (error) {
+    console.error('[SePay] Audit log error:', error);
+  }
+}
+
+/** Keep the bank's transaction reference on the order so staff can find it. The first reference stays if one is there. */
+async function saveBankTransactionRef(db: any, tables: WebhookTables, booking: any, bankRef: string) {
+  if (!bankRef) return;
+  try {
+    const column = tables.bookings.transaction_id;
+    await db
+      .update(tables.bookings)
+      .set({ transaction_id: bankRef })
+      .where(and(eq(tables.bookings.id, booking.id), or(isNull(column), eq(column, ''))));
+  } catch (error) {
+    console.error('[SePay] Save transaction reference error:', error);
+  }
+}
 
 export function timingSafeEqualStr(a: string, b: string): boolean {
   if (typeof a !== 'string' || typeof b !== 'string') return false;
@@ -19,7 +73,7 @@ export function timingSafeEqualStr(a: string, b: string): boolean {
 
 export async function handleSePayWebhookImpl(
   db: any,
-  tables: { bookings: any; users: any; accounts: any; movies: any; ticket_packages: any; branches: any },
+  tables: WebhookTables,
   body: any,
   sendMailFn?: (to: string, subject: string, html: string) => Promise<any>,
   getBookingEmailHtml?: (data: any) => string,
@@ -49,6 +103,12 @@ export async function handleSePayWebhookImpl(
 
     // Log for debugging
     console.log('[SePay] Webhook received:', JSON.stringify({ id, transferType, transferAmount: finalAmount, referenceCode }));
+
+    // Money going OUT of the account is never a customer payment.
+    if (String(transferType || '').toLowerCase() === 'out') {
+      console.log('[SePay] Outgoing transfer ignored:', id);
+      return { success: true, message: 'Outgoing transfer ignored' };
+    }
 
     if (!finalContent) {
       return { success: false, message: 'No content' };
@@ -85,19 +145,39 @@ export async function handleSePayWebhookImpl(
       return { success: true, message: 'Booking not found' };
     }
 
-    // Check amount
-    if (Number(finalAmount) < Number(booking.total_price)) {
-      console.log('[SePay] Insufficient amount:', finalAmount, 'expected:', booking.total_price);
-      return { success: true, message: 'Insufficient amount' };
-    }
+    // The bank's reference for this transfer, as before: referenceCode, else the description
+    const bankRef = String(referenceCode || description || id || '');
+    const amountReceived = Number(finalAmount);
+    const amountNeeded = Number(booking.total_price);
 
-    // Check if already paid
-    if (booking.payment_status === 'paid') {
+    // Already paid: money that arrives again is left alone, but leaves a trace for staff
+    if (String(booking.payment_status || '').toLowerCase() === 'paid') {
+      await recordTransferAudit(
+        db,
+        tables,
+        'sepay_duplicate',
+        booking,
+        `Đơn #${booking.id} đã thanh toán, nhưng ngân hàng ghi nhận thêm ${amountReceived} (mã giao dịch ${bankRef || 'không có'}).`,
+        { amount_received: amountReceived, bank_ref: bankRef }
+      );
       return { success: true, message: 'Already paid' };
     }
 
+    // Check amount: the rule is unchanged, the order is paid only when the amount is at least the price
+    if (amountReceived < amountNeeded) {
+      console.log('[SePay] Insufficient amount:', finalAmount, 'expected:', booking.total_price);
+      await recordTransferAudit(
+        db,
+        tables,
+        'sepay_insufficient',
+        booking,
+        `Đơn #${booking.id} nhận ${amountReceived}, cần ${amountNeeded} (mã giao dịch ${bankRef || 'không có'}). Đơn giữ nguyên trạng thái.`,
+        { amount_received: amountReceived, amount_needed: amountNeeded, bank_ref: bankRef }
+      );
+      return { success: true, message: 'Insufficient amount' };
+    }
+
     // Check if booking payment window has expired (10 minutes from creation)
-    const PAYMENT_WINDOW_MS = 10 * 60 * 1000; // 10 minutes
     const createdAt = booking.created_at ? new Date(booking.created_at) : null;
     const now = new Date();
 
@@ -116,12 +196,23 @@ export async function handleSePayWebhookImpl(
         },
         undefined, // No email for failed payments
         undefined,
-        tables
+        tables as any
       );
 
       console.log(
         `[SePay] Booking ${booking.id} marked as 'failed' due to expired payment window. Result:`,
         failedResult
+      );
+
+      // The money did arrive. Keep the bank reference and a trace so staff can find it and confirm by hand.
+      await saveBankTransactionRef(db, tables, booking, bankRef);
+      await recordTransferAudit(
+        db,
+        tables,
+        'sepay_late_payment',
+        booking,
+        `Đơn #${booking.id} nhận ${amountReceived} sau hạn thanh toán (mã giao dịch ${bankRef || 'không có'}). Cần nhân viên đối chiếu và xác nhận.`,
+        { amount_received: amountReceived, amount_needed: amountNeeded, bank_ref: bankRef }
       );
 
       return {
@@ -136,13 +227,13 @@ export async function handleSePayWebhookImpl(
       {
         payment_id: booking.id,
         payment_status: 'paid',
-        transaction_id: referenceCode || description,
+        transaction_id: bankRef || undefined,
         paid_at: new Date(),
         user_id: booking.user_id
       },
       sendMailFn,
       getBookingEmailHtml,
-      tables,
+      tables as any,
       context
     );
 

@@ -165,6 +165,8 @@ export async function getBookingByCodeImpl(anyDb: any, codeRaw: string, tables: 
     valid,
     can_use,
     pay_txt_code: booking.pay_txt_code,
+    // The bank's reference for the transfer, when one was recorded (shown to staff on the ticket check screen)
+    transaction_id: booking.transaction_id || null,
     validity_days: daysLeft,
     expired,
     checked_in_at: booking.checked_in_at,

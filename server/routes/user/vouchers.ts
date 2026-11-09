@@ -415,6 +415,12 @@ export async function redeemVoucherAfterPaymentImpl(
     }
   }
 
+  // One redemption log per booking: a repeated call for the same booking writes nothing more.
+  const existingLog = await anyDb.query.voucher_redemption_logs.findFirst({
+    where: eq(tables.voucher_redemption_logs.booking_id, booking_id)
+  });
+  if (existingLog) return { ok: true, already_logged: true };
+
   // used_count was already atomically incremented when the booking was CREATED (voucher slot locked).
   // Here we only write the audit log to record that the voucher was successfully redeemed with payment.
   // DO NOT increment used_count again here.
