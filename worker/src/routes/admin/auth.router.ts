@@ -3,6 +3,12 @@ import { drizzle } from 'drizzle-orm/d1';
 import * as schema from '../../../../shared/schema';
 import { requireStaffAuth } from '../../middleware';
 import { getMailer } from './admin-helpers';
+import {
+  LOCKED_MESSAGE,
+  clearStaffLoginFailures,
+  isStaffLoginLocked,
+  recordStaffLoginFailure
+} from '../../../../server/lib/login-throttle';
 
 import {
   checkSuperAdminExists,
@@ -16,8 +22,6 @@ import {
   staffExtendSessionImpl,
   staffGetMeImpl,
   staffChangePasswordImpl,
-  staffForgotPasswordImpl,
-  staffResetPasswordImpl,
   staffRequestPasswordChangeOTP,
   staffChangePasswordWithOTP,
   staffForceChangePasswordImpl
@@ -145,6 +149,12 @@ authRouter.post('/api/admin/auth/login', async (c) => {
 
     const db = drizzle(c.env.cinema_db, { schema });
 
+    // Too many wrong passwords from this email and IP, or from this IP overall: refuse before checking credentials
+    const loginEmail = (body as any).email;
+    if (await isStaffLoginLocked(c.env.SETTINGS_KV, loginEmail, clientIp)) {
+      return c.json({ status: 'error', message: LOCKED_MESSAGE }, 400);
+    }
+
     const r = await staffLoginImpl(
       db,
       {
@@ -161,7 +171,15 @@ authRouter.post('/api/admin/auth/login', async (c) => {
       body
     );
 
-    if (r.status === 'error') return c.json(r, 400);
+    if (r.status === 'error') {
+      if ((r as any).code === 'invalid_credentials') {
+        await recordStaffLoginFailure(c.env.SETTINGS_KV, loginEmail, clientIp);
+      }
+      return c.json(r, 400);
+    }
+
+    // Password was correct: forget earlier failures for this email and IP
+    await clearStaffLoginFailures(c.env.SETTINGS_KV, loginEmail, clientIp);
 
     // Bỏ qua tạo session cookie nếu yêu cầu OTP
     if (r.status === 'require_otp') {
@@ -415,45 +433,15 @@ authRouter.post('/api/admin/auth/change-password-with-otp', requireStaffAuth, as
   }
 });
 
-// POST /api/admin/auth/forgot-password - Forgot password
-
-authRouter.post('/api/admin/auth/forgot-password', async (c) => {
-  try {
-    const body = await c.req.json().catch(() => ({}));
-
-    const db = drizzle(c.env.cinema_db, { schema });
-
-    const r = await staffForgotPasswordImpl(db, { staffs: schema.staffs, staffTokens: schema.staffTokens }, body);
-
-    if (r.status === 'error') return c.json(r, 400);
-
-    return c.json(r);
-  } catch (err: any) {
-    return c.json({ status: 'error', message: String(err?.message || 'Internal error') }, 500);
-  }
+// Staff forgot-password and reset-password-by-token are switched off.
+// Staff emails are placeholders, so no reset link can be delivered. A Super Admin resets
+// a staff password from the staff screen instead (POST /api/admin/staff/:id/reset-password).
+authRouter.post('/api/admin/auth/forgot-password', (c) => {
+  return c.json({ status: 'error', message: 'Not found' }, 404);
 });
 
-// POST /api/admin/auth/reset-password - Reset password with token
-
-authRouter.post('/api/admin/auth/reset-password', async (c) => {
-  try {
-    const body = await c.req.json().catch(() => ({}));
-
-    const db = drizzle(c.env.cinema_db, { schema });
-
-    const r = await staffResetPasswordImpl(
-      db,
-      { staffs: schema.staffs, staffTokens: schema.staffTokens, auditLogs: schema.auditLogs },
-      c.env.SETTINGS_KV,
-      body
-    );
-
-    if (r.status === 'error') return c.json(r, 400);
-
-    return c.json(r);
-  } catch (err: any) {
-    return c.json({ status: 'error', message: String(err?.message || 'Internal error') }, 500);
-  }
+authRouter.post('/api/admin/auth/reset-password', (c) => {
+  return c.json({ status: 'error', message: 'Not found' }, 404);
 });
 
 // ── Helper ──────────────────────────────────────────────────────────────────

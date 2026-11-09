@@ -48,7 +48,7 @@ export async function handleSePayWebhookImpl(
     const finalAmount = transferAmount;
 
     // Log for debugging
-    console.log('[SePay] Webhook received:', JSON.stringify(body));
+    console.log('[SePay] Webhook received:', JSON.stringify({ id, transferType, transferAmount: finalAmount, referenceCode }));
 
     if (!finalContent) {
       return { success: false, message: 'No content' };

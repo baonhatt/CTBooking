@@ -205,8 +205,6 @@ export async function createStaffImpl(
   const callerIsSuperAdmin = !!caller?.isSuperAdmin;
   const now = new Date().toISOString();
 
-  console.log('createStaffImpl forcePasswordChange:', forcePasswordChange, 'body:', body);
-
   // Check if email already exists in staffs
   const [existingStaff] = await db.select().from(staffs).where(eq(staffs.email, email)).limit(1);
   if (existingStaff && !existingStaff.deletedAt) {
@@ -241,13 +239,6 @@ export async function createStaffImpl(
 
   // Hash password
   const hashedPassword = await hashPassword(generatedPassword);
-
-  // Log generated password to console for local dev convenience
-  console.log(`\n===============================================================`);
-  console.log(`🎉 [STAFF CREATED / REACTIVATED]`);
-  console.log(`👤 Nhân viên: ${fullname} (${email})`);
-  console.log(`🔑 MẬT KHẨU KHỞI TẠO: ${generatedPassword}`);
-  console.log(`===============================================================\n`);
 
   let targetStaffId: number;
 
@@ -344,7 +335,7 @@ export async function createStaffImpl(
       context
     );
   } else {
-    console.warn('[Staff] No mailer provided, skipping account creation email (password was logged to console)');
+    console.warn('[Staff] No mailer provided, skipping account creation email');
   }
 
   const [finalStaff] = await db.select().from(staffs).where(eq(staffs.id, targetStaffId)).limit(1);
@@ -410,7 +401,6 @@ export async function updateStaffImpl(
   const callerIsSuperAdmin = !!caller?.isSuperAdmin;
   const now = new Date().toISOString();
 
-  console.log('updateStaffImpl body:', body);
 
   // Check if staff exists
   const [existing] = await db.select().from(staffs).where(eq(staffs.id, id)).limit(1);
@@ -740,13 +730,6 @@ export async function resetStaffPasswordImpl(
     loginUrl: loginUrl
   });
 
-  // Log prominent reset password banner in console for local dev convenience
-  console.log(`\n===============================================================`);
-  console.log(`🔑 [ADMIN RESET STAFF PASSWORD]`);
-  console.log(`👤 Nhân viên: ${existing.fullname} (${existing.email})`);
-  console.log(`🔑 MẬT KHẨU MỚI: ${newPassword}`);
-  console.log(`===============================================================\n`);
-
   if (mailer) {
     const { mailQueue } = await import('../../lib/mail-queue');
     mailQueue.add(
@@ -771,7 +754,7 @@ export async function resetStaffPasswordImpl(
       context
     );
   } else {
-    console.warn('[Staff] No mailer provided, skipping password reset email (new password was logged to console)');
+    console.warn('[Staff] No mailer provided, skipping password reset email');
   }
 
   const auditOld = buildAuditPayload(existing, 'staff');

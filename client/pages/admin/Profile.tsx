@@ -103,8 +103,8 @@ export default function ProfilePage({ active, setActive, adminEmailState, handle
       return;
     }
 
-    if (newPassword.length < 6) {
-      toast.error('Mật khẩu mới phải có ít nhất 6 ký tự');
+    if (newPassword.length < 12 || !/[A-Za-z]/.test(newPassword) || !/[0-9]/.test(newPassword)) {
+      toast.error('Mật khẩu mới phải có ít nhất 12 ký tự, gồm cả chữ và số');
       return;
     }
 
@@ -195,7 +195,7 @@ export default function ProfilePage({ active, setActive, adminEmailState, handle
                       type="password"
                       value={newPassword}
                       onChange={(e) => setNewPassword(e.target.value)}
-                      placeholder="Nhập mật khẩu mới (ít nhất 6 ký tự)"
+                      placeholder="Nhập mật khẩu mới (ít nhất 12 ký tự, gồm chữ và số)"
                     />
                   </div>
 

@@ -733,8 +733,8 @@ const ForcePasswordChangeView = ({ staff }: { staff: any }) => {
       setError('Mật khẩu xác nhận không khớp');
       return;
     }
-    if (newPassword.length < 6) {
-      setError('Mật khẩu phải có ít nhất 6 ký tự');
+    if (newPassword.length < 12 || !/[A-Za-z]/.test(newPassword) || !/[0-9]/.test(newPassword)) {
+      setError('Mật khẩu phải có ít nhất 12 ký tự, gồm cả chữ và số');
       return;
     }
 
@@ -799,7 +799,7 @@ const ForcePasswordChangeView = ({ staff }: { staff: any }) => {
                   type="password"
                   value={newPassword}
                   onChange={(e) => setNewPassword(e.target.value)}
-                  placeholder="Nhập tối thiểu 6 ký tự"
+                  placeholder="Tối thiểu 12 ký tự, gồm chữ và số"
                   className="bg-slate-950/70 border-slate-800/90 rounded-xl pl-10 pr-3 py-2.5 text-sm text-white placeholder:text-slate-600 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition-all"
                   required
                   autoFocus

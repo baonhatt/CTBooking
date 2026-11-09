@@ -132,8 +132,7 @@ app.use('/api/admin/*', async (c, next) => {
   const publicPaths = [
     '/api/admin/setup/super-admin',
     '/api/admin/auth/login',
-    '/api/admin/auth/forgot-password',
-    '/api/admin/auth/reset-password'
+    '/api/admin/auth/verify-login-otp'
   ];
   if (publicPaths.includes(url.pathname)) {
     return next();

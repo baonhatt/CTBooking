@@ -9,6 +9,32 @@ export async function verifyPassword(password: string, hash: string): Promise<bo
   return await bcrypt.compare(password, hash);
 }
 
+/** Minimum length of a staff password chosen by the staff member. */
+export const STAFF_PASSWORD_MIN_LENGTH = 12;
+
+/** bcrypt only uses the first 72 bytes, so longer passwords would give a false sense of strength. */
+export const STAFF_PASSWORD_MAX_LENGTH = 72;
+
+/**
+ * Checks a password a staff member chooses when changing their own password.
+ * Returns an error message, or null when the password is acceptable.
+ */
+export function validateStaffPasswordStrength(password: unknown): string | null {
+  if (typeof password !== 'string' || password.length === 0) {
+    return 'Vui lòng nhập mật khẩu mới';
+  }
+  if (password.length < STAFF_PASSWORD_MIN_LENGTH) {
+    return `Mật khẩu mới phải có ít nhất ${STAFF_PASSWORD_MIN_LENGTH} ký tự`;
+  }
+  if (password.length > STAFF_PASSWORD_MAX_LENGTH) {
+    return `Mật khẩu mới không được dài quá ${STAFF_PASSWORD_MAX_LENGTH} ký tự`;
+  }
+  if (!/[A-Za-z]/.test(password) || !/[0-9]/.test(password)) {
+    return 'Mật khẩu mới phải có cả chữ và số';
+  }
+  return null;
+}
+
 export function generateToken(): string {
   // Generate a random 64-character hex string
   const array = new Uint8Array(32);

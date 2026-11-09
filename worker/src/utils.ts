@@ -1,4 +1,5 @@
 import { Context } from 'hono';
+import { isLocal as isLocalRequestUrl } from '../../server/lib/media-utils';
 
 export const RL_MAX = 100;
 export const RL_WINDOW_MS = 60_000;
@@ -60,6 +61,62 @@ export async function deleteCache(env: any, fullUrl: string) {
   }
 }
 
+/** `ok` is true when the check passed. Otherwise `status` and `message` describe the rejection. */
+export type TurnstileResult = { ok: boolean; status: 200 | 403 | 500; message: string };
+
+/** Longest Turnstile token accepted (Cloudflare documents 2048 characters as the maximum). */
+const TURNSTILE_TOKEN_MAX_LENGTH = 2048;
+
+/** Seconds to wait for the Turnstile verification service before giving up. */
+const TURNSTILE_TIMEOUT_MS = 8000;
+
+/**
+ * Verifies a Cloudflare Turnstile token for the customer-facing routes.
+ * - Skipped on localhost.
+ * - Fails closed when TURNSTILE_SECRET is not configured, so a missing secret can never turn the check off.
+ * - Builds the request body with URLSearchParams so the client-supplied token cannot add or override fields.
+ */
+export async function verifyTurnstile(
+  env: any,
+  token: unknown,
+  requestUrl: string,
+  remoteIp?: string
+): Promise<TurnstileResult> {
+  if (isLocalRequestUrl(requestUrl)) return { ok: true, status: 200, message: '' };
+
+  const secret = String(env?.TURNSTILE_SECRET || '');
+  if (!secret) {
+    return { ok: false, status: 500, message: 'Hệ thống chưa cấu hình xác thực bảo mật. Vui lòng liên hệ quản trị viên.' };
+  }
+
+  if (typeof token !== 'string' || token.length === 0 || token.length > TURNSTILE_TOKEN_MAX_LENGTH) {
+    return {
+      ok: false,
+      status: 403,
+      message: 'Thiếu mã xác thực bảo mật (CAPTCHA). Vui lòng tải lại trang và thử lại.'
+    };
+  }
+
+  try {
+    const form = new URLSearchParams({ secret, response: token });
+    if (remoteIp) form.set('remoteip', remoteIp);
+
+    const verifyRes = await fetch('https://challenges.cloudflare.com/turnstile/v0/siteverify', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: form,
+      signal: AbortSignal.timeout(TURNSTILE_TIMEOUT_MS)
+    });
+    const verifyData: any = await verifyRes.json();
+    if (!verifyData?.success) {
+      return { ok: false, status: 403, message: 'Xác minh CAPTCHA thất bại. Vui lòng tải lại trang.' };
+    }
+    return { ok: true, status: 200, message: '' };
+  } catch {
+    return { ok: false, status: 500, message: 'Lỗi xác minh bảo mật nội bộ.' };
+  }
+}
+
 export async function hmacHex(algo: 'SHA-256' | 'SHA-512', key: string, message: string): Promise<string> {
   const enc = new TextEncoder();
   const cryptoKey = await crypto.subtle.importKey('raw', enc.encode(key), { name: 'HMAC', hash: algo }, false, [
@@ -78,10 +135,23 @@ export function logSystemError(context: string, error: any, payload?: any) {
   const stack = error?.stack || 'No stack trace';
   const safePayload = payload ? { ...payload } : 'No payload';
 
-  // Mask sensitive fields
+  // Mask sensitive fields (credentials and personal data)
+  const maskedKeys = [
+    'password',
+    'newPassword',
+    'oldPassword',
+    'token',
+    'turnstileToken',
+    'otp',
+    'email',
+    'emailBook',
+    'phone',
+    'name'
+  ];
   if (typeof safePayload === 'object' && safePayload !== null) {
-    if ('password' in safePayload) safePayload.password = '***';
-    if ('token' in safePayload) safePayload.token = '***';
+    for (const maskedKey of maskedKeys) {
+      if (maskedKey in safePayload) (safePayload as any)[maskedKey] = '***';
+    }
   }
 
   console.error(`[${timestamp}] [ERROR] [${context}]`);

@@ -5,11 +5,20 @@ import {
   verifyPassword,
   generateToken,
   getStaffSessionExpiry,
-  invalidateStaffPermissionCache
+  invalidateStaffPermissionCache,
+  validateStaffPasswordStrength
 } from '../../lib/staff-auth';
 import { logAuditAction } from '../../lib/audit-logger';
 import { buildAuditPayload } from '../../lib/audit-utils';
 import { sendStaffPasswordChangeOTP, validateStaffOTP, deleteStaffOTP } from '../../lib/otp-utils';
+import { getGlobalSettingsImpl } from '../../lib/global-settings';
+import {
+  LOCKED_MESSAGE,
+  OTP_DEFAULT_MAX_FAILS,
+  clearStaffOtpFailures,
+  isStaffOtpLocked,
+  recordStaffOtpFailure
+} from '../../lib/login-throttle';
 
 export async function staffLoginImpl(db: any, tables: any, kv: any, body: { email: string; password: string }) {
   const { staffs, staffTokens } = tables;
@@ -18,18 +27,18 @@ export async function staffLoginImpl(db: any, tables: any, kv: any, body: { emai
   // Find staff by email
   const [staff] = await db.select().from(staffs).where(eq(staffs.email, email)).limit(1);
   if (!staff) {
-    return { status: 'error', message: 'Email hoặc mật khẩu không đúng' };
+    return { status: 'error', code: 'invalid_credentials', message: 'Email hoặc mật khẩu không đúng' };
   }
 
   // Check if staff is active
   if (!staff.isActive) {
-    return { status: 'error', message: 'Tài khoản đã bị vô hiệu hóa' };
+    return { status: 'error', code: 'invalid_credentials', message: 'Tài khoản đã bị vô hiệu hóa' };
   }
 
   // Verify password
   const isValid = await verifyPassword(password, staff.password);
   if (!isValid) {
-    return { status: 'error', message: 'Email hoặc mật khẩu không đúng' };
+    return { status: 'error', code: 'invalid_credentials', message: 'Email hoặc mật khẩu không đúng' };
   }
 
   // Fetch global settings to check if Admin 2FA is enabled
@@ -54,6 +63,9 @@ export async function staffLoginImpl(db: any, tables: any, kv: any, body: { emai
     if (!result.success) {
       return { status: 'error', message: 'Không thể gửi mã OTP, vui lòng thử lại sau.' };
     }
+
+    // A fresh OTP was issued after a correct password, so earlier wrong OTP guesses no longer count
+    await clearStaffOtpFailures(kv, staff.id);
 
     return { 
       status: 'require_otp', 
@@ -114,16 +126,40 @@ export async function staffVerifyLoginOtpImpl(db: any, tables: any, kv: any, bod
   const { staffs, staffTokens } = tables;
   const { staffId, otp } = body;
 
-  const otpValidation = await validateStaffOTP(db, { staffTokens }, staffId, otp);
-  if (!otpValidation.valid) {
-    return { status: 'error', message: otpValidation.error || 'OTP không hợp lệ hoặc đã hết hạn' };
+  // One generic message for every rejection, so the reply does not reveal which check failed
+  const rejected = { status: 'error' as const, message: 'OTP không hợp lệ hoặc đã hết hạn' };
+
+  // Reject malformed input before touching the database
+  if (!Number.isInteger(staffId) || staffId <= 0 || typeof otp !== 'string' || !/^\d{4,8}$/.test(otp)) {
+    return rejected;
   }
 
-  // Get staff
   const [staff] = await db.select().from(staffs).where(eq(staffs.id, staffId)).limit(1);
   if (!staff || !staff.isActive) {
-    return { status: 'error', message: 'Tài khoản không tồn tại hoặc đã bị vô hiệu hóa' };
+    return rejected;
   }
+
+  // This step only exists for staff who were sent an OTP after a correct password.
+  // With 2FA off, or for the Super Admin (who skips 2FA), there is nothing to verify.
+  const globalSettings = await getGlobalSettingsImpl(kv);
+  const adminOtpSettings = globalSettings.admin_otp_settings;
+  const is2FAEnabled = adminOtpSettings?.enable_2fa ?? true;
+  if (!is2FAEnabled || staff.isSuperAdmin) {
+    return rejected;
+  }
+
+  const maxFails = Number(adminOtpSettings?.max_otp_attempts) || OTP_DEFAULT_MAX_FAILS;
+  if (await isStaffOtpLocked(kv, staffId, maxFails)) {
+    return { status: 'error', message: LOCKED_MESSAGE };
+  }
+
+  const otpValidation = await validateStaffOTP(db, { staffTokens }, staffId, otp);
+  if (!otpValidation.valid) {
+    await recordStaffOtpFailure(kv, staffId);
+    return rejected;
+  }
+
+  await clearStaffOtpFailures(kv, staffId);
 
   // Delete used OTP
   await deleteStaffOTP(db, { staffTokens }, staffId);
@@ -262,6 +298,14 @@ export async function staffChangePasswordImpl(
 ) {
   const { staffs, staffTokens } = tables;
   const { oldPassword, newPassword } = body;
+
+  const strengthError = validateStaffPasswordStrength(newPassword);
+  if (strengthError) {
+    return { status: 'error', message: strengthError };
+  }
+  if (newPassword === oldPassword) {
+    return { status: 'error', message: 'Mật khẩu mới phải khác mật khẩu cũ' };
+  }
 
   // Get staff
   const [staff] = await db.select().from(staffs).where(eq(staffs.id, staffId)).limit(1);
@@ -478,6 +522,14 @@ export async function staffChangePasswordWithOTP(
   const { staffs, staffTokens } = tables;
   const { oldPassword, newPassword, otp } = body;
 
+  const strengthError = validateStaffPasswordStrength(newPassword);
+  if (strengthError) {
+    return { status: 'error', message: strengthError };
+  }
+  if (newPassword === oldPassword) {
+    return { status: 'error', message: 'Mật khẩu mới phải khác mật khẩu cũ' };
+  }
+
   // Get staff
   const [staff] = await db.select().from(staffs).where(eq(staffs.id, staffId)).limit(1);
   if (!staff) {
@@ -563,6 +615,14 @@ export async function staffForceChangePasswordImpl(
   // Double check if force change is required
   if (!staff.forcePasswordChange) {
     return { status: 'error', message: 'Tài khoản không ở trạng thái yêu cầu đổi mật khẩu bắt buộc' };
+  }
+
+  const strengthError = validateStaffPasswordStrength(newPassword);
+  if (strengthError) {
+    return { status: 'error', message: strengthError };
+  }
+  if (await verifyPassword(newPassword, staff.password)) {
+    return { status: 'error', message: 'Mật khẩu mới phải khác mật khẩu hiện tại' };
   }
 
   const auditOld = buildAuditPayload(staff, 'staff');

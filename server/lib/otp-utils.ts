@@ -179,15 +179,6 @@ export async function sendStaffPasswordChangeOTP(
     createdAt: new Date().toISOString()
   });
 
-  // Log prominent OTP banner in console for local dev convenience
-  console.log(`\n===============================================================`);
-  console.log(`🔐 [STAFF PASSWORD CHANGE OTP]`);
-  console.log(`👤 Nhân viên: ${staffName} (ID: ${staffId})`);
-  console.log(`📧 Gửi tới email: ${staffEmail}`);
-  console.log(`🔑 MÃ XÁC THỰC OTP: ${otp}`);
-  console.log(`⏱️ Thời hạn: ${expiryMinutes} phút`);
-  console.log(`===============================================================\n`);
-
   // Send OTP email
   const html = getStaffPasswordChangeOTPTemplate({
     staffName,
@@ -264,14 +255,6 @@ export async function sendStaffLoginOTP(
     createdAt: new Date().toISOString()
   });
 
-  console.log(`\n===============================================================`);
-  console.log(`🔐 [STAFF LOGIN OTP]`);
-  console.log(`👤 Nhân viên: ${staffName} (ID: ${staffId})`);
-  console.log(`📧 Gửi tới email: ${staffEmail}`);
-  console.log(`🔑 MÃ ĐĂNG NHẬP (2FA): ${otp}`);
-  console.log(`⏱️ Thời hạn: ${expiryMinutes} phút`);
-  console.log(`===============================================================\n`);
-
   // Send OTP email
   const html = getStaffLoginOTPTemplate({
     staffName,
@@ -330,9 +313,6 @@ export async function validateStaffOTP(
   });
 
   if (!tokenRecord) {
-    if (otp === '123456') {
-      return { valid: true };
-    }
     return { valid: false, error: 'OTP không đúng' };
   }
 
