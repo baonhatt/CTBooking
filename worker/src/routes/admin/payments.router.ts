@@ -26,6 +26,7 @@ import { logSystemError } from '../../utils';
 import { getRevenueImpl, listTransactionsImpl, getTransactionByIdImpl } from '../../../../server/routes/admin/payments';
 import { checkSepayTransactionImpl } from '../../../../server/routes/admin/sepay';
 import { confirmBookingImpl } from '../../../../server/routes/admin/confirm-booking';
+import { resendBookingEmailImpl } from '../../../../server/routes/admin/resend-booking-email';
 import { confirmUseTicketImpl, getBookingByCodeImpl } from '../../../../server/routes/user/booking/query';
 type Variables = { staffId?: number; staffEmail?: string; staffFullname?: string; isSuperAdmin?: boolean; staffPermissions?: Array<{ module: string; action: string }>; staffBranchIds?: number[]; };
 const paymentsRouter = new Hono<{ Bindings: any; Variables: Variables }>();
@@ -233,6 +234,38 @@ paymentsRouter.post('/api/admin/confirm-booking', requireStaffAuth, requirePermi
     logSystemError('confirm-booking', err, body);
 
     return c.json({ message: err?.message || 'Lỗi máy chủ nội bộ' }, 500);
+  }
+});
+
+// Staff send the confirmation email of a paid order again. Uses the existing ticket_check.validate right.
+paymentsRouter.post('/api/admin/bookings-resend-email', requireStaffAuth, requirePermission('ticket_check', 'validate'), async (c) => {
+  let body: any = {};
+
+  try {
+    const db = drizzle(c.env.cinema_db, { schema });
+    const tables = getD1Tables(schema);
+    body = await c.req.json().catch(() => ({}));
+
+    const appBaseUrl = c.env.VITE_CLIENT_BASE_URL || 'https://cinesphere.com.vn';
+    const renderBooking = (data: any) => getBookingEmailTemplate(appBaseUrl, data);
+
+    // The staff member and branch scope come from the session, never from the request body
+    const r = await resendBookingEmailImpl(
+      db,
+      tables,
+      body,
+      { id: c.get('staffId'), email: c.get('staffEmail'), fullname: c.get('staffFullname') },
+      getRestrictBranchIds(c),
+      getMailer(c),
+      renderBooking,
+      c.executionCtx
+    );
+
+    const status = typeof (r as any).status === 'number' ? (r as any).status : 200;
+    return c.json({ ...(r as any), status: status >= 400 ? 'error' : 'success' }, status as any);
+  } catch (err: any) {
+    logSystemError('resend-booking-email', err, body);
+    return c.json({ status: 'error', message: 'Lỗi máy chủ nội bộ' }, 500);
   }
 });
 

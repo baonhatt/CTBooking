@@ -237,9 +237,14 @@ userRouter.post('/api/resend-otp', async (c) => {
 });
 
 const registerSchema = z.object({
-  email: z.string().email('Email không hợp lệ'),
+  email: z.string().email('Email không hợp lệ').max(254, 'Email quá dài'),
   password: z.string().min(1, 'Mật khẩu không được để trống'),
-  name: z.string().min(1, 'Tên không được để trống'),
+  name: z
+    .string()
+    .trim()
+    .min(1, 'Tên không được để trống')
+    .max(100, 'Tên tối đa 100 ký tự')
+    .refine((value) => !/[<>]/.test(value), 'Tên không được chứa ký tự < hoặc >'),
   phone: z.string().optional(),
   gender: z.string().optional(),
   dob: z.string().optional(),

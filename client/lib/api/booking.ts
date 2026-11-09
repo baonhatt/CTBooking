@@ -61,6 +61,13 @@ export async function confirmBookingApi(body: {
   });
 }
 
+export async function resendBookingEmailApi(bookingId: number) {
+  return request<{ message: string }>('/api/admin/bookings-resend-email', {
+    method: 'POST',
+    body: JSON.stringify({ booking_id: bookingId })
+  });
+}
+
 export async function getBookingByCodeApi(code: string) {
   return request<{
     id: number;
@@ -83,6 +90,8 @@ export async function getBookingByCodeApi(code: string) {
     can_use: boolean;
     validity_days: number | null;
     expired: boolean;
+    transaction_id?: string | null;
+    email_status?: { state: 'sent' | 'failed' | 'pending' | 'none'; at: string | null };
   }>(`/api/admin/bookings-code/${code}`);
 }
 

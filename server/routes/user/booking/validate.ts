@@ -3,6 +3,7 @@ import { eq, and, asc, isNull, inArray, sql } from 'drizzle-orm';
 import { validateVoucherForVRImpl, matchesBranch } from '../vouchers';
 import { HttpError, MAX_TICKET_PER_ORDER, BookingValidationResult, normalizeQuantity } from './shared';
 import { resolveOrderBranchId } from '../../../lib/booking-branch';
+import { isValidCustomerName, isValidCustomerEmail, NAME_MAX_LENGTH } from '../../../lib/customer-input';
 
 export async function validateBookingInput(
   anyDb: any,
@@ -25,6 +26,12 @@ export async function validateBookingInput(
   }
   if (ticketCount > MAX_TICKET_PER_ORDER) {
     throw new HttpError(400, `Mỗi lượt chỉ đặt tối đa ${MAX_TICKET_PER_ORDER} vé.`);
+  }
+  if (!isValidCustomerName(name)) {
+    throw new HttpError(400, `Họ tên không hợp lệ (tối đa ${NAME_MAX_LENGTH} ký tự, không chứa < hoặc >).`);
+  }
+  if (!isValidCustomerEmail(email) || !isValidCustomerEmail(emailBook)) {
+    throw new HttpError(400, 'Email không hợp lệ.');
   }
   const usersTable = tables.users;
   const accountsTable = tables.accounts;

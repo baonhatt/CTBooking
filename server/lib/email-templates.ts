@@ -19,6 +19,25 @@ const COMPANY_ADDRESS = process.env.COMPANY_ADDRESS || '123 Đường Điện �
 const BRAND_SOLID = '#667eea'; // màu solid fallback khi gradient không chạy (Outlook)
 const BRAND_GRADIENT = 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)';
 
+// ---- Escaping: every value that comes from a customer, staff member or the database goes through these ----
+
+/** Makes a value safe to put in HTML text or in a quoted attribute. Missing values become an empty string. */
+export function escapeHtml(value: unknown): string {
+  return String(value ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+/** A link for href="...": only https (or http on localhost for development). Anything else becomes "#". */
+export function escapeAttr(url: unknown): string {
+  const text = String(url ?? '').trim();
+  const allowed = /^https:\/\//i.test(text) || /^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?(\/|$)/i.test(text);
+  return allowed ? escapeHtml(text) : '#';
+}
+
 export function getBookingEmailTemplate(baseUrlOrData: any, maybeData?: any): string {
   const data = typeof baseUrlOrData === 'object' && baseUrlOrData !== null ? baseUrlOrData : maybeData || {};
   const baseUrl =
@@ -57,10 +76,10 @@ export function getBookingEmailTemplate(baseUrlOrData: any, maybeData?: any): st
             (title, index) => `
         <tr>
             <td style="padding: 10px 0; ${index < movieTitles.length - 1 ? 'border-bottom: 1px dashed #e2e8f0;' : ''} font-size: 14px; color: #2d3748; font-weight: 600;">
-                🎬&nbsp;${title}
+                🎬&nbsp;${escapeHtml(title)}
             </td>
             <td style="padding: 10px 0; ${index < movieTitles.length - 1 ? 'border-bottom: 1px dashed #e2e8f0;' : ''} font-size: 12px; color: #a0aec0; white-space: nowrap; text-align: right; padding-left: 12px;">
-                ${durations[index] || '--'} phút
+                ${escapeHtml(durations[index] || '--')} phút
             </td>
         </tr>
         `
@@ -76,11 +95,11 @@ export function getBookingEmailTemplate(baseUrlOrData: any, maybeData?: any): st
     ? `
     <tr>
         <td style="padding: 12px 0; border-bottom: 1px solid #f7fafc; color: #718096; font-weight: 500;">Chi nhánh:</td>
-        <td style="padding: 12px 0; border-bottom: 1px solid #f7fafc; color: #1a202c; font-weight: 700; text-align: right;">${data.branchName}</td>
+        <td style="padding: 12px 0; border-bottom: 1px solid #f7fafc; color: #1a202c; font-weight: 700; text-align: right;">${escapeHtml(data.branchName)}</td>
     </tr>
     <tr>
         <td style="padding: 12px 0; border-bottom: 1px solid #f7fafc; color: #718096; font-weight: 500;">Địa chỉ:</td>
-        <td style="padding: 12px 0; border-bottom: 1px solid #f7fafc; color: #4a5568; font-weight: 700; font-size: 12px; text-align: right;">${data.branchAddress || ''}</td>
+        <td style="padding: 12px 0; border-bottom: 1px solid #f7fafc; color: #4a5568; font-weight: 700; font-size: 12px; text-align: right;">${escapeHtml(data.branchAddress)}</td>
     </tr>`
     : ``;
 
@@ -120,13 +139,13 @@ export function getBookingEmailTemplate(baseUrlOrData: any, maybeData?: any): st
   const priceSummaryHtml = `
     <tr>
         <td style="padding: 12px 0; border-bottom: 1px dashed #e2e8f0; color: #718096; font-size: 14px;">Tổng tiền:</td>
-        <td style="padding: 12px 0; border-bottom: 1px dashed #e2e8f0; color: #1a202c; font-weight: 700; font-size: 15px; text-align: right;">${originalTotalStr}đ</td>
+        <td style="padding: 12px 0; border-bottom: 1px dashed #e2e8f0; color: #1a202c; font-weight: 700; font-size: 15px; text-align: right;">${escapeHtml(originalTotalStr)}đ</td>
     </tr>
     ${
       data.discountAmt && data.discountAmt > 0
         ? `
     <tr>
-        <td style="padding: 12px 0; border-bottom: 1px dashed #e2e8f0; color: #718096; font-size: 14px;">Giảm giá${data.voucherCode ? ` (${data.voucherCode})` : ''}:</td>
+        <td style="padding: 12px 0; border-bottom: 1px dashed #e2e8f0; color: #718096; font-size: 14px;">Giảm giá${data.voucherCode ? ` (${escapeHtml(data.voucherCode)})` : ''}:</td>
         <td style="padding: 12px 0; border-bottom: 1px dashed #e2e8f0; color: #38a169; font-weight: 700; font-size: 15px; text-align: right;">-${data.discountAmt.toLocaleString('vi-VN')}đ</td>
     </tr>
     `
@@ -137,7 +156,7 @@ export function getBookingEmailTemplate(baseUrlOrData: any, maybeData?: any): st
             <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse: collapse; background: #eef2ff; border-left: 4px solid #4f46e5; margin: 10px 0; border-radius: 6px;">
                 <tr>
                     <td style="padding: 12px 14px; color: #4a5568; font-weight: 600; font-size: 14px;">Tổng thanh toán:</td>
-                    <td style="padding: 12px 14px; color: #4338ca; font-weight: 800; font-size: 19px; text-align: right;">${finalTotalStr}đ</td>
+                    <td style="padding: 12px 14px; color: #4338ca; font-weight: 800; font-size: 19px; text-align: right;">${escapeHtml(finalTotalStr)}đ</td>
                 </tr>
             </table>
         </td>
@@ -170,13 +189,13 @@ export function getBookingEmailTemplate(baseUrlOrData: any, maybeData?: any): st
         </div>
         <div class="content">
             <div style="font-size: 16px; color: #2d3748; margin-bottom: 20px;">
-                Xin chào <strong>${data.customerName || 'Quý khách'}</strong>,<br>
+                Xin chào <strong>${escapeHtml(data.customerName || 'Quý khách')}</strong>,<br>
                 Đơn hàng của bạn đã được xác nhận. Vui lòng xuất trình mã vé dưới đây tại quầy soát vé.
             </div>
             
             <div class="booking-code-box">
                 <div style="font-size: 12px; color: #718096; margin-bottom: 8px; font-weight: bold;">MÃ ĐẶT VÉ CỦA BẠN</div>
-                <div class="booking-code">${data.bookingCode || 'KHÔNG RÕ'}</div>
+                <div class="booking-code">${escapeHtml(data.bookingCode || 'KHÔNG RÕ')}</div>
             </div>
 
             ${data.moviePackagesTableHtml || ''}
@@ -189,7 +208,7 @@ export function getBookingEmailTemplate(baseUrlOrData: any, maybeData?: any): st
                 <tr>
                     <td style="padding: 12px 0; border-bottom: 1px solid #f7fafc; color: #718096; font-weight: 500;">Số lượng vé:</td>
                     <td style="padding: 12px 0; border-bottom: 1px solid #f7fafc; text-align: right;">
-                        <span style="background: #e0e7ff; color: #4338ca; padding: 3px 10px; border-radius: 4px; font-weight: 700; font-size: 13px;">${data.ticketCount || 0} VÉ</span>
+                        <span style="background: #e0e7ff; color: #4338ca; padding: 3px 10px; border-radius: 4px; font-weight: 700; font-size: 13px;">${escapeHtml(data.ticketCount || 0)} VÉ</span>
                     </td>
                 </tr>
                 <tr>
@@ -217,7 +236,7 @@ export function getBookingEmailTemplate(baseUrlOrData: any, maybeData?: any): st
         <div class="footer">
             <p><strong>CINESPHERE - TRẢI NGHIỆM ĐIỆN ẢNH VŨ TRỤ</strong></p>
             <p>Trụ sở: ${COMPANY_ADDRESS}</p>
-            <p>Email: ${SUPPORT_EMAIL} | Hotline: ${hotline}</p>
+            <p>Email: ${SUPPORT_EMAIL} | Hotline: ${escapeHtml(hotline)}</p>
             <p style="margin-top: 15px;">Đây là email tự động, vui lòng không trả lời.</p>
         </div>
     </div>
@@ -325,7 +344,7 @@ export function getResetPasswordEmailTemplate(arg1: string, arg2?: string): stri
 
             <div class="btn-container">
                 <!-- FIX: inline CSS đầy đủ trên thẻ <a> để không phụ thuộc <style> bị strip -->
-                <a href="${link}" class="btn" style="display: inline-block; padding: 14px 34px; background-color: ${BRAND_SOLID}; background-image: ${BRAND_GRADIENT}; color: #ffffff; text-decoration: none; border-radius: 8px; font-weight: 600; font-size: 16px;">Đặt lại Mật khẩu</a>
+                <a href="${escapeAttr(link)}" class="btn" style="display: inline-block; padding: 14px 34px; background-color: ${BRAND_SOLID}; background-image: ${BRAND_GRADIENT}; color: #ffffff; text-decoration: none; border-radius: 8px; font-weight: 600; font-size: 16px;">Đặt lại Mật khẩu</a>
             </div>
 
             <div class="note">
@@ -400,8 +419,8 @@ export function getWelcomeEmailTemplate(arg1: any, arg2?: any): string {
     </div>
     <div class="content">
       <div class="greeting">
-        Xin chào <strong>${data.customerName || 'Quý khách'}</strong>,<br>
-        Tài khoản của bạn đã được tạo thành công với email <strong>${data.email || 'của bạn'}</strong>.<br>
+        Xin chào <strong>${escapeHtml(data.customerName || 'Quý khách')}</strong>,<br>
+        Tài khoản của bạn đã được tạo thành công với email <strong>${escapeHtml(data.email || 'của bạn')}</strong>.<br>
         Vui lòng truy cập trang web của chúng tôi để có thể trải nghiệm đầy đủ các chức năng sau khi đăng nhập.
       </div>
       <div class="card">
@@ -434,7 +453,7 @@ export function getWelcomeEmailTemplate(arg1: any, arg2?: any): string {
         </table>
       </div>
       <div style="text-align:center; margin-top: 20px; margin-bottom: 15px;">
-        <a class="btn btn-primary" href="${homeUrl}" target="_blank" style="display: inline-block; padding: 14px 32px; border-radius: 8px; text-decoration: none; font-weight: 600; background-color: ${BRAND_SOLID}; background-image: ${BRAND_GRADIENT}; color: #ffffff;">Đến Trang Chủ Đặt Vé</a>
+        <a class="btn btn-primary" href="${escapeAttr(homeUrl)}" target="_blank" style="display: inline-block; padding: 14px 32px; border-radius: 8px; text-decoration: none; font-weight: 600; background-color: ${BRAND_SOLID}; background-image: ${BRAND_GRADIENT}; color: #ffffff;">Đến Trang Chủ Đặt Vé</a>
       </div>
       <div style="font-size: 13px; color: #6b7280; margin-top: 12px;">
         Cần hỗ trợ? Vui lòng liên hệ đội ngũ chăm sóc khách hàng của chúng tôi qua email: ${SUPPORT_EMAIL}.
@@ -486,23 +505,23 @@ export function getOTPEmailTemplate(data: {
 
     <div class="content">
       <div class="greeting">
-        Xin chào <strong>${data.customerName || 'Quý khách'}</strong>,
+        Xin chào <strong>${escapeHtml(data.customerName || 'Quý khách')}</strong>,
       </div>
 
       <p style="font-size: 15px; line-height: 1.6;">
-        Chúng tôi nhận được yêu cầu đăng nhập đối với tài khoản <strong>${data.email}</strong>. Để hoàn tất quá trình này, vui lòng nhập mã xác thực (OTP) sau:
+        Chúng tôi nhận được yêu cầu đăng nhập đối với tài khoản <strong>${escapeHtml(data.email)}</strong>. Để hoàn tất quá trình này, vui lòng nhập mã xác thực (OTP) sau:
       </p>
 
       <!-- FIX: inline background-color + background-image trực tiếp trên box để không phụ thuộc <style> -->
       <div class="otp-box" style="background: #f8fafc; border: 2px dashed #cbd5e1; border-radius: 12px; padding: 25px; text-align: center; margin: 25px 0;">
         <div class="otp-label" style="font-size: 13px; color: #64748b; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 12px;">Mã Xác Thực (OTP)</div>
-        <div class="otp-value" style="font-size: 42px; font-weight: 800; color: #1e293b; font-family: monospace; letter-spacing: 12px; line-height: 1; padding-left: 12px;">${data.otp}</div>
+        <div class="otp-value" style="font-size: 42px; font-weight: 800; color: #1e293b; font-family: monospace; letter-spacing: 12px; line-height: 1; padding-left: 12px;">${escapeHtml(data.otp)}</div>
       </div>
 
       <div class="warning" style="background-color: #fff3cd; border-left: 4px solid #ffc107; padding: 15px; border-radius: 6px; margin: 20px 0; font-size: 13px; color: #856404;">
         ⚠️ <strong>Lưu ý quan trọng:</strong>
         <ul style="margin: 10px 0 0 0; padding-left: 20px;">
-          <li>Mã này sẽ hết hạn sau <strong>${data.expiryMinutes} phút</strong></li>
+          <li>Mã này sẽ hết hạn sau <strong>${escapeHtml(data.expiryMinutes)} phút</strong></li>
           <li>Không chia sẻ mã này với bất kỳ ai, kể cả nhân viên CINESPHERE</li>
           <li>Nếu bạn không yêu cầu đăng nhập, vui lòng bỏ qua email này</li>
         </ul>
@@ -577,7 +596,7 @@ function staffInfoRow(label: string, value: string): string {
   return `
     <tr>
         <td style="padding: 10px 10px 10px 0; border-bottom: 1px dashed #e2e8f0; color: #64748b; font-size: 13px; width: 60px;">${label}</td>
-        <td style="padding: 10px 0; border-bottom: 1px dashed #e2e8f0; color: #0f172a; font-weight: 700; font-size: 14px;">${value}</td>
+        <td style="padding: 10px 0; border-bottom: 1px dashed #e2e8f0; color: #0f172a; font-weight: 700; font-size: 14px;">${escapeHtml(value)}</td>
     </tr>`;
 }
 
@@ -591,7 +610,7 @@ export function getStaffAccountCreatedTemplate(data: {
 
   const content = `
       <div class="greeting">
-        Xin chào <strong>${data.staffName || 'Nhân viên'}</strong>,
+        Xin chào <strong>${escapeHtml(data.staffName || 'Nhân viên')}</strong>,
       </div>
 
       <p style="font-size: 15px; line-height: 1.6;">
@@ -606,7 +625,7 @@ export function getStaffAccountCreatedTemplate(data: {
 
       <div class="password-box" style="background: #f1f5f9; border: 2px dashed #cbd5e1; border-radius: 10px; padding: 20px; text-align: center; margin: 20px 0;">
         <div class="password-label" style="font-size: 12px; color: #64748b; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px;">Mật khẩu của bạn</div>
-        <div class="password-value" style="font-size: 28px; font-weight: 800; color: #0f172a; font-family: 'Segoe UI', Tahoma, Verdana, sans-serif; letter-spacing: 1px; line-height: 1; overflow-wrap: break-word; word-break: break-all;">${data.password}</div>
+        <div class="password-value" style="font-size: 28px; font-weight: 800; color: #0f172a; font-family: 'Segoe UI', Tahoma, Verdana, sans-serif; letter-spacing: 1px; line-height: 1; overflow-wrap: break-word; word-break: break-all;">${escapeHtml(data.password)}</div>
       </div>
 
       <div class="warning" style="background-color: #fffbeb; border-left: 4px solid #f59e0b; padding: 14px; border-radius: 6px; margin: 20px 0; font-size: 13px; color: #92400e;">
@@ -614,7 +633,7 @@ export function getStaffAccountCreatedTemplate(data: {
         <ul style="margin: 10px 0 0 0; padding-left: 20px;">
           <li>Vui lòng đổi mật khẩu ngay sau lần đăng nhập đầu tiên</li>
           <li>Không chia sẻ mật khẩu này với bất kỳ ai</li>
-          <li>Truy cập <a href="${loginUrl}" style="color: #d97706; font-weight: 600; text-decoration: underline;">Trang Đăng Nhập Hệ Thống</a></li>
+          <li>Truy cập <a href="${escapeAttr(loginUrl)}" style="color: #d97706; font-weight: 600; text-decoration: underline;">Trang Đăng Nhập Hệ Thống</a></li>
         </ul>
       </div>
 
@@ -636,7 +655,7 @@ export function getStaffPasswordResetTemplate(data: {
 
   const content = `
       <div class="greeting">
-        Xin chào <strong>${data.staffName || 'Nhân viên'}</strong>,
+        Xin chào <strong>${escapeHtml(data.staffName || 'Nhân viên')}</strong>,
       </div>
 
       <p style="font-size: 15px; line-height: 1.6;">
@@ -651,7 +670,7 @@ export function getStaffPasswordResetTemplate(data: {
 
       <div class="password-box" style="background: #f1f5f9; border: 2px dashed #cbd5e1; border-radius: 10px; padding: 20px; text-align: center; margin: 20px 0;">
         <div class="password-label" style="font-size: 12px; color: #64748b; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px;">Mật khẩu mới của bạn</div>
-        <div class="password-value" style="font-size: 28px; font-weight: 800; color: #0f172a; font-family: 'Segoe UI', Tahoma, Verdana, sans-serif; letter-spacing: 1px; line-height: 1; overflow-wrap: break-word; word-break: break-all;">${data.newPassword}</div>
+        <div class="password-value" style="font-size: 28px; font-weight: 800; color: #0f172a; font-family: 'Segoe UI', Tahoma, Verdana, sans-serif; letter-spacing: 1px; line-height: 1; overflow-wrap: break-word; word-break: break-all;">${escapeHtml(data.newPassword)}</div>
       </div>
 
       <div class="warning" style="background-color: #fffbeb; border-left: 4px solid #f59e0b; padding: 14px; border-radius: 6px; margin: 20px 0; font-size: 13px; color: #92400e;">
@@ -659,7 +678,7 @@ export function getStaffPasswordResetTemplate(data: {
         <ul style="margin: 10px 0 0 0; padding-left: 20px;">
           <li>Vui lòng đổi mật khẩu ngay sau lần đăng nhập tiếp theo</li>
           <li>Không chia sẻ mật khẩu này với bất kỳ ai</li>
-          <li>Truy cập <a href="${loginUrl}" style="color: #d97706; font-weight: 600; text-decoration: underline;">Trang Đăng Nhập Hệ Thống</a></li>
+          <li>Truy cập <a href="${escapeAttr(loginUrl)}" style="color: #d97706; font-weight: 600; text-decoration: underline;">Trang Đăng Nhập Hệ Thống</a></li>
         </ul>
       </div>
 
@@ -679,22 +698,22 @@ export function getStaffPasswordChangeOTPTemplate(data: {
 }): string {
   const content = `
       <div class="greeting">
-        Xin chào <strong>${data.staffName || 'Nhân viên'}</strong>,
+        Xin chào <strong>${escapeHtml(data.staffName || 'Nhân viên')}</strong>,
       </div>
 
       <p style="font-size: 15px; line-height: 1.6;">
-        Để tiếp tục quá trình bảo mật 2 lớp cho tài khoản <strong>${data.email}</strong>, vui lòng nhập mã xác thực (OTP) sau đây trên hệ thống:
+        Để tiếp tục quá trình bảo mật 2 lớp cho tài khoản <strong>${escapeHtml(data.email)}</strong>, vui lòng nhập mã xác thực (OTP) sau đây trên hệ thống:
       </p>
 
       <div class="password-box" style="background: #f8fafc; border: 2px dashed #cbd5e1; border-radius: 12px; padding: 25px; text-align: center; margin: 25px 0;">
         <div class="password-label" style="font-size: 13px; color: #64748b; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 12px;">Mã Xác Thực (OTP)</div>
-        <div class="password-value" style="font-size: 42px; font-weight: 800; color: #1e293b; font-family: monospace; letter-spacing: 12px; line-height: 1; padding-left: 12px;">${data.otp}</div>
+        <div class="password-value" style="font-size: 42px; font-weight: 800; color: #1e293b; font-family: monospace; letter-spacing: 12px; line-height: 1; padding-left: 12px;">${escapeHtml(data.otp)}</div>
       </div>
 
       <div class="warning" style="background-color: #fffbeb; border-left: 4px solid #f59e0b; padding: 14px; border-radius: 6px; margin: 20px 0; font-size: 13px; color: #92400e;">
         ⚠️ <strong>Lưu ý quan trọng:</strong>
         <ul style="margin: 10px 0 0 0; padding-left: 20px;">
-          <li>Mã này sẽ hết hạn sau <strong>${data.expiryMinutes} phút</strong></li>
+          <li>Mã này sẽ hết hạn sau <strong>${escapeHtml(data.expiryMinutes)} phút</strong></li>
           <li>Mã OTP là thông tin bảo mật, tuyệt đối không chia sẻ cho người khác</li>
           <li>Nếu bạn không thực hiện đổi mật khẩu, hệ thống có thể đang gặp rủi ro</li>
         </ul>
@@ -712,24 +731,24 @@ export function getStaffLoginOTPTemplate(data: { staffName?: string; email: stri
   const staffName = data.staffName || data.email;
   const content = `
       <div class="greeting">
-        Xin chào <strong>${staffName}</strong>,
+        Xin chào <strong>${escapeHtml(staffName)}</strong>,
       </div>
 
       <p style="font-size: 15px; line-height: 1.6;">
-        Một thiết bị đang cố gắng đăng nhập vào tài khoản Quản trị viên <strong>${data.email}</strong> của bạn.
+        Một thiết bị đang cố gắng đăng nhập vào tài khoản Quản trị viên <strong>${escapeHtml(data.email)}</strong> của bạn.
         <br/><br/>
         Trạng thái Bảo Mật 2 Lớp (2FA) đang bật. Vui lòng sử dụng mã xác thực (OTP) bên dưới để hoàn tất đăng nhập:
       </p>
 
       <div class="password-box" style="background: #f8fafc; border: 2px dashed #cbd5e1; border-radius: 12px; padding: 25px; text-align: center; margin: 25px 0;">
         <div class="password-label" style="font-size: 13px; color: #64748b; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 12px;">Mã Đăng Nhập (OTP)</div>
-        <div class="password-value" style="font-size: 42px; font-weight: 800; color: #4338ca; font-family: monospace; letter-spacing: 12px; line-height: 1; padding-left: 12px;">${data.otp}</div>
+        <div class="password-value" style="font-size: 42px; font-weight: 800; color: #4338ca; font-family: monospace; letter-spacing: 12px; line-height: 1; padding-left: 12px;">${escapeHtml(data.otp)}</div>
       </div>
 
       <div class="warning" style="background-color: #fffbeb; border-left: 4px solid #f59e0b; padding: 14px; border-radius: 6px; margin: 20px 0; font-size: 13px; color: #92400e;">
         ⚠️ <strong>Lưu ý quan trọng:</strong>
         <ul style="margin: 10px 0 0 0; padding-left: 20px;">
-          <li>Mã này sẽ hết hạn sau <strong>${data.expiryMinutes} phút</strong></li>
+          <li>Mã này sẽ hết hạn sau <strong>${escapeHtml(data.expiryMinutes)} phút</strong></li>
           <li>Mã OTP là thông tin bảo mật, tuyệt đối không chia sẻ cho bất kỳ ai.</li>
           <li>Nếu bạn không phải là người đang cố đăng nhập, <strong>mật khẩu của bạn đã bị lộ!</strong> Vui lòng đổi mật khẩu ngay lập tức.</li>
         </ul>

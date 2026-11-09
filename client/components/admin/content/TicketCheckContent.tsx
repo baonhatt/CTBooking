@@ -16,7 +16,13 @@ import {
   AlertDialogHeader,
   AlertDialogTitle
 } from '@/components/ui/alert-dialog';
-import { confirmBookingApi, getBookingByCodeApi, useTicketApi, checkSepayTransactionApi } from '@/lib/api';
+import {
+  confirmBookingApi,
+  getBookingByCodeApi,
+  useTicketApi,
+  checkSepayTransactionApi,
+  resendBookingEmailApi
+} from '@/lib/api';
 import { getAdminBranchOptions } from '@/lib/api/branches';
 import {
   parseMoviePackages,
@@ -70,6 +76,20 @@ interface VRItem {
   [k: string]: any;
 }
 
+// How the latest confirmation email of an order is shown to staff
+const EMAIL_STATE_LABEL: Record<string, string> = {
+  sent: 'đã gửi',
+  failed: 'gửi thất bại',
+  pending: 'đang gửi',
+  none: 'chưa gửi'
+};
+const EMAIL_STATE_COLOR: Record<string, string> = {
+  sent: 'text-green-600',
+  failed: 'text-red-600',
+  pending: 'text-amber-600',
+  none: 'text-amber-600'
+};
+
 interface TicketInfo {
   id: number;
   booking_code: string;
@@ -109,6 +129,8 @@ interface TicketInfo {
   ticket_package_name?: string;
   booking_type?: 'movie' | 'vr' | 'combo_vr' | string | null;
   vr_items?: VRItem[];
+  /** The latest confirmation email of this order */
+  email_status?: { state: 'sent' | 'failed' | 'pending' | 'none'; at: string | null };
 }
 
 const formatMoney = (n: number | string | null | undefined) => {
@@ -125,6 +147,7 @@ export default function TicketCheckContent() {
   const [error, setError] = useState<string | null>(null);
   const [useLoading, setUseLoading] = useState(false);
   const isActionSubmittingRef = useRef(false);
+  const [resendLoading, setResendLoading] = useState(false);
 
   // Parse URL if being redirected from Transactions page
   const [searchParams] = useSearchParams();
@@ -179,6 +202,21 @@ export default function TicketCheckContent() {
       }, 50);
     }
   }, [initCode, hasAutoSearched, permissions, isSuperAdmin]);
+
+  // Send the confirmation email of a paid order again, then reload the order to show the new email status
+  const handleResendEmail = async () => {
+    if (!ticketInfo || resendLoading) return;
+    setResendLoading(true);
+    try {
+      const res = await resendBookingEmailApi(ticketInfo.id);
+      toast.success('Thành công', { description: res.message });
+      await handleSearch();
+    } catch (err: any) {
+      toast.error('Không gửi lại được email', { description: err.message || 'Vui lòng thử lại' });
+    } finally {
+      setResendLoading(false);
+    }
+  };
 
   const handleSearch = async (overrideCode?: string | React.MouseEvent) => {
     if (!hasPermission('ticket_check', 'scan')) {
@@ -936,6 +974,27 @@ export default function TicketCheckContent() {
                     </div>
                   )}
                 </div>
+
+                {/* Email xác nhận của đơn đã thanh toán: trạng thái và nút gửi lại */}
+                {String(ticketInfo.payment_status || '').toLowerCase() === 'paid' && (
+                  <div className="mt-4 py-3 px-4 rounded-2xl bg-slate-50 border border-slate-200 flex items-center justify-between gap-3 text-left">
+                    <p className="text-sm text-slate-600">
+                      Email xác nhận:{' '}
+                      <span className={'font-bold ' + EMAIL_STATE_COLOR[ticketInfo.email_status?.state || 'none']}>
+                        {EMAIL_STATE_LABEL[ticketInfo.email_status?.state || 'none']}
+                      </span>
+                      {ticketInfo.email_status?.at ? ' (' + formatDate(ticketInfo.email_status.at) + ')' : ''}
+                    </p>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={handleResendEmail}
+                      disabled={resendLoading || !hasPermission('ticket_check', 'validate')}
+                    >
+                      {resendLoading ? 'Đang gửi...' : 'Gửi lại email'}
+                    </Button>
+                  </div>
+                )}
               </CardContent>
             </Card>
 

@@ -6,6 +6,7 @@ import { sqlBranchIdsMatchFilter } from '../../lib/branch-ids';
 import { allocateVoucherDiscountToVrItems, parseApplicableIds } from '../../../shared/booking-invoice';
 import { generatePayTxtCode, isPayCodeCollision } from '../../lib/pay-code';
 import { resolveOrderBranchId } from '../../lib/booking-branch';
+import { isValidCustomerName, isValidCustomerEmail } from '../../lib/customer-input';
 import { releaseVoucherForCancelledBooking } from '../scheduled/booking-expiry';
 
 // =============== 1. List VR Packages for user booking page ===============
@@ -58,8 +59,9 @@ export async function validateVRBookingInput(
     throw new Error('Vui lòng chọn ít nhất 1 gói trải nghiệm VR');
   }
   if (!name || !name.trim()) throw new Error('Vui lòng nhập họ tên');
+  if (!isValidCustomerName(name)) throw new Error('Họ tên không hợp lệ (tối đa 100 ký tự, không chứa < hoặc >)');
   if (!phone || !/^[0-9]{9,11}$/.test(phone.replace(/\D/g, ''))) throw new Error('Số điện thoại không hợp lệ');
-  if (!emailBook || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailBook)) throw new Error('Email không hợp lệ');
+  if (!isValidCustomerEmail(emailBook)) throw new Error('Email không hợp lệ');
 
   const vrPackageIds = vr_items.map((i) => i.vr_package_id);
   const duplicate = vrPackageIds.filter((x, i, arr) => arr.indexOf(x) !== i);

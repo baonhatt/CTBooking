@@ -1,4 +1,4 @@
-import { eq, and, isNull, or, inArray, like } from 'drizzle-orm';
+import { eq, and, isNull, or, inArray, like, desc } from 'drizzle-orm';
 import { formatDateForDb } from '../../../lib/date-utils';
 import { logAuditAction } from '../../../lib/audit-logger';
 
@@ -116,6 +116,27 @@ export async function getBookingByCodeImpl(anyDb: any, codeRaw: string, tables: 
     } catch {}
   }
 
+  // The latest "booking confirmed" email for this order: sent, failed, still pending, or never tried
+  let email_status: { state: 'sent' | 'failed' | 'pending' | 'none'; at: string | null } = { state: 'none', at: null };
+  if ((tables as any).email_logs) {
+    try {
+      const emailLogs = (tables as any).email_logs;
+      const latest = await anyDb
+        .select()
+        .from(emailLogs)
+        .where(and(eq(emailLogs.booking_id, booking.id), eq(emailLogs.email_type, 'booking_confirmation')))
+        .orderBy(desc(emailLogs.id))
+        .limit(1);
+      if (latest && latest[0]) {
+        const state = String(latest[0].status || '').toLowerCase();
+        email_status = {
+          state: state === 'sent' || state === 'failed' ? state : 'pending',
+          at: latest[0].sent_at || latest[0].created_at || null
+        };
+      }
+    } catch {}
+  }
+
   let voucher_details: { scope: string; description: string | null; applicable_ids: any } | null = null;
   if (booking.voucher_id && (tables as any).vouchers) {
     try {
@@ -171,7 +192,8 @@ export async function getBookingByCodeImpl(anyDb: any, codeRaw: string, tables: 
     expired,
     checked_in_at: booking.checked_in_at,
     vr_items,
-    voucher_details
+    voucher_details,
+    email_status
   };
 }
 
