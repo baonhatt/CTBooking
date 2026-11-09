@@ -3,10 +3,12 @@ import bcrypt from 'bcryptjs';
 import {
   staffChangePasswordImpl,
   staffChangePasswordWithOTP,
+  staffExtendSessionImpl,
   staffForceChangePasswordImpl,
   staffVerifyLoginOtpImpl
 } from './staff-auth';
 import { LOCKED_MESSAGE } from '../../lib/login-throttle';
+import { STAFF_SESSION_MAX_AGE_DAYS } from '../../lib/staff-auth';
 
 vi.mock('../../lib/audit-logger', () => ({
   logAuditAction: vi.fn(async () => undefined)
@@ -255,5 +257,48 @@ describe('staff password policy', () => {
 
     expect(result.status).toBe('success');
     expect(updated.some((values) => values.forcePasswordChange === false)).toBe(true);
+  });
+});
+
+describe('staffExtendSessionImpl', () => {
+  const daysAgo = (days: number) => new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString();
+
+  function makeSessionDb(tokenRecord: any) {
+    const updated: any[] = [];
+    const selectChain: any = {
+      from: () => selectChain,
+      where: () => selectChain,
+      limit: async () => (tokenRecord ? [tokenRecord] : [])
+    };
+    const db: any = {
+      select: () => selectChain,
+      update: () => ({ set: (values: any) => ({ where: async () => void updated.push(values) }) })
+    };
+    return { db, updated };
+  }
+
+  it('extends a young session', async () => {
+    const { db, updated } = makeSessionDb({ id: 1, staffId: 7, createdAt: daysAgo(1) });
+
+    const result: any = await staffExtendSessionImpl(db, tables, 'token');
+
+    expect(result.status).toBe('success');
+    expect(updated.some((values) => values.expiredAt)).toBe(true);
+  });
+
+  it('refuses to extend a session older than the maximum age', async () => {
+    const { db, updated } = makeSessionDb({ id: 1, staffId: 7, createdAt: daysAgo(STAFF_SESSION_MAX_AGE_DAYS + 1) });
+
+    const result: any = await staffExtendSessionImpl(db, tables, 'token');
+
+    expect(result.status).toBe('error');
+    expect(result.message).toMatch(/đăng nhập lại/);
+    expect(updated).toHaveLength(0);
+  });
+
+  it('refuses when there is no active session', async () => {
+    const { db } = makeSessionDb(undefined);
+    const result: any = await staffExtendSessionImpl(db, tables, 'token');
+    expect(result.status).toBe('error');
   });
 });

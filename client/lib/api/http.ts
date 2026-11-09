@@ -96,6 +96,19 @@ export async function request<T>(path: string, init: RequestInit = {}) {
     headers
   });
   if (!res.ok) {
+    // Read the server's message first: a refusal (403) should show the reason, not only a generic notice
+    let errorMessage = `HTTP ${res.status}`;
+    let serverMessage = '';
+    try {
+      const errorData = await res.json();
+      if (errorData?.message) {
+        serverMessage = String(errorData.message);
+        errorMessage = serverMessage;
+      }
+    } catch {
+      // ignore parse error
+    }
+
     // Xử lý chung chặn 401 (Hết phiên, token invalid)
     if (res.status === 401 && typeof window !== 'undefined') {
       // Loại trừ các API setup công khai và API login để tránh redirect loop
@@ -108,19 +121,10 @@ export async function request<T>(path: string, init: RequestInit = {}) {
     } else if (res.status === 403 && typeof window !== 'undefined') {
       // Xử lý chặn lỗi 403 (Không đủ quyền)
       import('sonner').then(({ toast }) => {
-        toast.error('Bạn không có quyền thực hiện thao tác này.', { id: 'admin-access-denied' });
+        toast.error(serverMessage || 'Bạn không có quyền thực hiện thao tác này.', { id: 'admin-access-denied' });
       });
     }
 
-    let errorMessage = `HTTP ${res.status}`;
-    try {
-      const errorData = await res.json();
-      if (errorData?.message) {
-        errorMessage = errorData.message;
-      }
-    } catch {
-      // ignore parse error
-    }
     throw new Error(errorMessage);
   }
   return (await res.json()) as T;

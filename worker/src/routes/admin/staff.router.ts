@@ -2,7 +2,7 @@ import { Hono, Context } from 'hono';
 import { drizzle } from 'drizzle-orm/d1';
 import * as schema from '../../../../shared/schema';
 import { requireStaffAuth, requirePermission } from '../../middleware';
-import { getMailer, getRestrictBranchIds } from './admin-helpers';
+import { getRestrictBranchIds } from './admin-helpers';
 
 import {
   listStaffImpl,
@@ -17,6 +17,22 @@ import {
 
 type Variables = { staffId?: number; staffEmail?: string; staffFullname?: string; isSuperAdmin?: boolean; staffPermissions?: Array<{ module: string; action: string }>; staffBranchIds?: number[]; };
 const staffRouter = new Hono<{ Bindings: any; Variables: Variables }>();
+
+/** The signed-in staff member, as the Impl functions expect it. */
+function getCaller(c: Context<any>) {
+  return {
+    isSuperAdmin: c.get('isSuperAdmin'),
+    branchIds: c.get('staffBranchIds') || [],
+    id: c.get('staffId'),
+    email: c.get('staffEmail'),
+    fullname: c.get('staffFullname')
+  };
+}
+
+/** 403 for a refusal by permission or scope, 400 for any other error. */
+function errorStatus(result: { code?: string }) {
+  return result.code === 'forbidden' ? 403 : 400;
+}
 
 staffRouter.get('/api/admin/staff', requireStaffAuth, requirePermission('staff', 'view'), async (c) => {
   try {
@@ -73,9 +89,12 @@ staffRouter.get('/api/admin/staff/:id', requireStaffAuth, requirePermission('sta
 
         staffBranches: schema.staffBranches,
 
-        branches: schema.branches
+        branches: schema.branches,
+
+        auditLogs: schema.auditLogs
       },
-      id
+      id,
+      getCaller(c)
     );
 
     if (r.status === 'error') return c.json(r, 404);
@@ -94,32 +113,20 @@ staffRouter.post('/api/admin/staff', requireStaffAuth, requirePermission('staff'
 
     const db = drizzle(c.env.cinema_db, { schema });
 
-    const staffMailer = getMailer(c);
-
     const r = await createStaffImpl(
       db,
       {
         staffs: schema.staffs,
         staffRoles: schema.staffRoles,
         staffBranches: schema.staffBranches,
-        email_logs: schema.email_logs,
         auditLogs: schema.auditLogs
       },
       null,
       body,
-      {
-        isSuperAdmin: c.get('isSuperAdmin'),
-        branchIds: c.get('staffBranchIds') || [],
-        id: c.get('staffId'),
-        email: c.get('staffEmail'),
-        fullname: c.get('staffFullname')
-      },
-      c.env,
-      { waitUntil: (p) => c.executionCtx.waitUntil(p) },
-      staffMailer
+      getCaller(c)
     );
 
-    if (r.status === 'error') return c.json(r, 400);
+    if (r.status === 'error') return c.json(r, errorStatus(r));
 
     return c.json(r);
   } catch (err: any) {
@@ -148,18 +155,10 @@ staffRouter.put('/api/admin/staff/:id', requireStaffAuth, requirePermission('sta
       null,
       id,
       body,
-      {
-        isSuperAdmin: c.get('isSuperAdmin'),
-        branchIds: c.get('staffBranchIds') || [],
-        id: c.get('staffId'),
-        email: c.get('staffEmail'),
-        fullname: c.get('staffFullname')
-      },
-      c.env,
-      { waitUntil: (p) => c.executionCtx.waitUntil(p) }
+      getCaller(c)
     );
 
-    if (r.status === 'error') return c.json(r, 400);
+    if (r.status === 'error') return c.json(r, errorStatus(r));
 
     return c.json(r);
   } catch (err: any) {
@@ -175,17 +174,14 @@ staffRouter.delete('/api/admin/staff/:id', requireStaffAuth, requirePermission('
 
     const db = drizzle(c.env.cinema_db, { schema });
 
-    const staffId = c.get('staffId');
-    const staffEmail = c.get('staffEmail');
-    const staffFullname = c.get('staffFullname');
+    const r = await deleteStaffImpl(
+      db,
+      { staffs: schema.staffs, staffBranches: schema.staffBranches, auditLogs: schema.auditLogs },
+      id,
+      getCaller(c)
+    );
 
-    const r = await deleteStaffImpl(db, { staffs: schema.staffs, auditLogs: schema.auditLogs }, id, {
-      id: staffId,
-      email: staffEmail,
-      fullname: staffFullname
-    });
-
-    if (r.status === 'error') return c.json(r, 400);
+    if (r.status === 'error') return c.json(r, errorStatus(r));
 
     return c.json(r);
   } catch (err: any) {
@@ -198,15 +194,14 @@ staffRouter.post('/api/admin/staff/:id/restore', requireStaffAuth, requirePermis
   try {
     const id = Number(c.req.param('id'));
     const db = drizzle(c.env.cinema_db, { schema });
-    const staffId = c.get('staffId');
-    const staffEmail = c.get('staffEmail');
-    const staffFullname = c.get('staffFullname');
+    const r = await restoreStaffImpl(
+      db,
+      { staffs: schema.staffs, staffBranches: schema.staffBranches, auditLogs: schema.auditLogs },
+      id,
+      getCaller(c)
+    );
 
-    const r = await restoreStaffImpl(db, { staffs: schema.staffs, auditLogs: schema.auditLogs }, id, {
-      id: staffId,
-      email: staffEmail,
-      fullname: staffFullname
-    });
+    if (r.status === 'error') return c.json(r, errorStatus(r));
 
     return c.json(r, 200);
   } catch (err: any) {
@@ -241,29 +236,21 @@ staffRouter.post(
     try {
       const id = Number(c.req.param('id'));
 
-      const body = await c.req.json().catch(() => ({}));
-
       const db = drizzle(c.env.cinema_db, { schema });
-
-      const staffMailer = getMailer(c);
 
       const r = await resetStaffPasswordImpl(
         db,
         {
           staffs: schema.staffs,
           staffTokens: schema.staffTokens,
-          email_logs: schema.email_logs,
           auditLogs: schema.auditLogs
         },
         null,
         id,
-        body,
-        c.env,
-        { waitUntil: (p) => c.executionCtx.waitUntil(p) },
-        staffMailer
+        getCaller(c)
       );
 
-      if (r.status === 'error') return c.json(r, 400);
+      if (r.status === 'error') return c.json(r, errorStatus(r));
 
       return c.json(r);
     } catch (err: any) {

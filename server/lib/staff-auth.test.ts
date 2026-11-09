@@ -1,5 +1,39 @@
 import { describe, it, expect } from 'vitest';
-import { validateStaffPasswordStrength } from './staff-auth';
+import { generateStrongPassword, validateStaffPasswordStrength } from './staff-auth';
+
+describe('generateStrongPassword', () => {
+  it('meets the staff password policy every time', () => {
+    for (let attempt = 0; attempt < 200; attempt++) {
+      expect(validateStaffPasswordStrength(generateStrongPassword())).toBeNull();
+    }
+  });
+
+  it('contains a lower case letter, an upper case letter, a digit and a symbol', () => {
+    for (let attempt = 0; attempt < 200; attempt++) {
+      const password = generateStrongPassword();
+      expect(password).toMatch(/[a-z]/);
+      expect(password).toMatch(/[A-Z]/);
+      expect(password).toMatch(/[0-9]/);
+      expect(password).toMatch(/[!@#$%^&*\-_=+]/);
+    }
+  });
+
+  it('avoids characters that look alike', () => {
+    for (let attempt = 0; attempt < 200; attempt++) {
+      expect(generateStrongPassword()).not.toMatch(/[0O1lI]/);
+    }
+  });
+
+  it('is never shorter than the staff minimum, even if a shorter length is asked for', () => {
+    expect(generateStrongPassword(4).length).toBeGreaterThanOrEqual(12);
+    expect(generateStrongPassword(20)).toHaveLength(20);
+  });
+
+  it('does not repeat', () => {
+    const passwords = new Set(Array.from({ length: 200 }, () => generateStrongPassword()));
+    expect(passwords.size).toBe(200);
+  });
+});
 
 describe('validateStaffPasswordStrength', () => {
   it('accepts a 12 character password with letters and digits', () => {

@@ -37,12 +37,30 @@ export async function requireAuth(c: Context, next: any) {
 }
 
 /**
+ * Admin routes that can be called without a staff session.
+ * Every other /api/admin route, including the rest of /api/admin/auth/*, needs a valid staff token.
+ */
+export const PUBLIC_ADMIN_PATHS = [
+  '/api/admin/setup/super-admin',
+  '/api/admin/login',
+  '/api/admin/auth/login',
+  '/api/admin/auth/verify-login-otp',
+  '/api/admin/auth/forgot-password',
+  '/api/admin/auth/reset-password'
+];
+
+export function isPublicAdminPath(pathname: string): boolean {
+  return PUBLIC_ADMIN_PATHS.includes(pathname);
+}
+
+/**
  * Middleware requireStaffAuth - Check staff session token
  * Sử dụng cho các admin routes cần staff authentication
  */
 export async function requireStaffAuth(c: Context, next: Next) {
-  // Exclude auth routes
-  if (c.req.path.startsWith('/api/admin/auth/')) {
+  // Only the routes listed in PUBLIC_ADMIN_PATHS skip authentication.
+  // The other /api/admin/auth/* routes (me, logout, change-password...) read the staff id set below.
+  if (isPublicAdminPath(c.req.path)) {
     return await next();
   }
 

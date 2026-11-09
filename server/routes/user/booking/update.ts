@@ -1,4 +1,4 @@
-import { eq, and, isNull } from 'drizzle-orm';
+import { eq, and, isNull, or, sql } from 'drizzle-orm';
 import { generateBookingCode, getBookingEmailTemplate } from '../../../lib/booking-utils';
 import { mailQueue } from '../../../lib/mail-queue';
 import { formatDateForDb } from '../../../lib/date-utils';
@@ -14,6 +14,8 @@ export async function updatePaymentImpl(
     payment_status?: string;
     transaction_id?: string;
     paid_at?: string | Date;
+    /** Staff member who confirmed the payment by hand. Stored on the booking when it becomes paid. */
+    confirmed_by_staff_id?: number;
   },
   sendMailFn?: (to: string, subject: string, html: string) => Promise<any>,
   getBookingEmailHtml?: (data: any) => string,
@@ -32,7 +34,7 @@ export async function updatePaymentImpl(
   context?: { waitUntil: (promise: Promise<any>) => void }
 ) {
   try {
-    const { user_id, payment_id, payment_status, transaction_id, paid_at } = payload;
+    const { user_id, payment_id, payment_status, transaction_id, paid_at, confirmed_by_staff_id } = payload;
     if (!payment_id || !payment_status) {
       return { status: 400, message: 'Vui lòng nhập đầy đủ thông tin hợp lệ.' };
     }
@@ -132,6 +134,7 @@ export async function updatePaymentImpl(
       updatePayload.booking_code = bookingCode;
       // Clear the payment deadline — booking is now confirmed paid
       updatePayload.payment_expires_at = null;
+      if (confirmed_by_staff_id) updatePayload.confirmed_by_staff_id = Number(confirmed_by_staff_id);
     }
 
     // 4. Update và lấy kết quả mới nhất
@@ -144,7 +147,29 @@ export async function updatePaymentImpl(
     const updatedBooking = Array.isArray(updatedRes) ? updatedRes[0] : updatedRes;
 
     // 5b. Redeem Voucher + VR booking logic (only if paid)
+    let voucherSlotUnavailable = false;
     if (isPaid && !isAlreadyPaid) {
+      // A booking that was failed or expired had its voucher usage released. Take the slot again now that it is paid.
+      // If the voucher has no slot left the payment is still accepted (the money was received); the caller is told.
+      const previousStatus = String(booking.payment_status || '').toLowerCase();
+      if (['failed', 'expired', 'cancelled'].includes(previousStatus) && booking.voucher_id && vouchersTable) {
+        try {
+          const relocked = await anyDb
+            .update(vouchersTable)
+            .set({ used_count: sql`${vouchersTable.used_count} + 1`, updated_at: formatDateForDb(now) })
+            .where(
+              and(
+                eq(vouchersTable.id, Number(booking.voucher_id)),
+                or(isNull(vouchersTable.usage_limit), sql`${vouchersTable.used_count} < ${vouchersTable.usage_limit}`)
+              )
+            )
+            .returning({ id: vouchersTable.id });
+          voucherSlotUnavailable = !Array.isArray(relocked) || relocked.length === 0;
+        } catch (e) {
+          console.error('[updatePayment] Re-lock voucher error:', e);
+        }
+      }
+
       // Redeem voucher (if used)
       if (booking.voucher_id && vouchersTable && logsTable) {
         try {
@@ -427,7 +452,8 @@ export async function updatePaymentImpl(
         payment_status === 'failed'
           ? 'Giao dịch đã được hủy thành công'
           : 'Giao dịch đã xử lý xong (Mail đã được gửi tới khách hàng)',
-      booking: updatedBooking
+      booking: updatedBooking,
+      voucher_slot_unavailable: voucherSlotUnavailable
     };
   } catch (err: any) {
     return {

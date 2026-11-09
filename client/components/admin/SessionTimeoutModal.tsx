@@ -3,7 +3,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import { Button } from '@/components/ui/button';
 import { useStaffStore } from '@/store/staffStore';
 import { request } from '@/lib/api/http';
-import { handleAutoLogout } from '@/lib/auth-utils';
+import { handleAutoLogout, performLogout } from '@/lib/auth-utils';
 import { toast } from 'sonner';
 import { Clock, RefreshCw, LogOut, AlertTriangle } from 'lucide-react';
 
@@ -93,7 +93,7 @@ export const SessionTimeoutModal: React.FC = () => {
 
   const handleManualLogout = () => {
     setIsOpen(false);
-    handleAutoLogout();
+    void performLogout();
   };
 
   if (!isOpen || remainingSeconds === null) return null;

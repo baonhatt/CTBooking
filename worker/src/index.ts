@@ -14,7 +14,7 @@ import * as schema from '../../shared/schema';
 
 import type { D1Database, R2Bucket } from '@cloudflare/workers-types';
 
-import { requireStaffAuth } from './middleware';
+import { requireStaffAuth, isPublicAdminPath } from './middleware';
 
 import { expireStaleBookingsImpl } from '../../server/routes/scheduled/booking-expiry';
 import { isLocal } from './utils';
@@ -129,12 +129,7 @@ app.use(
 // Prevents any accidental exposition of admin or user endpoints due to missing trailing middlewares
 app.use('/api/admin/*', async (c, next) => {
   const url = new URL(c.req.url);
-  const publicPaths = [
-    '/api/admin/setup/super-admin',
-    '/api/admin/auth/login',
-    '/api/admin/auth/verify-login-otp'
-  ];
-  if (publicPaths.includes(url.pathname)) {
+  if (isPublicAdminPath(url.pathname)) {
     return next();
   }
   return requireStaffAuth(c, next);

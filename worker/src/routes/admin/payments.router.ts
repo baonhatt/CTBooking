@@ -25,7 +25,7 @@ import { getBookingEmailTemplate } from '../../../../server/lib/email-templates'
 import { logSystemError } from '../../utils';
 import { getRevenueImpl, listTransactionsImpl, getTransactionByIdImpl } from '../../../../server/routes/admin/payments';
 import { checkSepayTransactionImpl } from '../../../../server/routes/admin/sepay';
-import { updatePaymentImpl } from '../../../../server/routes/user/booking/update';
+import { confirmBookingImpl } from '../../../../server/routes/admin/confirm-booking';
 import { confirmUseTicketImpl, getBookingByCodeImpl } from '../../../../server/routes/user/booking/query';
 type Variables = { staffId?: number; staffEmail?: string; staffFullname?: string; isSuperAdmin?: boolean; staffPermissions?: Array<{ module: string; action: string }>; staffBranchIds?: number[]; };
 const paymentsRouter = new Hono<{ Bindings: any; Variables: Variables }>();
@@ -201,16 +201,21 @@ paymentsRouter.post('/api/admin/confirm-booking', requireStaffAuth, requirePermi
 
     const renderBooking = (data: any) => getBookingEmailTemplate(appBaseUrl, data);
 
-    const r = await updatePaymentImpl(
+    // The staff member and branch scope come from the session, never from the request body
+    const r = await confirmBookingImpl(
       db,
 
+      tables,
+
       body as any,
+
+      { id: c.get('staffId'), email: c.get('staffEmail'), fullname: c.get('staffFullname') },
+
+      getRestrictBranchIds(c),
 
       mailer,
 
       renderBooking,
-
-      tables,
 
       c.executionCtx
     );

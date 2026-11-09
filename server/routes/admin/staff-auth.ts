@@ -6,7 +6,8 @@ import {
   generateToken,
   getStaffSessionExpiry,
   invalidateStaffPermissionCache,
-  validateStaffPasswordStrength
+  validateStaffPasswordStrength,
+  STAFF_SESSION_MAX_AGE_DAYS
 } from '../../lib/staff-auth';
 import { logAuditAction } from '../../lib/audit-logger';
 import { buildAuditPayload } from '../../lib/audit-utils';
@@ -239,6 +240,16 @@ export async function staffExtendSessionImpl(db: any, tables: any, token: string
 
   if (!tokenRecord) {
     return { status: 'error', message: 'Phiên làm việc không tồn tại hoặc đã hết hạn' };
+  }
+
+  // Extending is capped, so a token cannot live forever just because someone keeps pressing "extend"
+  const sessionStartedAt = new Date(tokenRecord.createdAt).getTime();
+  const sessionAgeMs = Date.now() - sessionStartedAt;
+  if (Number.isFinite(sessionAgeMs) && sessionAgeMs > STAFF_SESSION_MAX_AGE_DAYS * 24 * 60 * 60 * 1000) {
+    return {
+      status: 'error',
+      message: `Phiên làm việc đã đạt thời hạn tối đa ${STAFF_SESSION_MAX_AGE_DAYS} ngày. Vui lòng đăng nhập lại.`
+    };
   }
 
   // Generate new expiry (extend by 24h from now)

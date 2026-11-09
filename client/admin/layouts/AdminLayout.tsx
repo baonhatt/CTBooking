@@ -35,6 +35,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/comp
 import { request } from '@/lib/api/http';
 import { useStaffPermissions, useIsSuperAdmin } from '@/hooks/useStaffPermission';
 import { useStaffStore } from '@/store/staffStore';
+import { performLogout } from '@/lib/auth-utils';
 
 
 
@@ -504,7 +505,10 @@ export default function AdminLayout({
             <Button
               variant="ghost"
               size="icon"
-              onClick={handleLogout}
+              onClick={() => {
+                // Real sign-out for every page. The page's own handleLogout prop only cleared part of the session.
+                void performLogout();
+              }}
               className="text-slate-500 hover:text-rose-600 hover:bg-rose-50 rounded-xl"
               title="Đăng xuất"
             >

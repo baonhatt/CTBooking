@@ -35,12 +35,61 @@ export function validateStaffPasswordStrength(password: unknown): string | null 
   return null;
 }
 
+const PASSWORD_LOWER = 'abcdefghijkmnopqrstuvwxyz';
+const PASSWORD_UPPER = 'ABCDEFGHJKLMNPQRSTUVWXYZ';
+const PASSWORD_DIGITS = '23456789';
+const PASSWORD_SYMBOLS = '!@#$%^&*-_=+';
+
+/** Picks a uniformly random integer in [0, upperExclusive) with the Web Crypto API (rejection sampling, no modulo bias). */
+function pickRandomIndex(upperExclusive: number): number {
+  const limit = 256 - (256 % upperExclusive);
+  const randomBytes = new Uint8Array(1);
+  while (true) {
+    crypto.getRandomValues(randomBytes);
+    if (randomBytes[0] < limit) return randomBytes[0] % upperExclusive;
+  }
+}
+
+function pickRandomCharacter(characters: string): string {
+  return characters[pickRandomIndex(characters.length)];
+}
+
+/**
+ * Generates a password for a staff account created or reset by the Super Admin.
+ * Always contains a lower case letter, an upper case letter, a digit and a symbol, and avoids look-alike
+ * characters (0, O, 1, l, I) so it can be read off the screen. Never less than the staff minimum length.
+ */
+export function generateStrongPassword(length: number = 14): string {
+  const targetLength = Math.max(length, STAFF_PASSWORD_MIN_LENGTH);
+  const allCharacters = PASSWORD_LOWER + PASSWORD_UPPER + PASSWORD_DIGITS + PASSWORD_SYMBOLS;
+
+  const characters = [
+    pickRandomCharacter(PASSWORD_LOWER),
+    pickRandomCharacter(PASSWORD_UPPER),
+    pickRandomCharacter(PASSWORD_DIGITS),
+    pickRandomCharacter(PASSWORD_SYMBOLS)
+  ];
+  while (characters.length < targetLength) {
+    characters.push(pickRandomCharacter(allCharacters));
+  }
+
+  // Fisher-Yates shuffle so the guaranteed characters are not always at the start
+  for (let index = characters.length - 1; index > 0; index--) {
+    const swapIndex = pickRandomIndex(index + 1);
+    [characters[index], characters[swapIndex]] = [characters[swapIndex], characters[index]];
+  }
+  return characters.join('');
+}
+
 export function generateToken(): string {
   // Generate a random 64-character hex string
   const array = new Uint8Array(32);
   crypto.getRandomValues(array);
   return Array.from(array, (byte) => byte.toString(16).padStart(2, '0')).join('');
 }
+
+/** A staff session can be extended only while it is younger than this. After that the staff member signs in again. */
+export const STAFF_SESSION_MAX_AGE_DAYS = 7;
 
 export function getStaffSessionExpiry(): string {
   const expiry = new Date();

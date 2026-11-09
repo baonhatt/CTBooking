@@ -3,6 +3,39 @@ import { parseBranchIds, staffCanAccessBranchIds, staffCanModifyBranchRecord } f
 
 export { staffCanAccessBranchIds, staffCanModifyBranchRecord, parseBranchIds, matchesBranchFilter } from './branch-ids';
 
+export interface StaffScope {
+  isSuperAdmin?: boolean;
+  branchIds?: number[];
+}
+
+/**
+ * Decides whether `caller` may act on another staff member.
+ *
+ * - Super Admin: always.
+ * - Nobody else may act on a Super Admin.
+ * - A caller with no branch, or a target with no branch, has no shared scope: not allowed.
+ * - 'view': the caller shares at least one branch with the target.
+ * - 'modify': every branch of the target is one of the caller's branches. A staff member who also works
+ *   at a branch the caller does not manage can only be changed by the Super Admin.
+ */
+export function canManageStaffTarget(
+  caller: StaffScope,
+  target: { isSuperAdmin?: boolean },
+  targetBranchIds: number[],
+  mode: 'view' | 'modify'
+): boolean {
+  if (caller.isSuperAdmin) return true;
+  if (target.isSuperAdmin) return false;
+
+  const callerBranchIds = caller.branchIds || [];
+  if (callerBranchIds.length === 0 || targetBranchIds.length === 0) return false;
+
+  if (mode === 'view') {
+    return targetBranchIds.some((branchId) => callerBranchIds.includes(branchId));
+  }
+  return targetBranchIds.every((branchId) => callerBranchIds.includes(branchId));
+}
+
 /**
  * Apply branch isolation filter to a query
  * This filters results to only include data from branches the staff has access to

@@ -14,6 +14,8 @@ import iconCine from '@/assets/images/iconCine.svg';
 import { AlertCircle, ShieldAlert, Lock, Mail, Eye, EyeOff, Loader2, ArrowRight, ShieldCheck } from 'lucide-react';
 import { forceChangePasswordApi, verifyAdminLoginOtpApi } from '@/lib/api/auth';
 import { SessionTimeoutModal } from '@/components/admin/SessionTimeoutModal';
+import { performLogout } from '@/lib/auth-utils';
+import { useStaffTokenSync } from '@/hooks/useStaffTokenSync';
 import AdminIndex from '@/pages/admin/AdminIndex';
 import DashboardPage from '@/pages/admin/Dashboard';
 import UsersPage from '@/pages/admin/Users';
@@ -390,6 +392,9 @@ export const AdminGate = () => {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
 
+  // Follow sign-out and sign-in done in another tab
+  useStaffTokenSync();
+
   // ĐẢM BẢO isAuthenticated ĐÚNG (Token đồng bộ với Store)
   // Fix lỗi flicker khi staff-storage vẫn còn isAuthenticated=true nhưng staffToken đã mất
   const [actuallyAuth, setActuallyAuth] = useState<boolean | null>(null);
@@ -441,14 +446,7 @@ export const AdminGate = () => {
   }, []);
 
   async function handleLogout() {
-    try {
-      await request('/api/admin/auth/logout', { method: 'POST' });
-    } catch (err) {
-      console.error('Logout error:', err);
-    }
-    localStorage.removeItem('staffToken');
-    clearStaff();
-    navigate('/login', { replace: true });
+    await performLogout();
   }
 
   // Ưu tiên hiển thị Login ngay nếu chắc chắn chưa auth, không cần đợi checkSetup hoàn thành

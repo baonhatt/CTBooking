@@ -1,14 +1,14 @@
 import { eq, and, or, like, isNull, isNotNull, desc, count, sql, aliasedTable, inArray } from 'drizzle-orm';
 import bcrypt from 'bcryptjs';
-import { hashPassword, invalidateStaffPermissionCache } from '../../lib/staff-auth';
-import { getStaffAccountCreatedTemplate, getStaffPasswordResetTemplate } from '../../lib/email-templates';
+import { generateStrongPassword, hashPassword, invalidateStaffPermissionCache } from '../../lib/staff-auth';
+import { canManageStaffTarget, type StaffScope } from '../../lib/branch-guard';
 import { logAuditAction } from '../../lib/audit-logger';
 import { buildAuditPayload } from '../../lib/audit-utils';
 
 export async function listStaffImpl(
   db: any,
   tables: any,
-  params: { page: number; pageSize: number; q?: string; includeInactive?: boolean; roleId?: number; branchId?: number; restrictToBranchIds?: number[] }
+  params: { page: number; pageSize: number; q?: string; includeInactive?: boolean; roleId?: number; branchId?: number; restrictToBranchIds?: number[] | null }
 ) {
   const { staffs, staffRoles, roles, staffBranches, branches } = tables;
   const { page = 1, pageSize = 20, q = '', includeInactive = false, roleId, branchId, restrictToBranchIds } = params;
@@ -58,7 +58,10 @@ export async function listStaffImpl(
     );
   }
 
-  if (restrictToBranchIds && restrictToBranchIds.length > 0) {
+  // null = unrestricted (Super Admin). An empty list means the caller has no branch, so they see nobody.
+  if (restrictToBranchIds && restrictToBranchIds.length === 0) {
+    conditions.push(sql`1 = 0`);
+  } else if (restrictToBranchIds) {
     // 1) Không cho phép xem Super Admin
     conditions.push(eq(staffs.isSuperAdmin, false));
     // 2) Chỉ được thấy những nhân viên thuộc các chi nhánh mà caller quản lý
@@ -133,12 +136,27 @@ export async function listStaffImpl(
   };
 }
 
-export async function getStaffByIdImpl(db: any, tables: any, id: number) {
+export async function getStaffByIdImpl(db: any, tables: any, id: number, caller?: StaffScope) {
   const { staffs, staffRoles, roles, staffBranches, branches, auditLogs } = tables;
 
-  const [staff] = await db.select().from(staffs).where(eq(staffs.id, id)).limit(1);
-  if (!staff) {
+  const [staffRow] = await db.select().from(staffs).where(eq(staffs.id, id)).limit(1);
+  if (!staffRow) {
     return { status: 'error', message: 'Staff not found' };
+  }
+
+  // The password hash must never leave the server
+  const { password: _passwordHash, ...staff } = staffRow;
+
+  // Outside the caller's scope the reply is the same as for a missing staff member, so existence is not revealed
+  if (caller && !caller.isSuperAdmin) {
+    const targetBranchRows = await db
+      .select({ branchId: staffBranches.branchId })
+      .from(staffBranches)
+      .where(eq(staffBranches.staffId, id));
+    const targetBranchIds = targetBranchRows.map((row: any) => row.branchId);
+    if (staff.deletedAt || !canManageStaffTarget(caller, staff, targetBranchIds, 'view')) {
+      return { status: 'error', message: 'Staff not found' };
+    }
   }
 
   const roleData = await db
@@ -153,20 +171,24 @@ export async function getStaffByIdImpl(db: any, tables: any, id: number) {
     .innerJoin(branches, eq(staffBranches.branchId, branches.id))
     .where(eq(staffBranches.staffId, id));
 
-  // Get tracking data from audit logs
-  const [createLog] = await db
-    .select()
-    .from(auditLogs)
-    .where(and(eq(auditLogs.entityType, 'staff'), eq(auditLogs.entityId, String(id)), eq(auditLogs.action, 'create')))
-    .orderBy(auditLogs.createdAt)
-    .limit(1);
+  // Get tracking data from audit logs (skipped when the caller did not pass the audit table)
+  let createLog: any;
+  let updateLog: any;
+  if (auditLogs) {
+    [createLog] = await db
+      .select()
+      .from(auditLogs)
+      .where(and(eq(auditLogs.entityType, 'staff'), eq(auditLogs.entityId, String(id)), eq(auditLogs.action, 'create')))
+      .orderBy(auditLogs.createdAt)
+      .limit(1);
 
-  const [updateLog] = await db
-    .select()
-    .from(auditLogs)
-    .where(and(eq(auditLogs.entityType, 'staff'), eq(auditLogs.entityId, String(id)), eq(auditLogs.action, 'update')))
-    .orderBy(desc(auditLogs.createdAt))
-    .limit(1);
+    [updateLog] = await db
+      .select()
+      .from(auditLogs)
+      .where(and(eq(auditLogs.entityType, 'staff'), eq(auditLogs.entityId, String(id)), eq(auditLogs.action, 'update')))
+      .orderBy(desc(auditLogs.createdAt))
+      .limit(1);
+  }
 
   return {
     status: 'success',
@@ -186,21 +208,16 @@ export async function createStaffImpl(
   kv: any,
   body: {
     email: string;
-    password?: string;
     fullname: string;
     phone?: string;
     avatar?: string;
     roleIds?: number[];
     branchIds?: number[];
-    forcePasswordChange?: boolean;
   },
-  caller?: { isSuperAdmin?: boolean; branchIds?: number[]; id?: number; email?: string; fullname?: string },
-  env?: any,
-  context?: { waitUntil: (promise: Promise<any>) => void },
-  mailer?: (to: string, subject: string, html: string) => Promise<any>
+  caller?: { isSuperAdmin?: boolean; branchIds?: number[]; id?: number; email?: string; fullname?: string }
 ) {
-  const { staffs, staffRoles, staffBranches, email_logs } = tables;
-  const { email, password, fullname, phone, avatar, roleIds = [], branchIds = [], forcePasswordChange = true } = body;
+  const { staffs, staffRoles, staffBranches } = tables;
+  const { email, fullname, phone, avatar, roleIds = [], branchIds = [] } = body;
   const callerBranchIds = caller?.branchIds || [];
   const callerIsSuperAdmin = !!caller?.isSuperAdmin;
   const now = new Date().toISOString();
@@ -209,6 +226,15 @@ export async function createStaffImpl(
   const [existingStaff] = await db.select().from(staffs).where(eq(staffs.email, email)).limit(1);
   if (existingStaff && !existingStaff.deletedAt) {
     return { status: 'error', message: 'Email đã tồn tại trong danh sách nhân viên đang hoạt động' };
+  }
+
+  // Reactivating a deleted account overwrites its password, roles and branches, so only the Super Admin may do it
+  if (existingStaff && existingStaff.deletedAt && !callerIsSuperAdmin) {
+    return {
+      status: 'error',
+      code: 'forbidden',
+      message: 'Email này thuộc một nhân viên đã bị xóa. Chỉ Super Admin mới được kích hoạt lại tài khoản đó.'
+    };
   }
 
   // Check if email already exists in accounts (Users)
@@ -234,10 +260,9 @@ export async function createStaffImpl(
     }
   }
 
-  // Auto-generate password if not provided
-  const generatedPassword = password || generateRandomPassword();
-
-  // Hash password
+  // The password is always generated here and shown once to the person creating the account.
+  // It is not emailed (staff emails are placeholders) and never written to a log.
+  const generatedPassword = generateStrongPassword();
   const hashedPassword = await hashPassword(generatedPassword);
 
   let targetStaffId: number;
@@ -256,7 +281,7 @@ export async function createStaffImpl(
         isActive: true,
         deletedAt: null,
         deleted_by_staff_id: null,
-        forcePasswordChange,
+        forcePasswordChange: true,
         updatedAt: now
       })
       .where(eq(staffs.id, targetStaffId));
@@ -277,7 +302,7 @@ export async function createStaffImpl(
         avatar,
         isSuperAdmin: false,
         isActive: true,
-        forcePasswordChange,
+        forcePasswordChange: true,
         createdAt: now,
         updatedAt: now
       })
@@ -299,43 +324,6 @@ export async function createStaffImpl(
       staffId: targetStaffId,
       branchId
     });
-  }
-
-  // Send email with password
-  const clientBase = String(env?.VITE_CLIENT_BASE_URL || 'https://cinesphere.com.vn').replace(/\/$/, '');
-  const loginUrl = `${clientBase}/login`;
-  const emailHtml = getStaffAccountCreatedTemplate({
-    staffName: fullname,
-    email: email,
-    password: generatedPassword,
-    loginUrl: loginUrl
-  });
-
-  if (mailer) {
-    const { mailQueue } = await import('../../lib/mail-queue');
-    mailQueue.add(
-      async () => {
-        try {
-          const mailRes = await mailer(email, 'Tài khoản nhân viên CINESPHERE', emailHtml);
-          console.log(`[Staff] Sent account creation email to ${email}`, mailRes);
-        } catch (e: any) {
-          console.error(`[Staff] Failed to send email to ${email}:`, e?.message || e);
-          throw e;
-        }
-      },
-      {
-        db,
-        recipient: email,
-        subject: 'Tài khoản nhân viên CINESPHERE',
-        emailType: 'welcome',
-        recipientType: 'staff',
-        staffId: targetStaffId,
-        emailLogsTable: email_logs
-      },
-      context
-    );
-  } else {
-    console.warn('[Staff] No mailer provided, skipping account creation email');
   }
 
   const [finalStaff] = await db.select().from(staffs).where(eq(staffs.id, targetStaffId)).limit(1);
@@ -363,17 +351,21 @@ export async function createStaffImpl(
       id: targetStaffId,
       email: email,
       fullname: fullname
-    }
+    },
+    // Shown once on screen. Not stored anywhere readable.
+    generated_password: generatedPassword
   };
 }
 
-function generateRandomPassword(length: number = 12): string {
-  const charset = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*';
-  let password = '';
-  for (let i = 0; i < length; i++) {
-    password += charset.charAt(Math.floor(Math.random() * charset.length));
-  }
-  return password;
+const OUT_OF_SCOPE_MESSAGE =
+  'Bạn chỉ được thao tác trên nhân viên làm việc duy nhất tại chi nhánh của mình. Nhân viên thuộc nhiều chi nhánh chỉ Super Admin được thao tác.';
+
+async function loadStaffBranchIds(db: any, staffBranches: any, staffId: number): Promise<number[]> {
+  const rows = await db
+    .select({ branchId: staffBranches.branchId })
+    .from(staffBranches)
+    .where(eq(staffBranches.staffId, staffId));
+  return rows.map((row: any) => row.branchId);
 }
 
 export async function updateStaffImpl(
@@ -391,16 +383,13 @@ export async function updateStaffImpl(
     branchIds?: number[];
     forcePasswordChange?: boolean;
   },
-  caller?: { isSuperAdmin?: boolean; branchIds?: number[]; id?: number; email?: string; fullname?: string },
-  env?: any,
-  context?: { waitUntil: (promise: Promise<any>) => void }
+  caller?: { isSuperAdmin?: boolean; branchIds?: number[]; id?: number; email?: string; fullname?: string }
 ) {
   const { staffs, staffRoles, staffBranches } = tables;
   const { email, fullname, phone, avatar, isActive, roleIds, branchIds, forcePasswordChange } = body;
   const callerBranchIds = caller?.branchIds || [];
   const callerIsSuperAdmin = !!caller?.isSuperAdmin;
   const now = new Date().toISOString();
-
 
   // Check if staff exists
   const [existing] = await db.select().from(staffs).where(eq(staffs.id, id)).limit(1);
@@ -413,7 +402,17 @@ export async function updateStaffImpl(
     return { status: 'error', message: 'Không thể sửa super admin' };
   }
 
+  if (existing.deletedAt) {
+    return { status: 'error', message: 'Nhân viên đã bị xóa. Hãy khôi phục trước khi sửa.' };
+  }
+
+  const oldBranchIds = await loadStaffBranchIds(db, staffBranches, id);
+
   if (!callerIsSuperAdmin) {
+    if (!canManageStaffTarget({ isSuperAdmin: false, branchIds: callerBranchIds }, existing, oldBranchIds, 'modify')) {
+      return { status: 'error', code: 'forbidden', message: OUT_OF_SCOPE_MESSAGE };
+    }
+
     if ((body as any).isSuperAdmin !== undefined) {
       return { status: 'error', message: 'Chỉ Super Admin mới được thay đổi quyền Super Admin' };
     }
@@ -422,12 +421,21 @@ export async function updateStaffImpl(
       return { status: 'error', message: 'Chỉ Super Admin mới được thay đổi role của nhân viên' };
     }
 
+    // Changing someone else's email would let the caller take the account over through a password reset
+    if (email !== undefined && email !== existing.email) {
+      return { status: 'error', message: 'Chỉ Super Admin mới được đổi email nhân viên' };
+    }
+
     if (branchIds !== undefined) {
       const invalidBranch = branchIds.some((branchId) => !callerBranchIds.includes(branchId));
       if (invalidBranch) {
         return { status: 'error', message: 'Không được gán nhân viên cho chi nhánh ngoài phạm vi quản lý' };
       }
     }
+  }
+
+  if (isActive === false && caller?.id === id) {
+    return { status: 'error', message: 'Không thể tự khóa tài khoản của chính mình' };
   }
 
   // Check email uniqueness if changing email
@@ -446,14 +454,10 @@ export async function updateStaffImpl(
   }
 
   const oldRoles = await db.select({ roleId: staffRoles.roleId }).from(staffRoles).where(eq(staffRoles.staffId, id));
-  const oldBranches = await db
-    .select({ branchId: staffBranches.branchId })
-    .from(staffBranches)
-    .where(eq(staffBranches.staffId, id));
 
   const auditOld = buildAuditPayload(existing, 'staff', {
     roleIds: oldRoles.map((r) => r.roleId),
-    branchIds: oldBranches.map((b) => b.branchId)
+    branchIds: oldBranchIds
   });
 
   // Update staff
@@ -491,14 +495,11 @@ export async function updateStaffImpl(
 
   const [updatedStaff] = await db.select().from(staffs).where(eq(staffs.id, id)).limit(1);
   const newRoles = await db.select({ roleId: staffRoles.roleId }).from(staffRoles).where(eq(staffRoles.staffId, id));
-  const newBranches = await db
-    .select({ branchId: staffBranches.branchId })
-    .from(staffBranches)
-    .where(eq(staffBranches.staffId, id));
+  const newBranchIds = await loadStaffBranchIds(db, staffBranches, id);
 
   const auditNew = buildAuditPayload(updatedStaff, 'staff', {
     roleIds: newRoles.map((r) => r.roleId),
-    branchIds: newBranches.map((b) => b.branchId)
+    branchIds: newBranchIds
   });
 
   // Log audit action
@@ -526,9 +527,9 @@ export async function deleteStaffImpl(
   db: any,
   tables: any,
   id: number,
-  staffInfo?: { id: number; email: string; fullname: string }
+  caller?: { id?: number; email?: string; fullname?: string; isSuperAdmin?: boolean; branchIds?: number[] }
 ) {
-  const { staffs } = tables;
+  const { staffs, staffBranches } = tables;
 
   // Check if staff exists
   const [existing] = await db.select().from(staffs).where(eq(staffs.id, id)).limit(1);
@@ -541,12 +542,27 @@ export async function deleteStaffImpl(
     return { status: 'error', message: 'Không thể xóa super admin' };
   }
 
+  if (existing.deletedAt) {
+    return { status: 'error', message: 'Nhân viên này đã bị xóa trước đó' };
+  }
+
+  if (caller?.id === id) {
+    return { status: 'error', message: 'Không thể tự xóa tài khoản của chính mình' };
+  }
+
+  if (!caller?.isSuperAdmin) {
+    const targetBranchIds = await loadStaffBranchIds(db, staffBranches, id);
+    if (!canManageStaffTarget(caller || {}, existing, targetBranchIds, 'modify')) {
+      return { status: 'error', code: 'forbidden', message: OUT_OF_SCOPE_MESSAGE };
+    }
+  }
+
   const deletionTimestamp = new Date().toISOString();
 
   // Soft delete by setting isActive to false and deleted_at
   await db
     .update(staffs)
-    .set({ isActive: false, deletedAt: deletionTimestamp, deleted_by_staff_id: staffInfo?.id })
+    .set({ isActive: false, deletedAt: deletionTimestamp, deleted_by_staff_id: caller?.id })
     .where(eq(staffs.id, id));
 
   const auditOld = buildAuditPayload(existing, 'staff');
@@ -555,7 +571,7 @@ export async function deleteStaffImpl(
       ...existing,
       isActive: false,
       deletedAt: deletionTimestamp,
-      deleted_by_staff_id: staffInfo?.id
+      deleted_by_staff_id: caller?.id
     },
     'staff'
   );
@@ -568,9 +584,9 @@ export async function deleteStaffImpl(
     'staff',
     id,
     `Xóa nhân viên: ${existing.fullname} (${existing.email})`,
-    staffInfo?.id || null,
-    staffInfo?.email || existing.email,
-    staffInfo?.fullname || existing.fullname,
+    caller?.id || null,
+    caller?.email || existing.email,
+    caller?.fullname || existing.fullname,
     auditOld,
     auditNew
   );
@@ -585,13 +601,25 @@ export async function restoreStaffImpl(
   db: any,
   tables: any,
   id: number,
-  staffInfo?: { id: number; email: string; fullname: string }
+  caller?: { id?: number; email?: string; fullname?: string; isSuperAdmin?: boolean; branchIds?: number[] }
 ) {
-  const { staffs } = tables;
+  const { staffs, staffBranches } = tables;
 
   const [existing] = await db.select().from(staffs).where(eq(staffs.id, id)).limit(1);
   if (!existing) {
     return { status: 'error', message: 'Staff not found' };
+  }
+
+  // Only a staff member that is actually deleted can be restored
+  if (!existing.deletedAt) {
+    return { status: 'error', message: 'Nhân viên này chưa bị xóa' };
+  }
+
+  if (!caller?.isSuperAdmin) {
+    const targetBranchIds = await loadStaffBranchIds(db, staffBranches, id);
+    if (!canManageStaffTarget(caller || {}, existing, targetBranchIds, 'modify')) {
+      return { status: 'error', code: 'forbidden', message: OUT_OF_SCOPE_MESSAGE };
+    }
   }
 
   // Restore by setting isActive to true and deleted_at to null
@@ -608,9 +636,9 @@ export async function restoreStaffImpl(
     'staff',
     id,
     `Restore nhân viên: ${existing.fullname} (${existing.email})`,
-    staffInfo?.id,
-    staffInfo?.email,
-    staffInfo?.fullname,
+    caller?.id,
+    caller?.email,
+    caller?.fullname,
     auditOld,
     auditNew
   );
@@ -670,35 +698,43 @@ export async function listDeletedStaffImpl(
   };
 }
 
+/**
+ * Resets a staff member's password. Only the Super Admin may do this.
+ * The new password is generated here and returned once, so the Super Admin can pass it on.
+ * It is not emailed (staff emails are placeholders) and not written to any log. The staff member must change
+ * it at the next login, and every session they have is revoked.
+ */
 export async function resetStaffPasswordImpl(
   db: any,
   tables: any,
   kv: any,
   id: number,
-  body: { newPassword?: string },
-  env?: any,
-  context?: { waitUntil: (promise: Promise<any>) => void },
-  mailer?: (to: string, subject: string, html: string) => Promise<any>
+  caller?: { id?: number; email?: string; fullname?: string; isSuperAdmin?: boolean }
 ) {
-  const { staffs, staffTokens, email_logs } = tables;
-  const { newPassword: requestedPassword } = body;
+  const { staffs, staffTokens } = tables;
   const now = new Date().toISOString();
 
-  // Check if staff exists
+  if (!caller?.isSuperAdmin) {
+    return { status: 'error', code: 'forbidden', message: 'Chỉ Super Admin mới được đặt lại mật khẩu nhân viên' };
+  }
+
   const [existing] = await db.select().from(staffs).where(eq(staffs.id, id)).limit(1);
   if (!existing) {
     return { status: 'error', message: 'Staff not found' };
   }
 
-  // Generate password if not provided
-  let newPassword = '';
-  if (!requestedPassword) {
-    newPassword = Math.random().toString(36).slice(-8);
-  } else {
-    newPassword = requestedPassword;
+  if (existing.deletedAt) {
+    return { status: 'error', message: 'Nhân viên đã bị xóa. Hãy khôi phục trước khi đặt lại mật khẩu.' };
   }
 
-  // Hash new password
+  if (caller.id === id) {
+    return {
+      status: 'error',
+      message: 'Hãy dùng chức năng đổi mật khẩu trong Hồ sơ để đổi mật khẩu của chính bạn'
+    };
+  }
+
+  const newPassword = generateStrongPassword();
   const hashedPassword = await hashPassword(newPassword);
 
   // Update password and force change on next login
@@ -720,43 +756,6 @@ export async function resetStaffPasswordImpl(
   // Invalidate permission cache
   await invalidateStaffPermissionCache(kv, id);
 
-  // Send email notification about password reset
-  const clientBase = String(env?.VITE_CLIENT_BASE_URL || 'https://cinesphere.com.vn').replace(/\/$/, '');
-  const loginUrl = `${clientBase}/login`;
-  const emailHtml = getStaffPasswordResetTemplate({
-    staffName: existing.fullname,
-    email: existing.email,
-    newPassword: newPassword,
-    loginUrl: loginUrl
-  });
-
-  if (mailer) {
-    const { mailQueue } = await import('../../lib/mail-queue');
-    mailQueue.add(
-      async () => {
-        try {
-          const mailRes = await mailer(existing.email, 'Reset Mật Khẩu Nhân Viên - CINESPHERE', emailHtml);
-          console.log(`[Staff] Sent password reset email to ${existing.email}`, mailRes);
-        } catch (e: any) {
-          console.error(`[Staff] Failed to send password reset email to ${existing.email}:`, e?.message || e);
-          throw e;
-        }
-      },
-      {
-        db,
-        recipient: existing.email,
-        subject: 'Reset Mật Khẩu Nhân Viên - CINESPHERE',
-        emailType: 'reset_password',
-        recipientType: 'staff',
-        staffId: id,
-        emailLogsTable: email_logs
-      },
-      context
-    );
-  } else {
-    console.warn('[Staff] No mailer provided, skipping password reset email');
-  }
-
   const auditOld = buildAuditPayload(existing, 'staff');
   const auditNew = buildAuditPayload(
     {
@@ -767,7 +766,7 @@ export async function resetStaffPasswordImpl(
     'staff'
   );
 
-  // Log audit action
+  // The audit entry names the Super Admin who did it, not the staff member who was reset
   await logAuditAction(
     db,
     tables.auditLogs,
@@ -775,15 +774,16 @@ export async function resetStaffPasswordImpl(
     'staff',
     id,
     `Reset mật khẩu nhân viên: ${existing.fullname} (${existing.email})`,
-    null,
-    existing.email,
-    existing.fullname,
+    caller.id || null,
+    caller.email,
+    caller.fullname,
     auditOld,
     auditNew
   );
 
   return {
     status: 'success',
-    message: 'Đã reset mật khẩu thành công và gửi email thông báo cho nhân viên'
+    message: 'Đã đặt lại mật khẩu. Hãy chuyển mật khẩu mới cho nhân viên, mật khẩu chỉ hiển thị một lần.',
+    generated_password: newPassword
   };
 }
