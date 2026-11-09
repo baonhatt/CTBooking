@@ -77,15 +77,18 @@ vouchersRouter.post('/api/admin/vouchers', requireStaffAuth, requirePermission('
     const staffEmail = c.get('staffEmail');
     const staffFullname = c.get('staffFullname');
 
-    const r = await createVoucherImpl(db, { vouchers: schema.vouchers, auditLogs: schema.auditLogs }, body, {
-      id: staffId,
-      email: staffEmail,
-      fullname: staffFullname
-    });
+    const r = await createVoucherImpl(
+      db,
+      { vouchers: schema.vouchers, auditLogs: schema.auditLogs },
+      body,
+      { id: staffId, email: staffEmail, fullname: staffFullname },
+      getRestrictBranchIds(c)
+    );
 
     return c.json(r, 201 as any);
   } catch (err: any) {
-    return c.json({ status: 'error', message: String(err?.message || 'Internal error') }, 500 as any);
+    const errStatus = Number(err?.statusCode) || 500;
+    return c.json({ status: 'error', message: String(err?.message || 'Internal error') }, errStatus as any);
   }
 });
 

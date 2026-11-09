@@ -2,7 +2,8 @@ import { eq, desc, or, count, and, isNull, isNotNull, like, sql, sum, inArray } 
 import { formatDateForDb } from '../../lib/date-utils';
 import { logAuditAction } from '../../lib/audit-logger';
 import { buildAuditPayload } from '../../lib/audit-utils';
-import { sqlBranchIdsStaffAccessFilter, staffCanAccessBranchIds } from '../../lib/branch-ids';
+import { sqlBranchIdsStaffAccessFilter, staffCanAccessBranchIds, staffCanModifyBranchRecord } from '../../lib/branch-ids';
+import { validateVoucherFields, checkVoucherBranches } from '../../lib/voucher-input';
 
 function parseJsonArrayNullable(value: any): string | null | undefined {
   if (value === undefined) return undefined;
@@ -176,8 +177,7 @@ export async function listVouchersImpl(
       total_revenue,
       used_count: redemptions_count,
       applicable_ticket_package_ids: parseJsonArrayOutput(v.applicable_ticket_package_ids),
-      applicable_user_ids: parseJsonArrayOutput(v.applicable_user_ids),
-      branch_ids: parseJsonArrayOutput(v.branch_ids)
+        branch_ids: parseJsonArrayOutput(v.branch_ids)
     };
   });
 
@@ -223,7 +223,6 @@ export async function listDeletedVouchersImpl(
   const items = itemsRaw.map((v: any) => ({
     ...v,
     applicable_ticket_package_ids: parseJsonArrayOutput(v.applicable_ticket_package_ids),
-    applicable_user_ids: parseJsonArrayOutput(v.applicable_user_ids),
     branch_ids: parseJsonArrayOutput(v.branch_ids)
   }));
   const [countResult] = await anyDb.select({ count: count() }).from(vouchers).where(whereClause);
@@ -295,7 +294,6 @@ export async function getVoucherImpl(
     created_by_staff_name: createLog?.staffFullname || null,
     updated_by_staff_name: updateLog?.staffFullname || null,
     applicable_ticket_package_ids: parseJsonArrayOutput(voucher.applicable_ticket_package_ids),
-    applicable_user_ids: parseJsonArrayOutput(voucher.applicable_user_ids),
     branch_ids: parseJsonArrayOutput(voucher.branch_ids)
   };
 }
@@ -322,17 +320,16 @@ export async function createVoucherImpl(
     valid_from?: string;
     valid_until?: string;
     applicable_ticket_package_ids?: any;
-    applicable_user_ids?: any;
     branch_ids?: any;
   },
-  staffInfo?: { id: number; email: string; fullname: string }
+  staffInfo?: { id: number; email: string; fullname: string },
+  restrictToBranchIds?: number[] | null
 ) {
   const cleanCode = (args.code || '').trim().toUpperCase();
-  if (!cleanCode) throw new Error('Mã voucher không được trống');
-  if (!args.discount_type) throw new Error('Thiếu loại giảm giá');
+  if (!cleanCode) throw Object.assign(new Error('Mã voucher không được trống'), { statusCode: 400 });
+  validateVoucherFields({ ...args, scope: args.scope || 'all' });
   const dValue = Number(args.discount_value);
-  if (!dValue || dValue <= 0) throw new Error('Giá trị giảm giá không hợp lệ');
-  if (args.discount_type === 'percent' && dValue > 100) throw new Error('Phần trăm giảm không được vượt quá 100%');
+  const branchIdsToSave = checkVoucherBranches(args.branch_ids, restrictToBranchIds, { required: true });
 
   const formattedDesc = formatVoucherDescription(args.note || args.description, {
     staff_id: args.sale_staff_id,
@@ -357,8 +354,7 @@ export async function createVoucherImpl(
     valid_until: args.valid_until || null,
     applicable_ticket_package_ids:
       (args.scope || 'all') === 'all' ? null : parseJsonArrayNullable(args.applicable_ticket_package_ids),
-    applicable_user_ids: parseJsonArrayNullable(args.applicable_user_ids),
-    branch_ids: parseJsonArrayNullable(args.branch_ids),
+    branch_ids: branchIdsToSave === undefined || branchIdsToSave === null ? null : JSON.stringify(branchIdsToSave),
     created_at: formatDateForDb(nowIso),
     updated_at: formatDateForDb(nowIso)
   };
@@ -424,7 +420,6 @@ export async function updateVoucherImpl(
     valid_from?: string;
     valid_until?: string;
     applicable_ticket_package_ids?: any;
-    applicable_user_ids?: any;
     branch_ids?: any;
   },
   staffInfo?: { id: number; email: string; fullname: string },
@@ -439,9 +434,9 @@ export async function updateVoucherImpl(
 
   // Check branch access
   if (restrictToBranchIds !== null && restrictToBranchIds !== undefined) {
-    const hasAccess = staffCanAccessBranchIds(existing.branch_ids, restrictToBranchIds, false);
+    const hasAccess = staffCanModifyBranchRecord(existing.branch_ids, restrictToBranchIds, false);
     if (!hasAccess) {
-      const err: any = new Error('Không có quyền chỉnh sửa voucher này');
+      const err: any = new Error('Voucher thuộc nhiều chi nhánh hoặc chi nhánh khác, chỉ Super Admin hoặc người quản lý đủ các chi nhánh đó được sửa');
       err.statusCode = 403;
       throw err;
     }
@@ -460,12 +455,19 @@ export async function updateVoucherImpl(
     email: targetSaleEmail
   });
 
-  const targetDiscountType = args.discount_type !== undefined ? args.discount_type : existing.discount_type;
-  const targetDiscountValue =
-    args.discount_value !== undefined ? Number(args.discount_value) : Number(existing.discount_value || 0);
-  if (targetDiscountType === 'percent' && targetDiscountValue > 100) {
-    throw new Error('Phần trăm giảm không được vượt quá 100%');
-  }
+  const pick = (name: string) => ((args as any)[name] !== undefined ? (args as any)[name] : existing[name]);
+  validateVoucherFields({
+    discount_type: pick('discount_type'),
+    discount_value: pick('discount_value'),
+    scope: pick('scope'),
+    min_order_value: pick('min_order_value'),
+    max_discount: pick('max_discount'),
+    usage_limit: pick('usage_limit'),
+    per_user_limit: pick('per_user_limit'),
+    valid_from: pick('valid_from'),
+    valid_until: pick('valid_until')
+  });
+  const branchIdsToSave = checkVoucherBranches(args.branch_ids, restrictToBranchIds, { required: false });
 
   const data: any = { updated_at: formatDateForDb(new Date()) };
   if (args.code !== undefined) data.code = (args.code || '').trim().toUpperCase();
@@ -490,9 +492,7 @@ export async function updateVoucherImpl(
     if (args.applicable_ticket_package_ids !== undefined)
       data.applicable_ticket_package_ids = parseJsonArrayNullable(args.applicable_ticket_package_ids);
   }
-  if (args.applicable_user_ids !== undefined)
-    data.applicable_user_ids = parseJsonArrayNullable(args.applicable_user_ids);
-  if (args.branch_ids !== undefined) data.branch_ids = parseJsonArrayNullable(args.branch_ids);
+  if (branchIdsToSave !== undefined) data.branch_ids = branchIdsToSave === null ? null : JSON.stringify(branchIdsToSave);
 
   const updatedRes = await anyDb.update(tables.vouchers).set(data).where(eq(tables.vouchers.id, id)).returning();
   let updatedVoucher: any = Array.isArray(updatedRes) ? updatedRes[0] : updatedRes;
@@ -536,7 +536,7 @@ export async function toggleVoucherStatusImpl(
 
   // Check branch access
   if (restrictToBranchIds !== null && restrictToBranchIds !== undefined) {
-    const hasAccess = staffCanAccessBranchIds(existing.branch_ids, restrictToBranchIds, false);
+    const hasAccess = staffCanModifyBranchRecord(existing.branch_ids, restrictToBranchIds, false);
     if (!hasAccess) {
       const err: any = new Error('Không có quyền thay đổi trạng thái voucher này');
       err.statusCode = 403;
@@ -581,7 +581,7 @@ export async function deleteVoucherImpl(
 
   // Check branch access
   if (restrictToBranchIds !== null && restrictToBranchIds !== undefined) {
-    const hasAccess = staffCanAccessBranchIds(existing.branch_ids, restrictToBranchIds, false);
+    const hasAccess = staffCanModifyBranchRecord(existing.branch_ids, restrictToBranchIds, false);
     if (!hasAccess) {
       const err: any = new Error('Không có quyền xóa voucher này');
       err.statusCode = 403;
@@ -636,7 +636,7 @@ export async function restoreVoucherImpl(
 
   // Check branch access
   if (restrictToBranchIds !== null && restrictToBranchIds !== undefined) {
-    const hasAccess = staffCanAccessBranchIds(existing.branch_ids, restrictToBranchIds, false);
+    const hasAccess = staffCanModifyBranchRecord(existing.branch_ids, restrictToBranchIds, false);
     if (!hasAccess) {
       const err: any = new Error('Không có quyền khôi phục voucher này');
       err.statusCode = 403;

@@ -36,7 +36,6 @@ interface VoucherItem {
   valid_until?: string | null;
   applicable_ticket_package_ids?: number[] | null;
   excluded_ticket_package_ids?: number[] | null;
-  applicable_user_ids?: number[] | null;
   branch_ids?: number[] | null;
   is_active?: boolean;
   is_deleted?: boolean;

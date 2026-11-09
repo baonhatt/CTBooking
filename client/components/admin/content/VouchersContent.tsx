@@ -100,7 +100,6 @@ interface VoucherItem {
     valid_until?: string | null;
     applicable_ticket_package_ids?: number[] | null;
     excluded_ticket_package_ids?: number[] | null;
-    applicable_user_ids?: number[] | null;
     branch_ids?: number[] | null;
     is_active?: boolean;
     is_deleted?: boolean;
@@ -201,6 +200,14 @@ export default function VouchersContent(props: Props) {
     const hasPermission = (module: string, action: string) => {
         if (isSuperAdmin) return true;
         return permissions.some((p) => p.module === module && p.action === action);
+    };
+
+    // A voucher for all branches, for no branch, or for a branch the staff member does not manage can only be changed by
+    // the Super Admin. The server enforces this too; here the Save button is locked and the reason shown.
+    const isVoucherLockedForStaff = (branchIds: unknown, managedBranchIds: number[]) => {
+        if (isSuperAdmin) return false;
+        if (!Array.isArray(branchIds) || branchIds.length === 0) return true;
+        return branchIds.some((id) => !managedBranchIds.includes(Number(id)));
     };
 
     const {
@@ -468,6 +475,8 @@ export default function VouchersContent(props: Props) {
         }
     };
 
+    const isEditLocked = !!editData?.id && isVoucherLockedForStaff(editData?.branch_ids, branchOptions.map((b) => b.id));
+
     const handleSave = async () => {
         if (!editData) return;
         const payload = { ...editData };
@@ -490,6 +499,19 @@ export default function VouchersContent(props: Props) {
         }
         if (payload.discount_type === 'percent' && (value < 1 || value > 100)) {
             toast.error('Phần trăm giảm giá phải từ 1 đến 100');
+            return;
+        }
+        // Branches. A limited staff member names branches of their own. Nobody saves an empty list.
+        if (!isSuperAdmin) {
+            let chosen = payload.branch_ids;
+            if (chosen === null || chosen === undefined) chosen = branchOptions.map((b) => b.id);
+            if (!Array.isArray(chosen) || chosen.length === 0) {
+                toast.error('Vui lòng chọn ít nhất một chi nhánh');
+                return;
+            }
+            payload.branch_ids = chosen;
+        } else if (Array.isArray(payload.branch_ids) && payload.branch_ids.length === 0) {
+            toast.error('Vui lòng chọn ít nhất một chi nhánh hoặc chọn "Tất cả chi nhánh"');
             return;
         }
         payload.code = payload.code.toUpperCase().trim();
@@ -1840,9 +1862,21 @@ export default function VouchersContent(props: Props) {
                                             branches={branchOptions.length > 0 ? branchOptions : branches}
                                             value={editData?.branch_ids ?? null}
                                             onChange={(ids) => setEditData({ ...editData, branch_ids: ids })}
+                                            allowAll={isSuperAdmin}
+                                            disabled={isEditLocked}
                                             className="rounded-lg text-xs"
                                         />
-                                        <p className="text-[10px] text-slate-400 mt-1">Để trống = áp dụng tất cả chi nhánh</p>
+                                        {isEditLocked ? (
+                                            <p className="text-[10px] text-red-600 mt-1">
+                                                Voucher thuộc nhiều chi nhánh, chỉ Super Admin được sửa
+                                            </p>
+                                        ) : (
+                                            <p className="text-[10px] text-slate-400 mt-1">
+                                                {isSuperAdmin
+                                                    ? 'Chọn "Tất cả chi nhánh" hoặc ít nhất một chi nhánh'
+                                                    : 'Chọn ít nhất một chi nhánh bạn quản lý'}
+                                            </p>
+                                        )}
                                     </div>
 
                                     <div className="flex items-center justify-between pt-3 border-t border-slate-100">
@@ -1898,7 +1932,7 @@ export default function VouchersContent(props: Props) {
                             </Button>
                             <Button
                                 onClick={handleSave}
-                                disabled={isSaving}
+                                disabled={isSaving || isEditLocked}
                                 className={`${editData?.scope === 'movie'
                                         ? 'bg-blue-600 hover:bg-blue-700'
                                         : editData?.scope === 'all'
