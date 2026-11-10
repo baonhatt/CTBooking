@@ -116,18 +116,17 @@ export async function listTransactionsImpl(
     const isNumber = /^\d+$/.test(searchText);
     const lowerSearchText = searchText.toLowerCase();
 
-    if (isNumber) {
-      whereCondition.push(eq(tables.bookings.id, Number(searchText)));
-    } else {
-      whereCondition.push(
-        or(
-          sql`LOWER(${tables.bookings.email}) LIKE ${`%${lowerSearchText}%`}`,
-          sql`LOWER(${tables.bookings.booking_code}) LIKE ${`%${lowerSearchText}%`}`,
-          sql`LOWER(${tables.bookings.pay_txt_code}) LIKE ${`%${lowerSearchText}%`}`,
-          sql`LOWER(${tables.bookings.voucher_code_snapshot}) LIKE ${`%${lowerSearchText}%`}`
-        )
-      );
-    }
+    // Staff search by email, phone, booking code, pay code or voucher. A number can also be the booking's own id,
+    // a phone number or part of a code, so those are all tried together.
+    const textMatches = [
+      sql`LOWER(${tables.bookings.email}) LIKE ${`%${lowerSearchText}%`}`,
+      sql`${tables.bookings.phone} LIKE ${`%${searchText}%`}`,
+      sql`LOWER(${tables.bookings.booking_code}) LIKE ${`%${lowerSearchText}%`}`,
+      sql`LOWER(${tables.bookings.pay_txt_code}) LIKE ${`%${lowerSearchText}%`}`,
+      sql`LOWER(${tables.bookings.voucher_code_snapshot}) LIKE ${`%${lowerSearchText}%`}`
+    ];
+    if (isNumber) textMatches.push(eq(tables.bookings.id, Number(searchText)));
+    whereCondition.push(or(...textMatches));
   }
 
   const finalWhere = and(...whereCondition);
@@ -281,6 +280,7 @@ export async function getTransactionByIdImpl(
     auditLogs: any;
     booking_vr_items?: any;
     vouchers?: any;
+    staffs?: any;
   },
   id: number,
   restrictToBranchIds: number[] | null = null
@@ -314,6 +314,8 @@ export async function getTransactionByIdImpl(
         transaction_id: tables.bookings.transaction_id,
         paid_at: tables.bookings.paid_at,
         expiry_date: tables.bookings.expiry_date,
+        payment_expires_at: tables.bookings.payment_expires_at,
+        confirmed_by_staff_id: tables.bookings.confirmed_by_staff_id,
         ticket_package_name: tables.bookings.ticket_package_name
       },
       account: {
@@ -325,6 +327,9 @@ export async function getTransactionByIdImpl(
       },
       branch: {
         name: tables.branches.name
+      },
+      movie: {
+        title: tables.movies.title
       }
     })
     .from(tables.bookings)
@@ -332,6 +337,7 @@ export async function getTransactionByIdImpl(
     .leftJoin(tables.accounts, eq(tables.users.id, tables.accounts.user_id))
     .leftJoin(tables.ticket_packages, eq(tables.bookings.ticket_package_id, tables.ticket_packages.id))
     .leftJoin(tables.branches, eq(tables.bookings.branch_id, tables.branches.id))
+    .leftJoin(tables.movies, eq(tables.bookings.movie_id, tables.movies.id))
     .where(
       restrictToBranchIds && restrictToBranchIds.length > 0
         ? and(eq(tables.bookings.id, id), inArray(tables.bookings.branch_id, restrictToBranchIds))
@@ -340,7 +346,18 @@ export async function getTransactionByIdImpl(
 
   if (!rows || rows.length === 0) return null;
 
-  const { booking, account, ticket_package, branch } = rows[0];
+  const { booking, account, ticket_package, branch, movie } = rows[0];
+
+  // Name of the staff member who confirmed the payment (cash or manual confirmation)
+  let confirmedByStaffName: string | null = null;
+  if (booking.confirmed_by_staff_id && tables.staffs) {
+    const [confirmedStaff] = await anyDb
+      .select({ fullname: tables.staffs.fullname })
+      .from(tables.staffs)
+      .where(eq(tables.staffs.id, booking.confirmed_by_staff_id))
+      .limit(1);
+    confirmedByStaffName = confirmedStaff?.fullname || null;
+  }
 
   // 2. Tính toán thời gian và trạng thái
   const now = new Date();
@@ -445,9 +462,12 @@ export async function getTransactionByIdImpl(
 
   return {
     id: booking.id,
+    payment_expires_at: booking.payment_expires_at || null,
     booking_type: bType,
     vr_items,
     ticket_package_name: booking.ticket_package_name,
+    // Title of the booked movie, so the detail screen does not have to load the ticket packages to show it
+    movie_title: movie?.title || null,
     user: {
       email_auth: account?.email || '',
       fullname: booking.name || 'Tên mặc định',
@@ -499,6 +519,7 @@ export async function getTransactionByIdImpl(
         : [],
       pay_txt_code: booking?.pay_txt_code,
       booking_code: booking?.booking_code,
+      confirmed_by_staff_name: confirmedByStaffName,
       checked_in_at: booking?.checked_in_at,
       is_used: booking?.is_used,
       created_at: booking.created_at,

@@ -15,6 +15,8 @@ import AdminLayout from '@/admin/layouts/AdminLayout';
 import { useStaffStore } from '@/store/staffStore';
 import { useNavigate } from 'react-router-dom';
 import { ConfirmDeleteDialog } from '@/components/admin/dialogs/ConfirmDeleteDialog';
+import { formatVnDate } from '@/lib/format';
+import { roleLevelLabel, countGrantedPermissions, TOTAL_APPLICABLE_PERMISSIONS } from './roleConstants';
 
 interface Role {
   id: number;
@@ -24,6 +26,9 @@ interface Role {
   isSystem: boolean;
   staffCount?: number;
   permissionIds?: number[];
+  permissions?: { module: string; action: string }[];
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 export default function RolesPage() {
@@ -285,8 +290,12 @@ export default function RolesPage() {
                   <tr className="bg-gray-50 border-b">
                     <th className="h-10 px-4 text-left align-middle font-semibold text-xs text-slate-500 uppercase tracking-wider">Tên vai trò</th>
                     <th className="h-10 px-4 text-left align-middle font-semibold text-xs text-slate-500 uppercase tracking-wider">Loại</th>
-                    <th className="h-10 px-4 text-left align-middle font-semibold text-xs text-slate-500 uppercase tracking-wider">Cấp độ · Nhân viên</th>
+                    <th className="h-10 px-4 text-left align-middle font-semibold text-xs text-slate-500 uppercase tracking-wider">Cấp độ</th>
+                    <th className="h-10 px-4 text-left align-middle font-semibold text-xs text-slate-500 uppercase tracking-wider">Nhân viên</th>
+                    <th className="h-10 px-4 text-left align-middle font-semibold text-xs text-slate-500 uppercase tracking-wider">Quyền</th>
                     <th className="h-10 px-4 text-left align-middle font-semibold text-xs text-slate-500 uppercase tracking-wider">Mô tả</th>
+                    <th className="h-10 px-4 text-left align-middle font-semibold text-xs text-slate-500 uppercase tracking-wider">Ngày tạo</th>
+                    <th className="h-10 px-4 text-left align-middle font-semibold text-xs text-slate-500 uppercase tracking-wider">Cập nhật</th>
                     <th className="h-10 px-4 text-right align-middle font-semibold text-xs text-slate-500 uppercase tracking-wider w-[140px]">Hành động</th>
                   </tr>
                 </thead>
@@ -297,7 +306,7 @@ export default function RolesPage() {
                       className="border-b hover:bg-gray-50 cursor-pointer"
                       onClick={() => navigate(`/roles/${role.id}`)}
                     >
-                      <td className="px-4 py-2.5 align-middle text-[13px] font-medium capitalize">{role.name}</td>
+                      <td className="px-4 py-2.5 align-middle text-[13px] font-medium">{role.name}</td>
                       <td className="px-4 py-2.5 align-middle text-[13px]">
                         {role.isSystem ? (
                           <span className="bg-gray-100 text-gray-600 px-2 py-1 rounded text-xs">Hệ thống</span>
@@ -306,9 +315,15 @@ export default function RolesPage() {
                         )}
                       </td>
                       <td className="px-4 py-2.5 align-middle text-[13px]">
-                        Lv{role.level} · {role.staffCount || 0} nhân viên
+                        {roleLevelLabel(role.level)}
+                      </td>
+                      <td className="px-4 py-2.5 align-middle text-[13px]">{role.staffCount || 0}</td>
+                      <td className="px-4 py-2.5 align-middle text-[13px]">
+                        Quyền: {countGrantedPermissions(role.permissions)}/{TOTAL_APPLICABLE_PERMISSIONS}
                       </td>
                       <td className="px-4 py-2.5 align-middle text-[13px] text-gray-600">{role.description || '-'}</td>
+                      <td className="px-4 py-2.5 align-middle text-[13px] text-gray-600">{formatVnDate(role.createdAt)}</td>
+                      <td className="px-4 py-2.5 align-middle text-[13px] text-gray-600">{formatVnDate(role.updatedAt)}</td>
                       <td className="px-4 py-2.5 align-middle text-[13px]" onClick={(e) => e.stopPropagation()}>
                         <div className="flex justify-end items-center gap-1 w-[100px] ml-auto">
                           <Button
@@ -317,6 +332,7 @@ export default function RolesPage() {
                             className="h-8 w-8 text-blue-600 hover:text-blue-700 hover:bg-blue-50 flex-shrink-0"
                             onClick={() => navigate(`/roles/${role.id}?mode=view`)}
                             title="Chi tiết"
+                            aria-label={`Xem chi tiết vai trò ${role.name}`}
                           >
                             <Eye className="h-3.5 w-3.5" />
                           </Button>
@@ -336,6 +352,7 @@ export default function RolesPage() {
                                 setIsDeleteDialogOpen(true);
                               }}
                               title="Xóa"
+                              aria-label={`Xóa vai trò ${role.name}`}
                             >
                               <Trash2 className="h-3.5 w-3.5" />
                             </Button>
@@ -365,6 +382,7 @@ export default function RolesPage() {
                 onClick={() => setIsCreateDialogOpen(false)}
                 className="h-8 w-8 rounded-full hover:bg-slate-100 text-slate-400 transition-colors"
                 title="Đóng"
+                aria-label="Đóng"
               >
                 <X className="w-5 h-5" />
               </Button>
@@ -388,9 +406,9 @@ export default function RolesPage() {
                     <SelectValue placeholder="Chọn cấp độ" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="0">Nhân viên (0)</SelectItem>
-                    <SelectItem value="1">Quản lý (1)</SelectItem>
-                    <SelectItem value="2">Quản trị (2)</SelectItem>
+                    <SelectItem value="0">{roleLevelLabel(0)}</SelectItem>
+                    <SelectItem value="1">{roleLevelLabel(1)}</SelectItem>
+                    <SelectItem value="2">{roleLevelLabel(2)}</SelectItem>
                   </SelectContent>
                 </Select>
               </div>

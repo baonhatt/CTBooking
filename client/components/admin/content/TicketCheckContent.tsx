@@ -24,6 +24,7 @@ import {
   resendBookingEmailApi
 } from '@/lib/api';
 import { getAdminBranchOptions } from '@/lib/api/branches';
+import { formatVnDateTime } from '@/lib/format';
 import {
   parseMoviePackages,
   parseApplicableIds,
@@ -114,6 +115,7 @@ interface TicketInfo {
   paid_at: string | null;
   expiry_date: string | null;
   checked_in_at: string | null;
+  checked_in_by_staff_name?: string | null;
   payment_method: string | null;
   userName: string;
   is_used: boolean;
@@ -272,7 +274,9 @@ export default function TicketCheckContent() {
             can_use: false,
             valid: false,
             expired: false,
-            checked_in_at: new Date().toISOString()
+            // The server's check-in time and staff name (the browser clock is only a fallback)
+            checked_in_at: res?.booking?.checked_in_at || new Date().toISOString(),
+            checked_in_by_staff_name: res?.booking?.checked_in_by_staff_name ?? null
           });
 
           // CHỈ ĐÓNG MODAL KHI THÀNH CÔNG
@@ -325,16 +329,8 @@ export default function TicketCheckContent() {
     }
   };
 
-  const formatDate = (str: string | null) =>
-    str
-      ? new Date(str).toLocaleString('vi-VN', {
-          hour: '2-digit',
-          minute: '2-digit',
-          day: '2-digit',
-          month: '2-digit',
-          year: 'numeric'
-        })
-      : '---';
+  // Always Vietnam time, the same format as the other admin screens
+  const formatDate = (str: string | null) => (str ? formatVnDateTime(str) : '---');
 
   const parseJsonData = (data: string | undefined) => {
     if (!data) return [];
@@ -395,10 +391,10 @@ export default function TicketCheckContent() {
               setCode('');
               setTicketInfo(null);
               setError(null);
-              toast.info('Đã làm mới dữ liệu');
+              toast.info('Đã xóa kết quả, sẵn sàng quét vé tiếp theo');
             }}
             className="rounded-xl shadow-sm hover:rotate-180 transition-transform duration-500 shrink-0 h-10 w-10 flex items-center justify-center bg-white border-slate-200"
-            title="Làm mới"
+            title="Xóa kết quả"
           >
             <RefreshCw className="w-4 h-4" />
           </Button>
@@ -412,7 +408,8 @@ export default function TicketCheckContent() {
             <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-slate-400 group-focus-within:text-blue-500 transition-colors" />
             <Input
               className="pl-12 h-14 text-lg shadow-xl shadow-slate-100/50 border-slate-200 focus:ring-4 focus:ring-blue-100 rounded-2xl transition-all"
-              placeholder="Nhập mã vé hoặc ID (VD: 1766461)..."
+              placeholder="Quét hoặc nhập mã đặt chỗ..."
+              autoFocus
               value={code}
               onChange={(e) => setCode(e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
@@ -528,11 +525,11 @@ export default function TicketCheckContent() {
                           </span>
                         )}
 
-                      <span className="text-[10px] font-mono font-bold text-slate-400 bg-slate-200/50 px-2 rounded">
+                      <span className="text-[11px] font-mono font-bold text-slate-400 bg-slate-200/50 px-2 rounded">
                         ID: #{ticketInfo.id}
                       </span>
                       {ticketInfo.voucher_code_snapshot ? (
-                        <Badge className="bg-orange-500/10 text-orange-700 border border-orange-200 text-[10px] font-bold gap-1 px-2 py-0.5">
+                        <Badge className="bg-orange-500/10 text-orange-700 border border-orange-200 text-[11px] font-bold gap-1 px-2 py-0.5">
                           <Tag className="w-3 h-3" />
                           Mã {ticketInfo.voucher_code_snapshot}
                           {discountAmount > 0 ? (
@@ -573,16 +570,16 @@ export default function TicketCheckContent() {
                         <Table>
                           <TableHeader className="bg-blue-50/60">
                             <TableRow className="hover:bg-transparent border-none">
-                              <TableHead className="text-[10px] font-bold uppercase text-blue-700 py-3">
+                              <TableHead className="text-[11px] font-bold uppercase text-blue-700 py-3">
                                 Tên gói
                               </TableHead>
-                              <TableHead className="text-center text-[10px] font-bold uppercase text-blue-700 py-3">
+                              <TableHead className="text-center text-[11px] font-bold uppercase text-blue-700 py-3">
                                 SL
                               </TableHead>
-                              <TableHead className="text-right text-[10px] font-bold uppercase text-blue-700 py-3">
+                              <TableHead className="text-right text-[11px] font-bold uppercase text-blue-700 py-3">
                                 Đơn giá
                               </TableHead>
-                              <TableHead className="text-right text-[10px] font-bold uppercase text-blue-700 py-3">
+                              <TableHead className="text-right text-[11px] font-bold uppercase text-blue-700 py-3">
                                 Thành tiền
                               </TableHead>
                             </TableRow>
@@ -602,7 +599,7 @@ export default function TicketCheckContent() {
                                     <p className="text-sm font-semibold text-slate-800 leading-tight">
                                       {pkg.name}
                                       {discounted ? (
-                                        <span className="inline-block ml-2 px-1.5 py-[2px] align-middle text-[8px] font-black text-rose-600 bg-rose-50 border border-rose-200 rounded">
+                                        <span className="inline-block ml-2 px-1.5 py-[2px] align-middle text-[11px] font-black text-rose-600 bg-rose-50 border border-rose-200 rounded">
                                           ĐƯỢC GIẢM
                                         </span>
                                       ) : null}
@@ -638,16 +635,16 @@ export default function TicketCheckContent() {
                           <Table>
                             <TableHeader className="bg-purple-50/60">
                               <TableRow className="hover:bg-transparent border-none">
-                                <TableHead className="text-[10px] font-bold uppercase text-purple-700 py-3">
+                                <TableHead className="text-[11px] font-bold uppercase text-purple-700 py-3">
                                   Tên gói VR
                                 </TableHead>
-                                <TableHead className="text-center text-[10px] font-bold uppercase text-purple-700 py-3">
+                                <TableHead className="text-center text-[11px] font-bold uppercase text-purple-700 py-3">
                                   SL
                                 </TableHead>
-                                <TableHead className="text-right text-[10px] font-bold uppercase text-purple-700 py-3">
+                                <TableHead className="text-right text-[11px] font-bold uppercase text-purple-700 py-3">
                                   Đơn giá
                                 </TableHead>
-                                <TableHead className="text-right text-[10px] font-bold uppercase text-purple-700 py-3">
+                                <TableHead className="text-right text-[11px] font-bold uppercase text-purple-700 py-3">
                                   Thành tiền
                                 </TableHead>
                               </TableRow>
@@ -680,7 +677,7 @@ export default function TicketCheckContent() {
                                               it.ticket_package?.name ||
                                               `Gói VR #${it.ticket_package_id || idx + 1}`}
                                             {discounted ? (
-                                              <span className="inline-block ml-2 px-1.5 py-[2px] align-middle text-[8px] font-black text-rose-600 bg-rose-50 border border-rose-200 rounded">
+                                              <span className="inline-block ml-2 px-1.5 py-[2px] align-middle text-[11px] font-black text-rose-600 bg-rose-50 border border-rose-200 rounded">
                                                 ĐƯỢC GIẢM
                                               </span>
                                             ) : null}
@@ -750,7 +747,7 @@ export default function TicketCheckContent() {
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-3 pt-4 border-t border-dashed border-orange-200">
                       {Number(ticketInfo.original_total_price) > 0 && (
                         <div className="bg-orange-50/60 border border-orange-100 rounded-xl p-3">
-                          <p className="text-[10px] font-bold uppercase text-orange-500">Tổng gốc</p>
+                          <p className="text-[11px] font-bold uppercase text-orange-500">Tổng gốc</p>
                           <p className="text-sm font-semibold text-orange-700 line-through opacity-80">
                             {formatMoney(ticketInfo.original_total_price)}
                           </p>
@@ -758,21 +755,21 @@ export default function TicketCheckContent() {
                       )}
                       {discountAmount > 0 && (
                         <div className="bg-red-50/60 border border-red-100 rounded-xl p-3">
-                          <p className="text-[10px] font-bold uppercase text-red-500 flex items-center gap-1">
+                          <p className="text-[11px] font-bold uppercase text-red-500 flex items-center gap-1">
                             <Percent className="w-3 h-3" /> {voucherScopeLabel(voucherScope)}
                           </p>
                           <p className="text-sm font-semibold text-red-700">
                             − {formatMoney(discountAmount)}
                           </p>
                           {ticketInfo.voucher_code_snapshot && (
-                            <p className="text-[10px] text-red-500 mt-0.5 font-mono">
+                            <p className="text-[11px] text-red-500 mt-0.5 font-mono">
                               {ticketInfo.voucher_code_snapshot}
                             </p>
                           )}
                         </div>
                       )}
                       <div className="bg-green-50/60 border border-green-100 rounded-xl p-3">
-                        <p className="text-[10px] font-bold uppercase text-green-600">Thành tiền</p>
+                        <p className="text-[11px] font-bold uppercase text-green-600">Thành tiền</p>
                         <p className="text-sm font-black text-green-700">{formatMoney(ticketInfo.total_price)}</p>
                       </div>
                     </div>
@@ -968,6 +965,11 @@ export default function TicketCheckContent() {
                             <p className="text-lg font-mono font-bold tracking-tight">
                               {formatDate(ticketInfo.checked_in_at)}
                             </p>
+                            {ticketInfo.checked_in_by_staff_name && (
+                              <p className="mt-1 text-xs font-medium opacity-80">
+                                Nhân viên soát: {ticketInfo.checked_in_by_staff_name}
+                              </p>
+                            )}
                           </div>
                         )}
                       </div>
@@ -1055,7 +1057,7 @@ export default function TicketCheckContent() {
                       ? `Vé mã ${ticketInfo?.booking_code} đã hết hạn. Bạn có chắc chắn muốn duyệt du di cho khách vào cổng không? Thao tác này sẽ được lưu lại trong nhật ký hệ thống (Audit Log).`
                       : (confirmType as string) === 'force_payment'
                         ? `Hệ thống gặp vấn đề: ${sepayCheckError}. Bạn có chắc chắn ĐÃ NHẬN ĐỦ TIỀN và ép hệ thống xác nhận bỏ qua tự động?`
-                        : `Bạn đã đối soát thành công số tiền ${Number(ticketInfo?.total_price).toLocaleString('vi-VN')}đ cho ID #${ticketInfo?.id}?`}
+                        : `Bạn đã đối soát thành công số tiền ${Number(ticketInfo?.total_price).toLocaleString('vi-VN')}đ cho mã đặt chỗ ${ticketInfo?.booking_code}?`}
                 </p>
                 {isBranchMismatch && (
                   <div className="p-3.5 bg-amber-500/10 border border-amber-500/30 rounded-xl text-amber-900 text-xs font-semibold flex items-start gap-2.5 text-left mt-2">

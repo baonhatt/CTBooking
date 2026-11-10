@@ -1,4 +1,4 @@
-import { eq, and, or, like, isNull, isNotNull, desc, count, sql, aliasedTable, inArray } from 'drizzle-orm';
+import { eq, and, or, like, isNull, isNotNull, desc, asc, count, sql, aliasedTable, inArray } from 'drizzle-orm';
 import bcrypt from 'bcryptjs';
 import { generateStrongPassword, hashPassword, invalidateStaffPermissionCache } from '../../lib/staff-auth';
 import { canManageStaffTarget, type StaffScope } from '../../lib/branch-guard';
@@ -652,10 +652,10 @@ export async function restoreStaffImpl(
 export async function listDeletedStaffImpl(
   db: any,
   tables: any,
-  options: { page?: number; pageSize?: number; search?: string } = {}
+  options: { page?: number; pageSize?: number; search?: string; sort?: string; dir?: string } = {}
 ) {
   const { staffs } = tables;
-  const { page = 1, pageSize = 10, search = '' } = options;
+  const { page = 1, pageSize = 10, search = '', sort, dir } = options;
 
   const conditions = [];
   if (search) {
@@ -683,7 +683,11 @@ export async function listDeletedStaffImpl(
     .where(whereClause)
     .limit(pageSize)
     .offset((page - 1) * pageSize)
-    .orderBy(desc(staffs.deletedAt));
+    .orderBy(
+      sort === 'name'
+        ? dir === 'asc' ? asc(staffs.fullname) : desc(staffs.fullname)
+        : dir === 'asc' ? asc(staffs.deletedAt) : desc(staffs.deletedAt)
+    );
 
   const items = await query;
 

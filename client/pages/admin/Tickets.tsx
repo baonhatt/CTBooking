@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import AdminLayout from '@/admin/layouts/AdminLayout';
 import TicketsContent from '@/components/admin/content/TicketsContent';
-import { getTickets, deleteTicketApi, getAdminBranchOptions } from '@/lib/api';
+import { getTickets, deleteTicketApi, getAdminBranchOptions, getTicketById } from '@/lib/api';
 import { useStaffPermission } from '@/hooks/useStaffPermission';
 import { useStaffStore } from '@/store/staffStore';
 import { useNavigate } from 'react-router-dom';
@@ -35,6 +35,7 @@ interface TicketPackage {
   min_players?: number;
   max_players?: number;
   updated_at?: string;
+  created_at?: string;
 }
 
 export default function TicketsPage() {
@@ -113,43 +114,50 @@ export default function TicketsPage() {
 
   const handleRefresh = async () => {
     setIsLoading(true);
-    const { items, total } = await getTickets({
-      page,
-      pageSize,
-      type: typeFilter,
-      includeInactive: !showActiveOnly,
-      branch_id: selectedBranchId,
-      sort: sortKey,
-      dir: sortDir
-    });
-    setTickets(
-      items.map((t: any) => ({
-        id: t.id,
-        name: t.name,
-        code: t.code || undefined,
-        description: t.description || undefined,
-        price: Number(t.price),
-        features: Array.isArray(t.features) ? t.features : [],
-        combo: Array.isArray(t.combo) ? t.combo : [],
-        movies: Array.isArray(t.movies) ? t.movies : [],
-        type: t.type || undefined,
-        min_group_size: t.min_group_size ?? undefined,
-        max_group_size: t.max_group_size ?? undefined,
-        is_member_only: !!t.is_member_only,
-        is_active: t.is_active ?? true,
-        display_order: t.display_order ?? 0,
-        branch_id: t.branch_id || undefined,
-        branch_ids: Array.isArray(t.branch_ids) ? t.branch_ids : (t.branch_ids ?? null),
-        cover_image: t.cover_image || undefined,
-        duration_min: t.duration_min !== null && t.duration_min !== undefined ? Number(t.duration_min) : undefined,
-        vr_genre: t.vr_genre || undefined,
-        min_players: t.min_players !== null && t.min_players !== undefined ? Number(t.min_players) : undefined,
-        max_players: t.max_players !== null && t.max_players !== undefined ? Number(t.max_players) : undefined,
-        updated_at: t.updated_at ? new Date(t.updated_at).toISOString() : undefined
-      }))
-    );
-    setTotal(total);
-    setIsLoading(false);
+    try {
+      const { items, total } = await getTickets({
+        page,
+        pageSize,
+        type: typeFilter,
+        includeInactive: !showActiveOnly,
+        branch_id: selectedBranchId,
+        sort: sortKey,
+        dir: sortDir
+      });
+      setTickets(
+        items.map((t: any) => ({
+          id: t.id,
+          name: t.name,
+          code: t.code || undefined,
+          description: t.description || undefined,
+          price: Number(t.price),
+          features: Array.isArray(t.features) ? t.features : [],
+          combo: Array.isArray(t.combo) ? t.combo : [],
+          movies: Array.isArray(t.movies) ? t.movies : [],
+          type: t.type || undefined,
+          min_group_size: t.min_group_size ?? undefined,
+          max_group_size: t.max_group_size ?? undefined,
+          is_member_only: !!t.is_member_only,
+          is_active: t.is_active ?? true,
+          display_order: t.display_order ?? 0,
+          branch_id: t.branch_id || undefined,
+          branch_ids: Array.isArray(t.branch_ids) ? t.branch_ids : (t.branch_ids ?? null),
+          cover_image: t.cover_image || undefined,
+          duration_min: t.duration_min !== null && t.duration_min !== undefined ? Number(t.duration_min) : undefined,
+          vr_genre: t.vr_genre || undefined,
+          min_players: t.min_players !== null && t.min_players !== undefined ? Number(t.min_players) : undefined,
+          max_players: t.max_players !== null && t.max_players !== undefined ? Number(t.max_players) : undefined,
+          updated_at: t.updated_at ? new Date(t.updated_at).toISOString() : undefined,
+          created_at: t.created_at ? new Date(t.created_at).toISOString() : undefined
+        }))
+      );
+      setTotal(total);
+    } catch (error: any) {
+      // Show the reason instead of leaving the previous list as if nothing happened
+      toast.error('Không tải được danh sách gói vé', { description: error?.message });
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   useEffect(() => {
@@ -176,9 +184,20 @@ export default function TicketsPage() {
     setIsEditOpen(true);
   };
 
+  // Orders that use the package being deleted (null while loading). The server refuses to delete a package that has
+  // orders, so the dialog says so up front instead of failing after the click.
+  const [ticketBookingCount, setTicketBookingCount] = useState<number | null>(null);
+
   const handleDelete = (ticket: any) => {
     setTicketToDelete(ticket);
+    setTicketBookingCount(null);
     setIsDeleteDialogOpen(true);
+    getTicketById(ticket.id)
+      .then((response: any) => {
+        const detail = response?.item ?? response;
+        setTicketBookingCount(Number(detail?.booking_count ?? 0));
+      })
+      .catch(() => setTicketBookingCount(0));
   };
 
   const confirmDelete = async () => {
@@ -248,10 +267,21 @@ export default function TicketsPage() {
         isOpen={isDeleteDialogOpen}
         onOpenChange={setIsDeleteDialogOpen}
         description={
-          <>
-            Bạn có chắc chắn muốn xóa gói vé "{ticketToDelete?.name}"? Hành động này không thể hoàn tác.
-          </>
+          <div className="space-y-2">
+            <p>Bạn có chắc chắn muốn xóa gói vé "{ticketToDelete?.name}"?</p>
+            {ticketBookingCount === null && <p className="text-slate-400">Đang kiểm tra số đơn đang dùng gói này...</p>}
+            {ticketBookingCount !== null && ticketBookingCount > 0 && (
+              <p className="rounded-lg border border-red-200 bg-red-50 p-3 font-medium text-red-700">
+                Gói này đang có {ticketBookingCount} đơn đặt nên không thể xóa. Hãy tắt gói (chuyển sang "Ngừng hoạt động")
+                để khách không mua được nữa.
+              </p>
+            )}
+            {ticketBookingCount === 0 && (
+              <p>Gói chưa có đơn nào. Sau khi xóa, gói nằm trong danh sách đã xóa và có thể khôi phục.</p>
+            )}
+          </div>
         }
+        confirmDisabled={ticketBookingCount === null || ticketBookingCount > 0}
         onConfirm={confirmDelete}
       />
     </AdminLayout>

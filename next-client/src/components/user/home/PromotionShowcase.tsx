@@ -121,7 +121,7 @@ export default function PromotionShowcase({
 
       <div className="container mx-auto px-3 sm:px-4 relative z-10">
         <div className="text-center max-w-3xl mx-auto mb-6 sm:mb-12 space-y-2 sm:space-y-3">
-          <div className="inline-flex items-center gap-1.5 sm:gap-2 px-3 py-1 sm:px-3.5 sm:py-1.5 rounded-full bg-amber-500/15 border border-amber-500/30 text-amber-300 text-[10px] sm:text-xs font-bold uppercase tracking-widest backdrop-blur-md shadow-[0_0_20px_rgba(245,158,11,0.2)]">
+          <div className="inline-flex items-center gap-1.5 sm:gap-2 px-3 py-1 sm:px-3.5 sm:py-1.5 rounded-full bg-amber-500/15 border border-amber-500/30 text-amber-300 text-[11px] sm:text-xs font-bold uppercase tracking-widest backdrop-blur-md shadow-[0_0_20px_rgba(245,158,11,0.2)]">
             <Sparkles className="w-3.5 h-3.5 text-amber-400" />
             <span>Ưu Đãi Suất Chiếu</span>
           </div>
@@ -146,13 +146,13 @@ export default function PromotionShowcase({
               >
                 <div className="h-full relative overflow-hidden rounded-xl sm:rounded-2xl p-3 sm:p-6 bg-slate-900/80 border border-white/10 backdrop-blur-xl hover:border-amber-400/40 hover:shadow-[0_0_35px_rgba(245,158,11,0.2)] group transition-all duration-300 flex flex-col justify-between">
                   {/* Badge */}
-                  <div className="absolute top-0 right-0 px-2 py-0.5 sm:px-3 sm:py-1 bg-amber-500/20 border-b border-l border-amber-500/30 text-amber-300 text-[8px] sm:text-[10px] font-extrabold uppercase tracking-wider rounded-bl-lg sm:rounded-bl-xl">
+                  <div className="absolute top-0 right-0 px-2 py-0.5 sm:px-3 sm:py-1 bg-amber-500/20 border-b border-l border-amber-500/30 text-amber-300 text-[11px] sm:text-[11px] font-extrabold uppercase tracking-wider rounded-bl-lg sm:rounded-bl-xl">
                     Gói Phim
                   </div>
 
                   <div className="space-y-2 sm:space-y-4">
                     <div>
-                      <span className="text-[9px] sm:text-[11px] uppercase font-bold text-amber-400/80 tracking-wider">
+                      <span className="text-[11px] sm:text-[11px] uppercase font-bold text-amber-400/80 tracking-wider">
                         CineSphere Combo
                       </span>
                       <h3 className="text-xs sm:text-xl font-black text-white group-hover:text-amber-200 transition-colors mt-0.5 line-clamp-2 min-h-[2rem] sm:min-h-0">
@@ -161,13 +161,13 @@ export default function PromotionShowcase({
                     </div>
 
                     <div className="py-1.5 sm:py-2 border-y border-white/10">
-                      <span className="text-[9px] sm:text-[11px] text-slate-400 block">Giá trọn gói</span>
+                      <span className="text-[11px] sm:text-[11px] text-slate-400 block">Giá trọn gói</span>
                       <span className="text-base sm:text-2xl lg:text-3xl font-black text-transparent bg-clip-text bg-gradient-to-r from-amber-200 via-orange-300 to-yellow-100">
                         {combo.price.toLocaleString('vi-VN')}₫
                       </span>
                     </div>
 
-                    <p className="text-[10px] sm:text-xs text-slate-300 leading-relaxed line-clamp-2 min-h-[1.75rem] sm:min-h-[2.5rem]">
+                    <p className="text-[11px] sm:text-xs text-slate-300 leading-relaxed line-clamp-2 min-h-[1.75rem] sm:min-h-[2.5rem]">
                       Vé trải nghiệm CINESPHERE kèm quà tặng ánh sáng lưu niệm.
                     </p>
                   </div>

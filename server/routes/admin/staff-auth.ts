@@ -1,4 +1,4 @@
-import { eq, and, isNull, gt } from 'drizzle-orm';
+import { eq, and, isNull, gt, inArray } from 'drizzle-orm';
 import bcrypt from 'bcryptjs';
 import {
   hashPassword,
@@ -283,8 +283,31 @@ export async function staffGetMeImpl(db: any, tables: any, kv: any, staffId: num
   const { loadStaffPermissions } = await import('../../lib/staff-auth');
   const { permissions, branchIds, isSuperAdmin } = await loadStaffPermissions(db, tables, kv, staff.id);
 
+  // Names of the roles the staff member holds (shown on the profile page)
+  let roleNames: string[] = [];
+  if (tables.staffRoles && tables.roles) {
+    const roleRows = await db
+      .select({ name: tables.roles.name })
+      .from(tables.staffRoles)
+      .innerJoin(tables.roles, eq(tables.roles.id, tables.staffRoles.roleId))
+      .where(eq(tables.staffRoles.staffId, staff.id));
+    roleNames = roleRows.map((row: { name: string }) => row.name);
+  }
+
+  // Names of the branches the staff member is assigned to (shown on the profile page)
+  let branchNames: string[] = [];
+  if (tables.branches && branchIds.length > 0) {
+    const branchRows = await db
+      .select({ name: tables.branches.name })
+      .from(tables.branches)
+      .where(inArray(tables.branches.id, branchIds));
+    branchNames = branchRows.map((row: { name: string }) => row.name);
+  }
+
   return {
     status: 'success',
+    roleNames,
+    branchNames,
     staff: {
       id: staff.id,
       email: staff.email,
@@ -293,7 +316,8 @@ export async function staffGetMeImpl(db: any, tables: any, kv: any, staffId: num
       avatar: staff.avatar,
       isSuperAdmin: staff.isSuperAdmin,
       forcePasswordChange: Boolean(staff.forcePasswordChange),
-      lastLoginAt: staff.lastLoginAt
+      lastLoginAt: staff.lastLoginAt,
+      createdAt: staff.createdAt
     },
     permissions,
     branchIds

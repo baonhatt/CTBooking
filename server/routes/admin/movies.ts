@@ -1,4 +1,4 @@
-import { eq, desc, and, inArray, sql, or, isNull, isNotNull, like, count } from 'drizzle-orm';
+import { eq, desc, asc, and, inArray, sql, or, isNull, isNotNull, like, count } from 'drizzle-orm';
 import { formatDateForDb } from '../../lib/date-utils';
 import { logAuditAction } from '../../lib/audit-logger';
 import { buildAuditPayload } from '../../lib/audit-utils';
@@ -89,6 +89,7 @@ export async function createMovieImpl(
     title: data.title,
     description: data.description,
     cover_image: coverImageUrl,
+    // TẠM BỎ QUA NHIỀU ẢNH (20261110): hiện mỗi phim chỉ dùng 1 poster (cover_image). Ảnh chi tiết (detail_images) chưa dùng: website khách không hiển thị và form sửa chưa có chỗ thêm/xóa ảnh này. Khi cần thư viện ảnh phim: thêm upload nhiều ảnh vào form sửa (MovieEditModal), hiển thị ở website khách, rồi bỏ ghi chú này.
     detail_images: Array.isArray(data.detail_images) ? JSON.stringify(data.detail_images) : data.detail_images,
     genres: Array.isArray(data.genres) ? JSON.stringify(data.genres) : data.genres,
     rating: data.rating ?? null,
@@ -466,12 +467,14 @@ export async function listDeletedMoviesImpl(
     page?: number;
     pageSize?: number;
     search?: string;
+    sort?: string;
+    dir?: string;
     branch_id?: number | null;
     restrictToBranchIds?: number[] | null;
   } = {}
 ) {
   const { movies, staffs } = tables;
-  const { page = 1, pageSize = 10, search = '', branch_id, restrictToBranchIds = null } = options;
+  const { page = 1, pageSize = 10, search = '', sort, dir, branch_id, restrictToBranchIds = null } = options;
 
   const conditions = [];
   if (search) {
@@ -511,7 +514,11 @@ export async function listDeletedMoviesImpl(
     .where(whereClause)
     .limit(pageSize)
     .offset((page - 1) * pageSize)
-    .orderBy(desc(movies.deleted_at));
+    .orderBy(
+      sort === 'name'
+        ? dir === 'asc' ? asc(movies.title) : desc(movies.title)
+        : dir === 'asc' ? asc(movies.deleted_at) : desc(movies.deleted_at)
+    );
 
   const [countResult] = await anyDb.select({ count: count() }).from(movies).where(whereClause);
 
@@ -756,15 +763,17 @@ export async function getMovieByIdImpl(
   return {
     id: movie.id,
     title: movie.title,
-    description: movie.description || 'Không có mô tả',
+    // Blank stays blank: the admin form loads this value for editing, so no made-up text or 0 here
+    description: movie.description || '',
     cover_image: movie.cover_image,
     genres: safeParseJson(movie.genres),
-    rating: Number(movie.rating || 0),
-    duration_min: movie.duration_min || 0,
+    rating: movie.rating === null || movie.rating === undefined ? null : Number(movie.rating),
+    duration_min: movie.duration_min ?? null,
     is_active: movie.is_active,
     release_date: safeDate(movie.release_date),
     created_at: safeDate(movie.created_at),
     updated_at: safeDate(movie.updated_at),
+    deleted_at: safeDate(movie.deleted_at),
     created_by_staff_name: createLog?.staffFullname || null,
     updated_by_staff_name: updateLog?.staffFullname || null,
     stats: { totalTicketsSold, totalRevenue, successfulBookings },

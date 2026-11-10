@@ -71,7 +71,7 @@ function buildCodeSearchConditions(normalizedCode: string, bookingsTable: any) {
   return or(...conditions);
 }
 
-export async function getBookingByCodeImpl(anyDb: any, codeRaw: string, tables: { bookings: any }) {
+export async function getBookingByCodeImpl(anyDb: any, codeRaw: string, tables: { bookings: any; auditLogs?: any }) {
   const code = String(codeRaw || '');
   if (!code || code.trim() === '') return { status: 400, message: 'Thiếu mã vé' };
   const normalizedCode = code.trim().toUpperCase();
@@ -153,6 +153,28 @@ export async function getBookingByCodeImpl(anyDb: any, codeRaw: string, tables: 
     } catch {}
   }
 
+  // Who checked the ticket in: the bookings table has no column for it, so it is read from the audit log
+  let checkedInByStaffName: string | null = null;
+  if (booking.is_used && tables.auditLogs) {
+    try {
+      const [checkInLog] = await anyDb
+        .select({ staffFullname: tables.auditLogs.staffFullname })
+        .from(tables.auditLogs)
+        .where(
+          and(
+            eq(tables.auditLogs.entityType, 'booking'),
+            eq(tables.auditLogs.entityId, String(booking.id)),
+            inArray(tables.auditLogs.action, ['check_in', 'force_checkin'])
+          )
+        )
+        .orderBy(desc(tables.auditLogs.createdAt))
+        .limit(1);
+      checkedInByStaffName = checkInLog?.staffFullname || null;
+    } catch (err) {
+      console.error('Could not read who checked the ticket in:', err);
+    }
+  }
+
   return {
     status: 200,
     id: booking.id,
@@ -191,6 +213,7 @@ export async function getBookingByCodeImpl(anyDb: any, codeRaw: string, tables: 
     validity_days: daysLeft,
     expired,
     checked_in_at: booking.checked_in_at,
+    checked_in_by_staff_name: checkedInByStaffName,
     vr_items,
     voucher_details,
     email_status
@@ -260,31 +283,41 @@ export async function confirmUseTicketImpl(
       return { status: 500, message: 'Không thể cập nhật trạng thái vé' };
     }
 
-    // Log audit log if this check-in was forced for an expired ticket
-    if (expired && allowExpired && staffInfo && tables.auditLogs) {
+    // Every check-in is written to the audit log (this is how the screen shows who checked a ticket in);
+    // a check-in forced for an expired ticket gets its own action
+    if (staffInfo && tables.auditLogs) {
+      const isForced = expired && allowExpired;
       try {
         await logAuditAction(
           anyDb,
           tables.auditLogs,
-          'force_checkin',
+          isForced ? 'force_checkin' : 'check_in',
           'booking',
           booking.id,
-          `Duyệt du di cho vé quá hạn vào cổng (Mã: ${booking.booking_code})`,
+          isForced
+            ? `Duyệt du di cho vé quá hạn vào cổng (Mã: ${booking.booking_code})`
+            : `Xác nhận cho khách vào cổng (Mã: ${booking.booking_code})`,
           staffInfo.id,
           staffInfo.email,
           staffInfo.fullname,
-          JSON.stringify({ is_used: false, expired: true }),
-          JSON.stringify({ is_used: true, forced_by: staffInfo.email })
+          JSON.stringify({ is_used: false, expired }),
+          JSON.stringify(isForced ? { is_used: true, forced_by: staffInfo.email } : { is_used: true })
         );
       } catch (err) {
-        console.error('Audit log error on force check-in:', err);
+        console.error('Audit log error on check-in:', err);
       }
     }
 
     return {
       status: 200,
       message: expired && allowExpired ? 'Đã duyệt du di cho vé quá hạn vào cổng' : 'Xác nhận sử dụng vé thành công',
-      booking: { id: updated.id, is_used: updated.is_used }
+      booking: {
+        id: updated.id,
+        is_used: updated.is_used,
+        // The server's own check-in time and the staff member, so the screen does not use the browser clock
+        checked_in_at: updated.checked_in_at,
+        checked_in_by_staff_name: staffInfo?.fullname || null
+      }
     };
   } catch (err: any) {
     const status = err?.status || 500;

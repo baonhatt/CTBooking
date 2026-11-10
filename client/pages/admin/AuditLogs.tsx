@@ -17,6 +17,7 @@ import {
   PaginationPrevious
 } from '@/components/ui/pagination';
 import { request } from '@/lib/api/http';
+import { formatVnDateTime } from '@/lib/format';
 import AdminLayout from '@/admin/layouts/AdminLayout';
 import { useStaffStore } from '@/store/staffStore';
 import { useNavigate } from 'react-router-dom';
@@ -33,6 +34,7 @@ interface AuditLog {
   oldValues?: string;
   newValues?: string;
   ipAddress?: string;
+  userAgent?: string | null;
   createdAt: string;
 }
 
@@ -48,6 +50,8 @@ const ACTION_LABELS: Record<string, string> = {
   update: 'Cập nhật',
   delete: 'Xóa',
   force_logout: 'Đăng xuất',
+  check_in: 'Cho vào cổng',
+  force_checkin: 'Duyệt vé quá hạn',
   reset_password: 'Đặt lại mật khẩu',
   copy: 'Sao chép'
 };
@@ -92,7 +96,7 @@ export default function AuditLogsPage() {
   const clearStaff = useStaffStore((state) => state.clearStaff);
   const [activeTab, setActiveTab] = useState('audit-logs');
   const [page, setPage] = useState(1);
-  const [pageSize] = useState(20);
+  const [pageSize, setPageSize] = useState(20);
   const [search, setSearch] = useState('');
   const [localSearch, setLocalSearch] = useState('');
 
@@ -110,7 +114,12 @@ export default function AuditLogsPage() {
   const [isDetailDialogOpen, setIsDetailDialogOpen] = useState(false);
 
   // Fetch audit logs
-  const { data: logsData, isFetching: logsLoading } = useQuery({
+  const {
+    data: logsData,
+    isFetching: logsLoading,
+    isError: logsFailed,
+    refetch: refetchLogs
+  } = useQuery({
     queryKey: [
       'audit-logs',
       page,
@@ -145,21 +154,38 @@ export default function AuditLogsPage() {
     }
   });
 
-  const formatDate = (dateString: string) => {
-    const date = new Date(dateString);
-    return date.toLocaleString('vi-VN', {
-      day: '2-digit',
-      month: '2-digit',
-      year: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-      second: '2-digit'
-    });
+  // Vietnam time, same format as the other admin screens
+  const formatDate = (dateString: string) => formatVnDateTime(dateString);
+
+  // A value of the before/after table. Objects keep their indentation, so they go in a <pre>.
+  const renderValue = (value: unknown) => {
+    if (value === undefined) return <span className="text-gray-400">-</span>;
+    if (value !== null && typeof value === 'object') {
+      return <pre className="whitespace-pre-wrap font-mono text-xs">{JSON.stringify(value, null, 2)}</pre>;
+    }
+    return String(value);
   };
 
-  const formatEntityLabel = (entityType: string, entityId: string) => {
-    const entityLabel = ENTITY_LABELS[entityType] || entityType;
-    return `${entityLabel} #${entityId}`;
+  // The most readable name of the record (booking code, name, title ...) taken from the saved values
+  const getEntityName = (log: AuditLog): string => {
+    for (const rawValues of [log.newValues, log.oldValues]) {
+      if (!rawValues) continue;
+      try {
+        const values = JSON.parse(rawValues);
+        const name = values.booking_code || values.code || values.name || values.fullname || values.title || values.email;
+        if (name) return String(name);
+      } catch {
+        // values that are not JSON have no name to show
+      }
+    }
+    return '';
+  };
+
+  const formatEntityLabel = (log: AuditLog) => {
+    const entityLabel = ENTITY_LABELS[log.entityType] || log.entityType;
+    const entityName = getEntityName(log);
+    // Show the name when there is one; the internal id only as a fallback
+    return entityName ? `${entityLabel}: ${entityName}` : `${entityLabel} #${log.entityId}`;
   };
 
   const getStaffInfo = (staffId: number) => {
@@ -286,6 +312,7 @@ export default function AuditLogsPage() {
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 w-4 h-4" />
                 <input
                   type="text"
+                  aria-label="Tìm theo tên nhân viên hoặc hành động"
                   placeholder="Tìm theo tên nhân viên hoặc hành động..."
                   value={localSearch}
                   onChange={(e) => setLocalSearch(e.target.value)}
@@ -305,6 +332,7 @@ export default function AuditLogsPage() {
           <div className="flex flex-wrap items-center gap-2.5 w-full xl:w-auto font-sans justify-start xl:justify-end">
             <select
               value={filterStaff}
+              aria-label="Lọc theo nhân viên"
               onChange={(e) => setFilterStaff(e.target.value)}
               className="h-10 px-3 bg-white border border-slate-200 rounded-xl text-xs focus:ring-2 focus:ring-blue-500 outline-none shadow-sm cursor-pointer min-w-[140px]"
             >
@@ -318,6 +346,7 @@ export default function AuditLogsPage() {
 
             <select
               value={filterAction}
+              aria-label="Lọc theo hành động"
               onChange={(e) => setFilterAction(e.target.value)}
               className="h-10 px-3 bg-white border border-slate-200 rounded-xl text-xs focus:ring-2 focus:ring-blue-500 outline-none shadow-sm cursor-pointer min-w-[140px]"
             >
@@ -331,6 +360,7 @@ export default function AuditLogsPage() {
 
             <select
               value={filterEntityType}
+              aria-label="Lọc theo đối tượng"
               onChange={(e) => setFilterEntityType(e.target.value)}
               className="h-10 px-3 bg-white border border-slate-200 rounded-xl text-xs focus:ring-2 focus:ring-blue-500 outline-none shadow-sm cursor-pointer min-w-[140px]"
             >
@@ -348,6 +378,7 @@ export default function AuditLogsPage() {
               onChange={(e) => setFilterFromDate(e.target.value)}
               className="h-10 px-3 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:ring-2 focus:ring-blue-500 outline-none shadow-sm cursor-pointer w-[130px]"
               title="Từ ngày"
+              aria-label="Từ ngày"
             />
             
             <input
@@ -356,6 +387,7 @@ export default function AuditLogsPage() {
               onChange={(e) => setFilterToDate(e.target.value)}
               className="h-10 px-3 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:ring-2 focus:ring-blue-500 outline-none shadow-sm cursor-pointer w-[130px]"
               title="Đến ngày"
+              aria-label="Đến ngày"
             />
 
             {(filterStaff || filterAction || filterEntityType || filterFromDate || filterToDate) && (
@@ -386,6 +418,15 @@ export default function AuditLogsPage() {
             </Button>
           </div>
         </div>
+
+        {logsFailed && (
+          <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 flex items-center justify-between gap-3">
+            <span>Không tải được nhật ký hoạt động. Dữ liệu bên dưới có thể đã cũ hoặc trống.</span>
+            <button onClick={() => refetchLogs()} className="font-semibold underline">
+              Tải lại
+            </button>
+          </div>
+        )}
 
         {/* TABLE */}
         <Card className="border border-gray-200 rounded-xl shadow-sm bg-white">
@@ -443,7 +484,7 @@ export default function AuditLogsPage() {
                       </Badge>
                     </TableCell>
                     <TableCell className="text-sm text-slate-600">
-                      {formatEntityLabel(log.entityType, log.entityId)}
+                      {formatEntityLabel(log)}
                     </TableCell>
                     <TableCell className="text-sm text-slate-600 font-mono">{log.ipAddress || '-'}</TableCell>
                     <TableCell className="text-right pr-6">
@@ -467,9 +508,26 @@ export default function AuditLogsPage() {
 
         {/* FOOTER / PAGINATION */}
         <div className="bg-white px-6 py-4 rounded-2xl border border-gray-200 shadow-sm flex flex-col sm:flex-row justify-between items-center gap-4">
-          <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
-            {total} bản ghi trong hệ thống
-          </span>
+          <div className="flex items-center gap-4">
+            <span className="text-[11px] font-bold text-slate-400 uppercase tracking-widest">
+              {total} bản ghi trong hệ thống
+            </span>
+            <select
+              value={pageSize}
+              aria-label="Số bản ghi mỗi trang"
+              onChange={(e) => {
+                setPageSize(Number(e.target.value));
+                setPage(1);
+              }}
+              className="h-8 px-2 bg-white border border-slate-200 rounded-lg text-xs outline-none cursor-pointer"
+            >
+              {[20, 50, 100].map((size) => (
+                <option key={size} value={size}>
+                  {size} / trang
+                </option>
+              ))}
+            </select>
+          </div>
           <Pagination>
             <PaginationContent>
               <PaginationItem>
@@ -510,7 +568,7 @@ export default function AuditLogsPage() {
         {/* Detail Dialog */}
         <Dialog open={isDetailDialogOpen} onOpenChange={setIsDetailDialogOpen}>
           <DialogContent className="[&>button]:hidden bg-white sm:max-w-4xl max-h-[80vh] overflow-y-auto rounded-2xl flex flex-col">
-            <DialogHeader>
+            <DialogHeader className="sticky top-0 z-10 bg-white pb-3 border-b">
               <DialogTitle>Chi tiết hoạt động</DialogTitle>
             </DialogHeader>
             {selectedLog && (
@@ -524,6 +582,10 @@ export default function AuditLogsPage() {
                     <Label className="text-sm font-medium">Địa chỉ IP</Label>
                     <div className="text-sm">{selectedLog.ipAddress || '-'}</div>
                   </div>
+                  <div className="col-span-2">
+                    <Label className="text-sm font-medium">Trình duyệt / thiết bị</Label>
+                    <div className="text-sm break-all">{selectedLog.userAgent || '-'}</div>
+                  </div>
                   <div>
                     <Label className="text-sm font-medium">Nhân viên</Label>
                     <div className="text-sm">
@@ -536,7 +598,7 @@ export default function AuditLogsPage() {
                   </div>
                   <div>
                     <Label className="text-sm font-medium">Đối tượng</Label>
-                    <div className="text-sm">{formatEntityLabel(selectedLog.entityType, selectedLog.entityId)}</div>
+                    <div className="text-sm">{formatEntityLabel(selectedLog)}</div>
                   </div>
                 </div>
 
@@ -570,28 +632,12 @@ export default function AuditLogsPage() {
                               <td className="p-3 font-medium text-sm">{key}</td>
                               {selectedLog.oldValues && (
                                 <td className="p-3 text-sm bg-red-50">
-                                  {oldValue !== undefined ? (
-                                    typeof oldValue === 'object' ? (
-                                      JSON.stringify(oldValue, null, 2)
-                                    ) : (
-                                      String(oldValue)
-                                    )
-                                  ) : (
-                                    <span className="text-gray-400">-</span>
-                                  )}
+                                  {renderValue(oldValue)}
                                 </td>
                               )}
                               {selectedLog.newValues && (
                                 <td className="p-3 text-sm bg-green-50">
-                                  {newValue !== undefined ? (
-                                    typeof newValue === 'object' ? (
-                                      JSON.stringify(newValue, null, 2)
-                                    ) : (
-                                      String(newValue)
-                                    )
-                                  ) : (
-                                    <span className="text-gray-400">-</span>
-                                  )}
+                                  {renderValue(newValue)}
                                 </td>
                               )}
                             </tr>

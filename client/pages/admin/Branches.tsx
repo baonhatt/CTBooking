@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import AdminLayout from '@/admin/layouts/AdminLayout';
 import { getBranches, deleteBranchApi, toggleBranchStatusApi } from '@/lib/api/branches';
 import { toast } from 'sonner';
@@ -55,8 +55,10 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger
 } from '@/components/ui/alert-dialog';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
+import { useConfirmUnsaved } from '@/hooks/useConfirmUnsaved';
+import { formatVnDateTime } from '@/lib/format';
 
 interface Branch {
   id: number;
@@ -142,15 +144,22 @@ export default function BranchesPage() {
 
   const handleRefresh = async () => {
     setIsLoading(true);
-    const { items, total } = await getBranches({
-      page,
-      pageSize,
-      q: searchQuery,
-      includeInactive: !showActiveOnly
-    });
-    setBranches(items);
-    setTotal(total);
-    setIsLoading(false);
+    try {
+      const { items, total } = await getBranches({
+        page,
+        pageSize,
+        q: searchQuery,
+        includeInactive: !showActiveOnly
+      });
+      setBranches(items);
+      setTotal(total);
+    } catch (e: any) {
+      toast.error('Không tải được danh sách chi nhánh', {
+        description: e?.message || 'Có lỗi xảy ra'
+      });
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   useEffect(() => {
@@ -333,6 +342,7 @@ export default function BranchesPage() {
                     <TableHead className="text-xs font-semibold text-gray-600 uppercase py-3">Tên</TableHead>
                     <TableHead className="text-xs font-semibold text-gray-600 uppercase py-3">Mã</TableHead>
                     <TableHead className="text-xs font-semibold text-gray-600 uppercase py-3">Địa chỉ</TableHead>
+                    <TableHead className="text-xs font-semibold text-gray-600 uppercase py-3">Liên hệ</TableHead>
                     <TableHead className="text-center text-xs font-semibold text-gray-600 uppercase py-3">
                       Mặc định
                     </TableHead>
@@ -348,6 +358,13 @@ export default function BranchesPage() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
+                  {branches.length === 0 && (
+                    <TableRow className="hover:bg-transparent">
+                      <TableCell colSpan={8} className="py-10 text-center text-sm text-slate-500">
+                        Chưa có chi nhánh nào
+                      </TableCell>
+                    </TableRow>
+                  )}
                   {branches.map((branch) => (
                     <TableRow
                       key={branch.id}
@@ -355,7 +372,19 @@ export default function BranchesPage() {
                     >
                       <TableCell className="font-medium text-slate-900">{branch.name}</TableCell>
                       <TableCell className="font-mono text-xs text-slate-500">{branch.code}</TableCell>
-                      <TableCell className="text-sm text-slate-600">{branch.address || '-'}</TableCell>
+                      <TableCell className="text-sm text-slate-600 max-w-[240px]">
+                        <span className="block truncate" title={branch.address || ''}>
+                          {branch.address || '-'}
+                        </span>
+                      </TableCell>
+                      <TableCell className="text-xs text-slate-600">
+                        <div className="flex flex-col gap-0.5">
+                          <span>{branch.phone || '-'}</span>
+                          <span className="text-slate-500 truncate max-w-[180px]" title={branch.email || ''}>
+                            {branch.email || ''}
+                          </span>
+                        </div>
+                      </TableCell>
                       <TableCell className="text-center">
                         {branch.is_default && (
                           <Badge className="bg-green-50 text-green-700 border-green-200 rounded-full px-2 py-0.5 text-xs font-medium">
@@ -390,7 +419,7 @@ export default function BranchesPage() {
                                         Cảnh báo: Có {branch.paid_unused_count} vé đã thanh toán chưa sử dụng!
                                       </p>
                                       <div className="bg-white/50 p-2 rounded border border-amber-100">
-                                        <p className="text-[10px] text-amber-600 uppercase font-bold mb-1">
+                                        <p className="text-[11px] text-amber-600 uppercase font-bold mb-1">
                                           Danh sách mã vé (Để copy):
                                         </p>
                                         <code className="text-xs text-slate-700 break-all leading-relaxed">
@@ -454,6 +483,7 @@ export default function BranchesPage() {
                             <AlertDialogTrigger asChild>
                               <Switch
                                 checked={branch.is_active}
+                                aria-label={`Kích hoạt chi nhánh ${branch.name}`}
                                 className="scale-100 transition-all border-2 border-transparent cursor-pointer"
                                 style={{
                                   opacity: 1,
@@ -498,6 +528,7 @@ export default function BranchesPage() {
                         ) : (
                           <Switch
                             checked={branch.is_active}
+                            aria-label={`Kích hoạt chi nhánh ${branch.name}`}
                             disabled
                             className="scale-100 opacity-40 cursor-not-allowed"
                             style={{ backgroundColor: branch.is_active ? '#10b981' : '#d1d5db' }}
@@ -515,6 +546,7 @@ export default function BranchesPage() {
                               setIsDetailDialogOpen(true);
                             }}
                             title="Chi tiết"
+                            aria-label={`Xem chi tiết chi nhánh ${branch.name}`}
                           >
                             <Eye className="h-3.5 w-3.5" />
                           </Button>
@@ -525,6 +557,7 @@ export default function BranchesPage() {
                               className="h-8 w-8 text-yellow-600 hover:text-yellow-700 hover:bg-yellow-50"
                               onClick={() => openEdit(branch)}
                               title="Sửa"
+                              aria-label={`Sửa chi nhánh ${branch.name}`}
                             >
                               <Pencil className="h-3.5 w-3.5" />
                             </Button>
@@ -536,6 +569,7 @@ export default function BranchesPage() {
                               className="h-8 w-8 text-red-600 hover:text-red-700 hover:bg-red-50"
                               onClick={() => handleDelete(branch.id)}
                               title="Xóa"
+                              aria-label={`Xóa chi nhánh ${branch.name}`}
                             >
                               <Trash2 className="h-3.5 w-3.5" />
                             </Button>
@@ -552,7 +586,7 @@ export default function BranchesPage() {
 
         {/* FOOTER / PAGINATION */}
         <div className="bg-white px-6 py-4 rounded-2xl border border-gray-200 shadow-sm flex flex-col sm:flex-row justify-between items-center gap-4">
-          <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+          <span className="text-[11px] font-bold text-slate-400 uppercase tracking-widest">
             {total} chi nhánh trong hệ thống
           </span>
           <Pagination>
@@ -648,30 +682,30 @@ export default function BranchesPage() {
                     <CardContent className="p-4 space-y-4">
                       <div className="grid grid-cols-2 gap-4">
                         <div className="space-y-1">
-                          <Label className="text-[10px] font-medium text-slate-500 uppercase">Tên chi nhánh</Label>
+                          <Label className="text-[11px] font-medium text-slate-500 uppercase">Tên chi nhánh</Label>
                           <div className="text-sm font-bold text-slate-900">{selectedBranch.name}</div>
                         </div>
                         <div className="space-y-1">
-                          <Label className="text-[10px] font-medium text-slate-500 uppercase">Mã chi nhánh</Label>
+                          <Label className="text-[11px] font-medium text-slate-500 uppercase">Mã chi nhánh</Label>
                           <div className="text-sm font-mono text-blue-600 font-bold">{selectedBranch.code}</div>
                         </div>
                         <div className="space-y-2 col-span-2">
-                          <Label className="text-[10px] font-medium text-slate-500 uppercase">
+                          <Label className="text-[11px] font-medium text-slate-500 uppercase">
                             Trạng thái hiện tại
                           </Label>
                           <div className="flex flex-wrap gap-2 pt-0.5">
                             {selectedBranch.is_default && (
-                              <Badge className="bg-green-100 text-green-700 hover:bg-green-100 border-none rounded-full px-2.5 py-0.5 text-[10px] font-bold uppercase">
+                              <Badge className="bg-green-100 text-green-700 hover:bg-green-100 border-none rounded-full px-2.5 py-0.5 text-[11px] font-bold uppercase">
                                 Mặc định
                               </Badge>
                             )}
                             <Badge
-                              className={`${selectedBranch.is_active ? 'bg-blue-100 text-blue-700' : 'bg-slate-100 text-slate-600'} border-none rounded-full px-2.5 py-0.5 text-[10px] font-bold uppercase`}
+                              className={`${selectedBranch.is_active ? 'bg-blue-100 text-blue-700' : 'bg-slate-100 text-slate-600'} border-none rounded-full px-2.5 py-0.5 text-[11px] font-bold uppercase`}
                             >
                               {selectedBranch.is_active ? 'Kích hoạt' : 'Đang ẩn'}
                             </Badge>
                             <Badge
-                              className={`${selectedBranch.is_open ? 'bg-emerald-100 text-emerald-700' : 'bg-rose-100 text-rose-700'} border-none rounded-full px-2.5 py-0.5 text-[10px] font-bold uppercase`}
+                              className={`${selectedBranch.is_open ? 'bg-emerald-100 text-emerald-700' : 'bg-rose-100 text-rose-700'} border-none rounded-full px-2.5 py-0.5 text-[11px] font-bold uppercase`}
                             >
                               {selectedBranch.is_open ? 'Đang mở cửa' : 'Đã đóng cửa'}
                             </Badge>
@@ -690,19 +724,19 @@ export default function BranchesPage() {
                     <CardContent className="p-4">
                       <div className="grid grid-cols-2 gap-3">
                         <div className="bg-blue-50/50 p-3 rounded-xl border border-blue-100 text-center">
-                          <div className="text-[9px] text-blue-500 uppercase font-black mb-1">Số phim</div>
+                          <div className="text-[11px] text-blue-500 uppercase font-black mb-1">Số phim</div>
                           <div className="text-xl font-black text-blue-700">{selectedBranch.movie_count}</div>
                         </div>
                         <div className="bg-purple-50/50 p-3 rounded-xl border border-purple-100 text-center">
-                          <div className="text-[9px] text-purple-500 uppercase font-black mb-1">Số gói vé</div>
+                          <div className="text-[11px] text-purple-500 uppercase font-black mb-1">Số gói vé</div>
                           <div className="text-xl font-black text-purple-700">{selectedBranch.package_count}</div>
                         </div>
                         <div className="bg-green-50/50 p-3 rounded-xl border border-green-100 text-center">
-                          <div className="text-[9px] text-green-500 uppercase font-black mb-1">Tổng Booking</div>
+                          <div className="text-[11px] text-green-500 uppercase font-black mb-1">Tổng Booking</div>
                           <div className="text-xl font-black text-green-700">{selectedBranch.booking_count}</div>
                         </div>
                         <div className="bg-rose-50/50 p-3 rounded-xl border border-rose-100 text-center">
-                          <div className="text-[9px] text-rose-500 uppercase font-black mb-1">Đang thanh toán</div>
+                          <div className="text-[11px] text-rose-500 uppercase font-black mb-1">Đang thanh toán</div>
                           <div className="text-xl font-black text-rose-700">
                             {selectedBranch.pending_bookings_count}
                           </div>
@@ -723,7 +757,7 @@ export default function BranchesPage() {
                         <div className="flex items-start gap-3">
                           <MapPin className="w-3.5 h-3.5 text-slate-400 shrink-0 mt-0.5" />
                           <div className="space-y-1">
-                            <p className="font-bold text-slate-700 uppercase text-[9px] tracking-tight">Địa chỉ</p>
+                            <p className="font-bold text-slate-700 uppercase text-[11px] tracking-tight">Địa chỉ</p>
                             <p className="text-slate-600 leading-normal">{selectedBranch.address || 'Chưa cập nhật'}</p>
                           </div>
                         </div>
@@ -731,14 +765,14 @@ export default function BranchesPage() {
                           <div className="flex items-start gap-3">
                             <Phone className="w-3.5 h-3.5 text-slate-400 shrink-0 mt-0.5" />
                             <div className="space-y-1">
-                              <p className="font-bold text-slate-700 uppercase text-[9px] tracking-tight">Điện thoại</p>
+                              <p className="font-bold text-slate-700 uppercase text-[11px] tracking-tight">Điện thoại</p>
                               <p className="text-slate-600">{selectedBranch.phone || 'Chưa cập nhật'}</p>
                             </div>
                           </div>
                           <div className="flex items-start gap-3">
                             <Mail className="w-3.5 h-3.5 text-slate-400 shrink-0 mt-0.5" />
                             <div className="space-y-1">
-                              <p className="font-bold text-slate-700 uppercase text-[9px] tracking-tight">Email</p>
+                              <p className="font-bold text-slate-700 uppercase text-[11px] tracking-tight">Email</p>
                               <p className="text-slate-600 break-all">{selectedBranch.email || 'Chưa cập nhật'}</p>
                             </div>
                           </div>
@@ -754,20 +788,20 @@ export default function BranchesPage() {
                       </div>
                       <CardContent className="p-4 grid grid-cols-2 gap-4 text-xs">
                         <div className="space-y-1">
-                          <p className="font-bold text-slate-700 uppercase text-[9px] tracking-tight">Ngày tạo</p>
+                          <p className="font-bold text-slate-700 uppercase text-[11px] tracking-tight">Ngày tạo</p>
                           <p className="text-slate-600 font-medium">
-                            {new Date(selectedBranch.created_at).toLocaleString('vi-VN')}
+                            {formatVnDateTime(selectedBranch.created_at)}
                           </p>
-                          <p className="text-[10px] text-slate-400 italic">
+                          <p className="text-[11px] text-slate-400 italic">
                             Bởi: {selectedBranch.created_by_staff_name || 'Hệ thống'}
                           </p>
                         </div>
                         <div className="space-y-1">
-                          <p className="font-bold text-slate-700 uppercase text-[9px] tracking-tight">Cập nhật cuối</p>
+                          <p className="font-bold text-slate-700 uppercase text-[11px] tracking-tight">Cập nhật cuối</p>
                           <p className="text-slate-600 font-medium">
-                            {new Date(selectedBranch.updated_at).toLocaleString('vi-VN')}
+                            {formatVnDateTime(selectedBranch.updated_at)}
                           </p>
-                          <p className="text-[10px] text-slate-400 italic">
+                          <p className="text-[11px] text-slate-400 italic">
                             Bởi: {selectedBranch.updated_by_staff_name || 'Hệ thống'}
                           </p>
                         </div>
@@ -795,7 +829,7 @@ export default function BranchesPage() {
                               <div className="space-y-4">
                                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                   <div className="space-y-1">
-                                    <Label className="text-[10px] font-bold text-slate-500 uppercase">
+                                    <Label className="text-[11px] font-bold text-slate-500 uppercase">
                                       Tên công ty hiển thị
                                     </Label>
                                     <p className="text-sm font-semibold text-slate-800 leading-tight">
@@ -803,25 +837,25 @@ export default function BranchesPage() {
                                     </p>
                                   </div>
                                   <div className="space-y-1">
-                                    <Label className="text-[10px] font-bold text-slate-500 uppercase">
+                                    <Label className="text-[11px] font-bold text-slate-500 uppercase">
                                       Hotline Footer
                                     </Label>
                                     <p className="text-sm font-bold text-cyan-600">{s.hotline || '-'}</p>
                                   </div>
                                   <div className="space-y-1 sm:col-span-2">
-                                    <Label className="text-[10px] font-bold text-slate-500 uppercase">
+                                    <Label className="text-[11px] font-bold text-slate-500 uppercase">
                                       Địa chỉ Công ty Footer
                                     </Label>
                                     <p className="text-sm text-slate-700">{s.company_address || '-'}</p>
                                   </div>
                                   <div className="space-y-1">
-                                    <Label className="text-[10px] font-bold text-slate-500 uppercase">
+                                    <Label className="text-[11px] font-bold text-slate-500 uppercase">
                                       Địa điểm bản đồ
                                     </Label>
                                     <p className="text-sm text-slate-700">{s.map_query || '-'}</p>
                                   </div>
                                   <div className="space-y-1">
-                                    <Label className="text-[10px] font-bold text-slate-500 uppercase">
+                                    <Label className="text-[11px] font-bold text-slate-500 uppercase">
                                       Tọa độ / Plus Code
                                     </Label>
                                     <p className="text-sm text-slate-700 font-mono">{s.map_coords || '-'}</p>
@@ -865,7 +899,7 @@ export default function BranchesPage() {
                                   key={idx}
                                   className="flex justify-between items-start gap-4 py-2.5 px-3 bg-slate-50 rounded-xl border border-slate-100"
                                 >
-                                  <span className="text-[10px] text-slate-500 font-bold uppercase tracking-tight mt-0.5 shrink-0">
+                                  <span className="text-[11px] text-slate-500 font-bold uppercase tracking-tight mt-0.5 shrink-0">
                                     {info.label}
                                   </span>
                                   <span className="text-xs text-slate-800 font-bold text-right uppercase">
@@ -902,7 +936,7 @@ export default function BranchesPage() {
                           }
                         } catch {}
                         return (
-                          <Badge variant="secondary" className="text-[10px] font-bold">
+                          <Badge variant="secondary" className="text-[11px] font-bold">
                             {banners.length} ảnh
                           </Badge>
                         );
@@ -948,7 +982,7 @@ export default function BranchesPage() {
                                     <ExternalLink className="w-3.5 h-3.5" />
                                   </a>
                                 </div>
-                                <span className="absolute bottom-1.5 left-1.5 px-1.5 py-0.5 rounded bg-black/60 backdrop-blur-xs text-[10px] font-bold text-white">
+                                <span className="absolute bottom-1.5 left-1.5 px-1.5 py-0.5 rounded bg-black/60 backdrop-blur-xs text-[11px] font-bold text-white">
                                   #{idx + 1}
                                 </span>
                               </div>
@@ -966,6 +1000,28 @@ export default function BranchesPage() {
       </Dialog>
     </AdminLayout>
   );
+}
+
+// Sections of the branch form, in page order, for the navigation bar at the top of the form
+const BRANCH_FORM_SECTIONS = [
+  { id: 'branch_section_basic', label: 'Thông tin chung' },
+  { id: 'branch_section_banner', label: 'Banner' },
+  { id: 'branch_section_footer', label: 'Liên hệ & bản đồ' },
+  { id: 'branch_section_payment', label: 'Vé & thanh toán' },
+  { id: 'branch_section_legal', label: 'Pháp lý' },
+  { id: 'branch_section_status', label: 'Trạng thái' }
+];
+
+const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+// A phone or hotline may hold digits, spaces, dots, dashes, brackets and a leading +; it needs 8 to 15 digits
+function getPhoneError(value: string): string {
+  const text = (value || '').trim();
+  if (!text) return '';
+  if (!/^\+?[0-9\s.\-()]+$/.test(text)) return 'Chỉ nhập số, dấu cách, dấu chấm hoặc dấu gạch ngang';
+  const digitCount = text.replace(/\D/g, '').length;
+  if (digitCount < 8 || digitCount > 15) return 'Số điện thoại phải có từ 8 đến 15 chữ số';
+  return '';
 }
 
 function BranchEditModal({ isOpen, onClose, data, onSave, branches }: any) {
@@ -987,6 +1043,8 @@ function BranchEditModal({ isOpen, onClose, data, onSave, branches }: any) {
   const [isLoading, setIsLoading] = useState(false);
   const [isCodeEditable, setIsCodeEditable] = useState(false);
   const [showQrUrlField, setShowQrUrlField] = useState(false);
+  // The form as it was loaded, to tell whether the user changed anything before closing
+  const loadedFormJsonRef = useRef('');
   const [settingsData, setSettingsData] = useState<any>({
     company_name: '',
     company_address: '',
@@ -1031,7 +1089,7 @@ function BranchEditModal({ isOpen, onClose, data, onSave, branches }: any) {
       }
       setBannerImages(initialBanners);
 
-      setFormData({
+      const loadedFormData = {
         name: data.name || '',
         code: data.code || '',
         address: data.address || '',
@@ -1042,7 +1100,9 @@ function BranchEditModal({ isOpen, onClose, data, onSave, branches }: any) {
         is_open: data.is_open ?? true,
         banner_images: JSON.stringify(initialBanners),
         settings: data.settings || ''
-      });
+      };
+      setFormData(loadedFormData);
+      loadedFormJsonRef.current = JSON.stringify(loadedFormData);
 
       // Parse settings JSON
       try {
@@ -1106,8 +1166,29 @@ function BranchEditModal({ isOpen, onClose, data, onSave, branches }: any) {
     handleSettingsChange('extra_info', newExtra);
   };
 
+  const isFormDirty = JSON.stringify(formData) !== loadedFormJsonRef.current;
+  const { handleOpenChange, UnsavedAlert } = useConfirmUnsaved({
+    isDirty: isFormDirty,
+    isSubmitting: isLoading,
+    onConfirmClose: onClose
+  });
+
+  // INLINE VALIDATION: a message under the field as soon as the value cannot be right (empty is allowed)
+  const emailError = formData.email.trim() && !EMAIL_PATTERN.test(formData.email.trim()) ? 'Email không hợp lệ' : '';
+  const phoneError = getPhoneError(formData.phone);
+  const hotlineError = getPhoneError(settingsData.hotline);
+  const hasFormError = Boolean(emailError || phoneError || hotlineError);
+
+  const scrollToSection = (sectionId: string) => {
+    document.getElementById(sectionId)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (hasFormError) {
+      toast.error('Vui lòng sửa các trường báo lỗi trước khi lưu');
+      return;
+    }
     setIsLoading(true);
 
     try {
@@ -1146,21 +1227,28 @@ function BranchEditModal({ isOpen, onClose, data, onSave, branches }: any) {
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-      <div
-        className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl relative max-h-[95vh] flex flex-col"
-        onClick={(e) => e.stopPropagation()}
-      >
+    <>
+      <UnsavedAlert />
+      <Dialog open={isOpen} onOpenChange={handleOpenChange}>
+        <DialogContent
+          className="[&>button]:hidden bg-white p-0 gap-0 w-full max-w-4xl max-h-[95vh] flex flex-col overflow-hidden rounded-2xl"
+          onEscapeKeyDown={() => handleOpenChange(false)}
+        >
         {/* Header */}
-        <div className="flex justify-between items-center px-6 py-4 border-b bg-slate-50 rounded-t-2xl">
+        <div className="flex justify-between items-center px-6 py-4 border-b bg-slate-50">
           <div>
-            <h2 className="text-xl font-bold text-slate-800">
+            <DialogTitle className="text-xl font-bold text-slate-800">
               {data.id === 0 ? 'Thêm chi nhánh mới' : 'Chỉnh sửa chi nhánh'}
-            </h2>
-            <p className="text-xs text-slate-500 mt-0.5">Cấu hình thông tin hoạt động và hiển thị cho chi nhánh</p>
+            </DialogTitle>
+            <DialogDescription className="text-xs text-slate-500 mt-0.5">
+              Cấu hình thông tin hoạt động và hiển thị cho chi nhánh
+            </DialogDescription>
           </div>
           <button
-            onClick={onClose}
+            type="button"
+            onClick={() => handleOpenChange(false)}
+            aria-label="Đóng"
+            title="Đóng"
             className="h-9 w-9 rounded-full hover:bg-white hover:shadow-md text-slate-400 hover:text-slate-600 transition-all flex items-center justify-center border border-transparent hover:border-slate-200"
           >
             <X className="w-5 h-5" />
@@ -1168,9 +1256,22 @@ function BranchEditModal({ isOpen, onClose, data, onSave, branches }: any) {
         </div>
 
         <form onSubmit={handleSubmit} className="flex-1 overflow-hidden flex flex-col">
+          {/* SECTION NAVIGATION: the form is long, so each button scrolls to one section */}
+          <nav className="flex gap-2 px-6 py-2 border-b bg-white overflow-x-auto" aria-label="Các mục của biểu mẫu">
+            {BRANCH_FORM_SECTIONS.map((section) => (
+              <button
+                key={section.id}
+                type="button"
+                onClick={() => scrollToSection(section.id)}
+                className="px-3 py-1 text-xs font-semibold text-slate-600 bg-slate-100 hover:bg-blue-50 hover:text-blue-700 rounded-full whitespace-nowrap transition-colors"
+              >
+                {section.label}
+              </button>
+            ))}
+          </nav>
           <div className="flex-1 overflow-y-auto p-6 space-y-8 custom-scrollbar">
             {/* SECTION 1: BASIC INFO */}
-            <section className="space-y-4">
+            <section id="branch_section_basic" className="space-y-4 scroll-mt-2">
               <div className="flex items-center gap-2 pb-2 border-b border-slate-100">
                 <div className="p-1.5 bg-blue-50 rounded-lg text-blue-600">
                   <Info className="w-4 h-4" />
@@ -1210,11 +1311,17 @@ function BranchEditModal({ isOpen, onClose, data, onSave, branches }: any) {
                         onClick={() => setIsCodeEditable(!isCodeEditable)}
                         className="px-3 bg-white border border-slate-200 hover:bg-slate-50 rounded-xl transition-colors shadow-sm"
                         title={isCodeEditable ? 'Khóa mã' : 'Sửa mã'}
+                        aria-label={isCodeEditable ? 'Khóa mã chi nhánh' : 'Sửa mã chi nhánh'}
                       >
                         <Edit2 className="w-4 h-4 text-slate-600" />
                       </button>
                     )}
                   </div>
+                  {data.id !== 0 && (
+                    <p className="text-xs text-slate-500 mt-1">
+                      Mã chi nhánh được khóa sau khi tạo vì các vé và đơn hàng đang dùng mã này.
+                    </p>
+                  )}
                 </div>
                 <div>
                   <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1">
@@ -1227,6 +1334,7 @@ function BranchEditModal({ isOpen, onClose, data, onSave, branches }: any) {
                     className="w-full px-4 py-2.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-all"
                     placeholder="Nhập số điện thoại..."
                   />
+                  {phoneError && <p className="text-xs text-red-600 mt-1">{phoneError}</p>}
                 </div>
                 <div className="md:col-span-2">
                   <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1">
@@ -1251,12 +1359,13 @@ function BranchEditModal({ isOpen, onClose, data, onSave, branches }: any) {
                     className="w-full px-4 py-2.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-all"
                     placeholder="email@chinhanh.com"
                   />
+                  {emailError && <p className="text-xs text-red-600 mt-1">{emailError}</p>}
                 </div>
               </div>
             </section>
 
             {/* SECTION: HERO BANNER CAROUSEL */}
-            <section className="space-y-4">
+            <section id="branch_section_banner" className="space-y-4 scroll-mt-2">
               <div className="flex items-center justify-between pb-2 border-b border-slate-100">
                 <div className="flex items-center gap-2">
                   <div className="p-1.5 bg-indigo-50 rounded-lg text-indigo-600">
@@ -1381,7 +1490,7 @@ function BranchEditModal({ isOpen, onClose, data, onSave, branches }: any) {
                             <Trash2 className="w-3.5 h-3.5" />
                           </button>
                         </div>
-                        <span className="absolute bottom-1.5 left-1.5 px-1.5 py-0.5 rounded bg-black/70 backdrop-blur-xs text-[10px] font-bold text-white">
+                        <span className="absolute bottom-1.5 left-1.5 px-1.5 py-0.5 rounded bg-black/70 backdrop-blur-xs text-[11px] font-bold text-white">
                           #{idx + 1}
                         </span>
                       </div>
@@ -1400,7 +1509,7 @@ function BranchEditModal({ isOpen, onClose, data, onSave, branches }: any) {
             </section>
 
             {/* SECTION 2: FOOTER CONFIG */}
-            <section className="space-y-4">
+            <section id="branch_section_footer" className="space-y-4 scroll-mt-2">
               <div className="flex items-center gap-2 pb-2 border-b border-slate-100">
                 <div className="p-1.5 bg-cyan-50 rounded-lg text-cyan-600">
                   <Phone className="w-4 h-4" />
@@ -1431,6 +1540,7 @@ function BranchEditModal({ isOpen, onClose, data, onSave, branches }: any) {
                     className="w-full px-4 py-2.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-cyan-500/20 focus:border-cyan-500 outline-none transition-all text-sm"
                     placeholder="036.6431.179"
                   />
+                  {hotlineError && <p className="text-xs text-red-600 mt-1">{hotlineError}</p>}
                 </div>
                 <div className="md:col-span-2">
                   <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1">
@@ -1519,6 +1629,7 @@ function BranchEditModal({ isOpen, onClose, data, onSave, branches }: any) {
                       </span>
                       <Switch
                         checked={settingsData.show_zalo_button}
+                        aria-label="Hiện nút chat Zalo"
                         onCheckedChange={(checked) => handleSettingsChange('show_zalo_button', checked)}
                       />
                     </div>
@@ -1531,6 +1642,7 @@ function BranchEditModal({ isOpen, onClose, data, onSave, branches }: any) {
                       </span>
                       <Switch
                         checked={settingsData.show_phone_button}
+                        aria-label="Hiện nút gọi điện"
                         onCheckedChange={(checked) => handleSettingsChange('show_phone_button', checked)}
                       />
                     </div>
@@ -1540,7 +1652,7 @@ function BranchEditModal({ isOpen, onClose, data, onSave, branches }: any) {
             </section>
 
             {/* SECTION 3: TICKET & PAYMENT CONFIG */}
-            <section className="space-y-4">
+            <section id="branch_section_payment" className="space-y-4 scroll-mt-2">
               <div className="flex items-center justify-between pb-2 border-b border-slate-100">
                 <div className="flex items-center gap-2">
                   <div className="w-8 h-8 rounded-lg bg-purple-100 flex items-center justify-center">
@@ -1577,7 +1689,7 @@ function BranchEditModal({ isOpen, onClose, data, onSave, branches }: any) {
                     className="w-full px-4 py-2.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-cyan-500/20 focus:border-cyan-500 outline-none transition-all text-sm"
                     placeholder="10"
                   />
-                  <p className="text-[10px] text-slate-400 mt-1">Số ngày vé có hiệu lực sau khi thanh toán</p>
+                  <p className="text-[11px] text-slate-400 mt-1">Số ngày vé có hiệu lực sau khi thanh toán</p>
                 </div>
                 <div className="md:col-span-2">
                   <div className="flex items-center justify-between mb-1">
@@ -1587,7 +1699,7 @@ function BranchEditModal({ isOpen, onClose, data, onSave, branches }: any) {
                     <button
                       type="button"
                       onClick={() => setShowQrUrlField(!showQrUrlField)}
-                      className="text-[10px] text-cyan-600 hover:text-cyan-700 font-medium flex items-center gap-1"
+                      className="text-[11px] text-cyan-600 hover:text-cyan-700 font-medium flex items-center gap-1"
                     >
                       {showQrUrlField ? 'Ẩn' : 'Tùy chọn nâng cao'}
                       <svg
@@ -1620,7 +1732,7 @@ function BranchEditModal({ isOpen, onClose, data, onSave, branches }: any) {
                         className="w-full px-4 py-2.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-cyan-500/20 focus:border-cyan-500 outline-none transition-all text-sm"
                         placeholder="https://img.vietqr.io/image/..."
                       />
-                      <p className="text-[10px] text-slate-400">
+                      <p className="text-[11px] text-slate-400">
                         Link ảnh QR code có sẵn (nếu đã tạo từ app ngân hàng). Nếu để trống, hệ thống sẽ tự tạo từ thông
                         tin ngân hàng bên dưới.
                       </p>
@@ -1660,7 +1772,7 @@ function BranchEditModal({ isOpen, onClose, data, onSave, branches }: any) {
                     className="w-full px-4 py-2.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-cyan-500/20 focus:border-cyan-500 outline-none transition-all text-sm"
                     placeholder="MB, VCB, BIDV... (tùy chọn)"
                   />
-                  <p className="text-[10px] text-slate-400 mt-1">Nếu để trống sẽ tự động map từ tên ngân hàng</p>
+                  <p className="text-[11px] text-slate-400 mt-1">Nếu để trống sẽ tự động map từ tên ngân hàng</p>
                 </div>
                 <div>
                   <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1">
@@ -1700,7 +1812,7 @@ function BranchEditModal({ isOpen, onClose, data, onSave, branches }: any) {
             </section>
 
             {/* SECTION 4: LEGAL INFO */}
-            <section className="space-y-4">
+            <section id="branch_section_legal" className="space-y-4 scroll-mt-2">
               <div className="flex items-center justify-between pb-2 border-b border-slate-100">
                 <div className="flex items-center gap-2">
                   <div className="p-1.5 bg-purple-50 rounded-lg text-purple-600">
@@ -1747,6 +1859,7 @@ function BranchEditModal({ isOpen, onClose, data, onSave, branches }: any) {
                       variant="ghost"
                       size="icon"
                       onClick={() => removeExtraInfo(idx)}
+                      aria-label="Xóa dòng thông tin pháp lý"
                       className="h-10 w-10 text-slate-300 hover:text-red-600 hover:bg-red-50 rounded-xl shrink-0 transition-colors"
                     >
                       <Trash2 className="w-4 h-4" />
@@ -1763,8 +1876,8 @@ function BranchEditModal({ isOpen, onClose, data, onSave, branches }: any) {
               </div>
             </section>
 
-            {/* SECTION 4: STATUS */}
-            <section className="bg-slate-50 p-6 rounded-2xl border border-slate-100 flex flex-wrap gap-x-8 gap-y-4">
+            {/* SECTION 5: STATUS */}
+            <section id="branch_section_status" className="scroll-mt-2 bg-slate-50 p-6 rounded-2xl border border-slate-100 flex flex-wrap gap-x-8 gap-y-4">
               <div className="flex items-center gap-3">
                 <input
                   type="checkbox"
@@ -1793,28 +1906,22 @@ function BranchEditModal({ isOpen, onClose, data, onSave, branches }: any) {
                   Đang mở cửa
                 </label>
               </div>
-              <div className="flex items-center gap-3 opacity-60">
-                <input
-                  type="checkbox"
-                  id="is_active"
-                  checked={formData.is_active}
-                  readOnly
-                  disabled
-                  className="w-5 h-5 rounded-lg border-slate-300 text-slate-600 cursor-not-allowed"
-                />
-                <label htmlFor="is_active" className="text-sm font-semibold text-slate-500">
-                  Kích hoạt
-                </label>
+              <div className="flex items-center gap-2 text-sm text-slate-500">
+                <Info className="w-4 h-4 shrink-0 text-blue-400" />
+                <span>
+                  Trạng thái kích hoạt: <b>{formData.is_active ? 'Đang hoạt động' : 'Đang ẩn'}</b>. Muốn đổi, dùng công
+                  tắc "Kích hoạt" ở danh sách chi nhánh.
+                </span>
               </div>
             </section>
           </div>
 
           {/* Actions */}
-          <div className="px-6 py-4 border-t bg-slate-50 flex justify-end gap-3 rounded-b-2xl">
+          <div className="px-6 py-4 border-t bg-slate-50 flex justify-end gap-3">
             <Button
               type="button"
               variant="ghost"
-              onClick={onClose}
+              onClick={() => handleOpenChange(false)}
               className="px-6 py-2 h-11 font-semibold text-slate-600 hover:bg-white hover:shadow-sm rounded-xl border border-transparent hover:border-slate-200 transition-all"
             >
               Hủy bỏ
@@ -1835,7 +1942,8 @@ function BranchEditModal({ isOpen, onClose, data, onSave, branches }: any) {
             </Button>
           </div>
         </form>
-      </div>
-    </div>
+        </DialogContent>
+      </Dialog>
+    </>
   );
 }

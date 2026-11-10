@@ -58,6 +58,7 @@ logsRouter.get('/api/admin/users', requireStaffAuth, requirePermission('users', 
     const pageSize = Number(c.req.query('pageSize') || 20);
 
     const q = String(c.req.query('q') || '');
+    const status = String(c.req.query('status') || '');
 
     const db = drizzle(c.env.cinema_db, { schema });
 
@@ -72,7 +73,7 @@ logsRouter.get('/api/admin/users', requireStaffAuth, requirePermission('users', 
         bookings: schema.bookings
       },
 
-      { page, pageSize, q }
+      { page, pageSize, q, status }
     );
 
     return c.json(r);

@@ -23,6 +23,16 @@ export function clearSessionStorage() {
       // Storage can be blocked (private window); nothing more to do
     }
   }
+
+  // Every saved admin list filter (admin_movies_filters, admin_vouchers_filters, ...) belongs to the person who set it
+  try {
+    for (let index = localStorage.length - 1; index >= 0; index--) {
+      const storageKey = localStorage.key(index);
+      if (storageKey && /^admin_.+_filters$/.test(storageKey)) localStorage.removeItem(storageKey);
+    }
+  } catch {
+    // Storage can be blocked; nothing more to do
+  }
 }
 
 /**

@@ -5,8 +5,8 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Checkbox } from '@/components/ui/checkbox';
+import { Switch } from '@/components/ui/switch';
 import { toast } from 'sonner';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -18,6 +18,7 @@ import { useStaffStore } from '@/store/staffStore';
 import { useNavigate } from 'react-router-dom';
 import { useStaffPermission, useStaffPermissions, useIsSuperAdmin } from '@/hooks/useStaffPermission';
 import { useConfirmUnsaved } from '@/hooks/useConfirmUnsaved';
+import { formatVnDateTime, activeStatusLabel } from '@/lib/format';
 import {
   Info,
   X,
@@ -45,6 +46,7 @@ interface Staff {
   avatar?: string;
   isSuperAdmin: boolean;
   forcePasswordChange: boolean;
+  isActive?: boolean;
   roleIds?: number[];
   roles?: string[];
   branchIds?: number[];
@@ -123,8 +125,9 @@ export default function StaffPage() {
     email: '',
     fullname: '',
     phone: '',
-    roleId: '',
-    branchIds: [] as number[]
+    roleIds: [] as number[],
+    branchIds: [] as number[],
+    isActive: true
   });
   const [errors, setErrors] = useState<Record<string, string>>({});
 
@@ -139,6 +142,8 @@ export default function StaffPage() {
         page: String(page),
         pageSize: String(pageSize)
       });
+      // Deactivated staff are listed too (with a badge), otherwise they could never be seen or reactivated
+      params.append('includeInactive', 'true');
       if (search) params.append('q', search);
       if (filterRole && filterRole !== 'all') params.append('roleId', filterRole);
       if (filterBranch && filterBranch !== 'all') params.append('branchId', filterBranch);
@@ -260,7 +265,7 @@ export default function StaffPage() {
     }
   });
 
-  const isCreateDirty = formData.email !== '' || formData.fullname !== '' || formData.phone !== '' || formData.roleId !== '' || formData.branchIds.length > 0;
+  const isCreateDirty = formData.email !== '' || formData.fullname !== '' || formData.phone !== '' || formData.roleIds.length > 0 || formData.branchIds.length > 0;
   const { handleOpenChange: handleCreateOpenChange, UnsavedAlert: CreateAlert } = useConfirmUnsaved({
     isDirty: isCreateDirty,
     isSubmitting: createMutation.isPending,
@@ -273,7 +278,8 @@ export default function StaffPage() {
   const isEditDirty = selectedStaff
     ? formData.fullname !== selectedStaff.fullname ||
       formData.phone !== (selectedStaff.phone || '') ||
-      formData.roleId !== (selectedStaff.roleIds && selectedStaff.roleIds.length > 0 ? String(selectedStaff.roleIds[0]) : '') ||
+      formData.isActive !== (selectedStaff.isActive !== false) ||
+      JSON.stringify(formData.roleIds.slice().sort()) !== JSON.stringify((selectedStaff.roleIds || []).slice().sort()) ||
       JSON.stringify(formData.branchIds.slice().sort()) !== JSON.stringify((selectedStaff.branchIds || []).slice().sort())
     : false;
   const { handleOpenChange: handleEditOpenChange, UnsavedAlert: EditAlert } = useConfirmUnsaved({
@@ -290,19 +296,35 @@ export default function StaffPage() {
       email: '',
       fullname: '',
       phone: '',
-      roleId: '',
-      branchIds: []
+      roleIds: [],
+      branchIds: [],
+      isActive: true
     });
     setErrors({});
   };
 
-  const handleCreate = () => {
+  // Vietnamese phone: 9-10 digits after a leading 0, or +84. Spaces, dots and dashes are allowed when typing.
+  const isValidPhone = (phone: string) => /^(0|\+84)\d{9,10}$/.test(phone.replace(/[\s.\-]/g, ''));
+
+  // Checks shared by create and edit. A role is required, but only when this user is allowed to set roles.
+  const validateStaffForm = (editedStaffIsSuperAdmin: boolean): Record<string, string> => {
     const newErrors: Record<string, string> = {};
-    if (!formData.email?.trim() || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email.trim())) {
-      newErrors.email = 'Email không hợp lệ';
-    }
     if (!formData.fullname?.trim()) {
       newErrors.fullname = 'Vui lòng nhập họ và tên';
+    }
+    if (formData.phone.trim() && !isValidPhone(formData.phone.trim())) {
+      newErrors.phone = 'Số điện thoại không hợp lệ (ví dụ 0901234567)';
+    }
+    if (isSuperAdmin && !editedStaffIsSuperAdmin && formData.roleIds.length === 0) {
+      newErrors.roleIds = 'Vui lòng chọn ít nhất một vai trò';
+    }
+    return newErrors;
+  };
+
+  const handleCreate = () => {
+    const newErrors = validateStaffForm(false);
+    if (!formData.email?.trim() || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email.trim())) {
+      newErrors.email = 'Email không hợp lệ';
     }
     if (Object.keys(newErrors).length > 0) {
       setErrors(newErrors);
@@ -311,18 +333,16 @@ export default function StaffPage() {
     const dataToSend: any = {
       ...formData
     };
-    if (isSuperAdmin) {
-      dataToSend.roleIds = formData.roleId ? [parseInt(formData.roleId)] : [];
+    delete dataToSend.isActive; // a new account is always active
+    if (!isSuperAdmin) {
+      delete dataToSend.roleIds; // only a super admin can set roles
     }
     createMutation.mutate(dataToSend);
   };
 
   const handleUpdate = () => {
     if (!selectedStaff) return;
-    const newErrors: Record<string, string> = {};
-    if (!formData.fullname?.trim()) {
-      newErrors.fullname = 'Vui lòng nhập họ và tên';
-    }
+    const newErrors = validateStaffForm(selectedStaff.isSuperAdmin);
     if (Object.keys(newErrors).length > 0) {
       setErrors(newErrors);
       return;
@@ -330,8 +350,8 @@ export default function StaffPage() {
     const dataToSend: any = {
       ...formData
     };
-    if (isSuperAdmin) {
-      dataToSend.roleIds = formData.roleId ? [parseInt(formData.roleId)] : [];
+    if (!isSuperAdmin) {
+      delete dataToSend.roleIds; // only a super admin can set roles
     }
     updateMutation.mutate({
       id: selectedStaff.id,
@@ -369,8 +389,9 @@ export default function StaffPage() {
       email: staff.email,
       fullname: staff.fullname,
       phone: staff.phone || '',
-      roleId: staff.roleIds && staff.roleIds.length > 0 ? String(staff.roleIds[0]) : '',
-      branchIds: staff.branchIds || []
+      roleIds: staff.roleIds || [],
+      branchIds: staff.branchIds || [],
+      isActive: staff.isActive !== false
     });
     setIsEditDialogOpen(true);
   };
@@ -384,6 +405,18 @@ export default function StaffPage() {
     }));
   };
 
+  const toggleRole = (roleId: number) => {
+    setFormData((prev) => ({
+      ...prev,
+      roleIds: prev.roleIds.includes(roleId) ? prev.roleIds.filter((id) => id !== roleId) : [...prev.roleIds, roleId]
+    }));
+    if (errors.roleIds) setErrors((prev) => ({ ...prev, roleIds: '' }));
+  };
+
+  const toggleAllBranches = (shouldSelectAll: boolean) => {
+    setFormData((prev) => ({ ...prev, branchIds: shouldSelectAll ? branches.map((branch: Branch) => branch.id) : [] }));
+  };
+
   const roles = (rolesData as any)?.items || [];
   const branches = (branchesData as any)?.items || [];
   const staffList = (staffData as any)?.items || [];
@@ -395,6 +428,46 @@ export default function StaffPage() {
     clearStaff();
     navigate('/login');
   };
+
+  // ROLE FIELD: several roles can be given to one staff member (the server accepts a list)
+  const renderRoleField = (idPrefix: string) => (
+    <div>
+      <Label>Vai trò {isSuperAdmin ? '*' : ''}</Label>
+      <div
+        className={`grid grid-cols-2 gap-2 mt-2 max-h-40 overflow-y-auto border rounded p-2 ${errors.roleIds ? 'border-destructive' : ''}`}
+      >
+        {roles.map((role: Role) => (
+          <div key={role.id} className="flex items-center space-x-2">
+            <Checkbox
+              id={`${idPrefix}-role-${role.id}`}
+              checked={formData.roleIds.includes(role.id)}
+              onCheckedChange={() => toggleRole(role.id)}
+              disabled={!isSuperAdmin}
+            />
+            <Label htmlFor={`${idPrefix}-role-${role.id}`} className="text-sm">
+              {role.name}
+            </Label>
+          </div>
+        ))}
+      </div>
+      {errors.roleIds && <p className="text-destructive text-xs mt-1">{errors.roleIds}</p>}
+      {!isSuperAdmin && <p className="text-xs text-slate-500 mt-1">Chỉ siêu quản trị mới được đổi vai trò.</p>}
+    </div>
+  );
+
+  // SELECT ALL BRANCHES: one checkbox above the branch list
+  const renderSelectAllBranches = (idPrefix: string) => (
+    <div className="flex items-center space-x-2">
+      <Checkbox
+        id={`${idPrefix}-branch-all`}
+        checked={branches.length > 0 && formData.branchIds.length === branches.length}
+        onCheckedChange={(checked) => toggleAllBranches(checked === true)}
+      />
+      <Label htmlFor={`${idPrefix}-branch-all`} className="text-xs font-normal text-slate-600">
+        Chọn tất cả chi nhánh
+      </Label>
+    </div>
+  );
 
 
 
@@ -533,32 +606,52 @@ export default function StaffPage() {
                       <tr className="border-b bg-gray-50">
                         <th className="h-10 px-4 text-left align-middle font-semibold text-xs text-slate-500 uppercase tracking-wider">Email</th>
                         <th className="h-10 px-4 text-left align-middle font-semibold text-xs text-slate-500 uppercase tracking-wider">Họ tên</th>
+                        <th className="h-10 px-4 text-left align-middle font-semibold text-xs text-slate-500 uppercase tracking-wider">SĐT</th>
                         <th className="h-10 px-4 text-left align-middle font-semibold text-xs text-slate-500 uppercase tracking-wider">Vai trò</th>
                         <th className="h-10 px-4 text-left align-middle font-semibold text-xs text-slate-500 uppercase tracking-wider">Chi nhánh</th>
                         <th className="h-10 px-4 text-left align-middle font-semibold text-xs text-slate-500 uppercase tracking-wider">Trạng thái</th>
+                        <th className="h-10 px-4 text-left align-middle font-semibold text-xs text-slate-500 uppercase tracking-wider">Đăng nhập cuối</th>
+                        <th className="h-10 px-4 text-left align-middle font-semibold text-xs text-slate-500 uppercase tracking-wider">Ngày tạo</th>
                         <th className="h-10 px-4 text-left align-middle font-semibold text-xs text-slate-500 uppercase tracking-wider">Hành động</th>
                       </tr>
                     </thead>
                     <tbody>
+                      {staffList.length === 0 && (
+                        <tr>
+                          <td colSpan={10} className="px-4 py-8 text-center text-sm text-slate-500">
+                            Không có nhân viên nào phù hợp
+                          </td>
+                        </tr>
+                      )}
                       {staffList.map((staff: Staff) => (
                         <tr key={staff.id} className="border-b hover:bg-gray-50">
                           <td className="px-4 py-2.5 align-middle text-[13px]">{staff.email}</td>
                           <td className="px-4 py-2.5 align-middle text-[13px]">{staff.fullname}</td>
-                          <td className="px-4 py-2.5 align-middle text-[13px]">
+                          <td className="px-4 py-2.5 align-middle text-[13px] whitespace-nowrap">{staff.phone || '-'}</td>
+                          <td className="px-4 py-2.5 align-middle text-[13px] max-w-[200px]">
                             {staff.isSuperAdmin ? (
                               <span className="font-semibold text-purple-700">Siêu quản trị</span>
                             ) : (
-                              staff.roles?.join(', ') || '-'
+                              <span className="block truncate" title={staff.roles?.join(', ') || ''}>
+                                {staff.roles?.join(', ') || '-'}
+                              </span>
                             )}
                           </td>
-                          <td className="px-4 py-2.5 align-middle text-[13px]">
+                          <td className="px-4 py-2.5 align-middle text-[13px] max-w-[220px]">
                             {staff.isSuperAdmin ? (
                               <span className="text-slate-500 italic">Tất cả chi nhánh</span>
                             ) : (
-                              staff.branchNames?.join(', ') || '-'
+                              <span className="block truncate" title={staff.branchNames?.join(', ') || ''}>
+                                {staff.branchNames?.join(', ') || '-'}
+                              </span>
                             )}
                           </td>
                           <td className="px-4 py-2.5 align-middle text-[13px]">
+                            <span
+                              className={`px-2 py-1 rounded text-xs mr-1 ${staff.isActive === false ? 'bg-slate-200 text-slate-600' : 'bg-green-100 text-green-700'}`}
+                            >
+                              {activeStatusLabel(staff.isActive)}
+                            </span>
                             {staff.isSuperAdmin && (
                               <span className="bg-purple-100 text-purple-800 px-2 py-1 rounded text-xs">Siêu quản trị</span>
                             )}
@@ -568,6 +661,10 @@ export default function StaffPage() {
                               </span>
                             )}
                           </td>
+                          <td className="px-4 py-2.5 align-middle text-[13px] whitespace-nowrap">
+                            {staff.lastLoginAt ? formatVnDateTime(staff.lastLoginAt) : 'Chưa đăng nhập'}
+                          </td>
+                          <td className="px-4 py-2.5 align-middle text-[13px] whitespace-nowrap">{formatVnDateTime(staff.createdAt)}</td>
                           <td className="px-4 py-2.5 align-middle text-[13px]">
                             <div className="flex gap-1">
                               <Button
@@ -579,6 +676,7 @@ export default function StaffPage() {
                                   setIsDetailDialogOpen(true);
                                 }}
                                 title="Chi tiết"
+                                aria-label={`Xem chi tiết nhân viên ${staff.fullname}`}
                               >
                                 <Eye className="w-4 h-4" />
                               </Button>
@@ -589,6 +687,7 @@ export default function StaffPage() {
                                   className="h-8 w-8 text-yellow-600 hover:text-yellow-700 hover:bg-yellow-50"
                                   onClick={() => openEditDialog(staff)}
                                   title="Sửa"
+                                  aria-label={`Sửa nhân viên ${staff.fullname}`}
                                 >
                                   <Edit className="w-4 h-4" />
                                 </Button>
@@ -603,6 +702,7 @@ export default function StaffPage() {
                                     setIsResetPasswordDialogOpen(true);
                                   }}
                                   title="Đặt lại mật khẩu"
+                                  aria-label={`Đặt lại mật khẩu của ${staff.fullname}`}
                                 >
                                   <Key className="w-4 h-4" />
                                 </Button>
@@ -617,6 +717,7 @@ export default function StaffPage() {
                                     setIsDeleteDialogOpen(true);
                                   }}
                                   title="Xóa"
+                                  aria-label={`Xóa nhân viên ${staff.fullname}`}
                                 >
                                   <Trash2 className="w-4 h-4" />
                                 </Button>
@@ -699,25 +800,22 @@ export default function StaffPage() {
                 </div>
                 <div>
                   <Label>Số điện thoại</Label>
-                  <Input value={formData.phone} onChange={(e) => setFormData({ ...formData, phone: e.target.value })} />
+                  <Input
+                    value={formData.phone}
+                    onChange={(e) => {
+                      setFormData({ ...formData, phone: e.target.value });
+                      if (errors.phone) setErrors((prev) => ({ ...prev, phone: '' }));
+                    }}
+                    className={errors.phone ? 'border-destructive' : ''}
+                  />
+                  {errors.phone && <p className="text-destructive text-xs mt-1">{errors.phone}</p>}
                 </div>
+                {renderRoleField('create')}
                 <div>
-                  <Label>Vai trò</Label>
-                  <Select value={formData.roleId} onValueChange={(v) => setFormData({ ...formData, roleId: v })}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Chọn vai trò" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {roles.map((role: Role) => (
-                        <SelectItem key={role.id} value={String(role.id)}>
-                          {role.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div>
-                  <Label>Chi nhánh</Label>
+                  <div className="flex items-center justify-between">
+                    <Label>Chi nhánh</Label>
+                    {renderSelectAllBranches('create')}
+                  </div>
                   <div className="grid grid-cols-2 gap-2 mt-2 max-h-40 overflow-y-auto border rounded p-2">
                     {branches.map((branch: Branch) => (
                       <div key={branch.id} className="flex items-center space-x-2">
@@ -738,7 +836,7 @@ export default function StaffPage() {
                   <span>Mật khẩu được tạo tự động và chỉ hiển thị một lần sau khi tạo. Hãy ghi lại và chuyển cho nhân viên.</span>
                 </div>
               </div>
-              <DialogFooter>
+              <DialogFooter className="sticky bottom-0 -mx-6 -mb-6 px-6 pb-6 pt-4 bg-white border-t">
                 <Button
                   type="button"
                   variant="ghost"
@@ -784,8 +882,9 @@ export default function StaffPage() {
             >
               <div className="space-y-4 py-4">
                 <div>
-                  <Label>Email *</Label>
+                  <Label>Email</Label>
                   <Input value={formData.email} readOnly className="bg-slate-100 text-slate-500 cursor-not-allowed border-slate-200" />
+                  <p className="text-xs text-slate-500 mt-1">Email dùng để đăng nhập nên không thể thay đổi.</p>
                 </div>
                 <div>
                   <Label>Họ tên *</Label>
@@ -801,32 +900,32 @@ export default function StaffPage() {
                 </div>
                 <div>
                   <Label>Số điện thoại</Label>
-                  <Input value={formData.phone} onChange={(e) => setFormData({ ...formData, phone: e.target.value })} />
+                  <Input
+                    value={formData.phone}
+                    onChange={(e) => {
+                      setFormData({ ...formData, phone: e.target.value });
+                      if (errors.phone) setErrors((prev) => ({ ...prev, phone: '' }));
+                    }}
+                    className={errors.phone ? 'border-destructive' : ''}
+                  />
+                  {errors.phone && <p className="text-destructive text-xs mt-1">{errors.phone}</p>}
                 </div>
-                <div>
-                  <Label>Vai trò</Label>
-                  {selectedStaff?.isSuperAdmin ? (
+                {selectedStaff?.isSuperAdmin ? (
+                  <div>
+                    <Label>Vai trò</Label>
                     <div className="mt-2 p-2 bg-purple-50 border border-purple-100 rounded-lg text-purple-700 text-sm font-bold flex items-center gap-2">
                       <Shield className="w-4 h-4" />
                       SUPER ADMIN (Tất cả quyền)
                     </div>
-                  ) : (
-                    <Select value={formData.roleId} onValueChange={(v) => setFormData({ ...formData, roleId: v })}>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Chọn vai trò" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {roles.map((role: Role) => (
-                          <SelectItem key={role.id} value={String(role.id)}>
-                            {role.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  )}
-                </div>
+                  </div>
+                ) : (
+                  renderRoleField('edit')
+                )}
                 <div>
-                  <Label>Chi nhánh</Label>
+                  <div className="flex items-center justify-between">
+                    <Label>Chi nhánh</Label>
+                    {!selectedStaff?.isSuperAdmin && renderSelectAllBranches('edit')}
+                  </div>
                   {selectedStaff?.isSuperAdmin ? (
                     <div className="mt-2 p-2 bg-blue-50 border border-blue-100 rounded-lg text-blue-700 text-sm font-bold flex items-center gap-2">
                       <Building2 className="w-4 h-4" />
@@ -850,6 +949,21 @@ export default function StaffPage() {
                   )}
                 </div>
               </div>
+              {!selectedStaff?.isSuperAdmin && (
+                <div className="flex items-center justify-between rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
+                  <div>
+                    <Label htmlFor="fmi_staff_is_active" className="text-sm font-semibold text-slate-700">
+                      Tài khoản hoạt động
+                    </Label>
+                    <p className="text-xs text-slate-500 mt-0.5">Tắt để khóa đăng nhập mà không xóa nhân viên.</p>
+                  </div>
+                  <Switch
+                    id="fmi_staff_is_active"
+                    checked={formData.isActive}
+                    onCheckedChange={(checked) => setFormData((prev) => ({ ...prev, isActive: checked }))}
+                  />
+                </div>
+              )}
               <div className="flex items-start gap-2 text-xs text-gray-500 px-1">
                 <Info className="w-3.5 h-3.5 mt-0.5 text-blue-400/70" />
                 <span>
@@ -858,7 +972,7 @@ export default function StaffPage() {
                     : 'Người dùng đã đổi mật khẩu lần đầu.'}
                 </span>
               </div>
-              <DialogFooter>
+              <DialogFooter className="sticky bottom-0 -mx-6 -mb-6 px-6 pb-6 pt-4 bg-white border-t">
                 <Button
                   type="button"
                   variant="ghost"
@@ -984,39 +1098,46 @@ export default function StaffPage() {
                         <div className="flex items-start gap-3">
                           <Mail className="w-3.5 h-3.5 text-slate-400 mt-1 shrink-0" />
                           <div className="space-y-0.5">
-                            <Label className="text-[10px] font-medium text-slate-500 uppercase">Email</Label>
+                            <Label className="text-[11px] font-medium text-slate-500 uppercase">Email</Label>
                             <div className="text-sm font-semibold text-slate-900 break-all">{selectedStaff.email}</div>
                           </div>
                         </div>
                         <div className="flex items-start gap-3">
                           <Info className="w-3.5 h-3.5 text-slate-400 mt-1 shrink-0" />
                           <div className="space-y-0.5">
-                            <Label className="text-[10px] font-medium text-slate-500 uppercase">Họ tên</Label>
+                            <Label className="text-[11px] font-medium text-slate-500 uppercase">Họ tên</Label>
                             <div className="text-sm font-medium text-slate-700">{selectedStaff.fullname}</div>
                           </div>
                         </div>
                         <div className="flex items-start gap-3">
                           <Phone className="w-3.5 h-3.5 text-slate-400 mt-1 shrink-0" />
                           <div className="space-y-0.5">
-                            <Label className="text-[10px] font-medium text-slate-500 uppercase">Số điện thoại</Label>
+                            <Label className="text-[11px] font-medium text-slate-500 uppercase">Số điện thoại</Label>
                             <div className="text-sm text-slate-700">{selectedStaff.phone || 'Chưa cập nhật'}</div>
                           </div>
                         </div>
                         <div className="flex items-center gap-2 pt-1">
                           {selectedStaff.isSuperAdmin && (
-                            <Badge className="bg-purple-100 text-purple-700 hover:bg-purple-100 border-none rounded-full px-2 py-0 text-[10px] h-5">
+                            <Badge className="bg-purple-100 text-purple-700 hover:bg-purple-100 border-none rounded-full px-2 py-0 text-[11px] h-5">
                               Siêu quản trị
                             </Badge>
                           )}
                           {selectedStaff.forcePasswordChange && (
-                            <Badge className="bg-yellow-100 text-yellow-700 hover:bg-yellow-100 border-none rounded-full px-2 py-0 text-[10px] h-5">
+                            <Badge className="bg-yellow-100 text-yellow-700 hover:bg-yellow-100 border-none rounded-full px-2 py-0 text-[11px] h-5">
                               Yêu cầu đổi mật khẩu
                             </Badge>
                           )}
-                          {!selectedStaff.isSuperAdmin && !selectedStaff.forcePasswordChange && (
-                            <Badge className="bg-blue-100 text-blue-700 hover:bg-blue-100 border-none rounded-full px-2 py-0 text-[10px] h-5">
-                              Hoạt động bình thường
+                          {selectedStaff.isActive === false ? (
+                            <Badge className="bg-slate-200 text-slate-600 hover:bg-slate-200 border-none rounded-full px-2 py-0 text-[11px] h-5">
+                              Ngừng hoạt động
                             </Badge>
+                          ) : (
+                            !selectedStaff.isSuperAdmin &&
+                            !selectedStaff.forcePasswordChange && (
+                              <Badge className="bg-blue-100 text-blue-700 hover:bg-blue-100 border-none rounded-full px-2 py-0 text-[11px] h-5">
+                                Hoạt động bình thường
+                              </Badge>
+                            )
                           )}
                         </div>
                       </div>
@@ -1034,7 +1155,7 @@ export default function StaffPage() {
                         <div className="space-y-2">
                           <div className="flex items-center gap-2">
                             <Key className="w-3.5 h-3.5 text-slate-400" />
-                            <Label className="text-[10px] font-medium text-slate-500 uppercase tracking-wider">
+                            <Label className="text-[11px] font-medium text-slate-500 uppercase tracking-wider">
                               Vai trò (Roles)
                             </Label>
                           </div>
@@ -1064,7 +1185,7 @@ export default function StaffPage() {
                         <div className="space-y-2 pt-2">
                           <div className="flex items-center gap-2">
                             <Building2 className="w-3.5 h-3.5 text-slate-400" />
-                            <Label className="text-[10px] font-medium text-slate-500 uppercase tracking-wider">
+                            <Label className="text-[11px] font-medium text-slate-500 uppercase tracking-wider">
                               Chi nhánh quản lý
                             </Label>
                           </div>
@@ -1104,30 +1225,30 @@ export default function StaffPage() {
                       </div>
                       <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
                         <div className="space-y-1">
-                          <Label className="text-[10px] font-medium text-slate-500 uppercase">Ngày tạo</Label>
+                          <Label className="text-[11px] font-medium text-slate-500 uppercase">Ngày tạo</Label>
                           <div className="text-xs text-slate-700 font-medium">
-                            {new Date(selectedStaff.createdAt).toLocaleString('vi-VN')}
+                            {formatVnDateTime(selectedStaff.createdAt)}
                           </div>
-                          <div className="text-[10px] text-slate-400 font-medium italic">
+                          <div className="text-[11px] text-slate-400 font-medium italic">
                             Bởi: {selectedStaff.created_by_staff_name || 'Hệ thống'}
                           </div>
                         </div>
                         <div className="space-y-1">
-                          <Label className="text-[10px] font-medium text-slate-500 uppercase">Cập nhật cuối</Label>
+                          <Label className="text-[11px] font-medium text-slate-500 uppercase">Cập nhật cuối</Label>
                           <div className="text-xs text-slate-700 font-medium">
                             {selectedStaff.updatedAt
-                              ? new Date(selectedStaff.updatedAt).toLocaleString('vi-VN')
+                              ? formatVnDateTime(selectedStaff.updatedAt)
                               : 'Chưa cập nhật'}
                           </div>
-                          <div className="text-[10px] text-slate-400 font-medium italic">
+                          <div className="text-[11px] text-slate-400 font-medium italic">
                             Bởi: {selectedStaff.updated_by_staff_name || 'Hệ thống'}
                           </div>
                         </div>
                         <div className="space-y-1">
-                          <Label className="text-[10px] font-medium text-slate-500 uppercase">Đăng nhập cuối</Label>
+                          <Label className="text-[11px] font-medium text-slate-500 uppercase">Đăng nhập cuối</Label>
                           <div className="text-xs text-slate-700 font-medium">
                             {selectedStaff.lastLoginAt
-                              ? new Date(selectedStaff.lastLoginAt).toLocaleString('vi-VN')
+                              ? formatVnDateTime(selectedStaff.lastLoginAt)
                               : 'Chưa đăng nhập'}
                           </div>
                         </div>

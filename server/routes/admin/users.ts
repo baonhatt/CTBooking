@@ -3,33 +3,43 @@ import { eq, or, desc, count, sql, and } from 'drizzle-orm';
 export async function getUsersImpl(
   anyDb: any,
   tables: { users: any; accounts: any; bookings: any },
-  args: { page: number; pageSize: number; q: string }
+  args: { page: number; pageSize: number; q: string; status?: string }
 ) {
-  const { page, pageSize, q } = args;
+  const { page, pageSize, q, status } = args;
   const skip = (page - 1) * pageSize;
   const bookingCountSq = anyDb
     .select({
       userId: tables.bookings.user_id,
-      count: count(tables.bookings.id).as('count')
+      count: count(tables.bookings.id).as('count'),
+      lastBookingAt: sql<string | null>`max(${tables.bookings.created_at})`.as('last_booking_at_sq')
     })
     .from(tables.bookings)
     .groupBy(tables.bookings.user_id)
     .as('booking_counts');
-  let whereCondition = undefined as any;
+  const conditions: any[] = [];
   if (q) {
     const lowerQ = q.toLowerCase();
-    whereCondition = or(
-      sql`LOWER(${tables.users.fullname}) LIKE ${`%${lowerQ}%`}`,
-      sql`LOWER(${tables.accounts.email}) LIKE ${`%${lowerQ}%`}`,
-      sql`LOWER(${tables.users.phone}) LIKE ${`%${lowerQ}%`}`
+    conditions.push(
+      or(
+        sql`LOWER(${tables.users.fullname}) LIKE ${`%${lowerQ}%`}`,
+        sql`LOWER(${tables.accounts.email}) LIKE ${`%${lowerQ}%`}`,
+        sql`LOWER(${tables.users.phone}) LIKE ${`%${lowerQ}%`}`
+      )
     );
   }
+  // Account status filter: 'active' or 'inactive' (anything else means all)
+  if (status === 'active') conditions.push(eq(tables.accounts.is_active, true));
+  if (status === 'inactive') conditions.push(eq(tables.accounts.is_active, false));
+  const whereCondition = conditions.length > 0 ? and(...conditions) : undefined;
   const itemsQuery = anyDb
     .select({
       user: tables.users,
       email: sql<string>`max(${tables.accounts.email})`.as('email'),
       is_active_agg: sql<number>`max(CASE WHEN ${tables.accounts.is_active} THEN 1 ELSE 0 END)`.as('is_active_agg'),
-      bookings_count: sql<number>`coalesce(max(${bookingCountSq.count}), 0)`.as('bookings_count')
+      bookings_count: sql<number>`coalesce(max(${bookingCountSq.count}), 0)`.as('bookings_count'),
+      // Login type (email / google ...) and the time of the last booking, for the list columns
+      login_type_agg: sql<string>`max(${tables.accounts.login_type})`.as('login_type_agg'),
+      last_booking_at: sql<string | null>`max(${bookingCountSq.lastBookingAt})`.as('last_booking_at')
     })
     .from(tables.users)
     .innerJoin(tables.accounts, eq(tables.users.id, tables.accounts.user_id))
@@ -55,6 +65,8 @@ export async function getUsersImpl(
     email: item.email || '',
     is_active: (item.is_active_agg ?? 1) > 0,
     total_bookings: Number(item.bookings_count || 0),
+    login_type: item.login_type_agg || 'email',
+    last_booking_at: item.last_booking_at || null,
     created_at: item.user.created_at,
     updated_at: item.user.updated_at
   }));
@@ -111,9 +123,19 @@ export async function getUserByIdImpl(
     .from(tables.bookings)
     .leftJoin(tables.movies, eq(tables.bookings.movie_id, tables.movies.id))
     .leftJoin(tables.ticket_packages, eq(tables.bookings.ticket_package_id, tables.ticket_packages.id))
-    .where(and(eq(tables.bookings.user_id, id), eq(tables.bookings.payment_status, 'paid')))
+    .where(eq(tables.bookings.user_id, id))
     .orderBy(desc(tables.bookings.created_at))
     .limit(10);
+
+  // Real totals: the list above is capped at 10 rows and now holds paid and unpaid bookings
+  const [totalBookingsRow] = await anyDb
+    .select({ count: count() })
+    .from(tables.bookings)
+    .where(eq(tables.bookings.user_id, id));
+  const [paidBookingsRow] = await anyDb
+    .select({ count: count() })
+    .from(tables.bookings)
+    .where(and(eq(tables.bookings.user_id, id), eq(tables.bookings.payment_status, 'paid')));
   const bookings = bookingsdata.map((row: any) => {
     return {
       ...row.booking,
@@ -126,6 +148,8 @@ export async function getUserByIdImpl(
     fullname: user.fullname || '',
     phone: user.phone || '',
     avatar: user.avatar || null,
+    gender: user.gender || null,
+    dob: user.dob || null,
     email: user.accounts[0]?.email || '',
     is_active: user.accounts[0]?.is_active ?? true,
     login_type: user.accounts[0]?.login_type || 'email',
@@ -142,7 +166,8 @@ export async function getUserByIdImpl(
       payment_status: b.payment_status,
       created_at: b.created_at
     })),
-    total_bookings: Number(bookings.length) || 0,
+    total_bookings: Number(totalBookingsRow?.count || 0),
+    paid_bookings: Number(paidBookingsRow?.count || 0),
     created_by_staff_name: createLog?.staffFullname || null,
     updated_by_staff_name: updateLog?.staffFullname || null
   };

@@ -548,7 +548,7 @@ export default function Account() {
                                             <div className="space-y-4">
                                                 <div className="flex items-center gap-2 pb-2 border-b border-white/5">
                                                     <User size={16} className="text-blue-400" />
-                                                    <h3 className="text-sm font-bold text-white uppercase tracking-wider">Thông tin cá nhân</h3>
+                                                    <h1 className="text-sm font-bold text-white uppercase tracking-wider">Thông tin cá nhân</h1>
                                                 </div>
 
                                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">

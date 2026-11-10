@@ -218,7 +218,11 @@ staffRouter.get('/api/admin/deleted/staff', requireStaffAuth, requirePermission(
 
     const db = drizzle(c.env.cinema_db, { schema });
 
-    const r = await listDeletedStaffImpl(db, { staffs: schema.staffs }, { page, pageSize, search });
+    const r = await listDeletedStaffImpl(
+      db,
+      { staffs: schema.staffs },
+      { page, pageSize, search, sort: String(c.req.query('sort') || ''), dir: String(c.req.query('dir') || '') }
+    );
 
     return c.json(r, 200);
   } catch (err) {

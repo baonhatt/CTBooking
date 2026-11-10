@@ -48,3 +48,6 @@ uploads/
 !docs/create_local_manager_accounts.sql
 tmp/
 
+
+# Local manual-test accounts (never commit)
+.local-test/

@@ -29,7 +29,10 @@
     "pages:deploy:preview": "npm run build:client:preview && npx wrangler pages deploy dist/spa --project-name=cinema-admin-pages --branch=preview",
     "db:push": "drizzle-kit push",
     "db:migrate:preview": "wrangler d1 migrations apply cinema_db --remote --env preview --config worker/wrangler.toml",
-    "db:import-local": "npx wrangler d1 execute cinema-db --local --file=cinema_db_prod.sql --config worker/wrangler.toml"
+    "db:export-prod": "npx wrangler d1 export cinema-db --remote --output=cinema_db_prod.sql --config worker/wrangler.toml",
+    "db:reset-local": "node scripts/db-reset-local.cjs",
+    "db:import-local": "node scripts/db-prepare-dump.cjs && npx wrangler d1 execute cinema-db --local --file=cinema_db_prod.local.sql --config worker/wrangler.toml",
+    "db:clone-prod-local": "npm run db:export-prod && npm run db:reset-local && npm run db:import-local"
   },
   "rollup": {
     "forceJs": true

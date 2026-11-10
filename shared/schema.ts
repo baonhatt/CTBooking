@@ -41,6 +41,7 @@ export const movies = sqliteTable('movies', {
   title: text('title').notNull(),
   description: text('description'),
   cover_image: text('cover_image'),
+  // TẠM BỎ QUA NHIỀU ẢNH (20261110): hiện mỗi phim chỉ dùng 1 poster (cover_image). Ảnh chi tiết (detail_images) chưa dùng: website khách không hiển thị và form sửa chưa có chỗ thêm/xóa ảnh này. Khi cần thư viện ảnh phim: thêm upload nhiều ảnh vào form sửa (MovieEditModal), hiển thị ở website khách, rồi bỏ ghi chú này.
   detail_images: text('detail_images'), // JSON string in SQLite
   genres: text('genres'), // JSON string in SQLite
   rating: real('rating'),

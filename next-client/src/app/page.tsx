@@ -12,11 +12,13 @@ const MovieScheduleSection = dynamic(() => import('@/components/user/home/MovieS
 const VRShowcase = dynamic(() => import('@/components/user/home/VRShowcase'));
 const PromotionShowcase = dynamic(() => import('@/components/user/home/PromotionShowcase'));
 const TechnologyBanner = dynamic(() => import('@/components/user/home/TechnologyBanner'));
-const ProductSection = dynamic(() => import('@/components/user/home/ProductSection'));
+// TẠM ẨN ĐỒ CHƠI (20261110): khách chưa dùng module đồ chơi nên ẩn khỏi giao diện. API, DB và các file Toys* vẫn giữ nguyên. Tìm "TẠM ẨN ĐỒ CHƠI" để mở lại.
+// const ProductSection = dynamic(() => import('@/components/user/home/ProductSection'));
 
 import { getActiveMoviesToday } from '@/lib/api/movies';
 import { getSiteMediaApi } from '@/lib/api/uploads';
-import { getActiveTickets, getActiveToys } from '@/lib/api/products';
+import { getActiveTickets } from '@/lib/api/products';
+// getActiveToys: TẠM ẨN ĐỒ CHƠI (20261110): khách chưa dùng module đồ chơi nên ẩn khỏi giao diện. API, DB và các file Toys* vẫn giữ nguyên. Tìm "TẠM ẨN ĐỒ CHƠI" để mở lại.
 import { getVRPackages } from '@/lib/api/vr-packages';
 import { getDefaultBranch, getPublicBranches } from '@/lib/api/branches';
 
@@ -80,11 +82,11 @@ export default async function Home({ searchParams }: { searchParams: { branch_id
   }
 
   // Fetch all initial data in parallel with branch filter
-  const [activeMovies, siteMediaRes, ticketsRes, toysRes, vrRes] = await Promise.all([
+  // TẠM ẨN ĐỒ CHƠI (20261110): khách chưa dùng module đồ chơi nên ẩn khỏi giao diện. API, DB và các file Toys* vẫn giữ nguyên. Tìm "TẠM ẨN ĐỒ CHƠI" để mở lại. (bỏ lấy danh sách đồ chơi)
+  const [activeMovies, siteMediaRes, ticketsRes, vrRes] = await Promise.all([
     getActiveMoviesToday(effectiveBranchId).catch(() => []),
     getSiteMediaApi({ active: true }).catch(() => ({ items: [] })),
     getActiveTickets(effectiveBranchId).catch(() => ({ items: [] })),
-    getActiveToys().catch(() => ({ items: [] })),
     getVRPackages(effectiveBranchId).catch(() => ({ items: [] }))
   ]);
 
@@ -110,7 +112,8 @@ export default async function Home({ searchParams }: { searchParams: { branch_id
           <VRShowcase initialPackages={vrRes.items || []} initialBranchId={effectiveBranchId} />
           <PromotionShowcase initialCombos={ticketsRes.items || []} initialBranchId={effectiveBranchId} />
           <TechnologyBanner initialMainItem={techMainItem} initialListItems={techListItems} />
-          <ProductSection initialProducts={toysRes.items || []} />
+          {/* TẠM ẨN ĐỒ CHƠI (20261110): khách chưa dùng module đồ chơi nên ẩn khỏi giao diện. API, DB và các file Toys* vẫn giữ nguyên. Tìm "TẠM ẨN ĐỒ CHƠI" để mở lại. */}
+          {/* <ProductSection initialProducts={toysRes.items || []} /> */}
         </Suspense>
       </main>
     </UserLayout>

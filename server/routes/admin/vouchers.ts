@@ -1,9 +1,14 @@
-import { eq, desc, or, count, and, isNull, isNotNull, like, sql, sum, inArray } from 'drizzle-orm';
+import { eq, desc, asc, or, count, and, isNull, isNotNull, like, sql, sum, inArray } from 'drizzle-orm';
 import { formatDateForDb } from '../../lib/date-utils';
 import { logAuditAction } from '../../lib/audit-logger';
 import { buildAuditPayload } from '../../lib/audit-utils';
 import { sqlBranchIdsStaffAccessFilter, staffCanAccessBranchIds, staffCanModifyBranchRecord } from '../../lib/branch-ids';
 import { validateVoucherFields, checkVoucherBranches } from '../../lib/voucher-input';
+
+/** True for a number the screen left empty (undefined, null or an empty text). */
+function isEmptyNumber(value: unknown): boolean {
+  return value === undefined || value === null || value === '';
+}
 
 function parseJsonArrayNullable(value: any): string | null | undefined {
   if (value === undefined) return undefined;
@@ -69,6 +74,48 @@ export function formatVoucherDescription(
   return cleanNote || null;
 }
 
+/** Status filters of the voucher list (expired, not started yet, quota used up, quota nearly used up). */
+export const VOUCHER_STATUS_FILTERS = ['expired', 'upcoming', 'out_of_quota', 'low_quota'];
+
+/** A voucher counts as "nearly out" when this share of its quota is used (and some is still left). */
+const LOW_QUOTA_SHARE = 0.9;
+
+/** Columns the list can be sorted by: the key sent by the screen -> the column name. Anything else is ignored. */
+const VOUCHER_SORT_COLUMNS: Record<string, string> = {
+  created_at: 'created_at',
+  code: 'code',
+  name: 'name',
+  discount_value: 'discount_value',
+  used_count: 'used_count',
+  valid_until: 'valid_until'
+};
+
+/** The SQL condition for one status filter, or null when the value is not a known filter. */
+export function voucherStatusCondition(vouchers: any, status?: string) {
+  // datetime() reads both the ISO text ("2026-11-10T03:00:00.000Z") and the "YYYY-MM-DD HH:MM:SS" text
+  if (status === 'expired') {
+    return sql`(${vouchers.valid_until} IS NOT NULL AND datetime(${vouchers.valid_until}) < datetime('now'))`;
+  }
+  if (status === 'upcoming') {
+    return sql`(${vouchers.valid_from} IS NOT NULL AND datetime(${vouchers.valid_from}) > datetime('now'))`;
+  }
+  if (status === 'out_of_quota') {
+    return sql`(${vouchers.usage_limit} IS NOT NULL AND ${vouchers.used_count} >= ${vouchers.usage_limit})`;
+  }
+  if (status === 'low_quota') {
+    return sql`(${vouchers.usage_limit} IS NOT NULL AND ${vouchers.usage_limit} > 0 AND ${vouchers.used_count} < ${vouchers.usage_limit} AND ${vouchers.used_count} >= ${vouchers.usage_limit} * ${LOW_QUOTA_SHARE})`;
+  }
+  return null;
+}
+
+/** Sort order of the list: the chosen column (newest first when none), with the id as tie-break so pages stay stable. */
+export function buildVoucherOrderBy(vouchers: any, sort_by?: string, sort_dir?: string) {
+  const columnName = sort_by ? VOUCHER_SORT_COLUMNS[sort_by] : undefined;
+  if (!columnName) return [desc(vouchers.created_at), desc(vouchers.id)];
+  const direction = sort_dir === 'asc' ? asc : desc;
+  return [direction(vouchers[columnName]), desc(vouchers.id)];
+}
+
 export async function listVouchersImpl(
   anyDb: any,
   tables: { vouchers: any; voucher_redemption_logs?: any },
@@ -79,10 +126,13 @@ export async function listVouchersImpl(
     scope?: string;
     is_active?: string;
     sale_staff_id?: string | number;
+    status?: string;
+    sort_by?: string;
+    sort_dir?: string;
     restrictToBranchIds?: number[] | null;
   }
 ) {
-  const { page, pageSize, q, scope, is_active, sale_staff_id, restrictToBranchIds = null } = args;
+  const { page, pageSize, q, scope, is_active, sale_staff_id, status, sort_by, sort_dir, restrictToBranchIds = null } = args;
   const conditions = [] as any[];
   conditions.push(isNull(tables.vouchers.deleted_at));
 
@@ -109,9 +159,13 @@ export async function listVouchersImpl(
   if (sale_staff_id && sale_staff_id !== 'all') {
     const targetStaffId = Number(sale_staff_id);
     conditions.push(
-      sql`${tables.vouchers.description} LIKE ${`%"sale_staff_id":${targetStaffId}%`} OR ${tables.vouchers.description} LIKE ${`%"sale_staff_id": ${targetStaffId}%`}`
+      // The brackets keep the OR inside this one condition (otherwise it would leak into the other filters)
+      sql`(${tables.vouchers.description} LIKE ${`%"sale_staff_id":${targetStaffId}%`} OR ${tables.vouchers.description} LIKE ${`%"sale_staff_id": ${targetStaffId}%`})`
     );
   }
+
+  const statusCondition = voucherStatusCondition(tables.vouchers, status);
+  if (statusCondition) conditions.push(statusCondition);
 
   // Branch access filter: staff can only see vouchers from their assigned branches
   // (or vouchers with branch_ids = null which apply to all branches)
@@ -129,7 +183,7 @@ export async function listVouchersImpl(
   const total = totalRes?.count || 0;
   const rawItems = await anyDb.query.vouchers.findMany({
     where: whereCondition,
-    orderBy: [desc(tables.vouchers.created_at)],
+    orderBy: buildVoucherOrderBy(tables.vouchers, sort_by, sort_dir),
     limit: pageSize,
     offset: (page - 1) * pageSize
   });
@@ -168,8 +222,10 @@ export async function listVouchersImpl(
       }
     }
 
+    // applicable_user_ids is no longer part of the admin API (the column stays in the database)
+    const { applicable_user_ids: _unusedUserIds, ...voucherFields } = v;
     return {
-      ...v,
+      ...voucherFields,
       note: meta.note,
       sale_staff_id: meta.sale_staff_id,
       sale_name: meta.sale_name,
@@ -215,13 +271,16 @@ export async function listDeletedVouchersImpl(
   const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
   const itemsRaw = await anyDb.query.vouchers.findMany({
     where: whereClause,
+    // Only the name of the staff member who deleted it (never the whole staff record)
+    with: { deleted_by_staff: { columns: { fullname: true } } },
     orderBy: [desc(vouchers.deleted_at)],
     limit: pageSize,
     offset: (page - 1) * pageSize
   });
   
-  const items = itemsRaw.map((v: any) => ({
+  const items = itemsRaw.map(({ applicable_user_ids: _unusedUserIds, deleted_by_staff, ...v }: any) => ({
     ...v,
+    deleted_by_staff_name: deleted_by_staff?.fullname || null,
     applicable_ticket_package_ids: parseJsonArrayOutput(v.applicable_ticket_package_ids),
     branch_ids: parseJsonArrayOutput(v.branch_ids)
   }));
@@ -229,11 +288,22 @@ export async function listDeletedVouchersImpl(
   return { status: 'success', items, total: countResult?.count || 0, page, pageSize };
 }
 
+/** How many redemptions the detail shows by default, and the most it can be asked for ("xem thêm"). */
+export const DEFAULT_REDEMPTION_LIMIT = 20;
+const MAX_REDEMPTION_LIMIT = 200;
+
+export function clampRedemptionLimit(value: unknown): number {
+  const number = Math.floor(Number(value));
+  if (!Number.isFinite(number) || number < 1) return DEFAULT_REDEMPTION_LIMIT;
+  return Math.min(number, MAX_REDEMPTION_LIMIT);
+}
+
 export async function getVoucherImpl(
   anyDb: any,
   tables: { vouchers: any; auditLogs: any; voucher_redemption_logs: any },
   id: number,
-  restrictToBranchIds?: number[] | null
+  restrictToBranchIds?: number[] | null,
+  redemptionLimit: number = DEFAULT_REDEMPTION_LIMIT
 ) {
   const voucher = await anyDb.query.vouchers.findFirst({ where: eq(tables.vouchers.id, id) });
   if (!voucher) return null;
@@ -251,11 +321,17 @@ export async function getVoucherImpl(
     .from(tables.voucher_redemption_logs)
     .where(eq(tables.voucher_redemption_logs.voucher_id, id));
 
-  const recent_redemptions = await anyDb.query.voucher_redemption_logs.findMany({
+  const redemptionRows = await anyDb.query.voucher_redemption_logs.findMany({
     where: eq(tables.voucher_redemption_logs.voucher_id, id),
+    // The booking code is what staff know a booking by (the numeric id stays out of the screen)
+    with: { booking: { columns: { booking_code: true } } },
     orderBy: [desc(tables.voucher_redemption_logs.redeemed_at)],
-    limit: 20
+    limit: clampRedemptionLimit(redemptionLimit)
   });
+  const recent_redemptions = redemptionRows.map(({ booking, ...row }: any) => ({
+    ...row,
+    booking_code: booking?.booking_code || null
+  }));
 
   const [createLog] = await anyDb
     .select()
@@ -283,8 +359,9 @@ export async function getVoucherImpl(
     .orderBy(desc(tables.auditLogs.createdAt))
     .limit(1);
 
+  const { applicable_user_ids: _unusedUserIds, ...voucherFields } = voucher;
   return {
-    ...voucher,
+    ...voucherFields,
     note: meta.note,
     sale_staff_id: meta.sale_staff_id,
     sale_name: meta.sale_name,
@@ -313,7 +390,7 @@ export async function createVoucherImpl(
     discount_type: string;
     discount_value: number;
     min_order_value?: number;
-    max_discount?: number;
+    max_discount?: number | null;
     usage_limit?: number;
     per_user_limit?: number;
     is_active?: boolean;
@@ -346,7 +423,8 @@ export async function createVoucherImpl(
     discount_type: args.discount_type,
     discount_value: String(dValue),
     min_order_value: String(Number(args.min_order_value ?? 0)),
-    max_discount: args.max_discount !== undefined ? String(Number(args.max_discount)) : null,
+    // Empty or null means "no cap" and stays null (String(Number(null)) would save "0")
+    max_discount: isEmptyNumber(args.max_discount) ? null : String(Number(args.max_discount)),
     usage_limit: args.usage_limit !== undefined && args.usage_limit !== null ? Number(args.usage_limit) : null,
     per_user_limit: args.per_user_limit !== undefined && args.per_user_limit !== null ? Number(args.per_user_limit) : 1,
     is_active: args.is_active !== undefined ? (args.is_active ? 1 : 0) : 1,
@@ -413,7 +491,7 @@ export async function updateVoucherImpl(
     discount_type?: string;
     discount_value?: number;
     min_order_value?: number;
-    max_discount?: number;
+    max_discount?: number | null;
     usage_limit?: number;
     per_user_limit?: number;
     is_active?: boolean;
@@ -478,7 +556,7 @@ export async function updateVoucherImpl(
   if (args.discount_value !== undefined) data.discount_value = String(Number(args.discount_value));
   if (args.min_order_value !== undefined) data.min_order_value = String(Number(args.min_order_value ?? 0));
   if (args.max_discount !== undefined)
-    data.max_discount = args.max_discount !== null ? String(Number(args.max_discount)) : null;
+    data.max_discount = isEmptyNumber(args.max_discount) ? null : String(Number(args.max_discount));
   if (args.usage_limit !== undefined) data.usage_limit = args.usage_limit !== null ? Number(args.usage_limit) : null;
   if (args.per_user_limit !== undefined)
     data.per_user_limit = args.per_user_limit !== null ? Number(args.per_user_limit) : null;

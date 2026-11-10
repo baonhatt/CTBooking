@@ -486,8 +486,14 @@ export default function Checkout() {
                                                                                 <div className="flex items-center gap-1.5">
                                                                                         <ShoppingCart className="w-4 h-4 text-blue-400" />
                                                                                         <span className="text-2xl md:text-3xl font-black text-white tracking-tighter">
-                                                                                                {formatMoney(order?.amount)}
-                                                                                                <span className="text-base md:text-lg ml-1 text-slate-400">₫</span>
+                                                                                                {order ? (
+                                                                                                        <>
+                                                                                                                {formatMoney(order.amount)}
+                                                                                                                <span className="text-base md:text-lg ml-1 text-slate-400">₫</span>
+                                                                                                        </>
+                                                                                                ) : (
+                                                                                                        <span className="text-slate-500">---</span>
+                                                                                                )}
                                                                                         </span>
                                                                                 </div>
                                                                         </div>
@@ -526,7 +532,7 @@ export default function Checkout() {
                                                                         >
                                                                                 <Sparkles className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
                                                                                 <span>
-                                                                                        Hệ thống đã gửi {!isVR ? 'thông tin vé chi tiết và **Mã đặt vé**' : 'thông tin trải nghiệm VR chi tiết và **Mã đặt chỗ**'} tới <b>{order?.email}</b>. Quý khách vui
+                                                                                        Hệ thống đã gửi {!isVR ? 'thông tin vé chi tiết và ' : 'thông tin trải nghiệm VR chi tiết và '}<b>{!isVR ? 'Mã đặt vé' : 'Mã đặt chỗ'}</b> tới <b>{order?.email}</b>. Quý khách vui
                                                                                         lòng kiểm tra email (bao gồm cả thư rác).
                                                                                 </span>
                                                                         </motion.div>

@@ -21,6 +21,8 @@ export type PostItem = {
   og_image?: string;
   canonical_url?: string;
   schema_type?: string;
+  // Branches the post is limited to; null or empty means all branches
+  branch_ids?: number[] | null;
 };
 
 export type PostsResponse = {

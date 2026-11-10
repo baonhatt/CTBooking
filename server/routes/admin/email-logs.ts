@@ -46,14 +46,20 @@ export async function getEmailLogsImpl(
         status: tables.email_logs.status,
         provider: tables.email_logs.provider,
         error_message: tables.email_logs.error_message,
+        // Tells a staff email (OTP of a staff member) from a customer email
+        recipient_type: tables.email_logs.recipient_type,
         user_id: tables.email_logs.user_id,
+        staff_id: tables.email_logs.staff_id,
         booking_id: tables.email_logs.booking_id,
+        // Shown instead of the internal booking id
+        booking_code: sql<string | null>`COALESCE(${tables.bookings.booking_code}, ${tables.bookings.pay_txt_code})`,
         metadata: tables.email_logs.metadata,
         sent_at: tables.email_logs.sent_at,
         created_at: tables.email_logs.created_at,
         updated_at: tables.email_logs.updated_at
       })
       .from(tables.email_logs)
+      .leftJoin(tables.bookings, eq(tables.bookings.id, tables.email_logs.booking_id))
       .where(whereClause)
       .orderBy(desc(tables.email_logs.created_at))
       .limit(limit)

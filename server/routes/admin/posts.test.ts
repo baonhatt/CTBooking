@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
 import * as schema from '../../../shared/schema';
-import { deletePostImpl, createPostImpl, updatePostImpl } from './posts';
+import { deletePostImpl, createPostImpl, updatePostImpl, loadPostStaffNames } from './posts';
 
 const tables: any = { posts: (schema as any).posts, auditLogs: (schema as any).auditLogs };
 const staff = { id: 5, email: 'staff@example.com', fullname: 'Staff' };
@@ -155,5 +155,73 @@ describe('post content is cleaned when it is saved', () => {
     await updatePostImpl(db, tables, 7, { title: 'New' } as any, undefined, undefined, undefined, staff);
 
     expect(postWrites(writes).find((entry) => entry.kind === 'update')!.values).not.toHaveProperty('content');
+  });
+});
+
+describe('post branches', () => {
+  it('create: no branch list means all branches (null), a list is saved as JSON', async () => {
+    const all = makeDb(undefined);
+    await createPostImpl(all.db, tables, { title: 'T', content: '<p>x</p>' } as any, undefined, undefined, staff);
+    expect(postWrites(all.writes).find((entry) => entry.kind === 'insert')!.values.branch_ids).toBeNull();
+
+    const some = makeDb(undefined);
+    await createPostImpl(some.db, tables, { title: 'T', content: '<p>x</p>', branch_ids: [2, 1, 2] } as any, undefined, undefined, staff);
+    expect(postWrites(some.writes).find((entry) => entry.kind === 'insert')!.values.branch_ids).toBe('[2,1]');
+  });
+
+  it('update: not sent leaves the branches alone, null means all, a list replaces them', async () => {
+    const untouched = makeDb(postRow());
+    await updatePostImpl(untouched.db, tables, 7, { title: 'New' } as any, undefined, undefined, undefined, staff);
+    expect(postWrites(untouched.writes).find((entry) => entry.kind === 'update')!.values).not.toHaveProperty('branch_ids');
+
+    const everyBranch = makeDb(postRow({ branch_ids: '[1]' }));
+    await updatePostImpl(everyBranch.db, tables, 7, { branch_ids: null } as any, undefined, undefined, undefined, staff);
+    expect(postWrites(everyBranch.writes).find((entry) => entry.kind === 'update')!.values.branch_ids).toBeNull();
+
+    const chosen = makeDb(postRow());
+    await updatePostImpl(chosen.db, tables, 7, { branch_ids: [3] } as any, undefined, undefined, undefined, staff);
+    expect(postWrites(chosen.writes).find((entry) => entry.kind === 'update')!.values.branch_ids).toBe('[3]');
+  });
+
+  it.each([
+    ['an empty list', []],
+    ['a text', 'abc'],
+    ['a branch that is not a number', [1, 'x']],
+    ['a negative branch', [-1]]
+  ])('refuses %s with a 400 and writes nothing', async (_label, branchIds) => {
+    const created = makeDb(undefined);
+    await expect(
+      createPostImpl(created.db, tables, { title: 'T', content: '<p>x</p>', branch_ids: branchIds } as any, undefined, undefined, staff)
+    ).rejects.toMatchObject({ statusCode: 400 });
+    expect(postWrites(created.writes)).toHaveLength(0);
+
+    const updated = makeDb(postRow());
+    await expect(
+      updatePostImpl(updated.db, tables, 7, { branch_ids: branchIds } as any, undefined, undefined, undefined, staff)
+    ).rejects.toMatchObject({ statusCode: 400 });
+    expect(postWrites(updated.writes)).toHaveLength(0);
+  });
+});
+
+describe('loadPostStaffNames', () => {
+  it('first create is the author, last update is the editor; posts without a log have no names', async () => {
+    const logs = [
+      { entityId: '7', action: 'create', staffFullname: 'An' },
+      { entityId: '7', action: 'update', staffFullname: 'Binh' },
+      { entityId: '7', action: 'update', staffFullname: 'Chi' },
+      { entityId: '8', action: 'create', staffFullname: 'Dung' }
+    ];
+    const db: any = { select: () => ({ from: () => ({ where: () => ({ orderBy: async () => logs }) }) }) };
+
+    const names = await loadPostStaffNames(db, tables, [7, 8, 9]);
+
+    expect(names.get(7)).toEqual({ created_by_staff_name: 'An', updated_by_staff_name: 'Chi' });
+    expect(names.get(8)).toEqual({ created_by_staff_name: 'Dung', updated_by_staff_name: null });
+    expect(names.has(9)).toBe(false);
+  });
+
+  it('does not query when there are no posts', async () => {
+    const db: any = { select: () => { throw new Error('should not run'); } };
+    expect((await loadPostStaffNames(db, tables, [])).size).toBe(0);
   });
 });

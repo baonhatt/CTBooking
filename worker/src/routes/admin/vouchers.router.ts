@@ -26,6 +26,9 @@ vouchersRouter.get('/api/admin/vouchers', requireStaffAuth, requirePermission('v
     const scope = c.req.query('scope') || '';
     const is_active = c.req.query('is_active');
     const sale_staff_id = c.req.query('sale_staff_id');
+    const status = c.req.query('status');
+    const sort_by = c.req.query('sort_by');
+    const sort_dir = c.req.query('sort_dir');
     const restrictBranchIds = getRestrictBranchIds(c);
 
     const db = drizzle(c.env.cinema_db, { schema });
@@ -33,7 +36,7 @@ vouchersRouter.get('/api/admin/vouchers', requireStaffAuth, requirePermission('v
     const r = await listVouchersImpl(
       db,
       { vouchers: schema.vouchers, voucher_redemption_logs: schema.voucher_redemption_logs },
-      { page, pageSize, q, scope, is_active, sale_staff_id, restrictToBranchIds: restrictBranchIds }
+      { page, pageSize, q, scope, is_active, sale_staff_id, status, sort_by, sort_dir, restrictToBranchIds: restrictBranchIds }
     );
 
     return c.json(r, 200 as any);
@@ -57,7 +60,9 @@ vouchersRouter.get('/api/admin/vouchers/:id', requireStaffAuth, requirePermissio
         voucher_redemption_logs: schema.voucher_redemption_logs
       },
       id,
-      restrictBranchIds
+      restrictBranchIds,
+      // "xem thêm" in the redemption history asks for more rows (the server caps it)
+      Number(c.req.query('redemption_limit') || 0) || undefined
     );
 
     if (!r) return c.json({ message: 'Voucher không tồn tại' }, 404 as any);

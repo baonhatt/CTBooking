@@ -146,7 +146,8 @@ paymentsRouter.get('/api/admin/transactions', requireStaffAuth, requirePermissio
 
 // Registered BEFORE /api/admin/transactions/:id, otherwise ":id" would match the word "export".
 // Export of the transaction list: at most 5000 rows, read in pages of 100. It tells the screen when it cut the list.
-paymentsRouter.get('/api/admin/transactions/export', requireStaffAuth, requirePermission('transactions', 'view'), async (c) => {
+// Needs the export right (the screen already hides the button without it), not only the view right
+paymentsRouter.get('/api/admin/transactions/export', requireStaffAuth, requirePermission('transactions', 'export'), async (c) => {
   try {
     const filters = readTransactionFilters(c);
     const db = drizzle(c.env.cinema_db, { schema });
@@ -201,7 +202,8 @@ paymentsRouter.get(
           branches: schema.branches,
           auditLogs: schema.auditLogs,
           booking_vr_items: (schema as any).booking_vr_items,
-          vouchers: (schema as any).vouchers
+          vouchers: (schema as any).vouchers,
+          staffs: schema.staffs
         },
         id,
         restrictBranchIds
@@ -346,7 +348,10 @@ paymentsRouter.post('/api/admin/bookings-use', requireStaffAuth, requirePermissi
 
   const r = await confirmUseTicketImpl(db, code, tables, restrictBranchIds, allowExpired, staffInfo);
 
-  const status = (r as any)?.status === 'error' ? 400 : 200;
+  // The impl answers with a numeric HTTP status (400 for a ticket already used, 403, 404 ...). It used to be compared
+  // with the word 'error', so a ticket that was already used was reported as a success.
+  const rawStatus = (r as any)?.status;
+  const status = typeof rawStatus === 'number' ? rawStatus : rawStatus === 'error' ? 400 : 200;
 
   const payload = {
     ...(r as any),
@@ -354,7 +359,7 @@ paymentsRouter.post('/api/admin/bookings-use', requireStaffAuth, requirePermissi
     status: status >= 400 ? 'error' : 'success'
   };
 
-  return c.json(payload, status);
+  return c.json(payload, status as any);
 });
 
 // ============================================================

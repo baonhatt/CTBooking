@@ -1,8 +1,89 @@
-import { eq, desc, and, or, like, sql } from 'drizzle-orm';
+import { eq, desc, asc, and, or, like, sql, inArray } from 'drizzle-orm';
 import { formatDateForDb } from '../../lib/date-utils';
 import { logAuditAction } from '../../lib/audit-logger';
 import { sanitizePostHtml } from '../../lib/sanitize-html';
 import { buildAuditPayload } from '../../lib/audit-utils';
+import { parseBranchIds, serializeBranchIds } from '../../lib/branch-ids';
+
+// Turns text into a url slug (no accents, lowercase, dashes)
+function make_slug(text: string): string {
+  return String(text || '')
+    .toLowerCase()
+    .replace(/[đĐ]/g, 'd')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9\s-]/g, '')
+    .replace(/\s+/g, '-')
+    .replace(/-+/g, '-')
+    .replace(/^-|-$/g, '')
+    .slice(0, 255);
+}
+
+// A publish date typed by staff: accepted only when it is a valid date that is not in the future
+function parse_publish_date(value: unknown): Date | null {
+  if (!value) return null;
+  const parsed = new Date(String(value));
+  if (Number.isNaN(parsed.getTime()) || parsed.getTime() > Date.now()) return null;
+  return parsed;
+}
+
+/**
+ * The branches a post is meant for, as sent by the screen: undefined (not sent: keep as it is), null (all branches) or a
+ * list of branch ids. An empty list is refused: "no branch" would hide the post from every branch.
+ */
+export function readPostBranchIds(value: unknown): number[] | null | undefined {
+  if (value === undefined) return undefined;
+  if (value === null) return null;
+  if (!Array.isArray(value)) throw Object.assign(new Error('Danh sách chi nhánh không hợp lệ'), { statusCode: 400 });
+  const ids = Array.from(new Set(value.map((id) => Number(id))));
+  if (ids.some((id) => !Number.isInteger(id) || id <= 0)) {
+    throw Object.assign(new Error('Danh sách chi nhánh không hợp lệ'), { statusCode: 400 });
+  }
+  if (ids.length === 0) {
+    throw Object.assign(new Error('Chọn ít nhất một chi nhánh hoặc chọn tất cả chi nhánh'), { statusCode: 400 });
+  }
+  return ids;
+}
+
+// The post as sent to screens: branch_ids is a list (or null for all branches), not the JSON text of the column
+function withBranchList(post: any) {
+  return { ...post, branch_ids: parseBranchIds(post?.branch_ids) };
+}
+
+/**
+ * Who created and who last changed each post, read from the audit log (the posts table has no staff columns).
+ * Only for the admin list: staff names are never part of the public post list.
+ */
+export async function loadPostStaffNames(anyDb: any, tables: { auditLogs: any }, postIds: number[]) {
+  const names = new Map<number, { created_by_staff_name: string | null; updated_by_staff_name: string | null }>();
+  if (postIds.length === 0) return names;
+
+  const logs = await anyDb
+    .select({
+      entityId: tables.auditLogs.entityId,
+      action: tables.auditLogs.action,
+      staffFullname: tables.auditLogs.staffFullname
+    })
+    .from(tables.auditLogs)
+    .where(
+      and(
+        eq(tables.auditLogs.entityType, 'post'),
+        inArray(tables.auditLogs.entityId, postIds.map(String)),
+        inArray(tables.auditLogs.action, ['create', 'update'])
+      )
+    )
+    .orderBy(asc(tables.auditLogs.createdAt));
+
+  for (const log of logs) {
+    const postId = Number(log.entityId);
+    const entry = names.get(postId) || { created_by_staff_name: null, updated_by_staff_name: null };
+    // The first "create" is the author; the last "update" is the person who changed it last
+    if (log.action === 'create' && !entry.created_by_staff_name) entry.created_by_staff_name = log.staffFullname || null;
+    if (log.action === 'update') entry.updated_by_staff_name = log.staffFullname || null;
+    names.set(postId, entry);
+  }
+  return names;
+}
 
 export async function listPostsImpl(
   anyDb: any,
@@ -12,9 +93,11 @@ export async function listPostsImpl(
     pageSize?: number;
     q?: string;
     status?: string;
+    // Adds created_by_staff_name / updated_by_staff_name to each item (admin list only)
+    withStaffNames?: boolean;
   } = {}
 ) {
-  const { page = 1, pageSize = 10, q, status } = options;
+  const { page = 1, pageSize = 10, q, status, withStaffNames = false } = options;
 
   let whereCondition: any = undefined;
   const conditions: any[] = [];
@@ -55,7 +138,25 @@ export async function listPostsImpl(
     offset: (page - 1) * pageSize
   });
 
-  return { items, page, pageSize, total };
+  const staffNames = withStaffNames
+    ? await loadPostStaffNames(
+        anyDb,
+        tables,
+        items.map((post: any) => post.id)
+      )
+    : null;
+
+  return {
+    items: items.map((post: any) => ({
+      ...withBranchList(post),
+      ...(staffNames
+        ? staffNames.get(post.id) || { created_by_staff_name: null, updated_by_staff_name: null }
+        : {})
+    })),
+    page,
+    pageSize,
+    total
+  };
 }
 
 export async function getPostImpl(
@@ -122,7 +223,7 @@ export async function getPostImpl(
     .limit(1);
 
   return {
-    ...post,
+    ...withBranchList(post),
     created_by_staff_name: createLog?.staffFullname || null,
     updated_by_staff_name: updateLog?.staffFullname || null
   };
@@ -133,6 +234,10 @@ export async function createPostImpl(
   tables: { posts: any; auditLogs: any },
   args: {
     title: string;
+    slug?: string;
+    published_at?: string | null;
+    // null or missing = all branches
+    branch_ids?: number[] | null;
     content: string;
     excerpt?: string;
     featured_image?: string;
@@ -168,6 +273,9 @@ export async function createPostImpl(
     schema_type
   } = args;
 
+  // Checked first, so a refused branch list never leaves an uploaded image behind
+  const branchIds = readPostBranchIds(args.branch_ids);
+
   let savedImage = featured_image;
 
   if (image_base64 && typeof image_base64 === 'string' && uploader) {
@@ -179,24 +287,25 @@ export async function createPostImpl(
     }
   }
 
-  const slug = title
-    .toLowerCase()
-    .replace(/[đĐ]/g, 'd')
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .replace(/[^a-z0-9\s-]/g, '')
-    .replace(/\s+/g, '-')
-    .replace(/-+/g, '-')
-    .slice(0, 255);
+  // The slug staff typed is used when there is one; a taken slug gets -2, -3 ... so saving never fails on a duplicate
+  const baseSlug = make_slug(args.slug || '') || make_slug(title) || 'bai-viet';
+  let slug = baseSlug;
+  for (let suffix = 2; suffix < 100; suffix++) {
+    const taken = await anyDb.query.posts.findFirst({ where: eq(tables.posts.slug, slug) });
+    if (!taken) break;
+    slug = `${baseSlug}-${suffix}`;
+  }
 
   const nowIso = new Date();
-  const published_at = status === 'published' ? nowIso : null;
+  // A published post can be back-dated by staff; otherwise it is published now
+  const published_at = status === 'published' ? (parse_publish_date(args.published_at) ?? nowIso) : null;
 
   // Build the data object explicitly to avoid issues with undefined values
   // which can cause parameter shifting in some Drizzle version/driver combinations.
   const insertData: any = {
     title,
     slug,
+    branch_ids: serializeBranchIds(branchIds ?? null),
     // The HTML is cleaned before it is saved (scripts, event handlers and the like are removed)
     content: sanitizePostHtml(content),
     excerpt: excerpt || null,
@@ -257,6 +366,9 @@ export async function updatePostImpl(
   args: {
     title?: string;
     slug?: string;
+    published_at?: string | null;
+    // undefined = unchanged, null = all branches
+    branch_ids?: number[] | null;
     content?: string;
     excerpt?: string;
     featured_image?: string;
@@ -279,6 +391,8 @@ export async function updatePostImpl(
     where: eq(tables.posts.id, id)
   });
   if (!existing) return null;
+
+  const branchIds = readPostBranchIds(args.branch_ids);
 
   const {
     title,
@@ -304,15 +418,26 @@ export async function updatePostImpl(
     data.title = title;
   }
   if (args.slug !== undefined) {
-    data.slug = args.slug;
+    const newSlug = make_slug(args.slug);
+    if (newSlug && newSlug !== existing.slug) {
+      const taken = await anyDb.query.posts.findFirst({ where: eq(tables.posts.slug, newSlug) });
+      if (taken && taken.id !== id) {
+        throw Object.assign(new Error('Slug này đang được bài viết khác sử dụng, hãy đổi slug.'), { statusCode: 409 });
+      }
+      data.slug = newSlug;
+    }
   }
+  if (branchIds !== undefined) data.branch_ids = serializeBranchIds(branchIds);
   if (content !== undefined) data.content = sanitizePostHtml(content);
   if (excerpt !== undefined) data.excerpt = excerpt;
   if (featured_image !== undefined) data.featured_image = featured_image;
   if (status !== undefined) {
     data.status = status;
-    if (status === 'published' && !existing.published_at) {
-      data.published_at = formatDateForDb(new Date());
+    if (status === 'published') {
+      // Staff may back-date the post; otherwise a first-time publish is dated now
+      const typedDate = parse_publish_date(args.published_at);
+      if (typedDate) data.published_at = formatDateForDb(typedDate);
+      else if (!existing.published_at) data.published_at = formatDateForDb(new Date());
     }
     if (status !== 'published') {
       // "Gỡ bài" / lưu trữ: không còn public

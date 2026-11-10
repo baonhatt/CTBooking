@@ -311,6 +311,8 @@ export async function getDashboardMetricsImpl(
     .select({
       user_id: tables.bookings.user_id,
       email: tables.bookings.email,
+      // A customer can have typed different names on different bookings, so one of them is taken
+      name: sql<string>`max(${tables.bookings.name})`,
       total_spent: sum(tables.bookings.total_price),
       booking_count: count()
     })
@@ -322,6 +324,7 @@ export async function getDashboardMetricsImpl(
 
   const topVipUsers = topUsersRaw.map((u: any) => ({
     userId: u.user_id,
+    name: u.name || '',
     email: u.email || 'Khách vãng lai',
     totalSpent: Number(u.total_spent || 0),
     bookingCount: Number(u.booking_count || 0)

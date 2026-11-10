@@ -16,6 +16,7 @@ import {
   AlertDialogTitle
 } from '@/components/ui/alert-dialog';
 import { useNavigate } from 'react-router-dom';
+import { formatVnDateTime, formatVnd } from '@/lib/format';
 import { useStaffStore } from '@/store/staffStore';
 import { RefreshCw, RotateCcw, Ticket as TicketIcon, ArrowLeft } from 'lucide-react';
 import { buildUrl } from '@/lib/api/http';
@@ -66,29 +67,19 @@ export default function DeletedTicketsPage() {
       const params = new URLSearchParams({
         page: String(page),
         pageSize: String(pageSize),
-        search: searchQuery
+        search: searchQuery,
+        // Sorting is done by the server so it covers every page, not just the 10 rows on screen
+        sort: sortField === 'deleted_at' ? 'deleted_at' : 'name',
+        dir: sortDir
       });
       const response = await fetch(buildUrl(`/api/admin/deleted/tickets?${params}`), {
         headers: {
           Authorization: `Bearer ${token}`
         }
       });
+      if (!response.ok) throw new Error('request failed');
       const data = await response.json();
-      // Client-side sorting
-      let sortedItems = data.items || [];
-      sortedItems.sort((a: TicketPackage, b: TicketPackage) => {
-        let valA: any, valB: any;
-        if (sortField === 'name') {
-          valA = a.name.toLowerCase();
-          valB = b.name.toLowerCase();
-        } else {
-          valA = new Date(a.deleted_at).getTime();
-          valB = new Date(b.deleted_at).getTime();
-        }
-        if (valA < valB) return sortDir === 'asc' ? -1 : 1;
-        if (valA > valB) return sortDir === 'asc' ? 1 : -1;
-        return 0;
-      });
+      const sortedItems = data.items || [];
       setTickets(sortedItems);
       setTotal(data.total || 0);
     } catch (error) {
@@ -220,27 +211,26 @@ export default function DeletedTicketsPage() {
                     <TableCell className="font-medium">
                       <div className="flex items-center gap-2">
                         <TicketIcon className="w-4 h-4 text-gray-500" />
-                        {t.name}
+                        <span className="max-w-[260px] truncate" title={t.name}>
+                          {t.name}
+                        </span>
                       </div>
                     </TableCell>
                     <TableCell>
                       <Badge variant="outline">{t.code || '-'}</Badge>
                     </TableCell>
                     <TableCell>
-                      <Badge variant="secondary">{t.type || '-'}</Badge>
+                      <Badge variant="secondary">{t.type === 'vr' ? 'Gói VR' : t.type === 'movie' ? 'Vé Phim' : t.type || '-'}</Badge>
                     </TableCell>
                     <TableCell>
-                      {new Intl.NumberFormat('vi-VN', {
-                        style: 'currency',
-                        currency: 'VND'
-                      }).format(Number(t.price))}
+                      {formatVnd(t.price)}
                     </TableCell>
                     <TableCell>
                       {t.is_member_only ? <Badge variant="default">Có</Badge> : <Badge variant="outline">Không</Badge>}
                     </TableCell>
                     <TableCell>{t.branch_name || '-'}</TableCell>
                     <TableCell className="text-gray-600">{t.deleted_by_staff_name || '-'}</TableCell>
-                    <TableCell>{t.deleted_at ? new Date(t.deleted_at).toLocaleString('vi-VN') : '-'}</TableCell>
+                    <TableCell>{formatVnDateTime(t.deleted_at)}</TableCell>
                     <TableCell className="text-right">
                       {hasPermission('tickets', 'restore') && (
                         <Button onClick={() => handleRestore(t.id)} variant="outline" size="sm">

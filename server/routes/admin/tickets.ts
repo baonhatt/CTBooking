@@ -127,6 +127,9 @@ export async function listTicketPackagesImpl(
       case 'name':
         orderByClause = [directionFn(tables.ticket_packages.name), desc(tables.ticket_packages.id)];
         break;
+      case 'display_order':
+        orderByClause = [directionFn(tables.ticket_packages.display_order), desc(tables.ticket_packages.id)];
+        break;
       case 'type':
         orderByClause = [
           directionFn(sql`CASE WHEN ${tables.ticket_packages.type} = 'vr' THEN 1 ELSE 0 END`),
@@ -208,7 +211,7 @@ export async function listTicketPackagesImpl(
  */
 export async function getTicketPackageImpl(
   anyDb: any,
-  tables: { ticket_packages: any; auditLogs: any; branches?: any },
+  tables: { ticket_packages: any; auditLogs: any; branches?: any; movies?: any; bookings?: any },
   id: number,
   restrictToBranchIds: number[] | null = null
 ) {
@@ -249,11 +252,40 @@ export async function getTicketPackageImpl(
     .orderBy(desc(tables.auditLogs.createdAt))
     .limit(1);
 
+  // Titles of the movies in the combo, so the admin detail can show names instead of ids (only when the
+  // caller passes the movies table). Movies that were deleted or hidden are still named: the combo keeps them.
+  let comboMovies: Array<{ id: number; title: string }> = [];
+  if (tables.movies) {
+    const comboIds = processComboInput(item.combo);
+    if (comboIds.length > 0) {
+      const movieRows = await anyDb
+        .select({ id: tables.movies.id, title: tables.movies.title })
+        .from(tables.movies)
+        .where(inArray(tables.movies.id, comboIds));
+      const titleById = new Map<number, string>(movieRows.map((row: any) => [Number(row.id), String(row.title)]));
+      comboMovies = comboIds
+        .filter((movieId) => titleById.has(movieId))
+        .map((movieId) => ({ id: movieId, title: titleById.get(movieId) as string }));
+    }
+  }
+
+  // How many orders use this package (a package with orders cannot be deleted; the delete dialog shows this first)
+  let bookingCount = 0;
+  if (tables.bookings) {
+    const [usage] = await anyDb
+      .select({ count: count() })
+      .from(tables.bookings)
+      .where(eq(tables.bookings.ticket_package_id, id));
+    bookingCount = Number(usage?.count || 0);
+  }
+
   // Parse JSON strings to arrays (handle old data formats: JSON array or "1|2|3")
   return enrichWithParsedBranchIds({
     ...item,
+    booking_count: bookingCount,
     created_by_staff_name: createLog?.staffFullname || null,
     updated_by_staff_name: updateLog?.staffFullname || null,
+    combo_movies: comboMovies,
     combo: item.combo
       ? Array.isArray(item.combo)
         ? item.combo
@@ -871,12 +903,14 @@ export async function listDeletedTicketPackagesImpl(
     page?: number;
     pageSize?: number;
     search?: string;
+    sort?: string;
+    dir?: string;
     branch_id?: number | null;
     restrictToBranchIds?: number[] | null;
   } = {}
 ) {
   const { ticket_packages, staffs } = tables;
-  const { page = 1, pageSize = 10, search = '', branch_id, restrictToBranchIds = null } = options;
+  const { page = 1, pageSize = 10, search = '', sort, dir, branch_id, restrictToBranchIds = null } = options;
 
   const conditions = [];
   if (search) {
@@ -920,7 +954,11 @@ export async function listDeletedTicketPackagesImpl(
     .where(whereClause)
     .limit(pageSize)
     .offset((page - 1) * pageSize)
-    .orderBy(desc(ticket_packages.deleted_at));
+    .orderBy(
+      sort === 'name'
+        ? dir === 'asc' ? asc(ticket_packages.name) : desc(ticket_packages.name)
+        : dir === 'asc' ? asc(ticket_packages.deleted_at) : desc(ticket_packages.deleted_at)
+    );
 
   const [countResult] = await anyDb.select({ count: count() }).from(ticket_packages).where(whereClause);
 

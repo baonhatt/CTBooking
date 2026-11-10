@@ -20,6 +20,7 @@ import { useStaffStore } from '@/store/staffStore';
 import { RefreshCw, RotateCcw, ArrowLeft } from 'lucide-react';
 import { buildUrl } from '@/lib/api/http';
 import { useHasStaffPermission } from '@/hooks/useStaffPermission';
+import { formatVnDateTime } from '@/lib/format';
 
 interface Staff {
   id: number;
@@ -63,29 +64,19 @@ export default function DeletedStaffPage() {
       const params = new URLSearchParams({
         page: String(page),
         pageSize: String(pageSize),
-        search: searchQuery
+        search: searchQuery,
+        // Sorting is done by the server so it covers every page, not just the 10 rows on screen
+        sort: sortField === 'deleted_at' ? 'deleted_at' : 'name',
+        dir: sortDir
       });
       const response = await fetch(buildUrl(`/api/admin/deleted/staff?${params}`), {
         headers: {
           Authorization: `Bearer ${token}`
         }
       });
+      if (!response.ok) throw new Error('request failed');
       const data = await response.json();
-      // Client-side sorting
-      let sortedItems = data.items || [];
-      sortedItems.sort((a: Staff, b: Staff) => {
-        let valA: any, valB: any;
-        if (sortField === 'fullname') {
-          valA = a.fullname.toLowerCase();
-          valB = b.fullname.toLowerCase();
-        } else {
-          valA = new Date(a.deleted_at).getTime();
-          valB = new Date(b.deleted_at).getTime();
-        }
-        if (valA < valB) return sortDir === 'asc' ? -1 : 1;
-        if (valA > valB) return sortDir === 'asc' ? 1 : -1;
-        return 0;
-      });
+      const sortedItems = data.items || [];
       setStaff(sortedItems);
       setTotal(data.total || 0);
     } catch (error) {
@@ -219,7 +210,7 @@ export default function DeletedStaffPage() {
                       <Badge variant="outline">{s.role || '-'}</Badge>
                     </TableCell>
                     <TableCell className="text-gray-600">{s.deleted_by_staff_name || '-'}</TableCell>
-                    <TableCell>{s.deleted_at ? new Date(s.deleted_at).toLocaleString('vi-VN') : '-'}</TableCell>
+                    <TableCell>{formatVnDateTime(s.deleted_at)}</TableCell>
                     <TableCell className="text-right">
                       {hasPermission('staff', 'restore') && (
                         <Button onClick={() => handleRestore(s.id)} variant="outline" size="sm">

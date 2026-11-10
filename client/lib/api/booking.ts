@@ -99,7 +99,7 @@ export async function useTicketApi(code: string, allowExpired: boolean = false) 
   return request<{
     status: string;
     message: string;
-    booking: { id: number; is_used: boolean };
+    booking: { id: number; is_used: boolean; checked_in_at?: string | null; checked_in_by_staff_name?: string | null };
   }>(`/api/admin/bookings-use`, {
     method: 'POST',
     body: JSON.stringify({ code, allow_expired: allowExpired })

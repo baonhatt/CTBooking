@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import {
+  AlertTriangle,
   CalendarClock,
   ChevronRight,
   Clock,
@@ -29,6 +30,20 @@ import {
   type ShowtimeItem
 } from '@/lib/api/showtimes';
 import { useConfirmUnsaved } from '@/hooks/useConfirmUnsaved';
+import { formatVnDateTime } from '@/lib/format';
+
+// loading: waiting for the branch list; ready: loaded (the list may be empty); error: the branch list failed to load
+export type BranchesStatus = 'loading' | 'ready' | 'error';
+
+type MoviesStatus = 'loading' | 'ready' | 'error';
+
+type FormField = 'movie_id' | 'start_time' | 'end_time';
+
+const FORM_FIELD_IDS: Record<FormField, string> = {
+  movie_id: 'fmi_showtime_movie',
+  start_time: 'fmi_showtime_start',
+  end_time: 'fmi_showtime_end'
+};
 
 function addMinutesToTime(value: string, minutes: number): string | null {
   if (!/^\d{2}:\d{2}$/.test(value) || !Number.isFinite(minutes)) return null;
@@ -44,15 +59,43 @@ function minutesBetween(start: string, end: string): number {
   return eh * 60 + em - (sh * 60 + sm);
 }
 
+// Minutes since midnight, for comparing two times of the same day
+function toMinutes(value: string): number {
+  const [hours, mins] = value.split(':').map(Number);
+  return hours * 60 + mins;
+}
+
+// FieldError: red text under a form field
+function FieldError({ message }: { message?: string }) {
+  if (!message) return null;
+  return (
+    <p role="alert" className="text-xs text-red-600">
+      {message}
+    </p>
+  );
+}
+
 interface Props {
   branches: any[];
+  branchesStatus: BranchesStatus;
   schedules: Record<number, ShowtimeItem[]>;
+  failedBranchIds: number[];
   isLoading: boolean;
   onRefresh: () => Promise<void>;
+  onRetryBranches: () => Promise<void>;
   onRefreshBranch: (branchId: number) => Promise<void>;
 }
 
-export default function ShowtimesContent({ branches, schedules, isLoading, onRefresh, onRefreshBranch }: Props) {
+export default function ShowtimesContent({
+  branches,
+  branchesStatus,
+  schedules,
+  failedBranchIds,
+  isLoading,
+  onRefresh,
+  onRetryBranches,
+  onRefreshBranch
+}: Props) {
   const permissions = useStaffPermissions();
   const isSuperAdmin = useIsSuperAdmin();
   const hasPermission = (module: string, action: string) => {
@@ -62,22 +105,26 @@ export default function ShowtimesContent({ branches, schedules, isLoading, onRef
 
   const [editorBranch, setEditorBranch] = useState<any | null>(null);
   const [movies, setMovies] = useState<any[]>([]);
+  const [moviesStatus, setMoviesStatus] = useState<MoviesStatus>('loading');
+  const [moviesReloadKey, setMoviesReloadKey] = useState(0);
   const [isSaving, setIsSaving] = useState(false);
   const [editing, setEditing] = useState<ShowtimeItem | null>(null);
   const [form, setForm] = useState({ movie_id: 0, start_time: '', end_time: '' });
+  const [formErrors, setFormErrors] = useState<Partial<Record<FormField, string>>>({});
   const [copyFromBranchId, setCopyFromBranchId] = useState<number | ''>('');
   const [isCopyConfirmOpen, setIsCopyConfirmOpen] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<ShowtimeItem | null>(null);
 
   const items = editorBranch ? schedules[editorBranch.id] || [] : [];
   const lastSlot = items[items.length - 1];
-  const selectedMovie = useMemo(() => movies.find((m) => m.id === form.movie_id), [movies, form.movie_id]);
 
   useEffect(() => {
     if (!editorBranch?.id) {
       setMovies([]);
       return;
     }
+    let cancelled = false;
+    setMoviesStatus('loading');
     (async () => {
       try {
         const { items: movieItems } = await getMoviesAdmin({
@@ -86,12 +133,41 @@ export default function ShowtimesContent({ branches, schedules, isLoading, onRef
           status: 'active',
           branch_id: editorBranch.id
         });
+        if (cancelled) return;
         setMovies(movieItems || []);
+        setMoviesStatus('ready');
       } catch {
+        if (cancelled) return;
         setMovies([]);
+        setMoviesStatus('error');
       }
     })();
-  }, [editorBranch?.id]);
+    return () => {
+      cancelled = true;
+    };
+  }, [editorBranch?.id, moviesReloadKey]);
+
+  // The movie options: active movies of the branch, plus the movie of the slot being edited when it is not among them
+  // (a movie that was hidden or is beyond the first 200), so the select never shows empty for an existing slot.
+  const movieOptions = useMemo(() => {
+    const options: Array<{ id: number; title: string; duration_min?: number; label_note?: string }> = movies.map((movie) => ({
+      id: movie.id,
+      title: movie.title,
+      duration_min: movie.duration_min
+    }));
+    if (form.movie_id && !options.some((option) => option.id === form.movie_id)) {
+      const slotOfMovie = items.find((slot) => slot.movie_id === form.movie_id);
+      options.push({
+        id: form.movie_id,
+        title: slotOfMovie?.movie_title || 'Phim của suất này',
+        duration_min: slotOfMovie?.movie_duration_min,
+        label_note: slotOfMovie?.movie_deleted ? 'phim đã xóa' : 'không còn trong danh sách đang chiếu'
+      });
+    }
+    return options;
+  }, [movies, form.movie_id, items]);
+
+  const selectedMovie = useMemo(() => movieOptions.find((m) => m.id === form.movie_id), [movieOptions, form.movie_id]);
 
   const applyEndFromDuration = (start: string, durationMin?: number) => {
     if (!start || !durationMin || durationMin <= 0) return '';
@@ -102,12 +178,14 @@ export default function ShowtimesContent({ branches, schedules, isLoading, onRef
     const start =
       next && lastSlot?.end_time ? lastSlot.end_time : items.length === 0 ? '10:00' : lastSlot?.end_time || '10:00';
     setEditing(null);
+    setFormErrors({});
     setForm({ movie_id: 0, start_time: start, end_time: '' });
   };
 
   const openEditor = (branch: any) => {
     setEditorBranch(branch);
     setEditing(null);
+    setFormErrors({});
     setCopyFromBranchId('');
     const slots = schedules[branch.id] || [];
     const last = slots[slots.length - 1];
@@ -119,6 +197,7 @@ export default function ShowtimesContent({ branches, schedules, isLoading, onRef
     setEditing(null);
     setDeleteTarget(null);
     setCopyFromBranchId('');
+    setFormErrors({});
   };
 
   const isDirty = useMemo(() => {
@@ -139,8 +218,18 @@ export default function ShowtimesContent({ branches, schedules, isLoading, onRef
     onConfirmClose: closeEditor
   });
 
+  const clearFormError = (field: FormField) => {
+    setFormErrors((prev) => {
+      if (!prev[field]) return prev;
+      const next = { ...prev };
+      delete next[field];
+      return next;
+    });
+  };
+
   const handleMovieChange = (movieId: number) => {
-    const movie = movies.find((m) => m.id === movieId);
+    const movie = movieOptions.find((m) => m.id === movieId);
+    clearFormError('movie_id');
     setForm((prev) => ({
       ...prev,
       movie_id: movieId,
@@ -149,18 +238,59 @@ export default function ShowtimesContent({ branches, schedules, isLoading, onRef
   };
 
   const handleStartChange = (start: string) => {
-    const movie = movies.find((m) => m.id === form.movie_id);
+    clearFormError('start_time');
     setForm((prev) => ({
       ...prev,
       start_time: start,
-      end_time: applyEndFromDuration(start, movie?.duration_min) || prev.end_time
+      end_time: applyEndFromDuration(start, selectedMovie?.duration_min) || prev.end_time
     }));
+  };
+
+  // What is wrong with the slot being typed, before it is sent: a time that ends before it starts, a slot that runs
+  // past midnight (the schedule is one day only) and a clash with another slot of the same branch.
+  const slotProblem = useMemo(() => {
+    if (!form.start_time) return null;
+    const duration = selectedMovie?.duration_min;
+    if (!form.end_time && duration && addMinutesToTime(form.start_time, duration) === null) {
+      return {
+        blocking: false,
+        message: `Phim dài ${duration} phút, bắt đầu ${form.start_time} sẽ kết thúc sau nửa đêm. Lịch chỉ gồm các suất trong cùng một ngày: chọn giờ bắt đầu sớm hơn hoặc nhập giờ kết thúc thủ công (tối đa 23:59).`
+      };
+    }
+    if (!form.end_time) return null;
+    if (toMinutes(form.end_time) <= toMinutes(form.start_time)) {
+      return { blocking: true, message: 'Giờ kết thúc phải sau giờ bắt đầu trong cùng ngày (không hỗ trợ suất qua nửa đêm).' };
+    }
+    const clash = items.find(
+      (slot) =>
+        slot.id !== editing?.id &&
+        toMinutes(slot.start_time) < toMinutes(form.end_time) &&
+        toMinutes(slot.end_time) > toMinutes(form.start_time)
+    );
+    if (clash) {
+      return {
+        blocking: true,
+        message: `Trùng giờ với suất ${clash.start_time} – ${clash.end_time}${clash.movie_title ? ` (${clash.movie_title})` : ''}.`
+      };
+    }
+    return null;
+  }, [form.start_time, form.end_time, selectedMovie, items, editing]);
+
+  // Shows the errors under their fields and puts the cursor on the first one
+  const showFormErrors = (errors: Partial<Record<FormField, string>>) => {
+    setFormErrors(errors);
+    const firstField = (['movie_id', 'start_time', 'end_time'] as FormField[]).find((field) => errors[field]);
+    if (firstField) document.getElementById(FORM_FIELD_IDS[firstField])?.focus();
   };
 
   const handleSave = async () => {
     if (!editorBranch) return;
-    if (!form.movie_id || !form.start_time || !form.end_time) {
-      toast.error('Chọn phim, giờ bắt đầu và giờ kết thúc');
+    const errors: Partial<Record<FormField, string>> = {};
+    if (!form.movie_id) errors.movie_id = 'Chọn phim';
+    if (!form.start_time) errors.start_time = 'Nhập giờ bắt đầu';
+    if (!form.end_time) errors.end_time = 'Nhập giờ kết thúc';
+    if (Object.keys(errors).length > 0) {
+      showFormErrors(errors);
       return;
     }
     setIsSaving(true);
@@ -175,6 +305,7 @@ export default function ShowtimesContent({ branches, schedules, isLoading, onRef
       await onRefreshBranch(editorBranch.id);
       const end = form.end_time;
       setEditing(null);
+      setFormErrors({});
       setForm({ movie_id: 0, start_time: end, end_time: '' });
     } catch (err: any) {
       toast.error(err.message || 'Lưu suất chiếu thất bại');
@@ -228,6 +359,7 @@ export default function ShowtimesContent({ branches, schedules, isLoading, onRef
 
   const openEdit = (slot: ShowtimeItem) => {
     setEditing(slot);
+    setFormErrors({});
     setForm({
       movie_id: slot.movie_id,
       start_time: slot.start_time,
@@ -249,6 +381,128 @@ export default function ShowtimesContent({ branches, schedules, isLoading, onRef
     return rows;
   }, [items]);
 
+  // BRANCH LIST
+  const renderBranchRow = (branch: any) => {
+    const slots = schedules[branch.id] || [];
+    const hasLoadFailed = failedBranchIds.includes(branch.id);
+    const opensAt = slots[0]?.start_time;
+    const closesAt = slots[slots.length - 1]?.end_time;
+    return (
+      <div key={branch.id} className="flex items-center hover:bg-slate-50/90 transition-colors">
+        <button
+          type="button"
+          onClick={() => openEditor(branch)}
+          aria-label={`Mở lịch chiếu chi nhánh ${branch.name}`}
+          className="flex-1 min-w-0 flex items-center gap-4 px-5 py-4 text-left"
+        >
+          <div className="h-10 w-10 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center shrink-0">
+            <MapPin className="w-4 h-4" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <div className="font-semibold text-slate-800 truncate flex items-center gap-2">
+              <span className="truncate" title={branch.name}>
+                {branch.name}
+              </span>
+              {branch.is_active === false && (
+                <span className="shrink-0 text-[11px] font-medium text-slate-500 bg-slate-100 border border-slate-200 rounded-full px-2 py-0.5">
+                  Ngừng hoạt động
+                </span>
+              )}
+            </div>
+            <div className="text-xs text-slate-400 mt-0.5 truncate" title={branch.address || undefined}>
+              {branch.address || branch.code || 'Chi nhánh'}
+            </div>
+          </div>
+          <div className="shrink-0 text-right">
+            {hasLoadFailed ? (
+              <span className="text-xs font-medium text-red-600 bg-red-50 border border-red-100 rounded-full px-2.5 py-1">
+                Lỗi tải
+              </span>
+            ) : slots.length > 0 ? (
+              <>
+                <div className="text-sm font-bold tabular-nums text-blue-700">
+                  {opensAt} – {closesAt}
+                </div>
+                <div className="text-[11px] text-slate-400">{slots.length} suất</div>
+              </>
+            ) : (
+              <span className="text-xs font-medium text-amber-600 bg-amber-50 border border-amber-100 rounded-full px-2.5 py-1">
+                Chưa có lịch
+              </span>
+            )}
+          </div>
+          <ChevronRight className="w-4 h-4 text-slate-300 shrink-0" />
+        </button>
+        {hasLoadFailed && (
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => onRefreshBranch(branch.id)}
+            className="mr-4 shrink-0 rounded-lg text-xs"
+          >
+            <RefreshCw className="w-3.5 h-3.5 mr-1" />
+            Thử lại
+          </Button>
+        )}
+      </div>
+    );
+  };
+
+  const renderBranchList = () => {
+    if (branchesStatus === 'loading' || (branchesStatus === 'ready' && isLoading && Object.keys(schedules).length === 0)) {
+      return (
+        <div className="flex items-center justify-center py-16 text-slate-500 gap-3">
+          <Loader2 className="w-6 h-6 animate-spin text-blue-600" />
+          <span className="font-medium text-sm">Đang tải danh sách chi nhánh & lịch chiếu...</span>
+        </div>
+      );
+    }
+    if (branchesStatus === 'error') {
+      return (
+        <div className="flex flex-col items-center justify-center py-14 text-center px-6">
+          <AlertTriangle className="w-9 h-9 text-red-400 mb-2" />
+          <p className="font-semibold text-slate-700">Không tải được danh sách chi nhánh</p>
+          <p className="text-sm text-slate-400 mt-1">Kiểm tra kết nối rồi thử lại.</p>
+          <Button variant="outline" onClick={onRetryBranches} className="mt-4 rounded-lg">
+            <RefreshCw className="w-4 h-4 mr-1" />
+            Thử lại
+          </Button>
+        </div>
+      );
+    }
+    if (branches.length === 0) {
+      return (
+        <div className="flex flex-col items-center justify-center py-14 text-center px-6">
+          <MapPin className="w-9 h-9 text-slate-300 mb-2" />
+          <p className="font-semibold text-slate-700">Chưa có chi nhánh nào để đặt lịch chiếu</p>
+          <p className="text-sm text-slate-400 mt-1">
+            Tài khoản này chưa được gán chi nhánh. Liên hệ quản trị viên để được phân quyền chi nhánh.
+          </p>
+        </div>
+      );
+    }
+    return <div className="divide-y divide-slate-100">{branches.map(renderBranchRow)}</div>;
+  };
+
+  // The note under the movie select: loading, load failure or no movie
+  const renderMoviesNote = () => {
+    if (moviesStatus === 'loading') return <p className="text-xs text-slate-400">Đang tải danh sách phim...</p>;
+    if (moviesStatus === 'error') {
+      return (
+        <p className="text-xs text-red-600">
+          Không tải được danh sách phim.{' '}
+          <button type="button" onClick={() => setMoviesReloadKey((key) => key + 1)} className="underline">
+            Thử lại
+          </button>
+        </p>
+      );
+    }
+    if (movies.length === 0) return <p className="text-xs text-amber-600">Chi nhánh này chưa có phim đang chiếu.</p>;
+    return null;
+  };
+
+  const copySourceSlots = copyFromBranchId ? schedules[Number(copyFromBranchId)] || [] : [];
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between gap-3">
@@ -262,6 +516,7 @@ export default function ShowtimesContent({ branches, schedules, isLoading, onRef
           variant="outline"
           size="icon"
           onClick={onRefresh}
+          aria-label="Làm mới lịch chiếu"
           className="rounded-xl shadow-sm hover:rotate-180 transition-transform duration-500 shrink-0 h-10 w-10"
           title="Làm mới"
         >
@@ -270,55 +525,7 @@ export default function ShowtimesContent({ branches, schedules, isLoading, onRef
       </div>
 
       <Card className="border border-gray-200 rounded-xl shadow-sm bg-white">
-        <CardContent className="p-0">
-          {isLoading || branches.length === 0 ? (
-            <div className="flex items-center justify-center py-16 text-slate-500 gap-3">
-              <Loader2 className="w-6 h-6 animate-spin text-blue-600" />
-              <span className="font-medium text-sm">Đang tải danh sách chi nhánh & lịch chiếu...</span>
-            </div>
-          ) : (
-            <div className="divide-y divide-slate-100">
-              {branches.map((branch) => {
-                const slots = schedules[branch.id] || [];
-                const opensAt = slots[0]?.start_time;
-                const closesAt = slots[slots.length - 1]?.end_time;
-                return (
-                  <button
-                    key={branch.id}
-                    type="button"
-                    onClick={() => openEditor(branch)}
-                    className="w-full flex items-center gap-4 px-5 py-4 text-left hover:bg-slate-50/90 transition-colors"
-                  >
-                    <div className="h-10 w-10 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center shrink-0">
-                      <MapPin className="w-4 h-4" />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="font-semibold text-slate-800 truncate">{branch.name}</div>
-                      <div className="text-xs text-slate-400 mt-0.5 truncate">
-                        {branch.address || branch.code || 'Chi nhánh'}
-                      </div>
-                    </div>
-                    <div className="shrink-0 text-right">
-                      {slots.length > 0 ? (
-                        <>
-                          <div className="text-sm font-bold tabular-nums text-blue-700">
-                            {opensAt} – {closesAt}
-                          </div>
-                          <div className="text-[11px] text-slate-400">{slots.length} suất</div>
-                        </>
-                      ) : (
-                        <span className="text-xs font-medium text-amber-600 bg-amber-50 border border-amber-100 rounded-full px-2.5 py-1">
-                          Chưa có lịch
-                        </span>
-                      )}
-                    </div>
-                    <ChevronRight className="w-4 h-4 text-slate-300 shrink-0" />
-                  </button>
-                );
-              })}
-            </div>
-          )}
-        </CardContent>
+        <CardContent className="p-0">{renderBranchList()}</CardContent>
       </Card>
 
       <EditorAlert />
@@ -336,6 +543,7 @@ export default function ShowtimesContent({ branches, schedules, isLoading, onRef
               variant="ghost"
               size="icon"
               onClick={() => handleEditorOpenChange(false)}
+              aria-label="Đóng"
               className="h-8 w-8 rounded-full hover:bg-slate-100 text-slate-400"
             >
               <X className="w-5 h-5" />
@@ -343,7 +551,8 @@ export default function ShowtimesContent({ branches, schedules, isLoading, onRef
           </DialogHeader>
 
           <div className="flex-1 overflow-y-auto space-y-4 py-2 pr-1">
-            {hasPermission('showtimes', 'create') && (
+            {/* Staff who can edit but not create still need the form while editing a slot */}
+            {(hasPermission('showtimes', 'create') || (editing && hasPermission('showtimes', 'edit'))) && (
               <div className="rounded-xl border border-slate-200 bg-slate-50/70 p-4 space-y-3">
                 <div className="flex items-center justify-between gap-2">
                   <p className="text-sm font-semibold text-slate-700">{editing ? 'Sửa suất' : 'Thêm suất'}</p>
@@ -359,51 +568,84 @@ export default function ShowtimesContent({ branches, schedules, isLoading, onRef
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
                   <div className="sm:col-span-2 space-y-1.5">
-                    <Label>Phim</Label>
+                    <Label htmlFor={FORM_FIELD_IDS.movie_id}>
+                      Phim <span className="text-red-500">*</span>
+                    </Label>
                     <select
+                      id={FORM_FIELD_IDS.movie_id}
+                      aria-required="true"
+                      aria-invalid={!!formErrors.movie_id}
                       value={form.movie_id || ''}
                       onChange={(e) => handleMovieChange(Number(e.target.value))}
                       className="w-full bg-white border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none h-10"
                     >
                       <option value="">Chọn phim</option>
-                      {movies.map((movie) => (
+                      {movieOptions.map((movie) => (
                         <option key={movie.id} value={movie.id}>
                           {movie.title}
                           {movie.duration_min ? ` (${movie.duration_min} phút)` : ''}
+                          {movie.label_note ? ` - ${movie.label_note}` : ''}
                         </option>
                       ))}
                     </select>
+                    <FieldError message={formErrors.movie_id} />
                   </div>
                   <div className="space-y-1.5">
-                    <Label>Giờ bắt đầu</Label>
+                    <Label htmlFor={FORM_FIELD_IDS.start_time}>
+                      Giờ bắt đầu <span className="text-red-500">*</span>
+                    </Label>
                     <Input
+                      id={FORM_FIELD_IDS.start_time}
                       type="time"
+                      aria-required="true"
+                      aria-invalid={!!formErrors.start_time}
                       value={form.start_time}
                       onChange={(e) => handleStartChange(e.target.value)}
                       className="h-10"
                     />
+                    <FieldError message={formErrors.start_time} />
                   </div>
                   <div className="space-y-1.5">
-                    <Label>Giờ kết thúc</Label>
+                    <Label htmlFor={FORM_FIELD_IDS.end_time}>
+                      Giờ kết thúc <span className="text-red-500">*</span>
+                    </Label>
                     <Input
+                      id={FORM_FIELD_IDS.end_time}
                       type="time"
+                      aria-required="true"
+                      aria-invalid={!!formErrors.end_time}
                       value={form.end_time}
-                      onChange={(e) => setForm((prev) => ({ ...prev, end_time: e.target.value }))}
+                      onChange={(e) => {
+                        clearFormError('end_time');
+                        setForm((prev) => ({ ...prev, end_time: e.target.value }));
+                      }}
                       className="h-10"
                     />
+                    <FieldError message={formErrors.end_time} />
                   </div>
                 </div>
-                {movies.length === 0 && (
-                  <p className="text-xs text-amber-600">Chi nhánh này chưa có phim đang chiếu.</p>
-                )}
+                {renderMoviesNote()}
                 <p className="text-xs text-slate-400">
                   Giờ kết thúc tự điền theo thời lượng phim
                   {selectedMovie?.duration_min ? ` (${selectedMovie.duration_min} phút)` : ''}, vẫn sửa được.
                 </p>
+                {slotProblem && (
+                  <p
+                    role="alert"
+                    className={`flex items-start gap-1.5 text-xs rounded-lg border px-3 py-2 ${
+                      slotProblem.blocking
+                        ? 'text-red-700 bg-red-50 border-red-100'
+                        : 'text-amber-700 bg-amber-50 border-amber-100'
+                    }`}
+                  >
+                    <AlertTriangle className="w-3.5 h-3.5 mt-0.5 shrink-0" />
+                    {slotProblem.message}
+                  </p>
+                )}
                 <div className="flex flex-wrap gap-2">
                   <Button
                     onClick={handleSave}
-                    disabled={isSaving}
+                    disabled={isSaving || !!slotProblem?.blocking}
                     className="bg-blue-600 hover:bg-blue-700 rounded-lg h-10 px-4"
                   >
                     <Plus className="w-4 h-4 mr-1" />
@@ -421,8 +663,9 @@ export default function ShowtimesContent({ branches, schedules, isLoading, onRef
             {hasPermission('showtimes', 'create') && hasPermission('showtimes', 'delete') && branches.length > 1 && (
               <div className="flex flex-wrap items-end gap-2 rounded-xl border border-slate-200 p-3">
                 <div className="flex-1 min-w-[200px] space-y-1.5">
-                  <Label>Sao chép lịch từ chi nhánh khác</Label>
+                  <Label htmlFor="fmi_showtime_copy_from">Sao chép lịch từ chi nhánh khác</Label>
                   <select
+                    id="fmi_showtime_copy_from"
                     value={copyFromBranchId}
                     onChange={(e) => setCopyFromBranchId(e.target.value ? Number(e.target.value) : '')}
                     className="w-full bg-white border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none h-10"
@@ -433,6 +676,7 @@ export default function ShowtimesContent({ branches, schedules, isLoading, onRef
                       .map((branch) => (
                         <option key={branch.id} value={branch.id}>
                           {branch.name}
+                          {branch.is_active === false ? ' (ngừng hoạt động)' : ''}
                           {(schedules[branch.id] || []).length ? ` (${schedules[branch.id].length} suất)` : ''}
                         </option>
                       ))}
@@ -451,7 +695,17 @@ export default function ShowtimesContent({ branches, schedules, isLoading, onRef
             )}
 
             <div className="rounded-xl border border-slate-200 overflow-hidden">
-              {items.length === 0 ? (
+              {editorBranch && failedBranchIds.includes(editorBranch.id) ? (
+                <div className="flex flex-col items-center justify-center py-12 text-center px-6">
+                  <AlertTriangle className="w-9 h-9 text-red-400 mb-2" />
+                  <p className="font-semibold text-slate-700">Không tải được lịch chiếu của chi nhánh này</p>
+                  <p className="text-sm text-slate-400 mt-1">Danh sách bên dưới có thể chưa đầy đủ.</p>
+                  <Button variant="outline" onClick={() => onRefreshBranch(editorBranch.id)} className="mt-4 rounded-lg">
+                    <RefreshCw className="w-4 h-4 mr-1" />
+                    Thử lại
+                  </Button>
+                </div>
+              ) : items.length === 0 ? (
                 <div className="flex flex-col items-center justify-center py-12 text-center px-6">
                   <CalendarClock className="w-9 h-9 text-slate-300 mb-2" />
                   <p className="font-semibold text-slate-700">Chưa có suất chiếu</p>
@@ -477,13 +731,14 @@ export default function ShowtimesContent({ branches, schedules, isLoading, onRef
                       );
                     }
                     const slot = row.slot;
+                    const updatedTip = slot.updated_at ? `Cập nhật lần cuối: ${formatVnDateTime(slot.updated_at)}` : undefined;
                     return (
-                      <div key={slot.id} className="flex items-center gap-3 px-4 py-3">
+                      <div key={slot.id} className="flex items-center gap-3 px-4 py-3" title={updatedTip}>
                         <div className="w-[118px] shrink-0 font-black tabular-nums text-blue-700">
                           {slot.start_time} – {slot.end_time}
                         </div>
                         <div className="flex-1 min-w-0">
-                          <div className="font-semibold text-slate-800 truncate">
+                          <div className="font-semibold text-slate-800 truncate" title={slot.movie_title || undefined}>
                             {slot.movie_title || `Phim #${slot.movie_id}`}
                           </div>
                           <div className="text-[11px] text-slate-400 mt-0.5">
@@ -498,6 +753,7 @@ export default function ShowtimesContent({ branches, schedules, isLoading, onRef
                               size="icon"
                               className="h-8 w-8 text-slate-500"
                               title="Sửa"
+                              aria-label={`Sửa suất ${slot.start_time} – ${slot.end_time}`}
                               onClick={() => openEdit(slot)}
                             >
                               <Pencil className="w-4 h-4" />
@@ -509,6 +765,7 @@ export default function ShowtimesContent({ branches, schedules, isLoading, onRef
                               size="icon"
                               className="h-8 w-8 text-rose-500"
                               title="Xóa"
+                              aria-label={`Xóa suất ${slot.start_time} – ${slot.end_time}`}
                               onClick={() => setDeleteTarget(slot)}
                             >
                               <Trash2 className="w-4 h-4" />
@@ -531,8 +788,21 @@ export default function ShowtimesContent({ branches, schedules, isLoading, onRef
         title="Sao chép lịch chiếu"
         description={
           <>
-            Lịch hiện tại của {editorBranch?.name} ({(editorBranch ? schedules[editorBranch.id] || [] : []).length} suất) sẽ bị XÓA
-            và thay bằng lịch của chi nhánh nguồn. Không thể hoàn tác. Tiếp tục?
+            <span className="block">
+              Lịch hiện tại của {editorBranch?.name} ({items.length} suất) sẽ bị XÓA và thay bằng lịch của chi nhánh nguồn
+              ({copySourceSlots.length} suất). Không thể hoàn tác.
+            </span>
+            {items.length > 0 && (
+              <span className="block mt-2 max-h-40 overflow-y-auto rounded-lg border border-red-100 bg-red-50/60 px-3 py-2 text-xs text-red-800">
+                {items.map((slot) => (
+                  <span key={slot.id} className="block truncate">
+                    {slot.start_time} – {slot.end_time}
+                    {slot.movie_title ? ` · ${slot.movie_title}` : ''}
+                  </span>
+                ))}
+              </span>
+            )}
+            <span className="block mt-2">Tiếp tục?</span>
           </>
         }
         onConfirm={handleCopy}

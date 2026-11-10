@@ -109,6 +109,7 @@ export default function TransactionsPage() {
           userId: t.user_id,
           email: t.email,
           userName: t.userName,
+          phone: t.phone,
           transactionId: t.transactionId,
           ticket_package_name: t.ticket_package_name,
           ticketCount: t.ticketCount,

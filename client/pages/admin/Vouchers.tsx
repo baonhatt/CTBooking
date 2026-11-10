@@ -35,7 +35,6 @@ interface VoucherItem {
   valid_from?: string | null;
   valid_until?: string | null;
   applicable_ticket_package_ids?: number[] | null;
-  excluded_ticket_package_ids?: number[] | null;
   branch_ids?: number[] | null;
   is_active?: boolean;
   is_deleted?: boolean;
@@ -81,6 +80,10 @@ export default function VouchersPage() {
   const [scopeFilter, setScopeFilter] = useState<VoucherListFilters['scope']>(initialFilters.scopeFilter || 'all');
   const [searchText, setSearchText] = useState<string>(initialFilters.searchText || '');
   const [selectedSaleId, setSelectedSaleId] = useState<string | number>(initialFilters.selectedSaleId || 'all');
+  const [statusFilter, setStatusFilter] = useState<string>(initialFilters.statusFilter || 'all');
+  // Newest first until a column header is clicked
+  const [sortBy, setSortBy] = useState<string>(initialFilters.sortBy || 'created_at');
+  const [sortDir, setSortDir] = useState<'asc' | 'desc'>(initialFilters.sortDir === 'asc' ? 'asc' : 'desc');
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [editData, setEditData] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -127,7 +130,10 @@ export default function VouchersPage() {
         scope: scopeFilter,
         is_active: showActiveOnly ? 'true' : 'all',
         branch_id: (selectedBranchId as any) === 'all' || !selectedBranchId ? undefined : (selectedBranchId as any),
-        sale_staff_id: selectedSaleId === 'all' ? undefined : selectedSaleId
+        sale_staff_id: selectedSaleId === 'all' ? undefined : selectedSaleId,
+        status: statusFilter === 'all' ? undefined : statusFilter,
+        sort_by: sortBy,
+        sort_dir: sortDir
       } as any);
       setVouchers(items || []);
       setTotal(total ?? 0);
@@ -140,7 +146,7 @@ export default function VouchersPage() {
 
   useEffect(() => {
     handleRefresh();
-  }, [page, showActiveOnly, selectedBranchId, scopeFilter, searchText, selectedSaleId]);
+  }, [page, showActiveOnly, selectedBranchId, scopeFilter, searchText, selectedSaleId, statusFilter, sortBy, sortDir]);
 
   useEffect(() => {
     try {
@@ -150,11 +156,14 @@ export default function VouchersPage() {
         branchId: selectedBranchId,
         scopeFilter,
         searchText,
-        selectedSaleId
+        selectedSaleId,
+        statusFilter,
+        sortBy,
+        sortDir
       };
       localStorage.setItem('admin_vouchers_filters', JSON.stringify(state));
     } catch {}
-  }, [page, showActiveOnly, selectedBranchId, scopeFilter, searchText, selectedSaleId]);
+  }, [page, showActiveOnly, selectedBranchId, scopeFilter, searchText, selectedSaleId, statusFilter, sortBy, sortDir]);
 
   const getTodayStartIso = () => {
     const d = new Date();
@@ -188,7 +197,6 @@ export default function VouchersPage() {
       valid_from: getTodayStartIso(),
       valid_until: getTodayEndIso(),
       applicable_ticket_package_ids: null,
-      excluded_ticket_package_ids: null,
       branch_ids: staff?.isSuperAdmin
         ? null
         : selectedBranchId && selectedBranchId !== 'all'
@@ -202,6 +210,17 @@ export default function VouchersPage() {
   const openEdit = (voucher: VoucherItem) => {
     setEditData({ ...voucher });
     setIsEditOpen(true);
+  };
+
+  // Clicking the sorted column flips the direction; a new column starts newest/highest first (A-Z for text)
+  const handleSortChange = (sortKey: string) => {
+    if (sortKey === sortBy) {
+      setSortDir(sortDir === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortBy(sortKey);
+      setSortDir(sortKey === 'code' || sortKey === 'name' ? 'asc' : 'desc');
+    }
+    setPage(1);
   };
 
   const handleDelete = (voucher: VoucherItem) => {
@@ -268,6 +287,14 @@ export default function VouchersPage() {
           setSelectedSaleId(s);
           setPage(1);
         }}
+        statusFilter={statusFilter}
+        setStatusFilter={(status) => {
+          setStatusFilter(status);
+          setPage(1);
+        }}
+        sortBy={sortBy}
+        sortDir={sortDir}
+        onSortChange={handleSortChange}
         isDeletedView={false}
         onDelete={handleDelete}
         onRestore={handleRestore}

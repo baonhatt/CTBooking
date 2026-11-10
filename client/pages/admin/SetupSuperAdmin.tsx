@@ -77,7 +77,7 @@ export default function SetupSuperAdminPage() {
             </div>
           </div>
           <h1 className="text-xl font-black tracking-widest text-white uppercase">CINESPHERE</h1>
-          <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 mt-1.5 rounded-full bg-slate-900/90 border border-slate-800 text-[10px] font-bold tracking-wider text-purple-400 uppercase">
+          <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 mt-1.5 rounded-full bg-slate-900/90 border border-slate-800 text-[11px] font-bold tracking-wider text-purple-400 uppercase">
             <Sparkles className="w-3 h-3" />
             Khởi tạo siêu quản trị
           </div>

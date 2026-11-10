@@ -273,7 +273,7 @@ branchesRouter.get(
       const r = await listDeletedBranchesImpl(
         db,
         { branches: schema.branches, staffs: schema.staffs },
-        { page, pageSize, search }
+        { page, pageSize, search, sort: String(c.req.query('sort') || ''), dir: String(c.req.query('dir') || '') }
       );
 
       return c.json(r, 200);

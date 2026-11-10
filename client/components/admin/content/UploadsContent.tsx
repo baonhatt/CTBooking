@@ -13,6 +13,9 @@ import {
   updateSiteMediaApi,
   deleteSiteMediaApi
 } from '@/lib/api/uploads';
+import { getBranches } from '@/lib/api/branches';
+import { BranchIdsBadge } from '@/components/admin/BranchIdsBadge';
+import { formatVnDateTime } from '@/lib/format';
 import { toast } from 'sonner';
 import { formatDistanceToNow } from 'date-fns';
 import { vi } from 'date-fns/locale';
@@ -93,8 +96,65 @@ export default function UploadsContent() {
   const [sortBy, setSortBy] = useState<'newest' | 'oldest' | 'section'>('newest');
   const [itemToDelete, setItemToDelete] = useState<any | null>(null);
 
-  const copyToClipboard = (text: string, id: number) => {
-    navigator.clipboard.writeText(text);
+  // Branches, only to turn the branch ids of a media item into names
+  const [branches, setBranches] = useState<{ id: number; name: string }[]>([]);
+
+  useEffect(() => {
+    getBranches({ pageSize: 100, includeInactive: true })
+      .then((res) => setBranches((res.items || []).map((branch: any) => ({ id: branch.id, name: branch.name }))))
+      .catch(() => {
+        // Without the names the badge falls back to the branch count, so the library still works
+      });
+  }, []);
+
+  // What to call a media item: its title, else the file name taken from the URL
+  const media_display_name = (media: any): string => {
+    if (media?.title) return String(media.title);
+    const lastSegment = String(media?.url || '').split('?')[0].split('/').pop() || '';
+    try {
+      return decodeURIComponent(lastSegment) || String(media?.public_id || '');
+    } catch {
+      return lastSegment || String(media?.public_id || '');
+    }
+  };
+
+  // Exact time of a media item, shown as a tooltip next to the relative time
+  const media_exact_time = (media: any): string => formatVnDateTime(media?.updated_at);
+
+  const media_status_badge = (media: any) => (
+    <span
+      className={`px-1.5 py-0.5 rounded text-[11px] font-bold ${
+        media?.is_active === false ? 'bg-red-500/20 text-red-300' : 'bg-emerald-500/20 text-emerald-300'
+      }`}
+    >
+      {media?.is_active === false ? 'Ẩn' : 'Hiển thị'}
+    </span>
+  );
+
+  // The clipboard can be blocked (no permission, not https): try the old way, then say it failed
+  const copyToClipboard = async (text: string, id: number) => {
+    let copied = false;
+    try {
+      await navigator.clipboard.writeText(text);
+      copied = true;
+    } catch {
+      try {
+        const helperInput = document.createElement('textarea');
+        helperInput.value = text;
+        helperInput.style.position = 'fixed';
+        helperInput.style.opacity = '0';
+        document.body.appendChild(helperInput);
+        helperInput.select();
+        copied = document.execCommand('copy');
+        document.body.removeChild(helperInput);
+      } catch {
+        copied = false;
+      }
+    }
+    if (!copied) {
+      toast.error('Không sao chép được URL, hãy chọn và sao chép thủ công');
+      return;
+    }
     setCopiedId(id);
     toast.success('Đã sao chép URL vào bộ nhớ tạm!');
     setTimeout(() => setCopiedId(null), 2000);
@@ -404,7 +464,8 @@ export default function UploadsContent() {
   return (
     <Card className="bg-gradient-to-br from-slate-900 to-slate-800 text-white border border-white/10">
       <CardHeader className="pb-4">
-        <CardTitle className="text-2xl font-bold">Quản lý tệp media</CardTitle>
+        {/* A real h1 (CardTitle renders an h3, and a heading cannot sit inside another heading) */}
+        <h1 className="text-2xl font-bold leading-none tracking-tight">Quản lý tệp media</h1>
       </CardHeader>
       <CardContent className="space-y-6">
         {/* Upload Section */}
@@ -565,7 +626,7 @@ export default function UploadsContent() {
                     )}
                     <span className="text-sm font-semibold truncate max-w-[200px]">{files[0].name}</span>
                   </div>
-                  <span className="text-[10px] uppercase tracking-wider font-bold text-gray-500 bg-white/5 px-2 py-0.5 rounded">
+                  <span className="text-[11px] uppercase tracking-wider font-bold text-gray-500 bg-white/5 px-2 py-0.5 rounded">
                     Preview
                   </span>
                 </div>
@@ -587,11 +648,11 @@ export default function UploadsContent() {
                 <div className="p-5 bg-black/40 border-t border-white/10 mt-auto">
                   <div className="grid grid-cols-2 gap-6">
                     <div className="space-y-1">
-                      <p className="text-[10px] text-gray-500 font-bold uppercase tracking-tight">Kích thước</p>
+                      <p className="text-[11px] text-gray-500 font-bold uppercase tracking-tight">Kích thước</p>
                       <p className="text-sm text-white font-medium">{formatSize(files[0].size || 0)}</p>
                     </div>
                     <div className="space-y-1">
-                      <p className="text-[10px] text-gray-500 font-bold uppercase tracking-tight">Định dạng</p>
+                      <p className="text-[11px] text-gray-500 font-bold uppercase tracking-tight">Định dạng</p>
                       <p className="text-sm text-white font-medium truncate">{files[0].type || 'N/A'}</p>
                     </div>
                   </div>
@@ -621,7 +682,7 @@ export default function UploadsContent() {
                     <RefreshCw className={`w-4 h-4 ${stage === 'uploading' ? 'animate-spin' : ''}`} />
                     Tiến trình trực tiếp
                   </h3>
-                  <span className="text-[10px] text-gray-500 bg-white/5 px-2 py-0.5 rounded-full border border-white/10">
+                  <span className="text-[11px] text-gray-500 bg-white/5 px-2 py-0.5 rounded-full border border-white/10">
                     {uploads.filter((u) => u.status === 'done').length}/{uploads.length} Hoàn thành
                   </span>
                 </div>
@@ -647,13 +708,13 @@ export default function UploadsContent() {
                           </div>
                           <div className="overflow-hidden">
                             <div className="text-sm text-white font-semibold truncate">{u.name}</div>
-                            <div className="text-[10px] text-gray-500 font-medium">
+                            <div className="text-[11px] text-gray-500 font-medium">
                               {formatSize(u.size)} • {u.type.split('/')[1]?.toUpperCase() || 'N/A'}
                             </div>
                           </div>
                         </div>
                         <div
-                          className={`shrink-0 px-2 py-1 rounded-md text-[10px] font-bold uppercase tracking-tighter ${
+                          className={`shrink-0 px-2 py-1 rounded-md text-[11px] font-bold uppercase tracking-tighter ${
                             u.status === 'done'
                               ? 'bg-emerald-500/20 text-emerald-400'
                               : u.status === 'error'
@@ -676,7 +737,7 @@ export default function UploadsContent() {
                       <div className="space-y-3">
                         {u.isImage && u.status !== 'done' && u.status !== 'error' && (
                           <div className="space-y-1.5">
-                            <div className="flex justify-between text-[10px] font-bold text-gray-400">
+                            <div className="flex justify-between text-[11px] font-bold text-gray-400">
                               <span>Nén ảnh</span>
                               <span>{u.compressProgress || 0}%</span>
                             </div>
@@ -686,7 +747,7 @@ export default function UploadsContent() {
 
                         {u.status !== 'done' && u.status !== 'error' && (
                           <div className="space-y-1.5">
-                            <div className="flex justify-between text-[10px] font-bold text-gray-400">
+                            <div className="flex justify-between text-[11px] font-bold text-gray-400">
                               <span>Tải lên</span>
                               <span>{u.uploadProgress}%</span>
                             </div>
@@ -751,7 +812,7 @@ export default function UploadsContent() {
                   {statusLines.map((ln, idx) => (
                     <div
                       key={idx}
-                      className="text-[10px] text-gray-500 py-1 flex gap-2 border-b border-white/5 last:border-0"
+                      className="text-[11px] text-gray-500 py-1 flex gap-2 border-b border-white/5 last:border-0"
                     >
                       <span className="text-blue-500/50 shrink-0">
                         [{new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })}]
@@ -826,7 +887,7 @@ export default function UploadsContent() {
                 <div className="relative flex-1 md:w-64">
                   <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
                   <Input
-                    placeholder="Tìm tên file, ID, URL..."
+                    placeholder="Tìm tên file, tiêu đề, URL..."
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
                     className="bg-black/40 border-white/10 pl-9 pr-8 h-9 text-xs text-white placeholder:text-gray-500 rounded-lg focus:border-blue-500"
@@ -913,7 +974,7 @@ export default function UploadsContent() {
               {/* Left Navigation Tree Sidebar */}
               <div className="w-64 border-r border-white/10 bg-slate-900/60 p-3 flex flex-col space-y-4 shrink-0 overflow-y-auto custom-scrollbar">
                 <div>
-                  <div className="text-[10px] font-bold uppercase tracking-wider text-gray-400 px-2 mb-2 flex items-center gap-1.5">
+                  <div className="text-[11px] font-bold uppercase tracking-wider text-gray-400 px-2 mb-2 flex items-center gap-1.5">
                     <FolderTree className="w-3.5 h-3.5 text-blue-400" />
                     Thư mục hệ thống
                   </div>
@@ -930,7 +991,7 @@ export default function UploadsContent() {
                         <FolderOpen className="w-4 h-4 text-yellow-500 shrink-0" />
                         <span className="truncate">Tất cả Media</span>
                       </div>
-                      <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-white/10 text-gray-300">
+                      <span className="px-2 py-0.5 rounded-full text-[11px] font-bold bg-white/10 text-gray-300">
                         {mediaItems.length}
                       </span>
                     </button>
@@ -947,7 +1008,7 @@ export default function UploadsContent() {
                         <Folder className="w-4 h-4 text-blue-400 shrink-0" />
                         <span className="truncate">Banner trang chủ</span>
                       </div>
-                      <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-white/10 text-gray-300">
+                      <span className="px-2 py-0.5 rounded-full text-[11px] font-bold bg-white/10 text-gray-300">
                         {mediaItems.filter((m) => m.section === 'hero_section').length}
                       </span>
                     </button>
@@ -964,7 +1025,7 @@ export default function UploadsContent() {
                         <Folder className="w-4 h-4 text-purple-400 shrink-0" />
                         <span className="truncate">Banner công nghệ</span>
                       </div>
-                      <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-white/10 text-gray-300">
+                      <span className="px-2 py-0.5 rounded-full text-[11px] font-bold bg-white/10 text-gray-300">
                         {mediaItems.filter((m) => m.section === 'technology_section1').length}
                       </span>
                     </button>
@@ -981,7 +1042,7 @@ export default function UploadsContent() {
                         <Folder className="w-4 h-4 text-emerald-400 shrink-0" />
                         <span className="truncate">Danh sách công nghệ</span>
                       </div>
-                      <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-white/10 text-gray-300">
+                      <span className="px-2 py-0.5 rounded-full text-[11px] font-bold bg-white/10 text-gray-300">
                         {mediaItems.filter((m) => m.section === 'technology_section2').length}
                       </span>
                     </button>
@@ -989,7 +1050,7 @@ export default function UploadsContent() {
                 </div>
 
                 <div className="pt-2 border-t border-white/10">
-                  <div className="text-[10px] font-bold uppercase tracking-wider text-gray-400 px-2 mb-2 flex items-center gap-1.5">
+                  <div className="text-[11px] font-bold uppercase tracking-wider text-gray-400 px-2 mb-2 flex items-center gap-1.5">
                     <Filter className="w-3.5 h-3.5 text-blue-400" />
                     Lọc theo loại tệp
                   </div>
@@ -1006,7 +1067,7 @@ export default function UploadsContent() {
                         <FileImage className="w-4 h-4 text-emerald-400 shrink-0" />
                         <span className="truncate">Hình ảnh</span>
                       </div>
-                      <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/10 text-emerald-400">
+                      <span className="px-2 py-0.5 rounded-full text-[11px] font-bold bg-emerald-500/10 text-emerald-400">
                         {mediaItems.filter((m) => m.type === 'image').length}
                       </span>
                     </button>
@@ -1023,7 +1084,7 @@ export default function UploadsContent() {
                         <FileVideo className="w-4 h-4 text-blue-400 shrink-0" />
                         <span className="truncate">Video Clips</span>
                       </div>
-                      <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-500/10 text-blue-400">
+                      <span className="px-2 py-0.5 rounded-full text-[11px] font-bold bg-blue-500/10 text-blue-400">
                         {mediaItems.filter((m) => m.type === 'video').length}
                       </span>
                     </button>
@@ -1080,7 +1141,7 @@ export default function UploadsContent() {
                               {folder.label}
                             </div>
                             <div className="text-[11px] text-gray-400">{folder.desc}</div>
-                            <div className="text-[10px] text-gray-500 font-semibold mt-1">
+                            <div className="text-[11px] text-gray-500 font-semibold mt-1">
                               {folder.count} tệp media
                             </div>
                           </div>
@@ -1109,7 +1170,7 @@ export default function UploadsContent() {
                             if (!searchQuery.trim()) return true;
                             const q = searchQuery.toLowerCase();
                             return (
-                              String(m.id).includes(q) ||
+                              media_display_name(m).toLowerCase().includes(q) ||
                               (m.url || '').toLowerCase().includes(q) ||
                               (m.section || '').toLowerCase().includes(q)
                             );
@@ -1136,7 +1197,7 @@ export default function UploadsContent() {
                         if (!searchQuery.trim()) return true;
                         const q = searchQuery.toLowerCase();
                         return (
-                          String(m.id).includes(q) ||
+                          media_display_name(m).toLowerCase().includes(q) ||
                           (m.url || '').toLowerCase().includes(q) ||
                           (m.section || '').toLowerCase().includes(q)
                         );
@@ -1169,7 +1230,7 @@ export default function UploadsContent() {
                               {m.type === 'image' ? (
                                 <img
                                   src={m.url}
-                                  alt={m.section}
+                                  alt={media_display_name(m)}
                                   loading="lazy"
                                   className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                                 />
@@ -1189,7 +1250,7 @@ export default function UploadsContent() {
                                       {getThumbnail(m.url, m.type) ? (
                                         <img
                                           src={getThumbnail(m.url, m.type)!}
-                                          alt={m.section}
+                                          alt={media_display_name(m)}
                                           loading="lazy"
                                           className="w-full h-full object-cover opacity-70 group-hover:opacity-90 transition-opacity"
                                         />
@@ -1209,12 +1270,12 @@ export default function UploadsContent() {
                               )}
 
                               {/* Section Badge */}
-                              <div className="absolute top-2 left-2 px-2 py-0.5 rounded-md bg-black/70 backdrop-blur-md border border-white/10 text-[9px] font-bold uppercase tracking-wider text-blue-300">
+                              <div className="absolute top-2 left-2 px-2 py-0.5 rounded-md bg-black/70 backdrop-blur-md border border-white/10 text-[11px] font-bold uppercase tracking-wider text-blue-300">
                                 {m.section.replace('_', ' ')}
                               </div>
 
                               {/* Type Badge */}
-                              <div className="absolute top-2 right-2 px-2 py-0.5 rounded-md bg-black/70 backdrop-blur-md border border-white/10 text-[9px] font-bold uppercase tracking-wider flex items-center gap-1">
+                              <div className="absolute top-2 right-2 px-2 py-0.5 rounded-md bg-black/70 backdrop-blur-md border border-white/10 text-[11px] font-bold uppercase tracking-wider flex items-center gap-1">
                                 {m.type === 'image' ? (
                                   <FileImage className="w-3 h-3 text-emerald-400" />
                                 ) : (
@@ -1229,15 +1290,23 @@ export default function UploadsContent() {
                             {/* Info Summary */}
                             <div className="p-3 flex-1 flex flex-col justify-between space-y-2">
                               <div>
-                                <div className="flex items-center justify-between text-[10px] text-gray-400 font-mono">
-                                  <span>ID: #{m.id}</span>
-                                  <span>{m.width && m.height ? `${m.width}x${m.height}` : m.format || 'N/A'}</span>
+                                <div className="flex items-center justify-between gap-2 text-[11px] text-gray-400">
+                                  <span className="flex items-center gap-1.5">
+                                    {media_status_badge(m)}
+                                    <span title="Thứ tự hiển thị">#{m.display_order ?? 0}</span>
+                                  </span>
+                                  <span className="font-mono">
+                                    {m.width && m.height ? `${m.width}x${m.height}` : m.format || 'N/A'}
+                                  </span>
                                 </div>
-                                <div className="text-xs text-white font-medium truncate mt-1">{m.url}</div>
+                                <div className="text-xs text-white font-medium truncate mt-1" title={media_display_name(m)}>
+                                  {media_display_name(m)}
+                                </div>
+                                <BranchIdsBadge branch_ids={m.branch_ids} branches={branches} className="mt-1" />
                               </div>
 
-                              <div className="pt-2 border-t border-white/5 flex items-center justify-between text-[10px] text-gray-500">
-                                <span>
+                              <div className="pt-2 border-t border-white/5 flex items-center justify-between text-[11px] text-gray-500">
+                                <span className="cursor-help" title={media_exact_time(m)}>
                                   {m.updated_at
                                     ? formatDistanceToNow(new Date(m.updated_at), { addSuffix: true, locale: vi })
                                     : 'N/A'}
@@ -1249,7 +1318,7 @@ export default function UploadsContent() {
                                     e.stopPropagation();
                                     copyToClipboard(m.url, m.id);
                                   }}
-                                  className="h-6 px-2 text-[10px] text-blue-400 hover:bg-blue-500/10 rounded"
+                                  className="h-6 px-2 text-[11px] text-blue-400 hover:bg-blue-500/10 rounded"
                                 >
                                   {copiedId === m.id ? (
                                     <Check className="w-3 h-3 text-emerald-400" />
@@ -1272,9 +1341,11 @@ export default function UploadsContent() {
                       <thead>
                         <tr className="border-b border-white/10 bg-white/5 text-[11px] font-bold text-gray-400 uppercase tracking-wider">
                           <th className="p-3">Tệp</th>
-                          <th className="p-3">ID</th>
+                          <th className="p-3">Chi nhánh</th>
                           <th className="p-3">Thư mục (Section)</th>
                           <th className="p-3">Loại</th>
+                          <th className="p-3">Trạng thái</th>
+                          <th className="p-3">Thứ tự</th>
                           <th className="p-3">Kích thước</th>
                           <th className="p-3">Ngày cập nhật</th>
                           <th className="p-3 text-right">Thao tác</th>
@@ -1294,7 +1365,7 @@ export default function UploadsContent() {
                             if (!searchQuery.trim()) return true;
                             const q = searchQuery.toLowerCase();
                             return (
-                              String(m.id).includes(q) ||
+                              media_display_name(m).toLowerCase().includes(q) ||
                               (m.url || '').toLowerCase().includes(q) ||
                               (m.section || '').toLowerCase().includes(q)
                             );
@@ -1310,30 +1381,36 @@ export default function UploadsContent() {
                               <td className="p-3 flex items-center gap-3">
                                 <div className="w-8 h-8 rounded bg-black/40 overflow-hidden shrink-0 flex items-center justify-center border border-white/10">
                                   {m.type === 'image' ? (
-                                    <img src={m.url} className="w-full h-full object-cover" />
+                                    <img src={m.url} alt={media_display_name(m)} className="w-full h-full object-cover" />
                                   ) : (
                                     <FileVideo className="w-4 h-4 text-blue-400" />
                                   )}
                                 </div>
-                                <span className="truncate max-w-[200px] text-xs font-mono">{m.url}</span>
+                                <span className="truncate max-w-[200px] text-xs" title={media_display_name(m)}>
+                                  {media_display_name(m)}
+                                </span>
                               </td>
-                              <td className="p-3 font-mono text-gray-400">#{m.id}</td>
                               <td className="p-3">
-                                <span className="px-2 py-0.5 rounded bg-blue-500/10 text-blue-300 text-[10px] font-bold">
+                                <BranchIdsBadge branch_ids={m.branch_ids} branches={branches} />
+                              </td>
+                              <td className="p-3">
+                                <span className="px-2 py-0.5 rounded bg-blue-500/10 text-blue-300 text-[11px] font-bold">
                                   {m.section}
                                 </span>
                               </td>
-                              <td className="p-3 uppercase text-[10px] font-bold">
+                              <td className="p-3 uppercase text-[11px] font-bold">
                                 <span
                                   className={m.type === 'image' ? 'text-emerald-400' : 'text-blue-400'}
                                 >
                                   {m.type}
                                 </span>
                               </td>
+                              <td className="p-3">{media_status_badge(m)}</td>
+                              <td className="p-3 text-gray-400 text-[11px]">{m.display_order ?? 0}</td>
                               <td className="p-3 text-gray-400 text-[11px]">
                                 {m.width && m.height ? `${m.width}x${m.height}` : 'N/A'}
                               </td>
-                              <td className="p-3 text-gray-400 text-[11px]">
+                              <td className="p-3 text-gray-400 text-[11px] cursor-help" title={media_exact_time(m)}>
                                 {m.updated_at
                                   ? formatDistanceToNow(new Date(m.updated_at), { addSuffix: true, locale: vi })
                                   : 'N/A'}
@@ -1406,7 +1483,7 @@ export default function UploadsContent() {
                       {selectedMediaItem.type === 'image' ? (
                         <img
                           src={selectedMediaItem.url}
-                          alt="Xem trước"
+                          alt={media_display_name(selectedMediaItem)}
                           className="w-full h-full object-contain"
                         />
                       ) : (
@@ -1417,17 +1494,33 @@ export default function UploadsContent() {
                     {/* Meta Properties List */}
                     <div className="space-y-3 bg-black/40 rounded-xl p-3 border border-white/5 text-xs">
                       <div>
-                        <div className="text-[10px] text-gray-500 font-bold uppercase">ID Tệp</div>
-                        <div className="font-mono text-white font-bold">#{selectedMediaItem.id}</div>
+                        <div className="text-[11px] text-gray-500 font-bold uppercase">Tên tệp / tiêu đề</div>
+                        <div className="text-white font-bold break-all">{media_display_name(selectedMediaItem)}</div>
                       </div>
 
                       <div>
-                        <div className="text-[10px] text-gray-500 font-bold uppercase">Thư mục (Section)</div>
+                        <div className="text-[11px] text-gray-500 font-bold uppercase">Chi nhánh</div>
+                        <BranchIdsBadge branch_ids={selectedMediaItem.branch_ids} branches={branches} className="mt-1" />
+                      </div>
+
+                      <div className="flex items-center gap-4">
+                        <div>
+                          <div className="text-[11px] text-gray-500 font-bold uppercase">Trạng thái</div>
+                          <div className="mt-1">{media_status_badge(selectedMediaItem)}</div>
+                        </div>
+                        <div>
+                          <div className="text-[11px] text-gray-500 font-bold uppercase">Thứ tự hiển thị</div>
+                          <div className="text-gray-300 font-medium">{selectedMediaItem.display_order ?? 0}</div>
+                        </div>
+                      </div>
+
+                      <div>
+                        <div className="text-[11px] text-gray-500 font-bold uppercase">Thư mục (Section)</div>
                         <div className="text-blue-300 font-semibold">{getSectionLabel(selectedMediaItem.section)}</div>
                       </div>
 
                       <div>
-                        <div className="text-[10px] text-gray-500 font-bold uppercase">Định dạng & kích thước</div>
+                        <div className="text-[11px] text-gray-500 font-bold uppercase">Định dạng & kích thước</div>
                         <div className="text-gray-300 font-medium">
                           {selectedMediaItem.type.toUpperCase()} •{' '}
                           {selectedMediaItem.width && selectedMediaItem.height
@@ -1438,24 +1531,22 @@ export default function UploadsContent() {
 
                       {selectedMediaItem.duration && (
                         <div>
-                          <div className="text-[10px] text-gray-500 font-bold uppercase">Thời lượng Video</div>
+                          <div className="text-[11px] text-gray-500 font-bold uppercase">Thời lượng Video</div>
                           <div className="text-gray-300 font-medium">{Number(selectedMediaItem.duration).toFixed(1)} giây</div>
                         </div>
                       )}
 
                       <div>
-                        <div className="text-[10px] text-gray-500 font-bold uppercase">Đường dẫn Direct URL</div>
-                        <div className="font-mono text-[10px] text-gray-400 break-all bg-black/50 p-2 rounded border border-white/5 mt-1 select-all">
+                        <div className="text-[11px] text-gray-500 font-bold uppercase">Đường dẫn Direct URL</div>
+                        <div className="font-mono text-[11px] text-gray-400 break-all bg-black/50 p-2 rounded border border-white/5 mt-1 select-all">
                           {selectedMediaItem.url}
                         </div>
                       </div>
 
                       <div>
-                        <div className="text-[10px] text-gray-500 font-bold uppercase">Cập nhật lần cuối</div>
+                        <div className="text-[11px] text-gray-500 font-bold uppercase">Cập nhật lần cuối</div>
                         <div className="text-gray-400 text-[11px]">
-                          {selectedMediaItem.updated_at
-                            ? new Date(selectedMediaItem.updated_at).toLocaleString('vi-VN')
-                            : 'N/A'}
+                          {selectedMediaItem.updated_at ? formatVnDateTime(selectedMediaItem.updated_at) : 'N/A'}
                         </div>
                       </div>
                     </div>
@@ -1520,7 +1611,7 @@ export default function UploadsContent() {
                 <span>•</span>
                 <span>{mediaItems.length} mục trong thư viện</span>
               </div>
-              <div className="text-[10px] text-gray-500">Giao diện thư viện v2.0</div>
+              <div className="text-[11px] text-gray-500">Giao diện thư viện v2.0</div>
             </div>
           </DialogContent>
         </Dialog>
@@ -1532,7 +1623,7 @@ export default function UploadsContent() {
           description={
             <span>
               Bạn có chắc chắn muốn xóa vĩnh viễn tệp media{' '}
-              <strong className="text-slate-900">ID #{itemToDelete?.id}</strong> không? Hành động này không thể hoàn tác.
+              <strong className="text-slate-900">{itemToDelete ? media_display_name(itemToDelete) : ''}</strong> không? Hành động này không thể hoàn tác.
             </span>
           }
           confirmText="Xóa vĩnh viễn"

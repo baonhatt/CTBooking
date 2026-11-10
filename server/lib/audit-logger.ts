@@ -75,28 +75,18 @@ export async function getAuditLogsImpl(
   const { page = 1, pageSize = 20, module, action, staffId, from, to, search } = params;
   const offset = (page - 1) * pageSize;
 
-  let query = db.select().from(auditLogs).orderBy(desc(auditLogs.createdAt)).limit(pageSize).offset(offset);
-
-  // Apply filters
-  if (module) {
-    query = query.where(eq(auditLogs.entityType, module));
-  }
-  if (action) {
-    query = query.where(eq(auditLogs.action, action));
-  }
-  if (staffId) {
-    query = query.where(eq(auditLogs.staffId, staffId));
-  }
+  // All filters go into one list and are joined with AND. (Calling .where() several times does not add up: each
+  // call replaces the one before, so only the last filter used to apply.)
+  const conditions: any[] = [];
+  if (module) conditions.push(eq(auditLogs.entityType, module));
+  if (action) conditions.push(eq(auditLogs.action, action));
+  if (staffId) conditions.push(eq(auditLogs.staffId, staffId));
   // Date range filtering
-  if (from) {
-    query = query.where(gte(auditLogs.createdAt, from));
-  }
-  if (to) {
-    query = query.where(lte(auditLogs.createdAt, to));
-  }
+  if (from) conditions.push(gte(auditLogs.createdAt, from));
+  if (to) conditions.push(lte(auditLogs.createdAt, to));
   // Search across multiple fields
   if (search) {
-    query = query.where(
+    conditions.push(
       or(
         like(auditLogs.staffEmail, `%${search}%`),
         like(auditLogs.staffFullname, `%${search}%`),
@@ -105,37 +95,18 @@ export async function getAuditLogsImpl(
       )
     );
   }
+  const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
 
-  const logs = await query;
+  const logs = await db
+    .select()
+    .from(auditLogs)
+    .where(whereClause)
+    .orderBy(desc(auditLogs.createdAt))
+    .limit(pageSize)
+    .offset(offset);
 
-  // Get total count with same filters
-  let countQuery = db.select({ count: count() }).from(auditLogs);
-  if (module) {
-    countQuery = countQuery.where(eq(auditLogs.entityType, module));
-  }
-  if (action) {
-    countQuery = countQuery.where(eq(auditLogs.action, action));
-  }
-  if (staffId) {
-    countQuery = countQuery.where(eq(auditLogs.staffId, staffId));
-  }
-  if (from) {
-    countQuery = countQuery.where(gte(auditLogs.createdAt, from));
-  }
-  if (to) {
-    countQuery = countQuery.where(lte(auditLogs.createdAt, to));
-  }
-  if (search) {
-    countQuery = countQuery.where(
-      or(
-        like(auditLogs.staffEmail, `%${search}%`),
-        like(auditLogs.staffFullname, `%${search}%`),
-        like(auditLogs.action, `%${search}%`),
-        like(auditLogs.oldValues, `%${search}%`)
-      )
-    );
-  }
-  const [totalResult] = await countQuery;
+  // Total count with the same filters
+  const [totalResult] = await db.select({ count: count() }).from(auditLogs).where(whereClause);
 
   return {
     items: logs,

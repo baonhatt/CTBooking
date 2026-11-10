@@ -8,6 +8,20 @@ import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle
+} from '@/components/ui/alert-dialog';
+import { BranchMultiSelect } from '@/components/admin/BranchMultiSelect';
+import { useConfirmUnsaved } from '@/hooks/useConfirmUnsaved';
+import { formatToVNDatetimeLocal, vnDatetimeLocalToUTC } from '@/lib/utils';
+import { getPublicPostUrl, getPublicSiteBaseUrl } from '@/lib/site-url';
+import {
   ArrowLeft,
   Save,
   ChevronDown,
@@ -24,7 +38,7 @@ import {
   RefreshCw
 } from 'lucide-react';
 import { PostRichTextEditor } from '@/components/admin/content/PostRichTextEditor';
-import { createPostApi } from '@/lib/api';
+import { createPostApi, getAdminBranchOptions } from '@/lib/api';
 import { uploadDirectToCloudinary } from '@/lib/api/uploads';
 import { toast } from 'sonner';
 
@@ -47,6 +61,8 @@ interface PostData {
   og_image?: string;
   canonical_url?: string;
   schema_type?: string;
+  // null = all branches
+  branch_ids?: number[] | null;
 }
 
 interface SectionState {
@@ -89,6 +105,15 @@ export default function PostCreatePage() {
   });
   const [sections, setSections] = useState<SectionState>({ publish: true, images: true, seo: false });
   const initialSnapshotRef = useRef<string>('');
+  const [branchOptions, setBranchOptions] = useState<Array<{ id: number; name: string }>>([]);
+  const [isMetaCutConfirmOpen, setIsMetaCutConfirmOpen] = useState(false);
+
+  // Branches the staff member can pick (the list is already limited to their branches by the server)
+  useEffect(() => {
+    getAdminBranchOptions({ includeInactive: true })
+      .then((res) => setBranchOptions(res.items || []))
+      .catch(() => setBranchOptions([]));
+  }, []);
 
   const adminEmail = localStorage.getItem('adminEmail') || '';
 
@@ -122,6 +147,7 @@ export default function PostCreatePage() {
       status: data.status ?? 'draft',
       is_featured: Boolean(data.is_featured),
       published_at: data.published_at ?? '',
+      branch_ids: data.branch_ids ?? null,
       meta_description: data.meta_description ?? '',
       meta_keywords: data.meta_keywords ?? '',
       seo_title: data.seo_title ?? '',
@@ -133,6 +159,12 @@ export default function PostCreatePage() {
     });
 
   const hasUnsavedChanges = () => initialSnapshotRef.current !== snapshotEditData(editData);
+
+  const { handleOpenChange: askLeave, UnsavedAlert: LeaveAlert } = useConfirmUnsaved({
+    isDirty: initialSnapshotRef.current !== '' && hasUnsavedChanges(),
+    isSubmitting: isSaving,
+    onConfirmClose: () => navigate('/posts')
+  });
 
   // Initialize snapshot on mount
   useEffect(() => {
@@ -147,7 +179,7 @@ export default function PostCreatePage() {
   }, [editData.title]);
 
   // Update canonical URL placeholder based on slug
-  const canonicalPlaceholder = editData.slug ? `https://cinesphere.com.vn/bai-viet/${editData.slug}` : '';
+  const canonicalPlaceholder = getPublicPostUrl(editData.slug);
 
   // Unsaved changes warning
   useEffect(() => {
@@ -209,6 +241,7 @@ export default function PostCreatePage() {
         status: nextStatus,
         is_featured: editData.is_featured || false,
         published_at: editData.published_at,
+        branch_ids: editData.branch_ids ?? null,
         meta_description: editData.meta_description,
         meta_keywords: editData.meta_keywords,
         seo_title: editData.seo_title,
@@ -254,16 +287,17 @@ export default function PostCreatePage() {
                 <Button
                   variant="ghost"
                   size="icon"
-                  onClick={() => navigate('/posts')}
+                  onClick={() => askLeave(false)}
                   className="rounded-xl"
                   title="Quay lại"
+                  aria-label="Quay lại danh sách bài viết"
                 >
                   <ArrowLeft className="w-5 h-5" />
                 </Button>
                 <div className="min-w-0">
                   <h1 className="text-lg font-bold text-slate-900 truncate">{editData.title || 'Bài viết mới'}</h1>
                   <div className="flex items-center gap-2 mt-0.5">
-                    <span className="inline-flex items-center gap-1 bg-amber-100 text-amber-700 border border-amber-200 px-2 py-0.5 rounded-full text-[10px] font-bold uppercase">
+                    <span className="inline-flex items-center gap-1 bg-amber-100 text-amber-700 border border-amber-200 px-2 py-0.5 rounded-full text-[11px] font-bold uppercase">
                       Nháp mới
                     </span>
                   </div>
@@ -299,11 +333,12 @@ export default function PostCreatePage() {
                 <CardContent className="p-6 space-y-6">
                   {/* Title */}
                   <div>
-                    <Label className="flex items-center gap-2">
+                    <Label htmlFor="fmi_post_title" className="flex items-center gap-2">
                       <Type className="w-4 h-4 text-slate-500" />
-                      Tiêu đề bài viết
+                      Tiêu đề bài viết <span className="text-red-500">*</span>
                     </Label>
                     <Input
+                      id="fmi_post_title"
                       className="mt-2 text-lg font-semibold"
                       value={editData.title || ''}
                       onChange={(e) => setEditData({ ...editData, title: e.target.value })}
@@ -340,7 +375,9 @@ export default function PostCreatePage() {
 
                   {/* Rich Text Editor */}
                   <div>
-                    <Label>Nội dung</Label>
+                    <Label>
+                      Nội dung <span className="text-red-500">*</span>
+                    </Label>
                     <div className="mt-2">
                       <PostRichTextEditor
                         value={editData.content || ''}
@@ -358,7 +395,16 @@ export default function PostCreatePage() {
               <Card className="border-none shadow-sm">
                 <CardHeader
                   className="px-4 py-3 bg-slate-50 border-b cursor-pointer"
+                  role="button"
+                  tabIndex={0}
+                  aria-expanded={sections.publish}
                   onClick={() => toggleSection('publish')}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault();
+                      toggleSection('publish');
+                    }
+                  }}
                 >
                   <div className="flex items-center justify-between">
                     <CardTitle className="text-sm font-bold">Xuất bản</CardTitle>
@@ -368,11 +414,12 @@ export default function PostCreatePage() {
                 {sections.publish && (
                   <CardContent className="p-4 space-y-4">
                     <div className="flex items-center justify-between">
-                      <Label className="flex items-center gap-2">
+                      <Label htmlFor="fmi_post_is_featured" className="flex items-center gap-2">
                         <Search className="w-4 h-4 text-slate-500" />
                         Bài nổi bật
                       </Label>
                       <Switch
+                        id="fmi_post_is_featured"
                         checked={editData.is_featured || false}
                         onCheckedChange={(checked) => setEditData({ ...editData, is_featured: checked })}
                         className="data-[state=checked]:bg-emerald-600"
@@ -386,9 +433,27 @@ export default function PostCreatePage() {
                       <Input
                         type="datetime-local"
                         className="mt-2"
-                        value={editData.published_at ? new Date(editData.published_at).toISOString().slice(0, 16) : ''}
-                        onChange={(e) => setEditData({ ...editData, published_at: e.target.value })}
+                        value={formatToVNDatetimeLocal(editData.published_at)}
+                        onChange={(e) => setEditData({ ...editData, published_at: vnDatetimeLocalToUTC(e.target.value) || undefined })}
                       />
+                      <p className="mt-1 text-[11px] text-slate-400">Giờ Việt Nam. Chỉ dùng để đặt ngày đăng đã qua, không hẹn giờ.</p>
+                    </div>
+                    <div>
+                      <Label className="flex items-center gap-2">
+                        <Globe className="w-4 h-4 text-slate-500" />
+                        Chi nhánh hiển thị
+                      </Label>
+                      <div className="mt-2">
+                        <BranchMultiSelect
+                          branches={branchOptions}
+                          value={editData.branch_ids ?? null}
+                          onChange={(ids) => setEditData({ ...editData, branch_ids: ids })}
+                          className="rounded-lg text-xs"
+                        />
+                      </div>
+                      <p className="mt-1 text-[11px] text-slate-400">
+                        Mặc định là tất cả chi nhánh. Hiện trang khách chưa lọc bài viết theo chi nhánh, nên lựa chọn này chỉ được lưu lại.
+                      </p>
                     </div>
                   </CardContent>
                 )}
@@ -398,7 +463,16 @@ export default function PostCreatePage() {
               <Card className="border-none shadow-sm">
                 <CardHeader
                   className="px-4 py-3 bg-slate-50 border-b cursor-pointer"
+                  role="button"
+                  tabIndex={0}
+                  aria-expanded={sections.images}
                   onClick={() => toggleSection('images')}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault();
+                      toggleSection('images');
+                    }
+                  }}
                 >
                   <div className="flex items-center justify-between">
                     <CardTitle className="text-sm font-bold">Hình ảnh & tóm tắt</CardTitle>
@@ -439,7 +513,7 @@ export default function PostCreatePage() {
                           src={editData.featured_image}
                           alt="Xem trước"
                           className="mt-2 w-full aspect-video object-cover rounded-lg border cursor-pointer hover:opacity-80 transition-opacity"
-                          onClick={() => window.open(editData.featured_image, '_blank')}
+                          onClick={() => window.open(editData.featured_image, '_blank', 'noopener,noreferrer')}
                           title="Bấm để xem ảnh lớn"
                         />
                       )}
@@ -464,7 +538,16 @@ export default function PostCreatePage() {
               <Card className="border-none shadow-sm">
                 <CardHeader
                   className="px-4 py-3 bg-slate-50 border-b cursor-pointer"
+                  role="button"
+                  tabIndex={0}
+                  aria-expanded={sections.seo}
                   onClick={() => toggleSection('seo')}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault();
+                      toggleSection('seo');
+                    }
+                  }}
                 >
                   <div className="flex items-center justify-between">
                     <CardTitle className="text-sm font-bold">SEO & chia sẻ</CardTitle>
@@ -522,13 +605,7 @@ export default function PostCreatePage() {
                           onClick={() => {
                             if (editData.excerpt) {
                               if (editData.excerpt.length > 160) {
-                                if (
-                                  confirm(
-                                    `Tóm tắt dài ${editData.excerpt.length} ký tự. Chỉ có thể copy tối đa 160 ký tự. Bạn có muốn tiếp tục?`
-                                  )
-                                ) {
-                                  setEditData({ ...editData, meta_description: editData.excerpt.slice(0, 160) });
-                                }
+                                setIsMetaCutConfirmOpen(true);
                               } else {
                                 setEditData({ ...editData, meta_description: editData.excerpt });
                               }
@@ -578,7 +655,7 @@ export default function PostCreatePage() {
                             src={editData.og_image}
                             alt="Xem trước OG"
                             className="w-12 h-12 object-cover rounded border cursor-pointer hover:opacity-80 transition-opacity"
-                            onClick={() => window.open(editData.og_image, '_blank')}
+                            onClick={() => window.open(editData.og_image, '_blank', 'noopener,noreferrer')}
                             title="Bấm để xem ảnh lớn"
                           />
                         )}
@@ -594,7 +671,7 @@ export default function PostCreatePage() {
                           className="flex-1"
                           value={editData.canonical_url || ''}
                           onChange={(e) => setEditData({ ...editData, canonical_url: e.target.value })}
-                          placeholder="https://cinesphere.com.vn/bai-viet/ten-bai-viet"
+                          placeholder={`${getPublicSiteBaseUrl()}/bai-viet/ten-bai-viet`}
                         />
                         <Button
                           type="button"
@@ -603,7 +680,7 @@ export default function PostCreatePage() {
                           onClick={() =>
                             setEditData({
                               ...editData,
-                              canonical_url: editData.slug ? `https://cinesphere.com.vn/bai-viet/${editData.slug}` : ''
+                              canonical_url: getPublicPostUrl(editData.slug)
                             })
                           }
                           title="Sao chép URL bài viết"
@@ -636,6 +713,29 @@ export default function PostCreatePage() {
           </div>
         </div>
       </div>
+      <LeaveAlert />
+      <AlertDialog open={isMetaCutConfirmOpen} onOpenChange={setIsMetaCutConfirmOpen}>
+        <AlertDialogContent className="rounded-2xl max-w-md font-sans bg-white">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="text-slate-900 text-lg font-bold">Cắt bớt tóm tắt?</AlertDialogTitle>
+            <AlertDialogDescription className="text-slate-600 text-sm mt-2">
+              Tóm tắt dài {editData.excerpt?.length || 0} ký tự, mô tả trên Google chỉ nhận tối đa 160 ký tự. Phần dư sẽ bị cắt bỏ. Tiếp tục?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter className="mt-4">
+            <AlertDialogCancel className="rounded-xl">Hủy</AlertDialogCancel>
+            <AlertDialogAction
+              className="rounded-xl"
+              onClick={() => {
+                setEditData({ ...editData, meta_description: (editData.excerpt || '').slice(0, 160) });
+                setIsMetaCutConfirmOpen(false);
+              }}
+            >
+              Cắt và sao chép
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </AdminLayout>
   );
 }

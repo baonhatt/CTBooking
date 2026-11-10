@@ -2,6 +2,7 @@ import { Hono } from 'hono';
 import { drizzle } from 'drizzle-orm/d1';
 import * as schema from '../../../../shared/schema';
 import { requireStaffAuth } from '../../middleware';
+import { isLocal } from '../../utils';
 import { getMailer } from './admin-helpers';
 import {
   LOCKED_MESSAGE,
@@ -121,29 +122,32 @@ authRouter.post('/api/admin/auth/login', async (c) => {
     const turnstileToken = (body as any).turnstileToken;
     const clientIp = c.req.header('CF-Connecting-IP') || '127.0.0.1';
 
-    if (typeof turnstileToken !== 'string' || turnstileToken.length === 0) {
-      return c.json({ status: 'error', message: 'Vui lòng xác thực bảo mật hệ thống (Captcha)' }, 403);
-    }
-    try {
-      const r = await fetch('https://challenges.cloudflare.com/turnstile/v0/siteverify', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-        body: new URLSearchParams({
-          secret: String(c.env.TURNSTILE_SECRET || ''),
-          response: turnstileToken,
-          remoteip: clientIp
-        })
-      });
-      if (!r.ok) throw new Error(`Turnstile error ${r.status}`);
-      const result: any = await r.json();
-      if (!result.success || result.action !== 'admin_login') {
-        return c.json(
-          { status: 'error', message: 'Hệ thống bảo vệ từ chối quyền truy cập do hoạt động bất thường' },
-          403
-        );
+    // On localhost the check is skipped, as the customer routes do (verifyTurnstile). A real host is never localhost.
+    if (!isLocal(c.req.url)) {
+      if (typeof turnstileToken !== 'string' || turnstileToken.length === 0) {
+        return c.json({ status: 'error', message: 'Vui lòng xác thực bảo mật hệ thống (Captcha)' }, 403);
       }
-    } catch (err) {
-      return c.json({ status: 'error', message: 'Máy chủ không thể kiểm tra xác thực bảo vệ' }, 500);
+      try {
+        const r = await fetch('https://challenges.cloudflare.com/turnstile/v0/siteverify', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+          body: new URLSearchParams({
+            secret: String(c.env.TURNSTILE_SECRET || ''),
+            response: turnstileToken,
+            remoteip: clientIp
+          })
+        });
+        if (!r.ok) throw new Error(`Turnstile error ${r.status}`);
+        const result: any = await r.json();
+        if (!result.success || result.action !== 'admin_login') {
+          return c.json(
+            { status: 'error', message: 'Hệ thống bảo vệ từ chối quyền truy cập do hoạt động bất thường' },
+            403
+          );
+        }
+      } catch (err) {
+        return c.json({ status: 'error', message: 'Máy chủ không thể kiểm tra xác thực bảo vệ' }, 500);
+      }
     }
     // --- TURNSTILE VALIDATION BLOCK KẾT THÚC ---
 

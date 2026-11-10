@@ -21,7 +21,8 @@ import DashboardPage from '@/pages/admin/Dashboard';
 import UsersPage from '@/pages/admin/Users';
 import MoviesPage from '@/pages/admin/Movies';
 import ShowtimesPage from '@/pages/admin/Showtimes';
-import ToysPage from '@/pages/admin/Toys';
+// TẠM ẨN ĐỒ CHƠI (20261110): khách chưa dùng module đồ chơi nên ẩn khỏi giao diện. API, DB và các file Toys* vẫn giữ nguyên. Tìm "TẠM ẨN ĐỒ CHƠI" để mở lại.
+// import ToysPage from '@/pages/admin/Toys';
 import PostsPage from '@/pages/admin/Posts';
 import PostEditPage from '@/pages/admin/PostEdit';
 import PostCreatePage from '@/pages/admin/PostCreate';
@@ -93,7 +94,9 @@ const AdminLoginView = () => {
   const [error, setError] = useState('');
   const [isEmailFocused, setIsEmailFocused] = useState(false);
   const [isPasswordFocused, setIsPasswordFocused] = useState(false);
-  const [turnstileToken, setTurnstileToken] = useState<string>('');
+  // On localhost there is no captcha: the widget is not shown and a placeholder token is sent
+  const IS_LOCAL_HOST = ['localhost', '127.0.0.1'].includes(window.location.hostname);
+  const [turnstileToken, setTurnstileToken] = useState<string>(IS_LOCAL_HOST ? 'local-dev' : '');
   
   // 2FA Flow states
   const [requireOtp, setRequireOtp] = useState(false);
@@ -106,6 +109,7 @@ const AdminLoginView = () => {
   const setStaff = useStaffStore((state) => state.setStaff);
 
   useEffect(() => {
+    if (IS_LOCAL_HOST) return;
     const renderWidget = () => {
       if ((window as any).turnstile && turnstileRef.current && !turnstileWidgetId.current) {
         turnstileWidgetId.current = (window as any).turnstile.render(turnstileRef.current, {
@@ -166,7 +170,7 @@ const AdminLoginView = () => {
       setError(err?.message || 'Lỗi kết nối server');
     } finally {
       setLoading(false);
-      if (!requireOtp && (window as any).turnstile && turnstileWidgetId.current) {
+      if (!IS_LOCAL_HOST && !requireOtp && (window as any).turnstile && turnstileWidgetId.current) {
         (window as any).turnstile.reset(turnstileWidgetId.current);
         setTurnstileToken('');
       }
@@ -348,9 +352,11 @@ const AdminLoginView = () => {
               )}
 
               {/* Cloudflare Turnstile CAPTCHA */}
-              <div className="flex justify-center mt-2">
-                <div ref={turnstileRef} className="cf-turnstile"></div>
-              </div>
+              {!IS_LOCAL_HOST && (
+                <div className="flex justify-center mt-2">
+                  <div ref={turnstileRef} className="cf-turnstile"></div>
+                </div>
+              )}
 
               {/* Submit Button */}
               <Button
@@ -511,6 +517,8 @@ export const AdminGate = () => {
             </ProtectedRoute>
           }
         />
+        {/* TẠM ẨN ĐỒ CHƠI (20261110): khách chưa dùng module đồ chơi nên ẩn khỏi giao diện. API, DB và các file Toys* vẫn giữ nguyên. Tìm "TẠM ẨN ĐỒ CHƠI" để mở lại. */}
+        {/*
         <Route
           path="/toys"
           element={
@@ -519,6 +527,7 @@ export const AdminGate = () => {
             </ProtectedRoute>
           }
         />
+        */}
         <Route
           path="/posts"
           element={

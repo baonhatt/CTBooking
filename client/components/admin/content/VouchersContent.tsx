@@ -24,11 +24,16 @@ import {
     Copy,
     FileText,
     User,
-    History
+    History,
+    ArrowUp,
+    ArrowDown,
+    ArrowUpDown
 } from 'lucide-react';
 import { formatToVNDatetimeLocal, vnDatetimeLocalToUTC } from '@/lib/utils';
-import { format, formatDistanceToNow, isAfter, isBefore } from 'date-fns';
+import { formatDistanceToNow, isAfter, isBefore } from 'date-fns';
 import { vi } from 'date-fns/locale';
+import { formatVnDate, formatVnDateTime } from '@/lib/format';
+import { request } from '@/lib/api/http';
 import { Switch } from '@/components/ui/switch';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -99,11 +104,11 @@ interface VoucherItem {
     valid_from?: string | null;
     valid_until?: string | null;
     applicable_ticket_package_ids?: number[] | null;
-    excluded_ticket_package_ids?: number[] | null;
     branch_ids?: number[] | null;
     is_active?: boolean;
     is_deleted?: boolean;
     deleted_at?: string | null;
+    deleted_by_staff_name?: string | null;
     created_at?: string;
     updated_at?: string;
     created_by_staff_id?: number | null;
@@ -143,6 +148,50 @@ interface Props {
     isDeletedView?: boolean;
     onDelete?: (v: VoucherItem) => void;
     onRestore?: (v: VoucherItem) => void;
+    // Status filter and sortable columns (only the active list uses them)
+    statusFilter?: string;
+    setStatusFilter?: (status: string) => void;
+    sortBy?: string;
+    sortDir?: 'asc' | 'desc';
+    onSortChange?: (sortKey: string) => void;
+}
+
+// Required fields of the voucher form: the order they are checked and focused in (top to bottom on screen)
+type VoucherField = 'code' | 'name' | 'discount_value' | 'valid_until' | 'packages' | 'branch_ids';
+const VOUCHER_FIELD_ORDER: VoucherField[] = ['code', 'name', 'discount_value', 'valid_until', 'packages', 'branch_ids'];
+const VOUCHER_FIELD_IDS: Record<VoucherField, string> = {
+    code: 'fmi_voucher_code',
+    name: 'fmi_voucher_name',
+    discount_value: 'fmi_voucher_discount_value',
+    valid_until: 'fmi_voucher_valid_until',
+    packages: 'div_voucher_packages',
+    branch_ids: 'div_voucher_branch_ids'
+};
+// Which form field's error goes away when a given editData key changes
+const VOUCHER_KEY_TO_FIELD: Record<string, VoucherField> = {
+    code: 'code',
+    name: 'name',
+    discount_value: 'discount_value',
+    valid_from: 'valid_until',
+    valid_until: 'valid_until',
+    applicable_ticket_package_ids: 'packages',
+    branch_ids: 'branch_ids'
+};
+
+// How many redemptions the detail asks for: the first page, then "xem thêm" steps (the server caps at 200)
+const REDEMPTION_LIMIT_STEPS = [20, 100, 200];
+
+// A voucher counts as "nearly out" when this share of its quota is used (same rule as the server filter)
+const LOW_QUOTA_SHARE = 0.9;
+
+// Red text under a form field
+function FieldError({ message }: { message?: string }) {
+    if (!message) return null;
+    return (
+        <p role="alert" className="text-[11px] text-red-600 mt-1">
+            {message}
+        </p>
+    );
 }
 
 const generateRandomCode = () => {
@@ -237,7 +286,12 @@ export default function VouchersContent(props: Props) {
         setSearchText,
         isDeletedView = false,
         onDelete,
-        onRestore
+        onRestore,
+        statusFilter = 'all',
+        setStatusFilter,
+        sortBy = 'created_at',
+        sortDir = 'desc',
+        onSortChange
     } = props;
     const { isLoading = false } = props as any;
 
@@ -256,6 +310,9 @@ export default function VouchersContent(props: Props) {
     const [isPermanent, setIsPermanent] = useState(false);
     const [isCodeEditable, setIsCodeEditable] = useState(false);
     const [confirmSaveData, setConfirmSaveData] = useState<{ payload: any; changes: string[] } | null>(null);
+    const [fieldErrors, setFieldErrors] = useState<Partial<Record<VoucherField, string>>>({});
+    const [redemptionLimitStep, setRedemptionLimitStep] = useState(0);
+    const [isLoadingDetail, setIsLoadingDetail] = useState(false);
 
     const isDirty = React.useMemo(() => {
         if (!isEditOpen || !editData) return false;
@@ -300,8 +357,9 @@ export default function VouchersContent(props: Props) {
 
     useEffect(() => {
         if (isEditOpen && editData) {
-            // Always reset code editability when dialog opens
+            // Always reset code editability (and old form errors) when dialog opens
             setIsCodeEditable(false);
+            setFieldErrors({});
             if (!editData.id || editData.id === 0) {
                 // When creating new voucher: if no dates provided, initialize to today start & end
                 if (!editData.valid_from && !editData.valid_until) {
@@ -408,6 +466,39 @@ export default function VouchersContent(props: Props) {
         }
     }, [isDetailDialogOpen, selectedVoucher?.id, selectedVoucher?.scope]);
 
+    // The list rows carry no redemption history or creator name, so the detail endpoint is read when the detail opens
+    useEffect(() => {
+        if (!isDetailDialogOpen || !selectedVoucher) return;
+        const voucherId = selectedVoucher.id;
+        let cancelled = false;
+        setIsLoadingDetail(true);
+        request<any>(`/api/admin/vouchers/${voucherId}?redemption_limit=${REDEMPTION_LIMIT_STEPS[redemptionLimitStep]}`)
+            .then((detail) => {
+                if (cancelled || !detail) return;
+                // used_count and total_revenue stay as the list computed them
+                const { used_count: _usedCount, total_revenue: _totalRevenue, ...detailFields } = detail;
+                setSelectedVoucher((current) => (current && current.id === voucherId ? { ...current, ...detailFields } : current));
+            })
+            .catch(() => { })
+            .finally(() => {
+                if (!cancelled) setIsLoadingDetail(false);
+            });
+        return () => {
+            cancelled = true;
+        };
+    }, [isDetailDialogOpen, selectedVoucher?.id, redemptionLimitStep]);
+
+    const openDetail = (voucher: VoucherItem) => {
+        setRedemptionLimitStep(0);
+        setSelectedVoucher(voucher);
+        setIsDetailDialogOpen(true);
+    };
+
+    const handleCopyBookingCode = (bookingCode: string) => {
+        navigator.clipboard.writeText(bookingCode);
+        toast.success('Đã sao chép mã đặt chỗ');
+    };
+
     const handleToggleStatus = async (id: number, currentStatus: boolean) => {
         setIsTogglingId(id);
         try {
@@ -469,7 +560,14 @@ export default function VouchersContent(props: Props) {
             setEditData(null);
             onRefresh();
         } catch (err: any) {
-            toast.error(err.message || 'Lưu voucher thất bại');
+            const message = err.message || 'Lưu voucher thất bại';
+            if (String(message).includes('đã tồn tại')) {
+                // Duplicate code: show it under the code field
+                setConfirmSaveData(null);
+                show_field_errors({ code: message });
+            } else {
+                toast.error(message);
+            }
         } finally {
             setIsSaving(false);
         }
@@ -477,43 +575,76 @@ export default function VouchersContent(props: Props) {
 
     const isEditLocked = !!editData?.id && isVoucherLockedForStaff(editData?.branch_ids, branchOptions.map((b) => b.id));
 
+    // Changes some fields of the form and clears the errors those fields had
+    const update_fields = (patch: Record<string, any>) => {
+        setEditData({ ...editData, ...patch });
+        if (Object.keys(fieldErrors).length === 0) return;
+        const nextErrors = { ...fieldErrors };
+        Object.keys(patch).forEach((key) => {
+            const field = VOUCHER_KEY_TO_FIELD[key];
+            if (field) delete nextErrors[field];
+        });
+        setFieldErrors(nextErrors);
+    };
+
+    // Shows the errors under their fields and puts the cursor on the first one
+    const show_field_errors = (errors: Partial<Record<VoucherField, string>>) => {
+        setFieldErrors(errors);
+        const firstField = VOUCHER_FIELD_ORDER.find((field) => errors[field]);
+        if (!firstField) return;
+        const element = document.getElementById(VOUCHER_FIELD_IDS[firstField]);
+        if (!element) return;
+        element.scrollIntoView({ block: 'center' });
+        element.focus();
+    };
+
+    // What is wrong with the form, field by field. A limited staff member names branches of their own; nobody saves an empty list.
+    const collect_voucher_errors = (payload: any, discountValue: number) => {
+        const errors: Partial<Record<VoucherField, string>> = {};
+        if (!payload.code || payload.code.trim() === '') errors.code = 'Vui lòng nhập mã voucher';
+        if (!payload.name || payload.name.trim() === '') errors.name = 'Vui lòng nhập tên chương trình';
+        if (isNaN(discountValue) || discountValue <= 0) {
+            errors.discount_value = 'Giá trị giảm giá phải lớn hơn 0';
+        } else if (payload.discount_type === 'percent' && (discountValue < 1 || discountValue > 100)) {
+            errors.discount_value = 'Phần trăm giảm giá phải từ 1 đến 100';
+        }
+        if (!isPermanent && payload.valid_from && payload.valid_until) {
+            if (new Date(payload.valid_until).getTime() <= new Date(payload.valid_from).getTime()) {
+                errors.valid_until = 'Ngày hết hạn phải sau ngày bắt đầu';
+            }
+        }
+        if (
+            (payload.scope || 'all') !== 'all' &&
+            Array.isArray(payload.applicable_ticket_package_ids) &&
+            payload.applicable_ticket_package_ids.length === 0
+        ) {
+            errors.packages = 'Vui lòng chọn ít nhất 1 gói áp dụng (hoặc chọn tất cả)';
+        }
+        if (!isSuperAdmin) {
+            const chosen = payload.branch_ids ?? branchOptions.map((b) => b.id);
+            if (!Array.isArray(chosen) || chosen.length === 0) errors.branch_ids = 'Vui lòng chọn ít nhất một chi nhánh';
+        } else if (Array.isArray(payload.branch_ids) && payload.branch_ids.length === 0) {
+            errors.branch_ids = 'Vui lòng chọn ít nhất một chi nhánh hoặc chọn "Tất cả chi nhánh"';
+        }
+        return errors;
+    };
+
     const handleSave = async () => {
         if (!editData) return;
         const payload = { ...editData };
-        if (!payload.code || payload.code.trim() === '') {
-            toast.error('Vui lòng nhập mã voucher');
-            return;
-        }
-        if (!payload.name || payload.name.trim() === '') {
-            toast.error('Vui lòng nhập tên chương trình');
-            return;
-        }
         if (!['percent', 'fixed'].includes(payload.discount_type)) {
             toast.error('Loại giảm giá không hợp lệ');
             return;
         }
         const value = Number(payload.discount_value);
-        if (isNaN(value) || value <= 0) {
-            toast.error('Giá trị giảm giá phải lớn hơn 0');
+        const errors = collect_voucher_errors(payload, value);
+        if (Object.keys(errors).length > 0) {
+            show_field_errors(errors);
             return;
         }
-        if (payload.discount_type === 'percent' && (value < 1 || value > 100)) {
-            toast.error('Phần trăm giảm giá phải từ 1 đến 100');
-            return;
-        }
-        // Branches. A limited staff member names branches of their own. Nobody saves an empty list.
-        if (!isSuperAdmin) {
-            let chosen = payload.branch_ids;
-            if (chosen === null || chosen === undefined) chosen = branchOptions.map((b) => b.id);
-            if (!Array.isArray(chosen) || chosen.length === 0) {
-                toast.error('Vui lòng chọn ít nhất một chi nhánh');
-                return;
-            }
-            payload.branch_ids = chosen;
-        } else if (Array.isArray(payload.branch_ids) && payload.branch_ids.length === 0) {
-            toast.error('Vui lòng chọn ít nhất một chi nhánh hoặc chọn "Tất cả chi nhánh"');
-            return;
-        }
+        setFieldErrors({});
+        // A limited staff member who left the branches empty saves for all the branches they manage
+        if (!isSuperAdmin) payload.branch_ids = payload.branch_ids ?? branchOptions.map((b) => b.id);
         payload.code = payload.code.toUpperCase().trim();
         payload.scope = editData.scope || 'all';
         payload.discount_value = value;
@@ -540,12 +671,7 @@ export default function VouchersContent(props: Props) {
         if (payload.scope === 'all') {
             payload.applicable_ticket_package_ids = null;
         } else {
-            // If user specifically cleared all checkboxes, they cannot save.
-            if (Array.isArray(payload.applicable_ticket_package_ids) && payload.applicable_ticket_package_ids.length === 0) {
-                toast.error('Vui lòng chọn ít nhất 1 gói áp dụng (hoặc chọn tất cả)');
-                return;
-            }
-            // If it has length > 0, keep it. If it is null, keep it as null (it means all).
+            // An empty list was refused above. A list is kept as it is; null means all packages.
         }
 
         if (editData.id && editData.id > 0) {
@@ -601,6 +727,32 @@ export default function VouchersContent(props: Props) {
         if (!code) return;
         navigator.clipboard.writeText(code);
         toast.success('Đã sao chép mã voucher');
+    };
+
+    // Column header; a button that sorts the list when the page supports it
+    const sort_head = (label: string, sortKey: string, extraClass = '') => {
+        const isSorted = sortBy === sortKey;
+        const SortIcon = isSorted ? (sortDir === 'asc' ? ArrowUp : ArrowDown) : ArrowUpDown;
+        return (
+            <TableHead
+                className={`text-xs font-semibold text-gray-600 uppercase py-3.5 ${extraClass}`}
+                aria-sort={isSorted ? (sortDir === 'asc' ? 'ascending' : 'descending') : undefined}
+            >
+                {onSortChange && !isDeletedView ? (
+                    <button
+                        type="button"
+                        onClick={() => onSortChange(sortKey)}
+                        className="inline-flex items-center gap-1 uppercase hover:text-slate-900"
+                        title="Bấm để sắp xếp"
+                    >
+                        {label}
+                        <SortIcon className={`w-3 h-3 ${isSorted ? 'text-purple-600' : 'text-gray-400'}`} />
+                    </button>
+                ) : (
+                    label
+                )}
+            </TableHead>
+        );
     };
 
     return (
@@ -696,15 +848,35 @@ export default function VouchersContent(props: Props) {
                     {/* Active filter switch */}
                     {!isDeletedView && (
                         <div className="flex items-center gap-2 px-3 py-1.5 bg-slate-50 rounded-xl border border-slate-200 h-10">
-                            <span className="text-[10px] font-bold text-slate-500 uppercase whitespace-nowrap">
+                            <span className="text-[11px] font-bold text-slate-500 uppercase whitespace-nowrap">
                                 Chỉ hiện khả dụng
                             </span>
                             <Switch
                                 checked={showActiveOnly}
+                                aria-label="Chỉ hiện voucher khả dụng"
                                 onCheckedChange={setShowActiveOnly}
                                 className="data-[state=checked]:bg-green-500 data-[state=unchecked]:bg-gray-300 cursor-pointer"
                             />
                         </div>
+                    )}
+
+                    {/* Status filter: expired / not started / quota */}
+                    {!isDeletedView && setStatusFilter && (
+                        <select
+                            aria-label="Lọc theo tình trạng voucher"
+                            value={statusFilter}
+                            onChange={(e) => {
+                                setStatusFilter(e.target.value);
+                                setPage(1);
+                            }}
+                            className="bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs font-semibold focus:ring-2 focus:ring-purple-500 outline-none shadow-sm cursor-pointer h-10"
+                        >
+                            <option value="all">Mọi tình trạng</option>
+                            <option value="expired">Đã hết hạn</option>
+                            <option value="upcoming">Chưa bắt đầu</option>
+                            <option value="low_quota">Sắp hết lượt</option>
+                            <option value="out_of_quota">Hết lượt dùng</option>
+                        </select>
                     )}
                 </div>
 
@@ -800,16 +972,12 @@ export default function VouchersContent(props: Props) {
                     <Table>
                         <TableHeader className="bg-gray-50 border-b border-gray-200">
                             <TableRow className="hover:bg-transparent border-none">
-                                <TableHead className="text-xs font-semibold text-gray-600 uppercase py-3.5">Mã voucher</TableHead>
-                                <TableHead className="text-xs font-semibold text-gray-600 uppercase py-3.5">Tên chương trình</TableHead>
+                                {sort_head('Mã voucher', 'code')}
+                                {sort_head('Tên chương trình', 'name')}
                                 <TableHead className="text-xs font-semibold text-gray-600 uppercase py-3.5">Phạm vi & Sale</TableHead>
-                                <TableHead className="text-xs font-semibold text-gray-600 uppercase py-3.5">Mức giảm</TableHead>
-                                <TableHead className="text-xs font-semibold text-gray-600 uppercase py-3.5">
-                                    Đã dùng / Giới hạn
-                                </TableHead>
-                                <TableHead className="text-xs font-semibold text-gray-600 uppercase py-3.5 min-w-[150px]">
-                                    Thời gian hiệu lực
-                                </TableHead>
+                                {sort_head('Mức giảm', 'discount_value')}
+                                {sort_head('Đã dùng / Còn lại', 'used_count')}
+                                {sort_head('Thời gian hiệu lực', 'valid_until', 'min-w-[150px]')}
                                 <TableHead className="text-xs font-semibold text-gray-600 uppercase py-3.5 min-w-[120px]">
                                     Chi nhánh
                                 </TableHead>
@@ -882,6 +1050,9 @@ export default function VouchersContent(props: Props) {
                                     const future = isFuture(v);
                                     const used = v.used_count ?? v.redemption_total_count ?? 0;
                                     const limit = v.usage_limit;
+                                    const remaining = limit ? Math.max(0, Number(limit) - used) : null;
+                                    const isOutOfQuota = !!limit && used >= Number(limit);
+                                    const isLowQuota = !!limit && !isOutOfQuota && used >= Number(limit) * LOW_QUOTA_SHARE;
                                     return (
                                         <TableRow
                                             key={v.id}
@@ -900,7 +1071,9 @@ export default function VouchersContent(props: Props) {
                                             </TableCell>
                                             <TableCell>
                                                 <div>
-                                                    <p className="text-sm font-semibold text-slate-800 leading-tight">{v.name}</p>
+                                                    <p className="text-sm font-semibold text-slate-800 leading-tight truncate max-w-[220px]" title={v.name}>
+                                                        {v.name}
+                                                    </p>
                                                     {v.min_order_value && v.min_order_value > 0 ? (
                                                         <p className="text-[11px] text-slate-500 mt-0.5">
                                                             Đơn tối thiểu: <b>{formatMoney(v.min_order_value)}</b>
@@ -914,28 +1087,28 @@ export default function VouchersContent(props: Props) {
                                                         {v.scope === 'movie' ? (
                                                             <Badge
                                                                 variant="outline"
-                                                                className="border-blue-200 bg-blue-50 text-blue-700 text-[10px] font-semibold gap-1"
+                                                                className="border-blue-200 bg-blue-50 text-blue-700 text-[11px] font-semibold gap-1"
                                                             >
                                                                 <Film size={10} /> Phim
                                                             </Badge>
                                                         ) : v.scope === 'all' ? (
                                                             <Badge
                                                                 variant="outline"
-                                                                className="border-indigo-200 bg-indigo-50 text-indigo-700 text-[10px] font-semibold gap-1"
+                                                                className="border-indigo-200 bg-indigo-50 text-indigo-700 text-[11px] font-semibold gap-1"
                                                             >
                                                                 <TicketIcon size={10} /> Toàn đơn
                                                             </Badge>
                                                         ) : (
                                                             <Badge
                                                                 variant="outline"
-                                                                className="border-purple-200 bg-purple-50 text-purple-700 text-[10px] font-semibold gap-1"
+                                                                className="border-purple-200 bg-purple-50 text-purple-700 text-[11px] font-semibold gap-1"
                                                             >
                                                                 <Gamepad2 size={10} /> VR
                                                             </Badge>
                                                         )}
                                                     </div>
                                                     {v.sale_name ? (
-                                                        <p className="text-[10px] text-slate-500 truncate max-w-[120px]" title={v.sale_name}>
+                                                        <p className="text-[11px] text-slate-500 truncate max-w-[120px]" title={v.sale_name}>
                                                             👤 {v.sale_name}
                                                         </p>
                                                     ) : null}
@@ -950,7 +1123,7 @@ export default function VouchersContent(props: Props) {
                                                         <Percent className="w-3 h-3" />
                                                         {v.discount_value}%
                                                         {v.max_discount ? (
-                                                            <span className="text-[10px] ml-0.5 opacity-75 font-normal">
+                                                            <span className="text-[11px] ml-0.5 opacity-75 font-normal">
                                                                 (tối đa {formatMoney(v.max_discount)})
                                                             </span>
                                                         ) : null}
@@ -974,30 +1147,43 @@ export default function VouchersContent(props: Props) {
                                                             {limit ? Number(limit).toLocaleString() : '∞'}
                                                         </span>
                                                     </span>
+                                                    {remaining !== null ? (
+                                                        isOutOfQuota ? (
+                                                            <Badge variant="destructive" className="w-fit text-[11px] font-semibold px-2 py-0">
+                                                                Hết lượt
+                                                            </Badge>
+                                                        ) : (
+                                                            <span
+                                                                className={`text-[11px] font-semibold ${isLowQuota ? 'text-amber-600' : 'text-slate-500'}`}
+                                                            >
+                                                                Còn {remaining.toLocaleString()} lượt{isLowQuota ? ' - sắp hết' : ''}
+                                                            </span>
+                                                        )
+                                                    ) : null}
                                                     {v.total_revenue !== undefined && v.total_revenue > 0 ? (
-                                                        <span className="text-[10px] font-semibold text-emerald-600">
+                                                        <span className="text-[11px] font-semibold text-emerald-600">
                                                             Thu: {formatMoney(v.total_revenue)}
                                                         </span>
                                                     ) : null}
                                                     {v.per_user_limit ? (
-                                                        <span className="text-[10px] text-slate-400">{v.per_user_limit} lượt/user</span>
+                                                        <span className="text-[11px] text-slate-400">{v.per_user_limit} lượt/user</span>
                                                     ) : null}
                                                 </div>
                                             </TableCell>
                                             <TableCell>
                                                 <div className="flex flex-col gap-1">
                                                     {expired ? (
-                                                        <Badge variant="destructive" className="w-fit text-[10px] font-semibold px-2 py-0.5">
+                                                        <Badge variant="destructive" className="w-fit text-[11px] font-semibold px-2 py-0.5">
                                                             Hết hiệu lực
                                                         </Badge>
                                                     ) : future ? (
-                                                        <Badge variant="secondary" className="w-fit text-[10px] font-semibold px-2 py-0.5">
+                                                        <Badge variant="secondary" className="w-fit text-[11px] font-semibold px-2 py-0.5">
                                                             Chưa bắt đầu
                                                         </Badge>
                                                     ) : (
                                                         <Badge
                                                             variant="outline"
-                                                            className="w-fit text-[10px] font-semibold px-2 py-0.5 border-emerald-300 text-emerald-700 bg-emerald-50"
+                                                            className="w-fit text-[11px] font-semibold px-2 py-0.5 border-emerald-300 text-emerald-700 bg-emerald-50"
                                                         >
                                                             Đang hiệu lực
                                                         </Badge>
@@ -1006,11 +1192,11 @@ export default function VouchersContent(props: Props) {
                                                         <CalendarDays className="w-3 h-3 text-slate-400 shrink-0" />
                                                         {v.valid_from ? (
                                                             <>
-                                                                {format(new Date(v.valid_from), 'dd/MM/yy')}
-                                                                {v.valid_until ? <> → {format(new Date(v.valid_until), 'dd/MM/yy')}</> : ' → Vĩnh viễn'}
+                                                                {formatVnDate(v.valid_from)}
+                                                                {v.valid_until ? <> → {formatVnDate(v.valid_until)}</> : ' → Vĩnh viễn'}
                                                             </>
                                                         ) : v.valid_until ? (
-                                                            <>→ hết {format(new Date(v.valid_until), 'dd/MM/yy')}</>
+                                                            <>→ hết {formatVnDate(v.valid_until)}</>
                                                         ) : (
                                                             <span className="text-slate-400 font-medium">Vĩnh viễn</span>
                                                         )}
@@ -1018,13 +1204,23 @@ export default function VouchersContent(props: Props) {
                                                 </div>
                                             </TableCell>
                                             <TableCell>
-                                                <BranchIdsBadge branch_ids={v.branch_ids} branches={branches} className="text-[10px]" />
+                                                <BranchIdsBadge branch_ids={v.branch_ids} branches={branches} className="text-[11px]" />
                                             </TableCell>
                                             <TableCell className="text-center">
                                                 {isDeletedView ? (
-                                                    <Badge variant="destructive" className="text-[10px]">
-                                                        Đã xóa
-                                                    </Badge>
+                                                    <div className="flex flex-col items-center gap-1">
+                                                        <Badge variant="destructive" className="text-[11px]">
+                                                            Đã xóa
+                                                        </Badge>
+                                                        {v.deleted_at && (
+                                                            <span className="text-[11px] text-slate-500">
+                                                                {formatVnDateTime(v.deleted_at)}
+                                                            </span>
+                                                        )}
+                                                        {v.deleted_by_staff_name && (
+                                                            <span className="text-[11px] text-slate-500">bởi {v.deleted_by_staff_name}</span>
+                                                        )}
+                                                    </div>
                                                 ) : isTogglingId === v.id ? (
                                                     <Loader2 className="w-4 h-4 animate-spin mx-auto text-slate-400" />
                                                 ) : (
@@ -1140,10 +1336,8 @@ export default function VouchersContent(props: Props) {
                                                         variant="outline"
                                                         size="sm"
                                                         className="h-8 rounded-lg hover:bg-slate-50 text-slate-600 border-slate-200"
-                                                        onClick={() => {
-                                                            setSelectedVoucher(v);
-                                                            setIsDetailDialogOpen(true);
-                                                        }}
+                                                        onClick={() => openDetail(v)}
+                                                        aria-label="Xem chi tiết"
                                                         title="Xem chi tiết"
                                                     >
                                                         <Eye className="h-4 w-4" />
@@ -1306,6 +1500,7 @@ export default function VouchersContent(props: Props) {
                                 variant="ghost"
                                 size="icon"
                                 onClick={() => handleEditOpenChange(false)}
+                                aria-label="Đóng"
                                 className="h-8 w-8 text-gray-500 hover:text-gray-700"
                             >
                                 <X className="h-4 w-4" />
@@ -1324,19 +1519,16 @@ export default function VouchersContent(props: Props) {
                                         Thông tin voucher
                                     </h3>
                                     <div>
-                                        <Label className="text-xs font-semibold text-gray-700 mb-1.5 block">
+                                        <Label htmlFor="fmi_voucher_code" className="text-xs font-semibold text-gray-700 mb-1.5 block">
                                             Mã voucher <span className="text-red-500">*</span>
                                         </Label>
                                         <div className="flex gap-2 items-center">
                                             <Input
+                                                id="fmi_voucher_code"
+                                                aria-invalid={!!fieldErrors.code}
                                                 placeholder="VD: VR20OFF"
                                                 value={editData?.code || ''}
-                                                onChange={(e) =>
-                                                    setEditData({
-                                                        ...editData,
-                                                        code: e.target.value.replace(/[^a-zA-Z0-9_\-]/g, '')
-                                                    })
-                                                }
+                                                onChange={(e) => update_fields({ code: e.target.value.replace(/[^a-zA-Z0-9_\-]/g, '') })}
                                                 disabled={!isCodeEditable}
                                                 className={`h-9.5 text-sm flex-1 font-mono uppercase tracking-wider font-semibold ${!isCodeEditable ? 'bg-gray-100 text-gray-600' : ''}`}
                                                 maxLength={30}
@@ -1370,7 +1562,7 @@ export default function VouchersContent(props: Props) {
                                                         <Button
                                                             type="button"
                                                             variant="outline"
-                                                            onClick={() => setEditData({ ...editData, code: generateRandomCode() })}
+                                                            onClick={() => update_fields({ code: generateRandomCode() })}
                                                             className="h-9.5 px-3 gap-1.5 border-purple-200 text-purple-700 hover:bg-purple-50 shrink-0"
                                                         >
                                                             <Sparkles className="w-3.5 h-3.5" />
@@ -1380,19 +1572,23 @@ export default function VouchersContent(props: Props) {
                                                 </>
                                             )}
                                         </div>
+                                        <FieldError message={fieldErrors.code} />
                                     </div>
 
                                     <div>
-                                        <Label className="text-xs font-semibold text-gray-700 mb-1.5 block">
+                                        <Label htmlFor="fmi_voucher_name" className="text-xs font-semibold text-gray-700 mb-1.5 block">
                                             Tên chương trình <span className="text-red-500">*</span>
                                         </Label>
                                         <Input
+                                            id="fmi_voucher_name"
+                                            aria-invalid={!!fieldErrors.name}
                                             placeholder="VD: Khai trương VR Giảm 20%"
                                             value={editData?.name || ''}
-                                            onChange={(e) => setEditData({ ...editData, name: e.target.value })}
+                                            onChange={(e) => update_fields({ name: e.target.value })}
                                             className="h-9.5 text-sm"
                                             maxLength={150}
                                         />
+                                        <FieldError message={fieldErrors.name} />
                                     </div>
 
                                     <div>
@@ -1450,12 +1646,7 @@ export default function VouchersContent(props: Props) {
                                         <Select
                                             value={editData?.scope || 'all'}
                                             onValueChange={(val) => {
-                                                setEditData({
-                                                    ...editData,
-                                                    scope: val,
-                                                    applicable_ticket_package_ids: null,
-                                                    excluded_ticket_package_ids: null
-                                                });
+                                                update_fields({ scope: val, applicable_ticket_package_ids: null });
                                             }}
                                         >
                                             <SelectTrigger className="h-9.5 text-sm">
@@ -1502,14 +1693,16 @@ export default function VouchersContent(props: Props) {
                                     </div>
 
                                     <div>
-                                        <Label className="text-xs font-semibold text-gray-700 mb-1.5 block">
+                                        <Label htmlFor="fmi_voucher_discount_value" className="text-xs font-semibold text-gray-700 mb-1.5 block">
                                             Giá trị giảm
                                             <span className="text-red-500 ml-1">*</span>
-                                            <span className="ml-2 text-[10px] font-normal text-slate-400">
+                                            <span className="ml-2 text-[11px] font-normal text-slate-400">
                                                 {editData?.discount_type === 'fixed' ? 'VNĐ' : '1-100 %'}
                                             </span>
                                         </Label>
                                         <Input
+                                            id="fmi_voucher_discount_value"
+                                            aria-invalid={!!fieldErrors.discount_value}
                                             type="text"
                                             placeholder={editData?.discount_type === 'fixed' ? 'VD: 50000' : 'VD: 20'}
                                             value={
@@ -1519,13 +1712,11 @@ export default function VouchersContent(props: Props) {
                                             }
                                             onChange={(e) => {
                                                 const v = Number(e.target.value.replace(/[^\d]/g, ''));
-                                                setEditData({
-                                                    ...editData,
-                                                    discount_value: isNaN(v) ? 0 : v
-                                                });
+                                                update_fields({ discount_value: isNaN(v) ? 0 : v });
                                             }}
                                             className="h-9.5 text-sm font-bold text-slate-800"
                                         />
+                                        <FieldError message={fieldErrors.discount_value} />
                                     </div>
 
                                     {editData?.discount_type === 'percent' ? (
@@ -1657,39 +1848,37 @@ export default function VouchersContent(props: Props) {
                                         className={`grid grid-cols-2 gap-3 transition-opacity ${isPermanent ? 'opacity-40 pointer-events-none' : ''}`}
                                     >
                                         <div>
-                                            <Label className="text-xs font-semibold text-gray-700 mb-1.5 block">Bắt đầu từ</Label>
+                                            <Label htmlFor="fmi_voucher_valid_from" className="text-xs font-semibold text-gray-700 mb-1.5 block">Bắt đầu từ</Label>
                                             <Input
+                                                id="fmi_voucher_valid_from"
                                                 type="datetime-local"
                                                 disabled={isPermanent}
                                                 value={toLocalDatetimeString(editData?.valid_from)}
                                                 onChange={(e) => {
                                                     const dt = e.target.value;
-                                                    setEditData({
-                                                        ...editData,
-                                                        valid_from: dt ? fromLocalDatetimeString(dt) : null
-                                                    });
+                                                    update_fields({ valid_from: dt ? fromLocalDatetimeString(dt) : null });
                                                 }}
                                                 className="h-9.5 text-sm"
                                             />
                                         </div>
                                         <div>
-                                            <Label className="text-xs font-semibold text-gray-700 mb-1.5 block">Hết hạn</Label>
+                                            <Label htmlFor="fmi_voucher_valid_until" className="text-xs font-semibold text-gray-700 mb-1.5 block">Hết hạn</Label>
                                             <Input
+                                                id="fmi_voucher_valid_until"
+                                                aria-invalid={!!fieldErrors.valid_until}
                                                 type="datetime-local"
                                                 disabled={isPermanent}
                                                 value={toLocalDatetimeString(editData?.valid_until)}
                                                 onChange={(e) => {
                                                     const dt = e.target.value;
-                                                    setEditData({
-                                                        ...editData,
-                                                        valid_until: dt ? fromLocalDatetimeString(dt) : null
-                                                    });
+                                                    update_fields({ valid_until: dt ? fromLocalDatetimeString(dt) : null });
                                                 }}
                                                 className="h-9.5 text-sm"
                                             />
+                                            <FieldError message={fieldErrors.valid_until} />
                                         </div>
                                     </div>
-                                    <p className="text-[10px] text-slate-400">
+                                    <p className="text-[11px] text-slate-400">
                                         {isPermanent
                                             ? '✨ Voucher có hiệu lực vĩnh viễn (áp dụng ngay lập tức và không bao giờ hết hạn).'
                                             : 'Voucher bắt đầu và kết thúc theo ngày giờ đã chọn ở trên.'}
@@ -1754,7 +1943,7 @@ export default function VouchersContent(props: Props) {
                                                     {mode === 'whitelist' && (
                                                         <Badge
                                                             variant="outline"
-                                                            className="text-[10px] border-green-300 bg-green-50 text-green-700 px-2 py-0 rounded-full"
+                                                            className="text-[11px] border-green-300 bg-green-50 text-green-700 px-2 py-0 rounded-full"
                                                         >
                                                             ✓ Chỉ áp {appliedList.length} gói
                                                         </Badge>
@@ -1762,19 +1951,21 @@ export default function VouchersContent(props: Props) {
                                                     {mode === 'all' && (
                                                         <Badge
                                                             variant="outline"
-                                                            className="text-[10px] border-slate-300 bg-slate-50 text-slate-600 px-2 py-0 rounded-full"
+                                                            className="text-[11px] border-slate-300 bg-slate-50 text-slate-600 px-2 py-0 rounded-full"
                                                         >
                                                             ○ Áp tất cả
                                                         </Badge>
                                                     )}
                                                     <span
-                                                        className={`ml-auto text-[10px] font-normal ${scopeConfig.textTheme.replace('800', '500')}`}
+                                                        className={`ml-auto text-[11px] font-normal ${scopeConfig.textTheme.replace('800', '500')}`}
                                                     >
                                                         {scopeConfig.hint}
                                                     </span>
                                                 </div>
 
                                                 <div
+                                                    id="div_voucher_packages"
+                                                    tabIndex={-1}
                                                     className={`border ${scopeConfig.borderClass} rounded-xl p-2.5 h-40 overflow-y-auto space-y-1.5 bg-white mt-2`}
                                                 >
                                                     {vrPackages.length === 0 ? (
@@ -1789,10 +1980,8 @@ export default function VouchersContent(props: Props) {
                                                                         id={`vrpkg-apply-all`}
                                                                         checked={isAllChecked}
                                                                         onCheckedChange={(checked) => {
-                                                                            setEditData({
-                                                                                ...editData,
-                                                                                applicable_ticket_package_ids: checked ? vrPackages.map((p: any) => p.id) : [],
-                                                                                excluded_ticket_package_ids: null
+                                                                            update_fields({
+                                                                                applicable_ticket_package_ids: checked ? vrPackages.map((p: any) => p.id) : []
                                                                             });
                                                                         }}
                                                                     />
@@ -1821,11 +2010,7 @@ export default function VouchersContent(props: Props) {
                                                                                         ? [...curr, pkg.id]
                                                                                         : curr.filter((id: number) => id !== pkg.id);
 
-                                                                                    setEditData({
-                                                                                        ...editData,
-                                                                                        applicable_ticket_package_ids: nextApplied,
-                                                                                        excluded_ticket_package_ids: null // ensure it's cleared if it ever existed
-                                                                                    });
+                                                                                    update_fields({ applicable_ticket_package_ids: nextApplied });
                                                                                 }}
                                                                             />
                                                                         </div>
@@ -1835,7 +2020,7 @@ export default function VouchersContent(props: Props) {
                                                                                 }`}
                                                                         >
                                                                             {pkg.name}
-                                                                            <span className="ml-1 text-[10px] text-slate-400">
+                                                                            <span className="ml-1 text-[11px] text-slate-400">
                                                                                 ({formatMoney(pkg.price)})
                                                                             </span>
                                                                         </label>
@@ -1845,6 +2030,7 @@ export default function VouchersContent(props: Props) {
                                                         </>
                                                     )}
                                                 </div>
+                                                <FieldError message={fieldErrors.packages} />
                                             </div>
                                         );
                                     })()
@@ -1857,21 +2043,30 @@ export default function VouchersContent(props: Props) {
                                         Chi nhánh &amp; Cài đặt
                                     </h3>
                                     <div>
-                                        <Label className="text-xs font-semibold text-gray-700 mb-1.5 block">Chi nhánh áp dụng</Label>
-                                        <BranchMultiSelect
-                                            branches={branchOptions.length > 0 ? branchOptions : branches}
-                                            value={editData?.branch_ids ?? null}
-                                            onChange={(ids) => setEditData({ ...editData, branch_ids: ids })}
-                                            allowAll={isSuperAdmin}
-                                            disabled={isEditLocked}
-                                            className="rounded-lg text-xs"
-                                        />
+                                        <Label className="text-xs font-semibold text-gray-700 mb-1.5 block">
+                                            Chi nhánh áp dụng <span className="text-red-500">*</span>
+                                        </Label>
+                                        <div id="div_voucher_branch_ids" tabIndex={-1} className="outline-none">
                                         {isEditLocked ? (
-                                            <p className="text-[10px] text-red-600 mt-1">
+                                            // Read-only summary: the staff member cannot change branches they do not manage
+                                            <BranchIdsBadge branch_ids={editData?.branch_ids} branches={branches} className="text-[11px]" />
+                                        ) : (
+                                            <BranchMultiSelect
+                                                branches={branchOptions.length > 0 ? branchOptions : branches}
+                                                value={editData?.branch_ids ?? null}
+                                                onChange={(ids) => update_fields({ branch_ids: ids })}
+                                                allowAll={isSuperAdmin}
+                                                className="rounded-lg text-xs"
+                                            />
+                                        )}
+                                        </div>
+                                        <FieldError message={fieldErrors.branch_ids} />
+                                        {isEditLocked ? (
+                                            <p className="text-[11px] text-red-600 mt-1">
                                                 Voucher thuộc nhiều chi nhánh, chỉ Super Admin được sửa
                                             </p>
                                         ) : (
-                                            <p className="text-[10px] text-slate-400 mt-1">
+                                            <p className="text-[11px] text-slate-400 mt-1">
                                                 {isSuperAdmin
                                                     ? 'Chọn "Tất cả chi nhánh" hoặc ít nhất một chi nhánh'
                                                     : 'Chọn ít nhất một chi nhánh bạn quản lý'}
@@ -1881,10 +2076,11 @@ export default function VouchersContent(props: Props) {
 
                                     <div className="flex items-center justify-between pt-3 border-t border-slate-100">
                                         <div>
-                                            <Label className="text-xs font-semibold text-gray-700 block">Trạng thái kích hoạt</Label>
-                                            <p className="text-[10px] text-slate-400">Bật = khách hàng có thể áp dụng voucher</p>
+                                            <Label htmlFor="fmi_voucher_is_active" className="text-xs font-semibold text-gray-700 block">Trạng thái kích hoạt</Label>
+                                            <p className="text-[11px] text-slate-400">Bật = khách hàng có thể áp dụng voucher</p>
                                         </div>
                                         <Switch
+                                            id="fmi_voucher_is_active"
                                             checked={!!(editData?.is_active ?? true)}
                                             onCheckedChange={(v) => setEditData({ ...editData, is_active: v })}
                                             className="data-[state=checked]:bg-green-500 data-[state=unchecked]:bg-gray-300"
@@ -1899,20 +2095,20 @@ export default function VouchersContent(props: Props) {
                     <div className="px-6 py-4 bg-white border-t border-slate-200 flex items-center justify-between">
                         <div className="flex items-center gap-2 text-xs text-slate-500">
                             {editData?.scope === 'movie' ? (
-                                <Badge variant="outline" className="border-blue-200 bg-blue-50 text-blue-700 text-[10px] font-semibold">
+                                <Badge variant="outline" className="border-blue-200 bg-blue-50 text-blue-700 text-[11px] font-semibold">
                                     <Film className="w-3 h-3 inline mr-1" /> Scope: Phim
                                 </Badge>
                             ) : editData?.scope === 'all' ? (
                                 <Badge
                                     variant="outline"
-                                    className="border-indigo-200 bg-indigo-50 text-indigo-700 text-[10px] font-semibold"
+                                    className="border-indigo-200 bg-indigo-50 text-indigo-700 text-[11px] font-semibold"
                                 >
                                     <TicketIcon className="w-3 h-3 inline mr-1" /> Scope: Tất cả
                                 </Badge>
                             ) : (
                                 <Badge
                                     variant="outline"
-                                    className="border-purple-200 bg-purple-50 text-purple-700 text-[10px] font-semibold"
+                                    className="border-purple-200 bg-purple-50 text-purple-700 text-[11px] font-semibold"
                                 >
                                     <Gamepad2 className="w-3 h-3 inline mr-1" /> Scope: VR
                                 </Badge>
@@ -1920,7 +2116,7 @@ export default function VouchersContent(props: Props) {
                             {editData?.id ? (
                                 <span>
                                     Cập nhật lần cuối:{' '}
-                                    {editData.updated_at ? format(new Date(editData.updated_at), 'dd/MM/yy HH:mm') : '-'}
+                                    {formatVnDateTime(editData.updated_at)}
                                 </span>
                             ) : (
                                 <span>Voucher mới — mặc định code sẽ được uppercased</span>
@@ -1968,25 +2164,25 @@ export default function VouchersContent(props: Props) {
                                                     {selectedVoucher.code}
                                                 </span>
                                                 {selectedVoucher.scope === 'vr' && (
-                                                    <Badge variant="outline" className="border-purple-200 bg-purple-50 text-purple-700 text-[10px] uppercase font-bold">
+                                                    <Badge variant="outline" className="border-purple-200 bg-purple-50 text-purple-700 text-[11px] uppercase font-bold">
                                                         🎮 CHỈ VR
                                                     </Badge>
                                                 )}
                                                 {selectedVoucher.scope === 'movie' && (
-                                                    <Badge variant="outline" className="border-blue-200 bg-blue-50 text-blue-700 text-[10px] uppercase font-bold">
+                                                    <Badge variant="outline" className="border-blue-200 bg-blue-50 text-blue-700 text-[11px] uppercase font-bold">
                                                         🎬 CHỈ PHIM
                                                     </Badge>
                                                 )}
                                                 {(!selectedVoucher.scope || selectedVoucher.scope === 'all') && (
-                                                    <Badge variant="outline" className="border-indigo-200 bg-indigo-50 text-indigo-700 text-[10px] uppercase font-bold">
+                                                    <Badge variant="outline" className="border-indigo-200 bg-indigo-50 text-indigo-700 text-[11px] uppercase font-bold">
                                                         🎟️ MỌI DỊCH VỤ
                                                     </Badge>
                                                 )}
                                             </div>
-                                            <p className="text-xs text-slate-500 mt-0.5 font-medium">{selectedVoucher.name}</p>
+                                            <p className="text-xs text-slate-500 mt-0.5 font-medium truncate max-w-[420px]" title={selectedVoucher.name}>{selectedVoucher.name}</p>
                                         </div>
                                     </div>
-                                    <Button variant="ghost" size="icon" onClick={() => setIsDetailDialogOpen(false)} className="h-8 w-8 rounded-full text-slate-400 hover:text-slate-700 hover:bg-slate-100">
+                                    <Button variant="ghost" size="icon" aria-label="Đóng" onClick={() => setIsDetailDialogOpen(false)} className="h-8 w-8 rounded-full text-slate-400 hover:text-slate-700 hover:bg-slate-100">
                                         <X className="h-4 w-4" />
                                     </Button>
                                 </div>
@@ -1996,7 +2192,6 @@ export default function VouchersContent(props: Props) {
                                 {(() => {
                                     const toArr = (v: any): number[] => (Array.isArray(v) ? (v as number[]) : []);
                                     const applied = toArr(selectedVoucher.applicable_ticket_package_ids);
-                                    const excluded = toArr(selectedVoucher.excluded_ticket_package_ids);
                                     const recent = Array.isArray(selectedVoucher.recent_redemptions)
                                         ? (selectedVoucher.recent_redemptions as any[])
                                         : [];
@@ -2053,11 +2248,11 @@ export default function VouchersContent(props: Props) {
                                                 <div className="flex flex-col md:flex-row gap-4 items-start">
                                                     <div className="flex-1 space-y-3 min-w-0 w-full">
                                                         <div>
-                                                            <p className="text-[10px] uppercase font-bold text-slate-400 mb-0.5">TÊN CHƯƠNG TRÌNH</p>
-                                                            <p className="font-bold text-slate-900 text-sm truncate">{selectedVoucher.name}</p>
+                                                            <p className="text-[11px] uppercase font-bold text-slate-400 mb-0.5">TÊN CHƯƠNG TRÌNH</p>
+                                                            <p className="font-bold text-slate-900 text-sm truncate" title={selectedVoucher.name}>{selectedVoucher.name}</p>
                                                         </div>
                                                         <div>
-                                                            <p className="text-[10px] uppercase font-bold text-slate-400 mb-0.5">MÔ TẢ / GHI CHÚ NỘI BỘ</p>
+                                                            <p className="text-[11px] uppercase font-bold text-slate-400 mb-0.5">MÔ TẢ / GHI CHÚ NỘI BỘ</p>
                                                             <div className="bg-slate-50 text-slate-700 text-xs p-2.5 rounded-lg border border-slate-100 whitespace-pre-wrap italic break-words break-all max-h-32 overflow-y-auto">
                                                                 {displayNote || <span className="text-slate-400 font-normal">Không có ghi chú bổ sung</span>}
                                                             </div>
@@ -2065,14 +2260,14 @@ export default function VouchersContent(props: Props) {
                                                     </div>
 
                                                     <div className="w-full md:w-56 shrink-0 bg-blue-50/50 border border-blue-100 rounded-xl p-3.5 space-y-1">
-                                                        <p className="text-[10px] uppercase font-bold text-blue-600 flex items-center gap-1.5 mb-1">
+                                                        <p className="text-[11px] uppercase font-bold text-blue-600 flex items-center gap-1.5 mb-1">
                                                             <User size={12} /> NHÂN VIÊN SALE PHỤ TRÁCH
                                                         </p>
                                                         {displaySaleName ? (
                                                             <div>
                                                                 <p className="font-bold text-slate-900 text-xs truncate" title={displaySaleName}>{displaySaleName}</p>
                                                                 {displaySaleEmail && (
-                                                                    <p className="text-[10px] text-slate-500 truncate" title={displaySaleEmail}>{displaySaleEmail}</p>
+                                                                    <p className="text-[11px] text-slate-500 truncate" title={displaySaleEmail}>{displaySaleEmail}</p>
                                                                 )}
                                                             </div>
                                                         ) : (
@@ -2090,18 +2285,18 @@ export default function VouchersContent(props: Props) {
                                                         <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wide">THIẾT LẬP TÀI CHÍNH</h3>
                                                     </div>
                                                     {selectedVoucher.is_active ? (
-                                                        <Badge variant="outline" className="text-[10px] border-emerald-200 bg-emerald-50 text-emerald-700 font-semibold px-2 py-0.5 rounded-full">
+                                                        <Badge variant="outline" className="text-[11px] border-emerald-200 bg-emerald-50 text-emerald-700 font-semibold px-2 py-0.5 rounded-full">
                                                             ĐANG BẬT
                                                         </Badge>
                                                     ) : (
-                                                        <Badge variant="outline" className="text-[10px] border-slate-200 bg-slate-100 text-slate-500 font-semibold px-2 py-0.5 rounded-full">
+                                                        <Badge variant="outline" className="text-[11px] border-slate-200 bg-slate-100 text-slate-500 font-semibold px-2 py-0.5 rounded-full">
                                                             ĐÃ VÔ HIỆU
                                                         </Badge>
                                                     )}
                                                 </div>
                                                 <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-xs">
                                                     <div className="bg-slate-50 rounded-xl p-3 border border-slate-100">
-                                                        <p className="text-[10px] uppercase font-bold text-slate-400 mb-1">MỨC GIẢM</p>
+                                                        <p className="text-[11px] uppercase font-bold text-slate-400 mb-1">MỨC GIẢM</p>
                                                         <p className="font-black text-rose-600 text-base">
                                                             {selectedVoucher.discount_type === 'percent' ? (
                                                                 <>{selectedVoucher.discount_value}%</>
@@ -2111,7 +2306,7 @@ export default function VouchersContent(props: Props) {
                                                         </p>
                                                     </div>
                                                     <div className="bg-slate-50 rounded-xl p-3 border border-slate-100">
-                                                        <p className="text-[10px] uppercase font-bold text-slate-400 mb-1">GIẢM TỐI ĐA</p>
+                                                        <p className="text-[11px] uppercase font-bold text-slate-400 mb-1">GIẢM TỐI ĐA</p>
                                                         <p className="font-bold text-slate-800">
                                                             {selectedVoucher.discount_type === 'percent' && selectedVoucher.max_discount
                                                                 ? formatMoney(selectedVoucher.max_discount)
@@ -2119,11 +2314,11 @@ export default function VouchersContent(props: Props) {
                                                         </p>
                                                     </div>
                                                     <div className="bg-slate-50 rounded-xl p-3 border border-slate-100">
-                                                        <p className="text-[10px] uppercase font-bold text-slate-400 mb-1">ĐƠN HÀNG TỐI THIỂU</p>
+                                                        <p className="text-[11px] uppercase font-bold text-slate-400 mb-1">ĐƠN HÀNG TỐI THIỂU</p>
                                                         <p className="font-bold text-slate-800">{formatMoney(selectedVoucher.min_order_value || 0)}</p>
                                                     </div>
                                                     <div className="bg-emerald-50/60 rounded-xl p-3 border border-emerald-100">
-                                                        <p className="text-[10px] uppercase font-bold text-emerald-700 mb-1">TỔNG DOANH THU ĐEM VỀ</p>
+                                                        <p className="text-[11px] uppercase font-bold text-emerald-700 mb-1">TỔNG DOANH THU ĐEM VỀ</p>
                                                         <p className="font-black text-emerald-700 text-base">
                                                             {formatMoney(selectedVoucher.total_revenue || 0)}
                                                         </p>
@@ -2141,20 +2336,16 @@ export default function VouchersContent(props: Props) {
                                                     </div>
                                                     <div className="space-y-2.5 text-xs">
                                                         <div>
-                                                            <p className="text-[10px] uppercase font-bold text-slate-400 mb-1">THỜI GIAN HIỆU LỰC</p>
+                                                            <p className="text-[11px] uppercase font-bold text-slate-400 mb-1">THỜI GIAN HIỆU LỰC</p>
                                                             <p className="font-semibold text-slate-800">
-                                                                {selectedVoucher.valid_from
-                                                                    ? format(new Date(selectedVoucher.valid_from), 'dd/MM/yyyy HH:mm')
-                                                                    : 'Từ khi tạo'}
+                                                                {selectedVoucher.valid_from ? formatVnDateTime(selectedVoucher.valid_from) : 'Từ khi tạo'}
                                                                 {' → '}
-                                                                {selectedVoucher.valid_until
-                                                                    ? format(new Date(selectedVoucher.valid_until), 'dd/MM/yyyy HH:mm')
-                                                                    : 'Không hết hạn'}
+                                                                {selectedVoucher.valid_until ? formatVnDateTime(selectedVoucher.valid_until) : 'Không hết hạn'}
                                                             </p>
                                                         </div>
 
                                                         <div>
-                                                            <p className="text-[10px] uppercase font-bold text-slate-400 mb-1">CHI NHÁNH ÁP DỤNG</p>
+                                                            <p className="text-[11px] uppercase font-bold text-slate-400 mb-1">CHI NHÁNH ÁP DỤNG</p>
                                                             <BranchIdsBadge
                                                                 branch_ids={selectedVoucher.branch_ids}
                                                                 branches={branches}
@@ -2164,14 +2355,19 @@ export default function VouchersContent(props: Props) {
 
                                                         <div className="grid grid-cols-2 gap-2 pt-1">
                                                             <div className="bg-slate-50 p-2.5 rounded-lg border border-slate-100">
-                                                                <p className="text-[10px] uppercase font-bold text-slate-400 mb-0.5">TIẾN ĐỘ SỬ DỤNG</p>
+                                                                <p className="text-[11px] uppercase font-bold text-slate-400 mb-0.5">TIẾN ĐỘ SỬ DỤNG</p>
                                                                 <p className="font-bold text-slate-800">
                                                                     <span className="text-blue-600">{selectedVoucher.used_count ?? 0}</span> /{' '}
                                                                     {selectedVoucher.usage_limit ?? '∞'}
                                                                 </p>
+                                                                {selectedVoucher.usage_limit ? (
+                                                                    <p className="text-[11px] text-slate-500 mt-0.5">
+                                                                        Còn {Math.max(0, Number(selectedVoucher.usage_limit) - (selectedVoucher.used_count ?? 0)).toLocaleString()} lượt
+                                                                    </p>
+                                                                ) : null}
                                                             </div>
                                                             <div className="bg-slate-50 p-2.5 rounded-lg border border-slate-100">
-                                                                <p className="text-[10px] uppercase font-bold text-slate-400 mb-0.5">GIỚI HẠN / 1 USER</p>
+                                                                <p className="text-[11px] uppercase font-bold text-slate-400 mb-0.5">GIỚI HẠN / 1 USER</p>
                                                                 <p className="font-bold text-slate-800">{selectedVoucher.per_user_limit ?? 1} Khách</p>
                                                             </div>
                                                         </div>
@@ -2194,7 +2390,6 @@ export default function VouchersContent(props: Props) {
                                                                         : 'Tất cả dịch vụ hệ thống';
 
                                                             const hasSpecificApplied = applied.length > 0;
-                                                            const hasExcluded = excluded.length > 0;
                                                             const isAllPackages = !hasSpecificApplied;
 
                                                             return (
@@ -2204,11 +2399,11 @@ export default function VouchersContent(props: Props) {
                                                                             Phạm vi: <strong className="text-slate-700 not-italic">{scopeText}</strong>
                                                                         </span>
                                                                         {isAllPackages ? (
-                                                                            <Badge variant="outline" className="border-purple-200 bg-purple-50 text-purple-700 text-[10px] font-semibold px-2 py-0.5 rounded-full">
+                                                                            <Badge variant="outline" className="border-purple-200 bg-purple-50 text-purple-700 text-[11px] font-semibold px-2 py-0.5 rounded-full">
                                                                                 ✓ Áp dụng tất cả ({detailPackages.length > 0 ? detailPackages.length : 'Tất cả'} gói)
                                                                             </Badge>
                                                                         ) : (
-                                                                            <Badge variant="outline" className="border-emerald-200 bg-emerald-50 text-emerald-700 text-[10px] font-semibold px-2 py-0.5 rounded-full">
+                                                                            <Badge variant="outline" className="border-emerald-200 bg-emerald-50 text-emerald-700 text-[11px] font-semibold px-2 py-0.5 rounded-full">
                                                                                 ✓ Chỉ áp dụng {applied.length} gói chỉ định
                                                                             </Badge>
                                                                         )}
@@ -2216,7 +2411,7 @@ export default function VouchersContent(props: Props) {
 
                                                                     {/* Danh sách các gói vé được áp dụng */}
                                                                     <div>
-                                                                        <p className="text-[10px] font-bold uppercase text-emerald-700 mb-1.5 flex items-center justify-between">
+                                                                        <p className="text-[11px] font-bold uppercase text-emerald-700 mb-1.5 flex items-center justify-between">
                                                                             <span>DANH SÁCH GÓI VÉ ĐƯỢC ÁP DỤNG:</span>
                                                                         </p>
                                                                         {detailPackages.length === 0 && !hasSpecificApplied ? (
@@ -2269,29 +2464,6 @@ export default function VouchersContent(props: Props) {
                                                                         )}
                                                                     </div>
 
-                                                                    {/* Danh sách các gói vé bị loại trừ (nếu có) */}
-                                                                    {hasExcluded && (
-                                                                        <div>
-                                                                            <p className="text-[10px] font-bold uppercase text-rose-600 mb-1">
-                                                                                ✗ LOẠI TRỪ ({excluded.length}) GÓI:
-                                                                            </p>
-                                                                            <div className="flex flex-col gap-1.5 max-h-24 overflow-y-auto p-2 bg-rose-50/50 border border-rose-100 rounded-xl">
-                                                                                {excluded.map((id) => {
-                                                                                    const pkg = detailPackages.find((p) => Number(p.id) === Number(id));
-                                                                                    const pkgName = pkg ? pkg.name : `Gói ID #${id}`;
-                                                                                    return (
-                                                                                        <div
-                                                                                            key={`ex-${id}`}
-                                                                                            className="bg-white border border-rose-200 text-rose-800 text-xs font-semibold px-3 py-1 rounded-lg flex items-center gap-2"
-                                                                                        >
-                                                                                            <span className="text-rose-600 font-bold">✗</span>
-                                                                                            <span>{pkgName}</span>
-                                                                                        </div>
-                                                                                    );
-                                                                                })}
-                                                                            </div>
-                                                                        </div>
-                                                                    )}
                                                                 </div>
                                                             );
                                                         })()}
@@ -2305,47 +2477,77 @@ export default function VouchersContent(props: Props) {
                                                     <div className="flex items-center gap-2 border-b border-slate-100 pb-2">
                                                         <History size={15} className="text-slate-500" />
                                                         <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wide">
-                                                            LỊCH SỬ GIAO DỊCH (20 LẦN DÙNG GẦN NHẤT)
+                                                            LỊCH SỬ GIAO DỊCH ({recent.length}
+                                                            {selectedVoucher.redemption_total_count ? ` / ${selectedVoucher.redemption_total_count}` : ''} LẦN DÙNG GẦN NHẤT)
                                                         </h3>
                                                     </div>
                                                     <div className="border border-slate-100 rounded-lg overflow-hidden">
                                                         <Table>
                                                             <TableHeader className="bg-slate-50">
                                                                 <TableRow className="hover:bg-transparent border-none">
-                                                                    <TableHead className="text-[10px] font-bold uppercase py-2">MÃ BOOKING</TableHead>
-                                                                    <TableHead className="text-[10px] font-bold uppercase py-2">MỨC GIẢM</TableHead>
-                                                                    <TableHead className="text-[10px] font-bold uppercase py-2">THỜI GIAN</TableHead>
+                                                                    <TableHead className="text-[11px] font-bold uppercase py-2">MÃ BOOKING</TableHead>
+                                                                    <TableHead className="text-[11px] font-bold uppercase py-2">MỨC GIẢM</TableHead>
+                                                                    <TableHead className="text-[11px] font-bold uppercase py-2">THỜI GIAN</TableHead>
                                                                 </TableRow>
                                                             </TableHeader>
                                                             <TableBody>
                                                                 {recent.map((r: any, i: number) => (
                                                                     <TableRow key={`rd-${r.id || i}`} className="hover:bg-slate-50 border-t border-slate-100">
-                                                                        <TableCell className="text-xs font-mono font-semibold">#{r.booking_id}</TableCell>
+                                                                        <TableCell className="text-xs font-mono font-semibold">
+                                                                            {r.booking_code ? (
+                                                                                <span className="inline-flex items-center gap-1.5">
+                                                                                    {r.booking_code}
+                                                                                    <button
+                                                                                        type="button"
+                                                                                        onClick={() => handleCopyBookingCode(r.booking_code)}
+                                                                                        className="text-slate-400 hover:text-slate-700"
+                                                                                        aria-label="Sao chép mã đặt chỗ"
+                                                                                        title="Sao chép mã đặt chỗ (dán vào ô tìm kiếm ở mục Giao dịch)"
+                                                                                    >
+                                                                                        <Copy className="w-3 h-3" />
+                                                                                    </button>
+                                                                                </span>
+                                                                            ) : (
+                                                                                '-'
+                                                                            )}
+                                                                        </TableCell>
                                                                         <TableCell className="text-xs font-bold text-emerald-600">
                                                                             -{formatMoney(r.discount_amount_applied)}
                                                                         </TableCell>
                                                                         <TableCell className="text-[11px] text-slate-500">
-                                                                            {r.redeemed_at ? format(new Date(r.redeemed_at), 'dd/MM/yyyy HH:mm') : '-'}
+                                                                            {formatVnDateTime(r.redeemed_at)}
                                                                         </TableCell>
                                                                     </TableRow>
                                                                 ))}
                                                             </TableBody>
                                                         </Table>
                                                     </div>
+                                                    {(selectedVoucher.redemption_total_count ?? 0) > recent.length &&
+                                                        redemptionLimitStep < REDEMPTION_LIMIT_STEPS.length - 1 && (
+                                                            <Button
+                                                                type="button"
+                                                                variant="outline"
+                                                                size="sm"
+                                                                disabled={isLoadingDetail}
+                                                                onClick={() => setRedemptionLimitStep(redemptionLimitStep + 1)}
+                                                                className="w-full rounded-lg text-xs"
+                                                            >
+                                                                {isLoadingDetail ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : 'Xem thêm'}
+                                                            </Button>
+                                                        )}
                                                 </div>
                                             )}
 
                                             {/* KHỐI 5: FOOTER AUDIT */}
                                             <div className="bg-white border border-slate-200/80 rounded-xl p-3 text-[11px] text-slate-500 flex items-center justify-between shadow-xs">
                                                 <span>
-                                                    Tạo bởi: <b className="text-slate-800">{selectedVoucher.created_by_staff_name || 'Hệ thống'}</b>
+                                                    Tạo lúc: <b className="text-slate-800">{formatVnDateTime(selectedVoucher.created_at)}</b> bởi{' '}
+                                                    <b className="text-slate-800">{selectedVoucher.created_by_staff_name || 'Hệ thống'}</b>
                                                 </span>
                                                 <span>
                                                     Cập nhật lần cuối:{' '}
                                                     <b className="text-slate-800">
-                                                        {selectedVoucher.updated_at
-                                                            ? format(new Date(selectedVoucher.updated_at), 'dd/MM/yyyy HH:mm')
-                                                            : '-'}
+                                                        {formatVnDateTime(selectedVoucher.updated_at)}
                                                     </b>{' '}
                                                     bởi <b className="text-slate-800">{selectedVoucher.updated_by_staff_name || 'Hệ thống'}</b>
                                                 </span>

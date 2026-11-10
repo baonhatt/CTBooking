@@ -113,6 +113,13 @@ export default function DashboardPage() {
     })();
   }, [staff]);
 
+  // Parts of the dashboard that failed to load. They are listed in a banner, because the cards would otherwise show 0
+  // as if it were real data.
+  const [failedParts, setFailedParts] = useState<string[]>([]);
+  const markFailed = (partName: string) =>
+    setFailedParts((previous) => (previous.includes(partName) ? previous : [...previous, partName]));
+  const markLoaded = (partName: string) => setFailedParts((previous) => previous.filter((name) => name !== partName));
+
   const handleRefresh = () => {
     setRefreshKey((prev) => prev + 1);
   };
@@ -124,8 +131,10 @@ export default function DashboardPage() {
         setIsTopTicketsLoading(true);
         const data = await getDashboardMetrics(topPeriod, selectedYear, selectedBranchId);
         setMetrics(data);
+        markLoaded('số liệu tổng quan');
       } catch (err) {
         console.error('Failed to load metrics:', err);
+        markFailed('số liệu tổng quan');
       } finally {
         setIsTopTicketsLoading(false);
         setIsPageLoading(false);
@@ -141,8 +150,10 @@ export default function DashboardPage() {
         setIsRevenueLoading(true);
         const data = await getRevenueByDate(undefined, 'paid', selectedYear, selectedBranchId);
         setDateRevenue({ total: data.total, count: data.count, revenueByMethod: data.revenueByMethod });
+        markLoaded('doanh thu');
       } catch (err) {
         console.error('Failed to load date revenue:', err);
+        markFailed('doanh thu');
       } finally {
         setIsRevenueLoading(false);
       }
@@ -173,10 +184,17 @@ export default function DashboardPage() {
       }
     } catch (err) {
       console.error('Failed to apply date filter:', err);
+      markFailed('doanh thu');
     } finally {
       setIsRevenueLoading(false);
     }
   };
+
+  // Choosing the day or month view (which starts on today) loads that period straight away
+  useEffect(() => {
+    if (dateFilterType !== 'year' && selectedDate) handleApplyDateFilter();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [dateFilterType, selectedDate]);
 
   // Load 7-day revenue for selected year
   useEffect(() => {
@@ -186,8 +204,10 @@ export default function DashboardPage() {
       try {
         const data = await getRevenue7Days(selectedYear, selectedBranchId);
         setRevenue7DaysData(data.data);
+        markLoaded('doanh thu 7 ngày');
       } catch (err) {
         console.error('Failed to load 7-day revenue:', err);
+        markFailed('doanh thu 7 ngày');
       }
     })();
   }, [selectedYear, refreshKey, selectedBranchId, canViewRevenue]);
@@ -201,8 +221,10 @@ export default function DashboardPage() {
         if ('data' in data) {
           setRevenueByMonthData(data.data);
         }
+        markLoaded('doanh thu theo tháng');
       } catch (err) {
         console.error('Failed to load monthly revenue:', err);
+        markFailed('doanh thu theo tháng');
       }
     })();
   }, [selectedYear, refreshKey, selectedBranchId, canViewRevenue]);
@@ -220,6 +242,14 @@ export default function DashboardPage() {
       adminEmailState={staff?.email || 'admin@email.com'}
       handleLogout={handleLogout}
     >
+      {failedParts.length > 0 && (
+        <div className="mb-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 flex items-center justify-between gap-3">
+          <span>Không tải được: {failedParts.join(', ')}. Số 0 hiển thị bên dưới có thể không phải dữ liệu thật.</span>
+          <button onClick={handleRefresh} className="font-semibold underline shrink-0">
+            Tải lại
+          </button>
+        </div>
+      )}
       <DashboardContent
         metrics={metrics}
         selectedDate={selectedDate}

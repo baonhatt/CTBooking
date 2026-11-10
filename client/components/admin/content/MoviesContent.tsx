@@ -38,9 +38,10 @@ import {
   SortAsc,
   Loader2
 } from 'lucide-react';
-import { format, formatDistanceToNow } from 'date-fns';
+import { formatDistanceToNow } from 'date-fns';
 import { vi } from 'date-fns/locale';
 import { getMovieById } from '@/lib/api';
+import { activeStatusLabel, formatVnd, formatVnDate, formatVnDateTime } from '@/lib/format';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -155,6 +156,9 @@ export default function MoviesContent({
 
   const [movieDetails, setMovieDetails] = useState<any>(null);
   const [isLoadingDetails, setIsLoadingDetails] = useState(false);
+  const [detailsError, setDetailsError] = useState('');
+  // Bumped by the retry button to load the detail again
+  const [detailsReloadKey, setDetailsReloadKey] = useState(0);
 
   const InfoRow = ({ label, value, icon }: { label: string; value: string; icon?: React.ReactNode }) => (
     <div className="flex justify-between items-center">
@@ -170,19 +174,22 @@ export default function MoviesContent({
       (async () => {
         try {
           setIsLoadingDetails(true);
+          setDetailsError('');
           const details = await getMovieById(selectedMovieId);
           setMovieDetails(details);
-
-        } catch (err) {
+        } catch (err: any) {
           console.error('Lỗi load chi tiết:', err);
+          setMovieDetails(null);
+          setDetailsError(err?.message || 'Không tải được chi tiết phim');
         } finally {
           setIsLoadingDetails(false);
         }
       })();
     } else {
       setMovieDetails(null);
+      setDetailsError('');
     }
-  }, [isDetailsOpen, selectedMovieId]);
+  }, [isDetailsOpen, selectedMovieId, detailsReloadKey]);
 
   const [localSearch, setLocalSearch] = useState(searchQuery);
 
@@ -244,9 +251,11 @@ export default function MoviesContent({
             <select
               value={sortKey}
               onChange={(e) => setSortKey(e.target.value as any)}
+              aria-label="Sắp xếp theo"
               className="h-9 px-3 bg-white border border-slate-200 rounded-lg text-xs focus:ring-2 focus:ring-blue-500 outline-none shadow-sm cursor-pointer"
             >
               <option value="updated_at">Mới cập nhật</option>
+              <option value="title">Theo tên phim</option>
               <option value="rating">Đánh giá cao</option>
               <option value="release_date">Ngày phát hành</option>
             </select>
@@ -256,6 +265,7 @@ export default function MoviesContent({
               onClick={() => setSortDir?.(sortDir === 'asc' ? 'desc' : 'asc')}
               className="rounded-lg border-slate-200 hover:bg-slate-50 active:scale-95 transition-all shadow-sm h-9 w-9 shrink-0"
               title={sortDir === 'asc' ? 'Tăng dần' : 'Giảm dần'}
+              aria-label={sortDir === 'asc' ? 'Đang tăng dần, bấm để giảm dần' : 'Đang giảm dần, bấm để tăng dần'}
             >
               {sortDir === 'desc' ? (
                 <SortDesc className="w-4 h-4 text-slate-600" />
@@ -269,6 +279,7 @@ export default function MoviesContent({
             <select
               value={selectedBranchId || 'all'}
               onChange={(e) => setSelectedBranchId(e.target.value === 'all' ? 'all' : Number(e.target.value))}
+              aria-label="Lọc theo chi nhánh"
               className="h-10 px-3 bg-white border border-slate-200 rounded-xl text-xs focus:ring-2 focus:ring-blue-500 outline-none shadow-sm cursor-pointer"
             >
               {isSuperAdmin && <option value="all">Tất cả chi nhánh</option>}
@@ -316,6 +327,7 @@ export default function MoviesContent({
             }}
             className="rounded-xl shadow-sm hover:rotate-180 transition-transform duration-500 shrink-0 h-10 w-10 ml-2"
             title="Làm mới"
+            aria-label="Làm mới danh sách"
           >
             <RefreshCw className={`w-4 h-4 ${isLoading ? 'animate-spin' : ''}`} />
           </Button>
@@ -335,6 +347,7 @@ export default function MoviesContent({
                 <TableHead className="text-xs font-semibold text-gray-600 uppercase py-3 text-center">
                   Đánh giá
                 </TableHead>
+                <TableHead className="text-xs font-semibold text-gray-600 uppercase py-3">Ngày phát hành</TableHead>
                 <TableHead className="text-xs font-semibold text-gray-600 uppercase py-3">Cập nhật</TableHead>
                 <TableHead className="text-xs font-semibold text-gray-600 uppercase py-3 min-w-[120px]">
                   Chi nhánh
@@ -351,14 +364,14 @@ export default function MoviesContent({
               {isLoading ? (
                 Array.from({ length: 5 }).map((_, idx) => (
                   <TableRow key={idx}>
-                    <TableCell colSpan={7}>
+                    <TableCell colSpan={8}>
                       <Skeleton className="h-16 w-full rounded-xl" />
                     </TableCell>
                   </TableRow>
                 ))
               ) : data.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={7} className="h-64 text-center">
+                  <TableCell colSpan={8} className="h-64 text-center">
                     <div className="flex flex-col items-center justify-center text-slate-400 gap-2">
                       <FilterX size={48} className="opacity-20 mb-2" />
                       <p className="text-sm font-medium text-slate-500">Không tìm thấy bộ phim nào phù hợp</p>
@@ -390,34 +403,39 @@ export default function MoviesContent({
                               className="w-12 h-16 object-cover rounded-lg shadow-sm border border-slate-100"
                               alt=""
                             />
-                            <div className="absolute -bottom-1 -right-1 bg-white shadow-sm border text-[8px] text-slate-600 px-1 rounded flex items-center gap-0.5 font-bold">
-                              <Clock size={8} /> {movie.duration}′
-                            </div>
+                            {movie.duration && (
+                              <div className="absolute -bottom-1 -right-1 bg-white shadow-sm border text-[11px] text-slate-600 px-1 rounded flex items-center gap-0.5 font-bold">
+                                <Clock size={8} /> {movie.duration}′
+                              </div>
+                            )}
                           </div>
                           <div className="flex flex-col gap-0.5 min-w-0">
                             <h4 className="font-bold text-slate-900 leading-tight line-clamp-1" title={movie.title}>
                               {movie.title}
                             </h4>
-                            <p className="text-[11px] text-slate-500 line-clamp-1">{movie.genres.join(' • ')}</p>
+                            <p className="text-[11px] text-slate-500 line-clamp-1" title={movie.genres.join(' • ')}>
+                              {movie.genres.length > 0 ? movie.genres.join(' • ') : '-'}
+                            </p>
                           </div>
                         </div>
                       </TableCell>
                       <TableCell className="text-center">
                         <div className="inline-flex items-center gap-1 bg-yellow-50 px-2 py-0.5 rounded-md border border-yellow-100">
                           <Star size={10} className="fill-yellow-500 text-yellow-500" />
-                          <span className="text-xs font-black text-yellow-700">{movie.rating || '0'}</span>
+                          {/* A blank rating is shown as "-", not as 0 */}
+                          <span className="text-xs font-black text-yellow-700">
+                            {movie.rating === null || movie.rating === undefined ? '-' : movie.rating}
+                          </span>
                         </div>
                       </TableCell>
+                      <TableCell className="text-xs text-slate-600">{formatVnDate(movie.release_date)}</TableCell>
                       <TableCell>
                         <div className="flex flex-col text-[11px]">
                           <span className="text-slate-600 font-medium flex items-center gap-1">
                             <History size={10} className="text-slate-400" />
-                            {movie.updated_at ? format(new Date(movie.updated_at), 'HH:mm') : '-'}
+                            {formatVnDateTime(movie.updated_at)}
                           </span>
-                          <span
-                            className="text-slate-400 italic cursor-help"
-                            title={movie.updated_at ? new Date(movie.updated_at).toLocaleString('vi-VN') : ''}
-                          >
+                          <span className="text-slate-400 italic cursor-help" title={formatVnDateTime(movie.updated_at)}>
                             {movie.updated_at
                               ? formatDistanceToNow(new Date(movie.updated_at), { addSuffix: true, locale: vi })
                               : ''}
@@ -439,6 +457,7 @@ export default function MoviesContent({
                                 <AlertDialogTrigger asChild>
                                   <Switch
                                     checked={isActive}
+                                    aria-label={`Đổi trạng thái phim ${movie.title}`}
                                     className="scale-100 transition-all border-2 border-transparent cursor-pointer"
                                     style={{
                                       opacity: 1,
@@ -497,7 +516,7 @@ export default function MoviesContent({
                           </div>
 
                           {/* Badge trạng thái */}
-                          <div className="w-20 flex shrink-0">
+                          <div className="w-32 flex shrink-0">
                             <Badge
                               className={`text-xs font-medium px-2 py-0.5 rounded-full border whitespace-nowrap justify-center w-full transition-all duration-200
                               ${
@@ -506,7 +525,7 @@ export default function MoviesContent({
                                   : 'bg-gray-100 text-gray-500 border-gray-200'
                               }`}
                             >
-                              {isActive ? 'Hoạt động' : 'Ngừng'}
+                              {activeStatusLabel(isActive)}
                             </Badge>
                           </div>
                         </div>
@@ -523,6 +542,7 @@ export default function MoviesContent({
                               setIsDetailsOpen(true);
                             }}
                             title="Xem chi tiết"
+                            aria-label={`Xem chi tiết phim ${movie.title}`}
                           >
                             <Eye className="h-3.5 w-3.5" />
                           </Button>
@@ -534,6 +554,7 @@ export default function MoviesContent({
                               className={`h-8 rounded-lg ${canEditThisMovie ? 'hover:bg-yellow-50 text-yellow-600' : 'opacity-40 cursor-not-allowed text-gray-400'}`}
                               onClick={() => canEditThisMovie && onEdit('movie', movie)}
                               title={canEditThisMovie ? 'Chỉnh sửa' : 'Chỉ Super Admin mới có quyền sửa phim này'}
+                              aria-label={`Chỉnh sửa phim ${movie.title}`}
                             >
                               <Pencil className="h-3.5 w-3.5" />
                             </Button>
@@ -545,6 +566,7 @@ export default function MoviesContent({
                               className="h-8 rounded-lg hover:bg-red-50 text-red-600"
                               onClick={() => onDelete(Number(movie.id))}
                               title="Xóa"
+                              aria-label={`Xóa phim ${movie.title}`}
                             >
                               <Trash2 className="h-3.5 w-3.5" />
                             </Button>
@@ -562,7 +584,7 @@ export default function MoviesContent({
 
       {/* PAGINATION */}
       <div className="flex flex-col sm:flex-row justify-between items-center bg-white px-6 py-4 rounded-2xl border shadow-sm gap-4">
-        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+        <span className="text-[11px] font-bold text-slate-400 uppercase tracking-widest">
           {moviesLength} phim trong hệ thống
         </span>
         <Pagination className="justify-end w-auto mx-0">
@@ -609,7 +631,19 @@ export default function MoviesContent({
           {isLoadingDetails ? (
             <div className="py-20 flex flex-col items-center gap-3">
               <div className="w-8 h-8 border-2 border-blue-600 border-t-transparent rounded-full animate-spin" />
-              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Đang tải dữ liệu...</p>
+              <p className="text-[11px] font-bold text-slate-400 uppercase tracking-widest">Đang tải dữ liệu...</p>
+            </div>
+          ) : detailsError ? (
+            <div className="py-16 px-6 flex flex-col items-center gap-3 text-center">
+              <AlertCircle className="w-8 h-8 text-red-500" />
+              <p className="text-sm font-semibold text-slate-700">Không tải được chi tiết phim</p>
+              <p className="text-xs text-slate-500">{detailsError}</p>
+              <div className="flex gap-2 mt-2">
+                <Button variant="outline" onClick={() => setIsDetailsOpen(false)}>
+                  Đóng
+                </Button>
+                <Button onClick={() => setDetailsReloadKey((key) => key + 1)}>Thử lại</Button>
+              </div>
             </div>
           ) : movieDetails ? (
             <div className="flex flex-col">
@@ -628,7 +662,7 @@ export default function MoviesContent({
                   </div>
                   <div className="flex-1">
                     <div className="flex items-center gap-3">
-                      <span className="font-mono text-[10px] bg-blue-50 text-blue-600 px-1.5 py-0.5 rounded border border-blue-100">
+                      <span className="font-mono text-[11px] bg-blue-50 text-blue-600 px-1.5 py-0.5 rounded border border-blue-100">
                         ID: {movieDetails.id}
                       </span>
                       <h2 className="text-base font-semibold text-gray-900 tracking-tight leading-none">
@@ -647,11 +681,15 @@ export default function MoviesContent({
                             duration: movieDetails.duration_min,
                             posterUrl: movieDetails.cover_image,
                             is_active: movieDetails.is_active,
-                            release_date: movieDetails.release_date
+                            release_date: movieDetails.release_date,
+                            // Without the branches the form would save this movie as "all branches"
+                            branch_id: movieDetails.branch_id,
+                            branch_ids: movieDetails.branch_ids
                           })
                         }
                         className="h-7 w-7 text-gray-500 hover:text-orange-600 hover:bg-orange-50 rounded-full transition-colors ml-1"
                         title="Chỉnh sửa phim"
+                        aria-label="Chỉnh sửa phim"
                       >
                         <Pencil className="h-4 w-4" />
                       </Button>
@@ -663,19 +701,19 @@ export default function MoviesContent({
                           {movieDetails.genres.slice(0, 4).map((genre: string) => (
                             <span
                               key={genre}
-                              className="text-[9px] font-medium px-2 py-0.5 bg-gray-100 text-gray-600 rounded border border-gray-200"
+                              className="text-[11px] font-medium px-2 py-0.5 bg-gray-100 text-gray-600 rounded border border-gray-200"
                             >
                               {genre}
                             </span>
                           ))}
                           {movieDetails.genres.length > 4 && (
-                            <span className="text-[9px] font-medium px-2 py-0.5 bg-gray-200 text-gray-500 rounded border border-gray-300">
-                              +{movieDetails.genres.length - 4} more
+                            <span className="text-[11px] font-medium px-2 py-0.5 bg-gray-200 text-gray-500 rounded border border-gray-300">
+                              +{movieDetails.genres.length - 4} thể loại khác
                             </span>
                           )}
                         </>
                       ) : (
-                        <span className="text-[9px] text-gray-500 italic">Chưa có thể loại</span>
+                        <span className="text-[11px] text-gray-500 italic">Chưa có thể loại</span>
                       )}
                     </div>
                   </div>
@@ -685,6 +723,8 @@ export default function MoviesContent({
                   variant="ghost"
                   size="icon"
                   onClick={() => setIsDetailsOpen(false)}
+                  aria-label="Đóng"
+                  title="Đóng"
                   className="h-8 w-8 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-full transition-colors mr-2"
                 >
                   <X size={20} />
@@ -698,24 +738,27 @@ export default function MoviesContent({
                   {[
                     {
                       label: 'Đánh giá',
-                      val: `${movieDetails.rating}/10`,
+                      val:
+                        movieDetails.rating === null || movieDetails.rating === undefined
+                          ? '-'
+                          : `${movieDetails.rating}/10`,
                       icon: <Star size={12} />,
                       color: 'text-blue-600'
                     },
                     {
                       label: 'Trạng thái',
-                      val: movieDetails.is_active === true ? 'Đang chiếu' : 'Đã ẩn',
+                      val: activeStatusLabel(movieDetails.is_active),
                       color: movieDetails.is_active === true ? 'text-emerald-600' : 'text-slate-400'
                     },
                     {
                       label: 'Thời lượng',
-                      val: `${movieDetails.duration_min} phút`,
+                      val: movieDetails.duration_min ? `${movieDetails.duration_min} phút` : '-',
                       icon: <Clock size={12} />,
                       color: 'text-slate-700'
                     },
                     {
                       label: 'Ngày phát hành',
-                      val: movieDetails.release_date ? format(new Date(movieDetails.release_date), 'dd/MM/yyyy') : '-',
+                      val: formatVnDate(movieDetails.release_date),
                       icon: <Calendar size={12} />,
                       color: 'text-slate-700'
                     }
@@ -726,7 +769,7 @@ export default function MoviesContent({
                     >
                       <div className="flex items-center gap-1.5 mb-1">
                         <span className="text-slate-400">{stat.icon}</span>
-                        <p className="text-[9px] text-slate-400 uppercase font-black">{stat.label}</p>
+                        <p className="text-[11px] text-slate-400 uppercase font-black">{stat.label}</p>
                       </div>
                       <p className={`text-lg font-bold ${stat.color || 'text-slate-700'}`}>{stat.val}</p>
                     </div>
@@ -742,7 +785,13 @@ export default function MoviesContent({
                         <h3 className="text-[11px] font-bold text-slate-600 uppercase flex items-center gap-2 tracking-tight">
                           <Ticket size={14} className="text-indigo-500" /> Phân loại gói vé áp dụng
                         </h3>
-                        <Button variant="ghost" size="sm" className="h-6 text-[10px] text-blue-600 hover:bg-blue-50">
+                        {/* Packages are managed on the ticket packages screen */}
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-6 text-[11px] text-blue-600 hover:bg-blue-50"
+                          onClick={() => navigate('/tickets')}
+                        >
                           Cấu hình
                         </Button>
                       </div>
@@ -767,8 +816,7 @@ export default function MoviesContent({
                                 <span
                                   className={`text-xs font-semibold ${isVip ? 'text-indigo-700' : 'text-emerald-700'}`}
                                 >
-                                  {pkg.name} ({Number(pkg.price || 0).toLocaleString()}
-                                  đ)
+                                  {pkg.name} ({formatVnd(pkg.price)})
                                 </span>
                               </div>
                             );
@@ -778,7 +826,11 @@ export default function MoviesContent({
                             Chưa có gói vé nào được áp dụng cho phim này
                           </div>
                         )}
-                        <button className="px-4 py-2 border border-dashed border-slate-300 rounded-lg text-slate-400 text-xs hover:bg-slate-50 hover:border-slate-400 transition-all">
+                        <button
+                          type="button"
+                          onClick={() => navigate('/tickets')}
+                          className="px-4 py-2 border border-dashed border-slate-300 rounded-lg text-slate-400 text-xs hover:bg-slate-50 hover:border-slate-400 transition-all"
+                        >
                           + Gán gói mới
                         </button>
                       </div>
@@ -792,14 +844,14 @@ export default function MoviesContent({
                       <div className="space-y-3">
                         <div className="flex justify-between text-xs">
                           <span className="text-slate-400">Thời lượng:</span>
-                          <span className="font-bold text-slate-700">{movieDetails.duration_min} phút</span>
+                          <span className="font-bold text-slate-700">
+                            {movieDetails.duration_min ? `${movieDetails.duration_min} phút` : '-'}
+                          </span>
                         </div>
                         <div className="flex justify-between text-xs">
                           <span className="text-slate-400">Ngày phát hành:</span>
-                          <span className="font-bold text-slate-700 px-1.5 py-0.5 bg-slate-100 rounded text-[10px]">
-                            {movieDetails.release_date
-                              ? format(new Date(movieDetails.release_date), 'dd/MM/yyyy HH:mm')
-                              : '-'}
+                          <span className="font-bold text-slate-700 px-1.5 py-0.5 bg-slate-100 rounded text-[11px]">
+                            {formatVnDateTime(movieDetails.release_date)}
                           </span>
                         </div>
                         <div className="flex items-center justify-between text-[11px]">
@@ -807,9 +859,7 @@ export default function MoviesContent({
                             <Calendar size={12} /> Ngày tạo:
                           </span>
                           <span className="font-mono text-slate-600">
-                            {movieDetails.created_at
-                              ? format(new Date(movieDetails.created_at), 'dd/MM/yyyy HH:mm')
-                              : '-'}
+                            {formatVnDateTime(movieDetails.created_at)}
                           </span>
                         </div>
                         <div className="flex items-center justify-between text-[11px]">
@@ -823,9 +873,7 @@ export default function MoviesContent({
                             <History size={12} /> Cập nhật:
                           </span>
                           <span className="font-mono text-slate-600">
-                            {movieDetails.updated_at
-                              ? format(new Date(movieDetails.updated_at), 'dd/MM/yyyy HH:mm')
-                              : '-'}
+                            {formatVnDateTime(movieDetails.updated_at)}
                           </span>
                         </div>
                         <div className="flex items-center justify-between text-[11px]">
@@ -834,6 +882,20 @@ export default function MoviesContent({
                             {movieDetails.updated_by_staff_name || '-'}
                           </span>
                         </div>
+                        <div className="flex items-start justify-between gap-2 text-[11px]">
+                          <span className="text-slate-400 shrink-0">Chi nhánh:</span>
+                          <BranchIdsBadge
+                            branch_ids={movieDetails.branch_ids}
+                            branch_id={movieDetails.branch_id}
+                            branches={branches || []}
+                          />
+                        </div>
+                        {movieDetails.deleted_at && (
+                          <div className="flex items-center justify-between text-[11px]">
+                            <span className="text-slate-400">Đã xóa lúc:</span>
+                            <span className="font-mono text-red-600">{formatVnDateTime(movieDetails.deleted_at)}</span>
+                          </div>
+                        )}
                       </div>
                     </div>
                   </div>
@@ -848,6 +910,32 @@ export default function MoviesContent({
                   </div>
                   <div className="p-5 text-[13px] text-slate-600 leading-relaxed min-h-[80px] line-clamp-6">
                     {movieDetails.description || 'Chưa có mô tả nội dung cho phim này.'}
+                  </div>
+                </section>
+
+                {/* Gallery: the extra images of the movie */}
+                <section className="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-sm">
+                  <div className="bg-slate-50 px-4 py-2 border-b border-slate-200">
+                    <h3 className="text-[11px] font-bold text-slate-500 uppercase tracking-widest flex items-center gap-2">
+                      {/* TẠM BỎ QUA NHIỀU ẢNH (20261110): hiện mỗi phim chỉ dùng 1 poster (cover_image). Ảnh chi tiết (detail_images) chưa dùng: website khách không hiển thị và form sửa chưa có chỗ thêm/xóa ảnh này. Khi cần thư viện ảnh phim: thêm upload nhiều ảnh vào form sửa (MovieEditModal), hiển thị ở website khách, rồi bỏ ghi chú này. */}
+                      <Image size={14} className="text-blue-500" /> Hình ảnh chi tiết
+                    </h3>
+                  </div>
+                  <div className="p-4 flex flex-wrap gap-3">
+                    {Array.isArray(movieDetails.detail_images) && movieDetails.detail_images.length > 0 ? (
+                      movieDetails.detail_images.map((imageUrl: string, index: number) => (
+                        <a key={`${imageUrl}-${index}`} href={imageUrl} target="_blank" rel="noreferrer">
+                          <img
+                            src={optimizeCloudinaryUrl(imageUrl, 300)}
+                            alt={`Hình chi tiết ${index + 1}`}
+                            loading="lazy"
+                            className="h-20 w-32 object-cover rounded-lg border border-slate-200"
+                          />
+                        </a>
+                      ))
+                    ) : (
+                      <div className="text-xs text-slate-400 italic">Chưa có hình ảnh chi tiết</div>
+                    )}
                   </div>
                 </section>
               </div>

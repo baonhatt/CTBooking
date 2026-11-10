@@ -21,6 +21,9 @@ function installBrowser(pathname: string) {
   const store = new Map<string, string>();
   for (const key of STAFF_KEYS) store.set(key, 'value');
   store.set('unrelated-setting', 'keep');
+  store.set('admin_vouchers_filters', '{}');
+  store.set('admin_movies_filters', '{}');
+  store.set('admin_sidebar_collapsed', 'true');
 
   const location = { href: '', pathname };
   const dispatchEvent = vi.fn();
@@ -28,7 +31,11 @@ function installBrowser(pathname: string) {
   vi.stubGlobal('localStorage', {
     getItem: (key: string) => (store.has(key) ? store.get(key) : null),
     setItem: (key: string, value: string) => void store.set(key, value),
-    removeItem: (key: string) => void store.delete(key)
+    removeItem: (key: string) => void store.delete(key),
+    get length() {
+      return store.size;
+    },
+    key: (index: number) => Array.from(store.keys())[index] ?? null
   });
   return { store, location, dispatchEvent };
 }
@@ -49,6 +56,16 @@ describe('clearSessionStorage', () => {
 
     for (const key of STAFF_KEYS) expect(store.has(key)).toBe(false);
     expect(store.get('unrelated-setting')).toBe('keep');
+  });
+
+  it('also removes every saved admin list filter, but keeps layout preferences', () => {
+    const { store } = installBrowser('/dashboard');
+
+    clearSessionStorage();
+
+    expect(store.has('admin_vouchers_filters')).toBe(false);
+    expect(store.has('admin_movies_filters')).toBe(false);
+    expect(store.get('admin_sidebar_collapsed')).toBe('true');
   });
 
   it('does not throw when storage is blocked', () => {

@@ -1,69 +1,179 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useId } from 'react';
 import { useNavigate } from 'react-router-dom';
 import AdminLayout from '@/admin/layouts/AdminLayout';
 import { useStaffStore } from '@/store/staffStore';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Switch } from '@/components/ui/switch';
-import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import {
-  Settings as SettingsIcon,
-  LayoutDashboard,
-  Mail
-} from 'lucide-react';
-import { buildUrl, request } from '@/lib/api/http';
+import { request } from '@/lib/api/http';
 import { useStaffPermission } from '@/hooks/useStaffPermission';
 import { toast } from 'sonner';
 
+// ====================================================================================================================
+// TYPES AND CONSTANTS
+// ====================================================================================================================
+interface OtpConfig {
+  enable_2fa: boolean;
+  otp_expiry_minutes: number;
+  otp_length: number;
+  otp_resend_cooldown_seconds: number;
+  max_otp_attempts: number;
+}
+
 interface AdminSettingsResponse {
   settings: {
-    otp_settings?: {
-      enable_2fa: boolean;
-      otp_expiry_minutes: number;
-      otp_length: number;
-      otp_resend_cooldown_seconds: number;
-      max_otp_attempts: number;
-    };
-    admin_otp_settings?: {
-      enable_2fa: boolean;
-      otp_expiry_minutes: number;
-      otp_length: number;
-      otp_resend_cooldown_seconds: number;
-      max_otp_attempts: number;
-    };
+    otp_settings?: OtpConfig;
+    admin_otp_settings?: OtpConfig;
   };
 }
 
+type OtpNumberKey = 'otp_expiry_minutes' | 'otp_length' | 'otp_resend_cooldown_seconds' | 'max_otp_attempts';
+
+// The four number fields of an OTP config. The ranges are the same ones the server accepts.
+const OTP_FIELDS: Array<{ key: OtpNumberKey; label: string; unit: string; min: number; max: number }> = [
+  { key: 'otp_expiry_minutes', label: 'Hết hạn sau', unit: 'phút', min: 1, max: 60 },
+  { key: 'otp_length', label: 'Độ dài mã', unit: 'ký tự', min: 4, max: 8 },
+  { key: 'otp_resend_cooldown_seconds', label: 'Chờ giữa 2 lần gửi', unit: 'giây', min: 10, max: 300 },
+  { key: 'max_otp_attempts', label: 'Số lần nhập sai tối đa', unit: 'lần', min: 3, max: 10 }
+];
+
+const DEFAULT_OTP_CONFIG: OtpConfig = {
+  enable_2fa: false,
+  otp_expiry_minutes: 5,
+  otp_length: 6,
+  otp_resend_cooldown_seconds: 30,
+  max_otp_attempts: 5
+};
+
+// ====================================================================================================================
+// OTP CARD: one card per audience (staff or customers), with its own Save button
+// ====================================================================================================================
+interface OtpCardProps {
+  title: string;
+  description: string;
+  savedConfig: OtpConfig;
+  canEdit: boolean;
+  isSaving: boolean;
+  onSave: (config: OtpConfig) => void;
+}
+
+function config_to_draft(config: OtpConfig) {
+  const draft: Record<string, string> = {};
+  for (const field of OTP_FIELDS) draft[field.key] = String(config[field.key]);
+  return draft;
+}
+
+function OtpCard({ title, description, savedConfig, canEdit, isSaving, onSave }: OtpCardProps) {
+  const [isEnabled, setIsEnabled] = useState(savedConfig.enable_2fa);
+  // Numbers are kept as text while typing, so a field can be cleared and retyped
+  const [draft, setDraft] = useState(config_to_draft(savedConfig));
+  const [errors, setErrors] = useState<Record<string, string>>({});
+
+  // Start again from the saved values whenever they change (after loading or after a save)
+  useEffect(() => {
+    setIsEnabled(savedConfig.enable_2fa);
+    setDraft(config_to_draft(savedConfig));
+    setErrors({});
+  }, [savedConfig]);
+
+  const isDirty =
+    isEnabled !== savedConfig.enable_2fa || OTP_FIELDS.some((field) => draft[field.key] !== String(savedConfig[field.key]));
+
+  const handleSave = () => {
+    const nextErrors: Record<string, string> = {};
+    const nextConfig: OtpConfig = { ...savedConfig, enable_2fa: isEnabled };
+    for (const field of OTP_FIELDS) {
+      const value = Number(draft[field.key]);
+      if (draft[field.key].trim() === '' || !Number.isInteger(value) || value < field.min || value > field.max) {
+        nextErrors[field.key] = `Nhập số nguyên từ ${field.min} đến ${field.max}`;
+      } else {
+        nextConfig[field.key] = value;
+      }
+    }
+    setErrors(nextErrors);
+    if (Object.keys(nextErrors).length === 0) onSave(nextConfig);
+  };
+
+  const fieldPrefix = `fmi_${useId()}_`;
+
+  return (
+    <section className="bg-white rounded-2xl border border-slate-200 shadow-sm">
+      <div className="flex items-start justify-between gap-4 p-5 border-b border-slate-100">
+        <div>
+          <h2 className="text-base font-bold text-slate-900">{title}</h2>
+          <p className="text-sm text-slate-500 mt-0.5">{description}</p>
+        </div>
+        <div className="flex items-center gap-2 shrink-0">
+          <span className={`text-xs font-semibold ${isEnabled ? 'text-blue-600' : 'text-slate-400'}`}>
+            {isEnabled ? 'Đang bật' : 'Đang tắt'}
+          </span>
+          <Switch
+            aria-label={`Bật xác thực 2 lớp: ${title}`}
+            checked={isEnabled}
+            disabled={!canEdit}
+            onCheckedChange={setIsEnabled}
+            className="data-[state=checked]:bg-blue-600"
+          />
+        </div>
+      </div>
+
+      <div className={`p-5 grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-4 transition-opacity ${isEnabled ? '' : 'opacity-50'}`}>
+        {OTP_FIELDS.map((field) => (
+          <div key={field.key}>
+            <Label htmlFor={fieldPrefix + field.key} className="text-sm text-slate-700">
+              {field.label}
+            </Label>
+            <div className="flex items-center gap-2 mt-1.5">
+              <Input
+                id={fieldPrefix + field.key}
+                type="number"
+                inputMode="numeric"
+                min={field.min}
+                max={field.max}
+                value={draft[field.key]}
+                disabled={!canEdit}
+                onChange={(event) => setDraft({ ...draft, [field.key]: event.target.value })}
+                className={`w-28 ${errors[field.key] ? 'border-red-400' : ''}`}
+              />
+              <span className="text-sm text-slate-500">{field.unit}</span>
+            </div>
+            {errors[field.key] && <p className="text-xs text-red-600 mt-1">{errors[field.key]}</p>}
+          </div>
+        ))}
+      </div>
+
+      <div className="flex items-center justify-end gap-3 px-5 py-3 border-t border-slate-100 bg-slate-50/60 rounded-b-2xl">
+        {isDirty && <span className="text-xs text-amber-600">Có thay đổi chưa lưu</span>}
+        <button
+          onClick={handleSave}
+          disabled={!isDirty || isSaving || !canEdit}
+          className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold rounded-lg transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+        >
+          {isSaving ? 'Đang lưu...' : 'Lưu'}
+        </button>
+      </div>
+    </section>
+  );
+}
+
+// ====================================================================================================================
+// PAGE
+// ====================================================================================================================
 export default function SettingsPage() {
   const navigate = useNavigate();
   const staff = useStaffStore((state) => state.staff);
   const clearStaff = useStaffStore((state) => state.clearStaff);
-  const [adminEmail, setAdminEmail] = useState('');
-  const defaultOtpConf = {
-    enable_2fa: false,
-    otp_expiry_minutes: 5,
-    otp_length: 6,
-    otp_resend_cooldown_seconds: 30,
-    max_otp_attempts: 5
-  };
-
-  const [otpSettings, setOtpSettings] = useState({ ...defaultOtpConf });
-  const [adminOtpSettings, setAdminOtpSettings] = useState({ ...defaultOtpConf, enable_2fa: true });
-  const [viewMode, setViewMode] = useState<'admin' | 'user'>('admin');
-  const [isSyncing, setIsSyncing] = useState(false);
-  // The settings as they were loaded from the server. Saving is blocked until they have been loaded, so the screen's
-  // default values can never overwrite the real ones.
-  const [loadedSettings, setLoadedSettings] = useState<{ otp: boolean; admin: boolean } | null>(null);
-  const [loadFailed, setLoadFailed] = useState(false);
   const canManageSettings = useStaffPermission('settings', 'manage');
 
-  const isProd = window.location.hostname !== 'localhost';
+  // The settings as they were loaded or last saved. Saving is blocked until they have been loaded, so the screen's
+  // default values can never overwrite the real ones.
+  const [staffConfig, setStaffConfig] = useState<OtpConfig>({ ...DEFAULT_OTP_CONFIG, enable_2fa: true });
+  const [customerConfig, setCustomerConfig] = useState<OtpConfig>({ ...DEFAULT_OTP_CONFIG });
+  const [isLoaded, setIsLoaded] = useState(false);
+  const [loadFailed, setLoadFailed] = useState(false);
+  const [savingKey, setSavingKey] = useState<'staff' | 'customer' | null>(null);
 
   useEffect(() => {
-    setAdminEmail(staff?.email || 'admin@email.com');
-
-    // Luôn fetch config từ server
     fetchSettings();
   }, []);
 
@@ -71,12 +181,9 @@ export default function SettingsPage() {
     try {
       const data = await request<AdminSettingsResponse>('/api/admin/settings');
       if (data && data.settings) {
-        if (data.settings.otp_settings) setOtpSettings(data.settings.otp_settings);
-        if (data.settings.admin_otp_settings) setAdminOtpSettings(data.settings.admin_otp_settings);
-        setLoadedSettings({
-          otp: data.settings.otp_settings?.enable_2fa === true,
-          admin: data.settings.admin_otp_settings?.enable_2fa === true
-        });
+        if (data.settings.admin_otp_settings) setStaffConfig(data.settings.admin_otp_settings);
+        if (data.settings.otp_settings) setCustomerConfig(data.settings.otp_settings);
+        setIsLoaded(true);
         setLoadFailed(false);
       } else {
         setLoadFailed(true);
@@ -87,43 +194,41 @@ export default function SettingsPage() {
     }
   };
 
-  const handleSaveOtpSettings = async () => {
-    if (!canManageSettings || !loadedSettings) return;
+  // Saves one card only: the server takes each config under its own key
+  const saveConfig = async (kind: 'staff' | 'customer', nextConfig: OtpConfig) => {
+    if (!canManageSettings || !isLoaded) return;
+    const savedConfig = kind === 'staff' ? staffConfig : customerConfig;
 
-    // Turning two-factor login on or off for staff or customers is confirmed first
-    if (adminOtpSettings.enable_2fa !== loadedSettings.admin) {
-      const message = adminOtpSettings.enable_2fa
-        ? 'Bật xác thực 2 lớp cho nhân viên? Chỉ bật khi TẤT CẢ nhân viên (trừ Super Admin) có email thật, vì họ sẽ nhận mã OTP qua email để đăng nhập.'
-        : 'Tắt xác thực 2 lớp cho nhân viên? Đăng nhập admin sẽ chỉ cần mật khẩu.';
+    // Turning two-factor login on or off is confirmed first
+    if (nextConfig.enable_2fa !== savedConfig.enable_2fa) {
+      let message: string;
+      if (kind === 'staff') {
+        message = nextConfig.enable_2fa
+          ? 'Bật xác thực 2 lớp cho nhân viên? Chỉ bật khi TẤT CẢ nhân viên (trừ Super Admin) có email thật, vì họ sẽ nhận mã OTP qua email để đăng nhập.'
+          : 'Tắt xác thực 2 lớp cho nhân viên? Đăng nhập admin sẽ chỉ cần mật khẩu.';
+      } else {
+        message = nextConfig.enable_2fa
+          ? 'Bật xác thực OTP cho khách hàng? Khách sẽ nhận mã OTP qua email khi đăng nhập.'
+          : 'Tắt xác thực OTP cho khách hàng?';
+      }
       if (!window.confirm(message)) return;
     }
-    if (otpSettings.enable_2fa !== loadedSettings.otp) {
-      const message = otpSettings.enable_2fa
-        ? 'Bật xác thực OTP cho khách hàng? Khách sẽ nhận mã OTP qua email khi đăng nhập.'
-        : 'Tắt xác thực OTP cho khách hàng?';
-      if (!window.confirm(message)) return;
-    }
-    await saveSettings();
-  };
 
-  const saveSettings = async () => {
-    setIsSyncing(true);
+    setSavingKey(kind);
     try {
       await request('/api/admin/settings', {
         method: 'POST',
-        body: JSON.stringify({
-          otp_settings: otpSettings,
-          admin_otp_settings: adminOtpSettings
-        })
+        body: JSON.stringify(kind === 'staff' ? { admin_otp_settings: nextConfig } : { otp_settings: nextConfig })
       });
-      toast.success('Đã lưu cấu hình cài đặt thành công!');
-      setLoadedSettings({ otp: otpSettings.enable_2fa === true, admin: adminOtpSettings.enable_2fa === true });
+      toast.success('Đã lưu cấu hình thành công!');
+      if (kind === 'staff') setStaffConfig(nextConfig);
+      else setCustomerConfig(nextConfig);
     } catch (err: any) {
       console.error('Failed to save admin settings:', err);
       // The server says why a value was refused (for example a number outside its range)
       toast.error(err?.message || 'Có lỗi xảy ra khi lưu cấu hình');
     } finally {
-      setIsSyncing(false);
+      setSavingKey(null);
     }
   };
 
@@ -140,198 +245,40 @@ export default function SettingsPage() {
       adminEmailState={staff?.email || 'admin@email.com'}
       handleLogout={handleLogout}
     >
-      <div className="space-y-6 max-w-5xl mx-auto">
-        {/* Header */}
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-2">
-          <div className="flex items-center gap-4">
-            <div className="w-14 h-14 bg-blue-50 rounded-2xl flex items-center justify-center shadow-lg shadow-blue-100">
-              <SettingsIcon size={28} className="text-blue-600" />
-            </div>
-            <div>
-              <h1 className="text-3xl font-black text-slate-900 tracking-tight leading-none mb-1">Cấu hình hệ thống</h1>
-              <p className="text-xs text-slate-400 font-bold uppercase tracking-[0.2em]">
-                Tùy chỉnh hệ thống & xác thực
-              </p>
-            </div>
-          </div>
+      <div className="max-w-3xl mx-auto space-y-5">
+        <div>
+          <h1 className="text-2xl font-bold text-slate-900">Cấu hình hệ thống</h1>
+          <p className="text-sm text-slate-500 mt-1">
+            Xác thực OTP khi đăng nhập. Thay đổi áp dụng ngay cho các mã OTP tạo sau đó.
+          </p>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          {/* Left Column: OTP Settings */}
-          <div className="lg:col-span-2 space-y-6">
-
-            {/* OTP Settings Card */}
-            <Card className="border-none shadow-2xl shadow-slate-200/50 rounded-[2rem] overflow-hidden bg-white">
-              <div className="p-8 bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 text-white relative overflow-hidden">
-                <div className="absolute top-0 right-0 w-64 h-64 bg-blue-500/10 rounded-full -translate-y-1/2 translate-x-1/2 blur-3xl" />
-                <div className="relative z-10 flex items-center gap-4">
-                  <div className="p-3 bg-white/10 backdrop-blur-md rounded-2xl border border-white/10">
-                    <Mail size={24} className="text-blue-400" />
-                  </div>
-                  <div>
-                    <CardTitle className="text-2xl font-black tracking-tight">Cấu hình OTP / 2FA</CardTitle>
-                    <div className="flex items-center gap-2 mt-1">
-                      <p className="text-slate-400 text-sm font-medium">Bật xác thực 2 lớp cho đăng nhập người dùng</p>
-                      {isProd && (
-                        <Badge
-                          variant="outline"
-                          className={`ml-2 text-[10px] ${isSyncing ? 'animate-pulse bg-blue-500/10 text-blue-400 border-blue-400/20' : 'bg-green-500/10 text-green-400 border-green-400/20'}`}
-                        >
-                          {isSyncing ? 'Đang lưu...' : 'Đã đồng bộ cloud'}
-                        </Badge>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              </div>
-              <CardContent className="p-8 space-y-6">
-                
-                {/* Tabs / Segment control */}
-                <div className="flex bg-slate-100 p-1.5 rounded-xl w-fit">
-                  <button
-                    onClick={() => setViewMode('admin')}
-                    className={`px-6 py-2 rounded-lg text-sm font-bold transition-all duration-300 flex-1 min-w-[140px] text-center ${viewMode === 'admin' ? 'bg-white shadow-sm text-blue-600' : 'text-slate-500 hover:text-slate-700'}`}
-                  >
-                    Bảo mật Admin
-                  </button>
-                  <button
-                    onClick={() => setViewMode('user')}
-                    className={`px-6 py-2 rounded-lg text-sm font-bold transition-all duration-300 flex-1 min-w-[140px] text-center ${viewMode === 'user' ? 'bg-white shadow-sm text-blue-600' : 'text-slate-500 hover:text-slate-700'}`}
-                  >
-                    Khách Hàng (User)
-                  </button>
-                </div>
-
-                {/* Enable 2FA */}
-                <div className="flex items-center justify-between p-5 bg-slate-50 rounded-2xl border border-slate-100">
-                  <div>
-                    <Label className="text-base font-semibold">Bật 2FA cho đăng nhập ({viewMode === 'admin' ? 'Admin' : 'Khách hàng'})</Label>
-                    <p className="text-sm text-slate-500 mt-1">
-                      Khi bật, tài khoản sẽ cần nhập OTP gửi qua email sau khi nhập mật khẩu
-                    </p>
-                  </div>
-                  <Switch
-                    checked={viewMode === 'admin' ? adminOtpSettings.enable_2fa : otpSettings.enable_2fa}
-                    disabled={!canManageSettings}
-                    onCheckedChange={(checked) => {
-                      if (viewMode === 'admin') setAdminOtpSettings({ ...adminOtpSettings, enable_2fa: checked });
-                      else setOtpSettings({ ...otpSettings, enable_2fa: checked });
-                    }}
-                    className="data-[state=checked]:bg-blue-600"
-                  />
-                </div>
-
-                {/* OTP Settings Grid */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div>
-                    <Label>Thời gian hết hạn OTP (phút)</Label>
-                    <Input
-                      type="number"
-                      min={1}
-                      max={60}
-                      value={viewMode === 'admin' ? adminOtpSettings.otp_expiry_minutes : otpSettings.otp_expiry_minutes}
-                      onChange={(e) => {
-                        const val = parseInt(e.target.value) || 5;
-                        if (viewMode === 'admin') setAdminOtpSettings({ ...adminOtpSettings, otp_expiry_minutes: val });
-                        else setOtpSettings({ ...otpSettings, otp_expiry_minutes: val });
-                      }}
-                      className="mt-2"
-                    />
-                    <p className="text-sm text-slate-500 mt-1">OTP sẽ hết hạn sau số phút này</p>
-                  </div>
-
-                  <div>
-                    <Label>Độ dài OTP</Label>
-                    <Input
-                      type="number"
-                      min={4}
-                      max={8}
-                      value={viewMode === 'admin' ? adminOtpSettings.otp_length : otpSettings.otp_length}
-                      onChange={(e) => {
-                        const val = parseInt(e.target.value) || 6;
-                        if (viewMode === 'admin') setAdminOtpSettings({ ...adminOtpSettings, otp_length: val });
-                        else setOtpSettings({ ...otpSettings, otp_length: val });
-                      }}
-                      className="mt-2"
-                    />
-                    <p className="text-sm text-slate-500 mt-1">Số ký tự của mã OTP (4-8)</p>
-                  </div>
-
-                  <div>
-                    <Label>Thời gian chờ gửi lại (giây)</Label>
-                    <Input
-                      type="number"
-                      min={10}
-                      max={300}
-                      value={viewMode === 'admin' ? adminOtpSettings.otp_resend_cooldown_seconds : otpSettings.otp_resend_cooldown_seconds}
-                      onChange={(e) => {
-                        const val = parseInt(e.target.value) || 30;
-                        if (viewMode === 'admin') setAdminOtpSettings({ ...adminOtpSettings, otp_resend_cooldown_seconds: val });
-                        else setOtpSettings({ ...otpSettings, otp_resend_cooldown_seconds: val });
-                      }}
-                      className="mt-2"
-                    />
-                    <p className="text-sm text-slate-500 mt-1">Thời gian chờ giữa các lần gửi lại</p>
-                  </div>
-
-                  <div>
-                    <Label>Số lần thử tối đa</Label>
-                    <Input
-                      type="number"
-                      min={3}
-                      max={10}
-                      value={viewMode === 'admin' ? adminOtpSettings.max_otp_attempts : otpSettings.max_otp_attempts}
-                      onChange={(e) => {
-                        const val = parseInt(e.target.value) || 5;
-                        if (viewMode === 'admin') setAdminOtpSettings({ ...adminOtpSettings, max_otp_attempts: val });
-                        else setOtpSettings({ ...otpSettings, max_otp_attempts: val });
-                      }}
-                      className="mt-2"
-                    />
-                    <p className="text-sm text-slate-500 mt-1">Số lần nhập sai tối đa trước khi khóa</p>
-                  </div>
-                </div>
-
-                {loadFailed && (
-                  <div className="rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700 flex items-center justify-between gap-3">
-                    <span>Không tải được cấu hình hiện tại nên chưa thể lưu, để tránh ghi đè giá trị thật.</span>
-                    <button onClick={fetchSettings} className="font-semibold underline">Tải lại</button>
-                  </div>
-                )}
-                <button
-                  onClick={handleSaveOtpSettings}
-                  disabled={isSyncing || !canManageSettings || !loadedSettings}
-                  className="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-xl transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  {isSyncing ? 'Đang lưu...' : 'Lưu cài đặt OTP'}
-                </button>
-              </CardContent>
-            </Card>
+        {loadFailed && (
+          <div className="rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700 flex items-center justify-between gap-3">
+            <span>Không tải được cấu hình hiện tại nên chưa thể lưu, để tránh ghi đè giá trị thật.</span>
+            <button onClick={fetchSettings} className="font-semibold underline">
+              Tải lại
+            </button>
           </div>
+        )}
 
-          {/* Right Column: Tips & Info */}
-          <div className="space-y-6">
-            <Card className="border-none shadow-2xl shadow-slate-200/50 rounded-[2rem] bg-indigo-600 text-white p-8 relative overflow-hidden">
-              <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full blur-2xl" />
-              <h3 className="text-xl font-black mb-4 flex items-center gap-2">
-                <LayoutDashboard size={20} /> Bảo mật 2FA
-              </h3>
-              <p className="text-sm font-medium text-indigo-100 leading-[1.6]">
-                Bật xác thực hai lớp (2FA) giúp tăng cường bảo mật cho toàn bộ tài khoản nhân viên và người dùng khi đăng nhập vào hệ thống Cinesphere.
-              </p>
-            </Card>
+        <OtpCard
+          title="Đăng nhập nhân viên (Admin)"
+          description="Nhân viên nhập mật khẩu rồi nhập mã OTP gửi qua email. Super Admin không bị yêu cầu mã."
+          savedConfig={staffConfig}
+          canEdit={canManageSettings && isLoaded}
+          isSaving={savingKey === 'staff'}
+          onSave={(config) => saveConfig('staff', config)}
+        />
 
-            <div className="p-8 bg-blue-50 border border-blue-100 rounded-[2rem] space-y-4">
-              <div className="w-10 h-10 bg-blue-600 rounded-xl flex items-center justify-center text-white">
-                <SettingsIcon size={20} />
-              </div>
-              <h4 className="text-lg font-black text-slate-900">Lưu ý cấu hình</h4>
-              <p className="text-xs text-slate-600 font-medium leading-relaxed">
-                Mọi thay đổi cấu hình OTP sẽ áp dụng ngay lập tức cho các lần tạo và gửi mã OTP tiếp theo.
-              </p>
-            </div>
-          </div>
-        </div>
+        <OtpCard
+          title="Đăng nhập khách hàng"
+          description="Khách hàng nhận mã OTP qua email khi đăng nhập trên website."
+          savedConfig={customerConfig}
+          canEdit={canManageSettings && isLoaded}
+          isSaving={savingKey === 'customer'}
+          onSave={(config) => saveConfig('customer', config)}
+        />
       </div>
     </AdminLayout>
   );

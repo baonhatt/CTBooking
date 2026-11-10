@@ -19,6 +19,8 @@ interface ConfirmDeleteDialogProps {
   cancelText?: string;
   onConfirm: () => void;
   isDeleting?: boolean;
+  // Disables the confirm button (for example when the server would refuse the delete anyway)
+  confirmDisabled?: boolean;
 }
 
 export function ConfirmDeleteDialog({
@@ -30,6 +32,7 @@ export function ConfirmDeleteDialog({
   cancelText = 'Hủy',
   onConfirm,
   isDeleting = false,
+  confirmDisabled = false,
 }: ConfirmDeleteDialogProps) {
   return (
     <AlertDialog open={isOpen} onOpenChange={onOpenChange}>
@@ -54,7 +57,7 @@ export function ConfirmDeleteDialog({
               e.preventDefault();
               onConfirm();
             }}
-            disabled={isDeleting}
+            disabled={isDeleting || confirmDisabled}
             className="bg-red-600 hover:bg-red-700 min-w-[100px] rounded-xl shadow-lg shadow-red-500/20 transition-all active:scale-95 text-white"
           >
             {isDeleting ? 'Đang xử lý...' : confirmText}

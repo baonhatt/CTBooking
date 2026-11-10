@@ -219,7 +219,7 @@ rolesRouter.get('/api/admin/deleted/roles', requireStaffAuth, requirePermission(
     const r = await listDeletedRolesImpl(
       db,
       { roles: schema.roles, staffs: schema.staffs },
-      { page, pageSize, search }
+      { page, pageSize, search, sort: String(c.req.query('sort') || ''), dir: String(c.req.query('dir') || '') }
     );
 
     return c.json(r, 200);

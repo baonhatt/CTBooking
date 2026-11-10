@@ -9,6 +9,7 @@ import { Switch } from '@/components/ui/switch';
 import {
   Pagination,
   PaginationContent,
+  PaginationEllipsis,
   PaginationItem,
   PaginationLink,
   PaginationNext,
@@ -22,7 +23,8 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger
 } from '@/components/ui/dropdown-menu';
-import { getTransactionById, getTransactions, exportTransactions, getTickets } from '@/lib/api';
+import { getTransactionById, getTransactions, exportTransactions } from '@/lib/api';
+import { EMPTY_VALUE, formatVnd, formatVnDateTime, paymentMethodLabel } from '@/lib/format';
 import { exportTransactionsData } from '@/lib/exportUtils';
 import {
   CheckCircle2,
@@ -63,6 +65,7 @@ interface Tx {
   userId?: number | null;
   transactionId: string;
   email: string;
+  phone?: string;
   userName: string;
   ticket_package_name: string;
   vr_items?: Array<{ package_name: string; quantity: number }>;
@@ -136,14 +139,14 @@ const parsePackageName = (name: string, t?: Tx) => {
   if (t?.booking_type === 'combo_vr' || t?.booking_type === 'vr') {
     if (t.vr_items && t.vr_items.length > 0) {
       vrItemsList = t.vr_items.map((it, idx) => (
-        <span key={`vr-${idx}`} className="truncate text-slate-500 mt-0.5 text-[10px] block max-w-[160px]" title={`${it.package_name} (x${it.quantity})`}>
+        <span key={`vr-${idx}`} className="truncate text-slate-500 mt-0.5 text-[11px] block max-w-[160px]" title={`${it.package_name} (x${it.quantity})`}>
           • {it.package_name} (x{it.quantity})
         </span>
       ));
     }
     if (!vrItemsList && t?.booking_type === 'combo_vr') {
       vrItemsList = (
-        <span className="truncate text-slate-500 mt-0.5 text-[10px] block max-w-[160px]">
+        <span className="truncate text-slate-500 mt-0.5 text-[11px] block max-w-[160px]">
           • Kèm tùy chọn VR (x{Math.max((t?.ticketCount || 1) - 1, 1)})
         </span>
       );
@@ -158,7 +161,7 @@ const parsePackageName = (name: string, t?: Tx) => {
         const parsed = JSON.parse(trimmed);
         if (Array.isArray(parsed)) {
           movieItemsList = parsed.map((item, idx) => (
-            <span key={idx} className="truncate text-slate-500 mt-0.5 text-[10px] block max-w-[160px]" title={`${item.name || 'Gói vé'} (x${item.quantity || 1})`}>
+            <span key={idx} className="truncate text-slate-500 mt-0.5 text-[11px] block max-w-[160px]" title={`${item.name || 'Gói vé'} (x${item.quantity || 1})`}>
               • {item.name || 'Gói vé'} (x{item.quantity || 1})
             </span>
           ));
@@ -168,7 +171,7 @@ const parsePackageName = (name: string, t?: Tx) => {
     
     if (!movieItemsList) {
       movieItemsList = (
-        <span className="truncate text-slate-500 mt-0.5 text-[10px] block max-w-[160px]" title={name || '---'}>
+        <span className="truncate text-slate-500 mt-0.5 text-[11px] block max-w-[160px]" title={name || '---'}>
           • {name || '---'}
         </span>
       );
@@ -184,6 +187,21 @@ const parsePackageName = (name: string, t?: Tx) => {
       {vrItemsList}
     </div>
   );
+};
+
+// Page numbers to show: first, last, and two either side of the current page, with 'gap' for skipped runs
+const getPageWindow = (currentPage: number, totalPages: number): Array<number | 'gap'> => {
+  const pageNumbers: Array<number | 'gap'> = [];
+  let previousShown = 0;
+  for (let pageNo = 1; pageNo <= totalPages; pageNo++) {
+    const isEdge = pageNo === 1 || pageNo === totalPages;
+    const isNearCurrent = Math.abs(pageNo - currentPage) <= 2;
+    if (!isEdge && !isNearCurrent) continue;
+    if (pageNo - previousShown > 1) pageNumbers.push('gap');
+    pageNumbers.push(pageNo);
+    previousShown = pageNo;
+  }
+  return pageNumbers;
 };
 
 interface Props {
@@ -250,19 +268,13 @@ export default function TransactionsContent({
   const [txDetails, setTxDetails] = useState<any>(null);
   const [isLoadingDetails, setIsLoadingDetails] = useState(false);
   const [detailsError, setDetailsError] = useState<string | null>(null);
-  const [allTickets, setAllTickets] = useState<any[]>([]);
   useEffect(() => {
     if (isDetailsOpen && selectedTxId) {
       (async () => {
         try {
           setIsLoadingDetails(true);
           setDetailsError(null);
-          if (!allTickets.length) {
-            try {
-              const { items } = await getTickets({ page: 1, pageSize: 200 });
-              setAllTickets(items || []);
-            } catch {}
-          }
+          setTxDetails(null);
           const details = await getTransactionById(selectedTxId);
           setTxDetails(details);
         } catch (err) {
@@ -274,6 +286,32 @@ export default function TransactionsContent({
       })();
     }
   }, [isDetailsOpen, selectedTxId]);
+
+  // Header values come from the list row until the detail has loaded
+  const headerBookingCode = txDetails?.booking_details?.booking_code || selectedTxSummary?.booking_code || '';
+  const headerTotalPrice = txDetails?.booking_details?.total_price ?? selectedTxSummary?.totalPrice;
+
+  // Voucher and sale attribution, shown inside the price section so the discount reads next to the amounts
+  const renderVoucherSummary = () => {
+    const voucher = txDetails?.voucher_info;
+    if (!voucher?.voucher_code && !voucher?.sale_name) return null;
+    const discountAmount = Number(voucher.voucher_discount_amount || 0);
+    const saleLabel = voucher.sale_name
+      ? `${voucher.sale_name}${voucher.sale_email ? ` (${voucher.sale_email})` : ''}`
+      : 'Voucher chung';
+    return (
+      <div className="grid grid-cols-3 gap-3 border-t border-purple-200/40 pt-3">
+        <InfoRow label="Mã voucher" value={voucher.voucher_code || EMPTY_VALUE} bold color="text-purple-700" />
+        <InfoRow
+          label={voucher.scope ? voucherScopeLabel(voucher.scope) : 'Giảm giá'}
+          value={discountAmount > 0 ? `-${formatVnd(discountAmount)}` : formatVnd(0)}
+          bold
+          color="text-emerald-700"
+        />
+        <InfoRow label="Sale phụ trách" value={saleLabel} bold color="text-blue-700" />
+      </div>
+    );
+  };
 
   const handleViewDetails = (tx: Tx) => {
     setSelectedTxId(Number(tx.id));
@@ -332,20 +370,22 @@ export default function TransactionsContent({
     return <Badge className="bg-green-100 text-green-700 border-green-200 py-1 font-bold">SẴN SÀNG SỬ DỤNG</Badge>;
   };
 
-  const formatDate = (date, onlyDate = false) => {
-    if (!date) return '---';
-    const d = new Date(date);
-    return onlyDate ? d.toLocaleDateString('vi-VN') : d.toLocaleString('vi-VN');
-  };
+  // One date format for the whole screen, always in Vietnam time
+  const formatDate = (date) => formatVnDateTime(date);
   const CopyableText = ({ text, label }: { text: string; label?: string }) => {
     const [copied, setCopied] = useState(false);
 
-    const handleCopy = () => {
+    const handleCopy = async () => {
       if (!text) return;
-      navigator.clipboard.writeText(text);
-      setCopied(true);
-      toast.success(`Đã sao chép ${label || ''}`);
-      setTimeout(() => setCopied(false), 2000);
+      try {
+        await navigator.clipboard.writeText(text);
+        setCopied(true);
+        toast.success(`Đã sao chép ${label || ''}`);
+        setTimeout(() => setCopied(false), 2000);
+      } catch {
+        // The clipboard can be blocked (no permission, not https), so say so instead of claiming success
+        toast.error('Không sao chép được, hãy chọn và sao chép thủ công');
+      }
     };
 
     return (
@@ -431,15 +471,15 @@ export default function TransactionsContent({
       <div className="flex flex-col gap-4 bg-white p-6 rounded-2xl border shadow-sm">
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
           <div className="flex flex-col gap-1">
-            <h3 className="text-lg font-bold text-slate-900 flex items-center gap-2">
+            <h1 className="text-lg font-bold text-slate-900 flex items-center gap-2">
               Lịch sử giao dịch
               <Badge
                 variant="secondary"
-                className="rounded-full bg-slate-100 text-slate-600 px-2 py-0 h-5 text-[10px] font-bold"
+                className="rounded-full bg-slate-100 text-slate-600 px-2 py-0 h-5 text-[11px] font-bold"
               >
                 {transactionsLength}
               </Badge>
-            </h3>
+            </h1>
             <p className="text-xs text-slate-500">Quản lý, đối soát và xuất file thống kê doanh thu hệ thống.</p>
           </div>
           <div className="flex items-center gap-2">
@@ -467,7 +507,7 @@ export default function TransactionsContent({
                     <Download className="w-4 h-4 text-emerald-600" />
                     <div className="flex flex-col">
                       <span className="font-semibold">Xuất toàn bộ theo bộ lọc</span>
-                      <span className="text-[10px] text-slate-400">({transactionsLength} giao dịch)</span>
+                      <span className="text-[11px] text-slate-400">({transactionsLength} giao dịch)</span>
                     </div>
                   </DropdownMenuItem>
                   <DropdownMenuItem
@@ -477,7 +517,7 @@ export default function TransactionsContent({
                     <FileSpreadsheet className="w-4 h-4 text-blue-600" />
                     <div className="flex flex-col">
                       <span className="font-semibold">Xuất trang hiện tại</span>
-                      <span className="text-[10px] text-slate-400">({data.length} giao dịch)</span>
+                      <span className="text-[11px] text-slate-400">({data.length} giao dịch)</span>
                     </div>
                   </DropdownMenuItem>
                 </DropdownMenuContent>
@@ -511,7 +551,8 @@ export default function TransactionsContent({
             <div className="relative flex-1">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 w-4 h-4" />
               <Input
-                placeholder="Tìm email hoặc mã giao dịch..."
+                aria-label="Tìm email, số điện thoại hoặc mã đặt chỗ"
+                placeholder="Tìm email, SĐT hoặc mã đặt chỗ..."
                 value={localTxQuery}
                 onChange={(e) => setLocalTxQuery(e.target.value)}
                 className="pl-10 h-10 bg-slate-50 border-transparent focus:bg-white focus:ring-2 focus:ring-blue-500 rounded-xl transition-all"
@@ -564,6 +605,7 @@ export default function TransactionsContent({
               <Input
                 type="date"
                 value={fromDate}
+                aria-label="Từ ngày"
                 onChange={(e) => setFromDate?.(e.target.value)}
                 className="w-36 h-7 bg-white border-0 shadow-sm text-xs rounded-lg px-2"
               />
@@ -572,6 +614,7 @@ export default function TransactionsContent({
               <Input
                 type="date"
                 value={toDate}
+                aria-label="Đến ngày"
                 onChange={(e) => setToDate?.(e.target.value)}
                 className="w-36 h-7 bg-white border-0 shadow-sm text-xs rounded-lg px-2"
               />
@@ -580,6 +623,7 @@ export default function TransactionsContent({
             {/* Sắp xếp theo */}
             <select
               value={sortKey}
+              aria-label="Sắp xếp theo"
               onChange={(e) => setSortKey(e.target.value as any)}
               className="h-10 px-3 bg-white border rounded-xl text-xs w-44 cursor-pointer shadow-sm focus:ring-2 focus:ring-blue-500 outline-none"
             >
@@ -590,6 +634,7 @@ export default function TransactionsContent({
             {/* Phương thức thanh toán */}
             <select
               value={paymentMethod}
+              aria-label="Phương thức thanh toán"
               onChange={(e) => setPaymentMethod?.(e.target.value)}
               className="h-10 px-3 bg-white border rounded-xl text-xs w-40 cursor-pointer shadow-sm focus:ring-2 focus:ring-blue-500 outline-none"
             >
@@ -602,6 +647,7 @@ export default function TransactionsContent({
             {branches.length > 0 ? (
               <select
                 value={selectedBranchId || 'all'}
+                aria-label="Chi nhánh"
                 onChange={(e) => setSelectedBranchId(e.target.value === 'all' ? 'all' : Number(e.target.value))}
                 className="h-10 px-3 bg-white border rounded-xl text-xs w-40 cursor-pointer shadow-sm focus:ring-2 focus:ring-blue-500 outline-none"
               >
@@ -659,14 +705,14 @@ export default function TransactionsContent({
           <Table className="w-full">
             <TableHeader className="bg-gray-50 border-b">
               <TableRow className="hover:bg-transparent border-none">
-                <TableHead className="w-[50px] px-2 text-center text-xs">ID</TableHead>
+                <TableHead className="w-[110px] px-2 text-center text-xs">Mã đặt chỗ</TableHead>
                 <TableHead className="w-[110px] px-2.5 text-xs">Chi nhánh</TableHead>
                 <TableHead className="w-[175px] px-2.5 text-xs">Người dùng</TableHead>
                 <TableHead className="text-center w-[72px] px-1.5 text-xs">Loại</TableHead>
                 <TableHead className="w-[162px] px-2.5 text-xs">Sản phẩm</TableHead>
                 <TableHead className="text-center w-[58px] px-1 text-xs whitespace-nowrap">SL</TableHead>
                 <TableHead className="w-[95px] px-2 text-xs">Doanh thu</TableHead>
-                <TableHead className="w-[108px] px-2 text-xs">Thời gian</TableHead>
+                <TableHead className="w-[130px] px-2 text-xs">Thời gian</TableHead>
                 <TableHead className="text-center w-[76px] px-1 text-xs whitespace-nowrap">Phương thức</TableHead>
                 <TableHead className="text-right w-[115px] pr-3 pl-1 text-xs">
                   Thao tác
@@ -773,9 +819,11 @@ export default function TransactionsContent({
                     return (
                       <TableRow
                         key={t.id}
-                        className="hover:bg-gray-50 transition-colors border-b border-gray-200 h-[52px]"
+                        className="hover:bg-gray-50 transition-colors border-b border-gray-200 min-h-[52px]"
                       >
-                        <TableCell className="font-mono text-xs text-gray-500 text-center px-2">#{t.id}</TableCell>
+                        <TableCell className="font-mono text-xs text-gray-600 text-center px-2" title={`Mã đặt chỗ: ${t.booking_code || t.id}`}>
+                          {t.booking_code || `#${t.id}`}
+                        </TableCell>
                         <TableCell className="px-2.5">
                           <div
                             className="text-[12px] font-medium text-slate-600 truncate max-w-[105px]"
@@ -792,13 +840,16 @@ export default function TransactionsContent({
                               {t.userName || 'Khách vãng lai'}
                             </span>
                             <span className="text-[11px] text-gray-500 truncate" title={t.email}>{t.email}</span>
+                            {t.phone && (
+                              <span className="text-[11px] text-gray-500 truncate" title={t.phone}>{t.phone}</span>
+                            )}
                             {t.voucher_code && (
                               <div className="flex items-center gap-1 mt-0.5 flex-wrap">
-                                <span className="inline-flex items-center px-1.5 py-0.5 rounded bg-purple-100 text-purple-700 font-mono text-[9px] font-bold truncate max-w-[110px]" title={t.voucher_code}>
+                                <span className="inline-flex items-center px-1.5 py-0.5 rounded bg-purple-100 text-purple-700 font-mono text-[11px] font-bold truncate max-w-[110px]" title={t.voucher_code}>
                                   🏷️ {t.voucher_code}
                                 </span>
                                 {t.sale_name && (
-                                  <span className="text-[9px] text-blue-600 font-semibold truncate max-w-[55px]" title={t.sale_name}>
+                                  <span className="text-[11px] text-blue-600 font-semibold truncate max-w-[55px]" title={t.sale_name}>
                                     👤 {t.sale_name}
                                   </span>
                                 )}
@@ -808,15 +859,15 @@ export default function TransactionsContent({
                         </TableCell>
                         <TableCell className="text-center px-1.5">
                           {t.booking_type === 'combo_vr' ? (
-                            <Badge className="bg-amber-100 text-amber-700 border-amber-200 py-0.5 px-1.5 font-bold flex items-center justify-center gap-1 mx-auto w-fit text-nowrap text-[10px]">
+                            <Badge className="bg-amber-100 text-amber-700 border-amber-200 py-0.5 px-1.5 font-bold flex items-center justify-center gap-1 mx-auto w-fit text-nowrap text-[11px]">
                               <Film size={9} /> Phim, VR
                             </Badge>
                           ) : t.booking_type === 'vr' ? (
-                            <Badge className="bg-purple-100 text-purple-700 border-purple-200 py-0.5 px-1.5 font-bold flex items-center justify-center gap-1 mx-auto w-fit text-[10px]">
+                            <Badge className="bg-purple-100 text-purple-700 border-purple-200 py-0.5 px-1.5 font-bold flex items-center justify-center gap-1 mx-auto w-fit text-[11px]">
                               <Gamepad2 size={9} /> VR
                             </Badge>
                           ) : (
-                            <Badge className="bg-blue-100 text-blue-700 border-blue-200 py-0.5 px-1.5 font-bold flex items-center justify-center gap-1 mx-auto w-fit text-[10px]">
+                            <Badge className="bg-blue-100 text-blue-700 border-blue-200 py-0.5 px-1.5 font-bold flex items-center justify-center gap-1 mx-auto w-fit text-[11px]">
                               <Film size={9} /> Phim
                             </Badge>
                           )}
@@ -828,42 +879,45 @@ export default function TransactionsContent({
                           {t.ticketCount}
                         </TableCell>
                         <TableCell className="font-bold text-blue-700 text-xs px-2 whitespace-nowrap">
-                          <div>{t.totalPrice.toLocaleString('vi-VN')}đ</div>
+                          <div>{formatVnd(t.totalPrice)}</div>
                           {t.voucher_discount_amount && t.voucher_discount_amount > 0 ? (
-                            <div className="text-[9px] text-emerald-600 font-medium">
-                              -{t.voucher_discount_amount.toLocaleString('vi-VN')}đ
+                            <div className="text-[11px] text-emerald-600 font-medium">
+                              -{formatVnd(t.voucher_discount_amount)}
                             </div>
                           ) : null}
                         </TableCell>
                         <TableCell className="text-[11px] text-slate-500 font-medium px-2">
                           {(() => {
                             const config = getStatusConfig();
+                            // Cancelled, failed and expired orders show when they stopped, paid orders when they were paid
+                            const isStopped = ['failed', 'cancelled', 'expired'].includes(t.paymentStatus);
                             const dateToUse =
-                              t.paymentStatus === 'paid' && t.paidAt
-                                ? t.paidAt
-                                : t.paymentStatus === 'failed'
-                                  ? t.updatedAt
-                                  : t.createdAt;
+                              t.paymentStatus === 'paid' && t.paidAt ? t.paidAt : isStopped ? t.updatedAt : t.createdAt;
                             const titleLabel =
-                              t.paymentStatus === 'paid' && t.paidAt
-                                ? 'Thanh toán'
-                                : t.paymentStatus === 'failed'
-                                  ? 'Hủy'
-                                  : 'Tạo';
+                              t.paymentStatus === 'paid' && t.paidAt ? 'Thanh toán' : isStopped ? 'Dừng' : 'Tạo';
 
                             return (
                               <div
-                                className="flex flex-col gap-1 cursor-help"
-                                title={`Thời gian ${titleLabel}: ${dateToUse ? new Date(dateToUse).toLocaleString('vi-VN') : '---'}`}
+                                className="flex flex-col gap-0.5 cursor-help"
+                                title={`Thời gian ${titleLabel}: ${formatVnDateTime(dateToUse)}`}
                               >
-                                <span className="text-slate-700 font-bold text-[10px]">
+                                <span className="text-slate-700 font-bold text-[11px]">
                                   {dateToUse
                                     ? formatDistanceToNow(new Date(dateToUse), { addSuffix: true, locale: vi })
                                     : '---'}
                                 </span>
+                                {/* Exact times, because staff reconcile against the bank statement */}
+                                <span className="text-[11px] font-normal text-slate-500 whitespace-nowrap">
+                                  Tạo: {formatVnDateTime(t.createdAt)}
+                                </span>
+                                {t.paidAt && (
+                                  <span className="text-[11px] font-normal text-slate-500 whitespace-nowrap">
+                                    TT: {formatVnDateTime(t.paidAt)}
+                                  </span>
+                                )}
                                 <Badge
                                   variant="outline"
-                                  className={`${config.style} px-1.5 py-0.5 text-[9px] font-bold whitespace-nowrap w-fit uppercase flex items-center`}
+                                  className={`${config.style} px-1.5 py-0.5 text-[11px] font-bold whitespace-nowrap w-fit uppercase flex items-center`}
                                 >
                                   {config.icon}
                                   {config.text}
@@ -874,7 +928,7 @@ export default function TransactionsContent({
                         </TableCell>
 
                         <TableCell className="text-center px-1">
-                          <span className="text-[10px] font-semibold tracking-wider uppercase text-slate-600 leading-tight block">{t.paymentMethod}</span>
+                          <span className="text-[11px] font-semibold tracking-wider uppercase text-slate-600 leading-tight block">{paymentMethodLabel(t.paymentMethod)}</span>
                         </TableCell>
 
                         <TableCell className="text-right pr-3 pl-1">
@@ -914,7 +968,8 @@ export default function TransactionsContent({
       <div className="mt-6 flex flex-col md:flex-row items-center justify-between gap-4">
         <p className="text-sm text-muted-foreground italic">Hiển thị {data.length} giao dịch trên trang này.</p>
         <Pagination>
-          <PaginationContent>
+          <PaginationContent className="flex-wrap">
+
             <PaginationItem>
               <PaginationPrevious
                 href="#"
@@ -925,20 +980,26 @@ export default function TransactionsContent({
                 className={currentPage === 1 ? 'pointer-events-none opacity-50' : ''}
               />
             </PaginationItem>
-            {Array.from({ length: totalPages }).map((_, i) => (
-              <PaginationItem key={i}>
-                <PaginationLink
-                  href="#"
-                  isActive={currentPage === i + 1}
-                  onClick={(e) => {
-                    e.preventDefault();
-                    setPage(i + 1);
-                  }}
-                >
-                  {i + 1}
-                </PaginationLink>
-              </PaginationItem>
-            ))}
+            {getPageWindow(currentPage, totalPages).map((pageItem, index) =>
+              pageItem === 'gap' ? (
+                <PaginationItem key={`gap-${index}`}>
+                  <PaginationEllipsis />
+                </PaginationItem>
+              ) : (
+                <PaginationItem key={pageItem}>
+                  <PaginationLink
+                    href="#"
+                    isActive={currentPage === pageItem}
+                    onClick={(e) => {
+                      e.preventDefault();
+                      setPage(pageItem);
+                    }}
+                  >
+                    {pageItem}
+                  </PaginationLink>
+                </PaginationItem>
+              )
+            )}
             <PaginationItem>
               <PaginationNext
                 href="#"
@@ -962,9 +1023,16 @@ export default function TransactionsContent({
             <div className="flex justify-between items-start">
               <div>
                 <DialogTitle className="text-xl font-bold text-gray-900">Chi tiết giao dịch</DialogTitle>
-                <div className="flex items-center gap-2 text-gray-500 text-[12px] mt-1.5 italic">
-                  ID hệ thống:
-                  <CopyableText text={txDetails?.id?.toString() || ''} label="ID hệ thống" />
+                <div className="flex items-center gap-4 text-gray-600 text-[13px] mt-1.5">
+                  <span className="flex items-center gap-2">
+                    Mã đặt chỗ:
+                    <span className="font-bold text-gray-900">
+                      <CopyableText text={headerBookingCode} label="mã đặt chỗ" />
+                    </span>
+                  </span>
+                  <span>
+                    Tổng tiền: <span className="font-bold text-emerald-700">{formatVnd(headerTotalPrice)}</span>
+                  </span>
                 </div>
               </div>
 
@@ -1037,6 +1105,7 @@ export default function TransactionsContent({
 
                 <button
                   onClick={() => setIsDetailsOpen(false)}
+                  aria-label="Đóng"
                   className="p-1.5 rounded-md hover:bg-gray-100 text-gray-500 hover:text-gray-700 transition-colors"
                 >
                   <X size={20} />
@@ -1080,7 +1149,7 @@ export default function TransactionsContent({
                         />
                         <Badge
                           variant={txDetails.user?.is_active ? 'default' : 'destructive'}
-                          className="text-[9px] h-5"
+                          className="text-[11px] h-5"
                         >
                           {txDetails.user?.is_active ? 'Hoạt động' : 'Vô hiệu'}
                         </Badge>
@@ -1109,10 +1178,10 @@ export default function TransactionsContent({
                               <table className="w-full text-xs text-left border-collapse">
                                 <thead className="bg-purple-50/60 text-purple-700">
                                   <tr className="border-none">
-                                    <th className="py-2 px-2.5 font-bold uppercase text-[10px]">Tên gói VR</th>
-                                    <th className="py-2 px-1 font-bold uppercase text-[10px] text-center w-8">SL</th>
-                                    <th className="py-2 px-1.5 font-bold uppercase text-[10px] text-right">Đơn giá</th>
-                                    <th className="py-2 px-2.5 font-bold uppercase text-[10px] text-right">Thành tiền</th>
+                                    <th className="py-2 px-2.5 font-bold uppercase text-[11px]">Tên gói VR</th>
+                                    <th className="py-2 px-1 font-bold uppercase text-[11px] text-center w-8">SL</th>
+                                    <th className="py-2 px-1.5 font-bold uppercase text-[11px] text-right">Đơn giá</th>
+                                    <th className="py-2 px-2.5 font-bold uppercase text-[11px] text-right">Thành tiền</th>
                                   </tr>
                                 </thead>
                                 <tbody>
@@ -1142,7 +1211,7 @@ export default function TransactionsContent({
                                                 it.ticket_package?.name ||
                                                 `Gói VR #${it.ticket_package_id || idx + 1}`}
                                               {discounted ? (
-                                                <span className="inline-block ml-1.5 px-1 py-[1px] align-middle text-[8px] font-black text-rose-600 bg-rose-50 border border-rose-200 rounded">
+                                                <span className="inline-block ml-1.5 px-1 py-[1px] align-middle text-[11px] font-black text-rose-600 bg-rose-50 border border-rose-200 rounded">
                                                   ĐƯỢC GIẢM
                                                 </span>
                                               ) : null}
@@ -1153,10 +1222,10 @@ export default function TransactionsContent({
                                           ×{qty}
                                         </td>
                                         <td className="py-2 px-1.5 text-right text-[11px] text-slate-600">
-                                          {unit.toLocaleString('vi-VN')}đ
+                                          {formatVnd(unit)}
                                         </td>
                                         <td className="py-2 px-2.5 text-right font-bold text-purple-700 text-xs">
-                                          {line.toLocaleString('vi-VN')}đ
+                                          {formatVnd(line)}
                                         </td>
                                       </tr>
                                     );
@@ -1169,6 +1238,7 @@ export default function TransactionsContent({
                               (Không có chi tiết gói VR)
                             </div>
                           )}
+                          {renderVoucherSummary()}
                           <div className="flex justify-between items-end border-t border-purple-200/30 pt-3">
                             <InfoRow
                               label="Tổng lượt chơi"
@@ -1181,9 +1251,9 @@ export default function TransactionsContent({
                               color="text-purple-700"
                             />
                             <div className="text-right">
-                              <p className="text-[10px] text-purple-600 uppercase font-bold">Tổng tiền</p>
+                              <p className="text-[11px] text-purple-600 uppercase font-bold">Tổng tiền</p>
                               <p className="text-3xl font-black text-emerald-700">
-                                {txDetails.booking_details?.total_price?.toLocaleString()}đ
+                                {formatVnd(txDetails.booking_details?.total_price)}
                               </p>
                             </div>
                           </div>
@@ -1197,6 +1267,7 @@ export default function TransactionsContent({
                           icon={<TicketIcon size={16} />}
                         />
                         <div className="bg-blue-50/40 rounded-xl p-5 border border-blue-100 space-y-4 shadow-sm">
+                          {txDetails.movie_title && <InfoRow label="Phim" value={txDetails.movie_title} bold />}
                           {(() => {
                             const discountAmount = Number(txDetails.voucher_info?.voucher_discount_amount || 0);
                             const voucherScope = txDetails.voucher_info?.scope || 'all';
@@ -1222,10 +1293,10 @@ export default function TransactionsContent({
                                   <table className="w-full text-xs text-left border-collapse">
                                     <thead className="bg-blue-50/70 text-blue-800">
                                       <tr className="border-none">
-                                        <th className="py-2 px-2.5 font-bold uppercase text-[10px]">Tên gói / Vé</th>
-                                        <th className="py-2 px-1 font-bold uppercase text-[10px] text-center w-8">SL</th>
-                                        <th className="py-2 px-1.5 font-bold uppercase text-[10px] text-right">Đơn giá</th>
-                                        <th className="py-2 px-2.5 font-bold uppercase text-[10px] text-right">Thành tiền</th>
+                                        <th className="py-2 px-2.5 font-bold uppercase text-[11px]">Tên gói / Vé</th>
+                                        <th className="py-2 px-1 font-bold uppercase text-[11px] text-center w-8">SL</th>
+                                        <th className="py-2 px-1.5 font-bold uppercase text-[11px] text-right">Đơn giá</th>
+                                        <th className="py-2 px-2.5 font-bold uppercase text-[11px] text-right">Thành tiền</th>
                                       </tr>
                                     </thead>
                                     <tbody>
@@ -1253,7 +1324,7 @@ export default function TransactionsContent({
                                                 <span className="text-[11px] font-semibold text-slate-800 leading-tight">
                                                   {it.name || `Gói vé #${idx + 1}`}
                                                   {discounted ? (
-                                                    <span className="inline-block ml-1.5 px-1 py-[1px] align-middle text-[8px] font-black text-rose-600 bg-rose-50 border border-rose-200 rounded">
+                                                    <span className="inline-block ml-1.5 px-1 py-[1px] align-middle text-[11px] font-black text-rose-600 bg-rose-50 border border-rose-200 rounded">
                                                       ĐƯỢC GIẢM
                                                     </span>
                                                   ) : null}
@@ -1264,10 +1335,10 @@ export default function TransactionsContent({
                                               ×{qty}
                                             </td>
                                             <td className="py-2 px-1.5 text-right text-[11px] text-slate-600 text-nowrap">
-                                              {unit.toLocaleString('vi-VN')}
+                                              {formatVnd(unit)}
                                             </td>
                                             <td className="py-2 px-2.5 text-right font-bold text-blue-900 text-xs text-nowrap">
-                                              {line.toLocaleString('vi-VN')}
+                                              {formatVnd(line)}
                                             </td>
                                           </tr>
                                         );
@@ -1286,7 +1357,7 @@ export default function TransactionsContent({
                                   bold
                                 />
                                 <span className="text-[14px] font-bold text-blue-600">
-                                  {txDetails.ticket_package?.ticket_unit_price?.toLocaleString('vi-VN')}đ
+                                  {formatVnd(txDetails.ticket_package?.ticket_unit_price)}
                                 </span>
                               </div>
                             );
@@ -1301,10 +1372,10 @@ export default function TransactionsContent({
                                 <table className="w-full text-xs text-left border-collapse">
                                   <thead className="bg-purple-50/70 text-purple-800">
                                     <tr className="border-none">
-                                      <th className="py-2 px-2.5 font-bold uppercase text-[10px]">Tên dịch vụ</th>
-                                      <th className="py-2 px-1 font-bold uppercase text-[10px] text-center w-8">SL</th>
-                                      <th className="py-2 px-1.5 font-bold uppercase text-[10px] text-right">Đơn giá</th>
-                                      <th className="py-2 px-2.5 font-bold uppercase text-[10px] text-right">Thành tiền</th>
+                                      <th className="py-2 px-2.5 font-bold uppercase text-[11px]">Tên dịch vụ</th>
+                                      <th className="py-2 px-1 font-bold uppercase text-[11px] text-center w-8">SL</th>
+                                      <th className="py-2 px-1.5 font-bold uppercase text-[11px] text-right">Đơn giá</th>
+                                      <th className="py-2 px-2.5 font-bold uppercase text-[11px] text-right">Thành tiền</th>
                                     </tr>
                                   </thead>
                                   <tbody>
@@ -1332,7 +1403,7 @@ export default function TransactionsContent({
                                               <span className="text-[11px] font-semibold text-slate-800 leading-tight">
                                                 {it.package_name || `Gói VR #${idx + 1}`}
                                                 {discounted ? (
-                                                  <span className="inline-block ml-1.5 px-1 py-[1px] align-middle text-[8px] font-black text-rose-600 bg-rose-50 border border-rose-200 rounded">
+                                                  <span className="inline-block ml-1.5 px-1 py-[1px] align-middle text-[11px] font-black text-rose-600 bg-rose-50 border border-rose-200 rounded">
                                                     ĐƯỢC GIẢM
                                                   </span>
                                                 ) : null}
@@ -1341,10 +1412,10 @@ export default function TransactionsContent({
                                           </td>
                                           <td className="py-2 px-1 text-center font-bold text-slate-700 text-xs text-nowrap">×{qty}</td>
                                           <td className="py-2 px-1.5 text-right text-[11px] text-slate-600 text-nowrap">
-                                            {unit.toLocaleString('vi-VN')}
+                                            {formatVnd(unit)}
                                           </td>
                                           <td className="py-2 px-2.5 text-right font-bold text-purple-900 text-xs text-nowrap">
-                                            {line.toLocaleString('vi-VN')}
+                                            {formatVnd(line)}
                                           </td>
                                         </tr>
                                       );
@@ -1355,6 +1426,7 @@ export default function TransactionsContent({
                             </div>
                           )}
 
+                          {renderVoucherSummary()}
                           <div className="flex justify-between items-end border-t border-blue-200/30 pt-3">
                             <InfoRow
                               label="Số lượng vé"
@@ -1385,20 +1457,15 @@ export default function TransactionsContent({
                               color="text-blue-700"
                             />
                             <div className="text-right flex flex-col items-end">
-                              <p className="text-[10px] text-blue-600 uppercase font-bold">Tổng tiền</p>
+                              <p className="text-[11px] text-blue-600 uppercase font-bold">Tổng tiền</p>
                               {txDetails.voucher_info?.voucher_discount_amount > 0 && (
                                 <p className="text-[13px] line-through text-slate-400 font-medium">
-                                  {txDetails.booking_details?.original_total_price?.toLocaleString('vi-VN')}đ
+                                  {formatVnd(txDetails.booking_details?.original_total_price)}
                                 </p>
                               )}
                               <p className="text-3xl font-black text-emerald-700 drop-shadow-sm">
-                                {txDetails.booking_details?.total_price?.toLocaleString('vi-VN')}đ
+                                {formatVnd(txDetails.booking_details?.total_price)}
                               </p>
-                              {txDetails.voucher_info?.voucher_discount_amount > 0 && (
-                                <div className="mt-1 bg-emerald-50 text-emerald-600 font-bold text-[10px] px-2 py-0.5 rounded uppercase border border-emerald-100">
-                                  Giảm: -{txDetails.voucher_info.voucher_discount_amount.toLocaleString('vi-VN')}đ
-                                </div>
-                              )}
                             </div>
                           </div>
                         </div>
@@ -1491,8 +1558,8 @@ export default function TransactionsContent({
                     <div className="grid grid-cols-1 md:grid-cols-3 p-6 gap-8">
                       <div>
                         <p className="text-[11px] text-slate-400 uppercase font-bold mb-2">Phương thức</p>
-                        <span className="text-[14px] font-bold text-slate-700 uppercase">
-                          {txDetails.payment_info?.payment_method}
+                        <span className="text-[14px] font-bold text-slate-700">
+                          {paymentMethodLabel(txDetails.payment_info?.payment_method)}
                         </span>
                       </div>
 
@@ -1530,149 +1597,93 @@ export default function TransactionsContent({
                       </div>
                     </div>
 
-                    {/* Hàng 3: Timeline */}
+                    {/* Hàng 3: Timeline, the same three dates for every status */}
                     {(() => {
                       const paymentStatus = txDetails.payment_info?.payment_status;
                       const isUsed = txDetails.booking_details?.is_used;
-                      const isExpired = txDetails.payment_info?.expired;
+                      const updatedAt = txDetails.booking_details?.updated_at;
+                      const isStopped = ['failed', 'cancelled'].includes(paymentStatus);
 
-                      // 1. Pending: Chỉ hiện ngày tạo
-                      if (paymentStatus === 'pending') {
-                        return (
-                          <div className="grid grid-cols-1 p-6 gap-2 bg-slate-50/30 text-center">
-                            <InfoRow label="Ngày tạo" value={formatDate(txDetails.booking_details?.created_at)} />
-                          </div>
-                        );
-                      }
-
-                      // 2. Cancelled: Hiện ngày tạo và ngày hủy (updatedAt)
-                      if (paymentStatus === 'failed') {
-                        return (
-                          <div className="grid grid-cols-2 p-6 gap-2 bg-slate-50/30 text-center">
-                            <InfoRow label="Ngày tạo" value={formatDate(txDetails.booking_details?.created_at)} />
-                            <InfoRow
-                              label="Ngày hủy"
-                              value={formatDate(txDetails.updatedAt || txDetails.booking_details?.updated_at)}
-                              color="text-red-600"
-                            />
-                          </div>
-                        );
-                      }
-
-                      // 3. Used: Hiện Ngày tạo, Thanh toán, Hạn dùng, Thời điểm sử dụng, Nhân viên xác nhận
-                      if (isUsed) {
-                        return (
-                          <div className="grid grid-cols-5 p-6 gap-3 bg-slate-50/30 text-center">
+                      return (
+                        <>
+                          <div className="grid grid-cols-3 p-6 gap-3 bg-slate-50/30 text-center">
                             <InfoRow label="Ngày tạo" value={formatDate(txDetails.booking_details?.created_at)} />
                             <InfoRow label="Thanh toán" value={formatDate(txDetails.payment_info?.paid_at)} />
                             <InfoRow
-                              label="Hạn dùng"
-                              value={formatDate(txDetails.payment_info?.expiry_date)}
-                              color="text-red-500"
-                            />
-                            <InfoRow
-                              label="Thời điểm sử dụng"
-                              value={formatDate(txDetails.booking_details?.checked_in_at)}
-                              color="text-blue-600"
-                              bold
-                            />
-                            <InfoRow
-                              label="Nhân viên xác nhận"
-                              value={
-                                txDetails.booking_details?.confirmed_by_staff_name ||
-                                txDetails.booking_details?.confirmed_by_staff?.fullname ||
-                                '-'
-                              }
-                              color="text-green-600"
+                              label={isStopped ? 'Ngày hủy' : 'Cập nhật'}
+                              value={formatDate(updatedAt)}
+                              color={isStopped ? 'text-red-600' : 'text-gray-800'}
                             />
                           </div>
-                        );
-                      }
 
-                      // 4. Default (Paid / Expired / Others): Hiện Ngày tạo, Thanh toán, Hạn dùng, Còn lại
-                      return (
-                        <div className="grid grid-cols-4 p-6 gap-3 bg-slate-50/30 text-center">
-                          <InfoRow label="Ngày tạo" value={formatDate(txDetails.booking_details?.created_at)} />
-                          <InfoRow label="Thanh toán" value={formatDate(txDetails.payment_info?.paid_at)} />
-                          <InfoRow
-                            label="Hạn dùng"
-                            value={formatDate(txDetails.payment_info?.expiry_date)}
-                            color="text-red-500"
-                          />
-                          <InfoRow
-                            label="Còn lại"
-                            value={
-                              txDetails.payment_info?.expired
-                                ? 'Đã hết hạn sử dụng'
-                                : txDetails.payment_info?.days_left === 0
-                                  ? 'Hết hạn hôm nay'
-                                  : txDetails.payment_info?.days_left === null
-                                    ? '---'
-                                    : `${txDetails.payment_info?.days_left} ngày`
-                            }
-                            color={
-                              txDetails.payment_info?.expired
-                                ? 'text-red-600 font-black'
-                                : (txDetails.payment_info?.days_left ?? 0) <= 2
-                                  ? 'text-orange-500'
-                                  : 'text-emerald-600'
-                            }
-                            bold
-                            tooltip={
-                              txDetails.payment_info?.expiry_date && !txDetails.payment_info?.expired
-                                ? `Hết hạn: ${formatDate(txDetails.payment_info.expiry_date)}`
-                                : ''
-                            }
-                          />
-                        </div>
+                          {/* Used: expiry, when it was used and who confirmed it */}
+                          {isUsed && (
+                            <div className="grid grid-cols-3 p-6 pt-0 gap-3 bg-slate-50/30 text-center">
+                              <InfoRow
+                                label="Hạn dùng"
+                                value={formatDate(txDetails.payment_info?.expiry_date)}
+                                color="text-red-500"
+                              />
+                              <InfoRow
+                                label="Thời điểm sử dụng"
+                                value={formatDate(txDetails.booking_details?.checked_in_at)}
+                                color="text-blue-600"
+                                bold
+                              />
+                              <InfoRow
+                                label="Nhân viên xác nhận"
+                                value={
+                                  txDetails.booking_details?.confirmed_by_staff_name ||
+                                  txDetails.booking_details?.confirmed_by_staff?.fullname ||
+                                  '-'
+                                }
+                                color="text-green-600"
+                              />
+                            </div>
+                          )}
+
+                          {/* Paid and not used: expiry and days left */}
+                          {!isUsed && paymentStatus === 'paid' && (
+                            <div className="grid grid-cols-2 p-6 pt-0 gap-3 bg-slate-50/30 text-center">
+                              <InfoRow
+                                label="Hạn dùng"
+                                value={formatDate(txDetails.payment_info?.expiry_date)}
+                                color="text-red-500"
+                              />
+                              <InfoRow
+                                label="Còn lại"
+                                value={
+                                  txDetails.payment_info?.expired
+                                    ? 'Đã hết hạn sử dụng'
+                                    : txDetails.payment_info?.days_left === 0
+                                      ? 'Hết hạn hôm nay'
+                                      : txDetails.payment_info?.days_left === null
+                                        ? '---'
+                                        : `${txDetails.payment_info?.days_left} ngày`
+                                }
+                                color={
+                                  txDetails.payment_info?.expired
+                                    ? 'text-red-600 font-black'
+                                    : (txDetails.payment_info?.days_left ?? 0) <= 2
+                                      ? 'text-orange-500'
+                                      : 'text-emerald-600'
+                                }
+                                bold
+                                tooltip={
+                                  txDetails.payment_info?.expiry_date && !txDetails.payment_info?.expired
+                                    ? `Hết hạn: ${formatDate(txDetails.payment_info.expiry_date)}`
+                                    : ''
+                                }
+                              />
+                            </div>
+                          )}
+                        </>
                       );
                     })()}
                   </div>
                 </div>
               </div>
             ) : null}
-
-            {/* Voucher & Sale Attribution */}
-            {(txDetails?.voucher_info?.voucher_code || txDetails?.voucher_info?.sale_name) && (
-              <div className="mt-6 p-5 bg-purple-50/40 rounded-xl border border-purple-100">
-                <h4 className="text-sm font-semibold text-purple-900 mb-3 flex items-center gap-2">
-                  <TicketIcon size={16} className="text-purple-600" />
-                  Ưu đãi & nhân viên sale phụ trách
-                </h4>
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                  <InfoRow
-                    label="Mã Voucher"
-                    value={txDetails.voucher_info.voucher_code || '-'}
-                    bold
-                    color="text-purple-700"
-                  />
-                  <InfoRow
-                    label={
-                      txDetails.voucher_info.scope
-                        ? voucherScopeLabel(txDetails.voucher_info.scope)
-                        : 'Giảm giá'
-                    }
-                    value={
-                      txDetails.voucher_info.voucher_discount_amount
-                        ? `${Number(txDetails.voucher_info.voucher_discount_amount).toLocaleString('vi-VN')}đ`
-                        : '0đ'
-                    }
-                    bold
-                    color="text-emerald-700"
-                  />
-                  <InfoRow
-                    label="Sale phụ trách"
-                    value={
-                      txDetails.voucher_info.sale_name
-                        ? `${txDetails.voucher_info.sale_name}${txDetails.voucher_info.sale_email ? ` (${txDetails.voucher_info.sale_email})` : ''}`
-                        : 'Voucher chung'
-                    }
-                    bold
-                    color="text-blue-700"
-                  />
-                </div>
-              </div>
-            )}
 
             {/* Tracking Information */}
             {txDetails?.tracking && (

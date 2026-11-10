@@ -182,7 +182,7 @@ ticketsRouter.get(
       const r = await listDeletedTicketPackagesImpl(
         db,
         { ticket_packages: schema.ticket_packages, staffs: schema.staffs },
-        { page, pageSize, search, branch_id, restrictToBranchIds: restrictBranchIds }
+        { page, pageSize, search, sort: String(c.req.query('sort') || ''), dir: String(c.req.query('dir') || ''), branch_id, restrictToBranchIds: restrictBranchIds }
       );
 
       return c.json(r, 200);
@@ -258,7 +258,7 @@ ticketsRouter.get('/api/admin/tickets/:id', requireStaffAuth, requirePermission(
 
     const r = await getTicketPackageImpl(
       db,
-      { ticket_packages: schema.ticket_packages, auditLogs: schema.auditLogs },
+      { ticket_packages: schema.ticket_packages, auditLogs: schema.auditLogs, movies: schema.movies, bookings: schema.bookings },
       id,
       restrictBranchIds
     );

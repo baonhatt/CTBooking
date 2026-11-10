@@ -89,7 +89,9 @@ describe('booking input: name and email', () => {
     ['a name over 100 characters', { name: 'a'.repeat(101) }, /Họ tên/],
     ['a bad booking email', { emailBook: 'not-an-email' }, /Email/],
     ['a bad account email', { email: 'a b@c.co' }, /Email/],
-    ['an email over 254 characters', { emailBook: `${'a'.repeat(250)}@b.co` }, /Email/]
+    ['an email over 254 characters', { emailBook: `${'a'.repeat(250)}@b.co` }, /Email/],
+    ['a ticket count that is text', { ticketCount: 'abc' }, /Số lượng/],
+    ['a ticket count with a fraction', { ticketCount: 1.5 }, /Số lượng/]
   ])('refuses %s with a 400 before touching the database', async (_label, override, message) => {
     await expect(validateBookingInput(failingDb, { ...base, ...override }, bookingTables)).rejects.toMatchObject({
       status: 400,

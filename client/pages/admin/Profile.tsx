@@ -9,6 +9,8 @@ import { Skeleton } from '@/components/ui/skeleton';
 import AdminLayout from '@/admin/layouts/AdminLayout';
 import { useStaffStore } from '@/store/staffStore';
 import { requestStaffPasswordChangeOTP, changeStaffPasswordWithOTP } from '@/lib/api/admin';
+import { request } from '@/lib/api/http';
+import { formatVnDateTime } from '@/lib/format';
 
 type AdminLayoutActive =
   | 'dashboard'
@@ -38,6 +40,15 @@ interface Props {
 export default function ProfilePage({ active, setActive, adminEmailState, handleLogout }: Props) {
   const queryClient = useQueryClient();
   const { staff } = useStaffStore();
+  // The role names come from the server (the stored session only knows whether the user is a super admin)
+  const { data: meData } = useQuery({
+    queryKey: ['staff-me'],
+    queryFn: () =>
+      request<{ roleNames?: string[]; branchNames?: string[]; staff?: { createdAt?: string } }>('/api/admin/auth/me')
+  });
+  const roleNames = meData?.roleNames || [];
+  const branchNames = meData?.branchNames || [];
+  const NOT_UPDATED = 'Chưa cập nhật';
   const [oldPassword, setOldPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -141,22 +152,32 @@ export default function ProfilePage({ active, setActive, adminEmailState, handle
               <Label className="text-sm text-gray-600">Email</Label>
               <p className="font-medium">{staff.email}</p>
             </div>
-            {staff.phone && (
-              <div>
-                <Label className="text-sm text-gray-600">Số điện thoại</Label>
-                <p className="font-medium">{staff.phone}</p>
-              </div>
-            )}
+            <div>
+              <Label className="text-sm text-gray-600">Số điện thoại</Label>
+              <p className="font-medium">{staff.phone || NOT_UPDATED}</p>
+            </div>
             <div>
               <Label className="text-sm text-gray-600">Vai trò</Label>
-              <p className="font-medium">{staff.isSuperAdmin ? 'Siêu quản trị' : 'Nhân viên'}</p>
+              <p className="font-medium">
+                {staff.isSuperAdmin ? 'Siêu quản trị' : roleNames.length > 0 ? roleNames.join(', ') : 'Nhân viên'}
+              </p>
             </div>
-            {staff.lastLoginAt && (
-              <div>
-                <Label className="text-sm text-gray-600">Lần đăng nhập cuối</Label>
-                <p className="font-medium">{new Date(staff.lastLoginAt).toLocaleString('vi-VN')}</p>
-              </div>
-            )}
+            <div>
+              <Label className="text-sm text-gray-600">Chi nhánh phụ trách</Label>
+              <p className="font-medium">
+                {staff.isSuperAdmin ? 'Tất cả chi nhánh' : branchNames.length > 0 ? branchNames.join(', ') : NOT_UPDATED}
+              </p>
+            </div>
+            <div>
+              <Label className="text-sm text-gray-600">Ngày tạo tài khoản</Label>
+              <p className="font-medium">
+                {meData?.staff?.createdAt ? formatVnDateTime(meData.staff.createdAt) : NOT_UPDATED}
+              </p>
+            </div>
+            <div>
+              <Label className="text-sm text-gray-600">Lần đăng nhập cuối</Label>
+              <p className="font-medium">{staff.lastLoginAt ? formatVnDateTime(staff.lastLoginAt) : NOT_UPDATED}</p>
+            </div>
           </CardContent>
         </Card>
 
@@ -195,8 +216,9 @@ export default function ProfilePage({ active, setActive, adminEmailState, handle
                       type="password"
                       value={newPassword}
                       onChange={(e) => setNewPassword(e.target.value)}
-                      placeholder="Nhập mật khẩu mới (ít nhất 12 ký tự, gồm chữ và số)"
+                      placeholder="Nhập mật khẩu mới"
                     />
+                    <p className="text-xs text-gray-500 mt-1">Ít nhất 12 ký tự, gồm cả chữ và số.</p>
                   </div>
 
                   <div>

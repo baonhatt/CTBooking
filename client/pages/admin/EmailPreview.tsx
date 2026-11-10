@@ -3,7 +3,8 @@ import { useQuery } from '@tanstack/react-query';
 import { request } from '@/lib/api/http';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
-import { Loader2, Monitor, Smartphone, Code, ScanFace, FileCode2, Eye } from 'lucide-react';
+import { Loader2, Monitor, Smartphone, Code, ScanFace, FileCode2, Eye, Copy } from 'lucide-react';
+import { toast } from 'sonner';
 import { ScrollArea } from '@/components/ui/scroll-area';
 
 interface TemplateConfig {
@@ -35,6 +36,16 @@ export default function EmailPreviewPage() {
   }, [templates, activeTab]);
 
   const currentTemplate = templates.find(t => t.id === activeTab);
+
+  const copy_source = async () => {
+    if (!currentTemplate) return;
+    try {
+      await navigator.clipboard.writeText(currentTemplate.html);
+      toast.success('Đã sao chép mã nguồn email');
+    } catch {
+      toast.error('Không sao chép được, hãy chọn mã nguồn và sao chép thủ công');
+    }
+  };
 
   if (isLoading) {
     return (
@@ -128,6 +139,17 @@ export default function EmailPreviewPage() {
               Mã nguồn
             </Button>
           </div>
+
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={copy_source}
+            className="h-7 px-3 text-xs font-semibold shrink-0"
+            title="Sao chép mã nguồn HTML của mẫu đang chọn"
+          >
+            <Copy className="w-3.5 h-3.5 mr-1.5" />
+            Sao chép mã nguồn
+          </Button>
         </div>
 
         <div className="flex-1 p-4 md:p-8 overflow-y-auto w-full flex justify-center">
@@ -135,7 +157,9 @@ export default function EmailPreviewPage() {
             <Card className={`overflow-hidden transition-all duration-300 mx-auto shadow-xl border-slate-200 border-x-4 border-t-8 border-b-8 rounded-xl ${
               viewMode === 'mobile' ? 'max-w-[375px] w-full min-h-[667px]' : 'w-full max-w-4xl'
             } bg-white flex flex-col`}>
-              <iframe 
+              {/* An empty sandbox blocks scripts, forms and navigation inside the previewed email */}
+              <iframe
+                sandbox=""
                 srcDoc={currentTemplate.html}
                 className="w-full flex-1 border-0 h-[800px] min-h-[600px] bg-white transition-all"
                 title="Xem trước email"

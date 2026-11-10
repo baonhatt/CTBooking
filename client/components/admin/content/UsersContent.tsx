@@ -14,7 +14,9 @@ import {
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
 import { getUserById } from '@/lib/api';
-import { Search, RefreshCw, Eye, TrendingUp, User, X } from 'lucide-react';
+import { Search, RefreshCw, Eye, TrendingUp, User, X, Copy } from 'lucide-react';
+import { toast } from 'sonner';
+import { formatVnDateTime, formatVnDate, activeStatusLabel, paymentMethodLabel } from '@/lib/format';
 import { useHasStaffPermission } from '@/hooks/useStaffPermission';
 
 interface Props {
@@ -24,6 +26,8 @@ interface Props {
   setPage: (p: number) => void;
   userQuery: string;
   setUserQuery: (q: string) => void;
+  statusFilter?: string;
+  setStatusFilter?: (value: string) => void;
   onEdit: (type: 'user', data: any) => void;
   usersLength: number;
   onRefresh: () => void;
@@ -37,6 +41,8 @@ export default function UsersContent({
   setPage,
   userQuery,
   setUserQuery,
+  statusFilter = 'all',
+  setStatusFilter,
   onEdit,
   usersLength,
   onRefresh,
@@ -67,16 +73,36 @@ export default function UsersContent({
     }
   }, [isDetailsOpen, selectedUserId]);
 
-  const formatDateTime = (d: Date | string) => {
-    const date = typeof d === 'string' ? new Date(d) : d;
-    return date.toLocaleString('vi-VN', {
-      year: 'numeric',
-      month: '2-digit',
-      day: '2-digit',
-      hour: '2-digit',
-      minute: '2-digit',
-      second: '2-digit'
-    });
+  const formatDateTime = (value: Date | string) => formatVnDateTime(value);
+
+  // Booking payment status, as the owner reads it (anything unknown is shown as it is stored)
+  const PAYMENT_STATUS_STYLES: Record<string, { label: string; className: string }> = {
+    paid: { label: 'ĐÃ THANH TOÁN', className: 'bg-green-100 text-green-700' },
+    pending: { label: 'CHỜ THANH TOÁN', className: 'bg-yellow-100 text-yellow-700' },
+    failed: { label: 'THẤT BẠI', className: 'bg-red-100 text-red-700' },
+    expired: { label: 'HẾT HẠN', className: 'bg-slate-200 text-slate-600' },
+    cancelled: { label: 'ĐÃ HỦY', className: 'bg-slate-200 text-slate-600' },
+    refunded: { label: 'ĐÃ HOÀN TIỀN', className: 'bg-blue-100 text-blue-700' }
+  };
+
+  const getPaymentStatusStyle = (status?: string) =>
+    PAYMENT_STATUS_STYLES[status || ''] || {
+      label: (status || 'KHÔNG RÕ').toUpperCase(),
+      className: 'bg-slate-200 text-slate-600'
+    };
+
+  const GENDER_LABELS: Record<string, string> = { male: 'Nam', female: 'Nữ', other: 'Khác' };
+
+  const getLoginTypeLabel = (loginType?: string) => (loginType || 'email').toUpperCase();
+
+  const copyText = async (text: string, what: string) => {
+    if (!text) return;
+    try {
+      await navigator.clipboard.writeText(text);
+      toast.success(`Đã sao chép ${what}`);
+    } catch {
+      toast.error('Không sao chép được, hãy bôi đen và sao chép thủ công');
+    }
   };
 
   const handleViewDetails = (userId: number) => {
@@ -127,6 +153,17 @@ export default function UsersContent({
               <Search className="w-3.5 h-3.5" /> Tìm kiếm
             </Button>
           </form>
+
+          <select
+            value={statusFilter}
+            onChange={(e) => setStatusFilter?.(e.target.value)}
+            aria-label="Lọc theo trạng thái tài khoản"
+            className="h-10 px-3 bg-white border border-slate-200 rounded-xl text-xs focus:ring-2 focus:ring-blue-500 outline-none shadow-sm cursor-pointer"
+          >
+            <option value="all">Tất cả trạng thái</option>
+            <option value="active">Hoạt động</option>
+            <option value="inactive">Ngừng hoạt động</option>
+          </select>
         </div>
 
         {/* R I G H T - G R O U P */}
@@ -152,12 +189,14 @@ export default function UsersContent({
           <Table>
             <TableHeader className="bg-gray-50">
               <TableRow className="hover:bg-transparent border-none">
-                <TableHead className="text-xs font-semibold text-gray-600 uppercase py-3">ID</TableHead>
                 <TableHead className="text-xs font-semibold text-gray-600 uppercase py-3">Người dùng</TableHead>
                 <TableHead className="text-xs font-semibold text-gray-600 uppercase py-3">Email & SĐT</TableHead>
                 <TableHead className="text-center text-xs font-semibold text-gray-600 uppercase py-3">
                   Trạng thái
                 </TableHead>
+                <TableHead className="text-xs font-semibold text-gray-600 uppercase py-3">Đăng nhập</TableHead>
+                <TableHead className="text-center text-xs font-semibold text-gray-600 uppercase py-3">Lượt đặt</TableHead>
+                <TableHead className="text-xs font-semibold text-gray-600 uppercase py-3">Đặt gần nhất</TableHead>
                 <TableHead className="text-xs font-semibold text-gray-600 uppercase py-3">Ngày tạo</TableHead>
                 <TableHead className="text-right text-xs font-semibold text-gray-600 uppercase py-3 pr-6">
                   Thao tác
@@ -169,9 +208,6 @@ export default function UsersContent({
                 ? Array.from({ length: 5 }).map((_, idx) => (
                     <TableRow key={`sk-${idx}`}>
                       <TableCell>
-                        <Skeleton className="h-4 w-16" />
-                      </TableCell>
-                      <TableCell>
                         <Skeleton className="h-4 w-24" />
                       </TableCell>
                       <TableCell>
@@ -181,10 +217,16 @@ export default function UsersContent({
                         <Skeleton className="h-4 w-24" />
                       </TableCell>
                       <TableCell>
-                        <Skeleton className="h-5 w-20" />
+                        <Skeleton className="h-4 w-16" />
+                      </TableCell>
+                      <TableCell>
+                        <Skeleton className="h-4 w-10" />
                       </TableCell>
                       <TableCell>
                         <Skeleton className="h-4 w-28" />
+                      </TableCell>
+                      <TableCell>
+                        <Skeleton className="h-5 w-20" />
                       </TableCell>
                       <TableCell className="text-right">
                         <Skeleton className="h-8 w-16 ml-auto" />
@@ -196,7 +238,6 @@ export default function UsersContent({
                       key={u.id}
                       className="group hover:bg-gray-50 transition-colors border-b border-gray-200 h-[52px]"
                     >
-                      <TableCell className="text-center font-mono text-[11px] text-slate-400">{u.id}</TableCell>
                       <TableCell>
                         <div className="flex items-center gap-3">
                           <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 font-bold text-xs shrink-0">
@@ -220,8 +261,19 @@ export default function UsersContent({
                               : 'bg-gray-100 text-gray-600 border-gray-200'
                           }`}
                         >
-                          {u.is_active ? 'Hoạt động' : 'Không'}
+                          {activeStatusLabel(u.is_active)}
                         </Badge>
+                      </TableCell>
+                      <TableCell>
+                        <span className="text-xs text-slate-600 font-medium">{getLoginTypeLabel(u.login_type)}</span>
+                      </TableCell>
+                      <TableCell className="text-center text-sm font-semibold text-slate-700">
+                        {u.total_bookings ?? 0}
+                      </TableCell>
+                      <TableCell>
+                        <span className="text-xs text-slate-600 font-medium">
+                          {u.last_booking_at ? formatDateTime(u.last_booking_at) : 'Chưa đặt'}
+                        </span>
                       </TableCell>
                       <TableCell>
                         <span className="text-xs text-slate-600 font-medium">{formatDateTime(u.created_at)}</span>
@@ -235,6 +287,7 @@ export default function UsersContent({
                               className="h-8 rounded-lg hover:bg-blue-50 text-blue-600"
                               onClick={() => handleViewDetails(Number(u.id))}
                               title="Xem chi tiết"
+                              aria-label={`Xem chi tiết người dùng ${u.fullname}`}
                             >
                               <Eye className="h-3.5 w-3.5" />
                             </Button>
@@ -290,14 +343,19 @@ export default function UsersContent({
           <DialogTitle className="sr-only">Chi tiết người dùng</DialogTitle>
           <div className="bg-white px-6 py-4 flex items-center justify-between border-b">
             <div className="flex items-center gap-4">
-              <div className="w-12 h-12 rounded-full bg-blue-50 flex items-center justify-center text-blue-600 font-bold text-xl border border-blue-100">
-                {userDetails?.fullname?.charAt(0).toUpperCase() || <User size={24} />}
-              </div>
+              {userDetails?.avatar ? (
+                <img
+                  src={userDetails.avatar}
+                  alt={`Ảnh đại diện của ${userDetails.fullname || 'người dùng'}`}
+                  className="w-12 h-12 rounded-full object-cover border border-blue-100"
+                />
+              ) : (
+                <div className="w-12 h-12 rounded-full bg-blue-50 flex items-center justify-center text-blue-600 font-bold text-xl border border-blue-100">
+                  {userDetails?.fullname?.charAt(0).toUpperCase() || <User size={24} />}
+                </div>
+              )}
               <div className="flex-1">
                 <div className="flex items-center gap-3">
-                  <span className="font-mono text-[10px] bg-blue-50 text-blue-600 px-1.5 py-0.5 rounded border border-blue-100">
-                    ID: {selectedUserId}
-                  </span>
                   <h2 className="text-base font-semibold text-gray-900 tracking-tight leading-none">
                     {userDetails?.fullname || 'Người dùng'}
                   </h2>
@@ -310,6 +368,7 @@ export default function UsersContent({
               onClick={() => setIsDetailsOpen(false)}
               className="h-8 w-8 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-full transition-colors mr-2"
               title="Đóng"
+              aria-label="Đóng"
             >
               <X size={20} />
             </Button>
@@ -342,7 +401,7 @@ export default function UsersContent({
                               : 'bg-gray-100 text-gray-600 border-gray-200'
                           }`}
                         >
-                          {userDetails.is_active ? 'Hoạt động' : 'Không'}
+                          {activeStatusLabel(userDetails.is_active)}
                         </Badge>
                       </div>
                       <div className="flex justify-between items-center border-t pt-2 border-slate-50">
@@ -351,11 +410,53 @@ export default function UsersContent({
                       </div>
                       <div className="flex justify-between items-center border-t pt-2 border-slate-50">
                         <p className="text-[11px] text-slate-500 font-medium">Số điện thoại</p>
-                        <p className="text-sm font-bold text-slate-900 font-mono">{userDetails.phone}</p>
+                        <div className="flex items-center gap-1">
+                          <p className="text-sm font-bold text-slate-900 font-mono">{userDetails.phone || 'Chưa cập nhật'}</p>
+                          {userDetails.phone && (
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-6 w-6 text-slate-400 hover:text-slate-700"
+                              onClick={() => copyText(userDetails.phone, 'số điện thoại')}
+                              title="Sao chép số điện thoại"
+                              aria-label="Sao chép số điện thoại"
+                            >
+                              <Copy size={12} />
+                            </Button>
+                          )}
+                        </div>
+                      </div>
+                      <div className="flex justify-between items-center border-t pt-2 border-slate-50">
+                        <p className="text-[11px] text-slate-500 font-medium">Giới tính</p>
+                        <p className="text-sm text-slate-900">
+                          {userDetails.gender
+                            ? GENDER_LABELS[String(userDetails.gender).toLowerCase()] || userDetails.gender
+                            : 'Chưa cập nhật'}
+                        </p>
+                      </div>
+                      <div className="flex justify-between items-center border-t pt-2 border-slate-50">
+                        <p className="text-[11px] text-slate-500 font-medium">Ngày sinh</p>
+                        <p className="text-sm text-slate-900">
+                          {userDetails.dob ? formatVnDate(userDetails.dob) : 'Chưa cập nhật'}
+                        </p>
                       </div>
                       <div className="flex flex-col border-t pt-2 border-slate-50">
                         <p className="text-[11px] text-slate-500 font-medium mb-1">Email</p>
-                        <p className="text-sm font-bold text-blue-600 break-all">{userDetails.email}</p>
+                        <div className="flex items-center gap-1">
+                          <p className="text-sm font-bold text-blue-600 break-all">{userDetails.email}</p>
+                          {userDetails.email && (
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-6 w-6 shrink-0 text-slate-400 hover:text-slate-700"
+                              onClick={() => copyText(userDetails.email, 'email')}
+                              title="Sao chép email"
+                              aria-label="Sao chép email"
+                            >
+                              <Copy size={12} />
+                            </Button>
+                          )}
+                        </div>
                       </div>
                     </div>
                   </div>
@@ -372,7 +473,7 @@ export default function UsersContent({
                           variant="outline"
                           className="text-xs font-medium border-gray-300 text-gray-600 uppercase px-3 py-1"
                         >
-                          {userDetails.login_type}
+                          {getLoginTypeLabel(userDetails.login_type)}
                         </Badge>
                       </div>
                       <div className="flex justify-between items-center border-t pt-2 border-slate-50">
@@ -416,11 +517,13 @@ export default function UsersContent({
                       <h3 className="text-xs font-semibold text-gray-500 border-b pb-2 flex items-center gap-2">
                         <TrendingUp size={14} className="text-green-500" /> Thống kê đặt vé
                       </h3>
-                      <p className="text-sm opacity-60">Tổng số đơn đã thực hiện</p>
+                      <p className="text-sm opacity-60">Tổng số đơn đã tạo (cả chưa thanh toán và đã hủy)</p>
                     </div>
                     <div className="text-right">
                       <p className="text-4xl font-black">{userDetails.total_bookings}</p>
-                      <p className="text-xs font-medium tracking-tight opacity-70 mt-1">Giao dịch hoàn tất</p>
+                      <p className="text-xs font-medium tracking-tight opacity-70 mt-1">
+                        Đã thanh toán: {userDetails.paid_bookings ?? 0}
+                      </p>
                     </div>
                   </div>
                   <div className="absolute -right-4 -bottom-4 opacity-10 w-24 h-24 rotate-12">
@@ -431,7 +534,7 @@ export default function UsersContent({
                 {userDetails.recent_bookings && userDetails.recent_bookings.length > 0 && (
                   <div className="space-y-4">
                     <h3 className="text-xs font-semibold text-gray-500 border-b pb-2 flex items-center gap-2">
-                      <Eye size={14} className="text-blue-500" /> Đơn đặt vé gần đây (Tối đa 10 đơn)
+                      <Eye size={14} className="text-blue-500" /> Đơn đặt vé gần đây (tối đa 10 đơn, gồm cả chưa thanh toán và đã hủy)
                     </h3>
                     <div className="grid grid-cols-1 gap-3 max-h-[400px] overflow-y-auto pr-2 custom-scrollbar">
                       {userDetails.recent_bookings.map((booking: any, idx: number) => (
@@ -444,24 +547,22 @@ export default function UsersContent({
                               <p className="font-bold text-slate-900 leading-tight">
                                 {booking.movie_title || booking.ticket_package_name || 'Không xác định'}
                               </p>
-                              <div className="flex items-center gap-2 text-[10px] text-slate-500 font-bold uppercase">
+                              <div className="flex items-center gap-2 text-[11px] text-slate-500 font-bold uppercase">
                                 <span>{booking.ticket_count} vé</span>
                                 <span>•</span>
-                                <span>{booking.payment_method || 'N/A'}</span>
+                                <span>{paymentMethodLabel(booking.payment_method)}</span>
                               </div>
                             </div>
                             <Badge
                               className={`text-xs font-medium px-2 py-0.5 rounded shadow-none border-none ${
-                                ['paid'].includes(booking.payment_status)
-                                  ? 'bg-green-100 text-green-700'
-                                  : 'bg-yellow-100 text-yellow-700'
+                                getPaymentStatusStyle(booking.payment_status).className
                               }`}
                             >
-                              {['paid'].includes(booking.payment_status) ? 'ĐÃ THANH TOÁN' : 'CHỜ THANH TOÁN'}
+                              {getPaymentStatusStyle(booking.payment_status).label}
                             </Badge>
                           </div>
                           <div className="flex justify-between items-center border-t border-slate-50 pt-3">
-                            <span className="text-[10px] text-slate-400 font-mono">
+                            <span className="text-[11px] text-slate-400 font-mono">
                               {formatDateTime(booking.created_at)}
                             </span>
                             <span className="text-sm font-black text-slate-900">

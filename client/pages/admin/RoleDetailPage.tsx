@@ -6,6 +6,8 @@ import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
+import { Input } from '@/components/ui/input';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { toast } from 'sonner';
 import { Skeleton } from '@/components/ui/skeleton';
 import { request } from '@/lib/api/http';
@@ -13,7 +15,8 @@ import AdminLayout from '@/admin/layouts/AdminLayout';
 import { useStaffStore } from '@/store/staffStore';
 import { useIsSuperAdmin, useHasStaffPermission } from '@/hooks/useStaffPermission';
 import { X, FileText } from 'lucide-react';
-import { MODULES, ACTIONS, MODULE_LABELS, ACTION_LABELS, APPLICABLE_ACTIONS } from './roleConstants';
+import { MODULES, ACTIONS, MODULE_LABELS, ACTION_LABELS, APPLICABLE_ACTIONS, roleLevelLabel } from './roleConstants';
+import { formatVnDateTime } from '@/lib/format';
 import { ConfirmDeleteDialog } from '@/components/admin/dialogs/ConfirmDeleteDialog';
 
 interface Role {
@@ -46,6 +49,7 @@ export default function RoleDetailPage() {
   const isSuperAdmin = useIsSuperAdmin();
   const hasPermission = useHasStaffPermission();
   const canEditRole = hasPermission('roles', 'edit');
+  const canDeleteRole = hasPermission('roles', 'delete');
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [isSaveDialogOpen, setIsSaveDialogOpen] = useState(false);
 
@@ -54,6 +58,8 @@ export default function RoleDetailPage() {
   const [isEditMode, setIsEditMode] = useState(canEditRole ? initialMode === 'edit' : false);
   const [dirty, setDirty] = useState(false);
   const [permissionIds, setPermissionIds] = useState<number[]>([]);
+  // Name, description and level can be edited here too (a typo in a role name used to be unfixable)
+  const [roleInfo, setRoleInfo] = useState({ name: '', description: '', level: '0' });
   const headerRef = useRef<HTMLDivElement>(null);
   const [headerHeight, setHeaderHeight] = useState(0);
 
@@ -119,11 +125,17 @@ export default function RoleDetailPage() {
 
   const confirmUpdate = async () => {
     if (!id) return;
+    if (!roleInfo.name.trim()) {
+      toast.error('Tên vai trò không được để trống');
+      setIsSaveDialogOpen(false);
+      return;
+    }
     await updateMutation.mutateAsync({
       id: parseInt(id),
       data: {
-        name: (roleData as any)?.role?.name,
-        description: (roleData as any)?.role?.description,
+        name: roleInfo.name.trim(),
+        description: roleInfo.description.trim() || undefined,
+        level: parseInt(roleInfo.level),
         permissionIds
       }
     });
@@ -144,6 +156,38 @@ export default function RoleDetailPage() {
     });
   };
 
+  // Select all / clear all for a group of cells (one module row or one action column)
+  const setGroupPermissions = (groupPermissionIds: number[], shouldGrant: boolean) => {
+    if (!isEditMode || groupPermissionIds.length === 0) return;
+    setPermissionIds((prev) => {
+      const withoutGroup = prev.filter((permissionId) => !groupPermissionIds.includes(permissionId));
+      return shouldGrant ? [...withoutGroup, ...groupPermissionIds] : withoutGroup;
+    });
+    setDirty(true);
+  };
+
+  const getRowPermissionIds = (module: string): number[] => {
+    const rowIds: number[] = [];
+    (APPLICABLE_ACTIONS[module] || []).forEach((action) => {
+      const permissionId = getPermissionId(module, action);
+      if (typeof permissionId === 'number') rowIds.push(permissionId);
+    });
+    return rowIds;
+  };
+
+  const getColumnPermissionIds = (action: string): number[] => {
+    const columnIds: number[] = [];
+    MODULES.forEach((module) => {
+      if (!isActionApplicable(module, action)) return;
+      const permissionId = getPermissionId(module, action);
+      if (typeof permissionId === 'number') columnIds.push(permissionId);
+    });
+    return columnIds;
+  };
+
+  const areAllGranted = (groupPermissionIds: number[]) =>
+    groupPermissionIds.length > 0 && groupPermissionIds.every((permissionId) => permissionIds.includes(permissionId));
+
   const handleEditMode = () => {
     setIsEditMode(true);
     setSearchParams({ mode: 'edit' });
@@ -155,6 +199,7 @@ export default function RoleDetailPage() {
     setDirty(false);
     // Reset permissionIds to original
     const role = (roleData as any)?.role;
+    if (role) setRoleInfo({ name: role.name || '', description: role.description || '', level: String(role.level ?? 0) });
     if (role?.permissionIds) {
       setPermissionIds(role.permissionIds);
     } else if (role?.permissions) {
@@ -166,6 +211,7 @@ export default function RoleDetailPage() {
   // Update permissionIds when role data changes
   useEffect(() => {
     const role = (roleData as any)?.role;
+    if (role) setRoleInfo({ name: role.name || '', description: role.description || '', level: String(role.level ?? 0) });
     if (role?.permissionIds) {
       setPermissionIds(role.permissionIds);
       setDirty(false);
@@ -282,22 +328,80 @@ export default function RoleDetailPage() {
               <Button variant="ghost" size="sm" onClick={() => navigate('/roles')} className="rounded-lg">
                 ← Quay lại
               </Button>
-              <div>
-                <h3 className="font-bold text-slate-800 text-lg capitalize flex items-center gap-2">
-                  {role.name}
+              {isEditMode ? (
+                <div className="flex flex-wrap items-end gap-3">
+                  <div>
+                    <Label htmlFor="fmi_role_name" className="text-xs text-slate-500">Tên vai trò *</Label>
+                    <Input
+                      id="fmi_role_name"
+                      value={roleInfo.name}
+                      onChange={(e) => {
+                        setRoleInfo({ ...roleInfo, name: e.target.value });
+                        setDirty(true);
+                      }}
+                      className="h-9 w-56 mt-1"
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="fmi_role_description" className="text-xs text-slate-500">Mô tả</Label>
+                    <Input
+                      id="fmi_role_description"
+                      value={roleInfo.description}
+                      onChange={(e) => {
+                        setRoleInfo({ ...roleInfo, description: e.target.value });
+                        setDirty(true);
+                      }}
+                      className="h-9 w-72 mt-1"
+                    />
+                  </div>
+                  <div>
+                    <Label className="text-xs text-slate-500">Cấp độ</Label>
+                    <Select
+                      value={roleInfo.level}
+                      onValueChange={(value) => {
+                        setRoleInfo({ ...roleInfo, level: value });
+                        setDirty(true);
+                      }}
+                    >
+                      <SelectTrigger className="h-9 w-40 mt-1">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="0">{roleLevelLabel(0)}</SelectItem>
+                        <SelectItem value="1">{roleLevelLabel(1)}</SelectItem>
+                        <SelectItem value="2">{roleLevelLabel(2)}</SelectItem>
+                        {/* Older roles can hold a level outside 0-2; keep it selectable so it is shown and not changed */}
+                        {!['0', '1', '2'].includes(roleInfo.level) && (
+                          <SelectItem value={roleInfo.level}>{roleLevelLabel(Number(roleInfo.level))}</SelectItem>
+                        )}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <span className="text-xs text-slate-400 pb-2">{role.staffCount || 0} nhân viên</span>
                   {role.isSystem && (
-                    <span className="bg-amber-100 text-amber-800 text-[11px] font-semibold px-2 py-0.5 rounded-md">
+                    <span className="bg-amber-100 text-amber-800 text-[11px] font-semibold px-2 py-0.5 rounded-md mb-2">
                       Vai trò hệ thống
                     </span>
                   )}
-                </h3>
-                {role.description && <p className="text-xs text-slate-500 mt-0.5">{role.description}</p>}
-                <div className="flex items-center gap-2 mt-0.5">
-                  <span className="text-xs text-slate-400">
-                    Cấp độ: Lv{role.level} · {role.staffCount || 0} nhân viên
-                  </span>
                 </div>
-              </div>
+              ) : (
+                <div>
+                  <h3 className="font-bold text-slate-800 text-lg flex items-center gap-2">
+                    {role.name}
+                    {role.isSystem && (
+                      <span className="bg-amber-100 text-amber-800 text-[11px] font-semibold px-2 py-0.5 rounded-md">
+                        Vai trò hệ thống
+                      </span>
+                    )}
+                  </h3>
+                  {role.description && <p className="text-xs text-slate-500 mt-0.5">{role.description}</p>}
+                  <div className="flex items-center gap-2 mt-0.5">
+                    <span className="text-xs text-slate-400">
+                      Cấp độ: {roleLevelLabel(role.level)} · {role.staffCount || 0} nhân viên
+                    </span>
+                  </div>
+                </div>
+              )}
             </div>
             <div className="flex items-center gap-2">
               {isEditMode ? (
@@ -329,6 +433,23 @@ export default function RoleDetailPage() {
                   </Button>
                 )
               )}
+              {!role.isSystem && canDeleteRole && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => {
+                    if ((role.staffCount || 0) > 0) {
+                      toast.error(`Không thể xóa vai trò này vì đã được giao cho ${role.staffCount} nhân viên`);
+                      return;
+                    }
+                    setIsDeleteDialogOpen(true);
+                  }}
+                  disabled={deleteMutation.isPending}
+                  className="rounded-lg text-red-600 hover:text-red-700 hover:bg-red-50"
+                >
+                  Xóa vai trò
+                </Button>
+              )}
             </div>
           </div>
         </div>
@@ -351,6 +472,9 @@ export default function RoleDetailPage() {
                       {ACTION_LABELS[action] || action}
                     </th>
                   ))}
+                  <th className="px-2 py-3 text-center text-xs font-bold text-slate-700 whitespace-nowrap min-w-[80px]">
+                    Cả hàng
+                  </th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
@@ -380,6 +504,7 @@ export default function RoleDetailPage() {
                                   }
                                 }}
                                 disabled={disabled}
+                                aria-label={`${MODULE_LABELS[module] || module}: ${ACTION_LABELS[action] || action}`}
                                 className="data-[state=checked]:bg-blue-600 data-[state=checked]:border-blue-600"
                               />
                             </div>
@@ -389,15 +514,41 @@ export default function RoleDetailPage() {
                         </td>
                       );
                     })}
+                    <td className="px-2 py-2.5 text-center whitespace-nowrap">
+                      <Checkbox
+                        checked={areAllGranted(getRowPermissionIds(module))}
+                        onCheckedChange={(checked) => setGroupPermissions(getRowPermissionIds(module), checked === true)}
+                        disabled={(role.isSystem && !isSuperAdmin) || !isEditMode}
+                        aria-label={`Chọn tất cả quyền của ${MODULE_LABELS[module] || module}`}
+                        className="data-[state=checked]:bg-blue-600 data-[state=checked]:border-blue-600"
+                      />
+                    </td>
                   </tr>
                 ))}
+                <tr className="bg-slate-50">
+                  <td className="sticky left-0 z-10 bg-slate-50 px-4 py-2.5 font-semibold text-slate-800 text-xs sm:text-sm whitespace-nowrap border-r border-slate-200">
+                    Cả cột
+                  </td>
+                  {visibleActions.map((action) => (
+                    <td key={action} className="px-2 py-2.5 text-center whitespace-nowrap border-r border-slate-100">
+                      <Checkbox
+                        checked={areAllGranted(getColumnPermissionIds(action))}
+                        onCheckedChange={(checked) => setGroupPermissions(getColumnPermissionIds(action), checked === true)}
+                        disabled={(role.isSystem && !isSuperAdmin) || !isEditMode}
+                        aria-label={`Chọn tất cả module cho quyền ${ACTION_LABELS[action] || action}`}
+                        className="data-[state=checked]:bg-blue-600 data-[state=checked]:border-blue-600"
+                      />
+                    </td>
+                  ))}
+                  <td />
+                </tr>
               </tbody>
             </table>
           </div>
         </div>
 
-        {/* Role Info Section - chỉ hiển thị khi ở chế độ view */}
-        {!isEditMode && (
+        {/* Role Info Section - shown in view and edit mode */}
+        {role && (
           <Card className="mt-4">
             <CardHeader>
               <CardTitle className="text-base flex items-center gap-2">
@@ -409,7 +560,7 @@ export default function RoleDetailPage() {
                 <div className="space-y-2">
                   <Label className="text-sm font-medium text-gray-500">Ngày tạo</Label>
                   <div className="text-sm">
-                    {role.created_at ? new Date(role.created_at).toLocaleString('vi-VN') : '-'}
+                    {formatVnDateTime(role.created_at)}
                   </div>
                 </div>
                 <div className="space-y-2">
@@ -419,7 +570,7 @@ export default function RoleDetailPage() {
                 <div className="space-y-2">
                   <Label className="text-sm font-medium text-gray-500">Cập nhật lần cuối</Label>
                   <div className="text-sm">
-                    {role.updated_at ? new Date(role.updated_at).toLocaleString('vi-VN') : '-'}
+                    {formatVnDateTime(role.updated_at)}
                   </div>
                 </div>
                 <div className="space-y-2">

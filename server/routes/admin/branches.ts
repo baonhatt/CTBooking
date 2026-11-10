@@ -669,10 +669,10 @@ export async function toggleBranchStatusImpl(
 export async function listDeletedBranchesImpl(
   anyDb: any,
   tables: { branches: any; staffs: any },
-  options: { page?: number; pageSize?: number; search?: string } = {}
+  options: { page?: number; pageSize?: number; search?: string; sort?: string; dir?: string } = {}
 ) {
   const { branches, staffs } = tables;
-  const { page = 1, pageSize = 10, search = '' } = options;
+  const { page = 1, pageSize = 10, search = '', sort, dir } = options;
 
   const conditions = [];
   if (search) {
@@ -703,7 +703,11 @@ export async function listDeletedBranchesImpl(
     .where(whereClause)
     .limit(pageSize)
     .offset((page - 1) * pageSize)
-    .orderBy(desc(branches.deleted_at));
+    .orderBy(
+      sort === 'name'
+        ? dir === 'asc' ? asc(branches.name) : desc(branches.name)
+        : dir === 'asc' ? asc(branches.deleted_at) : desc(branches.deleted_at)
+    );
 
   const [countResult] = await anyDb.select({ count: count() }).from(branches).where(whereClause);
 

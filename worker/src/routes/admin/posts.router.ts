@@ -27,7 +27,7 @@ postsRouter.get('/api/admin/posts', requireStaffAuth, requirePermission('posts',
     const r = await listPostsImpl(
       db,
       { posts: schema.posts, auditLogs: schema.auditLogs },
-      { page, pageSize, q, status }
+      { page, pageSize, q, status, withStaffNames: true }
     );
 
     const parsedItems = (r.items || []).map((p: any) => ({
@@ -93,7 +93,7 @@ postsRouter.post('/api/admin/posts', requireStaffAuth, requirePermission('posts'
 
     return c.json({ status: 'success', post: r });
   } catch (err: any) {
-    return c.json({ status: 'error', message: String(err?.message || 'Internal error') }, 500);
+    return c.json({ status: 'error', message: String(err?.message || 'Internal error') }, (Number(err?.statusCode) || 500) as any);
   }
 });
 
@@ -137,7 +137,7 @@ postsRouter.put('/api/admin/posts/:id', requireStaffAuth, requirePermission('pos
 
     return c.json({ status: 'success', post: r });
   } catch (err: any) {
-    return c.json({ status: 'error', message: String(err?.message || 'Internal error') }, 500);
+    return c.json({ status: 'error', message: String(err?.message || 'Internal error') }, (Number(err?.statusCode) || 500) as any);
   }
 });
 

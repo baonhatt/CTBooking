@@ -4,8 +4,9 @@ import { Button } from '@/components/ui/button';
 import { Loader2, Lock, Plus, X } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Switch } from '@/components/ui/switch';
+import { activeStatusLabel } from '@/lib/format';
 import { toast } from 'sonner';
-import { format } from 'date-fns';
 import { BranchMultiSelect } from '@/components/admin/BranchMultiSelect';
 import { normalizeBranchIdsInput, parseBranchIdsFromApi } from '@/lib/branch-ids';
 import { createMovieApi, updateMovieApi, getMovieById, getAdminBranchOptions } from '@/lib/api';
@@ -77,12 +78,15 @@ export const MovieEditModal: React.FC<MovieEditModalProps> = ({
     const run = async () => {
       if (!isEditOpen || !editData?.id) return;
       const idNum = Number(editData.id);
-      if (!idNum || editData.description) return; // already loaded
+      // Load the detail once per opened movie. A blank description is a valid value, so a flag is used instead of
+      // testing the description (otherwise a movie without description would be loaded again and again).
+      if (!idNum || editData.detailsLoaded || (editData.description && editData.branch_ids !== undefined)) return;
       try {
         const m = await getMovieById(idNum);
         if (m) {
           setEditData({
             ...editData,
+            detailsLoaded: true,
             description: m.description || '',
             posterUrl: editData.posterUrl || m.cover_image || '',
             genresText:
@@ -118,11 +122,29 @@ export const MovieEditModal: React.FC<MovieEditModalProps> = ({
     let error = '';
     if (field === 'title' && !value?.trim()) error = 'Tên phim không được để trống';
     if (field === 'duration' && (!value || Number(value) <= 0)) error = 'Thời lượng phải lớn hơn 0 phút';
-    if (field === 'rating' && value && (Number(value) < 0 || Number(value) > 10)) error = 'Đánh giá phải từ 0-10';
+    // A blank rating is allowed (shown as "-" in the list)
+    if (field === 'rating' && value !== '' && value !== null && value !== undefined) {
+      if (Number.isNaN(Number(value)) || Number(value) < 0 || Number(value) > 10) error = 'Đánh giá phải từ 0-10';
+    }
     if (field === 'posterFile' && value?.size > 15_000_000) error = 'Ảnh phải nhỏ hơn 15MB';
 
     setFieldErrors((prev) => ({ ...prev, [field]: error }));
+    return error;
   };
+
+  // Check every required field at Save and show each problem under its field
+  const validateAllFields = () => {
+    const errors = [
+      validateField('title', editData?.title),
+      validateField('duration', editData?.duration),
+      validateField('rating', editData?.rating),
+      validateField('posterFile', editData?.posterFile)
+    ];
+    return errors.every((error) => !error);
+  };
+
+  // Save stays blocked while the poster is too big (the poster is compressed and uploaded when Save is pressed)
+  const hasPosterError = Boolean(fieldErrors.posterFile);
 
   const handleDragOver = (e: React.DragEvent) => {
     e.preventDefault();
@@ -189,7 +211,10 @@ export const MovieEditModal: React.FC<MovieEditModalProps> = ({
             {editData?.id ? 'Chỉnh sửa thông tin phim' : 'Khởi tạo phim chiếu rạp mới'}
           </DialogTitle>
           <button
+            type="button"
             onClick={handleClose}
+            aria-label="Đóng"
+            title="Đóng"
             className="p-2 hover:bg-slate-100 rounded-full transition-colors text-slate-500 hover:text-slate-700"
           >
             <X className="w-5 h-5" />
@@ -247,7 +272,7 @@ export const MovieEditModal: React.FC<MovieEditModalProps> = ({
                     />
                     {fieldErrors.posterFile && <p className="text-xs text-red-500 mt-1">{fieldErrors.posterFile}</p>}
                   </div>
-                  <p className="text-[10px] text-slate-400 mt-3 text-center italic">
+                  <p className="text-[11px] text-slate-400 mt-3 text-center italic">
                     Hỗ trợ: JPG, PNG, WEBP (Tối đa 15MB)
                   </p>
                 </label>
@@ -279,7 +304,9 @@ export const MovieEditModal: React.FC<MovieEditModalProps> = ({
                     ) : null}
 
                     <div className={`${editData?.id ? 'col-span-12 lg:col-span-8' : 'col-span-12'}`}>
-                      <Label className="text-sm font-medium text-gray-900 mb-2 block">Tên phim</Label>
+                      <Label className="text-sm font-medium text-gray-900 mb-2 block">
+                        Tên phim <span className="text-red-500">*</span>
+                      </Label>
                       <Input
                         placeholder="Ví dụ: Đào, Phở và Piano"
                         value={editData?.title || ''}
@@ -349,7 +376,9 @@ export const MovieEditModal: React.FC<MovieEditModalProps> = ({
                   <div className="space-y-4">
                     <div className="grid grid-cols-12 gap-4">
                       <div className="col-span-12 lg:col-span-6">
-                        <Label className="text-sm font-medium text-gray-900 mb-2 block">Chi nhánh</Label>
+                        <Label className="text-sm font-medium text-gray-900 mb-2 block">
+                          Chi nhánh <span className="text-red-500">*</span>
+                        </Label>
                         {availableBranches && availableBranches.length > 0 ? (
                           <BranchMultiSelect
                             branches={availableBranches}
@@ -373,7 +402,9 @@ export const MovieEditModal: React.FC<MovieEditModalProps> = ({
                       </div>
 
                       <div className="col-span-12 lg:col-span-3">
-                        <Label className="text-sm font-medium text-gray-900 mb-2 block">Thời lượng (Phút)</Label>
+                        <Label className="text-sm font-medium text-gray-900 mb-2 block">
+                          Thời lượng (Phút) <span className="text-red-500">*</span>
+                        </Label>
                         <Input
                           type="number"
                           placeholder="120"
@@ -399,9 +430,10 @@ export const MovieEditModal: React.FC<MovieEditModalProps> = ({
                           placeholder="8.5"
                           value={editData?.rating ?? ''}
                           onChange={(e) => {
+                            // Blank stays blank (null), it must not turn into 0
                             setEditData({
                               ...editData,
-                              rating: e.target.value ? Number(e.target.value) : undefined
+                              rating: e.target.value === '' ? null : Number(e.target.value)
                             });
                             validateField('rating', e.target.value);
                             setIsDirty(true);
@@ -432,6 +464,21 @@ export const MovieEditModal: React.FC<MovieEditModalProps> = ({
                           className="w-full h-10 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:border-blue-600 focus:ring-2 focus:ring-blue-600/10 outline-none transition-all"
                         />
                       </div>
+
+                      <div className="col-span-12 lg:col-span-6">
+                        <Label className="text-sm font-medium text-gray-900 mb-2 block">Trạng thái</Label>
+                        <div className="flex items-center gap-3 h-10">
+                          <Switch
+                            checked={editData?.is_active !== false}
+                            aria-label="Trạng thái phim"
+                            onCheckedChange={(checked) => {
+                              setEditData({ ...editData, is_active: checked });
+                              setIsDirty(true);
+                            }}
+                          />
+                          <span className="text-sm text-slate-600">{activeStatusLabel(editData?.is_active !== false)}</span>
+                        </div>
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -449,15 +496,11 @@ export const MovieEditModal: React.FC<MovieEditModalProps> = ({
               Hủy bỏ
             </Button>
             <Button
-              disabled={isSaving}
+              disabled={isSaving || hasPosterError}
               className="h-10 bg-blue-600 hover:bg-blue-700 min-w-[140px] rounded-lg shadow-lg shadow-blue-500/20 transition-all active:scale-95"
               onClick={async () => {
-                if (!editData.title?.trim()) {
-                  toast.error('Lỗi', { description: 'Vui lòng nhập tên phim' });
-                  return;
-                }
-                if (!editData.duration || Number(editData.duration) <= 0) {
-                  toast.error('Lỗi', { description: 'Thời lượng phim không hợp lệ' });
+                if (!validateAllFields()) {
+                  toast.error('Lỗi', { description: 'Vui lòng kiểm tra các ô báo lỗi' });
                   return;
                 }
 
@@ -499,7 +542,10 @@ export const MovieEditModal: React.FC<MovieEditModalProps> = ({
                     cover_image: editData.posterUrl,
                     cover_image_base64: coverBase64,
                     genres: editData.genres,
-                    rating: Number(editData.rating) || 0,
+                    // Blank rating is saved as empty, not as 0
+                    rating: (editData.rating === null || editData.rating === undefined || editData.rating === ''
+                      ? null
+                      : Number(editData.rating)) as any,
                     duration_min: Number(editData.duration),
                     branch_ids,
                     is_active: editData.is_active !== false,

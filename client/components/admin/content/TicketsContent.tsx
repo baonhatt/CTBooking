@@ -22,7 +22,7 @@ import {
   SortDesc,
   SortAsc
 } from 'lucide-react';
-import { format, formatDistanceToNow } from 'date-fns';
+import { formatDistanceToNow } from 'date-fns';
 import { vi } from 'date-fns/locale';
 import { Switch } from '@/components/ui/switch';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -57,13 +57,27 @@ import { BranchIdsBadge } from '@/components/admin/BranchIdsBadge';
 import { normalizeBranchIdsInput, parseBranchIdsFromApi } from '@/lib/branch-ids';
 import { toast } from 'sonner';
 import { useNavigate } from 'react-router-dom';
-import { createTicketApi, updateTicketApi, getAdminBranchOptions, toggleTicketStatusApi } from '@/lib/api';
+import { createTicketApi, updateTicketApi, getAdminBranchOptions, toggleTicketStatusApi, getTicketById } from '@/lib/api';
 import { uploadDirectToCloudinary } from '@/lib/api/uploads';
 import { getMoviesAdmin } from '@/lib/api/movies';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useStaffPermissions, useIsSuperAdmin } from '@/hooks/useStaffPermission';
 import { useStaffStore } from '@/store/staffStore';
 import { useConfirmUnsaved } from '@/hooks/useConfirmUnsaved';
+import { EMPTY_VALUE, activeStatusLabel, formatVnDateTime, formatVnd } from '@/lib/format';
+
+// Message under a form field that failed validation
+function FieldError({ message }: { message?: string }) {
+  if (!message) return null;
+  return <p className="text-xs text-red-500 mt-1">{message}</p>;
+}
+
+// Empty input -> no value (so "blank" is not saved as 0)
+function parse_optional_number(value: unknown): number | undefined {
+  if (value === '' || value === null || value === undefined) return undefined;
+  const parsed = Number(value);
+  return Number.isNaN(parsed) ? undefined : parsed;
+}
 
 interface TicketPackage {
   id: number;
@@ -91,6 +105,8 @@ interface TicketPackage {
   created_at?: string;
   created_by_staff_name?: string;
   updated_by_staff_name?: string;
+  // Movies of the combo with their titles (only the detail API returns this)
+  combo_movies?: Array<{ id: number; title: string }>;
 }
 
 interface Props {
@@ -188,6 +204,57 @@ export default function TicketsContent(props: Props) {
   const [ticketToToggle, setTicketToToggle] = useState<{ id: number; currentStatus: boolean } | null>(null);
   const [isTogglingStatus, setIsTogglingStatus] = useState(false);
   const [confirmSaveData, setConfirmSaveData] = useState<{ payload: any; changes: string[] } | null>(null);
+  // Search box of the combo movie picker and how many movies match it on the server
+  const [movieSearch, setMovieSearch] = useState('');
+  const [movieTotal, setMovieTotal] = useState(0);
+  // Every movie seen so far (search results, combo of the opened package), by id, to show titles of selected movies
+  const [knownMovies, setKnownMovies] = useState<Record<number, any>>({});
+  // Movies in the combo when the form was opened. They are kept on save even if the movie is hidden since.
+  const [originalComboIds, setOriginalComboIds] = useState<number[]>([]);
+  const [ticketErrors, setTicketErrors] = useState<Record<string, string>>({});
+  const [detailLoadError, setDetailLoadError] = useState(false);
+
+  const clearTicketError = (field: string) => {
+    setTicketErrors((previous) => (previous[field] ? { ...previous, [field]: '' } : previous));
+  };
+
+  const rememberMovies = (movieList: any[]) => {
+    setKnownMovies((previous) => {
+      const next = { ...previous };
+      movieList.forEach((movie) => {
+        next[Number(movie.id)] = { ...next[Number(movie.id)], ...movie };
+      });
+      return next;
+    });
+  };
+
+  const toggleSort = (key: string) => {
+    if (sortKey === key) {
+      setSortDir(sortDir === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortKey(key);
+      setSortDir(key === 'updated_at' ? 'desc' : 'asc');
+    }
+    setPage(1);
+  };
+
+  // Column title that sorts the list on the server when clicked
+  const renderSortableHead = (label: string, key: string) => (
+    <TableHead
+      className="text-xs font-semibold text-gray-600 uppercase py-3"
+      aria-sort={sortKey === key ? (sortDir === 'asc' ? 'ascending' : 'descending') : 'none'}
+    >
+      <button
+        type="button"
+        onClick={() => toggleSort(key)}
+        className="inline-flex items-center gap-1 uppercase hover:text-slate-900"
+        title={`Sắp xếp theo ${label.toLowerCase()}`}
+      >
+        {label}
+        {sortKey === key && (sortDir === 'asc' ? <SortAsc className="w-3 h-3" /> : <SortDesc className="w-3 h-3" />)}
+      </button>
+    </TableHead>
+  );
 
   const isDirty = React.useMemo(() => {
     if (!isEditOpen || !editData) return false;
@@ -216,50 +283,119 @@ export default function TicketsContent(props: Props) {
     }
   });
 
-  // Fetch movies when dialog opens or branch changes
+  // When the form opens: load branches, remember the combo it started with and name its movies
   React.useEffect(() => {
-    if (isEditOpen) {
-      getMoviesAdmin({ status: 'active', pageSize: 100 }).then((res) => {
-        setMovies(res.items);
-      });
-      getAdminBranchOptions({ includeInactive: true }).then((res) => {
-        setBranchOptions(res.items);
-      });
+    if (!isEditOpen) {
+      setMovieSearch('');
+      setTicketErrors({});
+      return;
     }
+    getAdminBranchOptions({ includeInactive: true }).then((res) => {
+      setBranchOptions(res.items);
+    });
+    const startCombo: number[] = Array.isArray(editData?.combo) ? editData.combo.map(Number) : [];
+    setOriginalComboIds(startCombo);
+    if (editData?.id && startCombo.length > 0) {
+      getTicketById(Number(editData.id))
+        .then((res: any) => {
+          const detail = res?.item ?? res;
+          if (Array.isArray(detail?.combo_movies)) rememberMovies(detail.combo_movies);
+        })
+        .catch(() => {});
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isEditOpen]);
+
+  // Movies for the combo picker: the server searches by title, so a package can pick any movie, not only the first 100
+  React.useEffect(() => {
+    if (!isEditOpen) return;
+    const searchText = movieSearch.trim();
+    const timer = setTimeout(
+      () => {
+        getMoviesAdmin({ status: 'active', pageSize: 100, q: searchText })
+          .then((res) => {
+            setMovies(res.items);
+            setMovieTotal(Number(res.total ?? res.items.length));
+            rememberMovies(res.items);
+          })
+          .catch(() => toast.error('Không tải được danh sách phim'));
+      },
+      searchText ? 300 : 0
+    );
+    return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isEditOpen, movieSearch]);
+
+  // A movie can join the combo when the package is global, the movie is global, or they share a branch
+  const isMovieEligible = (movie: any) => {
+    const packageBranchesRaw =
+      editData?.branch_ids !== undefined ? editData.branch_ids : editData?.branch_id ? [editData.branch_id] : [];
+    if (packageBranchesRaw === null) return true;
+    const packageBranches = Array.isArray(packageBranchesRaw) ? packageBranchesRaw : [];
+    // The movie branch ids can be a stringified JSON from the API
+    const movieBranchesRaw = parseBranchIdsFromApi(movie.branch_ids ?? movie.branch_id);
+    if (movieBranchesRaw === null) return true;
+    const movieBranches = Array.isArray(movieBranchesRaw) ? movieBranchesRaw : [];
+    return packageBranches.some((branchId: number) => movieBranches.includes(branchId));
+  };
 
   const filteredMovies = React.useMemo(() => {
     if (!movies) return [];
-    
-    // Determine the raw branch list for the ticket package
-    const pBranchesRaw = editData?.branch_ids !== undefined 
-      ? editData.branch_ids 
-      : (editData?.branch_id ? [editData.branch_id] : []);
-    
-    // If it's explicitly null, the package is Global (All Branches)
-    const isPackageGlobal = pBranchesRaw === null;
-    const pBranches = Array.isArray(pBranchesRaw) ? pBranchesRaw : [];
-
-    return movies.filter((movie) => {
-      // Must securely parse the movie branch ids as it can be a stringified JSON from API
-      const mBranchesRaw = parseBranchIdsFromApi(movie.branch_ids ?? movie.branch_id);
-      const isMovieGlobal = mBranchesRaw === null;
-      const mBranches = Array.isArray(mBranchesRaw) ? mBranchesRaw : [];
-      
-      // If Ticket is global, it can include ANY movie
-      if (isPackageGlobal) {
-        return true;
-      }
-      
-      // If movie is global, it's playable everywhere and thus available for any specific ticket package
-      if (isMovieGlobal) {
-        return true;
-      }
-      
-      // Both are specific: ensure they share at least one branch
-      return pBranches.some((b: number) => mBranches.includes(b));
-    });
+    return movies.filter((movie) => isMovieEligible(movie));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [movies, editData?.branch_ids, editData?.branch_id]);
+
+  // Movies of the combo that stay on save: the ones it started with, plus new ones the branch rule allows
+  const keepComboIds = (combo: any[]): number[] =>
+    (combo || [])
+      .map(Number)
+      .filter((movieId) => originalComboIds.includes(movieId) || (knownMovies[movieId] && isMovieEligible(knownMovies[movieId])));
+
+  // Selected movies that the current search does not show, so they can still be seen and removed
+  const selectedOutsideResults = keepComboIds(editData?.combo || []).filter(
+    (movieId) => !filteredMovies.some((movie) => Number(movie.id) === movieId)
+  );
+
+  // Check the form and show each problem under its field. Returns true when the form can be saved.
+  const validateTicketForm = () => {
+    const errors: Record<string, string> = {};
+    const isVr = editData?.type === 'vr';
+    if (!editData?.name?.trim()) errors.name = 'Vui lòng nhập tên gói';
+    if (editData?.price === undefined || editData?.price === null || editData?.price === '') {
+      errors.price = 'Vui lòng nhập giá';
+    } else if (Number.isNaN(Number(editData.price)) || Number(editData.price) < 0) {
+      errors.price = 'Giá không được nhỏ hơn 0';
+    }
+    const displayOrder = parse_optional_number(editData?.display_order);
+    if (displayOrder !== undefined && (displayOrder < 0 || !Number.isInteger(displayOrder))) {
+      errors.display_order = 'Thứ tự phải là số nguyên từ 0 trở lên';
+    }
+    const branchIds = normalizeBranchIdsInput(editData?.branch_ids, editData?.branch_id);
+    if (Array.isArray(branchIds) && branchIds.length === 0) {
+      errors.branch_ids = 'Vui lòng chọn ít nhất một chi nhánh hoặc "Tất cả chi nhánh"';
+    }
+    if (isVr) {
+      const duration = parse_optional_number(editData?.duration_min);
+      if (duration !== undefined && duration <= 0) errors.duration_min = 'Thời lượng phải lớn hơn 0 phút';
+      const minPlayers = parse_optional_number(editData?.min_players);
+      const maxPlayers = parse_optional_number(editData?.max_players);
+      if (minPlayers !== undefined && minPlayers < 1) errors.min_players = 'Tối thiểu 1 người chơi';
+      if (maxPlayers !== undefined && maxPlayers < 1) errors.max_players = 'Tối thiểu 1 người chơi';
+      if (minPlayers !== undefined && maxPlayers !== undefined && minPlayers > maxPlayers) {
+        errors.max_players = 'Số người tối đa phải lớn hơn hoặc bằng số người tối thiểu';
+      }
+    } else {
+      const minGroup = parse_optional_number(editData?.min_group_size);
+      const maxGroup = parse_optional_number(editData?.max_group_size);
+      if (minGroup !== undefined && minGroup < 1) errors.min_group_size = 'Tối thiểu 1 người';
+      if (maxGroup !== undefined && maxGroup < 1) errors.max_group_size = 'Tối thiểu 1 người';
+      if (minGroup !== undefined && maxGroup !== undefined && minGroup > maxGroup) {
+        errors.max_group_size = 'Nhóm tối đa phải lớn hơn hoặc bằng nhóm tối thiểu';
+      }
+    }
+    setTicketErrors(errors);
+    return Object.keys(errors).length === 0;
+  };
 
   // ✅ FIX: Chỉ đóng popup AFTER API call thành công
   const handleToggleStatus = async (id: number, currentStatus: boolean) => {
@@ -344,12 +480,14 @@ export default function TicketsContent(props: Props) {
           <select
             value={sortKey}
             onChange={(e) => setSortKey?.(e.target.value)}
+            aria-label="Sắp xếp theo"
             className="bg-white border rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none shadow-sm cursor-pointer h-10"
           >
             <option value="updated_at">Mới cập nhật</option>
             <option value="name">Tên gói</option>
             <option value="price">Giá</option>
             <option value="type">Phân loại</option>
+            <option value="display_order">Thứ tự hiển thị</option>
           </select>
 
           <Button
@@ -358,6 +496,7 @@ export default function TicketsContent(props: Props) {
             onClick={() => setSortDir?.(sortDir === 'asc' ? 'desc' : 'asc')}
             className="rounded-xl border-slate-200 hover:bg-slate-50 active:scale-95 transition-all shadow-sm h-10 w-10 shrink-0"
             title={sortDir === 'asc' ? 'Tăng dần' : 'Giảm dần'}
+            aria-label={sortDir === 'asc' ? 'Đang tăng dần, bấm để giảm dần' : 'Đang giảm dần, bấm để tăng dần'}
           >
             {sortDir === 'desc' ? (
               <SortDesc className="w-4 h-4 text-slate-600" />
@@ -370,6 +509,7 @@ export default function TicketsContent(props: Props) {
             <select
               value={selectedBranchId || 'all'}
               onChange={(e) => setSelectedBranchId(e.target.value === 'all' ? 'all' : Number(e.target.value))}
+              aria-label="Lọc theo chi nhánh"
               className="bg-white border rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none shadow-sm cursor-pointer h-10"
             >
               {isSuperAdmin && <option value="all">Tất cả chi nhánh</option>}
@@ -409,6 +549,7 @@ export default function TicketsContent(props: Props) {
             onClick={onRefresh}
             className="rounded-xl shadow-sm hover:rotate-180 transition-transform duration-500 shrink-0 h-10 w-10"
             title="Làm mới"
+            aria-label="Làm mới danh sách"
           >
             <RefreshCw className={`w-4 h-4 ${isLoading ? 'animate-spin' : ''}`} />
           </Button>
@@ -419,10 +560,11 @@ export default function TicketsContent(props: Props) {
           <Table>
             <TableHeader className="bg-gray-50">
               <TableRow className="hover:bg-transparent border-none">
-                <TableHead className="text-xs font-semibold text-gray-600 uppercase py-3">Tên gói / Dịch vụ</TableHead>
-                <TableHead className="text-xs font-semibold text-gray-600 uppercase py-3">Phân loại</TableHead>
-                <TableHead className="text-xs font-semibold text-gray-600 uppercase py-3">Giá niêm yết</TableHead>
-                <TableHead className="text-xs font-semibold text-gray-600 uppercase py-3">Cập nhật</TableHead>
+                {renderSortableHead('Tên gói / Dịch vụ', 'name')}
+                {renderSortableHead('Phân loại', 'type')}
+                {renderSortableHead('Giá niêm yết', 'price')}
+                {renderSortableHead('Thứ tự', 'display_order')}
+                {renderSortableHead('Cập nhật', 'updated_at')}
                 <TableHead className="text-xs font-semibold text-gray-600 uppercase py-3 min-w-[120px]">
                   Chi nhánh
                 </TableHead>
@@ -448,6 +590,9 @@ export default function TicketsContent(props: Props) {
                         <Skeleton className="h-4 w-20" />
                       </TableCell>
                       <TableCell>
+                        <Skeleton className="h-4 w-8" />
+                      </TableCell>
+                      <TableCell>
                         <Skeleton className="h-4 w-16" />
                       </TableCell>
                       <TableCell>
@@ -461,7 +606,15 @@ export default function TicketsContent(props: Props) {
                       </TableCell>
                     </TableRow>
                   ))
-                : data.map((t) => {
+                : data.length === 0
+                  ? [
+                      <TableRow key="empty">
+                        <TableCell colSpan={8} className="h-32 text-center text-sm text-slate-400">
+                          Không có gói vé nào phù hợp
+                        </TableCell>
+                      </TableRow>
+                    ]
+                  : data.map((t) => {
                     const isVR = t.type === 'vr';
                     return (
                       <TableRow
@@ -488,12 +641,19 @@ export default function TicketsContent(props: Props) {
                               </div>
                             )}
                             <div className="flex flex-col gap-0.5">
-                              <span className="font-bold text-slate-900">{t.name}</span>
+                              <span className="font-bold text-slate-900 max-w-[260px] truncate" title={t.name}>
+                                {t.name}
+                              </span>
                               <div className="flex items-center gap-2">
-                                <span className="text-[10px] text-slate-400 font-mono">Mã: {t.code || '—'}</span>
+                                <span className="text-[11px] text-slate-400 font-mono">Mã: {t.code || '—'}</span>
                                 {isVR && t.vr_genre && (
-                                  <span className="text-[10px] text-purple-600 bg-purple-50 px-1.5 py-0.2 rounded font-medium">
+                                  <span className="text-[11px] text-purple-600 bg-purple-50 px-1.5 py-0.2 rounded font-medium">
                                     {t.vr_genre}
+                                  </span>
+                                )}
+                                {t.is_member_only && (
+                                  <span className="text-[11px] text-amber-700 bg-amber-50 px-1.5 rounded font-medium">
+                                    Thành viên
                                   </span>
                                 )}
                               </div>
@@ -504,7 +664,7 @@ export default function TicketsContent(props: Props) {
                           {isVR ? (
                             <Badge
                               variant="outline"
-                              className="text-[10px] font-bold border-purple-200 text-purple-700 bg-purple-50 flex items-center gap-1 w-fit"
+                              className="text-[11px] font-bold border-purple-200 text-purple-700 bg-purple-50 flex items-center gap-1 w-fit"
                             >
                               <Gamepad2 className="w-3 h-3 text-purple-600" />
                               Gói VR {t.duration_min ? `• ${t.duration_min}p` : ''}
@@ -512,26 +672,22 @@ export default function TicketsContent(props: Props) {
                           ) : (
                             <Badge
                               variant="outline"
-                              className="text-[10px] font-bold border-blue-200 text-blue-700 bg-blue-50 flex items-center gap-1 w-fit"
+                              className="text-[11px] font-bold border-blue-200 text-blue-700 bg-blue-50 flex items-center gap-1 w-fit"
                             >
                               <Film className="w-3 h-3 text-blue-600" />
                               Vé Phim {t.combo && t.combo.length > 0 ? `• ${t.combo.length} phim` : ''}
                             </Badge>
                           )}
                         </TableCell>
-                        <TableCell className="font-black text-slate-700">
-                          {Number(t.price).toLocaleString('vi-VN')} đ
-                        </TableCell>
+                        <TableCell className="font-black text-slate-700">{formatVnd(t.price)}</TableCell>
+                        <TableCell className="text-xs text-slate-600">{t.display_order ?? EMPTY_VALUE}</TableCell>
                         <TableCell>
-                          <div className="flex flex-col text-[10px]">
+                          <div className="flex flex-col text-[11px]">
                             <span className="text-slate-600 font-bold flex items-center gap-1">
                               <History size={10} className="text-slate-400" />
-                              {t.updated_at ? format(new Date(t.updated_at), 'HH:mm') : '-'}
+                              {formatVnDateTime(t.updated_at)}
                             </span>
-                            <span
-                              className="text-slate-400 italic cursor-help"
-                              title={t.updated_at ? new Date(t.updated_at).toLocaleString('vi-VN') : ''}
-                            >
+                            <span className="text-slate-400 italic cursor-help" title={formatVnDateTime(t.updated_at)}>
                               {t.updated_at
                                 ? formatDistanceToNow(new Date(t.updated_at), { addSuffix: true, locale: vi })
                                 : ''}
@@ -547,6 +703,7 @@ export default function TicketsContent(props: Props) {
                               <AlertDialogTrigger asChild>
                                 <Switch
                                   checked={t.is_active}
+                                  aria-label={`Đổi trạng thái gói ${t.name}`}
                                   className="scale-100 transition-all border-2 border-transparent cursor-pointer"
                                   style={{
                                     opacity: 1,
@@ -565,6 +722,7 @@ export default function TicketsContent(props: Props) {
                             <Switch
                               checked={t.is_active}
                               disabled
+                              aria-label={`Trạng thái gói ${t.name}: ${activeStatusLabel(t.is_active)}`}
                               className="scale-100 opacity-40 cursor-not-allowed"
                               style={{ backgroundColor: t.is_active ? '#10b981' : '#d1d5db' }}
                               title={!canModifyTicket(t) ? "Không có quyền sửa (Khác chi nhánh / Dùng chung)" : ""}
@@ -579,8 +737,29 @@ export default function TicketsContent(props: Props) {
                             onClick={() => {
                               setSelectedTicket(t);
                               setIsDetailDialogOpen(true);
+                              setDetailLoadError(false);
+                              // The list does not carry who created/changed the package or the combo titles, so load them.
+                              // The API returns the package itself (older code expected it inside "item").
+                              getTicketById(t.id)
+                                .then((res: any) => {
+                                  const detail = res?.item ?? res;
+                                  if (!detail) return;
+                                  setSelectedTicket((current) =>
+                                    current && current.id === t.id
+                                      ? {
+                                          ...current,
+                                          created_at: detail.created_at ?? current.created_at,
+                                          combo_movies: Array.isArray(detail.combo_movies) ? detail.combo_movies : [],
+                                          created_by_staff_name: detail.created_by_staff_name ?? undefined,
+                                          updated_by_staff_name: detail.updated_by_staff_name ?? undefined
+                                        }
+                                      : current
+                                  );
+                                })
+                                .catch(() => setDetailLoadError(true));
                             }}
                             title="Xem chi tiết"
+                            aria-label={`Xem chi tiết gói ${t.name}`}
                           >
                             <Eye className="h-4.5 w-4.5" />
                           </Button>
@@ -595,6 +774,7 @@ export default function TicketsContent(props: Props) {
                                 onClone(packageToClone);
                               }}
                               title="Nhân bản"
+                              aria-label={`Nhân bản gói ${t.name}`}
                             >
                               <Copy className="h-4.5 w-4.5" />
                             </Button>
@@ -606,6 +786,7 @@ export default function TicketsContent(props: Props) {
                               className={`h-8 rounded-lg border-yellow-200 ${canModifyTicket(t) ? 'hover:bg-yellow-50 text-yellow-600' : 'opacity-40 cursor-not-allowed'}`}
                               onClick={() => canModifyTicket(t) && onEdit(t)}
                               title={!canModifyTicket(t) ? "Không có quyền sửa (Khác chi nhánh / Dùng chung)" : "Chỉnh sửa"}
+                              aria-label={`Chỉnh sửa gói ${t.name}`}
                             >
                               <Pencil className="h-4.5 w-4.5" />
                             </Button>
@@ -617,6 +798,7 @@ export default function TicketsContent(props: Props) {
                               className={`h-8 rounded-lg border-red-200 ${canModifyTicket(t) ? 'hover:bg-red-50 text-red-600' : 'opacity-40 cursor-not-allowed'}`}
                               onClick={() => canModifyTicket(t) && onDelete(t)}
                               title={!canModifyTicket(t) ? "Không có quyền xóa (Khác chi nhánh / Dùng chung)" : "Xóa"}
+                              aria-label={`Xóa gói ${t.name}`}
                             >
                               <Trash2 className="h-4.5 w-4.5" />
                             </Button>
@@ -703,6 +885,8 @@ export default function TicketsContent(props: Props) {
                 variant="ghost"
                 size="icon"
                 onClick={() => handleEditOpenChange(false)}
+                aria-label="Đóng"
+                title="Đóng"
                 className="h-8 w-8 text-gray-500 hover:text-gray-700"
               >
                 <X className="h-4 w-4" />
@@ -753,9 +937,13 @@ export default function TicketsContent(props: Props) {
                       <Input
                         placeholder={editData?.type === 'vr' ? 'Vd: VR Escape Room Phiêu lưu' : 'Vd: Vé đôi VIP'}
                         value={editData?.name || ''}
-                        onChange={(e) => setEditData({ ...editData, name: e.target.value })}
-                        className="h-9.5 text-sm"
+                        onChange={(e) => {
+                          setEditData({ ...editData, name: e.target.value });
+                          clearTicketError('name');
+                        }}
+                        className={`h-9.5 text-sm ${ticketErrors.name ? 'border-red-500' : ''}`}
                       />
+                      <FieldError message={ticketErrors.name} />
                     </div>
                     <div>
                       <Label className="text-xs font-semibold text-gray-700 mb-1.5 block">Mã gói</Label>
@@ -775,6 +963,7 @@ export default function TicketsContent(props: Props) {
                             onClick={() => setIsCodeEditable && setIsCodeEditable(!isCodeEditable)}
                             className="h-9.5 w-9.5 shrink-0"
                             title={isCodeEditable ? 'Khóa mã' : 'Sửa mã'}
+                            aria-label={isCodeEditable ? 'Khóa mã gói' : 'Sửa mã gói'}
                           >
                             <Pencil className="w-3.5 h-3.5" />
                           </Button>
@@ -796,11 +985,14 @@ export default function TicketsContent(props: Props) {
                           : ''
                       }
                       onChange={(e) => {
-                        const v = Number(e.target.value.replace(/[^\d]/g, ''));
-                        setEditData({ ...editData, price: isNaN(v) ? 0 : v });
+                        const digits = e.target.value.replace(/[^\d]/g, '');
+                        // Empty box stays empty so the required check can catch it
+                        setEditData({ ...editData, price: digits === '' ? undefined : Number(digits) });
+                        clearTicketError('price');
                       }}
-                      className="h-9.5 text-sm font-semibold text-slate-800"
+                      className={`h-9.5 text-sm font-semibold text-slate-800 ${ticketErrors.price ? 'border-red-500' : ''}`}
                     />
+                    <FieldError message={ticketErrors.price} />
                   </div>
 
                   {editData?.type === 'vr' ? (
@@ -811,14 +1003,16 @@ export default function TicketsContent(props: Props) {
                           type="number"
                           placeholder="Vd: 30"
                           value={editData?.duration_min ?? ''}
-                          onChange={(e) =>
+                          onChange={(e) => {
                             setEditData({
                               ...editData,
                               duration_min: e.target.value ? Number(e.target.value) : undefined
-                            })
-                          }
-                          className="h-9.5 text-sm"
+                            });
+                            clearTicketError('duration_min');
+                          }}
+                          className={`h-9.5 text-sm ${ticketErrors.duration_min ? 'border-red-500' : ''}`}
                         />
+                        <FieldError message={ticketErrors.duration_min} />
                       </div>
                       <div>
                         <Label className="text-xs font-semibold text-gray-700 mb-1.5 block">Thể loại VR</Label>
@@ -830,7 +1024,40 @@ export default function TicketsContent(props: Props) {
                         />
                       </div>
                     </div>
-                  ) : null}
+                  ) : (
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <Label className="text-xs font-semibold text-gray-700 mb-1.5 block">Nhóm tối thiểu (người)</Label>
+                        <Input
+                          type="number"
+                          min={1}
+                          placeholder="Vd: 2"
+                          value={editData?.min_group_size ?? ''}
+                          onChange={(e) => {
+                            setEditData({ ...editData, min_group_size: parse_optional_number(e.target.value) });
+                            clearTicketError('min_group_size');
+                          }}
+                          className={`h-9.5 text-sm ${ticketErrors.min_group_size ? 'border-red-500' : ''}`}
+                        />
+                        <FieldError message={ticketErrors.min_group_size} />
+                      </div>
+                      <div>
+                        <Label className="text-xs font-semibold text-gray-700 mb-1.5 block">Nhóm tối đa (người)</Label>
+                        <Input
+                          type="number"
+                          min={1}
+                          placeholder="Vd: 6"
+                          value={editData?.max_group_size ?? ''}
+                          onChange={(e) => {
+                            setEditData({ ...editData, max_group_size: parse_optional_number(e.target.value) });
+                            clearTicketError('max_group_size');
+                          }}
+                          className={`h-9.5 text-sm ${ticketErrors.max_group_size ? 'border-red-500' : ''}`}
+                        />
+                        <FieldError message={ticketErrors.max_group_size} />
+                      </div>
+                    </div>
+                  )}
 
                   <div>
                     <Label className="text-xs font-semibold text-gray-700 mb-1.5 block">Mô tả tóm tắt</Label>
@@ -945,6 +1172,7 @@ export default function TicketsContent(props: Props) {
                             onClick={() => setEditData({ ...editData, cover_image: '' })}
                             className="absolute top-2 right-2 bg-black/60 hover:bg-black/80 text-white rounded-full p-1 transition-colors"
                             title="Xóa ảnh"
+                            aria-label="Xóa ảnh bìa"
                           >
                             <X className="w-3.5 h-3.5" />
                           </button>
@@ -959,10 +1187,14 @@ export default function TicketsContent(props: Props) {
                         <Input
                           type="number"
                           placeholder="1"
-                          value={editData?.min_players ?? 1}
-                          onChange={(e) => setEditData({ ...editData, min_players: Number(e.target.value || 1) })}
-                          className="h-9.5 text-sm bg-white"
+                          value={editData?.min_players ?? ''}
+                          onChange={(e) => {
+                            setEditData({ ...editData, min_players: parse_optional_number(e.target.value) });
+                            clearTicketError('min_players');
+                          }}
+                          className={`h-9.5 text-sm bg-white ${ticketErrors.min_players ? 'border-red-500' : ''}`}
                         />
+                        <FieldError message={ticketErrors.min_players} />
                       </div>
                       <div>
                         <Label className="text-xs font-semibold text-gray-700 mb-1.5 block">Người chơi tối đa</Label>
@@ -970,14 +1202,13 @@ export default function TicketsContent(props: Props) {
                           type="number"
                           placeholder="4"
                           value={editData?.max_players ?? ''}
-                          onChange={(e) =>
-                            setEditData({
-                              ...editData,
-                              max_players: e.target.value ? Number(e.target.value) : undefined
-                            })
-                          }
-                          className="h-9.5 text-sm bg-white"
+                          onChange={(e) => {
+                            setEditData({ ...editData, max_players: parse_optional_number(e.target.value) });
+                            clearTicketError('max_players');
+                          }}
+                          className={`h-9.5 text-sm bg-white ${ticketErrors.max_players ? 'border-red-500' : ''}`}
                         />
+                        <FieldError message={ticketErrors.max_players} />
                       </div>
                     </div>
                   </div>
@@ -987,7 +1218,7 @@ export default function TicketsContent(props: Props) {
                     <div className="border-b pb-2 flex items-center justify-between">
                       <h3 className="text-xs font-bold text-gray-700 flex items-center gap-2">
                         <Film size={14} className="text-blue-500" />
-                        Combo Phim ({(editData?.combo || []).filter((id: number) => filteredMovies.some(m => m.id === id)).length}/{filteredMovies.length})
+                        Combo Phim (đã chọn {keepComboIds(editData?.combo || []).length})
                       </h3>
                       {filteredMovies.length > 0 && (
                         <div className="flex items-center gap-1.5 hover:bg-slate-50 px-2 py-1 rounded cursor-pointer transition-colors">
@@ -1007,16 +1238,52 @@ export default function TicketsContent(props: Props) {
                           />
                           <label
                             htmlFor="check-all-movies"
-                            className="text-[10px] font-bold uppercase text-slate-500 cursor-pointer"
+                            className="text-[11px] font-bold uppercase text-slate-500 cursor-pointer"
                           >
-                            Chọn tất cả
+                            Chọn tất cả kết quả
                           </label>
                         </div>
                       )}
                     </div>
+                    <Input
+                      placeholder="Tìm phim theo tên..."
+                      value={movieSearch}
+                      onChange={(e) => setMovieSearch(e.target.value)}
+                      aria-label="Tìm phim cho combo"
+                      className="h-9 text-xs"
+                    />
                     <div className="border border-gray-200 rounded-xl p-2.5 h-44 overflow-y-auto space-y-1.5 bg-gray-50/50">
-                      {filteredMovies.length === 0 ? (
-                        <p className="text-xs text-gray-400 text-center py-6">Không có phim nào khả dụng cho chi nhánh này</p>
+                      {selectedOutsideResults.map((movieId) => (
+                        <div
+                          key={`selected-${movieId}`}
+                          className="flex items-center space-x-2.5 bg-blue-50/60 p-1.5 rounded-lg border border-blue-100"
+                        >
+                          <Checkbox
+                            id={`movie-${movieId}`}
+                            checked
+                            onCheckedChange={() =>
+                              setEditData({
+                                ...editData,
+                                combo: (editData.combo || []).filter((id: number) => Number(id) !== movieId)
+                              })
+                            }
+                          />
+                          <label
+                            htmlFor={`movie-${movieId}`}
+                            className="text-xs font-medium leading-none cursor-pointer flex-1 text-slate-700 truncate"
+                            title={knownMovies[movieId]?.title}
+                          >
+                            {knownMovies[movieId]?.title || `Phim #${movieId}`}
+                            <span className="ml-1 text-[11px] text-slate-400">(đã chọn, ngoài kết quả tìm)</span>
+                          </label>
+                        </div>
+                      ))}
+                      {filteredMovies.length === 0 && selectedOutsideResults.length === 0 ? (
+                        <p className="text-xs text-gray-400 text-center py-6">
+                          {movieSearch.trim()
+                            ? 'Không tìm thấy phim nào'
+                            : 'Không có phim nào khả dụng cho chi nhánh này'}
+                        </p>
                       ) : (
                         filteredMovies.map((movie) => (
                           <div
@@ -1043,7 +1310,8 @@ export default function TicketsContent(props: Props) {
                             />
                             <label
                               htmlFor={`movie-${movie.id}`}
-                              className="text-xs font-medium leading-none cursor-pointer flex-1 text-slate-700"
+                              className="text-xs font-medium leading-none cursor-pointer flex-1 text-slate-700 truncate"
+                              title={movie.title}
                             >
                               {movie.title}
                             </label>
@@ -1051,6 +1319,11 @@ export default function TicketsContent(props: Props) {
                         ))
                       )}
                     </div>
+                    {movieTotal > movies.length && (
+                      <p className="text-[11px] text-slate-400">
+                        Đang hiện {movies.length}/{movieTotal} phim. Gõ tên phim để tìm thêm.
+                      </p>
+                    )}
                   </div>
                 )}
 
@@ -1060,18 +1333,22 @@ export default function TicketsContent(props: Props) {
                     <Info size={14} className="text-blue-500" /> Chi nhánh & cài đặt hiển thị
                   </h3>
                   <div>
-                    <Label className="text-xs font-semibold text-gray-700 mb-1.5 block">Chi nhánh áp dụng</Label>
+                    <Label className="text-xs font-semibold text-gray-700 mb-1.5 block">
+                      Chi nhánh áp dụng <span className="text-red-500">*</span>
+                    </Label>
                     <BranchMultiSelect
                       branches={branchOptions}
                       value={normalizeBranchIdsInput(editData?.branch_ids, editData?.branch_id)}
-                      onChange={(branch_ids) =>
+                      onChange={(branch_ids) => {
                         setEditData({
                           ...editData,
                           branch_ids,
                           branch_id: branch_ids && branch_ids.length === 1 ? branch_ids[0] : undefined
-                        })
-                      }
+                        });
+                        clearTicketError('branch_ids');
+                      }}
                     />
+                    <FieldError message={ticketErrors.branch_ids} />
                   </div>
 
                   <div className="grid grid-cols-2 gap-3 pt-1">
@@ -1081,14 +1358,16 @@ export default function TicketsContent(props: Props) {
                         type="number"
                         placeholder="0"
                         value={editData?.display_order ?? 0}
-                        onChange={(e) =>
+                        onChange={(e) => {
                           setEditData({
                             ...editData,
                             display_order: Number(e.target.value || 0)
-                          })
-                        }
-                        className="h-9.5 text-sm"
+                          });
+                          clearTicketError('display_order');
+                        }}
+                        className={`h-9.5 text-sm ${ticketErrors.display_order ? 'border-red-500' : ''}`}
                       />
+                      <FieldError message={ticketErrors.display_order} />
                     </div>
                     <div className="flex items-center justify-between pt-5">
                       <Label
@@ -1115,27 +1394,19 @@ export default function TicketsContent(props: Props) {
               Hủy
             </Button>
             <Button
-              disabled={isSaving}
+              disabled={isSaving || isUploadingImage}
               className={`rounded-xl px-5 text-white ${
                 editData?.type === 'vr' ? 'bg-purple-600 hover:bg-purple-700' : 'bg-blue-600 hover:bg-blue-700'
               }`}
               onClick={async () => {
+                if (isUploadingImage) return;
+                if (!validateTicketForm()) {
+                  toast.error('Vui lòng kiểm tra các ô báo lỗi');
+                  return;
+                }
                 try {
                   setIsSaving(true);
-                  if (!editData?.name?.trim()) {
-                    toast.error('Vui lòng nhập tên gói');
-                    return;
-                  }
-                  if (editData?.price === undefined || editData?.price === null || Number(editData.price) < 0) {
-                    toast.error('Vui lòng nhập giá hợp lệ');
-                    return;
-                  }
-
                   const branch_ids = normalizeBranchIdsInput(editData?.branch_ids, editData?.branch_id);
-                  if (Array.isArray(branch_ids) && branch_ids.length === 0) {
-                    toast.error('Vui lòng chọn ít nhất một chi nhánh hoặc "Tất cả chi nhánh"');
-                    return;
-                  }
 
                   const features =
                     typeof editData.features === 'string'
@@ -1145,8 +1416,8 @@ export default function TicketsContent(props: Props) {
                           .filter(Boolean)
                       : editData.features || [];
 
-                  const rawCombo = editData.type === 'vr' ? [] : editData.combo || [];
-                  const validCombo = rawCombo.filter((id: number) => filteredMovies.some(m => m.id === id));
+                  // Movies already in the combo stay even when hidden since; new ones must pass the branch rule
+                  const validCombo = editData.type === 'vr' ? [] : keepComboIds(editData.combo || []);
 
                   const payload = {
                     name: editData.name.trim(),
@@ -1156,8 +1427,8 @@ export default function TicketsContent(props: Props) {
                     features,
                     type: editData.type || 'movie',
                     combo: validCombo,
-                    min_group_size: editData.min_group_size ? Number(editData.min_group_size) : undefined,
-                    max_group_size: editData.max_group_size ? Number(editData.max_group_size) : undefined,
+                    min_group_size: parse_optional_number(editData.min_group_size),
+                    max_group_size: parse_optional_number(editData.max_group_size),
                     is_member_only: !!editData.is_member_only,
                     is_active: editData.is_active !== undefined ? !!editData.is_active : true,
                     display_order: editData.display_order ? Number(editData.display_order) : 0,
@@ -1165,8 +1436,8 @@ export default function TicketsContent(props: Props) {
                     cover_image: editData.cover_image?.trim() || undefined,
                     duration_min: editData.duration_min ? Number(editData.duration_min) : undefined,
                     vr_genre: editData.vr_genre?.trim() || undefined,
-                    min_players: editData.min_players ? Number(editData.min_players) : undefined,
-                    max_players: editData.max_players ? Number(editData.max_players) : undefined
+                    min_players: parse_optional_number(editData.min_players),
+                    max_players: parse_optional_number(editData.max_players)
                   };
 
                   const executeSaveTicket = async (p: any) => {
@@ -1196,7 +1467,7 @@ export default function TicketsContent(props: Props) {
                       const changes: string[] = [];
                       if (Number(originalItem.price) !== Number(payload.price)) {
                         changes.push(
-                          `Giá niêm yết gói: ${Number(originalItem.price).toLocaleString('vi-VN')}đ → ${Number(payload.price).toLocaleString('vi-VN')}đ`
+                          `Giá niêm yết gói: ${formatVnd(originalItem.price)} → ${formatVnd(payload.price)}`
                         );
                       }
                       if (changes.length > 0) {
@@ -1218,6 +1489,8 @@ export default function TicketsContent(props: Props) {
                 <span className="flex items-center gap-2">
                   <Loader2 className="h-4 w-4 animate-spin" /> Đang lưu...
                 </span>
+              ) : isUploadingImage ? (
+                'Đang tải ảnh lên...'
               ) : (
                 'Lưu gói'
               )}
@@ -1243,7 +1516,7 @@ export default function TicketsContent(props: Props) {
               <DialogTitle className="text-base font-bold text-slate-800">
                 {selectedTicket?.type === 'vr' ? 'Chi tiết gói trải nghiệm VR' : 'Chi tiết gói vé phim'}
               </DialogTitle>
-              <p className="text-xs text-slate-400">Mã: {selectedTicket?.code || 'N/A'}</p>
+              <p className="text-xs text-slate-400">Mã: {selectedTicket?.code || EMPTY_VALUE}</p>
             </div>
             <div className="flex-1" />
             <Button
@@ -1251,6 +1524,7 @@ export default function TicketsContent(props: Props) {
               size="icon"
               onClick={() => setIsDetailDialogOpen(false)}
               title="Đóng"
+              aria-label="Đóng"
               className="h-8 w-8 rounded-full hover:bg-slate-100 text-slate-400 transition-colors"
             >
               <X className="w-5 h-5" />
@@ -1259,8 +1533,13 @@ export default function TicketsContent(props: Props) {
 
           {selectedTicket && (
             <div className="p-6 overflow-y-auto max-h-[75vh] space-y-4">
-              {/* VR Hero Card if VR */}
-              {selectedTicket.type === 'vr' && selectedTicket.cover_image && (
+              {detailLoadError && (
+                <div className="text-xs text-red-600 bg-red-50 border border-red-100 rounded-lg px-3 py-2">
+                  Không tải được người tạo, người sửa và danh sách phim của gói. Đóng và mở lại để thử lại.
+                </div>
+              )}
+              {/* Cover image (VR hero card; movie packages show the cover when one was set) */}
+              {selectedTicket.cover_image && (
                 <div className="relative w-full h-48 rounded-2xl overflow-hidden border border-purple-200 shadow-xs group">
                   <img
                     src={selectedTicket.cover_image}
@@ -1271,7 +1550,7 @@ export default function TicketsContent(props: Props) {
                     <div className="text-white">
                       <div className="flex items-center gap-2 mb-1">
                         <Badge className="bg-purple-600 text-white border-none font-bold text-xs">
-                          🎮 TRẢI NGHIỆM VR
+                          {selectedTicket.type === 'vr' ? '🎮 TRẢI NGHIỆM VR' : '🎬 VÉ PHIM'}
                         </Badge>
                         {selectedTicket.vr_genre && (
                           <span className="text-xs font-semibold bg-white/20 px-2 py-0.5 rounded-full backdrop-blur-xs">
@@ -1297,17 +1576,19 @@ export default function TicketsContent(props: Props) {
                   <CardContent className="px-4 pb-4">
                     <div className="grid grid-cols-2 gap-3">
                       <div className="space-y-1">
-                        <Label className="text-[10px] font-bold uppercase text-gray-400 block">Tên gói</Label>
-                        <div className="text-sm font-bold text-slate-800 truncate">{selectedTicket.name}</div>
+                        <Label className="text-[11px] font-bold uppercase text-gray-400 block">Tên gói</Label>
+                        <div className="text-sm font-bold text-slate-800 truncate" title={selectedTicket.name}>
+                          {selectedTicket.name}
+                        </div>
                       </div>
                       <div className="space-y-1">
-                        <Label className="text-[10px] font-bold uppercase text-gray-400 block">Mã gói</Label>
+                        <Label className="text-[11px] font-bold uppercase text-gray-400 block">Mã gói</Label>
                         <div className="text-xs font-mono bg-slate-100 px-2 py-1 rounded w-fit">
                           {selectedTicket.code || '-'}
                         </div>
                       </div>
                       <div className="space-y-1">
-                        <Label className="text-[10px] font-bold uppercase text-gray-400 block">Phân loại</Label>
+                        <Label className="text-[11px] font-bold uppercase text-gray-400 block">Phân loại</Label>
                         <div>
                           {selectedTicket.type === 'vr' ? (
                             <Badge className="bg-purple-100 text-purple-700 border-purple-200 text-xs">Gói VR</Badge>
@@ -1317,7 +1598,7 @@ export default function TicketsContent(props: Props) {
                         </div>
                       </div>
                       <div className="space-y-1">
-                        <Label className="text-[10px] font-bold uppercase text-gray-400 block">Trạng thái</Label>
+                        <Label className="text-[11px] font-bold uppercase text-gray-400 block">Trạng thái</Label>
                         <div>
                           <Badge
                             className={
@@ -1326,7 +1607,25 @@ export default function TicketsContent(props: Props) {
                                 : 'bg-gray-100 text-gray-500 border-gray-200 text-xs'
                             }
                           >
-                            {selectedTicket.is_active ? 'Hoạt động' : 'Ngừng'}
+                            {activeStatusLabel(selectedTicket.is_active)}
+                          </Badge>
+                        </div>
+                      </div>
+                      <div className="space-y-1">
+                        <Label className="text-[11px] font-bold uppercase text-gray-400 block">Thứ tự hiển thị</Label>
+                        <div className="text-xs">{selectedTicket.display_order ?? EMPTY_VALUE}</div>
+                      </div>
+                      <div className="space-y-1">
+                        <Label className="text-[11px] font-bold uppercase text-gray-400 block">Đối tượng</Label>
+                        <div>
+                          <Badge
+                            className={
+                              selectedTicket.is_member_only
+                                ? 'bg-amber-100 text-amber-700 border-amber-200 text-xs'
+                                : 'bg-slate-100 text-slate-600 border-slate-200 text-xs'
+                            }
+                          >
+                            {selectedTicket.is_member_only ? 'Chỉ thành viên' : 'Mọi khách hàng'}
                           </Badge>
                         </div>
                       </div>
@@ -1345,13 +1644,13 @@ export default function TicketsContent(props: Props) {
                   <CardContent className="px-4 pb-4">
                     <div className="grid grid-cols-2 gap-3">
                       <div className="space-y-1">
-                        <Label className="text-[10px] font-bold uppercase text-gray-400 block">Giá niêm yết</Label>
+                        <Label className="text-[11px] font-bold uppercase text-gray-400 block">Giá niêm yết</Label>
                         <div className="text-base font-black text-emerald-600">
-                          {new Intl.NumberFormat('vi-VN').format(selectedTicket.price)} VNĐ
+                          {formatVnd(selectedTicket.price)}
                         </div>
                       </div>
                       <div className="space-y-1">
-                        <Label className="text-[10px] font-bold uppercase text-gray-400 block">Chi nhánh</Label>
+                        <Label className="text-[11px] font-bold uppercase text-gray-400 block">Chi nhánh</Label>
                         <div>
                           <BranchIdsBadge
                             branch_ids={selectedTicket.branch_ids}
@@ -1363,30 +1662,33 @@ export default function TicketsContent(props: Props) {
                       {selectedTicket.type === 'vr' ? (
                         <>
                           <div className="space-y-1">
-                            <Label className="text-[10px] font-bold uppercase text-gray-400 block">Thời lượng</Label>
+                            <Label className="text-[11px] font-bold uppercase text-gray-400 block">Thời lượng</Label>
                             <div className="text-xs font-bold text-purple-700 flex items-center gap-1">
-                              <Clock className="w-3 h-3" /> {selectedTicket.duration_min || 30} phút
+                              <Clock className="w-3 h-3" />
+                              {selectedTicket.duration_min ? `${selectedTicket.duration_min} phút` : EMPTY_VALUE}
                             </div>
                           </div>
                           <div className="space-y-1">
-                            <Label className="text-[10px] font-bold uppercase text-gray-400 block">Số người chơi</Label>
+                            <Label className="text-[11px] font-bold uppercase text-gray-400 block">Số người chơi</Label>
                             <div className="text-xs font-bold text-slate-700 flex items-center gap-1">
                               <Users className="w-3 h-3 text-slate-400" />
-                              {selectedTicket.min_players || 1} - {selectedTicket.max_players || 'Không giới hạn'} người
+                              {selectedTicket.min_players || selectedTicket.max_players
+                                ? `${selectedTicket.min_players ?? EMPTY_VALUE} - ${selectedTicket.max_players ?? 'Không giới hạn'} người`
+                                : EMPTY_VALUE}
                             </div>
                           </div>
                         </>
                       ) : (
                         <>
                           <div className="space-y-1">
-                            <Label className="text-[10px] font-bold uppercase text-gray-400 block">
+                            <Label className="text-[11px] font-bold uppercase text-gray-400 block">
                               Nhóm tối thiểu
                             </Label>
-                            <div className="text-xs">{selectedTicket.min_group_size ?? 1}</div>
+                            <div className="text-xs">{selectedTicket.min_group_size ?? EMPTY_VALUE}</div>
                           </div>
                           <div className="space-y-1">
-                            <Label className="text-[10px] font-bold uppercase text-gray-400 block">Nhóm tối đa</Label>
-                            <div className="text-xs">{selectedTicket.max_group_size ?? '-'}</div>
+                            <Label className="text-[11px] font-bold uppercase text-gray-400 block">Nhóm tối đa</Label>
+                            <div className="text-xs">{selectedTicket.max_group_size ?? EMPTY_VALUE}</div>
                           </div>
                         </>
                       )}
@@ -1404,10 +1706,44 @@ export default function TicketsContent(props: Props) {
                   </CardHeader>
                   <CardContent className="px-4 pb-4">
                     <div className="text-xs leading-relaxed bg-slate-50 p-3 rounded-xl border border-slate-100 text-slate-700">
-                      {selectedTicket.description || 'Không có mô tả'}
+                      {selectedTicket.description || EMPTY_VALUE}
                     </div>
                   </CardContent>
                 </Card>
+
+                {/* Movies of the combo */}
+                {selectedTicket.type !== 'vr' && (
+                  <Card className="border border-gray-200 rounded-2xl shadow-xs bg-white col-span-2">
+                    <CardHeader className="pb-2 px-4 pt-4">
+                      <CardTitle className="text-xs font-bold text-slate-700 flex items-center gap-2">
+                        <Film className="w-3.5 h-3.5 text-blue-500" />
+                        Phim trong combo
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent className="px-4 pb-4">
+                      <div className="flex flex-wrap gap-1.5">
+                        {selectedTicket.combo_movies && selectedTicket.combo_movies.length > 0 ? (
+                          selectedTicket.combo_movies.map((movie) => (
+                            <Badge
+                              key={movie.id}
+                              variant="outline"
+                              className="bg-blue-50 text-blue-700 border-blue-200 text-xs max-w-[260px] truncate"
+                              title={movie.title}
+                            >
+                              {movie.title}
+                            </Badge>
+                          ))
+                        ) : (
+                          <span className="text-xs text-gray-400">
+                            {selectedTicket.combo && selectedTicket.combo.length > 0
+                              ? `${selectedTicket.combo.length} phim (đang tải tên phim)`
+                              : EMPTY_VALUE}
+                          </span>
+                        )}
+                      </div>
+                    </CardContent>
+                  </Card>
+                )}
 
                 {/* Features & Audit */}
                 <Card className="border border-gray-200 rounded-2xl shadow-xs bg-white col-span-2">
@@ -1436,11 +1772,7 @@ export default function TicketsContent(props: Props) {
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-2 pt-2 border-t border-slate-100 text-[11px] text-slate-500">
                       <div>
                         Ngày tạo:{' '}
-                        <span className="font-semibold text-slate-700">
-                          {selectedTicket.created_at
-                            ? new Date(selectedTicket.created_at).toLocaleDateString('vi-VN')
-                            : '-'}
-                        </span>
+                        <span className="font-semibold text-slate-700">{formatVnDateTime(selectedTicket.created_at)}</span>
                       </div>
                       <div>
                         Tạo bởi:{' '}
@@ -1450,11 +1782,7 @@ export default function TicketsContent(props: Props) {
                       </div>
                       <div>
                         Cập nhật:{' '}
-                        <span className="font-semibold text-slate-700">
-                          {selectedTicket.updated_at
-                            ? new Date(selectedTicket.updated_at).toLocaleDateString('vi-VN')
-                            : '-'}
-                        </span>
+                        <span className="font-semibold text-slate-700">{formatVnDateTime(selectedTicket.updated_at)}</span>
                       </div>
                       <div>
                         Người sửa:{' '}

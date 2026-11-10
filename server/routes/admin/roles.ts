@@ -1,4 +1,4 @@
-import { eq, and, desc, count, isNull, isNotNull, like, sql, inArray } from 'drizzle-orm';
+import { eq, and, desc, asc, count, isNull, isNotNull, like, sql, inArray } from 'drizzle-orm';
 import { logAuditAction } from '../../lib/audit-logger';
 import { buildAuditPayload } from '../../lib/audit-utils';
 
@@ -78,10 +78,10 @@ export async function listRolesImpl(
 export async function listDeletedRolesImpl(
   db: any,
   tables: { roles: any; staffs: any },
-  options: { page?: number; pageSize?: number; search?: string } = {}
+  options: { page?: number; pageSize?: number; search?: string; sort?: string; dir?: string } = {}
 ) {
   const { roles, staffs } = tables;
-  const { page = 1, pageSize = 10, search = '' } = options;
+  const { page = 1, pageSize = 10, search = '', sort, dir } = options;
 
   const conditions = [];
   if (search) {
@@ -106,7 +106,11 @@ export async function listDeletedRolesImpl(
     .where(whereClause)
     .limit(pageSize)
     .offset((page - 1) * pageSize)
-    .orderBy(desc(roles.deleted_at));
+    .orderBy(
+      sort === 'name'
+        ? dir === 'asc' ? asc(roles.name) : desc(roles.name)
+        : dir === 'asc' ? asc(roles.deleted_at) : desc(roles.deleted_at)
+    );
 
   const [countResult] = await db.select({ count: count() }).from(roles).where(whereClause);
 

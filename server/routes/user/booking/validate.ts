@@ -24,6 +24,11 @@ export async function validateBookingInput(
   if (!email || !phone || !emailBook || !name || !ticketCount || ticketCount <= 0) {
     throw new HttpError(400, 'Vui lòng nhập đầy đủ thông tin hợp lệ.');
   }
+  // A count that is not a whole number (text, 1.5) is refused here, not left to fail later in the database
+  if (!Number.isInteger(Number(ticketCount))) {
+    throw new HttpError(400, 'Số lượng không hợp lệ.');
+  }
+  ticketCount = Number(ticketCount);
   if (ticketCount > MAX_TICKET_PER_ORDER) {
     throw new HttpError(400, `Mỗi lượt chỉ đặt tối đa ${MAX_TICKET_PER_ORDER} vé.`);
   }

@@ -5,7 +5,11 @@ import {
   updateVoucherImpl,
   toggleVoucherStatusImpl,
   deleteVoucherImpl,
-  restoreVoucherImpl
+  restoreVoucherImpl,
+  getVoucherImpl,
+  clampRedemptionLimit,
+  voucherStatusCondition,
+  buildVoucherOrderBy
 } from './vouchers';
 
 const tables: any = { vouchers: (schema as any).vouchers, auditLogs: (schema as any).auditLogs };
@@ -226,5 +230,84 @@ describe('updateVoucherImpl', () => {
     const { db, voucherWrites } = makeDb(voucherRow('[1]'));
     await updateVoucherImpl(db, tables, 7, { name: 'x', applicable_user_ids: [1] } as any, staffInfo, null);
     expect(voucherWrites[0].values).not.toHaveProperty('applicable_user_ids');
+  });
+});
+
+describe('max_discount: empty means no cap', () => {
+  it.each([
+    ['null', null],
+    ['an empty text', ''],
+    ['not sent', undefined]
+  ])('create with %s saves null, not "0"', async (_label, maxDiscount) => {
+    const { db, voucherWrites } = makeDb(null);
+    await createVoucherImpl(db, tables, { ...NEW_VOUCHER, max_discount: maxDiscount as any }, staffInfo, null);
+    expect(voucherWrites[0].values.max_discount).toBeNull();
+  });
+
+  it('create with a number keeps it, update with null clears it', async () => {
+    const created = makeDb(null);
+    await createVoucherImpl(created.db, tables, { ...NEW_VOUCHER, max_discount: 50000 }, staffInfo, null);
+    expect(created.voucherWrites[0].values.max_discount).toBe('50000');
+
+    const updated = makeDb(voucherRow('[1]', { max_discount: 50000 }));
+    await updateVoucherImpl(updated.db, tables, 7, { max_discount: null }, staffInfo, null);
+    expect(updated.voucherWrites[0].values.max_discount).toBeNull();
+  });
+});
+
+describe('voucher list filters and order', () => {
+  it('knows the four status filters and ignores anything else', () => {
+    const vouchers = (schema as any).vouchers;
+    for (const status of ['expired', 'upcoming', 'out_of_quota', 'low_quota']) {
+      expect(voucherStatusCondition(vouchers, status)).not.toBeNull();
+    }
+    expect(voucherStatusCondition(vouchers, 'all')).toBeNull();
+    expect(voucherStatusCondition(vouchers, "x'; DROP TABLE vouchers;--")).toBeNull();
+    expect(voucherStatusCondition(vouchers, undefined)).toBeNull();
+  });
+
+  it('sorts by the chosen column, newest first by default, and ignores unknown columns', () => {
+    const vouchers = (schema as any).vouchers;
+    expect(buildVoucherOrderBy(vouchers)).toHaveLength(2);
+    expect(buildVoucherOrderBy(vouchers, 'password', 'asc')).toHaveLength(2);
+    const chosen = buildVoucherOrderBy(vouchers, 'used_count', 'asc');
+    expect(chosen).toHaveLength(2);
+    expect(chosen[0]).not.toBe(buildVoucherOrderBy(vouchers)[0]);
+  });
+});
+
+describe('voucher detail: redemption history', () => {
+  it('limits the redemptions (default 20, at most 200) and gives the booking code instead of the booking relation', async () => {
+    expect(clampRedemptionLimit(undefined)).toBe(20);
+    expect(clampRedemptionLimit('abc')).toBe(20);
+    expect(clampRedemptionLimit(0)).toBe(20);
+    expect(clampRedemptionLimit(100)).toBe(100);
+    expect(clampRedemptionLimit(5000)).toBe(200);
+
+    let askedLimit = 0;
+    const db: any = {
+      query: {
+        vouchers: { findFirst: async () => voucherRow(null) },
+        voucher_redemption_logs: {
+          findMany: async (options: any) => {
+            askedLimit = options.limit;
+            return [{ id: 1, booking_id: 5, booking: { booking_code: 'CT123' } }, { id: 2, booking_id: 6, booking: null }];
+          }
+        }
+      },
+      // The redemption count (awaited right after where) and the audit-log lookups (where -> orderBy -> limit)
+      select: () => ({
+        from: () => ({
+          where: () => Object.assign(Promise.resolve([{ count: 2 }]), { orderBy: () => ({ limit: async () => [] }) })
+        })
+      })
+    };
+    const detailTables: any = { ...tables, voucher_redemption_logs: (schema as any).voucher_redemption_logs };
+
+    const detail = await getVoucherImpl(db, detailTables, 7, null, 100);
+
+    expect(askedLimit).toBe(100);
+    expect(detail.recent_redemptions.map((row: any) => row.booking_code)).toEqual(['CT123', null]);
+    expect(detail.recent_redemptions[0]).not.toHaveProperty('booking');
   });
 });

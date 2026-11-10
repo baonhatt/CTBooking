@@ -9,9 +9,9 @@ export default function NotFound() {
   return (
     <div className="min-h-screen flex items-center justify-center bg-background px-4">
       <div className="text-center">
-        <div className="text-6xl font-extrabold bg-gradient-to-r from-blue-400 via-purple-400 to-pink-400 bg-clip-text text-transparent">
+        <h1 className="text-6xl font-extrabold bg-gradient-to-r from-blue-400 via-purple-400 to-pink-400 bg-clip-text text-transparent">
           404
-        </div>
+        </h1>
         <p className="mt-3 text-gray-400">Trang bạn tìm không tồn tại hoặc đã được di chuyển.</p>
         <div className="mt-6 flex justify-center gap-3">
           <Button

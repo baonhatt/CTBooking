@@ -2,13 +2,14 @@ import { jsonLdString, addMissingImageAlt } from '@/lib/safe-html';
 import type { Metadata } from 'next';
 export const runtime = 'edge';
 import Link from 'next/link';
-import { notFound } from 'next/navigation';
+import { notFound, permanentRedirect } from 'next/navigation';
 import { ArrowLeft, Eye } from 'lucide-react';
 import UserLayout from '@/layouts/UserLayout';
 import { getPostBySlugId, getPublicPosts, type PostItem } from '@/lib/api/posts';
 import { buildPostHref } from '@/lib/utils';
 import PostSidebar from './PostSidebar';
 import PostViewIncrementor from './PostViewIncrementor';
+import BranchScoped from '@/components/user/posts/BranchScoped';
 
 import { siteConfig } from '@/config/site';
 
@@ -87,6 +88,19 @@ export default async function PostDetailPage({ params }: { params: { slug: strin
 
   if (!post || post.status !== 'published') {
     notFound();
+  }
+
+  // The same post can be reached with any text before its id (an old slug, a typo, only the id). Send all of them to
+  // the one real address with a permanent redirect, so search engines keep a single URL per post.
+  const canonicalSlug = buildPostHref(post).replace('/bai-viet/', '');
+  let requestedSlug = params.slug;
+  try {
+    requestedSlug = decodeURIComponent(params.slug);
+  } catch {
+    // a malformed address is simply redirected to the real one
+  }
+  if (requestedSlug !== canonicalSlug) {
+    permanentRedirect(buildPostHref(post));
   }
 
   const relatedPosts = (allPostsRes?.items ?? [])
@@ -220,8 +234,8 @@ export default async function PostDetailPage({ params }: { params: { slug: strin
               <h3 className="text-white text-2xl font-black">Bài viết liên quan</h3>
               <div className="mt-4 grid grid-cols-1 md:grid-cols-3 gap-4">
                 {relatedPosts.map((item) => (
+                  <BranchScoped key={item.id} branchIds={item.branch_ids}>
                   <Link
-                    key={item.id}
                     href={buildPostHref(item)}
                     className="rounded-2xl neon-border bg-white/5 hover:bg-white/[0.1] transition-colors p-4"
                   >
@@ -237,6 +251,7 @@ export default async function PostDetailPage({ params }: { params: { slug: strin
                       {new Date(item.published_at || item.created_at || Date.now()).toLocaleDateString('vi-VN')}
                     </p>
                   </Link>
+                  </BranchScoped>
                 ))}
               </div>
             </div>

@@ -272,7 +272,7 @@ moviesRouter.get(
       const r = await listDeletedMoviesImpl(
         db,
         { movies: schema.movies, staffs: schema.staffs },
-        { page, pageSize, search, branch_id, restrictToBranchIds: restrictBranchIds }
+        { page, pageSize, search, sort: String(c.req.query('sort') || ''), dir: String(c.req.query('dir') || ''), branch_id, restrictToBranchIds: restrictBranchIds }
       );
 
       return c.json(r, 200);

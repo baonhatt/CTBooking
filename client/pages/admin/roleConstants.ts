@@ -96,3 +96,25 @@ export const APPLICABLE_ACTIONS: Record<string, string[]> = {
   settings: ['view', 'manage'],
   transactions: ['view', 'export']
 };
+
+// One wording for the role level, used by the create form, the list and the detail page
+export const ROLE_LEVEL_LABELS: Record<number, string> = {
+  0: 'Nhân viên',
+  1: 'Quản lý',
+  2: 'Quản trị'
+};
+
+export function roleLevelLabel(level: number): string {
+  return ROLE_LEVEL_LABELS[level] || `Cấp ${level}`;
+}
+
+// How many permissions can be granted at all (the "M" in "Quyền: N/M")
+export const TOTAL_APPLICABLE_PERMISSIONS = Object.values(APPLICABLE_ACTIONS).reduce(
+  (total, actions) => total + actions.length,
+  0
+);
+
+// How many of a role's permissions are in the matrix (older rows may hold permissions the matrix no longer shows)
+export function countGrantedPermissions(permissionList: { module: string; action: string }[] = []): number {
+  return permissionList.filter((item) => APPLICABLE_ACTIONS[item.module]?.includes(item.action)).length;
+}

@@ -130,7 +130,8 @@ export default function AdminLayout({
         { key: 'movies', label: 'Danh sách phim', icon: <Clapperboard className="h-4 w-4 text-emerald-400" /> },
         { key: 'showtimes', label: 'Lịch chiếu phim', icon: <CalendarClock className="h-4 w-4 text-emerald-400" /> },
         { key: 'tickets', label: 'Gói vé & bảng giá', icon: <TicketIcon className="h-4 w-4 text-emerald-400" /> },
-        { key: 'toys', label: 'Đồ chơi & quà tặng', icon: <Package className="h-4 w-4 text-emerald-400" /> },
+        // TẠM ẨN ĐỒ CHƠI (20261110): khách chưa dùng module đồ chơi nên ẩn khỏi giao diện. API, DB và các file Toys* vẫn giữ nguyên. Tìm "TẠM ẨN ĐỒ CHƠI" để mở lại.
+        // { key: 'toys', label: 'Đồ chơi & quà tặng', icon: <Package className="h-4 w-4 text-emerald-400" /> },
         { key: 'posts', label: 'Bài viết & bảng tin', icon: <FileText className="h-4 w-4 text-emerald-400" /> }
       ]
     },
@@ -248,6 +249,11 @@ export default function AdminLayout({
     return 'Bảng điều khiển';
   }, [active]);
 
+  // Browser tab title follows the current admin page
+  useEffect(() => {
+    document.title = `${currentTabLabel} - Admin Cinesphere`;
+  }, [currentTabLabel]);
+
   return (
     <div className={layoutClass}>
       {isSidebarOpen && (
@@ -270,6 +276,7 @@ export default function AdminLayout({
             <div className="flex items-center justify-between mb-6 relative">
               <button
                 className="absolute top-0 right-0 p-1 md:hidden text-slate-400 hover:text-white transition-colors"
+                aria-label="Đóng menu"
                 onClick={() => setIsSidebarOpen(false)}
               >
                 <X className="h-5 w-5" />
@@ -303,6 +310,7 @@ export default function AdminLayout({
                     type="search"
                     name="admin_sidebar_search_query"
                     id="admin_sidebar_search_query"
+                    aria-label="Tìm kiếm menu"
                     placeholder="Tìm kiếm..."
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
@@ -520,7 +528,7 @@ export default function AdminLayout({
         {/* Mobile Topbar */}
         <div className="lg:hidden md:hidden shrink-0 w-full bg-white/80 backdrop-blur-xl border-b border-slate-200/60 p-4 flex items-center justify-between sticky top-0 z-30 shadow-sm/50">
           <div className="flex items-center gap-3">
-            <Button variant="ghost" size="icon" onClick={() => setIsSidebarOpen(true)} className="rounded-xl">
+            <Button variant="ghost" size="icon" title="Mở menu" onClick={() => setIsSidebarOpen(true)} className="rounded-xl">
               <Menu className="h-6 w-6 text-slate-700" />
             </Button>
             <span className="font-bold text-slate-800 text-sm">{currentTabLabel}</span>

@@ -4,17 +4,23 @@ import { useState, useMemo } from 'react';
 import { Search } from 'lucide-react';
 import { type PostItem } from '@/lib/api/posts';
 import Link from 'next/link';
+import { useBranch } from '@/hooks/useBranch';
+import { isPostForBranch } from '@/lib/post-branch';
 
 export default function PostsSearchClient({ initialPosts }: { initialPosts: PostItem[] }) {
   const [q, setQ] = useState('');
+  const { selectedBranch } = useBranch();
 
   const filtered = useMemo(() => {
     if (!q.trim()) return [];
     const key = q.toLowerCase();
+    // Search results follow the same branch rule as the list (posts of other branches are not suggested)
     return initialPosts.filter(
-      (p) => (p.title ?? '').toLowerCase().includes(key) || (p.excerpt ?? '').toLowerCase().includes(key)
+      (p) =>
+        isPostForBranch(p.branch_ids, selectedBranch?.id) &&
+        ((p.title ?? '').toLowerCase().includes(key) || (p.excerpt ?? '').toLowerCase().includes(key))
     );
-  }, [initialPosts, q]);
+  }, [initialPosts, q, selectedBranch?.id]);
 
   return (
     <div className="mt-6 lg:mt-0 flex flex-col sm:flex-row items-stretch sm:items-center gap-4 lg:gap-8 relative z-20">

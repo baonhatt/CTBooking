@@ -16,6 +16,7 @@ import {
   AlertDialogTitle
 } from '@/components/ui/alert-dialog';
 import { useNavigate } from 'react-router-dom';
+import { formatVnDate, formatVnDateTime } from '@/lib/format';
 import { useStaffStore } from '@/store/staffStore';
 import { RefreshCw, RotateCcw, Image as ImageIcon, ArrowLeft } from 'lucide-react';
 import { buildUrl } from '@/lib/api/http';
@@ -66,29 +67,19 @@ export default function DeletedMoviesPage() {
       const params = new URLSearchParams({
         page: String(page),
         pageSize: String(pageSize),
-        search: searchQuery
+        search: searchQuery,
+        // Sorting is done by the server so it covers every page, not just the 10 rows on screen
+        sort: sortField === 'deleted_at' ? 'deleted_at' : 'name',
+        dir: sortDir
       });
       const response = await fetch(buildUrl(`/api/admin/deleted/movies?${params}`), {
         headers: {
           Authorization: `Bearer ${token}`
         }
       });
+      if (!response.ok) throw new Error('request failed');
       const data = await response.json();
-      // Client-side sorting
-      let sortedItems = data.items || [];
-      sortedItems.sort((a: Movie, b: Movie) => {
-        let valA: any, valB: any;
-        if (sortField === 'title') {
-          valA = a.title.toLowerCase();
-          valB = b.title.toLowerCase();
-        } else {
-          valA = new Date(a.deleted_at).getTime();
-          valB = new Date(b.deleted_at).getTime();
-        }
-        if (valA < valB) return sortDir === 'asc' ? -1 : 1;
-        if (valA > valB) return sortDir === 'asc' ? 1 : -1;
-        return 0;
-      });
+      const sortedItems = data.items || [];
       setMovies(sortedItems);
       setTotal(data.total || 0);
     } catch (error) {
@@ -226,7 +217,9 @@ export default function DeletedMoviesPage() {
                         </div>
                       )}
                     </TableCell>
-                    <TableCell className="font-medium">{m.title}</TableCell>
+                    <TableCell className="font-medium max-w-[280px] truncate" title={m.title}>
+                      {m.title}
+                    </TableCell>
                     <TableCell>
                       {m.genres && m.genres.length > 0 ? (
                         <div className="flex flex-wrap gap-1">
@@ -246,10 +239,10 @@ export default function DeletedMoviesPage() {
                       )}
                     </TableCell>
                     <TableCell>{m.duration_min ? `${m.duration_min} phút` : '-'}</TableCell>
-                    <TableCell>{m.rating ? <Badge variant="outline">⭐ {m.rating}</Badge> : '-'}</TableCell>
-                    <TableCell>{m.release_date ? new Date(m.release_date).toLocaleDateString('vi-VN') : '-'}</TableCell>
+                    <TableCell>{m.rating !== null && m.rating !== undefined ? <Badge variant="outline">⭐ {m.rating}</Badge> : '-'}</TableCell>
+                    <TableCell>{formatVnDate(m.release_date)}</TableCell>
                     <TableCell className="text-gray-600">{m.deleted_by_staff_name || '-'}</TableCell>
-                    <TableCell>{m.deleted_at ? new Date(m.deleted_at).toLocaleString('vi-VN') : '-'}</TableCell>
+                    <TableCell>{formatVnDateTime(m.deleted_at)}</TableCell>
                     <TableCell className="text-right">
                       {hasPermission('movies', 'restore') && (
                         <Button onClick={() => handleRestore(m.id)} variant="outline" size="sm">

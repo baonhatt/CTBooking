@@ -1,10 +1,11 @@
 import { request } from './http';
 
-export async function getUsers(options?: { page?: number; pageSize?: number; q?: string; signal?: AbortSignal }) {
+export async function getUsers(options?: { page?: number; pageSize?: number; q?: string; status?: string; signal?: AbortSignal }) {
   const params = new URLSearchParams();
   if (options?.page) params.set('page', String(options.page));
   if (options?.pageSize) params.set('pageSize', String(options.pageSize));
   if (options?.q) params.set('q', options.q);
+  if (options?.status && options.status !== 'all') params.set('status', options.status);
   const path = `/api/admin/users${params.toString() ? `?${params.toString()}` : ''}`;
   return request<{
     items: any[];
