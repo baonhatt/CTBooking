@@ -1,6 +1,62 @@
 import { eq, and, desc, asc, count, isNull, isNotNull, like, sql, inArray } from 'drizzle-orm';
 import { logAuditAction } from '../../lib/audit-logger';
 import { buildAuditPayload } from '../../lib/audit-utils';
+import { addRequiredPermissions } from '../../../shared/permission-rules';
+
+const SUPER_ADMIN_ONLY_MESSAGE = 'Chỉ Super Admin mới được quản lý vai trò';
+const MAX_ROLE_NAME_LENGTH = 100;
+// Levels offered by the role form (see roleConstants on the client)
+const MIN_ROLE_LEVEL = 0;
+const MAX_ROLE_LEVEL = 2;
+
+// How many staff (not deleted) hold each role; a role with nobody gets 0. Skipped when the tables are not passed.
+async function countStaffByRole(db: any, tables: any, roleIds: number[]): Promise<Map<number, number>> {
+  const { staffRoles, staffs } = tables;
+  const countByRole = new Map<number, number>();
+  if (!staffRoles || !staffs || roleIds.length === 0) return countByRole;
+  const rows = await db
+    .select({ roleId: staffRoles.roleId, total: count() })
+    .from(staffRoles)
+    .innerJoin(staffs, eq(staffRoles.staffId, staffs.id))
+    .where(and(inArray(staffRoles.roleId, roleIds), isNull(staffs.deletedAt)))
+    .groupBy(staffRoles.roleId);
+  for (const row of rows) {
+    countByRole.set(row.roleId, row.total);
+  }
+  return countByRole;
+}
+
+// Checks the posted permission ids and adds the permissions they need (e.g. "edit" brings "view")
+async function resolvePermissionIds(
+  db: any,
+  permissionsTable: any,
+  permissionIds: unknown
+): Promise<{ error?: string; ids?: number[] }> {
+  if (!Array.isArray(permissionIds) || !permissionIds.every((item) => Number.isInteger(item))) {
+    return { error: 'Danh sách quyền không hợp lệ' };
+  }
+  const allPermissions: { id: number; module: string; action: string }[] = await db
+    .select({ id: permissionsTable.id, module: permissionsTable.module, action: permissionsTable.action })
+    .from(permissionsTable);
+  const keyById = new Map<number, string>();
+  const idByKey = new Map<string, number>();
+  for (const permission of allPermissions) {
+    const key = `${permission.module}:${permission.action}`;
+    keyById.set(permission.id, key);
+    idByKey.set(key, permission.id);
+  }
+  const uniqueIds = Array.from(new Set(permissionIds as number[]));
+  if (uniqueIds.some((permissionId) => !keyById.has(permissionId))) {
+    return { error: 'Có quyền không tồn tại' };
+  }
+  const selectedKeys = uniqueIds.map((permissionId) => keyById.get(permissionId) as string);
+  const completeKeys = addRequiredPermissions(selectedKeys, Array.from(idByKey.keys()));
+  return { ids: completeKeys.map((key) => idByKey.get(key) as number) };
+}
+
+function isValidRoleLevel(level: unknown): level is number {
+  return Number.isInteger(level) && (level as number) >= MIN_ROLE_LEVEL && (level as number) <= MAX_ROLE_LEVEL;
+}
 
 export async function listRolesImpl(
   db: any,
@@ -30,7 +86,13 @@ export async function listRolesImpl(
     .offset(offset);
 
   const roleIds = roleList.map((r: any) => r.id);
-  const rolesWithPerms = roleList.map((r: any) => ({ ...r, permissionIds: [], permissions: [] }));
+  const staffCountByRole = await countStaffByRole(db, tables, roleIds);
+  const rolesWithPerms = roleList.map((r: any) => ({
+    ...r,
+    staffCount: staffCountByRole.get(r.id) || 0,
+    permissionIds: [],
+    permissions: []
+  }));
 
   if (roleIds.length > 0) {
     const allPerms = await db
@@ -156,10 +218,13 @@ export async function getRoleByIdImpl(db: any, tables: any, id: number) {
     .orderBy(desc(auditLogs.createdAt))
     .limit(1);
 
+  const staffCountByRole = await countStaffByRole(db, tables, [id]);
+
   return {
     status: 'success',
     role: {
       ...role,
+      staffCount: staffCountByRole.get(id) || 0,
       created_by_staff_name: createLog?.staffFullname || null,
       updated_by_staff_name: updateLog?.staffFullname || null,
       permissions: permData.map((p) => ({
@@ -180,11 +245,27 @@ export async function createRoleImpl(
     level: number;
     permissionIds: number[];
   },
-  staffInfo?: { id: number; email: string; fullname: string }
+  staffInfo?: { id: number; email: string; fullname: string; isSuperAdmin?: boolean }
 ) {
-  const { roles, rolePermissions } = tables;
-  const { name, description, level, permissionIds } = body;
+  const { roles, rolePermissions, permissions } = tables;
+  const { description, level } = body;
+  const name = typeof body.name === 'string' ? body.name.trim() : '';
   const now = new Date().toISOString();
+
+  if (!staffInfo?.isSuperAdmin) {
+    return { status: 'error', message: SUPER_ADMIN_ONLY_MESSAGE };
+  }
+  if (!name || name.length > MAX_ROLE_NAME_LENGTH) {
+    return { status: 'error', message: `Tên vai trò không được để trống và tối đa ${MAX_ROLE_NAME_LENGTH} ký tự` };
+  }
+  if (!isValidRoleLevel(level)) {
+    return { status: 'error', message: 'Cấp độ vai trò không hợp lệ' };
+  }
+  const resolved = await resolvePermissionIds(db, permissions, body.permissionIds ?? []);
+  if (resolved.error) {
+    return { status: 'error', message: resolved.error };
+  }
+  const permissionIds = resolved.ids as number[];
 
   // Check if role name already exists
   const [existing] = await db.select().from(roles).where(eq(roles.name, name)).limit(1);
@@ -254,9 +335,14 @@ export async function updateRoleImpl(
   },
   staffInfo?: { id: number; email: string; fullname: string; isSuperAdmin?: boolean }
 ) {
-  const { roles, rolePermissions } = tables;
-  const { name, description, level, permissionIds } = body;
+  const { roles, rolePermissions, permissions } = tables;
+  const { description, level } = body;
+  const name = typeof body.name === 'string' ? body.name.trim() : undefined;
   const now = new Date().toISOString();
+
+  if (!staffInfo?.isSuperAdmin) {
+    return { status: 'error', message: SUPER_ADMIN_ONLY_MESSAGE };
+  }
 
   // Check if role exists
   const [existing] = await db.select().from(roles).where(eq(roles.id, id)).limit(1);
@@ -264,9 +350,25 @@ export async function updateRoleImpl(
     return { status: 'error', message: 'Role not found' };
   }
 
-  // Cannot modify system roles unless SuperAdmin
-  if (existing.isSystem && !staffInfo?.isSuperAdmin) {
-    return { status: 'error', message: 'Không thể sửa system role (Chỉ Super Admin mới có quyền)' };
+  if (name !== undefined && (!name || name.length > MAX_ROLE_NAME_LENGTH)) {
+    return { status: 'error', message: `Tên vai trò không được để trống và tối đa ${MAX_ROLE_NAME_LENGTH} ký tự` };
+  }
+  // The seed finds system roles by name, so renaming one would make the next seed add a second copy
+  if (existing.isSystem && name !== undefined && name !== existing.name) {
+    return { status: 'error', message: 'Không thể đổi tên vai trò hệ thống' };
+  }
+  // A role made before the form had levels keeps its level; any other change must stay inside the form's range
+  if (level !== undefined && level !== existing.level && !isValidRoleLevel(level)) {
+    return { status: 'error', message: 'Cấp độ vai trò không hợp lệ' };
+  }
+
+  let permissionIds: number[] | undefined;
+  if (body.permissionIds !== undefined) {
+    const resolved = await resolvePermissionIds(db, permissions, body.permissionIds);
+    if (resolved.error) {
+      return { status: 'error', message: resolved.error };
+    }
+    permissionIds = resolved.ids;
   }
 
   // Check name uniqueness if changing name
@@ -287,7 +389,8 @@ export async function updateRoleImpl(
   // Update role
   const updateData: any = { updatedAt: now };
   if (name) updateData.name = name;
-  if (description) updateData.description = description;
+  // An empty description clears it
+  if (description !== undefined) updateData.description = String(description).trim() || null;
   if (level !== undefined) updateData.level = level;
 
   await db.update(roles).set(updateData).where(eq(roles.id, id));
@@ -335,9 +438,13 @@ export async function deleteRoleImpl(
   db: any,
   tables: any,
   id: number,
-  staffInfo?: { id: number; email: string; fullname: string }
+  staffInfo?: { id: number; email: string; fullname: string; isSuperAdmin?: boolean }
 ) {
   const { roles, staffRoles } = tables;
+
+  if (!staffInfo?.isSuperAdmin) {
+    return { status: 'error', message: SUPER_ADMIN_ONLY_MESSAGE };
+  }
 
   // Check if role exists
   const [existing] = await db.select().from(roles).where(eq(roles.id, id)).limit(1);
@@ -403,9 +510,13 @@ export async function restoreRoleImpl(
   db: any,
   tables: any,
   id: number,
-  staffInfo?: { id: number; email: string; fullname: string }
+  staffInfo?: { id: number; email: string; fullname: string; isSuperAdmin?: boolean }
 ) {
   const { roles } = tables;
+
+  if (!staffInfo?.isSuperAdmin) {
+    return { status: 'error', message: SUPER_ADMIN_ONLY_MESSAGE };
+  }
 
   // Check if role exists and is deleted
   const [existing] = await db

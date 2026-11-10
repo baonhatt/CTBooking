@@ -108,7 +108,8 @@ export const PERMISSIONS_SEED = [
 export const ROLES_SEED = [
   {
     name: 'staff',
-    description: 'Nhân viên cơ bản — chỉ check vé và xem giao dịch',
+    // ticket_check:validate also covers marking a ticket used, confirming a payment by hand and resending the booking email
+    description: 'Nhân viên quầy — soát vé, xác nhận thanh toán tay, xem giao dịch của chi nhánh mình',
     isSystem: true,
     level: 0,
     permissions: [
@@ -121,7 +122,9 @@ export const ROLES_SEED = [
   },
   {
     name: 'manager',
-    description: 'Quản lý chi nhánh — quản lý nội dung, xem báo cáo',
+    // Content and reports of the manager's own branch (the server limits edits to records of one branch).
+    // No delete rights and no branch editing: branches:edit is not limited to the manager's branch on the server.
+    description: 'Quản lý chi nhánh — quản lý nội dung và báo cáo của chi nhánh mình, không xóa dữ liệu',
     isSystem: true,
     level: 1,
     permissions: [
@@ -145,7 +148,6 @@ export const ROLES_SEED = [
       'vouchers:create',
       'vouchers:edit',
       'vouchers:toggle_status',
-      'vouchers:delete',
       'transactions:view',
       'transactions:export',
       'posts:view',
@@ -155,7 +157,6 @@ export const ROLES_SEED = [
       'users:view_detail',
       'staff:view',
       'branches:view',
-      'branches:edit',
       'uploads:view',
       'uploads:upload',
       'ticket_check:scan',
@@ -165,7 +166,10 @@ export const ROLES_SEED = [
   },
   {
     name: 'admin',
-    description: 'Quản trị viên — toàn quyền trừ system settings và xóa branches',
+    // No settings:*, branches:delete and roles create/edit/delete (Super Admin only).
+    // staff:reset_password is left out on purpose: the server lets only the Super Admin reset a password.
+    // Staff rights are narrower than they look: no role assignment, no email change, only staff of one branch of the caller.
+    description: 'Quản trị viên — toàn quyền nội dung, nhân viên trong chi nhánh, trừ cài đặt hệ thống, vai trò và xóa chi nhánh',
     isSystem: true,
     level: 2,
     permissions: [
@@ -205,6 +209,7 @@ export const ROLES_SEED = [
       'transactions:view',
       'transactions:export',
       'branches:view',
+      'branches:create',
       'branches:edit',
       'branches:toggle_status',
       'branches:view_deleted',
@@ -219,7 +224,6 @@ export const ROLES_SEED = [
       'staff:create',
       'staff:edit',
       'staff:delete',
-      'staff:reset_password',
       'staff:view_deleted',
       'staff:restore',
       'roles:view',

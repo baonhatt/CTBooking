@@ -35,7 +35,11 @@ rolesRouter.get('/api/admin/roles', requireStaffAuth, requirePermission('roles',
 
         rolePermissions: schema.rolePermissions,
 
-        permissions: schema.permissions
+        permissions: schema.permissions,
+
+        staffRoles: schema.staffRoles,
+
+        staffs: schema.staffs
       },
       { page, pageSize, q, isSystem }
     );
@@ -62,6 +66,10 @@ rolesRouter.get('/api/admin/roles/:id', requireStaffAuth, requirePermission('rol
         rolePermissions: schema.rolePermissions,
 
         permissions: schema.permissions,
+
+        staffRoles: schema.staffRoles,
+
+        staffs: schema.staffs,
 
         auditLogs: schema.auditLogs
       },
@@ -97,10 +105,12 @@ rolesRouter.post('/api/admin/roles', requireStaffAuth, requirePermission('roles'
 
         rolePermissions: schema.rolePermissions,
 
+        permissions: schema.permissions,
+
         auditLogs: schema.auditLogs
       },
       body,
-      { id: staffId, email: staffEmail, fullname: staffFullname }
+      { id: staffId, email: staffEmail, fullname: staffFullname, isSuperAdmin: Boolean(c.get('isSuperAdmin')) }
     );
 
     if (r.status === 'error') return c.json(r, 400);
@@ -135,6 +145,8 @@ rolesRouter.put('/api/admin/roles/:id', requireStaffAuth, requirePermission('rol
         roles: schema.roles,
 
         rolePermissions: schema.rolePermissions,
+
+        permissions: schema.permissions,
 
         auditLogs: schema.auditLogs
       },
@@ -175,7 +187,7 @@ rolesRouter.delete('/api/admin/roles/:id', requireStaffAuth, requirePermission('
         auditLogs: schema.auditLogs
       },
       id,
-      { id: staffId, email: staffEmail, fullname: staffFullname }
+      { id: staffId, email: staffEmail, fullname: staffFullname, isSuperAdmin: Boolean(c.get('isSuperAdmin')) }
     );
 
     if (r.status === 'error') return c.json(r, 400);
@@ -198,7 +210,8 @@ rolesRouter.post('/api/admin/roles/:id/restore', requireStaffAuth, requirePermis
     const r = await restoreRoleImpl(db, { roles: schema.roles, auditLogs: schema.auditLogs }, id, {
       id: staffId,
       email: staffEmail,
-      fullname: staffFullname
+      fullname: staffFullname,
+      isSuperAdmin: Boolean(c.get('isSuperAdmin'))
     });
 
     return c.json(r, 200);

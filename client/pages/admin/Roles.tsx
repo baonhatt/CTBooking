@@ -237,7 +237,7 @@ export default function RolesPage() {
               </Button>
             )}
 
-            {hasPermission('roles', 'create') && (
+            {isSuperAdmin && hasPermission('roles', 'create') && (
               <Button
                 onClick={() => {
                   resetForm();
@@ -285,18 +285,30 @@ export default function RolesPage() {
               </div>
             ) : (
             <div className="overflow-x-auto">
-              <table className="w-full">
+              <table className="w-full min-w-[1100px] table-fixed">
+                {/* Fixed widths per column; the description takes whatever is left */}
+                <colgroup>
+                  <col className="w-[190px]" />
+                  <col className="w-[110px]" />
+                  <col className="w-[100px]" />
+                  <col className="w-[110px]" />
+                  <col className="w-[130px]" />
+                  <col />
+                  <col className="w-[115px]" />
+                  <col className="w-[115px]" />
+                  <col className="w-[130px]" />
+                </colgroup>
                 <thead>
                   <tr className="bg-gray-50 border-b">
-                    <th className="h-10 px-4 text-left align-middle font-semibold text-xs text-slate-500 uppercase tracking-wider">Tên vai trò</th>
-                    <th className="h-10 px-4 text-left align-middle font-semibold text-xs text-slate-500 uppercase tracking-wider">Loại</th>
-                    <th className="h-10 px-4 text-left align-middle font-semibold text-xs text-slate-500 uppercase tracking-wider">Cấp độ</th>
-                    <th className="h-10 px-4 text-left align-middle font-semibold text-xs text-slate-500 uppercase tracking-wider">Nhân viên</th>
-                    <th className="h-10 px-4 text-left align-middle font-semibold text-xs text-slate-500 uppercase tracking-wider">Quyền</th>
-                    <th className="h-10 px-4 text-left align-middle font-semibold text-xs text-slate-500 uppercase tracking-wider">Mô tả</th>
-                    <th className="h-10 px-4 text-left align-middle font-semibold text-xs text-slate-500 uppercase tracking-wider">Ngày tạo</th>
-                    <th className="h-10 px-4 text-left align-middle font-semibold text-xs text-slate-500 uppercase tracking-wider">Cập nhật</th>
-                    <th className="h-10 px-4 text-right align-middle font-semibold text-xs text-slate-500 uppercase tracking-wider w-[140px]">Hành động</th>
+                    <th className="h-10 px-4 text-left align-middle font-semibold text-xs text-slate-500 uppercase tracking-wider whitespace-nowrap">Tên vai trò</th>
+                    <th className="h-10 px-4 text-left align-middle font-semibold text-xs text-slate-500 uppercase tracking-wider whitespace-nowrap">Loại</th>
+                    <th className="h-10 px-4 text-left align-middle font-semibold text-xs text-slate-500 uppercase tracking-wider whitespace-nowrap">Cấp độ</th>
+                    <th className="h-10 px-4 text-left align-middle font-semibold text-xs text-slate-500 uppercase tracking-wider whitespace-nowrap">Nhân viên</th>
+                    <th className="h-10 px-4 text-left align-middle font-semibold text-xs text-slate-500 uppercase tracking-wider whitespace-nowrap">Quyền</th>
+                    <th className="h-10 px-4 text-left align-middle font-semibold text-xs text-slate-500 uppercase tracking-wider whitespace-nowrap">Mô tả</th>
+                    <th className="h-10 px-4 text-left align-middle font-semibold text-xs text-slate-500 uppercase tracking-wider whitespace-nowrap">Ngày tạo</th>
+                    <th className="h-10 px-4 text-left align-middle font-semibold text-xs text-slate-500 uppercase tracking-wider whitespace-nowrap">Cập nhật</th>
+                    <th className="h-10 px-4 text-right align-middle font-semibold text-xs text-slate-500 uppercase tracking-wider">Hành động</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -306,26 +318,30 @@ export default function RolesPage() {
                       className="border-b hover:bg-gray-50 cursor-pointer"
                       onClick={() => navigate(`/roles/${role.id}`)}
                     >
-                      <td className="px-4 py-2.5 align-middle text-[13px] font-medium">{role.name}</td>
-                      <td className="px-4 py-2.5 align-middle text-[13px]">
+                      <td className="px-4 py-2.5 align-middle text-[13px] font-medium">
+                        <span className="block truncate" title={role.name}>{role.name}</span>
+                      </td>
+                      <td className="px-4 py-2.5 align-middle text-[13px] whitespace-nowrap">
                         {role.isSystem ? (
                           <span className="bg-gray-100 text-gray-600 px-2 py-1 rounded text-xs">Hệ thống</span>
                         ) : (
                           <span className="bg-blue-100 text-blue-600 px-2 py-1 rounded text-xs">Tùy chỉnh</span>
                         )}
                       </td>
-                      <td className="px-4 py-2.5 align-middle text-[13px]">
+                      <td className="px-4 py-2.5 align-middle text-[13px] whitespace-nowrap">
                         {roleLevelLabel(role.level)}
                       </td>
-                      <td className="px-4 py-2.5 align-middle text-[13px]">{role.staffCount || 0}</td>
-                      <td className="px-4 py-2.5 align-middle text-[13px]">
+                      <td className="px-4 py-2.5 align-middle text-[13px] whitespace-nowrap">{role.staffCount || 0}</td>
+                      <td className="px-4 py-2.5 align-middle text-[13px] whitespace-nowrap">
                         Quyền: {countGrantedPermissions(role.permissions)}/{TOTAL_APPLICABLE_PERMISSIONS}
                       </td>
-                      <td className="px-4 py-2.5 align-middle text-[13px] text-gray-600">{role.description || '-'}</td>
-                      <td className="px-4 py-2.5 align-middle text-[13px] text-gray-600">{formatVnDate(role.createdAt)}</td>
-                      <td className="px-4 py-2.5 align-middle text-[13px] text-gray-600">{formatVnDate(role.updatedAt)}</td>
+                      <td className="px-4 py-2.5 align-middle text-[13px] text-gray-600">
+                        <span className="line-clamp-2" title={role.description || ''}>{role.description || '-'}</span>
+                      </td>
+                      <td className="px-4 py-2.5 align-middle text-[13px] text-gray-600 whitespace-nowrap">{formatVnDate(role.createdAt)}</td>
+                      <td className="px-4 py-2.5 align-middle text-[13px] text-gray-600 whitespace-nowrap">{formatVnDate(role.updatedAt)}</td>
                       <td className="px-4 py-2.5 align-middle text-[13px]" onClick={(e) => e.stopPropagation()}>
-                        <div className="flex justify-end items-center gap-1 w-[100px] ml-auto">
+                        <div className="flex justify-end items-center gap-1">
                           <Button
                             variant="ghost"
                             size="icon"
@@ -336,7 +352,7 @@ export default function RolesPage() {
                           >
                             <Eye className="h-3.5 w-3.5" />
                           </Button>
-                          {!role.isSystem && hasPermission('roles', 'delete') ? (
+                          {!role.isSystem && isSuperAdmin && hasPermission('roles', 'delete') ? (
                             <Button
                               variant="ghost"
                               size="icon"

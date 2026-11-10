@@ -16,6 +16,7 @@ import { useStaffStore } from '@/store/staffStore';
 import { useIsSuperAdmin, useHasStaffPermission } from '@/hooks/useStaffPermission';
 import { X, FileText } from 'lucide-react';
 import { MODULES, ACTIONS, MODULE_LABELS, ACTION_LABELS, APPLICABLE_ACTIONS, roleLevelLabel } from './roleConstants';
+import { addRequiredPermissions, removePermissionWithDependents } from '@shared/permission-rules';
 import { formatVnDateTime } from '@/lib/format';
 import { ConfirmDeleteDialog } from '@/components/admin/dialogs/ConfirmDeleteDialog';
 
@@ -48,8 +49,9 @@ export default function RoleDetailPage() {
   const clearStaff = useStaffStore((state) => state.clearStaff);
   const isSuperAdmin = useIsSuperAdmin();
   const hasPermission = useHasStaffPermission();
-  const canEditRole = hasPermission('roles', 'edit');
-  const canDeleteRole = hasPermission('roles', 'delete');
+  // The server lets only the Super Admin create, edit and delete roles, so the page shows the same
+  const canEditRole = isSuperAdmin && hasPermission('roles', 'edit');
+  const canDeleteRole = isSuperAdmin && hasPermission('roles', 'delete');
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [isSaveDialogOpen, setIsSaveDialogOpen] = useState(false);
 
@@ -147,23 +149,46 @@ export default function RoleDetailPage() {
     deleteMutation.mutate(parseInt(id));
   };
 
+  // Permissions the matrix does not show (older rows) are kept as they are; only known ones follow the dependency rules
+  const applyKeys = (newKeys: string[]) => {
+    const hiddenIds = permissionIds.filter((permissionId) => !keyById.has(permissionId));
+    const knownIds = newKeys
+      .map((key) => idByKey.get(key))
+      .filter((permissionId): permissionId is number => typeof permissionId === 'number');
+    setPermissionIds([...hiddenIds, ...knownIds]);
+    setDirty(true);
+  };
+
+  const getSelectedKeys = (): string[] =>
+    permissionIds.map((permissionId) => keyById.get(permissionId)).filter((key): key is string => Boolean(key));
+
+  // Ticking a permission also ticks what it needs; unticking one also unticks what needs it
   const togglePermission = (permissionId: number) => {
-    if (!isEditMode) return;
-    setPermissionIds((prev) => {
-      const newIds = prev.includes(permissionId) ? prev.filter((id) => id !== permissionId) : [...prev, permissionId];
-      setDirty(true);
-      return newIds;
-    });
+    const key = keyById.get(permissionId);
+    if (!isEditMode || !key) return;
+    const selectedKeys = getSelectedKeys();
+    if (selectedKeys.includes(key)) {
+      applyKeys(removePermissionWithDependents(key, selectedKeys, allKeys));
+    } else {
+      applyKeys(addRequiredPermissions([...selectedKeys, key], allKeys));
+    }
   };
 
   // Select all / clear all for a group of cells (one module row or one action column)
   const setGroupPermissions = (groupPermissionIds: number[], shouldGrant: boolean) => {
     if (!isEditMode || groupPermissionIds.length === 0) return;
-    setPermissionIds((prev) => {
-      const withoutGroup = prev.filter((permissionId) => !groupPermissionIds.includes(permissionId));
-      return shouldGrant ? [...withoutGroup, ...groupPermissionIds] : withoutGroup;
-    });
-    setDirty(true);
+    const groupKeys = groupPermissionIds
+      .map((permissionId) => keyById.get(permissionId))
+      .filter((key): key is string => Boolean(key));
+    let nextKeys = getSelectedKeys();
+    if (shouldGrant) {
+      nextKeys = addRequiredPermissions([...nextKeys, ...groupKeys], allKeys);
+    } else {
+      for (const key of groupKeys) {
+        nextKeys = removePermissionWithDependents(key, nextKeys, allKeys);
+      }
+    }
+    applyKeys(nextKeys);
   };
 
   const getRowPermissionIds = (module: string): number[] => {
@@ -187,6 +212,12 @@ export default function RoleDetailPage() {
 
   const areAllGranted = (groupPermissionIds: number[]) =>
     groupPermissionIds.length > 0 && groupPermissionIds.every((permissionId) => permissionIds.includes(permissionId));
+
+  // true = all ticked, 'indeterminate' = some ticked, false = none
+  const groupCheckedState = (groupPermissionIds: number[]): boolean | 'indeterminate' => {
+    if (areAllGranted(groupPermissionIds)) return true;
+    return groupPermissionIds.some((permissionId) => permissionIds.includes(permissionId)) ? 'indeterminate' : false;
+  };
 
   const handleEditMode = () => {
     setIsEditMode(true);
@@ -248,6 +279,25 @@ export default function RoleDetailPage() {
   const getPermissionId = (module: string, action: string) => {
     return permissionMap.get(`${module}_${action}`);
   };
+
+  // "module:action" <-> id, for the dependency rules
+  const keyById = new Map<number, string>();
+  const idByKey = new Map<string, number>();
+  permissions.forEach((permission: Permission) => {
+    keyById.set(permission.id, `${permission.module}:${permission.action}`);
+    idByKey.set(`${permission.module}:${permission.action}`, permission.id);
+  });
+  const allKeys = Array.from(idByKey.keys());
+
+  // Cells of the matrix with no permission row in the database (the default roles were not set up after an update)
+  const missingPermissionKeys: string[] = [];
+  if ((permissionsData as any)?.permissions?.length) {
+    MODULES.forEach((module) => {
+      (APPLICABLE_ACTIONS[module] || []).forEach((action) => {
+        if (typeof getPermissionId(module, action) !== 'number') missingPermissionKeys.push(`${module}:${action}`);
+      });
+    });
+  }
 
   const isActionApplicable = (module: string, action: string) => {
     return APPLICABLE_ACTIONS[module]?.includes(action) || false;
@@ -340,6 +390,8 @@ export default function RoleDetailPage() {
                         setDirty(true);
                       }}
                       className="h-9 w-56 mt-1"
+                      disabled={role.isSystem}
+                      title={role.isSystem ? 'Không đổi tên vai trò hệ thống' : undefined}
                     />
                   </div>
                   <div>
@@ -454,6 +506,13 @@ export default function RoleDetailPage() {
           </div>
         </div>
 
+        {missingPermissionKeys.length > 0 && (
+          <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+            Có {missingPermissionKeys.length} quyền chưa có trong hệ thống nên các ô đó không tick được. Vào trang Vai trò và bấm
+            "Khởi tạo vai trò mặc định" để thêm.
+          </div>
+        )}
+
         {/* Permission Matrix */}
         <div className="border border-slate-200 rounded-xl overflow-hidden bg-white shadow-xs">
           <div className="overflow-x-auto">
@@ -487,7 +546,8 @@ export default function RoleDetailPage() {
                       const permissionId = getPermissionId(module, action);
                       const applicable = isActionApplicable(module, action);
                       const checked = typeof permissionId === 'number' ? permissionIds.includes(permissionId) : false;
-                      const disabled = (role.isSystem && !isSuperAdmin) || !applicable || !isEditMode;
+                      const isMissing = applicable && typeof permissionId !== 'number';
+                      const disabled = !applicable || !isEditMode || isMissing;
 
                       return (
                         <td
@@ -504,6 +564,11 @@ export default function RoleDetailPage() {
                                   }
                                 }}
                                 disabled={disabled}
+                                title={
+                                  isMissing
+                                    ? 'Quyền này chưa có trong hệ thống. Bấm "Khởi tạo vai trò mặc định" ở trang Vai trò.'
+                                    : undefined
+                                }
                                 aria-label={`${MODULE_LABELS[module] || module}: ${ACTION_LABELS[action] || action}`}
                                 className="data-[state=checked]:bg-blue-600 data-[state=checked]:border-blue-600"
                               />
@@ -516,9 +581,11 @@ export default function RoleDetailPage() {
                     })}
                     <td className="px-2 py-2.5 text-center whitespace-nowrap">
                       <Checkbox
-                        checked={areAllGranted(getRowPermissionIds(module))}
-                        onCheckedChange={(checked) => setGroupPermissions(getRowPermissionIds(module), checked === true)}
-                        disabled={(role.isSystem && !isSuperAdmin) || !isEditMode}
+                        checked={groupCheckedState(getRowPermissionIds(module))}
+                        onCheckedChange={() =>
+                          setGroupPermissions(getRowPermissionIds(module), !areAllGranted(getRowPermissionIds(module)))
+                        }
+                        disabled={!isEditMode}
                         aria-label={`Chọn tất cả quyền của ${MODULE_LABELS[module] || module}`}
                         className="data-[state=checked]:bg-blue-600 data-[state=checked]:border-blue-600"
                       />
@@ -532,9 +599,11 @@ export default function RoleDetailPage() {
                   {visibleActions.map((action) => (
                     <td key={action} className="px-2 py-2.5 text-center whitespace-nowrap border-r border-slate-100">
                       <Checkbox
-                        checked={areAllGranted(getColumnPermissionIds(action))}
-                        onCheckedChange={(checked) => setGroupPermissions(getColumnPermissionIds(action), checked === true)}
-                        disabled={(role.isSystem && !isSuperAdmin) || !isEditMode}
+                        checked={groupCheckedState(getColumnPermissionIds(action))}
+                        onCheckedChange={() =>
+                          setGroupPermissions(getColumnPermissionIds(action), !areAllGranted(getColumnPermissionIds(action)))
+                        }
+                        disabled={!isEditMode}
                         aria-label={`Chọn tất cả module cho quyền ${ACTION_LABELS[action] || action}`}
                         className="data-[state=checked]:bg-blue-600 data-[state=checked]:border-blue-600"
                       />

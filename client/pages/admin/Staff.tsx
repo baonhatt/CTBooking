@@ -9,6 +9,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Switch } from '@/components/ui/switch';
 import { toast } from 'sonner';
 import { Badge } from '@/components/ui/badge';
+import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
 import { Skeleton } from '@/components/ui/skeleton';
 import { request } from '@/lib/api/http';
 import { ConfirmDeleteDialog } from '@/components/admin/dialogs/ConfirmDeleteDialog';
@@ -18,7 +19,7 @@ import { useStaffStore } from '@/store/staffStore';
 import { useNavigate } from 'react-router-dom';
 import { useStaffPermission, useStaffPermissions, useIsSuperAdmin } from '@/hooks/useStaffPermission';
 import { useConfirmUnsaved } from '@/hooks/useConfirmUnsaved';
-import { formatVnDateTime, activeStatusLabel } from '@/lib/format';
+import { formatVnDate, formatVnDateTime, activeStatusLabel } from '@/lib/format';
 import {
   Info,
   X,
@@ -37,6 +38,9 @@ import {
   Building2,
   History
 } from 'lucide-react';
+
+// Branches listed in the table row; the rest collapse into a +N chip with a tooltip
+const MAX_BRANCHES_SHOWN = 2;
 
 interface Staff {
   id: number;
@@ -604,67 +608,84 @@ export default function StaffPage() {
                   <table className="w-full">
                     <thead>
                       <tr className="border-b bg-gray-50">
-                        <th className="h-10 px-4 text-left align-middle font-semibold text-xs text-slate-500 uppercase tracking-wider">Email</th>
-                        <th className="h-10 px-4 text-left align-middle font-semibold text-xs text-slate-500 uppercase tracking-wider">Họ tên</th>
-                        <th className="h-10 px-4 text-left align-middle font-semibold text-xs text-slate-500 uppercase tracking-wider">SĐT</th>
-                        <th className="h-10 px-4 text-left align-middle font-semibold text-xs text-slate-500 uppercase tracking-wider">Vai trò</th>
-                        <th className="h-10 px-4 text-left align-middle font-semibold text-xs text-slate-500 uppercase tracking-wider">Chi nhánh</th>
-                        <th className="h-10 px-4 text-left align-middle font-semibold text-xs text-slate-500 uppercase tracking-wider">Trạng thái</th>
-                        <th className="h-10 px-4 text-left align-middle font-semibold text-xs text-slate-500 uppercase tracking-wider">Đăng nhập cuối</th>
-                        <th className="h-10 px-4 text-left align-middle font-semibold text-xs text-slate-500 uppercase tracking-wider">Ngày tạo</th>
-                        <th className="h-10 px-4 text-left align-middle font-semibold text-xs text-slate-500 uppercase tracking-wider">Hành động</th>
+                        <th className="h-10 px-4 text-left align-middle font-semibold text-xs text-slate-500 uppercase tracking-wider whitespace-nowrap">Nhân viên</th>
+                        <th className="h-10 px-4 text-left align-middle font-semibold text-xs text-slate-500 uppercase tracking-wider whitespace-nowrap">SĐT</th>
+                        <th className="h-10 px-4 text-left align-middle font-semibold text-xs text-slate-500 uppercase tracking-wider whitespace-nowrap">Vai trò</th>
+                        <th className="h-10 px-4 text-left align-middle font-semibold text-xs text-slate-500 uppercase tracking-wider whitespace-nowrap">Chi nhánh</th>
+                        <th className="h-10 px-4 text-left align-middle font-semibold text-xs text-slate-500 uppercase tracking-wider whitespace-nowrap">Trạng thái</th>
+                        <th className="h-10 px-4 text-left align-middle font-semibold text-xs text-slate-500 uppercase tracking-wider whitespace-nowrap">Đăng nhập cuối</th>
+                        <th className="h-10 px-4 text-left align-middle font-semibold text-xs text-slate-500 uppercase tracking-wider whitespace-nowrap">Ngày tạo</th>
+                        <th className="h-10 px-4 text-left align-middle font-semibold text-xs text-slate-500 uppercase tracking-wider whitespace-nowrap">Hành động</th>
                       </tr>
                     </thead>
                     <tbody>
                       {staffList.length === 0 && (
                         <tr>
-                          <td colSpan={10} className="px-4 py-8 text-center text-sm text-slate-500">
+                          <td colSpan={8} className="px-4 py-8 text-center text-sm text-slate-500">
                             Không có nhân viên nào phù hợp
                           </td>
                         </tr>
                       )}
                       {staffList.map((staff: Staff) => (
                         <tr key={staff.id} className="border-b hover:bg-gray-50">
-                          <td className="px-4 py-2.5 align-middle text-[13px]">{staff.email}</td>
-                          <td className="px-4 py-2.5 align-middle text-[13px]">{staff.fullname}</td>
+                          <td className="px-4 py-2.5 align-middle max-w-[260px]">
+                            <div className="text-[13px] font-medium text-slate-900 truncate" title={staff.fullname}>{staff.fullname}</div>
+                            <div className="text-xs text-slate-500 truncate" title={staff.email}>{staff.email}</div>
+                          </td>
                           <td className="px-4 py-2.5 align-middle text-[13px] whitespace-nowrap">{staff.phone || '-'}</td>
                           <td className="px-4 py-2.5 align-middle text-[13px] max-w-[200px]">
                             {staff.isSuperAdmin ? (
-                              <span className="font-semibold text-purple-700">Siêu quản trị</span>
+                              <span className="font-semibold text-purple-700 whitespace-nowrap">Siêu quản trị</span>
                             ) : (
                               <span className="block truncate" title={staff.roles?.join(', ') || ''}>
                                 {staff.roles?.join(', ') || '-'}
                               </span>
                             )}
                           </td>
-                          <td className="px-4 py-2.5 align-middle text-[13px] max-w-[220px]">
+                          <td className="px-4 py-2.5 align-middle text-[13px] max-w-[200px]">
                             {staff.isSuperAdmin ? (
-                              <span className="text-slate-500 italic">Tất cả chi nhánh</span>
+                              <span className="text-slate-500 italic whitespace-nowrap">Tất cả chi nhánh</span>
+                            ) : !staff.branchNames?.length ? (
+                              '-'
                             ) : (
-                              <span className="block truncate" title={staff.branchNames?.join(', ') || ''}>
-                                {staff.branchNames?.join(', ') || '-'}
+                              <span className="flex items-center gap-1.5 whitespace-nowrap">
+                                <span className="truncate">{staff.branchNames.slice(0, MAX_BRANCHES_SHOWN).join(', ')}</span>
+                                {staff.branchNames.length > MAX_BRANCHES_SHOWN && (
+                                  <Tooltip>
+                                    <TooltipTrigger asChild>
+                                      <span className="shrink-0 cursor-default rounded bg-slate-100 px-1.5 py-0.5 text-[11px] font-medium text-slate-600">
+                                        +{staff.branchNames.length - MAX_BRANCHES_SHOWN}
+                                      </span>
+                                    </TooltipTrigger>
+                                    <TooltipContent>
+                                      {staff.branchNames.map((branch_name: string) => (
+                                        <div key={branch_name}>{branch_name}</div>
+                                      ))}
+                                    </TooltipContent>
+                                  </Tooltip>
+                                )}
                               </span>
                             )}
                           </td>
-                          <td className="px-4 py-2.5 align-middle text-[13px]">
+                          <td className="px-4 py-2.5 align-middle text-[13px] whitespace-nowrap">
                             <span
-                              className={`px-2 py-1 rounded text-xs mr-1 ${staff.isActive === false ? 'bg-slate-200 text-slate-600' : 'bg-green-100 text-green-700'}`}
+                              className={`inline-block px-2 py-1 rounded text-xs ${staff.isActive === false ? 'bg-slate-200 text-slate-600' : 'bg-green-100 text-green-700'}`}
                             >
                               {activeStatusLabel(staff.isActive)}
                             </span>
-                            {staff.isSuperAdmin && (
-                              <span className="bg-purple-100 text-purple-800 px-2 py-1 rounded text-xs">Siêu quản trị</span>
-                            )}
                             {staff.forcePasswordChange && (
-                              <span className="bg-yellow-100 text-yellow-800 px-2 py-1 rounded text-xs ml-1">
-                                Đổi mật khẩu
+                              <span
+                                className="block mt-0.5 text-[11px] text-amber-700"
+                                title="Nhân viên phải đổi mật khẩu ở lần đăng nhập đầu"
+                              >
+                                Chờ đổi mật khẩu
                               </span>
                             )}
                           </td>
                           <td className="px-4 py-2.5 align-middle text-[13px] whitespace-nowrap">
                             {staff.lastLoginAt ? formatVnDateTime(staff.lastLoginAt) : 'Chưa đăng nhập'}
                           </td>
-                          <td className="px-4 py-2.5 align-middle text-[13px] whitespace-nowrap">{formatVnDateTime(staff.createdAt)}</td>
+                          <td className="px-4 py-2.5 align-middle text-[13px] whitespace-nowrap">{formatVnDate(staff.createdAt)}</td>
                           <td className="px-4 py-2.5 align-middle text-[13px]">
                             <div className="flex gap-1">
                               <Button
