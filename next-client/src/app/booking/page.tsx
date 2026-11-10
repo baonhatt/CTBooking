@@ -1,6 +1,6 @@
 'use client';
 
-import { isValidPayCode, serverClockOffsetMs, localDeadlineMs, SAFETY_MARGIN_MS } from '@/lib/payment-flow';
+import { isValidPayCode, serverClockOffsetMs, localDeadlineMs, SAFETY_MARGIN_MS, movieTitlesForOrder } from '@/lib/payment-flow';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
@@ -605,9 +605,13 @@ export default function BookingPage() {
         order_token: booking.order_token,
         payment_expires_at: booking.payment_expires_at,
         server_clock_offset_ms: serverOffsetMs,
+        // Every movie of the package (not only the first), so the QR and success pages list them all
         movie:
           movieItems.length > 0
-            ? (preferredMovie?.title || movieItems[0]?.movies?.[0]?.title || movieItems[0]?.name || '')
+            ? movieTitlesForOrder(
+                availableMovies.map((m: any) => m?.title),
+                preferredMovie?.title || movieItems[0]?.movies?.[0]?.title || movieItems[0]?.name || ''
+              )
             : 'Gói Trải Nghiệm VR',
         name,
         phone,

@@ -6,6 +6,7 @@ import {
   classifyPaymentStatus,
   isValidPayCode,
   localDeadlineMs,
+  movieTitlesForOrder,
   nextPollDelayMs,
   parseServerTime,
   secondsLeft,
@@ -120,5 +121,26 @@ describe('nextPollDelayMs', () => {
     expect(nextPollDelayMs(2)).toBe(20_000);
     expect(nextPollDelayMs(3)).toBe(POLL_MAX_INTERVAL_MS);
     expect(nextPollDelayMs(50)).toBe(POLL_MAX_INTERVAL_MS);
+  });
+});
+
+describe('movieTitlesForOrder', () => {
+  it('saves every movie of the package as a JSON list (the QR and success pages read this)', () => {
+    const saved = movieTitlesForOrder(['Đại Dương', 'Kỳ Quan Thế Giới', 'Vũ Trụ', 'Lòng Đất', 'Khủng Long', 'Vùng Đất Ma'], 'x');
+    expect(JSON.parse(saved)).toEqual(['Đại Dương', 'Kỳ Quan Thế Giới', 'Vũ Trụ', 'Lòng Đất', 'Khủng Long', 'Vùng Đất Ma']);
+  });
+
+  it('removes repeated names and empty values, keeping the order', () => {
+    const saved = movieTitlesForOrder(['A', ' A ', '', null, undefined, 42, 'B'], 'x');
+    expect(JSON.parse(saved)).toEqual(['A', 'B']);
+  });
+
+  it('keeps a single movie as a list of one', () => {
+    expect(JSON.parse(movieTitlesForOrder(['Đại Dương'], 'x'))).toEqual(['Đại Dương']);
+  });
+
+  it('returns the fallback text when there is no movie name at all', () => {
+    expect(movieTitlesForOrder([], 'Vé xem phim')).toBe('Vé xem phim');
+    expect(movieTitlesForOrder([null, ''], 'Vé xem phim')).toBe('Vé xem phim');
   });
 });

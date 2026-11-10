@@ -78,3 +78,22 @@ export function nextPollDelayMs(consecutiveFailures: number): number {
   if (consecutiveFailures <= 0) return POLL_INTERVAL_MS;
   return Math.min(POLL_INTERVAL_MS * 2 ** Math.min(consecutiveFailures, 4), POLL_MAX_INTERVAL_MS);
 }
+
+/**
+ * The movie names saved with an order in this browser, for the QR page and the "payment successful" page.
+ * Those pages no longer ask the server for the order (the server holds the customer's data), so they show what was
+ * saved here. Saving every movie of the package keeps them in line with the order (and the email), instead of
+ * only the first movie. Returns a JSON list of names; when there are none, returns the fallback text unchanged.
+ */
+export function movieTitlesForOrder(titles: unknown[], fallbackTitle: string): string {
+  const seen = new Set<string>();
+  const unique: string[] = [];
+  for (const title of titles) {
+    const text = typeof title === 'string' ? title.trim() : '';
+    if (text && !seen.has(text)) {
+      seen.add(text);
+      unique.push(text);
+    }
+  }
+  return unique.length > 0 ? JSON.stringify(unique) : fallbackTitle;
+}
